@@ -64,13 +64,23 @@
                             <span class="text-white text-sm">@motivo</span>
                             @if (expira != null)
                             {
-                                <span class="text-slate-400 text-xs ml-2">Expira: @expira</span>
+                                <span class="text-xs ml-2" x-data="killSwitchCountdown('@expira')" x-init="start()" x-text="label" :class="expirado ? 'text-red-400 font-semibold' : 'text-slate-400'"></span>
+                            }
+                            else
+                            {
+                                <span class="text-slate-500 text-xs ml-2">Sem expiração definida</span>
                             }
                         </div>
-                        <form method="post" asp-page-handler="RemoverKillSwitch">
-                            <input type="hidden" name="id" value="@bId" />
-                            <button type="submit" class="text-red-400 hover:text-red-300 text-xs">Remover</button>
-                        </form>
+                        <button type="button"
+                                @@click="$dispatch('open-justificar', {
+                                    endpoint: '?handler=RemoverKillSwitch',
+                                    acao: 'Remover kill-switch',
+                                    resumo: 'O canal @canal voltará a enviar notificações imediatamente.',
+                                    variant: 'danger',
+                                    confirmLabel: 'Remover (auditado)',
+                                    extraFields: '<input type=&quot;hidden&quot; name=&quot;id&quot; value=&quot;@bId&quot; />'
+                                })"
+                                class="text-red-400 hover:text-red-300 text-xs">Remover</button>
                     </div>
                 }
             </div>
@@ -82,17 +92,46 @@
 
         <h3 class="text-white font-medium mb-3">Ativar Kill-switch</h3>
         <form method="post" asp-page-handler="KillSwitch" class="flex gap-3 flex-wrap">
-            <select name="canal" class="input-dark text-sm">
+            <select name="canal" class="form-input text-sm">
                 <option value="">Todos os canais</option>
                 <option value="Email">Email</option>
                 <option value="Sms">SMS</option>
                 <option value="WhatsApp">WhatsApp</option>
                 <option value="InApp">In-App</option>
             </select>
-            <input type="text" name="motivo" class="input-dark text-sm flex-1" placeholder="Motivo (ex: Manutenção programada)" required />
+            <input type="text" name="motivo" class="form-input text-sm flex-1" placeholder="Motivo (ex: Manutenção programada)" required />
             <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
                 Ativar Kill-switch
             </button>
         </form>
     </div>
 </div>
+
+<script>
+function killSwitchCountdown(iso) {
+    return {
+        label: '',
+        expirado: false,
+        _timer: null,
+        compute() {
+            const target = new Date(iso).getTime();
+            const diff = target - Date.now();
+            if (diff <= 0) {
+                this.expirado = true;
+                this.label = 'Expirado';
+                if (this._timer) { clearInterval(this._timer); this._timer = null; }
+                return;
+            }
+            this.expirado = false;
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            this.label = 'Expira em ' + (h > 0 ? h + 'h ' : '') + (h > 0 || m > 0 ? m + 'min' : s + 's');
+        },
+        start() {
+            this.compute();
+            this._timer = setInterval(() => this.compute(), 30000);
+        }
+    };
+}
+</script>

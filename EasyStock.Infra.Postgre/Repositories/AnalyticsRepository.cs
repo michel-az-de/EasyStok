@@ -61,6 +61,62 @@ namespace EasyStock.Infra.Postgre.Repositories
             TipoMovimentacaoEstoque? tipo = null, Guid? lojaId = null)
             => _dashboard.GetMovimentacoesResumoAsync(empresaId, de, ate, tipo, lojaId);
 
+        // ── Delegation — Dashboard Full ──────────────────────────────────────
+
+        public Task<DashboardKpis> GetDashboardKpisAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+            => _dashboard.GetDashboardKpisAsync(empresaId, de, ate, lojaId);
+
+        public Task<EstoqueStatusDistribuicao> GetEstoqueStatusDistribuicaoAsync(Guid empresaId, Guid? lojaId = null)
+            => _dashboard.GetEstoqueStatusDistribuicaoAsync(empresaId, lojaId);
+
+        public Task<IReadOnlyList<PedidoPendenteResumo>> GetPedidosPendentesAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null, int pageSize = 50)
+            => _dashboard.GetPedidosPendentesAsync(empresaId, periodoDias, lojaId, pageSize);
+
+        public Task<int> GetEntreguesSemVendaCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+            => _dashboard.GetEntreguesSemVendaCountAsync(empresaId, periodoDias, lojaId);
+
+        public Task<int> GetLotesFinalizadosCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+            => _dashboard.GetLotesFinalizadosCountAsync(empresaId, periodoDias, lojaId);
+
+        public Task<int> GetClientesAtivosCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+            => _dashboard.GetClientesAtivosCountAsync(empresaId, periodoDias, lojaId);
+
+        // ── Delegation — Alertas ────────────────────────────────────────────
+
+        public Task<IReadOnlyList<AlertaEstoqueResumo>> GetItensCriticosResumoAsync(Guid empresaId, int top = 20, Guid? lojaId = null)
+            => _dashboard.GetItensCriticosResumoAsync(empresaId, top, lojaId);
+
+        // ── Delegation — Receita × Custo ────────────────────────────────────
+
+        public Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0)
+            => _dashboard.GetReceitaCustoSerieAsync(empresaId, de, ate, lojaId, timezoneOffsetMinutes);
+
+        // ── Delegation — Dashboard Extras ───────────────────────────────────
+
+        public Task<IReadOnlyList<FluxoCaixaDia>> GetFluxoCaixaAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+            => _dashboard.GetFluxoCaixaAsync(empresaId, de, ate, lojaId);
+
+        public Task<IReadOnlyList<ValidadeSemanaItem>> GetValidadeTimelineAsync(Guid empresaId, Guid? lojaId = null)
+            => _dashboard.GetValidadeTimelineAsync(empresaId, lojaId);
+
+        public Task<IReadOnlyList<TopProdutoDashboard>> GetTopProdutosAsync(Guid empresaId, DateTime de, DateTime ate, int top = 5, Guid? lojaId = null)
+            => _dashboard.GetTopProdutosAsync(empresaId, de, ate, top, lojaId);
+
+        public Task<IReadOnlyList<TopClienteDashboard>> GetTopClientesAsync(Guid empresaId, DateTime de, DateTime ate, int top = 5, Guid? lojaId = null)
+            => _dashboard.GetTopClientesAsync(empresaId, de, ate, top, lojaId);
+
+        public Task<IReadOnlyList<ProducaoPorOperador>> GetProducaoPorOperadorAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+            => _dashboard.GetProducaoPorOperadorAsync(empresaId, de, ate, lojaId);
+
+        public Task<IReadOnlyList<EntradasSaidasSemana>> GetEntradasSaidasSemanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+            => _dashboard.GetEntradasSaidasSemanalAsync(empresaId, de, ate, lojaId);
+
+        public Task<FornecedoresResumo> GetFornecedoresResumoAsync(Guid empresaId, Guid? lojaId = null)
+            => _dashboard.GetFornecedoresResumoAsync(empresaId, lojaId);
+
+        public Task<IReadOnlyList<NovosClientesMes>> GetNovosClientesPorMesAsync(Guid empresaId, int meses = 6, Guid? lojaId = null)
+            => _dashboard.GetNovosClientesPorMesAsync(empresaId, meses, lojaId);
+
         // ── Delegation — Receita ─────────────────────────────────────────────
 
         public Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)

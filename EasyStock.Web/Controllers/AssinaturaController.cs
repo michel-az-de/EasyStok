@@ -6,6 +6,14 @@ namespace EasyStock.Web.Controllers;
 
 public class AssinaturaController(AssinaturaService svc, SessionService session) : BaseController(session)
 {
+    [HttpGet("/api/assinatura")]
+    public async Task<IActionResult> GetStatus()
+    {
+        var result = await svc.GetStatusAsync();
+        if (!result.Success) return NotFound(new { data = (object?)null });
+        return Ok(result.Data);
+    }
+
     [HttpGet("/assinatura")]
     public async Task<IActionResult> Index()
     {

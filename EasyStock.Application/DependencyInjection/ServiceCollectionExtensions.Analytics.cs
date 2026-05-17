@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using EasyStock.Application.UseCases.Analytics.Dashboard;
 using EasyStock.Application.UseCases.Analytics.Dia;
+using EasyStock.Application.UseCases.Analytics.DashboardFull;
 using EasyStock.Application.UseCases.Analytics.Projecoes;
 using EasyStock.Application.UseCases.Analytics.Reposicao;
 using EasyStock.Application.UseCases.Analytics.Sazonalidade;
@@ -14,7 +15,9 @@ using EasyStock.Application.UseCases.Analytics.Margem;
 using EasyStock.Application.UseCases.Analytics.Movimentacoes;
 using EasyStock.Application.UseCases.Analytics.Validade;
 using EasyStock.Application.UseCases.Analytics.Parados;
+using EasyStock.Application.UseCases.Analytics.ReceitaCusto;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
+using EasyStock.Application.UseCases.Analytics.DashboardExtras;
 using EasyStock.Application.UseCases.Inteligencia.Board;
 using EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
 using EasyStock.Application.UseCases.Inteligencia.Rotatividade;
@@ -40,6 +43,7 @@ public static partial class ServiceCollectionExtensions
         // Analytics — Dashboard e KPIs
         services.AddScoped<GetDashboardUseCase>();
         services.AddScoped<ObterResumoDiaUseCase>();
+        services.AddScoped<GetDashboardFullUseCase>();
         services.AddScoped<CalcularProjecoesUseCase>();
         services.AddScoped<CalcularReposicaoUseCase>();
         services.AddScoped<CalcularSazonalidadeUseCase>();
@@ -52,6 +56,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterParadosUseCase>();
         services.AddScoped<ObterDiasAlertaParadoUseCase>();
         services.AddScoped<ObterVendasPorCanalUseCase>();
+        services.AddScoped<GetReceitaCustoUseCase>();
+        services.AddScoped<GetDashboardExtrasUseCase>();
 
         // Inteligência — Recomendações baseadas em IA/ML
         services.AddScoped<GetBoardUseCase>();

@@ -46,7 +46,7 @@
 
     @if (Model.Erro != null)
     {
-        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
+        <div class="bg-red-900/30 border border-red-500/40 text-red-200 rounded-md p-3 text-sm">@Model.Erro</div>
     }
 
     @if (Model.Id.HasValue && !Model.Aprovado)
@@ -155,6 +155,80 @@
                     <template x-for="v in varsDesconhecidas" :key="v"><code x-text="v"></code></template>
                     <p class="text-xs mt-1 opacity-75">Vao renderizar como string vazia se o disparador nao injetar.</p>
                 </div>
+
+                <!-- TAB: HTML -->
+                <div x-show="tab==='html'" class="p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <p class="form-label !mb-0">HTML renderizado</p>
+                        <button type="button" @@click="copiarHtml()"
+                                class="text-xs text-es-ink-mute hover:text-es-accent transition-colors"
+                                x-text="copiado ? '✓ Copiado' : 'Copiar'"></button>
+                    </div>
+                    <pre class="bg-es-bg border border-es-border rounded p-3 text-xs text-es-ink-dim overflow-auto max-h-[560px] whitespace-pre-wrap"
+                         x-text="previewCorpo || '(vazio)'"></pre>
+                </div>
+
+                <!-- TAB: Variáveis (form auto-detectado, toggle JSON avançado) -->
+                <div x-show="tab==='vars'" class="p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-es-ink-dim text-sm">
+                            <strong x-text="variaveisDetectadas.length"></strong>
+                            <span x-text="variaveisDetectadas.length === 1 ? 'variável' : 'variáveis'"></span>
+                            no template
+                        </p>
+                        <button type="button" @@click="modoVarsAvancado = !modoVarsAvancado"
+                                class="text-xs text-es-ink-mute hover:text-es-accent transition-colors">
+                            <span x-text="modoVarsAvancado ? '← Voltar ao modo simples' : 'Editar como JSON →'"></span>
+                        </button>
+                    </div>
+
+                    <!-- MODO FORM (default) -->
+                    <div x-show="!modoVarsAvancado" class="space-y-2">
+                        <template x-for="v in variaveisDetectadas" :key="v.nome">
+                            <div class="rounded border p-3 transition-colors"
+                                 :class="v.naoCatalogada
+                                     ? 'border-amber-500/30 bg-amber-500/[.04]'
+                                     : 'border-es-border bg-es-bg'">
+                                <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+                                    <code class="text-amber-400 font-mono text-xs"
+                                          x-text="'{{ ' + v.nome + ' }}'"></code>
+                                    <div class="flex items-center gap-1">
+                                        <span x-show="v.tipo"
+                                              class="text-es-ink-mute text-xs uppercase"
+                                              x-text="v.tipo"></span>
+                                        <span x-show="v.naoCatalogada"
+                                              class="status-badge badge-normal" style="font-size: 0.6rem;">não catalogada</span>
+                                    </div>
+                                </div>
+                                <input type="text"
+                                       :value="varsObj[v.nome] ?? ''"
+                                       @@input="setVar(v.nome, $event.target.value)"
+                                       class="form-input w-full text-sm"
+                                       :placeholder="v.exemplo || v.nome" />
+                                <p x-show="v.descricao"
+                                   class="text-es-ink-mute text-xs mt-1"
+                                   x-text="v.descricao"></p>
+                            </div>
+                        </template>
+                        <p x-show="variaveisDetectadas.length === 0"
+                           class="text-es-ink-mute text-xs italic text-center py-6">
+                            Nenhuma variável Scriban detectada.<br>
+                            Adicione <code class="text-amber-400">{{ "{{ nome }}" }}</code> no assunto ou no corpo.
+                        </p>
+                    </div>
+
+                    <!-- MODO JSON (avançado) -->
+                    <div x-show="modoVarsAvancado" x-cloak class="space-y-2">
+                        <textarea x-model="varsJson"
+                                  class="form-input w-full font-mono text-xs"
+                                  rows="18"
+                                  spellcheck="false"></textarea>
+                        <p class="text-es-ink-mute text-xs">
+                            Edição manual — necessária para arrays, objects ou tipos numéricos/booleanos.
+                        </p>
+                    </div>
+                </div>
+
             </div>
 
             <div class="card space-y-3" x-show="['Email'].includes(canal)" x-cloak>

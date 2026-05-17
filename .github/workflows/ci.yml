@@ -62,3 +62,32 @@ jobs:
           name: test-results
           path: ./TestResults/**/*.trx
           retention-days: 14
+
+      - name: Open helpdesk ticket on failure
+        if: failure() && env.CI_TICKETS_API_URL != ''
+        env:
+          CI_TICKETS_API_URL: ${{ secrets.CI_TICKETS_API_URL }}
+          CI_AUTO_TICKET_KEY: ${{ secrets.CI_AUTO_TICKET_KEY }}
+        run: |
+          # Auto-ticket em falha de CI. Signature deterministico (run_id + ref)
+          # garante idempotencia diaria — re-trigger do mesmo workflow nao
+          # multiplica tickets. /api/ci/tickets coalesca como comentario.
+          SIG=$(echo -n "ci-${GITHUB_RUN_ID}-${GITHUB_REF}" | sha256sum | awk '{print $1}')
+          # Anexa ultimas 80 linhas do test results (best-effort)
+          CONTEXTO=$(find ./TestResults -name '*.trx' -print0 \
+            | xargs -0 grep -h '<Message>' 2>/dev/null \
+            | tail -n 80 \
+            | sed 's/"/\\"/g' \
+            | tr -d '\r' \
+            | awk '{printf "%s\\n", $0}' \
+            || echo "(sem trx)")
+          curl -sS -X POST "${CI_TICKETS_API_URL}/api/ci/tickets" \
+            -H "Content-Type: application/json" \
+            -H "X-Ci-Key: ${CI_AUTO_TICKET_KEY}" \
+            -d "{
+              \"origin\": \"ci\",
+              \"signature\": \"${SIG}\",
+              \"titulo\": \"CI falhou em ${GITHUB_REF_NAME} (${GITHUB_RUN_ID})\",
+              \"descricao\": \"Run ${GITHUB_RUN_ID} falhou no commit ${GITHUB_SHA}\",
+              \"contexto\": \"${CONTEXTO}\"
+            }" || echo "(auto-ticket falhou — checar manualmente)"

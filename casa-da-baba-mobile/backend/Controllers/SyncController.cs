@@ -129,7 +129,9 @@ public class SyncController : ControllerBase
             {
                 Id = dto.Id, Name = dto.Name, Emoji = dto.Emoji, Category = dto.Category,
                 Unit = dto.Unit, Price = dto.Price, Stock = dto.Stock,
-                IsCustom = dto.Custom ?? false, LastDeviceId = deviceId
+                IsCustom = dto.Custom ?? false,
+                DefaultUnit = dto.DefaultUnit, DefaultGrams = dto.DefaultGrams,
+                LastDeviceId = deviceId
             });
         }
         else
@@ -142,6 +144,8 @@ public class SyncController : ControllerBase
             existing.Unit = dto.Unit;
             existing.Price = dto.Price;
             existing.Stock = dto.Stock;
+            existing.DefaultUnit = dto.DefaultUnit;
+            existing.DefaultGrams = dto.DefaultGrams;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.LastDeviceId = deviceId;
         }
@@ -192,6 +196,8 @@ public class SyncController : ControllerBase
                 Notes = dto.Notes,
                 Total = dto.Total,
                 Status = dto.Status,
+                ScheduledFor = ParseScheduledDate(dto.ScheduledFor),
+                ScheduledWindow = dto.ScheduledWindow,
                 CreatedAt = createdAt,
                 UpdatedAt = updatedAt,
                 LastDeviceId = deviceId
@@ -214,6 +220,8 @@ public class SyncController : ControllerBase
             existing.Status = dto.Status;
             existing.Notes = dto.Notes;
             existing.Total = dto.Total;
+            existing.ScheduledFor = ParseScheduledDate(dto.ScheduledFor);
+            existing.ScheduledWindow = dto.ScheduledWindow;
             existing.UpdatedAt = updatedAt;
             existing.LastDeviceId = deviceId;
             // Substitui os itens (simplificacao - em producao, faca diff item-a-item)
@@ -271,9 +279,11 @@ public class SyncController : ControllerBase
             batch.Items.Add(new BatchItem
             {
                 BatchId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, Photo = i.Photo
+                Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty,
+                WeightGrams = i.WeightGrams, Photo = i.Photo
             });
-            // Incrementa estoque
+            // Incrementa estoque (sempre por Qty; gramagem é metadado de
+            // rastreio, não muda contagem de unidades em estoque).
             var p = await _db.Set<Product>().FindAsync(i.ProductId);
             if (p != null) p.Stock += i.Qty;
         }
@@ -297,7 +307,8 @@ public class SyncController : ControllerBase
 
     // ---- DTO conversores pra pull ----
     private ProductDto ToDto(Product p) =>
-        new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom);
+        new(p.Id, p.Name, p.Emoji, p.Category, p.Unit, p.Price, p.Stock, p.IsCustom,
+            p.DefaultUnit, p.DefaultGrams);
 
     private ClientDto ToDto(Client c) =>
         new(c.Id, c.Name, c.Apt, c.Address, c.Phone,
@@ -309,11 +320,19 @@ public class SyncController : ControllerBase
             o.Items.Select(i => new OrderItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).ToList(),
             o.Notes, o.Total, o.Status,
             new DateTimeOffset(o.CreatedAt).ToUnixTimeMilliseconds(),
-            new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds());
+            new DateTimeOffset(o.UpdatedAt).ToUnixTimeMilliseconds(),
+            o.ScheduledFor?.ToString("yyyy-MM-dd"),
+            o.ScheduledWindow);
+
+    private static DateTime? ParseScheduledDate(string? iso)
+    {
+        if (string.IsNullOrWhiteSpace(iso)) return null;
+        return DateTime.TryParse(iso, out var d) ? d.Date : null;
+    }
 
     private BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,
-            b.Items.Select(i => new BatchItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.Photo)).ToList(),
+            b.Items.Select(i => new BatchItemDto(i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.Photo, i.WeightGrams)).ToList(),
             b.BatchPhoto,
             new DateTimeOffset(b.CreatedAt).ToUnixTimeMilliseconds());
 

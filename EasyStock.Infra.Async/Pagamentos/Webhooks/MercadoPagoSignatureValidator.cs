@@ -48,6 +48,24 @@ public sealed class MercadoPagoSignatureValidator(
         }
         if (string.IsNullOrWhiteSpace(ts) || string.IsNullOrWhiteSpace(v1)) return false;
 
+        // Replay protection: ±5min. MP envia ts em unix milliseconds (epoch ms);
+        // se vier em segundos (sandbox antigo), aceita os dois ranges.
+        if (long.TryParse(ts, out var tsRaw))
+        {
+            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var tsMs = tsRaw < 10_000_000_000L ? tsRaw * 1000L : tsRaw; // heuristica seg vs ms
+            var diff = Math.Abs(nowMs - tsMs);
+            if (diff > 5 * 60 * 1000)
+            {
+                logger.LogWarning("MercadoPago webhook: timestamp fora da janela ({Diff}ms).", diff);
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+
         // Extrai data.id do payload — campo obrigatorio na manifest MP.
         string? dataId = null;
         try

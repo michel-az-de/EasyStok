@@ -4,7 +4,6 @@ using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarPedido;
-// IClienteRepository nao usado: cliente eh resolvido via mobile_clients.erp_cliente_id (lookup direto no DbContext).
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -47,7 +46,8 @@ public class MobileOrdersController(
             o.Id, o.ClientId, o.ClientSnapshotName, o.ClientSnapshotRef,
             o.Notes, o.Total, o.Status, o.CreatedAt, o.UpdatedAt,
             o.EmpresaId, o.LojaId, o.ErpPedidoId, o.ErpVendaId,
-            o.LastDeviceId, o.LastOperatorName
+            o.LastDeviceId, o.LastOperatorName,
+            o.ScheduledDeliveryAt
         )).ToArray());
     }
 
@@ -124,7 +124,9 @@ public class MobileOrdersController(
                 MobileOrderId: mobile.Id,
                 Itens: itens,
                 CriadoPorUserId: ResolveUserId(),
-                CriadoPorNome: mobile.LastOperatorName
+                CriadoPorNome: mobile.LastOperatorName,
+                // F5 — propaga agendamento do mobile pro ERP.
+                AgendadoParaEm: mobile.ScheduledDeliveryAt
             ));
             erpPedidoId = result.Id;
         }
@@ -284,7 +286,9 @@ public record MobileOrderSummary(
     Guid? ErpPedidoId,
     Guid? ErpVendaId,
     string? LastDeviceId,
-    string? LastOperatorName
+    string? LastOperatorName,
+    // F5 — agendamento (MVP). NULL = pedido pra agora.
+    DateTime? ScheduledDeliveryAt = null
 );
 
 public record LinkPedidoRequest(Guid? ErpPedidoId);

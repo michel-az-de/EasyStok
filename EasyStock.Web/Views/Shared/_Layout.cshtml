@@ -19,7 +19,9 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"
+            integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F"
+            crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -30,14 +32,24 @@
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/form-validation.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" asp-append-version="true" />
-    <style>
-        /* Previne flash de dropdowns antes do Alpine.js inicializar */
-        .app-dropdown { display: none; }
-    </style>
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body h-full font-[Inter] antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);color:var(--text-primary);">
     <a href="#app-main" class="skip-link">Pular para o conteúdo</a>
+
+    @* C1 (2026-05-16): aviso para viewports <320px (split-screen extremo).
+       CSS em mobile.css mostra este div e esconde o resto. Atributo `hidden`
+       e fallback default — mobile.css carrega com media="(max-width: 768px)",
+       sem ele em desktop largo o div renderiza display:block default do browser. *@
+    <div class="viewport-too-narrow-warning" hidden role="alert" aria-live="assertive">
+        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+        <h2 class="text-base font-semibold">Tela muito estreita</h2>
+        <p class="text-sm opacity-80">Gire o aparelho ou abra em tela maior (mínimo 320px).</p>
+    </div>
+
     <div x-data="{ sidebarOpen: false }" class="flex h-screen overflow-hidden">
         <div x-show="sidebarOpen" x-cloak
              x-transition:enter="transition-opacity ease-linear duration-200"
@@ -51,7 +63,7 @@
         @await Html.PartialAsync("_Sidebar")
         <div class="flex flex-col flex-1 overflow-hidden min-w-0">
             @await Html.PartialAsync("_Topbar")
-            <main id="app-main" class="app-main flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6" tabindex="-1">
+            <main id="app-main" class="app-main flex-1 overflow-y-auto p-4 lg:p-6 pb-28 lg:pb-6" tabindex="-1">
                 @await Html.PartialAsync("_Toast")
                 @await Html.PartialAsync("_TrialBanner")
                 @RenderBody()
@@ -62,8 +74,11 @@
     @* Bottom nav: outside flex wrapper so it sits above everything *@
     @await Html.PartialAsync("_BottomNav")
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
+            integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG"
+            crossorigin="anonymous"></script>
     <script src="~/js/nav-progress.js" asp-append-version="true"></script>
+    <script src="~/js/format.js" asp-append-version="true"></script>
     <script src="~/js/toast.js" asp-append-version="true"></script>
     <script src="~/js/api.js" asp-append-version="true"></script>
     <script src="~/js/locale.js" asp-append-version="true"></script>

@@ -1,15 +1,20 @@
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AdicionarItemLote;
+using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
 using EasyStock.Application.UseCases.ConferirEtiqueta;
 using EasyStock.Application.UseCases.CriarLote;
+using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.RemoverItemLote;
+using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -24,9 +29,14 @@ public class LotesController(
     AdicionarItemLoteUseCase addItemUseCase,
     RemoverItemLoteUseCase removeItemUseCase,
     FinalizarLoteUseCase finalizarUseCase,
+    AtualizarPesoLoteItemUseCase atualizarPesoUseCase,
     ListarLotesUseCase listarUseCase,
     ObterLoteDetalhesUseCase obterUseCase,
     ConferirEtiquetaUseCase conferirUseCase,
+    MontarPayloadRenderUseCase montarRenderUseCase,
+    MarcarEtiquetasImpressasUseCase marcarImpressasUseCase,
+    ILoteRepository loteRepo,
+    IProdutoRepository produtoRepo,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List production batches (paginated)")]
@@ -115,4 +125,118 @@ public class LotesController(
         });
         return result == null ? DataNotFound("Etiqueta não encontrada.") : DataOk(result);
     }
+
+    [SwaggerOperation(Summary = "Get render payload (layout + labels + empresa) for printing")]
+    [HttpGet("{id:guid}/etiquetas/render")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> GetRenderPayload(
+        Guid id,
+        [FromQuery] Guid? empresaId,
+        [FromQuery] string? templateOrigem,
+        [FromQuery] Guid? templateId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var result = await montarRenderUseCase.ExecuteAsync(
+            new MontarPayloadRenderQuery(emp, id, templateOrigem, templateId));
+        return result == null ? DataNotFound("Lote não encontrado ou sem etiquetas.") : DataOk(result);
+    }
+
+    [SwaggerOperation(Summary = "Mark labels as printed (writes snapshot on first call, idempotent on repeat)")]
+    [HttpPost("{id:guid}/etiquetas/marcar-impressas")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> MarcarImpressas(
+        Guid id,
+        [FromBody] MarcarImpressasRequest body,
+        [FromQuery] Guid? empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var overwrite = Request.Headers.TryGetValue("X-Overwrite-Snapshot", out var v) &&
+                        string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
+
+        var result = await marcarImpressasUseCase.ExecuteAsync(new MarcarEtiquetasImpressasCommand(
+            emp, id, body.Ids, body.LayoutJson, body.LayoutMeta, body.Status, overwrite,
+            currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()));
+
+        if (result.IgnoradasSnapshotDivergente > 0 && result.Atualizadas == 0)
+            return Conflict(new
+            {
+                error = new
+                {
+                    code    = "SNAPSHOT_CONFLICT",
+                    message = $"{result.IgnoradasSnapshotDivergente} etiquetas já impressas com modelo diferente. Use X-Overwrite-Snapshot: true para substituir."
+                }
+            });
+
+        return DataOk(result);
+    }
+
+    /// <summary>
+    /// C2 (RDC 727/2022) — backfill manual de peso para LoteItem.
+    /// Bloqueado se lote ja finalizado (R3 - imutabilidade auditoria).
+    /// </summary>
+    [SwaggerOperation(Summary = "Update batch item weight (RDC 727 backfill — only in em_producao)")]
+    [HttpPatch("{loteId:guid}/itens/{itemId:guid}/peso")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> AtualizarPesoItem(
+        Guid loteId, Guid itemId,
+        [FromBody] AtualizarPesoItemRequest body,
+        [FromQuery] Guid? empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var result = await atualizarPesoUseCase.ExecuteAsync(
+            new AtualizarPesoLoteItemCommand(emp, loteId, itemId, body.PesoG));
+        return result == null
+            ? DataNotFound("Lote ou item não encontrado.")
+            : DataOk(result);
+    }
+
+    /// <summary>
+    /// C2 (R10) — lista lotes com pelo menos 1 item de produto Embalado sem peso.
+    /// Usado para badge contador e filtro "Pendentes de peso" em Lotes/Index.
+    /// </summary>
+    [SwaggerOperation(Summary = "List batches with embalado items missing weight (R10)")]
+    [HttpGet("pendentes-peso")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> PendentesPeso([FromQuery] Guid? empresaId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+
+        // Carrega lotes em_producao com itens vinculados a Produto.
+        // Filtro por Embalado + sem peso e feito em memoria para reusar
+        // GetTipoEmbalagemMapAsync (1 query batch em vez de join custom).
+        var (todos, _) = await loteRepo.ListAsync(emp, 1, 500, status: "em_producao");
+        var lotesEmProducao = todos.ToList();
+
+        var todosProdutoIds = lotesEmProducao
+            .SelectMany(l => l.Itens)
+            .Where(i => i.ProdutoId.HasValue)
+            .Select(i => i.ProdutoId!.Value)
+            .Distinct()
+            .ToList();
+        var tipoMap = todosProdutoIds.Count > 0
+            ? await produtoRepo.GetTipoEmbalagemMapAsync(emp, todosProdutoIds)
+            : new Dictionary<Guid, TipoEmbalagem>();
+
+        var pendentes = lotesEmProducao
+            .Select(l => new
+            {
+                id = l.Id,
+                codigo = l.Codigo,
+                dataProducao = l.DataProducao,
+                itensPendentes = l.Itens.Count(i =>
+                    i.ProdutoId.HasValue
+                    && tipoMap.TryGetValue(i.ProdutoId.Value, out var t)
+                    && t == TipoEmbalagem.Embalado
+                    && (!i.PesoG.HasValue || i.PesoG.Value <= 0))
+            })
+            .Where(x => x.itensPendentes > 0)
+            .OrderByDescending(x => x.dataProducao)
+            .ToList();
+
+        return Ok(pendentes);
+    }
 }
+
+public sealed record AtualizarPesoItemRequest(int PesoG);

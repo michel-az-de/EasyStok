@@ -51,12 +51,21 @@ public class KdsController(
 
         var filtro = ParsearStatuses(statuses);
 
+        // KDS so puxa pedidos do dia: nao-agendados aparecem sempre; agendados
+        // aparecem dentro da janela [-2h, +24h] a partir de agora.
+        // O limite inferior de -2h evita acumulo de pedidos atrasados de dias
+        // anteriores. O superior de +24h cobre dia seguinte sem saber TZ da empresa.
+        var janelaInicio = DateTime.UtcNow.AddHours(-2);
+        var janelaFim = DateTime.UtcNow.AddHours(24);
+
         var query = db.Set<Order>()
             .AsNoTracking()
             .Include(o => o.Items)
             .Where(o => o.EmpresaId == device.EmpresaId
                      && o.LojaId == device.LojaId
-                     && filtro.Contains(o.Status));
+                     && filtro.Contains(o.Status)
+                     && (o.ScheduledDeliveryAt == null
+                         || (o.ScheduledDeliveryAt >= janelaInicio && o.ScheduledDeliveryAt <= janelaFim)));
 
         var orders = await query
             .OrderBy(o => o.CreatedAt)
@@ -136,6 +145,10 @@ public class KdsController(
         Total: o.Total,
         CriadoEm: new DateTimeOffset(o.CreatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds(),
         AtualizadoEm: new DateTimeOffset(o.UpdatedAt, TimeSpan.Zero).ToUnixTimeMilliseconds(),
+        // F5 — campo de agendamento (long? unix ms). PWA usa pra ordenar/badge.
+        ScheduledDeliveryAt: o.ScheduledDeliveryAt.HasValue
+            ? new DateTimeOffset(DateTime.SpecifyKind(o.ScheduledDeliveryAt.Value, DateTimeKind.Utc), TimeSpan.Zero).ToUnixTimeMilliseconds()
+            : (long?)null,
         Itens: o.Items.Select(i => new KdsOrderItemDto(
             ProdutoId: i.ProductId,
             Nome: i.Name,
@@ -157,7 +170,9 @@ public record KdsOrderDto(
     decimal Total,
     long CriadoEm,
     long AtualizadoEm,
-    KdsOrderItemDto[] Itens
+    KdsOrderItemDto[] Itens,
+    // F5 — agendamento (MVP). NULL = sem agendamento (caso padrão).
+    long? ScheduledDeliveryAt = null
 );
 
 public record KdsOrderItemDto(

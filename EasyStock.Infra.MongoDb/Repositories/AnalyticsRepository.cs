@@ -816,6 +816,36 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
         return result;
     }
 
+    // ── Alertas (not implemented for MongoDB) ────────────────────────────
+
+    public Task<IReadOnlyList<AlertaEstoqueResumo>> GetItensCriticosResumoAsync(Guid empresaId, int top = 20, Guid? lojaId = null)
+        => throw new NotImplementedException("Itens críticos não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    // ── Receita × Custo (not implemented for MongoDB) ────────────────────
+
+    public Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0)
+        => throw new NotImplementedException("Receita × Custo não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    // ── Dashboard Full (not implemented for MongoDB) ──────────────────────
+
+    public Task<EstoqueStatusDistribuicao> GetEstoqueStatusDistribuicaoAsync(Guid empresaId, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard full not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<IReadOnlyList<PedidoPendenteResumo>> GetPedidosPendentesAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null, int pageSize = 50)
+        => throw new NotImplementedException("Dashboard full not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<int> GetEntreguesSemVendaCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard full not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<DashboardKpis> GetDashboardKpisAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard full not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<int> GetLotesFinalizadosCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard full not yet implemented for MongoDB. Use PostgreSQL provider.");
+
+    public Task<int> GetClientesAtivosCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard full not yet implemented for MongoDB. Use PostgreSQL provider.");
+
     // ── Store Intelligence (not implemented for MongoDB) ─────────────────
 
     public Task<IReadOnlyList<LojaComparacao>> GetComparacaoLojasAsync(Guid empresaId, int periodoDias = 30)
@@ -832,4 +862,30 @@ public sealed class AnalyticsRepository(MongoEasyStockContext context, IDistribu
 
     public Task<ResumoDia> GetResumoDiaAsync(Guid empresaId, Guid? lojaId = null)
         => throw new NotImplementedException("Resumo do dia not implemented for MongoDB. Use PostgreSQL provider.");
+
+    // ── Dashboard Extras (not implemented for MongoDB) ───────────────────────
+
+    public Task<IReadOnlyList<FluxoCaixaDia>> GetFluxoCaixaAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<IReadOnlyList<ValidadeSemanaItem>> GetValidadeTimelineAsync(Guid empresaId, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<IReadOnlyList<TopProdutoDashboard>> GetTopProdutosAsync(Guid empresaId, DateTime de, DateTime ate, int top = 5, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<IReadOnlyList<TopClienteDashboard>> GetTopClientesAsync(Guid empresaId, DateTime de, DateTime ate, int top = 5, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<IReadOnlyList<ProducaoPorOperador>> GetProducaoPorOperadorAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<IReadOnlyList<EntradasSaidasSemana>> GetEntradasSaidasSemanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<FornecedoresResumo> GetFornecedoresResumoAsync(Guid empresaId, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
+
+    public Task<IReadOnlyList<NovosClientesMes>> GetNovosClientesPorMesAsync(Guid empresaId, int meses = 6, Guid? lojaId = null)
+        => throw new NotImplementedException("Dashboard extras não implementado para MongoDB. Use o provedor PostgreSQL.");
 }

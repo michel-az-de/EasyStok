@@ -17,23 +17,24 @@
         <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
     }
 
-    <form method="post" class="card p-6 space-y-5">
+    <form method="post" class="card p-6 space-y-5"
+          x-data="{ trigger: '@Model.TriggerTipo', tipoEvento: '@Model.TipoEvento' }">
         @if (!Model.Id.HasValue)
         {
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label-dark">Código</label>
-                    <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_cron" />
+                    <label class="form-label">Código</label>
+                    <input asp-for="Codigo" class="form-input w-full font-mono" placeholder="produto_vencendo_cron" />
                 </div>
                 <div>
-                    <label class="label-dark">Nome</label>
-                    <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Diário" />
+                    <label class="form-label">Nome</label>
+                    <input asp-for="Nome" class="form-input w-full" placeholder="Produto Vencendo — Diário" />
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label-dark">Tipo de Evento</label>
-                    <select asp-for="TipoEvento" class="input-dark w-full">
+                    <label class="form-label">Tipo de Evento</label>
+                    <select asp-for="TipoEvento" class="form-input w-full" @@change="tipoEvento = $event.target.value">
                         <option value="ProdutoVencendo">Produto Vencendo</option>
                         <option value="AssinaturaExpirando">Assinatura Expirando</option>
                         <option value="AlertaEstoqueCritico">Alerta Estoque</option>
@@ -41,8 +42,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="label-dark">Trigger</label>
-                    <select asp-for="TriggerTipo" class="input-dark w-full">
+                    <label class="form-label">Trigger</label>
+                    <select asp-for="TriggerTipo" class="form-input w-full" @@change="trigger = $event.target.value">
                         <option value="Cron">Cron</option>
                         <option value="Evento">Evento (imediato)</option>
                     </select>
@@ -50,12 +51,23 @@
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label-dark">Código do Template</label>
-                    <input asp-for="TemplateCodigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_email_v1" />
+                    <label class="form-label">Código do Template</label>
+                    <select asp-for="TemplateCodigo" class="form-input w-full font-mono">
+                        <option value="">— selecione um template —</option>
+                        @foreach (var tpl in Model.TemplatesDisponiveis)
+                        {
+                            <option value="@tpl.Codigo"
+                                    data-evento="@tpl.TipoEvento"
+                                    x-show="!tipoEvento || tipoEvento === '@tpl.TipoEvento'">
+                                @tpl.Codigo — @tpl.Nome (@tpl.Canal)
+                            </option>
+                        }
+                    </select>
+                    <p class="text-slate-500 text-xs mt-1">Filtrado pelo Tipo de Evento selecionado.</p>
                 </div>
                 <div>
-                    <label class="label-dark">Categoria</label>
-                    <select asp-for="Categoria" class="input-dark w-full">
+                    <label class="form-label">Categoria</label>
+                    <select asp-for="Categoria" class="form-input w-full">
                         <option value="Transacional">Transacional</option>
                         <option value="Operacional">Operacional</option>
                         <option value="Marketing">Marketing</option>
@@ -64,15 +76,29 @@
             </div>
         }
 
-        <div>
-            <label class="label-dark">Expressão Cron</label>
-            <input asp-for="CronExpression" class="input-dark w-full font-mono" placeholder="0 8 * * *" />
-            <p class="text-slate-500 text-xs mt-1">Formato padrão de 5 campos. Ex: <code class="text-amber-400">0 8 * * *</code> = diariamente às 8h UTC</p>
+        <div x-show="trigger === 'Cron'" x-transition>
+            <label class="form-label">Expressão Cron</label>
+            <input asp-for="CronExpression" class="form-input w-full font-mono" placeholder="0 8 * * *" />
+            <details class="text-slate-500 text-xs mt-1 cursor-pointer">
+                <summary class="hover:text-slate-300">Formato padrão de 5 campos — clique para ver exemplos</summary>
+                <ul class="mt-2 space-y-1 pl-2">
+                    <li><code class="text-amber-400">0 8 * * *</code> &nbsp;→&nbsp; todo dia às 8h UTC</li>
+                    <li><code class="text-amber-400">0 9 * * 1</code> &nbsp;→&nbsp; toda segunda às 9h UTC</li>
+                    <li><code class="text-amber-400">0 */2 * * *</code> &nbsp;→&nbsp; a cada 2 horas</li>
+                    <li><code class="text-amber-400">*/15 * * * *</code> &nbsp;→&nbsp; a cada 15 minutos</li>
+                    <li><code class="text-amber-400">0 0 1 * *</code> &nbsp;→&nbsp; primeiro dia de cada mês, meia-noite</li>
+                </ul>
+                <p class="mt-2 text-slate-500">Campos: <code>minuto hora dia-mês mês dia-semana</code> (0–6, dom=0).</p>
+            </details>
+        </div>
+
+        <div x-show="trigger === 'Evento'" x-transition x-cloak class="bg-slate-800/40 border border-slate-700 rounded p-3 text-slate-400 text-sm">
+            Disparada imediatamente quando o evento <code class="text-amber-400" x-text="tipoEvento"></code> é publicado. Sem cron necessário.
         </div>
 
         <div>
-            <label class="label-dark">Parâmetros (JSON)</label>
-            <textarea asp-for="ParametrosJson" class="input-dark w-full font-mono text-xs" rows="4"
+            <label class="form-label">Parâmetros (JSON)</label>
+            <textarea asp-for="ParametrosJson" class="form-input w-full font-mono text-xs" rows="4"
                       placeholder='{"diasAntes": [7, 3, 1]}'></textarea>
         </div>
 

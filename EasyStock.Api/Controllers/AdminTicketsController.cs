@@ -2,6 +2,7 @@ using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Api.Services.Helpdesk;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,9 @@ public class AdminTicketsController(
     AdminAuditService audit,
     HelpdeskTicketService ticketService,
     HelpdeskAnexoService anexoService,
-    HelpdeskBugFixService bugFixService) : EasyStockControllerBase
+    HelpdeskBugFixService bugFixService,
+    HelpdeskDashboardService dashboardService,
+    ObterPedidoDetalhesUseCase obterPedidoUseCase) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetTickets(
@@ -116,6 +119,7 @@ public class AdminTicketsController(
             .Include(t => t.OrigemTicket)
             .Include(t => t.MetaTecnico)
             .Include(t => t.Fatura)
+            .Include(t => t.Pedido)
             .Include(t => t.Mensagens)
                 .ThenInclude(m => m.Autor)
             .FirstOrDefaultAsync(t => t.Id == id);
@@ -163,6 +167,10 @@ public class AdminTicketsController(
             origemTicketTitulo = ticket.OrigemTicket?.Titulo,
             ticket.FaturaId,
             faturaNumero = ticket.Fatura?.Numero,
+            ticket.PedidoId,
+            pedidoStatus = ticket.Pedido?.Status,
+            pedidoClienteNome = ticket.Pedido?.ClienteNome,
+            pedidoTotal = ticket.Pedido is null ? (decimal?)null : (decimal)ticket.Pedido.Total,
             metaTecnico = ticket.MetaTecnico is null ? null : new
             {
                 ticket.MetaTecnico.SeveridadeTecnica,
@@ -203,8 +211,9 @@ public class AdminTicketsController(
         try
         {
             var ticket = await ticketService.AbrirAsync(new AbrirAdminTicketCommand(
-                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel, FaturaId: req.FaturaId));
-            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}", req.EmpresaId);
+                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel,
+                FaturaId: req.FaturaId, PedidoId: req.PedidoId));
+            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}, PedidoId={req.PedidoId}", req.EmpresaId);
             return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -232,9 +241,10 @@ public class AdminTicketsController(
     {
         try
         {
+            var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             var msg = await ticketService.ResponderAsync(new ResponderAdminTicketCommand(
                 id, req.Conteudo, req.Interno, req.AnexoIds));
-            await audit.LogAsync("TicketRespondido", $"TicketId={id}, Interno={req.Interno}", null);
+            await audit.LogAsync("TicketRespondido", $"TicketId={id}, Interno={req.Interno}", tenantId);
             return DataCreated($"/api/admin/tickets/{id}/mensagens/{msg.Id}", new { msg.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -271,20 +281,29 @@ public class AdminTicketsController(
     {
         try
         {
+            var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             var bug = await bugFixService.GerarAsync(new GerarBugFixCommand(
                 id, req.Titulo, req.Descricao, req.Severidade, req.Componente, req.StackTrace));
-            await audit.LogAsync("BugFixGerado", $"OrigemTicketId={id}, NovoTicketId={bug.Id}", null);
+            await audit.LogAsync("BugFixGerado", $"OrigemTicketId={id}, NovoTicketId={bug.Id}", tenantId);
             return DataCreated($"/api/admin/tickets/{bug.Id}", new { bug.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
         catch (UnauthorizedAccessException ex) { return StatusCode(403, new { message = ex.Message }); }
     }
 
+    private static readonly HashSet<string> _extensoesPermitidas =
+        new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".txt", ".csv", ".xlsx", ".docx", ".zip" };
+    private const long MaxAnexoBytes = 10 * 1024 * 1024;
+
     [HttpPost("{id:guid}/anexos")]
     [RequestSizeLimit(15 * 1024 * 1024)]
     public async Task<IActionResult> Anexar(Guid id, IFormFile file, [FromQuery] Guid? mensagemId = null)
     {
         if (file is null || file.Length == 0) return DataBadRequest("Arquivo obrigatorio.");
+        if (file.Length > MaxAnexoBytes) return DataBadRequest("Arquivo excede o limite de 10 MB.");
+        var ext = Path.GetExtension(file.FileName);
+        if (string.IsNullOrEmpty(ext) || !_extensoesPermitidas.Contains(ext))
+            return DataBadRequest($"Tipo de arquivo nao permitido. Extensoes aceitas: {string.Join(", ", _extensoesPermitidas)}");
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
@@ -299,20 +318,57 @@ public class AdminTicketsController(
         catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
     }
 
+    /// <summary>
+    /// Onda 1.4 — resumo de tickets criticos para widget Operacao e badge global.
+    /// Critico = aberto/emAtendimento/aguardandoCliente com SLA violado OU prioridade Alta/Critica.
+    /// Quando empresaId omitido, agrega cross-tenant (badge global no _Layout admin).
+    /// </summary>
+    [HttpGet("criticos-resumo")]
+    public async Task<IActionResult> GetCriticosResumo([FromQuery] Guid? empresaId = null, [FromQuery] int limit = 5)
+    {
+        if (limit < 1) limit = 1;
+        if (limit > 20) limit = 20;
+        var resumo = await dashboardService.ObterCriticosAsync(empresaId, limit);
+        return DataOk(resumo);
+    }
+
+    /// <summary>
+    /// Onda 1.1 — retorna snapshot read-only do pedido vinculado ao ticket (se houver).
+    /// Reutiliza ObterPedidoDetalhesUseCase e DTOs Pedido* existentes. Carrega
+    /// EmpresaId do ticket (SuperAdmin tem acesso cross-tenant). 404 se ticket
+    /// nao existe ou nao tem pedido vinculado.
+    /// </summary>
+    [HttpGet("{id:guid}/pedido-resumo")]
+    public async Task<IActionResult> GetPedidoResumo(Guid id)
+    {
+        var t = await db.AdminTickets
+            .Where(x => x.Id == id)
+            .Select(x => new { x.EmpresaId, x.PedidoId })
+            .FirstOrDefaultAsync();
+        if (t is null) return DataNotFound("Ticket nao encontrado.");
+        if (!t.PedidoId.HasValue) return DataNotFound("Ticket nao tem pedido vinculado.");
+
+        var detalhe = await obterPedidoUseCase.ExecuteAsync(new ObterPedidoDetalhesQuery(t.EmpresaId, t.PedidoId.Value));
+        if (detalhe is null) return DataNotFound("Pedido vinculado nao encontrado (pode ter sido excluido).");
+
+        return DataOk(detalhe);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteTicket(Guid id)
     {
         try
         {
+            var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             await ticketService.AlterarStatusAsync(new AlterarStatusTicketCommand(id, TicketStatus.Fechado));
-            await audit.LogAsync("TicketFechado", $"TicketId={id}", null);
+            await audit.LogAsync("TicketFechado", $"TicketId={id}", tenantId);
             return DataOk(new { id, status = "Fechado" });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
     }
 }
 
-public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null, Guid? FaturaId = null);
+public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null, Guid? FaturaId = null, Guid? PedidoId = null);
 public record PatchTicketRequest(string? Status, string? Prioridade, Guid? AtendenteId);
 public record AddMensagemRequest(string Conteudo, bool Interno = false, IReadOnlyList<Guid>? AnexoIds = null);
 public record EncaminharRequest(string NovoNivel, string? Motivo);

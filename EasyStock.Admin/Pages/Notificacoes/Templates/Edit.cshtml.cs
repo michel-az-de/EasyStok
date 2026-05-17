@@ -27,6 +27,8 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
     public DateTime? AtualizadoEm { get; private set; }
     public string? AtualizadoPor { get; private set; }
 
+    public sealed record VariavelOpcao(string Nome, string Tipo, string Descricao, string Exemplo);
+
     public async Task OnGetAsync()
     {
         if (Id.HasValue) { await CarregarTemplateAsync(Id.Value); return; }
@@ -53,32 +55,6 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
             if (t.TryGetProperty("atualizadoEm", out var ae) && ae.ValueKind == JsonValueKind.String)
                 AtualizadoEm = ae.GetDateTime();
             AtualizadoPor = t.TryGetProperty("atualizadoPor", out var ap2) ? ap2.GetString() : null;
-        }
-        catch (SessionExpiredException) { throw; }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Erro ao carregar template {Id}", id);
-            Erro = "Erro ao carregar template.";
-        }
-    }
-
-    private async Task CarregarDuplicandoAsync(Guid origem)
-    {
-        try
-        {
-            var result = await api.GetRawAsync($"api/admin/notificacoes/templates/{origem}");
-            var t = result.GetProperty("data");
-            var codigoOriginal = t.GetProperty("codigo").GetString() ?? "";
-            var canalOriginal = t.GetProperty("canal").GetString() ?? "Email";
-            var canalDestino = string.IsNullOrWhiteSpace(CanalAlvo) ? canalOriginal : CanalAlvo;
-
-            Nome = (t.GetProperty("nome").GetString() ?? "") + $" — copia ({canalDestino})";
-            Canal = canalDestino;
-            TipoEvento = t.GetProperty("tipoEvento").GetString()!;
-            AssuntoTemplate = t.GetProperty("assuntoTemplate").GetString() ?? "";
-            CorpoTemplate = t.GetProperty("corpoTemplate").GetString() ?? "";
-            Idioma = t.TryGetProperty("idioma", out var id1) ? id1.GetString() ?? "pt-BR" : "pt-BR";
-            Codigo = SugerirCodigoDuplicado(codigoOriginal, canalDestino);
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)

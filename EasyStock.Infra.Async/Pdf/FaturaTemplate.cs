@@ -153,8 +153,6 @@ public sealed class FaturaTemplate(Fatura fatura) : IDocument
         });
     }
 
-    private static void ComposeEnderecoLinhas(QuestPDF.Infrastructure.IContainer _, Endereco? endereco) { /* sobrecarga indireta — ver abaixo */ }
-
     private static void ComposeEnderecoLinhas(QuestPDF.Fluent.ColumnDescriptor col, Endereco? endereco)
     {
         if (endereco is null) return;

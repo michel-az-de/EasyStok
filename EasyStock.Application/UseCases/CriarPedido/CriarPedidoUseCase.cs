@@ -30,7 +30,9 @@ public sealed record CriarPedidoCommand(
     [property: MaxLength(64)] string? MobileOrderId = null,
     IReadOnlyList<CriarPedidoItemInput>? Itens = null,
     Guid? CriadoPorUserId = null,
-    [property: MaxLength(120)] string? CriadoPorNome = null);
+    [property: MaxLength(120)] string? CriadoPorNome = null,
+    // F5 — agendamento (MVP). NULL = pedido pra agora.
+    DateTime? AgendadoParaEm = null);
 
 /// <summary>
 /// Cria um novo pedido (encomenda) — Onda P2. Se <see cref="ClienteId"/>
@@ -50,6 +52,13 @@ public class CriarPedidoUseCase(
     public async Task<PedidoResult> ExecuteAsync(CriarPedidoCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+
+        // F5 — agendamento precisa ser no futuro. PWA valida client-side, mas
+        // API publica e SyncController nao validam — espelha a checagem aqui
+        // pra impedir pedido agendado pro passado (worker ignoraria silenciosamente
+        // via filtro de status, mas dado corrompido fica registrado).
+        if (cmd.AgendadoParaEm.HasValue && cmd.AgendadoParaEm.Value <= DateTime.UtcNow)
+            throw new UseCaseValidationException("Data agendada precisa ser no futuro.");
 
         // Pedido sem itens é permitido (operador pode adicionar depois via
         // AdicionarItemPedido), mas se itens vieram, todos devem ser válidos.
@@ -85,6 +94,7 @@ public class CriarPedidoUseCase(
         }
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
+        pedido.AgendadoParaEm = cmd.AgendadoParaEm;
 
         // Adiciona itens.
         if (cmd.Itens != null)
@@ -145,6 +155,18 @@ public class CriarPedidoUseCase(
             cliente.RegistrarPedido(pedido.CriadoEm);
             await clienteRepo.UpdateAsync(cliente);
         }
+        else if (!string.IsNullOrWhiteSpace(cmd.ClienteNomeAdHoc))
+        {
+            // Pedido balcão: tenta associar ao cliente cadastrado com o mesmo nome.
+            var matches = await clienteRepo.SearchAsync(cmd.EmpresaId, cmd.ClienteNomeAdHoc, maxResults: 1);
+            var clienteAdHoc = matches.FirstOrDefault(c =>
+                string.Equals(c.Nome, cmd.ClienteNomeAdHoc, StringComparison.OrdinalIgnoreCase));
+            if (clienteAdHoc != null)
+            {
+                clienteAdHoc.RegistrarPedido(pedido.CriadoEm);
+                await clienteRepo.UpdateAsync(clienteAdHoc);
+            }
+        }
 
         await uow.CommitAsync();
 
@@ -160,5 +182,6 @@ public class CriarPedidoUseCase(
         p.Status, p.Total, p.TotalPago,
         p.Observacoes, p.Origem, p.MobileOrderId, p.VendaId,
         p.Itens.Count,
-        p.CriadoEm, p.AlteradoEm, p.EntreguEm, p.CanceladoEm);
+        p.CriadoEm, p.AlteradoEm, p.EntreguEm, p.CanceladoEm,
+        p.AgendadoParaEm);
 }

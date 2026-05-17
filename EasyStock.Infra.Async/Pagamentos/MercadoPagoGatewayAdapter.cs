@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using Microsoft.Extensions.Configuration;
@@ -46,7 +47,7 @@ public sealed class MercadoPagoGatewayAdapter(
             return Task.FromResult(new InstrucaoPagamento(
                 Provedor: Provedor,
                 TransactionId: "unconfigured",
-                DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { erro = "MP nao configurado." })
+                DadosGatewayJson: JsonSerializer.Serialize(new { erro = "MP nao configurado." })
             ));
         }
 

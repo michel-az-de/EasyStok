@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Faturas;
 
+/// <summary>
+/// Dashboard financeiro: MRR, inadimplência e cohort de receita.
+/// Métricas carregadas via <c>api/admin/faturas/metricas?dias=N</c> (padrão 30 dias).
+/// </summary>
 public class DashboardModel(AdminApiClient api, AdminSessionService session, ILogger<DashboardModel> log) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public int Dias { get; set; } = 30;
@@ -20,8 +24,7 @@ public class DashboardModel(AdminApiClient api, AdminSessionService session, ILo
 
         try
         {
-            var raw = await api.GetRawAsync($"api/admin/faturas/metricas?dias={Dias}");
-            Metricas = raw.TryGetProperty("data", out var d) ? d : default;
+            Metricas = await api.GetAsync<JsonElement>($"api/admin/faturas/metricas?dias={Dias}");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)

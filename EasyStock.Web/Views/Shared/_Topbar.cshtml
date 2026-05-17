@@ -2,6 +2,9 @@
     var usuarioNome = ViewBag.UsuarioNome as string ?? "Usuário";
     var iniciais = string.Join("", (usuarioNome).Split(' ').Take(2).Select(p => p.Length > 0 ? p[0].ToString().ToUpper() : ""));
     if (string.IsNullOrEmpty(iniciais)) iniciais = "U";
+    var lojaAtualNome = ViewBag.LojaAtualNome as string;
+    var lojaAtualEmoji = (ViewBag.LojaAtualEmoji as string) ?? "🏪";
+    var usuarioRole = ViewBag.Role as string;
 }
 
 <header class="app-topbar relative z-40 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0"
@@ -258,10 +261,16 @@
         }
     </script>
 
-    <div class="relative">
+    @* BUG 3: toggle de tema oculto. tokens.css tem :root[data-theme="dark"] mas a
+       maior parte do admin usa Tailwind utility classes (bg-white, text-slate-900,
+       etc.) que NÃO reagem a data-theme — o botão trocava o atributo mas a tela
+       seguia clara. Ocultamos o controle até implementarmos dark mode completo;
+       o handler window.EasyStockTheme abaixo permanece (sem dano) pra retomar
+       quando o tema for prioridade. *@
+    @* <div class="relative">
         <button type="button"
                 onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
-                class="theme-toggle-btn app-surface-btn flex items-center gap-2 px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
+                class="theme-toggle-btn app-surface-btn flex items-center gap-2 whitespace-nowrap px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 title="Ativar tema escuro"
                 aria-label="Ativar tema escuro">
             <span class="theme-icon-light" aria-hidden="true">
@@ -276,52 +285,60 @@
             </span>
             <span class="hidden md:inline theme-toggle-label">Ativar tema escuro</span>
         </button>
-    </div>
+    </div> *@
 
-    <!-- Ação rápida (desktop only) -->
+    <!-- Acao rapida (desktop only). Antes tinha classe `app-primary-btn` que aplica
+         gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo
+         escuro. Removida — botao continua secundario branco (consistente com tema). -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
         <button @@click="open = !open"
-                class="app-primary-btn flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                type="button"
+                aria-haspopup="menu"
+                :aria-expanded="open ? 'true' : 'false'"
+                aria-label="Abrir ações rápidas"
+                class="ui-secondary-btn flex items-center gap-2 whitespace-nowrap bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span class="hidden sm:inline">Ação rápida</span>
         </button>
         <div x-show="open" x-cloak @@click.outside="open = false"
+             role="menu"
+             aria-label="Ações rápidas"
              class="app-dropdown absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
             <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Estoque</div>
-            <a href="/entradas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>📥</span> Nova entrada
+            <a href="/entradas/nova" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">📥</span> Nova entrada
             </a>
-            <a href="/saidas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>📤</span> Registrar Saída
+            <a href="/saidas/nova" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">📤</span> Nova saída
             </a>
-            <a href="/entradas/reposicao" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>🔄</span> Repor estoque
+            <a href="/entradas/reposicao" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">🔄</span> Repor estoque
             </a>
-            <a href="/estoque" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>📦</span> Ver estoque
+            <a href="/estoque" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">📦</span> Ver estoque
             </a>
-            <div class="border-t border-slate-100 my-1"></div>
+            <div class="border-t border-slate-100 my-1" role="separator"></div>
             <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Vendas</div>
-            <a href="/pedidos" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>📋</span> Pedidos
+            <a href="/pedidos" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">📋</span> Ver pedidos
             </a>
-            <a href="/kds" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>👨‍🍳</span> KDS — Cozinha
+            <a href="/kds" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">👨‍🍳</span> Abrir KDS (cozinha)
             </a>
-            <a href="/clientes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>👥</span> Clientes
+            <a href="/clientes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">👥</span> Ver clientes
             </a>
-            <a href="/caixa" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>🏧</span> Caixa
+            <a href="/caixa" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">💰</span> Abrir caixa
             </a>
-            <div class="border-t border-slate-100 my-1"></div>
-            <a href="/anuncios" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>🤖</span> Gerar anúncio com IA
+            <div class="border-t border-slate-100 my-1" role="separator"></div>
+            <a href="/anuncios" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">🤖</span> Gerar anúncio com IA
             </a>
-            <a href="/analytics/movimentacoes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span>📊</span> Ver movimentações
+            <a href="/analytics/movimentacoes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <span aria-hidden="true">📊</span> Ver movimentações
             </a>
         </div>
     </div>
@@ -329,15 +346,28 @@
     <!-- Notificações Dropdown -->
     <div x-data="notifDropdown()" class="relative">
         <button @@click="toggle()"
+                type="button"
+                aria-haspopup="menu"
+                :aria-expanded="open ? 'true' : 'false'"
+                :aria-label="resumo && resumo.totalNaoLidas > 0 ? ('Notificações: ' + resumo.totalNaoLidas + ' não lida' + (resumo.totalNaoLidas > 1 ? 's' : '')) : 'Notificações'"
                 :class="open ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-md shadow-indigo-100/80' : ''"
                 class="app-icon-btn relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-            <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span id="topbar-notif-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"></span>
+            @* Pente-fino 2026-05-16: badge com aria-live e role=status pra leitores de tela
+               anunciarem a contagem quando ela muda. aria-atomic garante leitura completa. *@
+            <span id="topbar-notif-badge"
+                  class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label="Notificacoes nao lidas"></span>
         </button>
 
         <div x-show="open" @@click.outside="open = false" x-cloak x-transition
+             role="menu"
+             aria-label="Notificações recentes"
              class="app-dropdown absolute right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] max-h-[480px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
@@ -358,25 +388,27 @@
             </div>
 
             <!-- Items -->
-            <div class="overflow-y-auto flex-1">
+            <div class="overflow-y-auto flex-1" role="presentation">
                 <template x-if="loading">
-                    <div class="px-4 py-8 text-center text-slate-400 text-sm">Carregando...</div>
+                    <div class="px-4 py-8 text-center text-slate-400 text-sm" role="status" aria-live="polite">Carregando notificações…</div>
                 </template>
                 <template x-if="!loading && erro">
-                    <div class="px-4 py-8 text-center text-slate-400">
-                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="px-4 py-8 text-center text-slate-500" role="alert">
+                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                         </svg>
-                        <p class="text-sm">Não foi possível carregar notificações</p>
-                        <button @@click="erro=false; load()" class="mt-2 text-xs text-indigo-600 hover:underline">Tentar novamente</button>
+                        <p class="text-sm font-medium text-slate-700">Não conseguimos carregar suas notificações</p>
+                        <p class="text-xs text-slate-400 mt-1">Verifique sua conexão e tente novamente.</p>
+                        <button @@click="erro=false; load()" class="mt-3 text-xs text-indigo-600 hover:underline font-medium">Tentar de novo</button>
                     </div>
                 </template>
                 <template x-if="!loading && !erro && items.length === 0">
-                    <div class="px-4 py-8 text-center text-slate-400">
-                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="px-4 py-8 text-center text-slate-500" role="status">
+                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
-                        <p class="text-sm">Nenhuma notificação pendente</p>
+                        <p class="text-sm font-medium text-slate-700">Você está em dia</p>
+                        <p class="text-xs text-slate-400 mt-1">Sem notificações pendentes no momento.</p>
                     </div>
                 </template>
                 <template x-for="n in items" :key="n.id">
@@ -389,8 +421,8 @@
                                 <div class="text-xs text-slate-500 mt-0.5 line-clamp-2" x-text="n.mensagem"></div>
                                 <div class="flex items-center gap-2 mt-1.5">
                                     <a :href="acaoUrl(n)" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium" x-text="acaoLabel(n)"></a>
-                                    <span class="text-slate-300">|</span>
-                                    <button @@click.stop="marcarLida(n.id)" class="text-xs text-slate-400 hover:text-slate-600">Marcar lida</button>
+                                    <span class="text-slate-300" aria-hidden="true">|</span>
+                                    <button type="button" @@click.stop="marcarLida(n.id)" class="text-xs text-slate-400 hover:text-slate-600">Marcar como lida</button>
                                     <span class="text-xs text-slate-300 ml-auto" x-text="tempoRelativo(n.criadaEm || n.createdAt)"></span>
                                 </div>
                             </div>
@@ -400,7 +432,7 @@
             </div>
 
             <!-- Footer -->
-            <a href="/notificacoes" class="block px-4 py-2.5 text-center text-sm text-indigo-600 font-medium hover:bg-indigo-50 border-t border-slate-100 rounded-b-xl transition-colors">
+            <a href="/notificacoes" role="menuitem" class="block px-4 py-2.5 text-center text-sm text-indigo-600 font-medium hover:bg-indigo-50 border-t border-slate-100 rounded-b-xl transition-colors">
                 Ver todas as notificações
             </a>
         </div>
@@ -535,9 +567,9 @@
                     if (!dt) return '';
                     const diff = (Date.now() - new Date(dt).getTime()) / 1000;
                     if (diff < 60) return 'agora';
-                    if (diff < 3600) return Math.floor(diff / 60) + 'min';
-                    if (diff < 86400) return Math.floor(diff / 3600) + 'h';
-                    return Math.floor(diff / 86400) + 'd';
+                    if (diff < 3600) return 'há ' + Math.floor(diff / 60) + 'min';
+                    if (diff < 86400) return 'há ' + Math.floor(diff / 3600) + 'h';
+                    return 'há ' + Math.floor(diff / 86400) + 'd';
                 }
             };
         }
@@ -597,44 +629,104 @@
     </script>
 
     <!-- Avatar / usuário -->
-    <div x-data="{ open: false }" class="relative">
+    <div x-data="{ open: false, logoutAsk: false }" class="relative">
         <button @@click="open = !open"
-                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors max-w-[220px]">
-            <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                type="button"
+                aria-haspopup="menu"
+                :aria-expanded="open ? 'true' : 'false'"
+                aria-label="Abrir menu da conta"
+                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg transition-colors max-w-[220px]"
+                style="color: var(--text-primary);"
+                onmouseover="this.style.background='var(--ink-100)'"
+                onmouseout="this.style.background=''">
+            <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold" aria-hidden="true">
                 @iniciais
             </div>
             <div class="text-left hidden sm:block min-w-0 flex-1">
                 <div class="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[150px]" title="@usuarioNome">@usuarioNome</div>
             </div>
-            <svg class="hidden sm:block w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="hidden sm:block w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
         </button>
         <div x-show="open" x-cloak @@click.outside="open = false"
-             class="app-dropdown absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
-            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-100 truncate">@usuarioNome</div>
-            <a href="/configuracoes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             role="menu"
+             aria-label="Conta"
+             class="app-dropdown absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+            <div class="px-4 py-2.5 border-b border-slate-100">
+                <div class="text-sm font-semibold text-slate-800 truncate" title="@usuarioNome">@usuarioNome</div>
+                @if (!string.IsNullOrEmpty(lojaAtualNome))
+                {
+                    <div class="text-xs text-slate-500 truncate mt-0.5" title="@lojaAtualNome">
+                        <span aria-hidden="true">@lojaAtualEmoji</span> @lojaAtualNome
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(usuarioRole))
+                {
+                    <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mt-1">@usuarioRole</div>
+                }
+            </div>
+            <a href="/configuracoes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Configurações
             </a>
-            <a href="/usuarios" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <a href="/usuarios" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
-                Usuários
+                Gerenciar usuários
             </a>
-            <div class="border-t border-slate-100 my-1"></div>
-            <form asp-controller="Auth" asp-action="Logout" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sair
-                </button>
-            </form>
+            <div class="border-t border-slate-100 my-1" role="separator"></div>
+            <button type="button"
+                    @@click="open = false; logoutAsk = true; $nextTick(() => document.getElementById('logoutCancelBtn')?.focus())"
+                    class="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                    style="color: var(--crit-600);"
+                    onmouseover="this.style.background='var(--crit-50)'"
+                    onmouseout="this.style.background=''">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sair
+            </button>
         </div>
+
+        <!-- Modal de confirmação de logout -->
+        <template x-teleport="body">
+            <div x-show="logoutAsk" x-cloak
+                 class="auth-prem-modal-backdrop"
+                 role="alertdialog"
+                 aria-labelledby="logoutTitle"
+                 aria-describedby="logoutText"
+                 @@keydown.escape.window="logoutAsk = false"
+                 @@click.self="logoutAsk = false">
+                <div class="auth-prem-modal" @@click.stop>
+                    <div class="auth-prem-modal-icon" aria-hidden="true">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </div>
+                    <h2 id="logoutTitle" class="auth-prem-modal-title">Sair da conta?</h2>
+                    <p id="logoutText" class="auth-prem-modal-text">
+                        Você precisará entrar novamente para continuar. Suas alterações estão salvas.
+                    </p>
+                    <div class="auth-prem-modal-actions">
+                        <button type="button"
+                                id="logoutCancelBtn"
+                                @@click="logoutAsk = false"
+                                class="auth-prem-modal-btn auth-prem-modal-btn--ghost">
+                            Cancelar
+                        </button>
+                        <form asp-controller="Auth" asp-action="Logout" method="post" style="flex: 1; display: flex;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="auth-prem-modal-btn auth-prem-modal-btn--danger" style="width: 100%;">
+                                Sair
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </header>

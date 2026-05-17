@@ -4,13 +4,20 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # Secrets — nunca commitar
-# Valores reais devem vir de variáveis de ambiente do Azure App Service / Key Vault
+# Valores reais devem vir de variáveis de ambiente do Render (envVarGroup
+# `easystok-secrets` em render.yaml).
 appsettings.Development.json
 appsettings.Production.json
 appsettings.*.local.json
 .env
 .env.*
 !.env.example
+
+# Arquivos de sessao do Claude Code mal-encodados que vazaram em outros
+# checkouts. O nome real comeca com "C:Users..." sem separadores; manter
+# patterns largos para pegar variantes.
+**/C\357\200\272Users*
+**/*claude-projects*tool-results*pr-sizes.json
 
 # Node / Tailwind build artifacts (gerados em build, não versionados)
 node_modules/
@@ -388,3 +395,7 @@ publish-web/
 publish-admin/
 *.zip
 EasyStock.Api/easystock.db*
+
+# Build artifact que escapou pra raiz em 2026-05-16 (incidente wip(snapshot))
+# Ver: docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
+/admin/

@@ -30,15 +30,20 @@ public class AdicionarClienteDocumentoUseCase(
         var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId);
         if (cliente == null) return null;
 
-        // Normalização: se for cpf/cnpj válido, mantém só dígitos
-        var valorNormalizado = Cnpj.TryFrom(cmd.Valor)?.Value ?? cmd.Valor.Trim();
+        var tipoNorm = string.IsNullOrWhiteSpace(cmd.Tipo) ? "outro" : cmd.Tipo.Trim().ToLowerInvariant();
+        var valorNormalizado = tipoNorm switch
+        {
+            "cnpj" => Cnpj.TryFrom(cmd.Valor)?.Value ?? cmd.Valor.Trim(),
+            "cpf"  => new string(cmd.Valor.Where(char.IsDigit).ToArray()),
+            _      => cmd.Valor.Trim()
+        };
 
         var agora = DateTime.UtcNow;
         var doc = new ClienteDocumento
         {
             Id = Guid.NewGuid(),
             ClienteId = cliente.Id,
-            Tipo = string.IsNullOrWhiteSpace(cmd.Tipo) ? "outro" : cmd.Tipo.Trim().ToLowerInvariant(),
+            Tipo = tipoNorm,
             Valor = valorNormalizado,
             Emissor = cmd.Emissor,
             EmitidoEm = cmd.EmitidoEm,
