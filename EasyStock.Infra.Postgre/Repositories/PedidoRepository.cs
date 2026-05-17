@@ -28,6 +28,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             string? search = null, string? sort = "criadoem", string? order = "desc")
         {
             var query = db.Pedidos.AsNoTracking()
+                .Include(p => p.Itens)
                 .Where(p => p.EmpresaId == empresaId);
 
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(p => p.Status == status);

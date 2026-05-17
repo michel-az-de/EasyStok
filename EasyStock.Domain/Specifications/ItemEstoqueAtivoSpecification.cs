@@ -7,6 +7,6 @@ public class ItemEstoqueAtivoSpecification : IEspecificacao<ItemEstoque>
 {
     public bool EhSatisfeitaPor(ItemEstoque item)
     {
-        return item.Status is StatusItemEstoque.Ok or StatusItemEstoque.Warn or StatusItemEstoque.Critical or StatusItemEstoque.Slow;
+        return item.Status is StatusItemEstoque.Ok or StatusItemEstoque.Warn or StatusItemEstoque.Critical or StatusItemEstoque.Esgotado or StatusItemEstoque.Slow;
     }
 }

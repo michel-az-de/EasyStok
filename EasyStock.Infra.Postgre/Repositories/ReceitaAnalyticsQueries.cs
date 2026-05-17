@@ -43,7 +43,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
         var cached = await GetCachedAsync<List<ReceitaPorPeriodo>>(cacheKey);
         if (cached is not null) return cached;
 
-        var de = DateTime.UtcNow.AddMonths(-meses);
+        var de = DateTime.SpecifyKind(DateTime.UtcNow.AddMonths(-meses), DateTimeKind.Utc);
 
         var vendasQuery = dbContext.Vendas
             .AsNoTracking()
@@ -156,7 +156,9 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         var vendasQuery = dbContext.Vendas
             .AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate);
+            .Where(v => v.EmpresaId == empresaId &&
+                v.DataVenda >= DateTime.SpecifyKind(de, DateTimeKind.Utc) &&
+                v.DataVenda <= DateTime.SpecifyKind(ate, DateTimeKind.Utc));
         if (lojaId.HasValue)
             vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
 

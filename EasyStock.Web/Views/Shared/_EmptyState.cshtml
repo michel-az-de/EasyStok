@@ -1,11 +1,17 @@
 @{
-    var icon = ViewData["EmptyIcon"] as string ?? "📋";
+    var explicitIcon = ViewData["EmptyIcon"] as string;
     var title = ViewData["EmptyTitle"] as string ?? "Nenhum item encontrado";
     var description = ViewData["EmptyDescription"] as string;
     var ctaText = ViewData["EmptyCta"] as string;
     var ctaHref = ViewData["EmptyCtaHref"] as string;
     var ctaModal = ViewData["EmptyCtaModal"] as string;
     var illustration = ViewData["EmptyIllustration"] as string; // box | search | inbox | chart
+    // Quando nada for passado, mostra a ilustração genérica em vez do emoji 📋.
+    if (string.IsNullOrEmpty(illustration) && string.IsNullOrEmpty(explicitIcon))
+    {
+        illustration = "box";
+    }
+    var icon = explicitIcon ?? "📋";
 }
 
 <div class="text-center py-12 text-slate-400 anim-fadeInUp">

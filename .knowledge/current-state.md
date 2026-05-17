@@ -11,11 +11,11 @@
 - Feature parity vs Bling/Tiny/Omie: estimativa de **30–35%** (auditoria abril/2026 — sem mudança estrutural desde então; ver `audit-brutal.md`).
 
 ## Infra
-- **Azure App Service ativo** (workflow `.github/workflows/deploy-azure.yml` dispara em push pra master/main). API + Web + Admin atrás de App Services separados.
-- **Azure PostgreSQL Flexible** `pg-easystock` ainda é o banco transacional.
-- **GCP Cloud Run** documentado em `gcp-deploy.md` como plano alternativo ($300 free credit, Cloud SQL `db-f1-micro`); **não migrado**, apenas scripts prontos.
-- **Cloudflared** em `~/bin/cloudflared.exe` como backup pra túnel HTTPS público.
-- **Render** NÃO está em uso (referência antiga em memória de 2026-04 — desconsiderar).
+- **Render** e o canal unico de producao via Blueprint `render.yaml` + workflow `.github/workflows/deploy-render.yml`. Services: `easystok-api` (8080), `easystok-web` (8081, serve PWA + `/downloads`), `easystok-admin` (8080), `easystok-worker`. Preview Environments por PR habilitados (`previewsEnabled: true`, expiram 7d apos ultimo commit).
+- **Postgres managed Render** e o banco transacional. Connection string em `easystok-secrets` envVarGroup (Preview tem `easystok-secrets-preview` com DB efemero, isolado de prod).
+- **Azure App Service descomissionado em 2026-05-11**: workflows `deploy-azure.yml` e `azure-static-web-apps-*.yml` removidos. Plano antigo GCP (`gcp-deploy.md` + `scripts/gcp-deploy.sh`) tambem removido — nunca executado.
+- **APK Casa da Baba**: gerado e assinado em CI (`deploy-render.yml > build-apk`), commitado em `EasyStock.Web/wwwroot/downloads/easystok-<sha>.apk` + copia `easystok-latest.apk`. Capacitor poll-a `/downloads/apk/manifest`.
+- **Cloudflared** em `~/bin/cloudflared.exe` como backup pra túnel HTTPS público (dev local).
 
 ## Estado por área (atualizado pós-ondas de abril/maio)
 
@@ -51,7 +51,7 @@
 
 ## O que falta pro MVP-pago (atualizado)
 1. Deploy GCP estável (se decidir migrar — Azure paga hoje).
-2. Rate limiting em endpoints públicos (`/auth/login`, `/auth/registrar`, webhooks).
+2. Rate limiting em `/api/webhooks/pix` (login/register cobertos desde B-015).
 3. NF-e mínimo via emissor third-party (Focus NFe/eNotas).
 4. Onboarding cliente externo testado E2E (signup → trial → upgrade).
 5. CI bloqueando merge com teste vermelho.

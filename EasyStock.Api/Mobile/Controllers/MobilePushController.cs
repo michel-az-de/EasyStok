@@ -9,6 +9,13 @@ namespace EasyStock.Api.Mobile.Controllers;
 /// Registro de token FCM para push notifications.
 /// Device pareado envia seu token após inicialização do FCM no app.
 /// Backend armazena e usa para enviar push na feature de notificações operacionais.
+///
+/// TODO B5 (deferido em 2026-05-12): o sender FCM ainda nao foi implementado
+/// neste backend. Quando entrar, garantir payload data-only (sem campo
+/// "notification") pra que o Android entregue mesmo com app fechado e o handler
+/// nativo possa acionar window.cdbSync.flush() via bridge Capacitor. Payload
+/// com campo "notification" entra no system tray mas NAO acorda o app — fila
+/// fica parada ate operador reabrir manualmente. Ref: docs/firebase data-only.
 /// </summary>
 [ApiController]
 [Route("api/mobile/push")]

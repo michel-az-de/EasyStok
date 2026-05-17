@@ -1,10 +1,13 @@
 @using EasyStock.Web.Services
+@inject IConfiguration Configuration
 @model OperationDashboardApi?
 @{
     ViewBag.Title = "Operação Mobile";
     Layout = "_Layout";
     var devices = ViewBag.Devices as List<MobileDeviceApi> ?? new List<MobileDeviceApi>();
     var ativos = devices.Where(d => !d.Revoked).ToList();
+    var apiBase = (Configuration["ApiSettings:BaseUrl"] ?? "").TrimEnd('/');
+    var kdsUrl = string.IsNullOrEmpty(apiBase) ? "/pwa/#kds" : $"{apiBase}/pwa/#kds";
 }
 
 <div class="flex items-center justify-between mb-6">
@@ -16,6 +19,14 @@
         }
     </div>
     <div class="flex items-center gap-3">
+        <a href="@kdsUrl" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg
+                  bg-gradient-to-r from-orange-500 to-amber-500 text-white
+                  hover:from-orange-600 hover:to-amber-600 transition shadow-sm"
+           title="Abrir o KDS da cozinha em nova aba. Precisa de device pareado neste navegador.">
+            👨‍🍳 Abrir KDS
+            <span class="text-[9px] uppercase tracking-wider opacity-80">alpha</span>
+        </a>
         <button type="button" onclick="location.reload()" class="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg" title="Atualizar agora">
             ↻ Atualizar
         </button>
@@ -89,7 +100,7 @@
                 };
                 var fg = a.Color switch
                 {
-                    "amber" => "text-amber-700",
+                    "amber" => "text-amber-800",
                     "red" => "text-red-700",
                     "indigo" => "text-indigo-700",
                     _ => "text-slate-700"
@@ -182,7 +193,7 @@
                             <form method="post" action="/operacao/devices/@d.Id/comando" class="inline">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="commandType" value="reload" />
-                                <button type="submit" class="text-xs text-slate-600 hover:text-amber-700 font-medium" title="Reinicia o app no celular">
+                                <button type="submit" class="text-xs text-slate-600 hover:text-amber-800 font-medium" title="Reinicia o app no celular">
                                     Recarregar
                                 </button>
                             </form>

@@ -54,6 +54,7 @@ public class ConferirEtiquetaUseCase(
         return new LoteEtiquetaResult(
             etq.Id, etq.LoteId, etq.LoteItemId, etq.Sequencial, etq.Codigo, etq.Status,
             etq.ConferidaEm, etq.ConferidaPorUserId, etq.ConferidaPorNome,
-            etq.ObservacaoConferencia, etq.CriadoEm);
+            etq.ObservacaoConferencia, etq.CriadoEm,
+            etq.LayoutSnapshotJson, etq.LayoutSnapshotMeta);
     }
 }

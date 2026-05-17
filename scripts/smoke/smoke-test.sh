@@ -126,6 +126,28 @@ else
     yellow "Pulando testes autenticados — sem token"
 fi
 
+# --- AUTO-TICKET EM FALHA ---
+# Quando smoke falha, abre ticket helpdesk via /api/ci/tickets pra dev
+# investigar. Exige CI_AUTO_TICKET_KEY definido no ambiente (vem dos secrets
+# do CI). Best-effort: se a key nao estiver setada ou o endpoint estiver
+# fora, so loga — nao mascara o exit code do smoke.
+if [ "$FAIL" -gt 0 ] && [ -n "${CI_AUTO_TICKET_KEY:-}" ]; then
+    echo ""
+    yellow "Abrindo ticket de helpdesk pra falhas do smoke..."
+    DEPLOY_ID="${GITHUB_SHA:-${DEPLOY_ID:-$(date +%s)}}"
+    SIG=$(echo -n "smoke-${DEPLOY_ID}-${BASE}" | sha256sum | awk '{print $1}')
+    curl -sS -X POST "${BASE}/api/ci/tickets" \
+        -H "Content-Type: application/json" \
+        -H "X-Ci-Key: ${CI_AUTO_TICKET_KEY}" \
+        -d "{
+            \"origin\": \"smoke\",
+            \"signature\": \"${SIG}\",
+            \"titulo\": \"Smoke falhou pos-deploy (${FAIL}/${TOTAL})\",
+            \"descricao\": \"Smoke test em ${BASE} reportou ${FAIL} falhas de ${TOTAL}.\",
+            \"contexto\": \"deploy=${DEPLOY_ID} base=${BASE}\"
+        }" > /dev/null 2>&1 || yellow "auto-ticket falhou — checar manualmente"
+fi
+
 # --- RESUMO ---
 echo ""
 echo "=========================================="

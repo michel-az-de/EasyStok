@@ -307,9 +307,9 @@
                 // Dados do item selecionado
                 itemEstoqueId: '@(Model.ItemEstoqueId ?? "")',
                 produtoId: '@(Model.ProdutoId ?? "")',
-                produtoNome: '@(Model.ProdutoNome ?? "")',
+                produtoNome: @Json.Serialize(Model.ProdutoNome ?? ""),
                 produtoSku: '',
-                variacaoNome: '@(Model.VariacaoNome ?? "")',
+                variacaoNome: @Json.Serialize(Model.VariacaoNome ?? ""),
                 estoqueAtual: @Model.EstoqueAtual,
 
                 // Campos do form

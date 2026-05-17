@@ -133,3 +133,81 @@
 button:focus-visible {
   outline-color: var(--orange-500);
 }
+
+/* ---------- Modal (sincronizado com Web) ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(5, 11, 27, 0.6);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  z-index: 100; display: grid; place-items: center;
+  padding: 16px;
+  animation: anim-backdropFade var(--motion-base, 200ms) var(--ease-out, ease-out) both;
+}
+.modal-panel {
+  background: var(--bg-surface); border: 1px solid var(--border-soft);
+  border-radius: 16px; box-shadow: 0 24px 60px -20px rgba(5, 11, 27, 0.55);
+  width: 100%; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column;
+  animation: anim-scaleIn var(--motion-base, 200ms) var(--ease-out, ease-out) both;
+}
+.modal-sm   { max-width: 420px; }
+.modal-md   { max-width: 580px; }
+.modal-lg   { max-width: 820px; }
+.modal-full { max-width: 96vw; max-height: 96vh; }
+.modal-header { padding: 18px 22px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-body   { padding: 22px; overflow-y: auto; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border-soft); display: flex; gap: 8px; justify-content: flex-end; }
+@keyframes anim-backdropFade {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes anim-scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- Coluna numerica (sincronizado com Web) ---------- */
+.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- KPI (sincronizado com Web) ---------- */
+.kpi-val {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--ink-900);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.kpi-lbl {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-500);
+  margin-top: 3px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ---------- Tabela polida (sincronizado com Web) ---------- */
+.tbl-full th {
+  background: var(--ink-50);
+  color: var(--ink-700);
+  font-weight: 500;
+  padding: 12px 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--border-soft);
+}
+.tbl-full td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+  color: var(--ink-800);
+  transition: background var(--motion-fast, 120ms) var(--ease-out, ease-out);
+}
+.tbl-full tbody tr:hover td {
+  background: var(--ink-50);
+}
+.tbl-full th.col-num { text-align: right; }

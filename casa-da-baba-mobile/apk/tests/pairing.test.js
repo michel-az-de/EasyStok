@@ -75,4 +75,46 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(got.length, 1);
     assert.strictEqual(got[0].type, 'order.upsert');
   });
+
+  // A2 — invariante: clearPairing NUNCA toca em outras chaves cdb-*.
+  // Re-pareamento mantem fila offline + dados de negocio + identidade do
+  // device. Apagar a fila aqui = perder vendas em pendencia.
+  test('A2: clearPairing preserva cdb-sync-queue e dados de negocio', () => {
+    const cdbSync = sandbox.window && sandbox.window.cdbSync;
+    if (!cdbSync || !cdbSync.clearPairing) return;
+
+    // Setup: pairing + fila + dados de negocio + outras chaves cdb-*
+    sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ apiKey: 'mk_test' }));
+    sandbox.localStorage.setItem('cdb-sync-queue', JSON.stringify([
+      { id: 'm-1', type: 'order.upsert', payload: { id: 'o1' } },
+      { id: 'm-2', type: 'product.upsert', payload: { id: 'p1' } }
+    ]));
+    sandbox.localStorage.setItem('cdb-products', '[{"id":"p1"}]');
+    sandbox.localStorage.setItem('cdb-orders', '[{"id":"o1"}]');
+    sandbox.localStorage.setItem('cdb-device-id', 'dev-test-123');
+    sandbox.localStorage.setItem('cdb-pwa-installed-version', 'v100');
+    sandbox.localStorage.setItem('cdb-last-sync', '1700000000000');
+
+    cdbSync.clearPairing();
+
+    // Pairing removido
+    assert.strictEqual(sandbox.localStorage.getItem('cdb-pairing'), null,
+      'cdb-pairing deve ser removido');
+
+    // Tudo o resto intacto
+    const queue = JSON.parse(sandbox.localStorage.getItem('cdb-sync-queue'));
+    assert.strictEqual(queue.length, 2, 'fila preservada');
+    assert.strictEqual(queue[0].id, 'm-1');
+
+    assert.strictEqual(sandbox.localStorage.getItem('cdb-products'), '[{"id":"p1"}]',
+      'cdb-products preservado');
+    assert.strictEqual(sandbox.localStorage.getItem('cdb-orders'), '[{"id":"o1"}]',
+      'cdb-orders preservado');
+    assert.strictEqual(sandbox.localStorage.getItem('cdb-device-id'), 'dev-test-123',
+      'cdb-device-id preservado');
+    assert.strictEqual(sandbox.localStorage.getItem('cdb-pwa-installed-version'), 'v100',
+      'cdb-pwa-installed-version preservado');
+    assert.strictEqual(sandbox.localStorage.getItem('cdb-last-sync'), '1700000000000',
+      'cdb-last-sync preservado');
+  });
 };

@@ -1,5 +1,6 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
@@ -266,6 +267,7 @@ public class ItemEstoqueControllerTests
             CategoriaId = Guid.NewGuid()
         });
         _unitOfWork.CommitAsync().Returns(1);
+        _unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
 
         var result = await _controller.RegistrarSaida(command);
 
@@ -337,6 +339,7 @@ public class ItemEstoqueControllerTests
         });
         _movimentacaoEstoqueRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(0.2m);
         _unitOfWork.CommitAsync().Returns(1);
+        _unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
 
         var result = await _controller.RegistrarSaida(command);
 

@@ -28,7 +28,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             string? status = null, DateTime? desde = null, DateTime? ate = null,
             string? search = null, string? sort = "dataproducao", string? order = "desc")
         {
-            var q = db.Lotes.AsNoTracking().Where(l => l.EmpresaId == empresaId);
+            var q = db.Lotes
+                .Include(l => l.Itens)
+                .Include(l => l.Etiquetas)
+                .AsNoTracking()
+                .Where(l => l.EmpresaId == empresaId);
             if (!string.IsNullOrWhiteSpace(status)) q = q.Where(l => l.Status == status);
             if (desde.HasValue) q = q.Where(l => l.DataProducao >= desde.Value);
             if (ate.HasValue)   q = q.Where(l => l.DataProducao <= ate.Value);
@@ -78,5 +82,40 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .FirstOrDefaultAsync(e => e.Codigo == codigo && e.Lote!.EmpresaId == empresaId);
 
         public Task UpdateEtiquetaAsync(LoteEtiqueta e) { db.Set<LoteEtiqueta>().Update(e); return Task.CompletedTask; }
+
+        public async Task<IEnumerable<LoteEtiqueta>> GetEtiquetasForRenderAsync(Guid empresaId, Guid loteId)
+        {
+            return await db.Set<LoteEtiqueta>()
+                .Include(e => e.LoteItem)
+                    .ThenInclude(i => i!.Produto)
+                .Include(e => e.Lote)
+                .Where(e => e.LoteId == loteId && e.Lote!.EmpresaId == empresaId)
+                .OrderBy(e => e.Sequencial)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task UpdateEtiquetasSnapshotAsync(
+            IEnumerable<Guid> ids,
+            string layoutJson,
+            string layoutMeta,
+            string status)
+        {
+            var idList = ids.ToList();
+            await db.Set<LoteEtiqueta>()
+                .Where(e => idList.Contains(e.Id))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(e => e.LayoutSnapshotJson, layoutJson)
+                    .SetProperty(e => e.LayoutSnapshotMeta, layoutMeta)
+                    .SetProperty(e => e.Status, status));
+        }
+
+        public async Task UpdateEtiquetasStatusAsync(IEnumerable<Guid> ids, string status)
+        {
+            var idList = ids.ToList();
+            await db.Set<LoteEtiqueta>()
+                .Where(e => idList.Contains(e.Id))
+                .ExecuteUpdateAsync(s => s.SetProperty(e => e.Status, status));
+        }
     }
 }

@@ -65,9 +65,22 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 : "Ocorreu um erro inesperado. Use o CorrelationId para rastreamento.";
         }
 
-        var apiError = new ApiError(code, title, errorDetail, correlationId);
+        // UseCaseValidationException pode trazer Code + Details estruturados (ex: CYCLE_DETECTED).
+        // Quando setados, sobrescrevem o code generico "VALIDATION_ERROR".
+        var effectiveCode = code;
+        object? effectiveDetails = null;
+        if (exception is UseCaseValidationException ucvex)
+        {
+            if (!string.IsNullOrEmpty(ucvex.Code))
+                effectiveCode = ucvex.Code;
+            effectiveDetails = ucvex.Details;
+        }
+
+        var apiError = new ApiError(effectiveCode, title, errorDetail, correlationId);
         if (exception is EasyStock.Domain.Exceptions.PlanoLimiteAtingidoException planEx)
             apiError = apiError with { Recurso = planEx.Recurso };
+        if (effectiveDetails is not null)
+            apiError = apiError with { Details = effectiveDetails };
         var envelope = new ApiErrorResponse(apiError);
 
         httpContext.Response.StatusCode = statusCode;

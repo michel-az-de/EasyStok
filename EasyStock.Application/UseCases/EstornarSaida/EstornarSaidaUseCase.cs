@@ -20,7 +20,7 @@ namespace EasyStock.Application.UseCases.EstornarSaida
     public sealed record EstornarSaidaResult(
         Guid EstornoId,
         Guid MovimentacaoOriginalId,
-        int QuantidadeRestaurada);
+        decimal QuantidadeRestaurada);
 
     public class EstornarSaidaUseCase(
         IMovimentacaoEstoqueRepository movimentacaoRepository,

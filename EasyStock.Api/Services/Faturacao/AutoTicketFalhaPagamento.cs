@@ -96,7 +96,6 @@ public sealed class AutoTicketFalhaPagamento(
                 Categoria: TicketCategoria.Financeiro,
                 Prioridade: TicketPrioridade.Alta,
                 Nivel: NivelAtendimento.N2,
-                AnexoIds: null,
                 FaturaId: fatura.Id
             ), ct);
 

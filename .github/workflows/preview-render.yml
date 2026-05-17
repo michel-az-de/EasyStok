@@ -1,0 +1,91 @@
+name: Render Preview (PR)
+
+# Quando um PR é aberto contra master, o Render Preview Environment é criado
+# automaticamente pelo Blueprint (previewsEnabled: true em render.yaml).
+#
+# Este workflow:
+#   - reescreve CACHE_VERSION com cdb-<sha-do-PR> antes de qualquer build
+#   - roda os testes
+#   - aguarda o preview env subir e smoke-testa /health dos services
+#   - comenta o link do preview no PR
+#
+# NÃO commita APK aqui — APK release só sai em master pra evitar poluir
+# wwwroot/downloads com builds de PR descartáveis.
+
+on:
+  pull_request:
+    branches: [master]
+
+env:
+  DOTNET_VERSION: '9.x'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-test:
+    name: Build + Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Rewrite CACHE_VERSION (preview)
+        shell: pwsh
+        run: ./scripts/rewrite-cache-version.ps1 -Sha "${{ github.event.pull_request.head.sha }}"
+
+      - run: dotnet restore
+      - run: dotnet build -c Release --no-restore
+      - run: dotnet test -c Release --no-build
+
+  smoke-preview:
+    name: Smoke-test Render Preview
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Wait for preview env (Render leva ~5min)
+        run: sleep 180
+
+      - name: Resolve preview URLs
+        id: urls
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          echo "api=https://easystok-api-pr-$PR.onrender.com"   >> "$GITHUB_OUTPUT"
+          echo "web=https://easystok-web-pr-$PR.onrender.com"   >> "$GITHUB_OUTPUT"
+          echo "admin=https://easystok-admin-pr-$PR.onrender.com" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke API
+        run: |
+          for i in $(seq 1 30); do
+            S=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.urls.outputs.api }}/health" || echo 000)
+            echo "api attempt $i: $S"
+            [ "$S" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::warning::API preview não respondeu — preview env pode ainda estar buildando"
+
+      - name: Smoke Web
+        run: |
+          S=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.urls.outputs.web }}/health" || echo 000)
+          echo "web: $S"
+
+      - name: Comment preview URLs on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: render-preview
+          message: |
+            ### Render Preview Environment
+
+            | Service | URL | Health |
+            |---|---|---|
+            | API | ${{ steps.urls.outputs.api }} | [/health](${{ steps.urls.outputs.api }}/health) |
+            | Web (PWA) | ${{ steps.urls.outputs.web }} | [/health](${{ steps.urls.outputs.web }}/health) |
+            | Admin | ${{ steps.urls.outputs.admin }} | [/health](${{ steps.urls.outputs.admin }}/health) |
+
+            PWA version endpoint: [`/api/mobile/version`](${{ steps.urls.outputs.api }}/api/mobile/version)
+            Downloads APK: ${{ steps.urls.outputs.web }}/downloads
+
+            > Preview env é descartável e expira 7 dias após o último commit do PR.

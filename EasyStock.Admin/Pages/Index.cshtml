@@ -73,46 +73,47 @@
 
     <!-- Métricas principais -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="card">
+        <a href="/Tenants?status=Ativa" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Ativos</div>
             <div class="text-3xl font-bold text-es-ink" x-text="dash.tenantsAtivos">@Model.TenantsAtivos</div>
             <div class="text-es-ink-mute text-xs mt-1">de <span x-text="dash.totalTenants">@Model.TotalTenants</span> total</div>
-        </div>
-        <div class="card">
+        </a>
+        <a href="/Tenants?status=Suspensa" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Suspensos</div>
             <div class="text-3xl font-bold text-es-gold" x-text="dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
             <div class="text-es-ink-mute text-xs mt-1">+<span x-text="dash.tenantsNovos">@Model.TenantsNovos</span> novos (30d)</div>
-        </div>
-        <div class="card">
+        </a>
+        <a href="/Tickets?status=Aberto" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tickets Abertos</div>
             <div class="text-3xl font-bold text-es-basil" x-text="dash.ticketsAbertos">@Model.TicketsAbertos</div>
             <div class="text-red-400 text-xs mt-1 font-medium"><span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> críticos</div>
-        </div>
-        <div class="card">
+        </a>
+        <a href="/Faturas" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Receita Estimada</div>
             <div class="text-3xl font-bold text-es-accent">R$ <span x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0})">@Model.ReceitaMensal.ToString("N0")</span></div>
             <div class="text-es-ink-mute text-xs mt-1">mensal (assinaturas ativas)</div>
-        </div>
+        </a>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="card">
+        <a href="/Tenants" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Usuários Ativos</div>
             <div class="text-2xl font-bold text-es-ink" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</div>
-        </div>
-        <div class="card">
+        </a>
+        <a href="/AuditLogs" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Logins (24h)</div>
             <div class="text-2xl font-bold text-es-ink" x-text="dash.logins24h">@Model.Logins24h</div>
-        </div>
-        <div class="card">
+            <div x-show="dash.logins24h === 0" x-cloak class="text-es-ink-mute text-xs mt-1">nenhum login nas últimas 24h</div>
+        </a>
+        <a href="/Tickets?status=EmAtendimento" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Em Atendimento</div>
             <div class="text-2xl font-bold text-es-gold" x-text="dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</div>
-        </div>
-        <div class="card">
+        </a>
+        <a href="/Tenants" class="card block hover:ring-1 hover:ring-es-accent/40 transition-all">
             <div class="text-es-ink-mute text-xs font-semibold uppercase tracking-wide mb-1">Tenants Novos</div>
             <div class="text-2xl font-bold text-es-basil" x-text="dash.tenantsNovos">@Model.TenantsNovos</div>
             <div class="text-es-ink-mute text-xs mt-1">últimos 30 dias</div>
-        </div>
+        </a>
     </div>
 </div>
 

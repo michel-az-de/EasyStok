@@ -88,11 +88,17 @@ public sealed class GeradorNotificacoesAutomaticas(
                         var severidade = diasRestantes <= 3 ? SeveridadeNotificacao.Alta : SeveridadeNotificacao.Media;
                         var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
                         var dataValidade = item.ValidadeEm!.DataValidade.ToString("dd/MM/yyyy");
+                        var prazoTexto = diasRestantes switch
+                        {
+                            0 => "vence hoje",
+                            1 => "vence amanhã",
+                            _ => $"vence em {diasRestantes} dia(s)"
+                        };
                         return CriarSeNaoExisteNoDiaAsync(
                             empresa.Id,
                             TipoAlertaEstoque.ValidadeProxima,
                             "Validade Próxima",
-                            $"{codigo} vence em {diasRestantes} dia(s) ({dataValidade}). {qty_context(item)} Priorize a venda ou rotatividade.",
+                            $"{codigo} {prazoTexto} ({dataValidade}). {qty_context(item)} Priorize a venda ou rotatividade.",
                             severidade,
                             item.Id);
                     },

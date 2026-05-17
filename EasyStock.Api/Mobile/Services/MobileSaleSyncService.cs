@@ -51,9 +51,12 @@ public class MobileSaleSyncService(
             if (items == null || items.Count == 0) return false;
 
             // Resolve mobile_products pra cada item — só os linkados viram ItemVenda.
+            // IgnoreQueryFilters: backfill/endpoint mobile não tem JWT, então o
+            // Global Query Filter tenant zeraria (CurrentTenantId=Guid.Empty).
+            // Filtragem manual por EmpresaId já garante o isolamento.
             var mobileIds = items.Select(i => i.ProductId).Distinct().ToList();
-            var products = await _db.Set<Product>().AsNoTracking()
-                .Where(p => mobileIds.Contains(p.Id))
+            var products = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.EmpresaId == order.EmpresaId && mobileIds.Contains(p.Id))
                 .ToListAsync(ct);
 
             var linkedItems = items
@@ -93,7 +96,8 @@ public class MobileSaleSyncService(
             foreach (var li in linkedItems)
             {
                 var produtoId = li.Product!.ErpProductId!.Value;
-                var itemEstoque = await _db.Set<ItemEstoque>().AsNoTracking()
+                // IgnoreQueryFilters: vide comentario no SELECT de products acima.
+                var itemEstoque = await _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
                     .Where(ie => ie.EmpresaId == order.EmpresaId &&
                                  ie.ProdutoId == produtoId &&
                                  (ie.LojaId == null || ie.LojaId == order.LojaId))
@@ -101,10 +105,48 @@ public class MobileSaleSyncService(
 
                 if (itemEstoque == null)
                 {
-                    _log.LogWarning(
-                        "Onda 3: produto {ErpId} (mobile {MobileId}) sem ItemEstoque na empresa/loja — ItemVenda não criado. Pedido {OrderId}",
-                        produtoId, li.Product.Id, order.Id);
-                    continue;
+                    // F8-I: auto-cria ItemEstoque com qtd=0 pra produtos vendidos
+                    // sem entrada previa (ad-hoc). Sem isso a Venda nasce vazia
+                    // e perde-se rastreabilidade. Saldo negativo é a verdade —
+                    // produto vendido sem entrada registrada.
+                    var produto = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.Id == produtoId, ct);
+                    if (produto == null)
+                    {
+                        _log.LogWarning(
+                            "Onda 3: produto {ErpId} nao existe — ItemVenda não criado. Pedido {OrderId}",
+                            produtoId, order.Id);
+                        continue;
+                    }
+
+                    var custoUnit = produto.CustoReferencia ?? Dinheiro.Zero;
+                    var novoItem = ItemEstoque.CriarParaEntrada(
+                        id: Guid.NewGuid(),
+                        empresaId: order.EmpresaId.Value,
+                        produto: produto,
+                        variacao: null,
+                        quantidade: Quantidade.Zero,
+                        custoUnitario: custoUnit,
+                        precoVendaSugerido: produto.PrecoReferencia,
+                        dataEntrada: DateTime.UtcNow,
+                        codigoInterno: $"AUTO-{Guid.NewGuid().ToString("N").Substring(0, 8)}",
+                        codigoLote: null,
+                        codigoMarketplace: null,
+                        variacaoDescricao: null,
+                        cor: null,
+                        tamanho: null,
+                        descricaoAnuncio: null,
+                        dimensoesReais: null,
+                        fornecedorNome: null,
+                        validade: null,
+                        observacoes: $"Auto-criado pela Onda 3 — produto vendido (pedido mobile {order.Id}) sem entrada previa de estoque",
+                        criadoEm: DateTime.UtcNow);
+                    if (order.LojaId.HasValue) novoItem.LojaId = order.LojaId;
+                    _db.Add(novoItem);
+                    itemEstoque = novoItem;
+                    _log.LogInformation(
+                        "Onda 3: ItemEstoque auto-criado (qtd=0) pra produto {ErpId} (mobile {MobileId}) loja {LojaId} pedido {OrderId}",
+                        produtoId, li.Product.Id, order.LojaId, order.Id);
                 }
 
                 var itemVenda = new ItemVenda
@@ -125,6 +167,21 @@ public class MobileSaleSyncService(
             }
 
             order.ErpVendaId = vendaId;
+
+            // F9-D: auditoria — registra criacao da Venda em venda_alteracoes.
+            // AlteradoPorUserId nullable; usa LastOperatorName do mobile como nome.
+            _db.Add(new VendaAlteracao
+            {
+                Id = Guid.NewGuid(),
+                VendaId = vendaId,
+                AlteradoPorUserId = null,
+                AlteradoPorNome = string.IsNullOrWhiteSpace(order.LastOperatorName) ? "Sync mobile" : order.LastOperatorName,
+                Campo = "criada",
+                ValorAntigo = null,
+                ValorNovo = $"Pedido mobile #{order.Id.Substring(Math.Max(0, order.Id.Length - 8))} entregue. ItensCount={venda.ItensVenda?.Count ?? 0}; Total={venda.ValorTotal.Valor}",
+                AlteradoEm = DateTime.UtcNow,
+                Origem = "mobile"
+            });
 
             _log.LogInformation(
                 "Onda 3: Venda {VendaId} criada pra pedido mobile {OrderId} ({ItemsCount} itens, total {Total})",
@@ -151,7 +208,9 @@ public class MobileSaleSyncService(
         {
             if (!order.ErpVendaId.HasValue) return false;
 
-            var venda = await _db.Set<Venda>().FirstOrDefaultAsync(v => v.Id == order.ErpVendaId, ct);
+            // IgnoreQueryFilters: endpoint mobile sem JWT (CurrentTenantId=Empty).
+            var venda = await _db.Set<Venda>().IgnoreQueryFilters()
+                .FirstOrDefaultAsync(v => v.Id == order.ErpVendaId, ct);
             if (venda == null) return false;
 
             var prefix = "[CANCELADO no mobile em " + DateTime.UtcNow.ToString("dd/MM HH:mm") + "] ";

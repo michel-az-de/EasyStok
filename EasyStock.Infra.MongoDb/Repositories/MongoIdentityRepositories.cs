@@ -151,6 +151,14 @@ public sealed class PedidoFornecedorRepository(MongoEasyStockContext context, Mo
         return Task.CompletedTask;
     }
 
+    public Task AddItemAsync(PedidoFornecedorItem item)
+    {
+        // Em Mongo itens sao embedded no PedidoFornecedor — caller deve manter coerencia
+        // adicionando a item a pedido.Itens e chamando UpdateAsync(pedido).
+        throw new NotSupportedException(
+            "Mongo armazena itens embedded em PedidoFornecedor. Adicione a pedido.Itens e chame UpdateAsync.");
+    }
+
     public Task UpdateAsync(PedidoFornecedor pedido)
     {
         EnqueueReplaceScoped(Collection, pedido.Id, pedido.EmpresaId, pedido);

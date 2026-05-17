@@ -1,6 +1,6 @@
 namespace EasyStock.Application.Ports.Output;
 
-public record EfiCobrancaResult(
+public sealed record EfiCobrancaResult(
     string Txid,
     string PixCopiaCola,
     string QrCodeBase64,
