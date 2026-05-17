@@ -227,7 +227,8 @@ public sealed class NotificacoesDispatcherOrchestrator(
         try
         {
             assunto = await renderer.RenderizarAsync(template.AssuntoTemplate, vars, ct);
-            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, ct);
+            var corpoEscapaHtml = proximoCanal is CanalNotificacao.Email or CanalNotificacao.InApp;
+            corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars, corpoEscapaHtml, ct);
         }
         catch (Exception ex)
         {
