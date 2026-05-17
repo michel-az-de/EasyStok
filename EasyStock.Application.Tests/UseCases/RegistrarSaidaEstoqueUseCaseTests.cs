@@ -25,6 +25,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -109,6 +110,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -201,6 +203,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
 
         var empresaId = Guid.NewGuid();
         var produto = new Produto
@@ -265,6 +268,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
 
         var empresaId = Guid.NewGuid();
         var produto = new Produto
@@ -329,6 +333,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
 
         var empresaId = Guid.NewGuid();
         var produto = new Produto
@@ -401,6 +406,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -464,6 +470,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -527,6 +534,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -591,6 +599,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -671,6 +680,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
         var publicadorEventos = Substitute.For<IPublicadorEventos>();
         var empresaId = Guid.NewGuid();
 

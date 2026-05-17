@@ -1,6 +1,8 @@
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
 using EasyStock.Infra.Postgre.Events;
@@ -22,10 +24,19 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.AddSingleton<AuditTimestampsInterceptor>();
+        // IMemoryCache e a config CacheOptions sao requeridos pelo
+        // SubscriptionStatusCache. AddMemoryCache e idempotente; Configure
+        // garante o IOptions vazio com defaults se ninguem mais registrou.
+        services.AddMemoryCache();
+        services.Configure<EasyStock.Infra.Postgre.Configuration.CacheOptions>(_ => { });
+        services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
+        services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
         services.AddDbContext<EasyStockDbContext>((sp, options) =>
             options.UseSqlite(connectionString, sqlite =>
                 sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
-            .AddInterceptors(sp.GetRequiredService<AuditTimestampsInterceptor>()));
+            .AddInterceptors(
+                sp.GetRequiredService<AuditTimestampsInterceptor>(),
+                sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>()));
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
         services.AddScoped<ICategoriaRepository, CategoriaRepository>();

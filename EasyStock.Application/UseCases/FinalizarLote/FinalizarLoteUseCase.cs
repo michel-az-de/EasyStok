@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.Lotes;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.FinalizarLote;
@@ -16,6 +17,7 @@ public sealed record FinalizarLoteCommand(Guid EmpresaId, Guid Id);
 /// </summary>
 public class FinalizarLoteUseCase(
     ILoteRepository repo,
+    IProdutoRepository produtoRepo,
     IUnitOfWork uow,
     ILogger<FinalizarLoteUseCase> logger)
 {
@@ -30,6 +32,32 @@ public class FinalizarLoteUseCase(
 
         if (!lote.Itens.Any())
             throw new UseCaseValidationException("Lote sem itens não pode ser finalizado.");
+
+        // C2 (RDC 727/2022): bloqueia finalização se algum item de produto Embalado
+        // estiver sem peso. Itens de produto Avulso passam sem peso.
+        // Cobre lotes legados (LOT-260516) que entraram antes da migration.
+        var produtoIdsLote = lote.Itens
+            .Where(i => i.ProdutoId.HasValue)
+            .Select(i => i.ProdutoId!.Value)
+            .Distinct()
+            .ToList();
+        var tipoEmbalagemMap = produtoIdsLote.Count > 0
+            ? await produtoRepo.GetTipoEmbalagemMapAsync(cmd.EmpresaId, produtoIdsLote)
+            : new Dictionary<Guid, TipoEmbalagem>();
+        var itensEmbalagemSemPeso = lote.Itens.Where(i =>
+            i.ProdutoId.HasValue
+            && tipoEmbalagemMap.TryGetValue(i.ProdutoId.Value, out var t)
+            && t == TipoEmbalagem.Embalado
+            && (!i.PesoG.HasValue || i.PesoG.Value <= 0)
+        ).ToList();
+        if (itensEmbalagemSemPeso.Count > 0)
+        {
+            var nomes = string.Join(", ", itensEmbalagemSemPeso.Select(i => i.Nome));
+            throw new UseCaseValidationException(
+                $"Não é possível finalizar: {itensEmbalagemSemPeso.Count} item(ns) embalado(s) " +
+                $"sem peso ({nomes}). RDC 727 exige peso na rotulagem. " +
+                $"Edite o lote e informe o peso antes de finalizar.");
+        }
 
         // Gera etiquetas: 1 por unidade. Sequencial é global no lote (1..N).
         int seq = 0;

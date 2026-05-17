@@ -52,7 +52,7 @@ public class CaixaService(ApiClient api, SessionService session)
     }
 
     public Task<ApiResult<List<FechamentoCaixa>>> ListarFechamentosAsync() =>
-        api.GetAsync<List<FechamentoCaixa>>($"caixa/fechamentos?empresaId={GetEmpresaId()}&page=1&pageSize=60");
+        api.GetAsync<List<FechamentoCaixa>>($"caixa/fechamentos?empresaId={GetEmpresaId()}&page=1&pageSize=500");
 
     public Task<ApiResult<List<MobileCashSummary>>> ListarMobileAsync(bool pendingOnly = false)
     {

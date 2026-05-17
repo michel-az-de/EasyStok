@@ -8,169 +8,14 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
-    <title>Recibo · @p.Id.Substring(0, 8)</title>
+    <title>Recibo - @p.Id.Substring(0, 8)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-        :root { color-scheme: light; }
-        * { box-sizing: border-box; }
-        body {
-            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f3f4f6;
-            color: #111827;
-            line-height: 1.4;
-        }
-        .toolbar {
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
-            padding: 12px 16px;
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        .toolbar button, .toolbar a {
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            border: 1px solid transparent;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 150ms ease;
-        }
-        .toolbar .btn-primary { background: #0E2A6E; color: white; }
-        .toolbar .btn-primary:hover { background: #4338ca; }
-        .toolbar .btn-secondary { background: white; color: #374151; border-color: #d1d5db; }
-        .toolbar .btn-secondary:hover { background: #f9fafb; }
-
-        .recibo {
-            max-width: 480px;
-            margin: 16px auto;
-            background: white;
-            padding: 28px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border-radius: 12px;
-            font-size: 13px;
-        }
-        .header {
-            text-align: center;
-            border-bottom: 2px dashed #e5e7eb;
-            padding-bottom: 16px;
-            margin-bottom: 16px;
-        }
-        .header .empresa {
-            font-size: 18px;
-            font-weight: 700;
-            color: #111827;
-        }
-        .header .id {
-            font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
-            font-size: 11px;
-            color: #6b7280;
-            margin-top: 4px;
-        }
-        .meta {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 4px 12px;
-            margin-bottom: 16px;
-            color: #374151;
-        }
-        .meta .label { color: #6b7280; }
-        .items {
-            border-top: 1px dashed #e5e7eb;
-            border-bottom: 1px dashed #e5e7eb;
-            padding: 12px 0;
-            margin: 12px 0;
-        }
-        .items .row {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-        }
-        .items .row .name { flex: 1; padding-right: 8px; }
-        .items .row .name .qty { color: #6b7280; font-size: 11px; display: block; }
-        .items .row .price { font-variant-numeric: tabular-nums; }
-        .total {
-            font-size: 18px;
-            font-weight: 700;
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-top: 2px solid #111827;
-            margin-top: 8px;
-        }
-        .pagamentos {
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px dashed #e5e7eb;
-        }
-        .pagamentos h3 {
-            font-size: 12px;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin: 0 0 8px;
-        }
-        .pagamentos .pag-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            padding: 2px 0;
-        }
-        .pagamentos .pendente {
-            color: #b91c1c;
-            font-weight: 600;
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid #f3f4f6;
-        }
-        .pagamentos .quitado {
-            color: #047857;
-            font-weight: 600;
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid #f3f4f6;
-        }
-        .footer {
-            margin-top: 20px;
-            padding-top: 12px;
-            border-top: 1px dashed #e5e7eb;
-            font-size: 11px;
-            color: #6b7280;
-            text-align: center;
-        }
-        .observacoes {
-            margin-top: 12px;
-            padding: 8px 12px;
-            background: #f9fafb;
-            border-radius: 6px;
-            font-size: 12px;
-            color: #374151;
-            white-space: pre-line;
-        }
-
-        @@media print {
-            body { background: white; }
-            .toolbar { display: none; }
-            .recibo {
-                max-width: none;
-                margin: 0;
-                padding: 16px;
-                box-shadow: none;
-                border-radius: 0;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="~/css/recibo.css" asp-append-version="true" />
 </head>
-<body>
-    <div class="toolbar">
-        <a href="/pedidos/@p.Id" class="btn-secondary">← Voltar</a>
-        <button type="button" class="btn-primary" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+<body class="recibo-page">
+    <div class="recibo-toolbar">
+        <a href="/pedidos/@p.Id" class="btn-secondary">&larr; Voltar</a>
+        <button type="button" class="btn-primary" onclick="window.print()">Imprimir / Salvar PDF</button>
     </div>
 
     <div class="recibo">
@@ -202,7 +47,7 @@
                 <div class="row">
                     <div class="name">
                         @i.Emoji @i.Nome
-                        <span class="qty">@i.Quantidade @i.Unidade × @i.PrecoUnitario.ToString("C")</span>
+                        <span class="qty">@i.Quantidade @i.Unidade x @i.PrecoUnitario.ToString("C")</span>
                     </div>
                     <div class="price">@i.Subtotal.ToString("C")</div>
                 </div>
@@ -221,17 +66,17 @@
                 @foreach (var pg in Model.Detalhe.Pagamentos)
                 {
                     <div class="pag-row">
-                        <span>@pg.PagoEm.ToLocalTime().ToString("dd/MM HH:mm") · @pg.Metodo</span>
+                        <span>@pg.PagoEm.ToLocalTime().ToString("dd/MM HH:mm") - @pg.Metodo</span>
                         <span>@pg.Valor.ToString("C")</span>
                     </div>
                 }
                 @if (p.Quitado)
                 {
-                    <div class="quitado">✓ Quitado · @p.TotalPago.ToString("C")</div>
+                    <div class="quitado">Quitado - @p.TotalPago.ToString("C")</div>
                 }
                 else if (p.TotalPago > 0)
                 {
-                    <div class="pag-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f3f4f6;">
+                    <div class="pag-row pago-parcial">
                         <span>Pago</span><span>@p.TotalPago.ToString("C")</span>
                     </div>
                     <div class="pendente">Pendente: @p.Pendente.ToString("C")</div>
@@ -254,10 +99,10 @@
     </div>
 
     <script>
-        // Auto-foca no botão imprimir pra Enter ativar
+        // Auto-foca no botao imprimir pra Enter ativar
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-                // Permite o atalho nativo do browser (já chama window.print())
+                // Permite o atalho nativo do browser (ja chama window.print())
             }
         });
     </script>

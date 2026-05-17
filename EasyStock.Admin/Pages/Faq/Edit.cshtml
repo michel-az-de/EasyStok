@@ -4,64 +4,74 @@
     ViewData["Title"] = Model.Id.HasValue ? "Editar FAQ" : "Novo FAQ";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-es-ink text-xl font-semibold">@(Model.Id.HasValue ? "Editar item" : "Novo item")</h1>
+    <a asp-page="/Faq/Index" class="btn-secondary text-sm">Voltar</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Erro))
+{
+    <div class="mb-4 rounded bg-red-100 px-4 py-2 text-red-800">@Model.Erro</div>
+}
+
+@if (Model.Status != null)
+{
+    <div class="mb-4 text-sm text-es-ink-2">Status atual: <strong>@Model.Status</strong></div>
+}
+
+<form method="post" class="space-y-4 max-w-3xl">
     <div>
-        <es-breadcrumb>
-            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-            <es-breadcrumb-item href="/Faq">FAQ</es-breadcrumb-item>
-            <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Novo")</es-breadcrumb-item>
-        </es-breadcrumb>
-        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
-            <h2 style="margin:0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">@ViewData["Title"]</h2>
-            @if (Model.Status != null)
+        <label class="block text-sm mb-1">Categoria</label>
+        <select asp-for="CategoriaId" class="form-input w-full" required disabled="@Model.Id.HasValue">
+            <option value="">— selecione —</option>
+            @foreach (var cat in Model.Categorias)
             {
-                var sv = Model.Status switch { "Publicado" => "ok", "Arquivado" => "neutral", "Rascunho" => "warn", _ => "neutral" };
-                <es-badge variant="@sv" with-dot="true">@(Model.Status.ToUpper())</es-badge>
+                var id = cat.GetProperty("id").GetGuid();
+                var nome = cat.GetProperty("nome").GetString();
+                <option value="@id" selected="@(Model.CategoriaId == id)">@nome</option>
             }
+        </select>
+    </div>
+
+    <div>
+        <label class="block text-sm mb-1">Titulo *</label>
+        <input asp-for="Titulo" class="form-input w-full" maxlength="200" required />
+    </div>
+
+    @if (!Model.Id.HasValue)
+    {
+        <div>
+            <label class="block text-sm mb-1">Slug *</label>
+            <input asp-for="Slug" class="form-input w-full" maxlength="200" required
+                   placeholder="ex: como-cadastrar-produto" />
+            <p class="text-xs text-es-ink-2 mt-1">Use somente letras minusculas, numeros e hifen.</p>
+        </div>
+    }
+
+    <div>
+        <label class="block text-sm mb-1">Conteudo (Markdown) *</label>
+        <textarea asp-for="Conteudo" rows="14" class="form-input w-full font-mono text-xs" required></textarea>
+    </div>
+
+    <div>
+        <label class="block text-sm mb-1">Conteudo de busca (opcional, texto plano)</label>
+        <textarea asp-for="ConteudoBusca" rows="3" class="form-input w-full text-xs"></textarea>
+        <p class="text-xs text-es-ink-2 mt-1">Se vazio, sera derivado do Markdown automaticamente.</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm mb-1">Tags (separadas por virgula)</label>
+            <input asp-for="Tags" class="form-input w-full" maxlength="500" />
+        </div>
+        <div>
+            <label class="block text-sm mb-1">Ordem</label>
+            <input asp-for="Ordem" type="number" class="form-input w-full" />
         </div>
     </div>
-    <es-button variant="ghost" href="/Faq" icon="arrow-left">Voltar</es-button>
-</div>
 
-<div style="max-width:880px;">
-    <es-card>
-        <form method="post" style="display:flex; flex-direction:column; gap:14px;">
-            <es-select asp-for="CategoriaId" label="Categoria" required="true" disabled="@Model.Id.HasValue">
-                <option value="">— selecione —</option>
-                @foreach (var cat in Model.Categorias)
-                {
-                    var id = cat.GetProperty("id").GetGuid();
-                    var nome = cat.GetProperty("nome").GetString();
-                    <option value="@id" selected="@(Model.CategoriaId == id)">@nome</option>
-                }
-            </es-select>
-
-            <es-input asp-for="Titulo" label="Título" required="true" maxlength="200" />
-
-            @if (!Model.Id.HasValue)
-            {
-                <es-input asp-for="Slug" label="Slug" required="true" maxlength="200"
-                          placeholder="ex.: como-cadastrar-produto"
-                          helper="Use letras minúsculas, números e hífen. Sem espaços." />
-            }
-
-            <es-textarea asp-for="Conteudo" label="Conteúdo (Markdown)" required="true"
-                         rows="14" input-class="font-mono" />
-
-            <es-textarea asp-for="ConteudoBusca" label="Conteúdo de busca (texto plano)"
-                         rows="3" label-optional="true"
-                         helper="Se vazio, será derivado do Markdown automaticamente." />
-
-            <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
-                <es-input asp-for="Tags" label="Tags" maxlength="500" label-optional="true"
-                          helper="Separadas por vírgula." />
-                <es-input asp-for="Ordem" type="number" label="Ordem" />
-            </div>
-
-            <div style="display:flex; gap:8px; padding-top:6px;">
-                <es-button type="submit" variant="primary" icon="check">Salvar</es-button>
-                <es-button variant="ghost" href="/Faq">Cancelar</es-button>
-            </div>
-        </form>
-    </es-card>
-</div>
+    <div class="flex items-center gap-2">
+        <button type="submit" class="btn-primary">Salvar</button>
+        <a asp-page="/Faq/Index" class="btn-secondary">Cancelar</a>
+    </div>
+</form>

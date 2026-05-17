@@ -104,7 +104,8 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <span x-text="gerando ? 'Gerando...' : '✨ Gerar Anúncio'"></span>
+                <es-icon name="sparkles" class="es-icon--sm" x-show="!gerando"></es-icon>
+                <span x-text="gerando ? 'Gerando...' : 'Gerar Anúncio'"></span>
             </button>
         </div>
     </div>
@@ -133,9 +134,9 @@
             </div>
 
             <div x-show="resultado.length === 0 && !gerando"
-                 class="h-64 flex items-center justify-center text-slate-400">
+                 class="h-64 flex items-center justify-center" style="color: var(--text-muted);">
                 <div class="text-center">
-                    <div class="text-4xl mb-3">✨</div>
+                    <es-icon name="sparkles" class="mx-auto mb-3" style="width:40px; height:40px;"></es-icon>
                     <p class="text-sm">Configure e clique em "Gerar Anúncio"</p>
                 </div>
             </div>

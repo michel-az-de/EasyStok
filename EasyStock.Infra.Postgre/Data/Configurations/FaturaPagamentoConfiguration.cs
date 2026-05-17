@@ -11,6 +11,7 @@ public class FaturaPagamentoConfiguration : IEntityTypeConfiguration<FaturaPagam
         builder.ToTable("fatura_pagamentos");
         builder.HasKey(p => p.Id);
 
+        builder.Property(p => p.EmpresaId).IsRequired();
         builder.Property(p => p.Metodo).IsRequired().HasMaxLength(30);
         builder.Property(p => p.Valor).HasColumnType("decimal(14,2)");
         builder.Property(p => p.Status).HasConversion<string>().IsRequired().HasMaxLength(30);
@@ -19,6 +20,13 @@ public class FaturaPagamentoConfiguration : IEntityTypeConfiguration<FaturaPagam
         builder.Property(p => p.DadosGatewayJson).HasColumnType("jsonb");
         builder.Property(p => p.Observacao).HasMaxLength(2000);
         builder.Property(p => p.RegistradoPorNome).HasMaxLength(120);
+
+        // Onda P0 Payment Orchestration
+        builder.Property(p => p.TotalTentativas).IsRequired().HasDefaultValue(0);
+        builder.Property(p => p.UltimaErrorCategory)
+            .HasConversion<byte?>()
+            .HasColumnName("UltimaErrorCategory");
+        builder.Property(p => p.ClientIdempotencyKey).HasMaxLength(80);
 
         // FK explicita — pagamento nao existe sem fatura (Cascade).
         builder.HasOne(p => p.Fatura)
@@ -41,5 +49,16 @@ public class FaturaPagamentoConfiguration : IEntityTypeConfiguration<FaturaPagam
             .HasFilter("\"GatewayTransactionId\" IS NOT NULL");
         builder.HasIndex(p => new { p.FaturaId, p.Status })
             .HasDatabaseName("ix_fatura_pagamentos_fatura_status");
+
+        // Indice por empresa (Global Query Filter automatico aplica)
+        builder.HasIndex(p => new { p.EmpresaId, p.Status })
+            .HasDatabaseName("ix_fatura_pagamentos_empresa_status");
+
+        // UNIQUE parcial: Idempotency-Key opcional do cliente — segunda request com
+        // mesma key retorna o mesmo pagamento.
+        builder.HasIndex(p => new { p.EmpresaId, p.ClientIdempotencyKey })
+            .HasDatabaseName("ux_fatura_pagamentos_empresa_client_idempotency")
+            .HasFilter("\"ClientIdempotencyKey\" IS NOT NULL")
+            .IsUnique();
     }
 }

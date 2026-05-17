@@ -22,7 +22,7 @@ export function renderModule(root, state) {
 
     const selected = route.endpointId
         ? eps.find(e => e.id === route.endpointId && e.method === route.method)
-        : null;
+        : eps[0] || null;
 
     root.innerHTML = `
         ${renderHud(state)}
@@ -47,7 +47,7 @@ export function renderModule(root, state) {
                     }).join('')}
                 </div>
                 <ul class="es-rail-list" role="list">
-                    ${filteredEps.map(ep => renderRailItem(ep, route)).join('') || `<li class="es-rail-empty">— sem endpoints com esse filtro —</li>`}
+                    ${filteredEps.map(ep => renderRailItem(ep, route)).join('') || `<li class="es-rail-empty">Nenhum endpoint neste filtro.</li>`}
                 </ul>
             </aside>
             <section class="es-detail">

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using Microsoft.Extensions.Configuration;
@@ -39,9 +40,14 @@ public sealed class StripeGatewayAdapter(
         string.Equals(metodo, "cartao", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(metodo, "stripe", StringComparison.OrdinalIgnoreCase);
 
-    public Task<InstrucaoPagamento> CriarAsync(Fatura fatura, string metodo, CancellationToken ct = default)
+    public Task<InstrucaoPagamento> CriarAsync(
+        Fatura fatura,
+        string metodo,
+        string? idempotencyKey = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(fatura);
+        // P2: ao implementar, passar via RequestOptions { IdempotencyKey = idempotencyKey }.
         var secretKey = configuration["Stripe:SecretKey"];
         if (string.IsNullOrWhiteSpace(secretKey))
         {
@@ -53,7 +59,7 @@ public sealed class StripeGatewayAdapter(
                 Provedor: Provedor,
                 TransactionId: "unconfigured",
                 UrlCheckout: null,
-                DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { erro = "Stripe nao configurado." })
+                DadosGatewayJson: JsonSerializer.Serialize(new { erro = "Stripe nao configurado." })
             ));
         }
 

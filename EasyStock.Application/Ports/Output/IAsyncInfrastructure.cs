@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace EasyStock.Application.Ports.Output;
 
 /// <summary>

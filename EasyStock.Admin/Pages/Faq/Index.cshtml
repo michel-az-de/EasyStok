@@ -2,127 +2,121 @@
 @model EasyStock.Admin.Pages.Faq.IndexModel
 @using System.Text.Json
 @{
-    ViewData["Title"] = "FAQ — Base de conhecimento";
-    var orderBy = Request.Query["orderBy"].FirstOrDefault();
-    var dir = Request.Query["dir"].FirstOrDefault();
+    ViewData["Title"] = "FAQ";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
-        <es-breadcrumb>
-            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-            <es-breadcrumb-item>FAQ</es-breadcrumb-item>
-        </es-breadcrumb>
-        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
-            Base de conhecimento para clientes e equipe interna
-        </div>
-    </div>
-    <div style="display:flex; gap:8px;">
-        <es-button variant="ghost" href="/Faq/Categorias" icon="bookmark">Categorias</es-button>
-        <es-button variant="primary" href="/Faq/Edit" icon="plus">Novo item</es-button>
+<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
+    <h1 class="text-es-ink text-xl font-semibold">FAQ — Base de Conhecimento</h1>
+    <div class="flex gap-2">
+        <a asp-page="/Faq/Edit" asp-route-id="" class="btn-primary text-sm">+ Novo item</a>
+        <a asp-page="/Faq/Categorias" class="btn-secondary text-sm">Categorias</a>
     </div>
 </div>
 
-<es-card padding="md" card-class="mb-4">
-    <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; align-items:end;">
-        <es-input name="busca" label="Buscar" value="@Model.Busca" placeholder="Por título ou conteúdo..." prefix-icon="search" field-class="md:col-span-2" />
-        <es-select name="status" label="Status">
-            <option value="">Todos</option>
-            <option value="Rascunho" selected="@(Model.Status == "Rascunho")">Rascunho</option>
-            <option value="Publicado" selected="@(Model.Status == "Publicado")">Publicado</option>
-            <option value="Arquivado" selected="@(Model.Status == "Arquivado")">Arquivado</option>
-        </es-select>
-        <es-select name="categoriaId" label="Categoria">
-            <option value="">Todas</option>
-            @foreach (var cat in Model.Categorias)
-            {
-                var id = cat.GetProperty("id").GetGuid();
-                var nome = cat.GetProperty("nome").GetString();
-                <option value="@id" selected="@(Model.CategoriaId == id)">@nome</option>
-            }
-        </es-select>
-        <div style="display:flex; gap:8px;">
-            <es-button type="submit" variant="primary" icon="filter">Filtrar</es-button>
-            <es-button variant="ghost" href="/Faq">Limpar</es-button>
-        </div>
-    </form>
-</es-card>
+@if (!string.IsNullOrEmpty(Model.Erro))
+{
+    <div class="mb-4 rounded bg-red-100 px-4 py-2 text-red-800">@Model.Erro</div>
+}
 
-<es-filter-bar>
-    @if (!string.IsNullOrEmpty(Model.Busca)) { <es-filter-chip label="Busca" remove-param="busca">@Model.Busca</es-filter-chip> }
-    @if (!string.IsNullOrEmpty(Model.Status)) { <es-filter-chip label="Status" remove-param="status">@Model.Status</es-filter-chip> }
-    @if (Model.CategoriaId.HasValue) { <es-filter-chip label="Categoria" remove-param="categoriaId">filtrada</es-filter-chip> }
-</es-filter-bar>
-
-<es-data-table sort-key="@orderBy" sort-dir="@dir" is-empty="@(!Model.Itens.Any())">
-    <es-data-table-column key="titulo" label="Título" sortable="true" />
-    <es-data-table-column label="Categoria" />
-    <es-data-table-column label="Status" />
-    <es-data-table-column label="Vis." align="right" />
-    <es-data-table-column label="Útil / Não útil" align="right" />
-    <es-data-table-column label="Atualizado" align="right" />
-    <es-data-table-column label="" actions="true" width="220px" />
-
-    @foreach (var item in Model.Itens)
-    {
-        var id = item.GetProperty("id").GetGuid();
-        var status = item.GetProperty("status").GetString();
-        var titulo = item.GetProperty("titulo").GetString();
-        var catNome = item.GetProperty("categoriaNome").GetString();
-        var vis = item.GetProperty("visualizacoes").GetInt32();
-        var ok = item.GetProperty("utilCount").GetInt32();
-        var nok = item.GetProperty("naoUtilCount").GetInt32();
-        var atualizadoEm = item.TryGetProperty("publicadoEm", out var pe) && pe.ValueKind != JsonValueKind.Null ? pe.GetDateTime() : (DateTime?)null;
-        var statusVariant = status switch
+<form method="get" class="flex items-center gap-2 flex-wrap mb-6">
+    <input type="text" name="busca" value="@Model.Busca" placeholder="Buscar..." class="form-input max-w-xs" />
+    <select name="status" class="form-input max-w-[160px]">
+        <option value="">Todos status</option>
+        <option value="Rascunho" selected="@(Model.Status == "Rascunho")">Rascunho</option>
+        <option value="Publicado" selected="@(Model.Status == "Publicado")">Publicado</option>
+        <option value="Arquivado" selected="@(Model.Status == "Arquivado")">Arquivado</option>
+    </select>
+    <select name="categoriaId" class="form-input max-w-[200px]">
+        <option value="">Todas categorias</option>
+        @foreach (var cat in Model.Categorias)
         {
-            "Publicado" => "ok",
-            "Arquivado" => "neutral",
-            "Rascunho" => "warn",
-            _ => "neutral"
-        };
+            var id = cat.GetProperty("id").GetGuid();
+            var nome = cat.GetProperty("nome").GetString();
+            <option value="@id" selected="@(Model.CategoriaId == id)">@nome</option>
+        }
+    </select>
+    <button type="submit" class="btn-secondary text-sm">Filtrar</button>
+</form>
 
-        <tr>
-            <td data-label="Título" style="font-weight:500; color:var(--text-primary);">@titulo</td>
-            <td data-label="Categoria" style="color:var(--text-secondary); font-size:13px;">@catNome</td>
-            <td data-label="Status"><es-badge variant="@statusVariant" with-dot="true">@status</es-badge></td>
-            <td data-label="Vis." class="es-data-table-td-numeric" style="font-weight:500;">@vis</td>
-            <td data-label="Útil / Não útil" class="es-data-table-td-numeric">
-                <span style="color:var(--ok-600);">@ok</span> /
-                <span style="color:var(--crit-600);">@nok</span>
-            </td>
-            <td data-label="Atualizado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">
-                @(atualizadoEm?.ToString("dd/MM/yy HH:mm") ?? "—")
-            </td>
-            <td class="es-data-table-td-actions">
-                <div class="es-row-actions">
-                    <es-button variant="ghost" size="xs" icon="edit-2" href="/Faq/Edit/@id">Editar</es-button>
-                    @if (status == "Rascunho" || status == "Arquivado")
-                    {
-                        <form method="post" asp-page-handler="Publicar" asp-route-id="@id" style="display:inline;">
-                            <es-button type="submit" variant="ghost" size="xs" icon="check">Publicar</es-button>
-                        </form>
-                    }
-                    @if (status == "Publicado")
-                    {
-                        <form method="post" asp-page-handler="Arquivar" asp-route-id="@id" style="display:inline;">
-                            <es-button type="submit" variant="ghost" size="xs">Arquivar</es-button>
-                        </form>
-                    }
-                </div>
-            </td>
-        </tr>
-    }
-
-    <es-data-table-empty>
-        <es-empty-state icon="bookmark"
-                        title="Nenhum item de FAQ"
-                        description="Crie artigos para responder dúvidas frequentes dos clientes.">
-            <es-button variant="primary" icon="plus" href="/Faq/Edit">Criar primeiro item</es-button>
-        </es-empty-state>
-    </es-data-table-empty>
-</es-data-table>
+<div class="rounded border border-es-border bg-es-surface overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-es-surface-2 text-es-ink-2 text-left">
+            <tr>
+                <th class="p-3">Titulo</th>
+                <th class="p-3">Categoria</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Visualizacoes</th>
+                <th class="p-3">Util / Nao util</th>
+                <th class="p-3">Atualizado</th>
+                <th class="p-3"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Itens.Any())
+            {
+                <tr><td colspan="7" class="p-4 text-center text-es-ink-2">Nenhum item de FAQ encontrado.</td></tr>
+            }
+            else
+            {
+                @foreach (var item in Model.Itens)
+                {
+                    var id = item.GetProperty("id").GetGuid();
+                    var status = item.GetProperty("status").GetString();
+                    var titulo = item.GetProperty("titulo").GetString();
+                    var catNome = item.GetProperty("categoriaNome").GetString();
+                    var vis = item.GetProperty("visualizacoes").GetInt32();
+                    var ok = item.GetProperty("utilCount").GetInt32();
+                    var nok = item.GetProperty("naoUtilCount").GetInt32();
+                    <tr class="border-t border-es-border">
+                        <td class="p-3 font-medium">@titulo</td>
+                        <td class="p-3">@catNome</td>
+                        <td class="p-3">
+                            <span class="rounded px-2 py-0.5 text-xs @(status == "Publicado" ? "bg-green-100 text-green-800" : status == "Arquivado" ? "bg-gray-200 text-gray-700" : "bg-yellow-100 text-yellow-800")">
+                                @status
+                            </span>
+                        </td>
+                        <td class="p-3">@vis</td>
+                        <td class="p-3">@ok / @nok</td>
+                        <td class="p-3">
+                            @{
+                                var atualizadoEm = item.TryGetProperty("publicadoEm", out var pe) && pe.ValueKind != JsonValueKind.Null
+                                    ? pe.GetDateTime() : (DateTime?)null;
+                            }
+                            @(atualizadoEm?.ToString("yyyy-MM-dd HH:mm") ?? "-")
+                        </td>
+                        <td class="p-3">
+                            <div class="flex gap-2">
+                                <a asp-page="/Faq/Edit" asp-route-id="@id" class="btn-link text-sm">Editar</a>
+                                @if (status == "Rascunho" || status == "Arquivado")
+                                {
+                                    <form method="post" asp-page-handler="Publicar" asp-route-id="@id" class="inline">
+                                        <button type="submit" class="btn-link text-sm text-green-700">Publicar</button>
+                                    </form>
+                                }
+                                @if (status == "Publicado")
+                                {
+                                    <form method="post" asp-page-handler="Arquivar" asp-route-id="@id" class="inline">
+                                        <button type="submit" class="btn-link text-sm text-gray-700">Arquivar</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
 
 @if (Model.TotalPages > 1)
 {
-    <es-pagination page="@Model.Page" page-size="20" total="@(Model.TotalPages * 20)" />
+    <div class="mt-4 flex gap-2">
+        @for (int p = 1; p <= Model.TotalPages; p++)
+        {
+            <a class="@(p == Model.Page ? "btn-primary" : "btn-secondary") text-xs"
+               href="?page=@p&status=@Model.Status&categoriaId=@Model.CategoriaId&busca=@Model.Busca">
+                @p
+            </a>
+        }
+    </div>
 }

@@ -5,6 +5,7 @@
 
 :root {
   /* ----- Color: neutrals (cool gray) ----- */
+  --ink-950: #050B1B;          /* extremo: overlays opacos, sombras */
   --ink-900: #0A1530;          /* texto principal — segue o tom do navy */
   --ink-800: #122042;
   --ink-700: #2A3556;
@@ -55,18 +56,27 @@
   /* ----- Color: status ----- */
   --warn-700: #8A5A00;
   --warn-600: #B57A00;            /* alerta validade próxima */
+  --warn-500: #D89A1A;
+  --warn-400: #E2B854;
+  --warn-300: #ECCC7A;
   --warn-200: #F0DC9A;
   --warn-100: #FBEBC4;
   --warn-50:  #FCF5E0;
 
   --crit-700: #8E2A1E;
   --crit-600: #C03B2A;            /* crítico / vencido / sem estoque */
+  --crit-500: #D45744;
+  --crit-400: #E07566;
+  --crit-300: #E8978A;
   --crit-200: #EFB7AD;
   --crit-100: #F8D8D2;
   --crit-50:  #FBEAE6;
 
   --ok-700: #0E6B3D;
   --ok-600: #18874E;              /* sucesso */
+  --ok-500: #2DA365;
+  --ok-400: #56B883;
+  --ok-300: #8ACAA6;
   --ok-200: #BFE0CC;
   --ok-100: #D6EFDF;
   --ok-50:  #ECF7F0;
@@ -97,6 +107,13 @@
   --shadow-sm: 0 1px 2px rgba(10, 21, 48, 0.06), 0 1px 1px rgba(10, 21, 48, 0.04);
   --shadow-md: 0 4px 12px rgba(10, 21, 48, 0.08), 0 2px 4px rgba(10, 21, 48, 0.04);
   --shadow-lg: 0 16px 40px rgba(10, 21, 48, 0.14), 0 4px 12px rgba(10, 21, 48, 0.06);
+
+  /* ----- Motion (duration + easing) ----- */
+  --motion-fast: 120ms;          /* micro: hover, tap feedback */
+  --motion-base: 200ms;          /* default: modal open, toast slide */
+  --motion-slow: 320ms;          /* large: drawer slide, page transition */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* ----- Spacing scale ----- */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
@@ -368,6 +385,32 @@ html, body {
 .btn-dark:focus { box-shadow: var(--focus-ring-navy); }
 .btn-sm { padding: 10px 14px; font-size: 14px; }
 .btn-lg { padding: 18px 28px; font-size: 17px; }
+
+/* loading state — mantem texto, prefixa spinner inline */
+.btn[aria-busy="true"] {
+  pointer-events: none;
+  cursor: progress;
+}
+.btn[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin var(--motion-slow) linear infinite;
+  flex: none;
+}
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* touch target — viewports estreitos garantem 44x44px */
+@media (max-width: 640px) {
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+}
 
 /* ----- Cards ----- */
 .card {

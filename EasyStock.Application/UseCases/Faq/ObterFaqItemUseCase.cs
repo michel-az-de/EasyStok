@@ -14,12 +14,6 @@ namespace EasyStock.Application.UseCases.Faq
         string? Origem,
         bool RegistrarVisualizacao = true);
 
-    /// <summary>
-    /// Retorna detalhe de um item de FAQ por slug de categoria e slug do item.
-    /// Quando <c>RegistrarVisualizacao = true</c>, persiste um <see cref="FaqVisualizacao"/>
-    /// e incrementa o contador atomicamente. O IP e anonimizado via SHA-256 + salt
-    /// antes de ser gravado (LGPD).
-    /// </summary>
     public sealed class ObterFaqItemUseCase(IFaqRepository faqRepo, IUnitOfWork uow)
     {
         public async Task<FaqItemDetalheDto> ExecuteAsync(ObterFaqItemQuery query, CancellationToken ct = default)

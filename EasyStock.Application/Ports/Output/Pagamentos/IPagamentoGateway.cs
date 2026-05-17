@@ -27,7 +27,24 @@ public interface IPagamentoGateway
     /// </summary>
     /// <param name="fatura">Fatura ja emitida; deve ter <c>Total &gt; 0</c>.</param>
     /// <param name="metodo">Metodo solicitado (deve passar por <see cref="SuportaMetodo"/>).</param>
-    Task<InstrucaoPagamento> CriarAsync(Fatura fatura, string metodo, CancellationToken ct = default);
+    /// <param name="idempotencyKey">
+    /// Chave de idempotencia (SHA-256 hex, 64 chars) propagada pelo orchestrator.
+    /// Adapters que suportam header dedicado devem enviar:
+    /// <list type="bullet">
+    ///   <item>Stripe: header <c>Idempotency-Key</c></item>
+    ///   <item>MercadoPago: header <c>X-Idempotency-Key</c></item>
+    ///   <item>Efí Pix: usa <c>txid</c> derivado dos primeiros 32 chars</item>
+    /// </list>
+    /// Em P0 a maioria dos adapters ignora — o orchestrator ainda assim cria
+    /// um <c>PaymentAttempt</c> com a key persistida (UNIQUE constraint).
+    /// Default null preserva chamadas legadas.
+    /// </param>
+    /// <param name="ct">CancellationToken.</param>
+    Task<InstrucaoPagamento> CriarAsync(
+        Fatura fatura,
+        string metodo,
+        string? idempotencyKey = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Consulta o estado atual de uma transacao no gateway. Usado pela

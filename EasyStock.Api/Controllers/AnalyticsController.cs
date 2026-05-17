@@ -3,6 +3,8 @@ using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Analytics.AlertasDias;
 using EasyStock.Application.UseCases.Analytics.Alertas;
 using EasyStock.Application.UseCases.Analytics.Dashboard;
+using EasyStock.Application.UseCases.Analytics.Dia;
+using EasyStock.Application.UseCases.Analytics.DashboardFull;
 using EasyStock.Application.UseCases.Analytics.Margem;
 using EasyStock.Application.UseCases.Analytics.Movimentacoes;
 using EasyStock.Application.UseCases.Analytics.Parados;
@@ -11,7 +13,9 @@ using EasyStock.Application.UseCases.Analytics.Receita;
 using EasyStock.Application.UseCases.Analytics.Reposicao;
 using EasyStock.Application.UseCases.Analytics.Sazonalidade;
 using EasyStock.Application.UseCases.Analytics.Validade;
+using EasyStock.Application.UseCases.Analytics.ReceitaCusto;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
+using EasyStock.Application.UseCases.Analytics.DashboardExtras;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +32,8 @@ namespace EasyStock.Api.Controllers;
 [EnableRateLimiting("geral")]
 public class AnalyticsController(
     GetDashboardUseCase getDashboardUseCase,
+    ObterResumoDiaUseCase obterResumoDiaUseCase,
+    GetDashboardFullUseCase getDashboardFullUseCase,
     CalcularProjecoesUseCase calcProjecoesUseCase,
     CalcularReposicaoUseCase calcReposicaoUseCase,
     CalcularSazonalidadeUseCase calcSazonalidadeUseCase,
@@ -40,19 +46,52 @@ public class AnalyticsController(
     ObterParadosUseCase obterParadosUseCase,
     ObterDiasAlertaParadoUseCase obterDiasAlertaParadoUseCase,
     ObterVendasPorCanalUseCase obterVendasPorCanalUseCase,
+    GetReceitaCustoUseCase getReceitaCustoUseCase,
+    GetDashboardExtrasUseCase getDashboardExtrasUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
 
-    [SwaggerOperation(Summary = "Get dashboard summary", Description = "Aggregated KPIs: total products, stock items, low-stock count, expiring items, monthly revenue.")]
+    [SwaggerOperation(Summary = "Get dashboard summary", Description = "Aggregated KPIs: total products, stock items, low-stock count, expiring items, monthly revenue. Optionally filtered by store.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("dashboard")]
-    public async Task<IActionResult> Dashboard([FromQuery] Guid empresaId, [FromQuery] int periodo = 30)
+    public async Task<IActionResult> Dashboard([FromQuery] Guid empresaId, [FromQuery] int periodo = 30, [FromQuery] Guid? lojaId = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var result = await getDashboardUseCase.ExecuteAsync(new GetDashboardCommand(resolvedEmpresaId, periodo));
+        var result = await getDashboardUseCase.ExecuteAsync(new GetDashboardCommand(resolvedEmpresaId, periodo, lojaId));
+        return DataOk(result);
+    }
+
+    [SwaggerOperation(Summary = "Get full dashboard data", Description = "Consolidated endpoint: 8 KPI cards with delta %, stock status, pending orders, alerts, and insights. Single request replaces 12+ individual calls.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("dashboard-full")]
+    public async Task<IActionResult> DashboardFull(
+        [FromQuery] Guid empresaId,
+        [FromQuery] int periodo = 30,
+        [FromQuery] Guid? lojaId = null,
+        [FromQuery] int tz = 0)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await getDashboardFullUseCase.ExecuteAsync(
+            new GetDashboardFullCommand(resolvedEmpresaId, periodo, lojaId, tz));
+        return DataOk(result);
+    }
+
+    [SwaggerOperation(Summary = "Resumo do dia em curso", Description = "Vendas, pedidos pendentes, status do caixa e Pix recebidos no dia. Usado pelo dashboard primario.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("dia")]
+    public async Task<IActionResult> Dia([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId = null)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await obterResumoDiaUseCase.ExecuteAsync(new ObterResumoDiaCommand(resolvedEmpresaId, lojaId));
         return DataOk(result);
     }
 
@@ -233,6 +272,42 @@ public class AnalyticsController(
         var (items, totalCount) = await obterParadosUseCase.ExecuteAsync(
             new ObterParadosCommand(resolvedEmpresaId, lojaId, diasEfetivos, page, pageSize));
         return DataPaged(items, totalCount, page, pageSize);
+    }
+
+    [SwaggerOperation(Summary = "Get revenue vs cost time series", Description = "Série temporal de Receita/Custo/Lucro: por dia (≤30d) ou por mês (>30d). Receita = Vendas confirmadas; Custo = Entradas de estoque no período.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("receita-custo")]
+    public async Task<IActionResult> ReceitaCusto(
+        [FromQuery] Guid empresaId,
+        [FromQuery] int periodo = 30,
+        [FromQuery] Guid? lojaId = null,
+        [FromQuery] int tz = 0)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await getReceitaCustoUseCase.ExecuteAsync(
+            new GetReceitaCustoCommand(resolvedEmpresaId, periodo, lojaId, tz));
+        return DataOk(result);
+    }
+
+    [SwaggerOperation(Summary = "Get dashboard extras", Description = "Carrega dados secundários: fluxo de caixa, validade timeline, top produtos, top clientes, produção por operador, entradas/saídas semanal, fornecedores, novos clientes.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("dashboard-extras")]
+    public async Task<IActionResult> DashboardExtras(
+        [FromQuery] Guid empresaId,
+        [FromQuery] int periodo = 30,
+        [FromQuery] Guid? lojaId = null,
+        [FromQuery] int tz = 0)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await getDashboardExtrasUseCase.ExecuteAsync(
+            new GetDashboardExtrasCommand(resolvedEmpresaId, periodo, lojaId, tz));
+        return DataOk(result);
     }
 
     [SwaggerOperation(Summary = "Get sales by channel")]

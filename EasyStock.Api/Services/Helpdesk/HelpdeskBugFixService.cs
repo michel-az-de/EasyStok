@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -17,7 +18,7 @@ namespace EasyStock.Api.Services.Helpdesk;
 public sealed class HelpdeskBugFixService(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
-    SlaResolver slaResolver,
+    ISlaResolver slaResolver,
     INotificadorService notificador)
 {
     public async Task<AdminTicket> GerarAsync(GerarBugFixCommand cmd, CancellationToken ct = default)

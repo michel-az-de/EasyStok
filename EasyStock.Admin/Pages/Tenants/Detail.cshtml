@@ -27,6 +27,20 @@
     <es-button variant="ghost" size="sm" href="/Tenants" icon="arrow-left">Voltar</es-button>
 </div>
 
+@* Banner dourado — senha temporária do tenant ou usuário recém-criado. Some no próximo navigate. *@
+@if (!string.IsNullOrEmpty(Model.NovaSenhaTemporaria))
+{
+    <div class="bg-es-gold/10 border border-es-gold/30 text-es-gold rounded-lg px-4 py-3 text-sm mb-4">
+        <div class="font-semibold mb-1">
+            Senha temporária de <strong>@Model.NovoUsuarioNome</strong> — anote agora, não será reexibida:
+        </div>
+        <code class="font-mono text-base select-all">@Model.NovaSenhaTemporaria</code>
+        <div class="text-xs text-es-ink-mute mt-2">
+            E-mail de destino: <span class="font-mono">@Model.NovoUsuarioEmail</span>
+        </div>
+    </div>
+}
+
 <!-- Banner de alerta — populado por fetch ao carregar notas. -->
 <div x-data="alertaBanner('@Model.Id')" x-init="carregar()"
      x-show="alertasAtivos > 0" x-cloak
@@ -35,17 +49,21 @@
     <div class="text-xl leading-none">⚠️</div>
     <div class="flex-1 text-sm">
         <span class="text-red-300 font-semibold">
-            <span x-text="alertasAtivos"></span> alerta(s) ativo(s) neste cliente.
+            <span x-text="plural(alertasAtivos, 'alerta ativo', 'alertas ativos') + ' neste cliente.'"></span>
         </span>
         <span class="text-es-ink-dim">Veja na aba <strong>Notas</strong> antes de agir.</span>
+        <span x-show="primeiroAlertaTexto" x-cloak class="block text-xs text-red-300/80 mt-0.5 italic">
+            "<span x-text="primeiroAlertaTexto"></span><span x-show="primeiroAlertaTexto.length >= 80" x-cloak>…</span>"
+        </span>
     </div>
-    <a href="?tab=notas" class="text-xs text-red-300 hover:text-red-200 underline">Ver notas</a>
+    <a href="?tab=notas" class="text-xs text-red-300 hover:text-red-200 underline whitespace-nowrap">Ver notas</a>
 </div>
 
 <script>
 function alertaBanner(tenantId) {
     return {
         alertasAtivos: 0,
+        primeiroAlertaTexto: '',
         async carregar() {
             try {
                 const r = await fetch('/Tenants/Detail/' + tenantId + '?handler=Notas', { credentials: 'same-origin', cache: 'no-store' });
@@ -53,14 +71,57 @@ function alertaBanner(tenantId) {
                 const d = await r.json();
                 const data = d.data || d;
                 this.alertasAtivos = data.alertasAtivos ?? 0;
+                const alerta = (data.itens || []).find(n => n.tipoInt === 1);
+                this.primeiroAlertaTexto = alerta ? (alerta.texto || '').substring(0, 80) : '';
             } catch {}
+        }
+    };
+}
+
+// F4: card "Sincronização Mobile" no Detail. Fetch o counts via Razor handler.
+function mobileSyncHealth(tenantId) {
+    return {
+        loaded: false, healthy: true, totalPending: 0,
+        devices: 0, lastSyncAt: null, lastSyncFormatado: '',
+        entregueSemVenda: 0,
+        metricas: [],
+        async carregar() {
+            try {
+                const r = await fetch('/Tenants/Detail/' + tenantId + '?handler=MobileSyncHealth',
+                    { credentials: 'same-origin', cache: 'no-store' });
+                if (!r.ok) { this.loaded = true; return; }
+                const json = await r.json();
+                const d = json.data || json;
+                if (d.error) { this.loaded = true; return; }
+                this.healthy = !!d.healthy;
+                this.totalPending = d.totalPending ?? 0;
+                this.devices = d.devices ?? 0;
+                this.lastSyncAt = d.lastSyncAt;
+                this.entregueSemVenda = d.orders?.entregueSemVenda ?? 0;
+                this.metricas = [
+                    { label: 'Pedidos',  total: d.orders?.total   ?? 0, pending: d.orders?.pending   ?? 0 },
+                    { label: 'Clientes', total: d.clients?.total  ?? 0, pending: d.clients?.pending  ?? 0 },
+                    { label: 'Produtos', total: d.products?.total ?? 0, pending: d.products?.pending ?? 0 },
+                    { label: 'Lotes',    total: d.batches?.total  ?? 0, pending: d.batches?.pending  ?? 0 },
+                    { label: 'Caixa',    total: d.cash?.total     ?? 0, pending: d.cash?.pending     ?? 0 },
+                ];
+                if (d.lastSyncAt) {
+                    const dt = new Date(d.lastSyncAt);
+                    const diff = Math.floor((Date.now() - dt.getTime()) / 60000);
+                    if (diff < 1) this.lastSyncFormatado = 'agora';
+                    else if (diff < 60) this.lastSyncFormatado = diff + ' min atrás';
+                    else if (diff < 1440) this.lastSyncFormatado = Math.floor(diff/60) + 'h atrás';
+                    else this.lastSyncFormatado = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                }
+                this.loaded = true;
+            } catch (e) { this.loaded = true; }
         }
     };
 }
 </script>
 
 <!-- Header -->
-<div class="card mb-6" x-data="{ modal: null }">
+<div class="card mb-6" x-data="{ modal: null, motivoSuspender: '' }">
     <div class="flex items-start justify-between flex-wrap gap-4">
         <div>
             <div class="flex items-center gap-3 mb-1">
@@ -109,11 +170,16 @@ function alertaBanner(tenantId) {
                 @Html.AntiForgeryToken()
                 <div class="mb-4">
                     <label class="form-label">Motivo</label>
-                    <input type="text" name="motivo" class="form-input" placeholder="Motivo da suspensão..." required />
+                    <textarea name="motivo" x-model="motivoSuspender" rows="2" minlength="10" maxlength="1000"
+                              placeholder="Motivo da suspensão..." required
+                              class="form-input w-full"></textarea>
+                    <p class="text-xs mt-1" :class="motivoSuspender.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                        <span x-text="motivoSuspender.trim().length"></span> / 10 mínimo
+                    </p>
                 </div>
                 <div class="flex gap-3 justify-end">
-                    <button type="button" @@click="modal = null" class="btn-secondary">Cancelar</button>
-                    <button type="submit" class="btn-danger">Suspender</button>
+                    <button type="button" @@click="modal = null; motivoSuspender = ''" class="btn-secondary">Cancelar</button>
+                    <button type="submit" :disabled="motivoSuspender.trim().length < 10" class="btn-danger">Suspender</button>
                 </div>
             </form>
         </div>
@@ -273,11 +339,54 @@ function alertaBanner(tenantId) {
                 </div>
             </div>
         </div>
+
+        <!-- F4: Card Sincronização Mobile (Casa da Babá APK / PWA) -->
+        <div class="card" x-data="mobileSyncHealth('@Model.Id')" x-init="carregar()">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-es-ink font-semibold">Sincronização Mobile</h3>
+                    <span x-show="loaded && healthy" x-cloak
+                          class="text-xs px-2 py-0.5 rounded-full"
+                          style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.35)">
+                        ✓ sincronizado
+                    </span>
+                    <span x-show="loaded && !healthy" x-cloak
+                          class="text-xs px-2 py-0.5 rounded-full"
+                          style="background:rgba(248,113,113,0.15);color:#fca5a5;border:1px solid rgba(248,113,113,0.35)">
+                        ⚠ <span x-text="totalPending"></span> pendente(s)
+                    </span>
+                </div>
+                <button type="button" @@click="carregar()" class="text-xs text-es-ink-dim hover:text-es-ink">↻ atualizar</button>
+            </div>
+            <div x-show="!loaded" class="text-xs text-es-ink-dim">carregando…</div>
+            <div x-show="loaded" x-cloak class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <template x-for="m in metricas" :key="m.label">
+                    <div class="rounded-lg p-3" style="background:#0f172a;border:1px solid rgba(247,242,232,0.08)">
+                        <div class="text-[11px] uppercase tracking-wider text-es-ink-mute" x-text="m.label"></div>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <span class="text-lg font-semibold text-es-ink" x-text="m.total"></span>
+                            <span class="text-xs"
+                                  :style="m.pending > 0 ? 'color:#fca5a5' : 'color:#4ade80'"
+                                  x-text="m.pending > 0 ? (m.pending + ' sem link') : 'tudo linkado'"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div x-show="loaded && entregueSemVenda > 0" x-cloak
+                 class="mt-3 text-xs rounded-lg px-3 py-2"
+                 style="background:rgba(248,113,113,0.10);border:1px solid rgba(248,113,113,0.30);color:#fca5a5">
+                <strong x-text="entregueSemVenda"></strong> pedido(s) entregue(s) sem Venda — rode backfill.
+            </div>
+            <div x-show="loaded && lastSyncAt" x-cloak class="mt-3 text-xs text-es-ink-mute">
+                <span x-text="devices"></span> device(s) pareados · último sync <span x-text="lastSyncFormatado"></span>
+            </div>
+        </div>
     </div>
 
     <!-- Usuários -->
     <div x-show="tab === 'usuarios'" x-cloak x-data="{
             sessoesUserId: null, sessoesData: null, sessoesLoading: false, sessoesErro: '',
+            modalNovoUsuario: false,
             async carregarSessoes(uid) {
                 this.sessoesUserId = uid;
                 this.sessoesData = null;
@@ -300,13 +409,22 @@ function alertaBanner(tenantId) {
                 }
             }
          }">
+        <div class="flex items-center justify-between mb-3">
+            <div class="text-es-ink-dim text-sm">@Model.Usuarios.Count() @(Model.Usuarios.Count() == 1 ? "usuário cadastrado" : "usuários cadastrados") neste cliente</div>
+            <button type="button" @@click="modalNovoUsuario = true" class="btn-primary text-sm">
+                + Adicionar usuário
+            </button>
+        </div>
         <div class="card p-0 overflow-hidden">
             <table class="table-admin">
-                <thead><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
+                <thead><tr><th class="whitespace-nowrap min-w-[180px]">Nome</th><th>E-mail</th><th>Nível</th><th>Último acesso</th><th>Status</th><th class="text-right">Ações</th></tr></thead>
                 <tbody>
                     @if (!Model.Usuarios.Any())
                     {
-                        <tr><td colspan="6" class="text-es-ink-mute text-center py-8 text-sm">Cliente sem usuários cadastrados.</td></tr>
+                        <tr><td colspan="6" class="text-es-ink-mute text-center py-8 text-sm">
+                            Cliente sem usuários cadastrados.
+                            <button type="button" @@click="modalNovoUsuario = true" class="text-es-accent hover:underline ml-1">Adicionar o primeiro →</button>
+                        </td></tr>
                     }
                     @foreach (var u in Model.Usuarios)
                     {
@@ -320,10 +438,12 @@ function alertaBanner(tenantId) {
                         // Escapa pra atributo JS — evita quebra se o nome tiver aspas/apóstrofo.
                         var unomeJs = System.Text.Json.JsonSerializer.Serialize(unome);
                         var uemailJs = System.Text.Json.JsonSerializer.Serialize(uemail);
-                        <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', @Html.Raw(uemailJs)))">
-                            <td class="text-es-ink font-medium">@unome</td>
+                        var unomeEscaped = unome.Replace("\\", "\\\\").Replace("'", "\\'");
+                        var uemailEscaped = uemail.Replace("\\", "\\\\").Replace("'", "\\'");
+                        <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', '@Html.Raw(uemailEscaped)'))">
+                            <td class="text-es-ink font-medium whitespace-nowrap max-w-[220px] overflow-hidden text-ellipsis" title="@unome">@unome</td>
                             <td class="text-es-ink-dim font-mono text-xs">
-                                <span x-text="piiVisivel ? piiValor : @Html.Raw(uemailJs)"></span>
+                                <span x-text="piiValor"></span>
                                 <button type="button" :title="piiVisivel ? 'Re-mascarar' : 'Ver completo (auditado)'"
                                         @@click="piiVisivel ? remascarar() : abrirRevealModal()"
                                         class="ml-1 text-es-ink-mute hover:text-es-accent text-xs">
@@ -336,8 +456,9 @@ function alertaBanner(tenantId) {
                             <td class="text-es-ink-dim">@nivel</td>
                             <td class="text-es-ink-dim">@(ultimoDt != default ? ultimoDt.ToLocalTime().ToString("dd/MM/yy HH:mm") : "—")</td>
                             <td><span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span></td>
-                            <td class="text-right relative">
-                                <button type="button" @@click="open = !open" @@click.outside="open = false"
+                            <td class="text-right">
+                                <div class="relative" @@click.outside="open = false">
+                                <button type="button" @@click="open = !open"
                                         class="btn-secondary text-xs px-3 py-1">Ações ▾</button>
                                 <div x-show="open" x-cloak
                                      class="absolute right-0 mt-1 w-56 z-30 rounded-lg shadow-2xl py-1"
@@ -345,8 +466,8 @@ function alertaBanner(tenantId) {
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ResetSenhaUsuario&userId=@uid',
-                                                acao: 'Resetar senha de ' + @Html.Raw(unomeJs),
-                                                resumo: 'Uma nova senha temporária será gerada e enviada por email para ' + @Html.Raw(uemailJs) + '. Todas as sessões ativas serão revogadas.',
+                                                acao: 'Resetar senha de @Html.Raw(unomeEscaped)',
+                                                resumo: 'Uma senha temporária será gerada para @Html.Raw(uemailEscaped). As sessões ativas serão encerradas — o usuário vai precisar logar de novo.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Resetar senha (auditado)'
                                             })">
@@ -355,8 +476,8 @@ function alertaBanner(tenantId) {
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ForcarLogoutUsuario&userId=@uid',
-                                                acao: 'Forçar logout de ' + @Html.Raw(unomeJs),
-                                                resumo: 'Todas as sessões ativas (refresh tokens) deste usuário serão revogadas. Ele precisará logar novamente em todos os dispositivos.',
+                                                acao: 'Forçar logout de @Html.Raw(unomeEscaped)',
+                                                resumo: 'Todas as sessões ativas serão encerradas. O usuário vai precisar logar de novo em todos os dispositivos.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Forçar logout (auditado)'
                                             })">
@@ -368,7 +489,7 @@ function alertaBanner(tenantId) {
                                     </button>
                                     <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
-                                            @@click="open=false; $dispatch('open-editar-usuario', { userId: '@uid', nome: @Html.Raw(unomeJs), email: @Html.Raw(uemailJs) })">
+                                            @@click="open=false; $dispatch('open-editar-usuario', { userId: '@uid', nome: '@Html.Raw(unomeEscaped)', email: '@Html.Raw(uemailEscaped)' })">
                                         ✏️ Editar nome/email
                                     </button>
                                     @if (ativo)
@@ -376,7 +497,7 @@ function alertaBanner(tenantId) {
                                         <button type="button" class="w-full text-left px-3 py-2 text-xs text-amber-300 hover:bg-es-surface-2"
                                                 @@click="open=false; $dispatch('open-justificar', {
                                                     endpoint: '/Tenants/Detail/@Model.Id?handler=DesativarUsuario&userId=@uid',
-                                                    acao: 'Desativar ' + @Html.Raw(unomeJs),
+                                                    acao: 'Desativar @Html.Raw(unomeEscaped)',
                                                     resumo: 'O usuário não conseguirá mais fazer login. Sessões ativas serão encerradas. Pode ser reativado depois.',
                                                     variant: 'danger',
                                                     confirmLabel: 'Desativar (auditado)'
@@ -389,7 +510,7 @@ function alertaBanner(tenantId) {
                                         <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-basil hover:bg-es-surface-2"
                                                 @@click="open=false; $dispatch('open-justificar', {
                                                     endpoint: '/Tenants/Detail/@Model.Id?handler=ReativarUsuario&userId=@uid',
-                                                    acao: 'Reativar ' + @Html.Raw(unomeJs),
+                                                    acao: 'Reativar @Html.Raw(unomeEscaped)',
                                                     resumo: 'O usuário voltará a conseguir fazer login. Tentativas de bloqueio serão zeradas.',
                                                     variant: 'primary',
                                                     confirmLabel: 'Reativar (auditado)'
@@ -399,9 +520,10 @@ function alertaBanner(tenantId) {
                                     }
                                     <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10"
-                                            @@click="open=false; $dispatch('open-anonimizar', { userId: '@uid', nome: @Html.Raw(unomeJs), email: @Html.Raw(uemailJs) })">
+                                            @@click="open=false; $dispatch('open-anonimizar', { userId: '@uid', nome: '@Html.Raw(unomeEscaped)', email: '@Html.Raw(uemailEscaped)' })">
                                         ⚠️ Anonimizar (LGPD)
                                     </button>
+                                </div>
                                 </div>
                             </td>
                         </tr>
@@ -424,7 +546,7 @@ function alertaBanner(tenantId) {
                         <div class="text-es-ink-dim text-xs mb-3">
                             <span x-text="sessoesData.usuarioNome"></span> ·
                             <span x-text="sessoesData.usuarioEmail" class="font-mono"></span> ·
-                            <span class="font-bold text-es-ink" x-text="sessoesData.ativas + ' ativa(s) de ' + sessoesData.total"></span>
+                            <span class="font-bold text-es-ink" x-text="plural(sessoesData.ativas, 'ativa', 'ativas') + ' de ' + sessoesData.total"></span>
                         </div>
                         <div class="max-h-96 overflow-y-auto space-y-2">
                             <template x-for="s in (sessoesData.sessoes || [])" :key="s.id">
@@ -450,6 +572,80 @@ function alertaBanner(tenantId) {
         </div>
 
         @{ var afEditar = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
+
+        <!-- Modal Adicionar usuário ao tenant -->
+        <div x-show="modalNovoUsuario" x-cloak class="modal-overlay"
+             @@click.self="modalNovoUsuario = false" @@keydown.escape.window="modalNovoUsuario = false"
+             role="dialog" aria-modal="true" aria-labelledby="modal-novo-usuario-title">
+            <div class="modal-box max-w-md" x-data="{ motivoNovo: '', submitting: false }" @@click.stop>
+                <div class="flex items-start justify-between gap-3 mb-1">
+                    <div>
+                        <h3 id="modal-novo-usuario-title" class="text-es-ink font-semibold">Adicionar usuário ao cliente</h3>
+                        <p class="text-es-ink-dim text-xs mt-1">
+                            Cria o login no tenant. Senha temporária é gerada e enviada por e-mail.
+                        </p>
+                    </div>
+                    <button type="button" @@click="modalNovoUsuario = false" aria-label="Fechar"
+                            class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
+                </div>
+
+                <form method="post" asp-page-handler="CriarUsuario" @@submit="submitting = true" class="mt-4 space-y-3">
+                    <input type="hidden" name="__RequestVerificationToken" value="@afEditar" />
+
+                    <div>
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="nome" required minlength="2" maxlength="120"
+                               placeholder="João Pereira" class="form-input w-full" />
+                    </div>
+
+                    <div>
+                        <label class="form-label">E-mail</label>
+                        <input type="email" name="email" required maxlength="160"
+                               placeholder="joao@empresa.com.br" class="form-input w-full font-mono" />
+                        <p class="text-xs text-es-ink-mute mt-1">Tem que ser único no sistema todo.</p>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Nível de acesso</label>
+                        <select name="nivel" class="form-input w-full">
+                            <option value="Operador" selected>Operador (default)</option>
+                            <option value="Gerente">Gerente</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Visualizador">Visualizador (somente leitura)</option>
+                        </select>
+                        <p class="text-xs text-es-ink-mute mt-1">
+                            Admin pode tudo. Gerente vê relatórios. Operador opera caixa. Visualizador só lê.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                        <textarea name="motivo" x-model="motivoNovo" rows="2" minlength="10" maxlength="1000" required
+                                  placeholder="Ex.: cliente abriu chamado #1234, admin original saiu da empresa"
+                                  class="form-input w-full font-mono text-sm"></textarea>
+                        <p class="text-xs mt-1" :class="motivoNovo.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                            <span x-text="motivoNovo.trim().length"></span> / 10 mínimo
+                        </p>
+                    </div>
+
+                    <label class="flex items-center gap-2 text-xs text-es-ink-dim">
+                        <input type="checkbox" name="enviarEmail" value="true" checked class="form-checkbox" />
+                        Enviar a senha temporária por e-mail também
+                    </label>
+
+                    <div class="flex gap-3 justify-end pt-2">
+                        <button type="button" @@click="modalNovoUsuario = false" :disabled="submitting"
+                                class="btn-secondary text-sm">Cancelar</button>
+                        <button type="submit" :disabled="motivoNovo.trim().length < 10 || submitting"
+                                class="btn-primary text-sm">
+                            <span x-show="!submitting">Adicionar usuário (auditado)</span>
+                            <span x-show="submitting" x-cloak>Adicionando…</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Modal Editar usuário (com diff before/after) -->
         <div x-data="editarUsuarioModal()" x-init="init()"
              x-show="open" x-cloak class="modal-overlay"
@@ -572,6 +768,7 @@ function alertaBanner(tenantId) {
             };
         }
         window.__tenantId = '@Model.Id';
+        function plural(n, sg, pl) { return n + ' ' + (n === 1 ? sg : pl); }
         </script>
 
         <!-- Modal global PII reveal — escuta `open-pii-reveal` -->
@@ -772,9 +969,12 @@ function alertaBanner(tenantId) {
                     var lojaJson = System.Text.Json.JsonSerializer.Serialize(new { id = lid, nome = lnome, descricao = ldesc, documento = ldoc, endereco = lend, telefone = ltel });
                     // Nome serializado pra string JS literal — evita quebra com aspas no nome da loja.
                     var lnomeJs = System.Text.Json.JsonSerializer.Serialize(lnome);
+                    // Versão safe pra uso em string JS com aspas simples / atributo HTML com aspas duplas.
+                    var lojaJsonAttr = lojaJson.Replace("\"", "&quot;");
+                    var lnomeEscaped = lnome.Replace("\\", "\\\\").Replace("'", "\\'");
                     <div class="card flex flex-col">
                         <div class="flex items-start justify-between mb-2">
-                            <h4 class="text-es-ink font-semibold flex-1 truncate">@lnome</h4>
+                            <h4 class="text-es-ink font-semibold flex-1 truncate" title="@lnome">@lnome</h4>
                             <span class="status-badge ml-2 @(lativa ? "badge-ativa" : "badge-suspensa")">@(lativa ? "Ativa" : "Inativa")</span>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(ldesc))
@@ -787,32 +987,32 @@ function alertaBanner(tenantId) {
                             @if (!string.IsNullOrWhiteSpace(ltel)) { <div><span class="text-es-ink-dim">Tel:</span> <span class="text-es-ink-dim font-mono">@ltel</span></div> }
                         </dl>
                         <div class="flex gap-2 mt-auto pt-2" style="border-top:1px solid rgba(247,242,232,0.06)">
-                            <button type="button" @@click="editandoLoja = @Html.Raw(lojaJson)" class="btn-secondary text-xs flex-1">✏️ Editar</button>
+                            <button type="button" @@click="editandoLoja = @Html.Raw(lojaJsonAttr)" class="btn-secondary text-xs flex-1">✏️ Editar</button>
                             @if (lativa)
                             {
                                 <button type="button"
                                         @@click="$dispatch('open-justificar', {
                                             endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
-                                            acao: 'Desativar loja ' + @Html.Raw(lnomeJs),
+                                            acao: 'Desativar loja @Html.Raw(lnomeEscaped)',
                                             resumo: 'A loja não aparecerá mais para o cliente. Histórico (vendas, estoque) é preservado. Pode ser reativada.',
                                             variant: 'danger',
                                             confirmLabel: 'Desativar (auditado)',
                                             extraFields: '<input type=&quot;hidden&quot; name=&quot;ativa&quot; value=&quot;false&quot; />'
                                         })"
-                                        class="btn-danger text-xs">🚫</button>
+                                        class="btn-danger text-xs">🚫 Desativar</button>
                             }
                             else
                             {
                                 <button type="button"
                                         @@click="$dispatch('open-justificar', {
                                             endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
-                                            acao: 'Reativar loja ' + @Html.Raw(lnomeJs),
+                                            acao: 'Reativar loja @Html.Raw(lnomeEscaped)',
                                             resumo: 'A loja voltará a aparecer para o cliente.',
                                             variant: 'primary',
                                             confirmLabel: 'Reativar (auditado)',
                                             extraFields: '<input type=&quot;hidden&quot; name=&quot;ativa&quot; value=&quot;true&quot; />'
                                         })"
-                                        class="btn-primary text-xs">✓</button>
+                                        class="btn-primary text-xs">✓ Reativar</button>
                             }
                         </div>
                     </div>
@@ -912,13 +1112,16 @@ function alertaBanner(tenantId) {
             }
             @if (!Model.Features.Any())
             {
-                <div class="col-span-3 text-center text-es-ink-mute py-6">Nenhuma feature disponível.</div>
+                <div class="col-span-3 text-center text-es-ink-mute py-8 text-sm">
+                    <p class="font-medium text-es-ink mb-1">Nenhuma feature especial habilitada.</p>
+                    <p>Features são habilitadas por plano ou manualmente pelo time de operações.</p>
+                </div>
             }
         </div>
     </div>
 
     <!-- Atividade unificada (P1) — timeline com filtros -->
-    <div x-show="tab === 'atividade'" x-cloak x-data="atividadeTimeline('@Model.Id')" x-init="$watch('tab', t => { if (t === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); } })">
+    <div x-show="tab === 'atividade'" x-cloak x-data="atividadeTimeline('@Model.Id')" x-init="$watch('tab', t => { if (t === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); } }); if (tab === 'atividade' && !carregouUmaVez) { carregouUmaVez = true; recarregar(); }">
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
             <!-- Timeline -->
             <div class="card p-0 overflow-hidden">
@@ -926,7 +1129,7 @@ function alertaBanner(tenantId) {
                     <h3 class="text-es-ink font-semibold text-sm">Atividade do cliente</h3>
                     <div class="flex items-center gap-2 text-xs text-es-ink-mute">
                         <span x-show="loading" x-cloak>Carregando…</span>
-                        <span x-show="!loading && total !== null" x-cloak><b class="text-es-ink" x-text="total"></b> evento(s)</span>
+                        <span x-show="!loading && total !== null" x-cloak><b class="text-es-ink" x-text="total"></b> <span x-text="total === 1 ? 'evento' : 'eventos'"></span></span>
                         <button type="button" @@click="recarregar()" class="text-es-ink hover:text-es-accent ml-2">↻</button>
                     </div>
                 </div>
@@ -950,7 +1153,7 @@ function alertaBanner(tenantId) {
                                     <span x-text="ev.atorNome || 'Sistema'"></span>
                                     <span x-show="ev.atorEmail" x-cloak class="font-mono text-es-ink-mute">· <span x-text="ev.atorEmail"></span></span>
                                 </div>
-                                <div x-show="ev.detalhes" x-cloak class="text-es-ink-mute text-xs mt-1 break-all" x-text="ev.detalhes"></div>
+                                <div x-show="ev.detalhes" x-cloak class="text-es-ink-mute text-xs mt-1 break-all" x-text="formatarDetalhes(ev.acao, ev.detalhes)"></div>
                                 <div x-show="ev.motivo" x-cloak class="text-amber-300/80 text-xs mt-1 italic">
                                     Justificativa: <span x-text="ev.motivo"></span>
                                 </div>
@@ -1066,6 +1269,26 @@ function alertaBanner(tenantId) {
                     if (a.includes('alter') || a.includes('atualiz') || a.includes('edit')) return '✏️';
                     return '•';
                 },
+                formatarDetalhes(acao, detalhes) {
+                    if (!detalhes) return '';
+                    const kv = {};
+                    detalhes.split(',').forEach(p => {
+                        const [k, ...v] = p.trim().split('=');
+                        if (k) kv[k.trim()] = v.join('=').trim();
+                    });
+                    const a = (acao || '').toLowerCase();
+                    if (a.includes('lojacriada'))     return 'Loja ' + (kv['Nome'] || kv['LojaId'] || '') + ' criada';
+                    if (a.includes('lojaatualizada')) return 'Loja ' + (kv['Nome'] || '') + ' atualizada';
+                    if (a.includes('lojadesativada')) return 'Loja ' + (kv['Nome'] || '') + ' desativada';
+                    if (a.includes('lojareativada'))  return 'Loja ' + (kv['Nome'] || '') + ' reativada';
+                    if (a.includes('notainternacriada')) {
+                        const tipo = kv['Tipo'] || '';
+                        const tam  = kv['Tamanho'] || '';
+                        return 'Nota interna (' + tipo + (tam ? ', ' + tam + ' chars' : '') + ') adicionada';
+                    }
+                    if (a.includes('impersonad')) return 'Acesso impersonado — empresa ' + (kv['TenantId'] || '').substring(0, 8) + '…';
+                    return Object.entries(kv).map(([k, v]) => k + ': ' + v).join(' · ');
+                },
                 formatRelativo(iso) {
                     if (!iso) return '';
                     const d = new Date(iso);
@@ -1073,7 +1296,7 @@ function alertaBanner(tenantId) {
                     if (diff < 60) return 'agora há pouco';
                     if (diff < 3600) return Math.floor(diff/60) + ' min atrás';
                     if (diff < 86400) return Math.floor(diff/3600) + ' h atrás';
-                    if (diff < 86400*7) return Math.floor(diff/86400) + ' dia(s) atrás';
+                    if (diff < 86400*7) return plural(Math.floor(diff/86400), 'dia atrás', 'dias atrás');
                     return d.toLocaleDateString('pt-BR');
                 }
             };
@@ -1094,7 +1317,7 @@ function alertaBanner(tenantId) {
                     </div>
                     <div class="text-xs text-es-ink-mute">
                         <span x-show="loading" x-cloak>Carregando…</span>
-                        <span x-show="!loading"><b class="text-es-ink" x-text="notas.length"></b> nota(s)</span>
+                        <span x-show="!loading"><b class="text-es-ink" x-text="notas.length"></b> <span x-text="notas.length === 1 ? 'nota' : 'notas'"></span></span>
                     </div>
                 </div>
                 <div x-show="erro" x-cloak class="text-xs text-red-400 mb-2" x-text="erro"></div>
@@ -1201,7 +1424,9 @@ function alertaBanner(tenantId) {
                         if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
                         const d = await r.json();
                         const data = d.data || d;
-                        this.notas = data.itens || [];
+                        const itens = data.itens || [];
+                        // Notas de alerta (tipoInt===1) ficam no topo da lista.
+                        this.notas = [...itens].sort((a, b) => (b.tipoInt === 1 ? 1 : 0) - (a.tipoInt === 1 ? 1 : 0));
                     } catch (e) { this.erro = 'Falha: ' + (e.message || e); }
                     finally { this.loading = false; }
                 },
@@ -1276,7 +1501,7 @@ function alertaBanner(tenantId) {
                     if (diff < 60) return 'agora há pouco';
                     if (diff < 3600) return Math.floor(diff/60) + ' min atrás';
                     if (diff < 86400) return Math.floor(diff/3600) + ' h atrás';
-                    if (diff < 86400*7) return Math.floor(diff/86400) + ' dia(s) atrás';
+                    if (diff < 86400*7) return plural(Math.floor(diff/86400), 'dia atrás', 'dias atrás');
                     return d.toLocaleDateString('pt-BR');
                 }
             };
@@ -1327,8 +1552,8 @@ function alertaBanner(tenantId) {
                     Operação irreversível com double-confirm por email.
                 </p>
                 <div class="text-xs text-es-ink-mute" x-show="estatisticas.totalAcoesLgpd != null" x-cloak>
-                    <span x-text="estatisticas.totalAcoesLgpd ?? 0"></span> ação(ões) LGPD registrada(s) neste cliente
-                    · <span x-text="estatisticas.totalUnmasks ?? 0"></span> unmask(s) de PII
+                    <span x-text="plural(estatisticas.totalAcoesLgpd ?? 0, 'ação LGPD registrada', 'ações LGPD registradas') + ' neste cliente'"></span>
+                    · <span x-text="plural(estatisticas.totalUnmasks ?? 0, 'unmask de PII', 'unmasks de PII')"></span>
                 </div>
             </div>
 
@@ -1354,7 +1579,7 @@ function alertaBanner(tenantId) {
         <div class="card p-0 overflow-hidden">
             <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(247,242,232,0.08)">
                 <h3 class="text-es-ink font-semibold text-sm">Ações LGPD registradas</h3>
-                <span class="text-es-ink-mute text-xs"><b class="text-es-ink" x-text="totalHist"></b> registro(s)</span>
+                <span class="text-es-ink-mute text-xs"><b class="text-es-ink" x-text="totalHist"></b> <span x-text="totalHist === 1 ? 'registro' : 'registros'"></span></span>
             </div>
             <div x-show="loadingHist" x-cloak class="text-es-ink-mute text-sm py-6 text-center">Carregando…</div>
             <div x-show="erroHist" x-cloak class="bg-red-500/10 text-red-400 text-xs px-4 py-2 border-b border-red-500/30" x-text="erroHist"></div>

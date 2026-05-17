@@ -5,7 +5,7 @@ namespace EasyStock.Application.Ports.Output.Persistence;
 
 /// <summary>
 /// Repositorio do agregado <see cref="Fatura"/>. Todas as queries respeitam
-/// multi-tenancy via <see cref="EmpresaId"/> obrigatorio (exceto admin global).
+/// multi-tenancy via <c>EmpresaId</c> obrigatorio (exceto admin global).
 /// </summary>
 public interface IFaturaRepository
 {
@@ -44,6 +44,14 @@ public interface IFaturaRepository
 
     /// <summary>Busca por origem (ex: encontrar fatura existente para uma assinatura).</summary>
     Task<Fatura?> GetByOrigemAsync(Guid empresaId, OrigemFatura origem, Guid origemRefId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Replay de Idempotency-Key recebido do cliente. Se um <see cref="FaturaPagamento"/>
+    /// ja foi criado com esse <c>ClientIdempotencyKey</c> para o mesmo tenant,
+    /// retorna ele — orchestrator devolve sem chamar gateway novamente.
+    /// </summary>
+    Task<FaturaPagamento?> ObterPagamentoPorClientIdempotencyKeyAsync(
+        Guid empresaId, string clientIdempotencyKey, CancellationToken ct = default);
 
     // ─── F10 — Metricas agregadas ──────────────────────────────────────
 

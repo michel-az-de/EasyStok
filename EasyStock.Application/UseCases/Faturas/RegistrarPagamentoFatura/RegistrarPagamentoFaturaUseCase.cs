@@ -49,11 +49,11 @@ public class RegistrarPagamentoFaturaUseCase(
 
         var pagamento = cmd.StatusInicial == StatusFaturaPagamento.Confirmado
             ? FaturaPagamento.CriarConfirmado(
-                fatura.Id, cmd.Metodo, cmd.Valor, cmd.GatewayProvedor,
+                fatura.Id, cmd.Metodo, cmd.Valor, cmd.GatewayProvedor, fatura.EmpresaId,
                 cmd.GatewayTransactionId, cmd.DadosGatewayJson,
                 cmd.RegistradoPorUserId, cmd.RegistradoPorNome, cmd.Observacao)
             : FaturaPagamento.CriarPendente(
-                fatura.Id, cmd.Metodo, cmd.Valor, cmd.GatewayProvedor,
+                fatura.Id, cmd.Metodo, cmd.Valor, cmd.GatewayProvedor, fatura.EmpresaId,
                 cmd.GatewayTransactionId, cmd.DadosGatewayJson);
 
         try

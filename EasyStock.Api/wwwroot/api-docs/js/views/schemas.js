@@ -46,7 +46,7 @@ function renderSchemaIntro(total) {
         <div class="es-endpoint-empty">
             <span class="es-endpoint-empty-icon">${icon('book', 64)}</span>
             <h2>Schemas Codex</h2>
-            <p>${total} entidades indexadas. Selecione uma à esquerda pra ver props, tipos, exemplos e endpoints que usam.</p>
+            <p>${total} entidades indexadas. Selecione um schema à esquerda para ver propriedades, tipos, exemplos e endpoints relacionados.</p>
         </div>
     `;
 }

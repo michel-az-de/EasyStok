@@ -13,10 +13,6 @@ namespace EasyStock.Application.UseCases.Faq.Admin
 
     public sealed record CriarFaqCategoriaResult(Guid CategoriaId, string Slug);
 
-    /// <summary>
-    /// Cria uma nova categoria de FAQ. Slug e validado como unico globalmente.
-    /// Categorias sao base global (sem tenant).
-    /// </summary>
     public sealed class CriarFaqCategoriaUseCase(IFaqAdminRepository repo, IUnitOfWork uow)
     {
         public async Task<CriarFaqCategoriaResult> ExecuteAsync(CriarFaqCategoriaCommand cmd, CancellationToken ct = default)

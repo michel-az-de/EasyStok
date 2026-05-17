@@ -2,9 +2,11 @@ using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.GerenciarProduto;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
+using EasyStock.Application.Validators;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -25,6 +27,7 @@ public class ProdutoController(
     GerenciarProdutoUseCase gerenciarProdutoUseCase,
     GerenciarVariacaoProdutoUseCase gerenciarVariacaoProdutoUseCase,
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
+    SalvarFichaTecnicaUseCase salvarFichaTecnicaUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(
@@ -93,12 +96,12 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] Guid empresaId, [FromQuery] string termo)
+    public async Task<IActionResult> Search([FromQuery] Guid empresaId, [FromQuery] string termo, [FromQuery] int limite = 20)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        return DataOk(await produtoRepository.SearchAsync(resolvedEmpresaId, termo));
+        return DataOk(await produtoRepository.SearchAsync(resolvedEmpresaId, termo, Math.Min(limite, 100)));
     }
 
     [SwaggerOperation(Summary = "Create new product")]
@@ -333,6 +336,27 @@ public class ProdutoController(
 
         await gerenciarProdutoUseCase.ReordenarFotosAsync(resolvedEmpresaId, id, novaOrdem);
         return NoContent();
+    }
+
+    [SwaggerOperation(Summary = "Save nutritional/technical sheet for a product")]
+    [HttpPut("{id:guid}/ficha-tecnica")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> SalvarFichaTecnica(Guid id, [FromQuery] Guid empresaId, [FromBody] ProdutoFichaTecnicaCommand body)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var error)) return error!;
+        try
+        {
+            var result = await salvarFichaTecnicaUseCase.ExecuteAsync(
+                body with { EmpresaId = emp, ProdutoId = id },
+                currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Request.Headers.UserAgent.ToString());
+            return result == null ? DataNotFound("Produto não encontrado.") : DataOk(result);
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
     }
 
     [SwaggerOperation(Summary = "Get product change history (audit log)")]

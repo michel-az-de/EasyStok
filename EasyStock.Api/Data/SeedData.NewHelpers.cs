@@ -151,6 +151,7 @@ public static partial class SeedData
         context.Set<ClienteAlteracao>().Add(new ClienteAlteracao
         {
             Id = Guid.NewGuid(),
+            EmpresaId = cliente.EmpresaId,
             ClienteId = cliente.Id,
             AlteradoPorUserId = usuario.Id,
             AlteradoPorNome = usuario.Nome,

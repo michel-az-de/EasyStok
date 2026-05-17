@@ -17,15 +17,36 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
         return Task.CompletedTask;
     }
 
+    // IgnoreQueryFilters: este metodo e chamado por webhooks anonimos (RegistrarPagamentoFatura
+    // disparado pelo WebhookPixController) e jobs em background sem JWT. Nesses contextos
+    // CurrentTenantId == Guid.Empty e IsSuperAdmin == false, entao o filter global zeraria o
+    // resultado. Multi-tenancy fica garantido pelo Where manual `f.EmpresaId == empresaId` —
+    // defesa em profundidade conforme conventions.md.
     public Task<Fatura?> GetByIdAsync(Guid empresaId, Guid faturaId, CancellationToken ct = default) =>
         db.Faturas
+            .IgnoreQueryFilters()
             .Include(f => f.Itens.OrderBy(i => i.Ordem))
             .Include(f => f.Pagamentos)
             .Include(f => f.Eventos.OrderByDescending(e => e.OcorridoEm))
             .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Id == faturaId, ct);
 
+    public Task<FaturaPagamento?> ObterPagamentoPorClientIdempotencyKeyAsync(
+        Guid empresaId, string clientIdempotencyKey, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(clientIdempotencyKey)) return Task.FromResult<FaturaPagamento?>(null);
+        return db.FaturaPagamentos
+            .FirstOrDefaultAsync(p =>
+                p.EmpresaId == empresaId &&
+                p.ClientIdempotencyKey == clientIdempotencyKey, ct);
+    }
+
+    // IgnoreQueryFilters honra a semantica documentada na interface ("sem filtro EmpresaId").
+    // Sem isso, admin operacional caia silenciosamente no filter global e via comportamento
+    // diferente de SuperAdmin (que tem bypass IsSuperAdmin). Caller (controller admin) ja faz
+    // checagem explicita de tenant para admin operacional.
     public Task<Fatura?> GetByIdAdminAsync(Guid faturaId, CancellationToken ct = default) =>
         db.Faturas
+            .IgnoreQueryFilters()
             .Include(f => f.Empresa)
             .Include(f => f.Cliente)
             .Include(f => f.Itens.OrderBy(i => i.Ordem))
@@ -93,8 +114,12 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
         return (itens, total);
     }
 
+    // IgnoreQueryFilters: usado pela idempotencia de EmitirFaturaUseCase. O job de cobranca
+    // (CobrancaAssinaturaJob) chama em background sem JWT — sem isso retornaria null mesmo
+    // existindo fatura, gerando duplicidade. Tenant fica protegido pelo Where manual.
     public Task<Fatura?> GetByOrigemAsync(Guid empresaId, OrigemFatura origem, Guid origemRefId, CancellationToken ct = default) =>
         db.Faturas
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(
                 f => f.EmpresaId == empresaId
                   && f.Origem == origem

@@ -266,16 +266,10 @@ async function _executarImpressao(ids, template, overwrite = false) {
   try { layout = JSON.parse(template.layoutJson); } catch { _setStatus('Layout inválido.'); return; }
 
   const printWin = window.open('', '_blank', 'width=800,height=600');
-  if (!printWin) {
-    // BUG #28: feedback claro tambem fora do status inline pra desktop/sem hardware.
-    _setStatus('Pop-up bloqueado. Permita pop-ups e tente novamente.');
-    _showToastEtq('Pop-up bloqueado — habilite pop-ups e tente de novo.');
-    return;
-  }
+  if (!printWin) { _setStatus('Pop-up bloqueado. Permita pop-ups e tente novamente.'); return; }
 
   printWin.document.write(_buildPrintHtml(ids, layout));
   printWin.document.close();
-  _showToastEtq(`Etiquetas enviadas (${ids.length}). Verifique a janela de impressao.`);
 
   // Marcar como enviada_impressao
   try {

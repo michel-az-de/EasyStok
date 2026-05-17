@@ -29,7 +29,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         IReadOnlyCollection<ProdutoCaracteristicaInput>? Caracteristicas,
         IReadOnlyCollection<ProdutoEmbalagemInput>? Embalagens,
         IReadOnlyCollection<ProdutoVariacaoInput>? Variacoes,
-        Guid UsuarioId = default);
+        Guid UsuarioId = default,
+        // C2 (RDC 727/2022): default Avulso para nao quebrar callers existentes.
+        TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso);
 
     public sealed record CadastrarProdutoResult(
         Guid ProdutoId,
@@ -79,6 +81,12 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                     throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
             }
 
+            var nomeTrim = command.Nome.Trim();
+            if (await produtoRepository.ExistsNomeAsync(command.EmpresaId, nomeTrim))
+            {
+                throw new UseCaseValidationException($"Já existe um produto cadastrado com o nome \"{nomeTrim}\" nesta empresa.");
+            }
+
             if (!string.IsNullOrWhiteSpace(command.SkuBase))
             {
                 var skuBase = command.SkuBase.Trim();
@@ -92,6 +100,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             if (!string.IsNullOrWhiteSpace(command.CodigoBarras))
             {
                 var codigoBarras = command.CodigoBarras.Trim();
+                try { _ = Gtin.Parse(codigoBarras); }
+                catch (ArgumentException ex) { throw new UseCaseValidationException(ex.Message); }
                 if (await produtoRepository.ExistsCodigoBarrasAsync(command.EmpresaId, codigoBarras))
                 {
                     throw new UseCaseValidationException("Código de barras (EAN) duplicado para esta empresa.");
@@ -120,6 +130,15 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             }
 
             var agora = DateTime.UtcNow;
+            // Gating de status: produto sem preco de venda nasce Inativo (rascunho).
+            // Antes nascia sempre Ativo e podia ser exposto na vitrine sem preco, gerando
+            // pedidos com R$0 e leitura gerencial errada (auditoria QA 2026-05-16).
+            var statusInicial = (command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0)
+                ? StatusProduto.Ativo
+                : StatusProduto.Inativo;
+            if (statusInicial == StatusProduto.Inativo)
+                logger.LogInformation("Produto {Nome} criado como Inativo (sem preco de venda definido).", command.Nome);
+
             var produto = new Produto
             {
                 Id = Guid.NewGuid(),
@@ -130,6 +149,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 DescricaoBase = command.DescricaoBase?.Trim(),
                 Marca = command.Marca?.Trim(),
                 Tipo = command.Tipo,
+                TipoEmbalagem = command.TipoEmbalagem, // C2 (RDC 727/2022)
                 SkuBase = string.IsNullOrWhiteSpace(command.SkuBase) ? null : CodigoSku.From(command.SkuBase),
                 CodigoBarras = command.CodigoBarras?.Trim(),
                 ControlaValidade = command.ControlaValidade,
@@ -139,7 +159,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 MargemEstimada = command.MargemEstimada,
                 AtributosJson = command.AtributosJson,
                 FotosJson = command.FotosJson,
-                Status = StatusProduto.Ativo,
+                Status = statusInicial,
                 CriadoEm = agora,
                 AlteradoEm = agora,
                 CriadoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null,

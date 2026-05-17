@@ -17,4 +17,13 @@ public sealed class CacheOptions
     /// Padrao: 5 minutos.
     /// </summary>
     public TimeSpan ProdutosVersaoDuration { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Tempo de vida do snapshot de status de assinatura por tenant
+    /// (consumido pelo <c>SubscriptionGateMiddleware</c>). Padrao: 60s.
+    /// Curto de proposito — invalidacao explicita acontece via interceptor
+    /// EF, este TTL e o teto da janela de inconsistencia em caso de
+    /// invalidacao perdida.
+    /// </summary>
+    public TimeSpan SubscriptionStatusDuration { get; set; } = TimeSpan.FromSeconds(60);
 }
