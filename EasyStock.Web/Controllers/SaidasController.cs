@@ -64,10 +64,16 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         ViewBag.Title = "Histórico de Saídas";
         ViewBag.ActiveMenuItem = "Saidas";
 
+        // BUG 10: defaults usavam UTC e concatenavam ":T23:59:59" em "ate". Input
+        // <input type="date"> não aceita componente de hora, então o campo ficava
+        // visualmente vazio — usuário via "de" preenchido e "ate" em branco,
+        // achando que o filtro estava incompleto. Agora ambos chegam em yyyy-MM-dd
+        // puro e usam fuso BR (servidor pode rodar em UTC no Render).
         if (string.IsNullOrEmpty(de) && string.IsNullOrEmpty(ate))
         {
-            de = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
-            ate = DateTime.UtcNow.ToString("yyyy-MM-dd") + "T23:59:59";
+            var hojeBr = DateTime.UtcNow.AddHours(-3).Date;
+            de = hojeBr.AddDays(-30).ToString("yyyy-MM-dd");
+            ate = hojeBr.ToString("yyyy-MM-dd");
         }
 
         var result = await svc.ListarAsync(page, natureza, de, ate);

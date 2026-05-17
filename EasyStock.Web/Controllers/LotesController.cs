@@ -33,21 +33,28 @@ public class LotesController(
         // de rede/parse, mas qualquer outra exceção (NRE em DTO mal-formado, etc.)
         // escapava direto para o ErrorController. Aqui mantemos a página viva com
         // lista vazia + toast e logamos o stack pra triagem.
+        //
+        // BUG 9: o toast antes disparava em qualquer falha, mas a chamada principal
+        // (ListarAsync) podia ter sucedido e só a auxiliar (ListarPendentesPesoAsync)
+        // ter falhado — o usuário via toast vermelho com 50 lotes carregados. Agora
+        // só avisamos o usuário quando a lista principal não pôde ser carregada.
+        var listaPrincipalCarregou = status == "pendente_peso";
+
         try
         {
             // C2 (R10): consulta pendentes em paralelo a list. Status "pendente_peso"
             // e filtro client-side — chama endpoint dedicado.
             var pendentesTask = svc.ListarPendentesPesoAsync();
 
-            if (status == "pendente_peso")
-            {
-                vm.Items = new List<EasyStock.Web.Models.Api.Lote>();
-            }
-            else
+            if (status != "pendente_peso")
             {
                 var result = await svc.ListarAsync(status, search);
-                if (result.Success && result.Data is not null) vm.Items = result.Data;
-                else if (!result.Success)
+                if (result.Success && result.Data is not null)
+                {
+                    vm.Items = result.Data;
+                    listaPrincipalCarregou = true;
+                }
+                else
                     log.LogWarning("Lotes.Listar falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
                         result.ErrorCode, result.ErrorMessage, result.HttpStatus, result.CorrelationId);
             }
@@ -56,17 +63,27 @@ public class LotesController(
             if (pendentes.Success && pendentes.Data is not null)
             {
                 vm.PendentesPesoCount = pendentes.Data.Count;
-                if (status == "pendente_peso") vm.PendentesPeso = pendentes.Data;
+                if (status == "pendente_peso")
+                {
+                    vm.PendentesPeso = pendentes.Data;
+                    listaPrincipalCarregou = true;
+                }
             }
-            else if (!pendentes.Success)
+            else
+            {
                 log.LogWarning("Lotes.ListarPendentesPeso falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
                     pendentes.ErrorCode, pendentes.ErrorMessage, pendentes.HttpStatus, pendentes.CorrelationId);
+                if (status == "pendente_peso") listaPrincipalCarregou = false;
+            }
         }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha inesperada carregando /lotes (search={Search}, status={Status})", search, status);
-            Toast("warning", "Não foi possível carregar todos os lotes agora. Tente novamente em instantes.");
+            listaPrincipalCarregou = false;
         }
+
+        if (!listaPrincipalCarregou)
+            Toast("warning", "Não foi possível carregar a lista de lotes agora. Tente novamente em instantes.");
 
         return View(vm);
     }

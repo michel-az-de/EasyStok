@@ -184,10 +184,14 @@
       // state agora explica o gap pra o dono nao concluir "vi receita de R$ 795 mas
       // o caixa diz zero — sistema quebrado". Conserto longo (reconciliacao
       // automatica) vira no modulo Caixa Conciliado.
+      //
+      // BUG 7: copy generica que serve tanto para "caixa nao aberto" quanto para
+      // "caixa aberto sem movimento" e "caixa fechado". A CTA vai pra /caixa que
+      // mostra o estado real e a acao adequada (abrir / lancar / fechar).
       emptyState(
         'chart-fluxo-caixa',
-        'O caixa do dia ainda nao foi fechado. Os pagamentos recebidos so entram aqui depois do fechamento.',
-        'Fechar caixa de hoje →',
+        'Ainda não há fluxo de caixa registrado para hoje. Os lançamentos aparecem aqui depois que o caixa for aberto e fechado.',
+        'Ir para o caixa →',
         '/caixa');
       return;
     }

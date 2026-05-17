@@ -6,8 +6,8 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>
-            @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote cadastrado" : "lotes cadastrados")
+        <p title="Cada linha do estoque é um lote distinto (ItemEstoque). O KPI 'Lotes Produzidos' do dashboard conta apenas lotes finalizados no período.">
+            @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote em estoque" : "lotes em estoque")
             @if (Model.LotesComSaldo.HasValue && Model.LotesComSaldo.Value != Model.Paginacao.Total)
             {
                 <span class="text-slate-400">· @Model.LotesComSaldo com saldo</span>
