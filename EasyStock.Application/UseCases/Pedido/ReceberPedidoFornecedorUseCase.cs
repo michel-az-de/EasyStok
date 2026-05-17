@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ public sealed record ReceberPedidoFornecedorCommand(Guid PedidoId, Guid EmpresaI
 
 public class ReceberPedidoFornecedorUseCase(
     IPedidoFornecedorRepository pedidoRepository,
+    GerarContaPagarDePedidoFornecedorUseCase gerarContaPagarUseCase,
     IUnitOfWork unitOfWork,
     ILogger<ReceberPedidoFornecedorUseCase> logger)
 {
@@ -42,5 +44,19 @@ public class ReceberPedidoFornecedorUseCase(
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Pedido {PedidoId} marcado como recebido.", pedido.Id);
+
+        // Integracao automatica CAP/CAR (P1): best-effort — falha aqui nao reverte
+        // recebimento (idempotencia via OrigemRefId permite retry).
+        try
+        {
+            await gerarContaPagarUseCase.ExecuteAsync(
+                new GerarContaPagarDePedidoFornecedorCommand(pedido.EmpresaId, pedido));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Falha ao gerar ContaPagar automatica pra PedidoFornecedor {PedidoId} — recebimento mantido.",
+                pedido.Id);
+        }
     }
 }

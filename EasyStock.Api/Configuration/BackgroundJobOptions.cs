@@ -46,4 +46,18 @@ public sealed class BackgroundJobOptions
     /// (padrão), publica EventoNotificacao e o Worker despacha via Outbox.
     /// </summary>
     public bool UseLegacyEmailAlerts { get; set; } = false;
+
+    /// <summary>
+    /// Quando <c>true</c>, registra o <c>ContaFinanceiraVencimentoJob</c> (CAP/CAR)
+    /// que roda 1x/dia (09:30 UTC) marcando parcelas de Contas a Pagar/Receber
+    /// como vencidas e atualizando status agregado. Default true em producao.
+    /// </summary>
+    public bool EnableContaFinanceiraVencimentoJob { get; set; } = true;
+
+    /// <summary>
+    /// Quando <c>true</c>, registra o <c>ContaReceberPixReconciliacaoJob</c>
+    /// que roda hora em hora consultando Efi pra fechar gaps de webhook em
+    /// parcelas CR com Pix ativo. Default true em producao.
+    /// </summary>
+    public bool EnableContaReceberPixReconciliacaoJob { get; set; } = true;
 }

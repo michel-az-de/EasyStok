@@ -59,7 +59,30 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Erro ao carregar template origem {Id}", origem);
+            logger.LogError(ex, "Erro ao carregar template {Id}", id);
+            Erro = "Erro ao carregar template.";
+        }
+    }
+
+    private async Task CarregarDuplicandoAsync(Guid origemId)
+    {
+        try
+        {
+            var result = await api.GetRawAsync($"api/admin/notificacoes/templates/{origemId}");
+            var t = result.GetProperty("data");
+            var canalDestino = CanalAlvo ?? t.GetProperty("canal").GetString() ?? "Email";
+            Codigo = SugerirCodigoDuplicado(t.GetProperty("codigo").GetString()!, canalDestino);
+            Nome = $"{t.GetProperty("nome").GetString()} (cópia)";
+            Canal = canalDestino;
+            TipoEvento = t.GetProperty("tipoEvento").GetString()!;
+            AssuntoTemplate = t.GetProperty("assuntoTemplate").GetString()!;
+            CorpoTemplate = t.GetProperty("corpoTemplate").GetString()!;
+            Idioma = t.TryGetProperty("idioma", out var id1) ? id1.GetString() ?? "pt-BR" : "pt-BR";
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Erro ao carregar template origem {OrigemId}", origemId);
             Erro = "Erro ao carregar template de origem.";
         }
     }

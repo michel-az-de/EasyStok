@@ -106,6 +106,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
                 Repositories.Pagamentos.GatewayRoutingRuleRepository>();
 
+            // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
+            services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
+            services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
+            services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
+            services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
+            services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
+
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
             services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
             services.AddScoped<IFaqRepository, FaqRepository>();

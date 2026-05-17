@@ -224,6 +224,18 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Lancamento> Lancamentos { get; set; } = null!;
         public DbSet<LancamentoBaixa> LancamentoBaixas { get; set; } = null!;
 
+        // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
+        public DbSet<EasyStock.Domain.Entities.Financeiro.CategoriaFinanceira> CategoriasFinanceiras { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.CentroCusto> CentrosCusto { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaPagar> ContasPagar { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaPagarAlteracao> ContaPagarAlteracoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaReceber> ContasReceber { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaReceberAlteracao> ContaReceberAlteracoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ParcelaPagar> ParcelasPagar { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ParcelaReceber> ParcelasReceber { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.PagamentoParcela> PagamentosParcela { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaFinanceiraEvento> ContasFinanceirasEventos { get; set; } = null!;
+
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
         public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
 

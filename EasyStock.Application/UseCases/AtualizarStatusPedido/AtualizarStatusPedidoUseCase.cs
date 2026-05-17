@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Sales;
@@ -39,6 +40,8 @@ public sealed record AtualizarStatusPedidoCommand(
 public class AtualizarStatusPedidoUseCase(
     IPedidoRepository pedidoRepo,
     PedidoEstoqueIntegrationService estoqueIntegration,
+    IConfiguracaoLojaRepository configLojaRepo,
+    GerarContaReceberDePedidoUseCase gerarContaReceberUseCase,
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger)
 {
@@ -113,6 +116,32 @@ public class AtualizarStatusPedidoUseCase(
         await uow.CommitAsync();
 
         logger.LogInformation("Pedido {Id} status {Antigo} → {Novo}.", pedido.Id, statusAntigoStr, statusNovoStr);
+
+        // Integracao automatica CAP/CAR (P1): se status novo coincide com configuracao,
+        // gera ContaReceber. Best-effort: falha aqui nao reverte status do pedido
+        // (idempotencia via OrigemRefId garante retry seguro depois).
+        if (pedido.LojaId.HasValue)
+        {
+            try
+            {
+                var config = await configLojaRepo.GetByLojaIdAsync(pedido.LojaId.Value);
+                if (config is not null &&
+                    config.GerarContaReceberAutomaticaDePedido &&
+                    string.Equals(statusNovoStr, config.StatusPedidoQueGeraContaReceber, StringComparison.OrdinalIgnoreCase))
+                {
+                    await gerarContaReceberUseCase.ExecuteAsync(
+                        new GerarContaReceberDePedidoCommand(pedido.EmpresaId, pedido,
+                            cmd.UsuarioId, cmd.UsuarioNome));
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Falha ao gerar ContaReceber automatica pra pedido {Id} — status mantido. " +
+                    "Idempotencia via OrigemRefId permite retry.", pedido.Id);
+            }
+        }
+
         return CriarPedidoUseCase.Map(pedido);
     }
 }

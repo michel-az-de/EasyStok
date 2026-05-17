@@ -93,6 +93,18 @@
             <es-icon name="wallet" class="w-4 h-4 flex-shrink-0"></es-icon>
             Caixa
         </a>
+        <a href="/financeiro" class="ni @(activeItem == "Financeiro" ? "active" : "")">
+            <es-icon name="bar-chart-2" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Financeiro
+        </a>
+        <a href="/contas-a-receber" class="ni @(activeItem == "ContasAReceber" ? "active" : "")">
+            <es-icon name="circle-dollar-sign" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Contas a Receber
+        </a>
+        <a href="/contas-a-pagar" class="ni @(activeItem == "ContasAPagar" ? "active" : "")">
+            <es-icon name="credit-card" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Contas a Pagar
+        </a>
         <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
             <es-icon name="layers" class="w-4 h-4 flex-shrink-0"></es-icon>
             Lotes
@@ -108,12 +120,6 @@
 
         <div class="nav-section">Operação</div>
 
-        <a href="/estoque" class="ni @(activeItem == "Estoque" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Estoque
-        </a>
         <a href="/entradas/historico" class="ni @(activeItem is "Entradas" or "EntradasNova" or "EntradasHistorico" or "EntradasReposicao" ? "active" : "")">
             <es-icon name="arrow-down-to-line" class="w-4 h-4 flex-shrink-0"></es-icon>
             Entradas
