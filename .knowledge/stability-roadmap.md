@@ -13,7 +13,7 @@
 - [ ] **Deploy estável GCP**: Cloud Run + Cloud SQL com 1 prod + 1 staging. Dockerfiles prontos (`Dockerfile.cloudrun.{api,web,admin}`). Aguarda Project ID. Ver `.knowledge/gcp-deploy.md`.
 - [ ] **Backup Postgres + restore testado**: Cloud SQL faz daily, mas restore precisa ser exercitado. Documentar passo-a-passo no runbook.
 - [ ] **CI rodando 474 testes em cada PR**: GitHub Actions com `dotnet build` + `dotnet test` + lint. Bloquear merge se vermelho.
-- [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar.
+- [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar. (Parcial: 2026-05-07 — `/health/api` (PG+Redis+Config) e `/health/dispatcher` (heartbeat dos 3 loops Hosted) separados pra evitar cascata API↔Outbox quando `Notifications:Hosting:Mode=Hosted`. Falta plugar no Cloud Run/App Service e cobrir Worker via Kestrel mínimo.)
 - [ ] **Compras → estoque ponta-a-ponta testado**: `PedidoFornecedorItem` foi criada (commit recente) mas fluxo de recebimento → entrada de movimentação **sem teste de integração**.
 
 ## Bloco 2 — Observabilidade (P0/P1)
@@ -92,6 +92,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 - [x] **Notifications PR1–PR7 completo** — 2026-05-06. Outbox + adapters + Worker + painel Admin + LGPD + métricas OTel.
 - [x] **Helpdesk core E2E** — 2026-05-06. AdminTicket reformado + SLA monitor + 9 eventos globais + UI multi-nível.
 - [x] **Dual frontend formalizado** — 2026-05-06 (`4e9ffda`). Política PWA → MAUI unidirecional em `dual-frontend-policy.md`.
+- [x] **Cascata API+Worker mitigada (parcial)** — 2026-05-07. `/health/dispatcher` separado de `/health/api`; heartbeat singleton dos 3 loops Hosted; warning de startup quando `Notifications:Hosting:Mode=Hosted` na API. Bulkhead real continua sendo Worker como deploy separado (default).
 - [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` fixed-window 10/min/IP cobre login + register + refresh + forgot-password + reset-password. Teste em `AuthRateLimitTests.cs`. Webhook Pix segue como item residual.
 
 ---
