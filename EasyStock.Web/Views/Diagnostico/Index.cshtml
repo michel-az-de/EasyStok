@@ -27,7 +27,15 @@
     };
     string LatBadgeClass(long ms) => ms < 200 ? "text-green-700 bg-green-50" : ms < 1000 ? "text-yellow-700 bg-yellow-50" : "text-red-700 bg-red-50";
 
-    var overallStatus = apiOk && Model is not null ? (Model!.Status ?? "ok") : "critical";
+    // Normaliza valores desconhecidos pra "critical" — assim header (que cai no _ default
+    // pra qualquer coisa fora de ok/degraded) e a aba Insights (que so reconhecia
+    // critical/degraded) param de divergir quando a API devolve Status vazio/desconhecido.
+    var rawStatus = apiOk && Model is not null ? Model!.Status : null;
+    var overallStatus = rawStatus switch
+    {
+        "ok" or "degraded" or "critical" => rawStatus!,
+        _ => "critical"
+    };
     var overallIcon = overallStatus switch { "ok" => "check_circle", "degraded" => "warning", _ => "error" };
     var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Falha critica detectada" };
     var overallHero = overallStatus switch { "ok" => "from-green-500 to-emerald-600", "degraded" => "from-yellow-500 to-amber-600", _ => "from-red-500 to-rose-600" };
@@ -39,8 +47,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Central de Operacoes — EasyStock</title>
     <!-- tailwind: build local em ~/css/tailwind.dist.css -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    @* pinned 2026-05-15 — recalculate SRI on upgrade *@
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"
+            integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh"
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
+            integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG"
+            crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -48,21 +61,7 @@
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        [x-cloak] { display: none !important; }
-        .log-mono { font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.75rem; }
-        .tab-active { border-bottom: 2px solid #1E48A8; color: #4338ca; font-weight: 600; }
-        .tab-inactive { border-bottom: 2px solid transparent; color: #64748b; }
-        .tab-inactive:hover { color: #334155; border-color: #cbd5e1; }
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        .pulse-dot { animation: pulse 2s infinite; }
-        @@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
-    </style>
+    <link rel="stylesheet" href="~/css/diagnostico.css" asp-append-version="true" />
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen" x-data="diagApp()" x-init="init()">
 
@@ -73,7 +72,7 @@
             <div class="flex items-center gap-3">
                 <span class="material-icons-round text-3xl opacity-90">@overallIcon</span>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight">Central de Operacoes</h1>
+                    <h1 class="text-xl font-bold tracking-tight">Saúde do sistema</h1>
                     <p class="text-sm opacity-90">
                         @overallText
                         @if (apiOk && Model is not null)
@@ -103,6 +102,15 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
+    <!-- ── Banner contextual ──────────────────────────────────────────── -->
+    <div class="mb-6 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3 text-sm text-blue-900">
+        <span class="material-icons-round text-blue-600 text-base flex-shrink-0 mt-0.5">info</span>
+        <div>
+            <strong class="font-semibold">Esta página é para admins e suporte.</strong>
+            Se tudo aqui está verde, suas operações estão rodando bem — você não precisa olhar.
+        </div>
+    </div>
+
     <!-- ── TABS ──────────────────────────────────────────────────────── -->
     <div class="flex gap-6 border-b border-slate-200 mb-6 overflow-x-auto">
         <button @@click="activeTab='overview'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
@@ -130,7 +138,7 @@
             {
                 <span class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold" title="Estado crítico/degradado detectado">!</span>
             }
-            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800"
                 x-text="patterns.length"></span>
         </button>
     </div>
@@ -925,7 +933,7 @@
                                 <span class="text-[10px] text-slate-400 mr-1">Marcar como:</span>
                                 <template x-for="ackOpt in [
                                     { status: 'visto', label: 'Visto', icon: 'visibility', cls: 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100' },
-                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
+                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100' },
                                     { status: 'resolvido', label: 'Resolvido', icon: 'task_alt', cls: 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100' }
                                 ]" :key="ackOpt.status">
                                     <button @@click="ackAlerta(p, ackOpt.status)"
@@ -952,6 +960,7 @@
             <div class="flex flex-wrap gap-2">
                 <a href="/diagnostico/json" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">JSON Diagnostico</a>
                 <a href="@(apiBase)/swagger" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">Swagger</a>
+                <a href="@(apiBase)/api-docs/index.html" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">Console</a>
                 <a href="@(apiBase)/health" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">/health</a>
                 <a href="@(apiBase)/health/ready" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">/health/ready</a>
             </div>
@@ -1231,8 +1240,16 @@ function diagApp() {
             this.loadingEmpresasHealth = false;
         },
 
-        async esvaziarLixeira() {
-            if (!confirm('Excluir permanentemente todos os logs na lixeira?')) return;
+        esvaziarLixeira() {
+            const self = this;
+            window.easyConfirm({
+                titulo: 'Esvaziar lixeira de logs?',
+                mensagem: 'Todos os logs na lixeira serao excluidos permanentemente. Esta acao nao pode ser desfeita.',
+                textoBotao: 'Esvaziar lixeira',
+                classBotao: 'bg-red-600 hover:bg-red-700'
+            }, () => self._esvaziarLixeira());
+        },
+        async _esvaziarLixeira() {
             try {
                 const r = await fetch('/diagnostico/api/logs/lixeira/esvaziar', { method: 'POST' });
                 if (r.ok) {
@@ -1251,8 +1268,16 @@ function diagApp() {
             this.loadLixeira();
         },
 
-        async zerarMedidores() {
-            if (!confirm('Zerar todos os medidores e gráficos de health? Novos dados começarão a ser coletados em até 60s.')) return;
+        zerarMedidores() {
+            const self = this;
+            window.easyConfirm({
+                titulo: 'Zerar medidores e graficos?',
+                mensagem: 'Todos os dados de health serao apagados. Novos dados comecam a ser coletados em ate 60 segundos.',
+                textoBotao: 'Zerar medidores',
+                classBotao: 'bg-amber-600 hover:bg-amber-700'
+            }, () => self._zerarMedidores());
+        },
+        async _zerarMedidores() {
             this.zerandoMedidores = true;
             this.zerarMsg = '';
             try {
@@ -1275,12 +1300,24 @@ function diagApp() {
             setTimeout(() => { this.zerarMsg = ''; }, 5000);
         },
 
-        async expurgarLogs() {
+        expurgarLogs() {
+            // Admin-only: prompt nativo aceitavel para entrada numerica simples nesta tela.
             const dias = prompt('Quantos dias de logs manter? (1-30, padrão 3)', '3');
             if (dias === null) return;
-            const n = parseInt(dias) || 3;
-            if (n < 1 || n > 30) { alert('Valor deve ser entre 1 e 30.'); return; }
-            if (!confirm(`Excluir permanentemente logs com mais de ${n} dia(s)?`)) return;
+            const n = parseInt(dias, 10);
+            if (!Number.isFinite(n) || n < 1 || n > 30) {
+                window.showToast && window.showToast('Valor deve ser entre 1 e 30.', 'warning');
+                return;
+            }
+            const self = this;
+            window.easyConfirm({
+                titulo: 'Expurgar logs antigos?',
+                mensagem: `Todos os logs com mais de ${n} dia(s) serao excluidos permanentemente.`,
+                textoBotao: 'Expurgar',
+                classBotao: 'bg-red-600 hover:bg-red-700'
+            }, () => self._expurgarLogs(n));
+        },
+        async _expurgarLogs(n) {
             this.expurgandoLogs = true;
             this.expurgarMsg = '';
             try {
@@ -1367,8 +1404,16 @@ function diagApp() {
             this.loadingLogs = false;
         },
 
-        async limparLogs() {
-            if (!confirm('Mover todos os arquivos de log para a lixeira? Os logs serão preservados na pasta lixeira e poderão ser excluídos permanentemente depois.')) return;
+        limparLogs() {
+            const self = this;
+            window.easyConfirm({
+                titulo: 'Mover logs para a lixeira?',
+                mensagem: 'Todos os logs atuais serao movidos para a pasta lixeira. Voce ainda pode exclui-los permanentemente em seguida.',
+                textoBotao: 'Mover para lixeira',
+                classBotao: 'bg-amber-600 hover:bg-amber-700'
+            }, () => self._limparLogs());
+        },
+        async _limparLogs() {
             this.clearingLogs = true;
             this.clearLogsMsg = '';
             try {
@@ -1395,8 +1440,16 @@ function diagApp() {
             setTimeout(() => { this.clearLogsMsg = ''; }, 5000);
         },
 
-        async salvarStorage() {
-            if (!confirm('Salvar todos os logs atuais no storage configurado?')) return;
+        salvarStorage() {
+            const self = this;
+            window.easyConfirm({
+                titulo: 'Salvar logs no storage?',
+                mensagem: 'Todos os logs atuais serao enviados para o storage configurado.',
+                textoBotao: 'Salvar',
+                classBotao: 'bg-indigo-600 hover:bg-indigo-700'
+            }, () => self._salvarStorage());
+        },
+        async _salvarStorage() {
             this.savingStorage = true;
             this.saveStorageMsg = '';
             try {
@@ -1456,7 +1509,7 @@ function diagApp() {
 
                         const x = xAxis.getPixelForValue(nearestIdx);
                         const color = ev.tipo === 'error_spike' ? 'rgba(239,68,68,0.7)' : 'rgba(30, 72, 168,0.7)';
-                        const label = ev.tipo === 'error_spike' ? '⚡' : '🚀';
+                        const label = ev.tipo === 'error_spike' ? '!' : '*';
 
                         ctx.save();
                         ctx.beginPath();
@@ -1476,6 +1529,10 @@ function diagApp() {
                 }
             };
 
+            const css = getComputedStyle(document.documentElement);
+            const navy = css.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
+            const crit = css.getPropertyValue('--crit-600').trim() || 'rgb(239, 68, 68)';
+            const grid = css.getPropertyValue('--ink-100').trim() || 'rgb(241, 245, 249)';
             this.healthChartInstance = new Chart(canvas, {
                 type: 'line',
                 data: {
@@ -1484,7 +1541,7 @@ function diagApp() {
                         {
                             label: 'DB Latencia (ms)',
                             data: apiData,
-                            borderColor: '#1E48A8',
+                            borderColor: navy,
                             backgroundColor: 'rgba(30, 72, 168, 0.1)',
                             fill: true,
                             tension: 0.3,
@@ -1494,7 +1551,7 @@ function diagApp() {
                         {
                             label: 'Erros/min',
                             data: errData,
-                            borderColor: '#ef4444',
+                            borderColor: crit,
                             backgroundColor: 'rgba(239, 68, 68, 0.1)',
                             fill: true,
                             tension: 0.3,
@@ -1513,7 +1570,7 @@ function diagApp() {
                     },
                     scales: {
                         x: { ticks: { font: { size: 9 }, maxTicksLimit: 12 }, grid: { display: false } },
-                        y: { beginAtZero: true, ticks: { font: { size: 9 }, callback: v => v + 'ms' }, grid: { color: '#f1f5f9' } },
+                        y: { beginAtZero: true, ticks: { font: { size: 9 }, callback: v => v + 'ms' }, grid: { color: grid } },
                         y1: { position: 'right', beginAtZero: true, ticks: { font: { size: 9 } }, grid: { display: false } },
                     }
                 },
@@ -1534,6 +1591,10 @@ function diagApp() {
 
             if (this.errorsChartInstance) this.errorsChartInstance.destroy();
 
+            const errCss = getComputedStyle(document.documentElement);
+            const errNavy = errCss.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
+            const errCrit = errCss.getPropertyValue('--crit-600').trim() || 'rgb(239, 68, 68)';
+            const errGrid = errCss.getPropertyValue('--ink-100').trim() || 'rgb(241, 245, 249)';
             this.errorsChartInstance = new Chart(canvas, {
                 type: 'bar',
                 data: {
@@ -1543,7 +1604,7 @@ function diagApp() {
                             label: 'Requests',
                             data: reqData,
                             backgroundColor: 'rgba(30, 72, 168, 0.15)',
-                            borderColor: '#1E48A8',
+                            borderColor: errNavy,
                             borderWidth: 1,
                             borderRadius: 3,
                         },
@@ -1551,7 +1612,7 @@ function diagApp() {
                             label: 'Erros',
                             data: errData,
                             backgroundColor: 'rgba(239, 68, 68, 0.6)',
-                            borderColor: '#ef4444',
+                            borderColor: errCrit,
                             borderWidth: 1,
                             borderRadius: 3,
                         }
@@ -1565,7 +1626,7 @@ function diagApp() {
                     },
                     scales: {
                         x: { ticks: { font: { size: 9 } }, grid: { display: false } },
-                        y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: '#f1f5f9' } },
+                        y: { beginAtZero: true, ticks: { font: { size: 9 } }, grid: { color: errGrid } },
                     }
                 }
             });
@@ -1582,6 +1643,10 @@ function diagApp() {
 
             if (this.logVolumeChartInstance) this.logVolumeChartInstance.destroy();
 
+            const volCss = getComputedStyle(document.documentElement);
+            const volNavy = volCss.getPropertyValue('--navy-200').trim() || 'rgb(199, 210, 254)';
+            const volCrit = volCss.getPropertyValue('--crit-200').trim() || 'rgb(252, 165, 165)';
+            const volGrid = volCss.getPropertyValue('--ink-100').trim() || 'rgb(241, 245, 249)';
             this.logVolumeChartInstance = new Chart(canvas, {
                 type: 'bar',
                 data: {
@@ -1590,13 +1655,13 @@ function diagApp() {
                         {
                             label: 'Logs',
                             data: allHours.map(h => reqHours[h] || 0),
-                            backgroundColor: '#c7d2fe',
+                            backgroundColor: volNavy,
                             borderRadius: 2,
                         },
                         {
                             label: 'Erros',
                             data: allHours.map(h => errHours[h] || 0),
-                            backgroundColor: '#fca5a5',
+                            backgroundColor: volCrit,
                             borderRadius: 2,
                         }
                     ]
@@ -1607,7 +1672,7 @@ function diagApp() {
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { stacked: true, ticks: { font: { size: 8 } }, grid: { display: false } },
-                        y: { stacked: true, ticks: { font: { size: 8 } }, grid: { color: '#f1f5f9' } },
+                        y: { stacked: true, ticks: { font: { size: 8 } }, grid: { color: volGrid } },
                     }
                 }
             });

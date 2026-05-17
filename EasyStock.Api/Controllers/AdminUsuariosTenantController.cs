@@ -2,6 +2,9 @@ using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Admin.CriarUsuarioTenantPorAdmin;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,9 +29,74 @@ public class AdminUsuariosTenantController(
     IRefreshTokenRepository refreshTokens,
     IEmailService emailService,
     AdminAuditService audit,
+    CriarUsuarioTenantPorAdminUseCase criarUsuarioUseCase,
     ILogger<AdminUsuariosTenantController> logger) : EasyStockControllerBase
 {
     private const int MotivoMinimo = 10;
+
+    // ─────────────────────────── Criar usuário em tenant existente ───────────────────────────
+
+    /// <summary>
+    /// Cria um usuário em um tenant existente. Senha temporária gerada server-side é
+    /// retornada 1x (banner do admin) e opcionalmente enviada por email para o novo
+    /// usuário. Justificativa (≥10 chars) obrigatória → AdminAuditLog.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> Criar([FromBody] CriarUsuarioTenantRequest req)
+    {
+        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+            return DataBadRequest(erro!);
+        if (req!.TenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!Enum.TryParse<NivelAcesso>(req.Nivel, ignoreCase: true, out var nivel))
+            return DataBadRequest("Nível de acesso inválido. Use Admin, Gerente, Operador ou Visualizador.");
+
+        // Bloqueio: tenant suspenso/cancelado não recebe usuário novo. Mensagem direta
+        // pra que o operador entenda que precisa reativar antes.
+        var assinatura = await db.AssinaturasEmpresa
+            .AsNoTracking()
+            .Where(a => a.EmpresaId == req.TenantId)
+            .OrderByDescending(a => a.CriadoEm)
+            .FirstOrDefaultAsync();
+        if (assinatura?.Status == StatusAssinatura.Suspensa)
+            return DataBadRequest("Cliente está suspenso. Reative antes de adicionar usuários.");
+        if (assinatura?.Status == StatusAssinatura.Cancelada)
+            return DataBadRequest("Cliente está cancelado. Não é possível adicionar usuários.");
+
+        try
+        {
+            var resultado = await criarUsuarioUseCase.ExecuteAsync(new CriarUsuarioTenantPorAdminCommand(
+                TenantId: req.TenantId,
+                Nome: req.Nome ?? string.Empty,
+                Email: req.Email ?? string.Empty,
+                Nivel: nivel,
+                EnviarEmail: req.EnviarEmail ?? true));
+
+            await audit.LogAsync(
+                "AdminCriouUsuarioTenant",
+                $"UserId={resultado.UsuarioId}, Email={MascararEmail(resultado.Email)}, Nivel={resultado.Nivel}, EmailEnviado={resultado.EmailEnviado}",
+                tenantId: resultado.TenantId,
+                motivo: motivo,
+                entidadeAfetadaId: resultado.UsuarioId);
+
+            return DataCreated($"/api/admin/usuarios-tenant/{resultado.UsuarioId}", new
+            {
+                usuarioId = resultado.UsuarioId,
+                tenantId = resultado.TenantId,
+                nome = resultado.Nome,
+                email = resultado.Email,
+                nivel = resultado.Nivel.ToString(),
+                senhaTemporaria = resultado.SenhaTemporaria,
+                emailEnviado = resultado.EmailEnviado,
+                emailErro = resultado.EmailErro
+            });
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao criar usuário no tenant {TenantId}", req.TenantId);
+            return Problem(detail: ex.Message, statusCode: 500, title: "Erro ao criar usuário.");
+        }
+    }
 
     // ─────────────────────────── #6: Listar sessões ───────────────────────────
 
@@ -418,3 +486,10 @@ public class AdminUsuariosTenantController(
 public record MotivoRequest(string Motivo);
 public record ResetSenhaRequest(string Motivo, bool? EnviarPorEmail);
 public record AtualizarUsuarioRequest(string Motivo, string? Nome, string? Email);
+public record CriarUsuarioTenantRequest(
+    string Motivo,
+    Guid TenantId,
+    string? Nome,
+    string? Email,
+    string Nivel,
+    bool? EnviarEmail);

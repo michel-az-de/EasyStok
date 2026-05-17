@@ -6,11 +6,25 @@ public class DashboardViewModel
     public int QuantidadeTotalEmEstoque { get; set; }
     public decimal ValorEstoque { get; set; }
     public decimal ReceitaMes { get; set; }
+    public decimal MediaVendasDiaria { get; set; }
 
     public int EstoqueCritico { get; set; }
     public int ProximosVencimento { get; set; }
     public int ProdutosParados { get; set; }
     public int SugestoesReposicao { get; set; }
+
+    // Resumo do dia (Pulso de hoje) — vem de /analytics/dia
+    public int PedidosEntreguesHoje { get; set; }
+    public decimal FaturamentoHoje { get; set; }
+    public decimal TicketMedioHoje { get; set; }
+    public int PedidosPendentes { get; set; }
+    public decimal ValorPedidosPendentes { get; set; }
+    public bool CaixaAbertaHoje { get; set; }
+    public bool CaixaFechadaHoje { get; set; }
+    public decimal SaldoCaixaAtual { get; set; }
+    public int PixRecebidosHoje { get; set; }
+    public decimal ValorPixHoje { get; set; }
+    public bool OnboardingCompleto { get; set; } = true;
 
     public List<MovimentacaoRecente> MovimentacoesRecentes { get; set; } = [];
     public List<string> GraficoLabels { get; set; } = [];
@@ -23,6 +37,21 @@ public class DashboardViewModel
     public int GeracoesIaPercent => IaIlimitada || GeracoesIaLimite == 0
         ? 0
         : (int)Math.Min(100, Math.Round((double)GeracoesIaUsadas / GeracoesIaLimite * 100));
+
+    public decimal ReceitaMesAtual { get; set; }
+    public decimal ReceitaMesAnterior { get; set; }
+    public int VariacaoReceitaPercent =>
+        ReceitaMesAnterior == 0
+            ? 0
+            : (int)Math.Round((double)((ReceitaMesAtual - ReceitaMesAnterior) / ReceitaMesAnterior) * 100);
+    public bool TemComparativoReceita => ReceitaMesAnterior > 0 && ReceitaMesAtual > 0;
+
+    public bool TemAlertasCriticos => EstoqueCritico > 0 || ProximosVencimento > 0;
+    public bool TemQualquerAlerta =>
+        EstoqueCritico > 0 || ProximosVencimento > 0 || ProdutosParados > 0 || SugestoesReposicao > 0;
+
+    public bool ResumoApiFalhou { get; set; }
+    public bool TodasApisFalharam { get; set; }
 }
 
 public class MovimentacaoRecente

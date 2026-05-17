@@ -15,21 +15,32 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ThenInclude(up => up.Perfil)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
-        public Task<Usuario?> GetByEmailAsync(string email) =>
+        public async Task<Usuario?> GetByEmailAsync(string email)
+        {
             // Login precede o contexto de tenant: CurrentTenantId=Guid.Empty e
             // IsSuperAdmin=false durante a autenticacao. O global query filter
             // (Onda 1.2) elimina Perfil/UsuarioPerfil/UsuarioEmpresa com EmpresaId
-            // != Guid.Empty (todos eles), e Perfil com EmpresaId=null (SuperAdmin
-            // global) tambem cai porque null != Guid.Empty. Sem IgnoreQueryFilters
-            // o use case nao consegue resolver nivel/empresa de NINGUEM no login.
-            dbContext.Usuarios
-                .AsNoTracking()
-                .IgnoreQueryFilters()
-                .Include(u => u.Empresas)
-                .Include(u => u.Perfis!)
-                    .ThenInclude(up => up.Perfil)
-                        .ThenInclude(p => p!.Permissoes)
-                .FirstOrDefaultAsync(u => u.Email == email);
+            // != Guid.Empty, e Perfil com EmpresaId=null tambem cai porque
+            // null != Guid.Empty. Sem IgnoreQueryFilters o use case nao consegue
+            // resolver nivel/empresa de NINGUEM no login.
+            //
+            // RLS (2026-05-11): IgnoreQueryFilters sozinho não basta — a policy
+            // tenant_isolation no Postgres zera as linhas mesmo com filtro EF
+            // desligado. UseRowLevelSecurityBypass emite SET app.bypass_rls=true
+            // na conexão pelo SetTenantOnConnectionInterceptor, dando à query
+            // de login a visibilidade global que ela precisa antes do JWT existir.
+            using (dbContext.UseRowLevelSecurityBypass())
+            {
+                return await dbContext.Usuarios
+                    .AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Include(u => u.Empresas)
+                    .Include(u => u.Perfis!)
+                        .ThenInclude(up => up.Perfil)
+                            .ThenInclude(p => p!.Permissoes)
+                    .FirstOrDefaultAsync(u => u.Email == email);
+            }
+        }
 
         public async Task<(IEnumerable<Usuario> Usuarios, int Total)> GetByEmpresaAsync(Guid empresaId, int page, int pageSize)
         {

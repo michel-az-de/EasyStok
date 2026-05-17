@@ -130,3 +130,21 @@ public sealed class PreviewTemplateUseCase(
         return new PreviewTemplateResult(assunto, corpo);
     }
 }
+
+// ── Preview de DRAFT (assunto/corpo direto, sem template salvo) ──────────────
+
+public sealed record PreviewDraftTemplateCommand(
+    string AssuntoTemplate,
+    string CorpoTemplate,
+    IDictionary<string, object?> Variaveis) : ICommand;
+
+public sealed class PreviewDraftTemplateUseCase(IRendererTemplate renderer)
+    : IUseCase<PreviewDraftTemplateCommand, PreviewTemplateResult>
+{
+    public async Task<PreviewTemplateResult> ExecuteAsync(PreviewDraftTemplateCommand command)
+    {
+        var assunto = await renderer.RenderizarAsync(command.AssuntoTemplate ?? string.Empty, command.Variaveis);
+        var corpo = await renderer.RenderizarAsync(command.CorpoTemplate ?? string.Empty, command.Variaveis);
+        return new PreviewTemplateResult(assunto, corpo);
+    }
+}

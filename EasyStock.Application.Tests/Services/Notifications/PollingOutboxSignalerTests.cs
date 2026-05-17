@@ -44,6 +44,9 @@ public class PollingOutboxSignalerTests
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
+    // FLAKY: timing-sensitive (TimeSpan.FromMilliseconds(50) vs Task.Delay(150)).
+    // Pode falhar em CI lento ou em runner sob carga. Re-run resolve.
+    // Não-fiscal, não bloqueia deploy. Ver docs/dev/flaky-tests.md.
     [Fact]
     public async Task WaitAsync_completa_quando_intervalo_passa()
     {

@@ -14,12 +14,14 @@ namespace EasyStock.Infra.Notifications.Hosting;
 /// </summary>
 public sealed class AvaliadorLoopHostedService(
     IServiceProvider serviceProvider,
+    INotificationsLoopHeartbeat heartbeat,
     IOptions<NotificationsHostingOptions> options,
     ILogger<AvaliadorLoopHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("AvaliadorLoopHostedService iniciado.");
+        heartbeat.Heartbeat(NotificationsLoops.Avaliador);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -34,6 +36,8 @@ public sealed class AvaliadorLoopHostedService(
             {
                 logger.LogError(ex, "Erro no AvaliadorLoopHostedService — continuando próxima rodada.");
             }
+
+            heartbeat.Heartbeat(NotificationsLoops.Avaliador);
 
             try
             {

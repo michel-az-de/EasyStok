@@ -13,12 +13,14 @@ namespace EasyStock.Infra.Notifications.Hosting;
 /// </summary>
 public sealed class ColetorLoopHostedService(
     IServiceProvider serviceProvider,
+    INotificationsLoopHeartbeat heartbeat,
     IOptions<NotificationsHostingOptions> options,
     ILogger<ColetorLoopHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("ColetorLoopHostedService iniciado.");
+        heartbeat.Heartbeat(NotificationsLoops.Coletor);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -32,6 +34,8 @@ public sealed class ColetorLoopHostedService(
             {
                 logger.LogError(ex, "Erro no ColetorLoopHostedService — continuando próxima rodada.");
             }
+
+            heartbeat.Heartbeat(NotificationsLoops.Coletor);
 
             try
             {

@@ -1,44 +1,97 @@
 @page
+@using EasyStock.Admin.Pages.Notificacoes
 @model EasyStock.Admin.Pages.Notificacoes.Templates.IndexModel
 @{
-    ViewData["Title"] = "Templates de Notificação";
+    ViewData["Title"] = "Templates de Notificacao";
+
+    var eventosPorCategoria = new Dictionary<string, (string emoji, string desc, string[] eventos)>
+    {
+        ["Transacional"] = ("💳", "Transacoes financeiras + autenticacao", new[]
+        {
+            "AssinaturaExpirando", "AssinaturaExpirada",
+            "FaturaCriada", "FaturaVencendo", "FaturaPaga", "FaturaVencida",
+            "PagamentoConfirmado", "PagamentoFalhou",
+            "ResetSenha", "ConfirmacaoEmail"
+        }),
+        ["Helpdesk"] = ("🎫", "Tickets, SLA e ciclo de suporte", new[]
+        {
+            "TicketCriado", "TicketRespondidoCliente", "TicketRespondidoAdmin",
+            "TicketStatusAlterado", "TicketAtribuido", "TicketEncaminhadoNivel",
+            "SlaProximoVencer", "SlaViolado", "BugFixCriado", "ConviteCsat"
+        }),
+        ["Operacional"] = ("📦", "Estoque e alertas de operacao", new[]
+        {
+            "ProdutoVencendo", "ProdutoVencido", "AlertaEstoqueCritico", "TarefaPendente"
+        }),
+        ["Comunicacao"] = ("📢", "Broadcasts e comunicados gerais", new[]
+        {
+            "BroadcastSuperAdmin"
+        }),
+    };
+
+    var nomesCanais = new[] { ("Email", "📧"), ("InApp", "🔔"), ("Sms", "📱"), ("WhatsApp", "💬") };
+
+    var indexEventoCanal = new Dictionary<(string evento, string canal), List<System.Text.Json.JsonElement>>();
+    if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
+    {
+        foreach (var t in Model.Data.EnumerateArray())
+        {
+            var ev = t.TryGetProperty("tipoEvento", out var e) ? e.GetString() ?? "" : "";
+            var ca = t.TryGetProperty("canal", out var c) ? c.GetString() ?? "" : "";
+            if (string.IsNullOrWhiteSpace(ev) || string.IsNullOrWhiteSpace(ca)) continue;
+            var key = (ev, ca);
+            if (!indexEventoCanal.TryGetValue(key, out var lista))
+            {
+                lista = new List<System.Text.Json.JsonElement>();
+                indexEventoCanal[key] = lista;
+            }
+            lista.Add(t);
+        }
+    }
+
+    int TotalEventos() => eventosPorCategoria.Values.Sum(x => x.eventos.Length);
+    int EventosCobertos() => eventosPorCategoria.Values.Sum(x => x.eventos.Count(e => Model.CoberturaPorEvento.ContainsKey(e)));
 }
 
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
+<partial name="../_Subnav" />
+
+<div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-            <h1 class="text-2xl font-bold text-white">Templates</h1>
-            <p class="text-slate-400 text-sm mt-1">Modelos de mensagem por canal e tipo de evento</p>
+            <h1 class="text-2xl font-bold text-es-ink">Templates</h1>
+            <p class="text-es-ink-mute text-sm mt-1">
+                Modelos de mensagem por canal e tipo de evento
+                <span class="ml-2 badge-blue">@EventosCobertos() / @TotalEventos() eventos com cobertura ativa</span>
+            </p>
         </div>
         <a href="/Notificacoes/Templates/Edit" class="btn-primary px-4 py-2 text-sm">+ Novo Template</a>
     </div>
 
-    <form method="get" class="flex gap-3 flex-wrap">
-        <select name="canal" class="input-dark text-sm">
-            <option value="">Todos os canais</option>
-            <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
-            <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
-            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
-            <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
+    <form method="get" class="flex gap-3 flex-wrap items-center">
+        <div class="notif-search">
+            <span class="icon">🔍</span>
+            <input type="text" name="busca" value="@Model.Busca" placeholder="Buscar por codigo, nome ou evento..." />
+        </div>
+        <select name="canal" class="input-dark text-sm" style="max-width:160px">
+            <option value="">Todos canais</option>
+            <option value="Email" selected="@(Model.Canal == "Email")">📧 Email</option>
+            <option value="Sms" selected="@(Model.Canal == "Sms")">📱 SMS</option>
+            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">💬 WhatsApp</option>
+            <option value="InApp" selected="@(Model.Canal == "InApp")">🔔 In-App</option>
         </select>
-        <select name="tipoEvento" class="input-dark text-sm">
-            <option value="">Todos os eventos</option>
-            <option value="ProdutoVencendo">Produto Vencendo</option>
-            <option value="ProdutoVencido">Produto Vencido</option>
-            <option value="AssinaturaExpirando">Assinatura Expirando</option>
-            <option value="AssinaturaExpirada">Assinatura Expirada</option>
-            <option value="TarefaPendente">Tarefa Pendente</option>
-            <option value="ResetSenha">Reset de Senha</option>
-            <option value="ConfirmacaoEmail">Confirmação de Email</option>
-            <option value="AlertaEstoqueCritico">Alerta Estoque</option>
-            <option value="BroadcastSuperAdmin">Broadcast</option>
-        </select>
-        <select name="ativo" class="input-dark text-sm">
+        <select name="ativo" class="input-dark text-sm" style="max-width:120px">
             <option value="">Todos</option>
-            <option value="true">Ativos</option>
-            <option value="false">Inativos</option>
+            <option value="true" selected="@(Model.Ativo == true)">Ativos</option>
+            <option value="false" selected="@(Model.Ativo == false)">Inativos</option>
         </select>
+        <input type="hidden" name="modo" value="@Model.Modo" />
         <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
+        <div class="ml-auto preview-toggle">
+            <a href="?modo=grade&canal=@Model.Canal&busca=@Model.Busca&ativo=@Model.Ativo"
+               class="@(Model.Modo == "grade" ? "active" : "")">🗂️ grade</a>
+            <a href="?modo=tabela&canal=@Model.Canal&busca=@Model.Busca&ativo=@Model.Ativo"
+               class="@(Model.Modo == "tabela" ? "active" : "")">☰ tabela</a>
+        </div>
     </form>
 
     @if (Model.Erro != null)
@@ -46,79 +99,152 @@
         <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
     }
 
-    <div class="card overflow-hidden">
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase">
-                    <th class="px-4 py-3 text-left">Código / Nome</th>
-                    <th class="px-4 py-3 text-left">Canal</th>
-                    <th class="px-4 py-3 text-left">Evento</th>
-                    <th class="px-4 py-3 text-left">Versão</th>
-                    <th class="px-4 py-3 text-left">Status</th>
-                    <th class="px-4 py-3 text-left">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    @foreach (var t in Model.Data.EnumerateArray())
-                    {
-                        var id = t.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
-                        var codigo = t.TryGetProperty("codigo", out var c) ? c.GetString() : "";
-                        var nome = t.TryGetProperty("nome", out var n) ? n.GetString() : "";
-                        var canal = t.TryGetProperty("canal", out var ca) ? ca.GetString() : "";
-                        var evento = t.TryGetProperty("tipoEvento", out var ev) ? ev.GetString() : "";
-                        var versao = t.TryGetProperty("versao", out var v) ? v.GetInt32() : 0;
-                        var ativo = t.TryGetProperty("ativo", out var at) && at.GetBoolean();
-                        var aprovado = t.TryGetProperty("aprovado", out var ap) && ap.GetBoolean();
-
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors">
-                            <td class="px-4 py-3">
-                                <div class="font-mono text-amber-400 text-xs">@codigo</div>
-                                <div class="text-white">@nome</div>
-                            </td>
-                            <td class="px-4 py-3 text-slate-300">@canal</td>
-                            <td class="px-4 py-3 text-slate-300 text-xs">@evento</td>
-                            <td class="px-4 py-3 text-slate-400">v@versao</td>
-                            <td class="px-4 py-3">
-                                @if (ativo && aprovado)
-                                {
-                                    <span class="badge-green">Ativo</span>
-                                }
-                                else if (ativo && !aprovado)
-                                {
-                                    <span class="badge-yellow">Aguardando aprovação</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-gray">Inativo</span>
-                                }
-                            </td>
-                            <td class="px-4 py-3 flex gap-2">
-                                <a href="/Notificacoes/Templates/Edit?id=@id" class="text-blue-400 hover:text-blue-300 text-xs">Editar</a>
-                                @if (ativo && !aprovado)
-                                {
-                                    <form method="post" asp-page-handler="Aprovar" class="inline">
-                                        <input type="hidden" name="id" value="@id" />
-                                        <button type="submit" class="text-green-400 hover:text-green-300 text-xs">Aprovar</button>
-                                    </form>
-                                }
-                            </td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
-
-    @if (Model.TotalPages > 1)
+    @if (Model.Modo == "tabela")
     {
-        <div class="flex justify-center gap-2">
-            @for (var p = 1; p <= Model.TotalPages; p++)
-            {
-                <a href="?page=@p&canal=@Model.Canal&tipoEvento=@Model.TipoEvento&ativo=@Model.Ativo"
-                   class="px-3 py-1 rounded text-sm @(p == Model.Page ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white")">@p</a>
-            }
+        <div class="card p-0 overflow-hidden">
+            <table class="table-admin w-full">
+                <thead>
+                    <tr>
+                        <th>Codigo / Nome</th><th>Canal</th><th>Evento</th><th>Versao</th><th>Status</th><th>Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        foreach (var t in Model.Data.EnumerateArray())
+                        {
+                            var id = t.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
+                            var codigo = t.TryGetProperty("codigo", out var c) ? c.GetString() : "";
+                            var nome = t.TryGetProperty("nome", out var n) ? n.GetString() : "";
+                            var canal = t.TryGetProperty("canal", out var ca) ? ca.GetString() : "";
+                            var evento = t.TryGetProperty("tipoEvento", out var ev) ? ev.GetString() : "";
+                            var versao = t.TryGetProperty("versao", out var v) ? v.GetInt32() : 0;
+                            var ativo = t.TryGetProperty("ativo", out var at) && at.GetBoolean();
+                            var aprovado = t.TryGetProperty("aprovado", out var ap) && ap.GetBoolean();
+
+                            <tr>
+                                <td>
+                                    <div class="font-mono text-es-accent text-xs">@codigo</div>
+                                    <div class="text-es-ink">@nome</div>
+                                </td>
+                                <td>@canal</td>
+                                <td class="text-xs">@evento</td>
+                                <td class="text-es-ink-mute">v@versao</td>
+                                <td>
+                                    @if (ativo && aprovado) { <span class="badge-green">Ativo</span> }
+                                    else if (aprovado) { <span class="badge-blue">Aprovado</span> }
+                                    else { <span class="badge-yellow">Aguardando</span> }
+                                </td>
+                                <td>
+                                    <div class="flex gap-3 text-xs">
+                                        <a href="/Notificacoes/Templates/Edit?id=@id" class="text-es-accent hover:underline">Editar</a>
+                                        @if (!aprovado)
+                                        {
+                                            <form method="post" asp-page-handler="Aprovar" class="inline">
+                                                <input type="hidden" name="id" value="@id" />
+                                                <button type="submit" class="text-es-basil hover:underline">Aprovar</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            <div class="flex justify-center gap-2">
+                @for (var p = 1; p <= Model.TotalPages; p++)
+                {
+                    <a href="?modo=tabela&page=@p&canal=@Model.Canal&busca=@Model.Busca&ativo=@Model.Ativo"
+                       class="px-3 py-1 rounded text-sm @(p == Model.Page ? "bg-es-accent text-white" : "text-es-ink-mute hover:text-es-ink")">@p</a>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        @foreach (var (categoria, info) in eventosPorCategoria)
+        {
+            <div>
+                <div class="tpl-categoria-titulo">
+                    <span>@info.emoji</span>
+                    <span>@categoria</span>
+                    <span class="badge-categoria">@info.desc</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    @foreach (var evento in info.eventos)
+                    {
+                        var canaisCobertos = Model.CoberturaPorEvento.TryGetValue(evento, out var s) ? s : new HashSet<string>();
+
+                        <div class="tpl-evento-card">
+                            <div class="tpl-evento-titulo">@evento</div>
+                            <div class="tpl-evento-codigo">@(canaisCobertos.Count) de @nomesCanais.Length canais cobertos</div>
+
+                            <div class="canal-grid">
+                                @foreach (var (nomeCanal, emoji) in nomesCanais)
+                                {
+                                    var temTemplate = indexEventoCanal.TryGetValue((evento, nomeCanal), out var lista) && lista.Count > 0;
+                                    var temAtivo = canaisCobertos.Contains(nomeCanal);
+
+                                    if (temTemplate)
+                                    {
+                                        var primeiro = lista![0];
+                                        var tId = primeiro.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
+                                        <a href="/Notificacoes/Templates/Edit?id=@tId"
+                                           class="canal-pill @(temAtivo ? "has-template" : "")"
+                                           title="@nomeCanal · @lista.Count template(s)">
+                                            <span class="canal-icon">@emoji</span>
+                                            <span class="canal-status">@(temAtivo ? "✓" : "•")</span>
+                                            <span>@nomeCanal</span>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <a href="/Notificacoes/Templates/Edit"
+                                           class="canal-pill"
+                                           title="Criar template @nomeCanal para @evento"
+                                           onclick="localStorage.setItem('tpl_new_canal', '@nomeCanal'); localStorage.setItem('tpl_new_evento', '@evento');">
+                                            <span class="canal-icon" style="opacity:.45">@emoji</span>
+                                            <span class="canal-status">+</span>
+                                            <span>@nomeCanal</span>
+                                        </a>
+                                    }
+                                }
+                            </div>
+
+                            @if (canaisCobertos.Count == 0)
+                            {
+                                <p class="text-es-gold text-[10px] mt-2 flex items-center gap-1">
+                                    <span>⚠️</span><span>Sem cobertura ativa</span>
+                                </p>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
     }
 </div>
+
+@section Scripts {
+<script>
+    (function () {
+        if (!window.location.pathname.includes('/Templates/Edit')) return;
+        const canalAlvo = localStorage.getItem('tpl_new_canal');
+        const eventoAlvo = localStorage.getItem('tpl_new_evento');
+        if (!canalAlvo && !eventoAlvo) return;
+        localStorage.removeItem('tpl_new_canal');
+        localStorage.removeItem('tpl_new_evento');
+        setTimeout(() => {
+            const selCanal = document.querySelector('select[name="Canal"]');
+            const selEvento = document.querySelector('select[name="TipoEvento"]');
+            if (selCanal && canalAlvo) { selCanal.value = canalAlvo; selCanal.dispatchEvent(new Event('change')); }
+            if (selEvento && eventoAlvo) { selEvento.value = eventoAlvo; selEvento.dispatchEvent(new Event('change')); }
+        }, 100);
+    })();
+</script>
+}

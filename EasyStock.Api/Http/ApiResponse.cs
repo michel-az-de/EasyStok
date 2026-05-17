@@ -17,4 +17,10 @@ public sealed record ApiError(
     string? CorrelationId)
 {
     public string? Recurso { get; init; }
+
+    /// <summary>
+    /// Dados estruturados auxiliares para erros estruturados (ex: lista de fornecedores
+    /// com erro em SUPPLIER_INACTIVE, ciclo detectado em CYCLE_DETECTED). Opcional.
+    /// </summary>
+    public object? Details { get; init; }
 }

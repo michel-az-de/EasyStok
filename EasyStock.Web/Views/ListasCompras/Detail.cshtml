@@ -4,10 +4,18 @@
     ViewBag.Title = l.Nome;
     Layout = "_Layout";
     var pct = l.TotalItens > 0 ? (l.ItensFeitos * 100 / l.TotalItens) : 0;
+    var faltam = l.TotalItens - l.ItensFeitos;
+
+    // Agrupar itens por categoria (sem categoria → "Outros")
+    var grupos = Model.Detalhe.Itens
+        .GroupBy(i => string.IsNullOrWhiteSpace(i.Categoria) ? "Outros" : i.Categoria)
+        .OrderBy(g => g.Key == "Outros") // "Outros" sempre por último
+        .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+        .ToList();
 }
 
-<div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="ListasCompras" class="text-slate-400 hover:text-slate-600">
+<div class="flex items-center gap-3 mb-6 flex-wrap">
+    <a asp-action="Index" asp-controller="ListasCompras" class="text-slate-400 hover:text-slate-600" aria-label="Voltar">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
@@ -17,7 +25,7 @@
     <div class="ml-auto flex gap-2">
         @if (l.Status == "aberta")
         {
-            <form asp-action="Arquivar" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" onsubmit="return confirm('Arquivar lista?');">
+            <form asp-action="Arquivar" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Arquivar lista?","mensagem":"A lista sera movida para Arquivadas e nao aparecera no board ativo.","textoBotao":"Arquivar","classBotao":"bg-slate-600 hover:bg-slate-700"}'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">📦 Arquivar</button>
             </form>
@@ -26,70 +34,178 @@
         {
             <form asp-action="Reabrir" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post">
                 @Html.AntiForgeryToken()
-                <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">↩️ Reabrir</button>
+                <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">↩️ Reabrir lista</button>
             </form>
         }
     </div>
 </div>
 
+<!-- Card de progresso -->
 <div class="ws mb-6">
-    <div class="flex items-center justify-between mb-2">
-        <span class="text-sm text-slate-700">@l.ItensFeitos / @l.TotalItens comprados</span>
+    <div class="flex items-baseline justify-between mb-2">
+        <div>
+            <span class="text-2xl font-bold text-slate-900">@l.ItensFeitos</span>
+            <span class="text-sm text-slate-500">de @l.TotalItens itens comprados</span>
+        </div>
         <span class="text-sm font-semibold text-slate-900">@pct%</span>
     </div>
-    <div class="w-full bg-slate-100 rounded-full h-3"><div class="bg-indigo-600 h-3 rounded-full transition-all" style="width: @pct%"></div></div>
+    <div class="ped-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">
+        <div class="ped-progress__bar @(pct == 100 ? "ped-progress__bar--done" : "")" style="width: @(pct)%; background: @(pct == 100 ? null : "linear-gradient(90deg, #1E48A8 0%, #3B5BB8 100%)")"></div>
+    </div>
+    @if (l.Status == "aberta")
+    {
+        <p class="text-xs text-slate-500 mt-2">
+            @if (faltam == 0 && l.TotalItens > 0)
+            {
+                @:🎉 Tudo comprado! Pode arquivar a lista.
+            }
+            else if (faltam > 0)
+            {
+                @($"Faltam {faltam} {(faltam == 1 ? "item" : "itens")} para finalizar")
+            }
+            else
+            {
+                @:Adicione itens abaixo para começar
+            }
+        </p>
+    }
 </div>
 
 @if (l.Status == "aberta")
 {
     <form asp-action="AddItem" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" class="ws mb-6">
         @Html.AntiForgeryToken()
-        <div class="grid grid-cols-12 gap-2">
-            <input type="text"   name="texto"      placeholder="O que comprar?"  required class="ui-field text-sm col-span-5" />
-            <input type="number" name="quantidade" step="0.01" min="0"  placeholder="Qtd" class="ui-field text-sm col-span-2" />
-            <input type="text"   name="unidade"    placeholder="Un (kg, un, l...)" class="ui-field text-sm col-span-2" />
-            <input type="text"   name="categoria"  placeholder="Categoria (mercado, açougue...)" class="ui-field text-sm col-span-2" />
-            <button type="submit" class="app-primary-btn col-span-1 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+</button>
+        <div class="ped-add-row__title">Adicionar item</div>
+        <div class="grid grid-cols-12 gap-2 mt-2">
+            <input type="text"   name="texto"      placeholder="O que comprar? (ex: arroz 5kg)"  required class="ui-field text-sm col-span-12 md:col-span-5" autofocus />
+            <input type="number" name="quantidade" step="0.01" min="0"  placeholder="Qtd" class="ui-field text-sm col-span-3 md:col-span-2 text-right" />
+            <input type="text"   name="unidade"    placeholder="Un (kg, un, l)" class="ui-field text-sm col-span-3 md:col-span-2" />
+            <input type="text"   name="categoria"  placeholder="Categoria (mercado, açougue...)" class="ui-field text-sm col-span-4 md:col-span-2" />
+            <button type="submit" class="app-primary-btn col-span-2 md:col-span-1 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Add</button>
         </div>
     </form>
 }
 
 <div class="ws">
-    <h2 class="font-semibold text-slate-900 mb-3">Itens</h2>
     @if (!Model.Detalhe.Itens.Any())
     {
-        <p class="text-sm text-slate-500">Nenhum item ainda.</p>
+        <div class="text-center py-8">
+            <div class="text-3xl mb-1">🛒</div>
+            <p class="text-sm font-medium text-slate-600">Nenhum item ainda</p>
+            <p class="text-xs text-slate-500 mt-1">@(l.Status == "aberta" ? "Adicione itens no formulário acima" : "Reabra a lista para adicionar itens")</p>
+        </div>
     }
     else
     {
-        <ul class="divide-y divide-slate-100">
-        @foreach (var it in Model.Detalhe.Itens)
+        @foreach (var grupo in grupos)
         {
-            <li class="py-2 flex items-center gap-3">
-                <form asp-action="ToggleItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="done" value="@(!it.Done)" />
-                    <button type="submit" class="w-6 h-6 rounded border-2 @(it.Done ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 hover:border-indigo-400") flex items-center justify-center text-xs">
-                        @(it.Done ? "✓" : "")
-                    </button>
-                </form>
-                <div class="flex-1 min-w-0 @(it.Done ? "text-slate-400 line-through" : "text-slate-900")">
-                    <div class="text-sm font-medium truncate">
-                        @it.Texto
-                        @if (it.Quantidade.HasValue) { <span class="text-xs text-slate-400 font-normal">· @it.Quantidade @it.Unidade</span> }
-                    </div>
-                    @if (it.Done && it.DoneEm.HasValue)
-                    {
-                        <div class="text-xs text-slate-400">@it.DoneEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(it.DonePorNome) ? "" : "· " + it.DonePorNome)</div>
-                    }
+            var feitosGrupo = grupo.Count(i => i.Done);
+            var totalGrupo = grupo.Count();
+            <div class="lc-grupo">
+                <div class="lc-grupo__header">
+                    <h3 class="lc-grupo__nome">@grupo.Key</h3>
+                    <span class="lc-grupo__count">@feitosGrupo / @totalGrupo</span>
                 </div>
-                @if (!string.IsNullOrEmpty(it.Categoria)) { <span class="text-xs text-slate-400">@it.Categoria</span> }
-                <form asp-action="RemoveItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0" onsubmit="return confirm('Remover item?');">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="text-xs text-red-600 hover:text-red-700">×</button>
-                </form>
-            </li>
+                <ul class="divide-y divide-slate-100">
+                @foreach (var it in grupo)
+                {
+                    <li class="lc-item @(it.Done ? "lc-item--done" : "")">
+                        <form asp-action="ToggleItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="done" value="@(!it.Done)" />
+                            <button type="submit" class="lc-checkbox @(it.Done ? "lc-checkbox--checked" : "")" aria-label="@(it.Done ? "Desmarcar" : "Marcar como comprado")">
+                                @(it.Done ? "✓" : "")
+                            </button>
+                        </form>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium truncate">
+                                @it.Texto
+                                @if (it.Quantidade.HasValue) { <span class="text-xs text-slate-400 font-normal">· @it.Quantidade @it.Unidade</span> }
+                            </div>
+                            @if (it.Done && it.DoneEm.HasValue)
+                            {
+                                <div class="text-xs text-slate-400">comprado @it.DoneEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(it.DonePorNome) ? "" : "· " + it.DonePorNome)</div>
+                            }
+                        </div>
+                        <form asp-action="RemoveItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0" data-confirm='{"titulo":"Remover item da lista?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="text-slate-300 hover:text-red-600 text-lg leading-none p-1" aria-label="Remover item">×</button>
+                        </form>
+                    </li>
+                }
+                </ul>
+            </div>
         }
-        </ul>
     }
 </div>
+
+@if (l.Status == "aberta")
+{
+    <!-- Modal: confirmar arquivar lista -->
+    <div x-data="arquivarListaModal()"
+         x-show="open" x-cloak
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="alertdialog" aria-modal="true" aria-labelledby="fm-arq-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 460px"
+              method="post" action="/listas-compras/@l.Id/arquivar"
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-arq-title" class="fm-header__title">Arquivar lista?</h2>
+                    <p class="fm-header__subtitle">
+                        @if (faltam > 0)
+                        {
+                            @($"Ainda faltam {faltam} {(faltam == 1 ? "item" : "itens")} sem comprar. Você pode reabrir depois se precisar.")
+                        }
+                        else
+                        {
+                            @:Lista finalizada. Você pode reabrir depois se precisar.
+                        }
+                    </p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <footer class="fm-footer" style="padding-top: 16px">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Voltar
+                </button>
+                <button type="submit"
+                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    📦 Arquivar
+                </button>
+            </footer>
+        </form>
+    </div>
+
+    @section Scripts {
+    <script>
+    function arquivarListaModal() {
+        return {
+            open: false,
+            _previousFocus: null,
+            init() {
+                window.addEventListener('open-modal', (e) => {
+                    if (e.detail !== 'arquivar-lista') return;
+                    this._previousFocus = document.activeElement;
+                    this.open = true;
+                });
+                this.$watch('open', (v) => {
+                    document.body.style.overflow = v ? 'hidden' : '';
+                    if (!v && this._previousFocus) this._previousFocus.focus?.();
+                });
+            },
+            close() { this.open = false; }
+        };
+    }
+    </script>
+    }
+}

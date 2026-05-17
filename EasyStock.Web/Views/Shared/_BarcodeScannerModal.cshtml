@@ -1,0 +1,165 @@
+@*
+    Modal global de scanner de codigo de barras (Fase 5).
+    Abre via: window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan } }))
+    Onde `onScan` e uma funcao callback chamada com (codigo, formato).
+    Se a feature nao estiver disponivel, exibe input USB focado como fallback.
+*@
+<div id="es-barcode-modal"
+     x-data="barcodeScanner()"
+     x-init="init()"
+     x-show="open" x-cloak
+     class="fixed inset-0 z-[210] flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="es-barcode-title"
+     @@keydown.escape.window="fechar()">
+    <div class="absolute inset-0 bg-black/60" @@click="fechar()"></div>
+    <div class="relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+         style="background: var(--bg-surface); border: 1px solid var(--border-soft);">
+        <div class="flex items-center justify-between px-4 py-3"
+             style="border-bottom: 1px solid var(--border-soft);">
+            <h2 id="es-barcode-title" class="text-base font-semibold inline-flex items-center gap-2"
+                style="color: var(--text-primary);">
+                <es-icon name="scan-line" class="es-icon--sm" style="color: var(--orange-600);"></es-icon>
+                Ler código de barras
+            </h2>
+            <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="fechar()"></es-button>
+        </div>
+
+        <div class="p-4 space-y-3">
+            <template x-if="modo === 'camera'">
+                <div>
+                    <div class="aspect-square w-full bg-black rounded-lg overflow-hidden relative">
+                        <video x-ref="video" class="w-full h-full object-cover" muted playsinline></video>
+                        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                            <div class="w-3/4 h-1/3 border-2 border-white/70 rounded-lg"></div>
+                        </div>
+                    </div>
+                    <p class="text-xs mt-3 text-center" style="color: var(--text-muted);">
+                        Aproxime o codigo do centro da camera. <span x-text="ultimaLeitura ? 'Ultimo: ' + ultimaLeitura : ''"></span>
+                    </p>
+                </div>
+            </template>
+
+            <template x-if="modo === 'usb'">
+                <div>
+                    <label for="es-barcode-usb-input" class="block text-sm font-medium mb-2" style="color: var(--text-primary);">
+                        Bipe ou digite o codigo
+                    </label>
+                    <input id="es-barcode-usb-input" type="text" x-ref="usbInput"
+                           autocomplete="off" autofocus
+                           class="w-full px-4 py-3 rounded-lg text-base"
+                           style="background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text-primary);"
+                           placeholder="Bipe ou digite e pressione Enter" />
+                    <p class="text-xs mt-2" style="color: var(--text-muted);">
+                        Camera nao disponivel neste dispositivo. Use leitor USB ou Bluetooth como teclado.
+                    </p>
+                </div>
+            </template>
+
+            <template x-if="modo === 'erro'">
+                <div class="text-center py-4">
+                    <es-icon name="alert-triangle" class="mx-auto mb-2" style="width:32px; height:32px; color: var(--warn-600);"></es-icon>
+                    <p class="text-sm" style="color: var(--text-primary);" x-text="erroMsg"></p>
+                </div>
+            </template>
+        </div>
+
+        <div class="px-4 py-3 flex gap-2 justify-end"
+             style="border-top: 1px solid var(--border-soft);">
+            <es-button variant="ghost" size="sm" @@click="fechar()">Fechar</es-button>
+            <template x-if="modo === 'usb'">
+                <es-button variant="primary" size="sm" icon="check" @@click="confirmarUsb()">Usar codigo</es-button>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+    function barcodeScanner() {
+        return {
+            open: false,
+            modo: 'camera',  // 'camera' | 'usb' | 'erro'
+            scanner: null,
+            callback: null,
+            ultimaLeitura: '',
+            erroMsg: '',
+            _detachUsb: null,
+
+            init() {
+                window.addEventListener('barcode:open', (ev) => this.abrir(ev.detail || {}));
+                window.addEventListener('barcode:close', () => this.fechar());
+            },
+
+            async abrir(detail) {
+                this.callback = detail.onScan || null;
+                this.ultimaLeitura = '';
+                this.open = true;
+                if (!window.EasyScanner) {
+                    this.modo = 'usb';
+                    this.$nextTick(() => this.$refs.usbInput && this.$refs.usbInput.focus());
+                    this.bindUsb();
+                    return;
+                }
+                this.scanner = await window.EasyScanner.create({});
+                if (!this.scanner.supportsCamera) {
+                    this.modo = 'usb';
+                    this.$nextTick(() => this.$refs.usbInput && this.$refs.usbInput.focus());
+                    this.bindUsb();
+                    return;
+                }
+                this.modo = 'camera';
+                this.$nextTick(async () => {
+                    const ok = await this.scanner.startCamera(this.$refs.video, (code, format) => {
+                        this.ultimaLeitura = code;
+                        if (this.callback) {
+                            try { this.callback(code, format); }
+                            catch (e) { console.error('[barcode]', e); }
+                        }
+                        this.fechar();
+                    }, {
+                        onPermissionDenied: () => {
+                            this.modo = 'usb';
+                            this.bindUsb();
+                            window.showToast && window.showToast('Permissao da camera negada. Use leitor USB.', 'warning');
+                        }
+                    });
+                    if (!ok && this.modo === 'camera') {
+                        this.modo = 'usb';
+                        this.bindUsb();
+                    }
+                });
+            },
+
+            bindUsb() {
+                this.$nextTick(() => {
+                    if (!this.$refs.usbInput) return;
+                    if (this._detachUsb) this._detachUsb();
+                    this._detachUsb = window.EasyScanner.attachUsbInput(this.$refs.usbInput, (code) => {
+                        if (this.callback) {
+                            try { this.callback(code, 'usb'); }
+                            catch (e) { console.error('[barcode]', e); }
+                        }
+                        this.fechar();
+                    });
+                });
+            },
+
+            confirmarUsb() {
+                const v = this.$refs.usbInput && this.$refs.usbInput.value;
+                if (!v) return;
+                if (this.callback) {
+                    try { this.callback(v, 'usb-manual'); }
+                    catch (e) { console.error('[barcode]', e); }
+                }
+                this.fechar();
+            },
+
+            fechar() {
+                if (this.scanner) { try { this.scanner.stop(); } catch (_) {} }
+                if (this._detachUsb) { this._detachUsb(); this._detachUsb = null; }
+                this.scanner = null;
+                this.callback = null;
+                this.open = false;
+            }
+        };
+    }
+</script>

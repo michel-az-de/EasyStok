@@ -56,6 +56,18 @@ public class LotesService(ApiClient api, SessionService session)
     public Task<ApiResult<Lote>> FinalizarAsync(string id) =>
         api.PostAsync<Lote>($"lotes/{id}/finalizar?empresaId={GetEmpresaId()}", new { });
 
+    /// <summary>
+    /// C2 (R3 + backfill): atualiza peso de item de lote em producao.
+    /// API bloqueia se lote ja finalizado.
+    /// </summary>
+    public Task<ApiResult<object>> AtualizarPesoItemAsync(string loteId, string itemId, int pesoG) =>
+        api.PatchAsync<object>($"lotes/{loteId}/itens/{itemId}/peso?empresaId={GetEmpresaId()}",
+            new { pesoG });
+
+    /// <summary>C2 (R10): lista lotes com pelo menos 1 item embalado sem peso.</summary>
+    public Task<ApiResult<List<LotePendentePesoDto>>> ListarPendentesPesoAsync() =>
+        api.GetAsync<List<LotePendentePesoDto>>($"lotes/pendentes-peso?empresaId={GetEmpresaId()}");
+
     // ── Mobile ──────────────────────────────────────────────
     public Task<ApiResult<List<MobileBatchSummary>>> ListarMobileAsync(bool pendingOnly = false)
     {
@@ -74,3 +86,6 @@ public class LotesService(ApiClient api, SessionService session)
 public record CriarLoteItemInput(string Nome, int Quantidade,
     Guid? ProdutoId = null, string? Emoji = null, string? Unidade = null,
     int? PesoG = null, int? ValidadeDias = null, string? FotoUrl = null);
+
+/// <summary>C2 (R10): item retornado por /api/lotes/pendentes-peso.</summary>
+public record LotePendentePesoDto(Guid Id, string Codigo, DateTime DataProducao, int ItensPendentes);

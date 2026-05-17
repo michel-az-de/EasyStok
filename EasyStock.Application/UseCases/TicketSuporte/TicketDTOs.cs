@@ -7,7 +7,11 @@ namespace EasyStock.Application.UseCases.TicketSuporte
         string Descricao,
         TicketCategoria Categoria,
         /// <summary>F9 — FK opcional a uma Fatura que motivou o ticket.</summary>
-        Guid? FaturaId = null);
+        Guid? FaturaId = null,
+        /// <summary>Onda 1.1 — FK opcional a um Pedido que motivou o ticket.</summary>
+        Guid? PedidoId = null,
+        /// <summary>Canal de origem (Pwa, Web, Mobile, Admin, Site). Quando null, controller infere via User-Agent.</summary>
+        CanalOrigem? CanalOrigem = null);
 
     public sealed record ResponderRequest(string Resposta);
 

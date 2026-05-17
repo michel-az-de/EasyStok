@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using Microsoft.Extensions.Configuration;
@@ -58,7 +59,7 @@ public sealed class StripeGatewayAdapter(
                 Provedor: Provedor,
                 TransactionId: "unconfigured",
                 UrlCheckout: null,
-                DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { erro = "Stripe nao configurado." })
+                DadosGatewayJson: JsonSerializer.Serialize(new { erro = "Stripe nao configurado." })
             ));
         }
 

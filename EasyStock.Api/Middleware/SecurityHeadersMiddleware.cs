@@ -41,10 +41,10 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
         // 'unsafe-inline' em script/style necessario enquanto Diagnostico usa inline; tightening futuro com nonces.
         headers["Content-Security-Policy"] =
             "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline'; " +
-            "style-src 'self' 'unsafe-inline'; " +
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
             "img-src 'self' data: https:; " +
-            "font-src 'self' data:; " +
+            "font-src 'self' data: https://fonts.gstatic.com; " +
             "connect-src 'self'; " +
             "frame-ancestors 'none'; " +
             "base-uri 'self'; " +

@@ -1,0 +1,245 @@
+@{
+    Layout = null;
+    var loteId    = ViewBag.LoteId as string ?? "";
+    var empresaId = ViewBag.EmpresaId as string ?? "";
+}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <title>Imprimir etiquetas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/etiqueta/etiqueta.css" />
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: #ECEFF5; }
+        .toolbar { background: #fff; border-bottom: 1px solid #D8DCE3; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+        .toolbar a { color: #1A2E5A; font-size: 13px; text-decoration: none; }
+        .toolbar a:hover { text-decoration: underline; }
+        main { max-width: 700px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+        select, input[type=number] { border: 1px solid #D8DCE3; border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+        label { font-size: 14px; font-weight: 600; color: #3A4350; display: block; margin-bottom: 4px; }
+        .helper { font-size: 12px; color: #6B7480; margin-bottom: 6px; }
+        .card { background: #fff; border: 1px solid #D8DCE3; border-radius: 8px; padding: 16px; }
+        .radio-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        #status-msg { font-size: 12px; color: #4D5665; min-height: 18px; }
+        #sem-ficha-warn { display: none; }
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <a href="/lotes/@loteId">← Voltar ao lote</a>
+    <span style="flex:1"></span>
+    <a href="/etiquetas/modelos">Criar ou editar modelos →</a>
+</div>
+
+<main>
+    <div>
+        <h1 class="etq-page-title" id="imp-title">Imprimir etiquetas</h1>
+        <div class="helper" id="imp-subtitle"></div>
+    </div>
+
+    <div class="card">
+        <label>Modelo</label>
+        <div class="helper">Use o padrão ou escolha outro.</div>
+        <select id="template-sel" style="width:100%" onchange="atualizarPreview()"></select>
+    </div>
+
+    <div class="card">
+        <label>Etiquetas</label>
+        <div class="radio-row"><input type="radio" name="range" value="todas" checked onchange="updateCounts()"> Todas (<span id="count-todas">0</span>)</div>
+        <div class="radio-row"><input type="radio" name="range" value="pendentes" onchange="updateCounts()"> Pendentes (<span id="count-pendentes">0</span>)</div>
+        <div class="radio-row">
+            <input type="radio" name="range" value="intervalo" onchange="updateCounts()">
+            Intervalo: do nº <input type="number" id="from" min="1" style="width:52px" oninput="updateCounts()">
+            até <input type="number" id="to" min="1" style="width:52px" oninput="updateCounts()">
+        </div>
+    </div>
+
+    <div id="sem-ficha-warn" class="etq-disclaimer">
+        <strong id="sem-ficha-count"></strong> produtos sem ficha técnica. Campos nutricionais ficarão em branco.
+    </div>
+
+    <div class="card">
+        <label>Prévia</label>
+        <div class="helper" id="preview-chip"></div>
+        <div id="preview-area" class="etq-preview-wrap" style="min-height:100px"></div>
+    </div>
+
+    <div class="card">
+        <div id="status-msg"></div>
+        <div class="actions" style="margin-top:8px">
+            <button class="etq-btn-primary" onclick="imprimir()">Imprimir agora</button>
+            <button class="etq-btn-secondary" onclick="baixarPdf()">Baixar PDF</button>
+        </div>
+    </div>
+</main>
+
+<script src="/etiqueta/vendor/qrcode.min.js"></script>
+<script src="/etiqueta/vendor/jsbarcode.min.js"></script>
+<script type="module">
+import { renderEtiqueta } from '/etiqueta/render.js';
+import { renderCodes }   from '/etiqueta/codes.js';
+
+const LOTE_ID    = @Html.Raw(Json.Serialize(loteId));
+const EMPRESA_ID = @Html.Raw(Json.Serialize(empresaId));
+
+let _payload   = null;
+let _templates = [];
+
+async function init() {
+    setStatus('Carregando…');
+    try {
+        const [t, p] = await Promise.all([
+            apiFetch(`/api/etiquetas/templates?empresaId=${EMPRESA_ID}`),
+            apiFetch(`/api/lotes/${LOTE_ID}/etiquetas/render?empresaId=${EMPRESA_ID}`)
+        ]);
+        _templates = t.data ?? [];
+        _payload   = p.data;
+        populateTemplateSel();
+        updateCounts();
+        await atualizarPreview();
+        setStatus('');
+    } catch(err) {
+        setStatus('Erro ao carregar: ' + err.message);
+    }
+}
+
+function populateTemplateSel() {
+    const sel = document.getElementById('template-sel');
+    sel.innerHTML = '';
+    for (const t of _templates) {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ origem: t.Origem, id: t.Id, nome: t.Nome, layoutJson: t.LayoutJson });
+        opt.textContent = (t.IsDefault ? '★ ' : '') + (t.Origem === 'Sistema' ? `[Pronto] ${t.Nome}` : t.Nome);
+        if (t.IsDefault) opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+window.updateCounts = function() {
+    if (!_payload) return;
+    document.getElementById('count-todas').textContent    = _payload.Etiquetas.length;
+    document.getElementById('count-pendentes').textContent = _payload.Etiquetas.filter(e => e.Status === 'pendente').length;
+    const sf = _payload.ProdutosSemFicha ?? [];
+    const warn = document.getElementById('sem-ficha-warn');
+    if (sf.length > 0) { document.getElementById('sem-ficha-count').textContent = `${sf.length} produto(s)`; warn.style.display = 'block'; }
+    else warn.style.display = 'none';
+};
+
+window.atualizarPreview = async function() {
+    if (!_payload) return;
+    const t = getSelectedTemplate();
+    if (!t) return;
+    const area = document.getElementById('preview-area');
+    area.innerHTML = '';
+    try {
+        const layout = JSON.parse(t.layoutJson);
+        const primeira = _payload.Etiquetas[0];
+        if (!primeira) return;
+        const dados = etqToDados(primeira);
+        const el = renderEtiqueta(layout, dados);
+        area.appendChild(el);
+        await renderCodes(area);
+        document.getElementById('preview-chip').textContent =
+            `Etiqueta 1 de ${_payload.Etiquetas.length}. As demais seguem o mesmo layout.`;
+        document.getElementById('imp-title').textContent =
+            `Imprimir etiquetas — Lote ${primeira.LoteCodigo ?? LOTE_ID}`;
+    } catch(e) { area.textContent = 'Erro ao gerar prévia: ' + e.message; }
+};
+
+function getSelectedTemplate() {
+    const sel = document.getElementById('template-sel');
+    try { return JSON.parse(sel.value); } catch { return null; }
+}
+
+function getSelectedIds() {
+    if (!_payload) return [];
+    const range = document.querySelector('input[name="range"]:checked')?.value ?? 'todas';
+    if (range === 'pendentes') return _payload.Etiquetas.filter(e => e.Status === 'pendente').map(e => e.Id);
+    if (range === 'intervalo') {
+        const from = parseInt(document.getElementById('from').value) || 1;
+        const to   = parseInt(document.getElementById('to').value)   || _payload.Etiquetas.length;
+        return _payload.Etiquetas.filter(e => e.Sequencial >= from && e.Sequencial <= to).map(e => e.Id);
+    }
+    return _payload.Etiquetas.map(e => e.Id);
+}
+
+window.imprimir = async function() {
+    const t = getSelectedTemplate(); if (!t) return;
+    const ids = getSelectedIds();   if (!ids.length) { setStatus('Nenhuma etiqueta selecionada.'); return; }
+    if (ids.length > 100 && !confirm(`Imprimir ${ids.length} etiquetas? O navegador pode travar. Clique OK para continuar ou Cancelar para baixar PDF.`)) {
+        baixarPdf(); return;
+    }
+    setStatus('Abrindo janela de impressão…');
+
+    // Mark as enviada_impressao
+    fetch(`/api/lotes/${LOTE_ID}/etiquetas/marcar-impressas?empresaId=${EMPRESA_ID}`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, layoutJson: t.layoutJson, layoutMeta: { origem: t.origem, id: t.id, nome: t.nome }, status: 'enviada_impressao' }),
+    }).catch(() => {});
+
+    const layout = JSON.parse(t.layoutJson);
+    const w = layout.size?.w_mm ?? 80, h = layout.size?.h_mm ?? 40;
+    const etiquetas = _payload.Etiquetas.filter(e => ids.includes(e.Id));
+    const MM = 3.7795;
+    const labelsHtml = etiquetas.map((e, i) => {
+        const dados = etqToDados(e);
+        const el = renderEtiqueta(layout, dados, { forPrint: i === 0 });
+        return `<section style="page-break-after:always">${el.outerHTML}</section>`;
+    }).join('');
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title>
+<link rel="stylesheet" href="/etiqueta/etiqueta.css">
+<style>@@page{size:${w}mm ${h}mm;margin:0}body{margin:0}section:last-child{page-break-after:avoid}</style>
+</head><body>${labelsHtml}
+<script src="/etiqueta/vendor/qrcode.min.js"><\/script>
+<script src="/etiqueta/vendor/jsbarcode.min.js"><\/script>
+<script type="module">
+  import{renderCodes}from'/etiqueta/codes.js';
+  document.querySelectorAll('.etq-label').forEach(r=>renderCodes(r));
+  window.addEventListener('load',()=>setTimeout(()=>window.print(),600));
+<\/script></body></html>`);
+    win.document.close();
+    setStatusHtml(`${_esc(String(ids.length))} etiquetas enviadas para impressão. <a href="#" onclick="marcarImpressas();return false">Marcar como impressas →</a>`);
+};
+
+window.marcarImpressas = async function() {
+    const t = getSelectedTemplate(); if (!t) return;
+    const ids = getSelectedIds();
+    await fetch(`/api/lotes/${LOTE_ID}/etiquetas/marcar-impressas?empresaId=${EMPRESA_ID}`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Overwrite-Snapshot': 'true' },
+        body: JSON.stringify({ ids, layoutJson: t.layoutJson, layoutMeta: { origem: t.origem, id: t.id, nome: t.nome }, status: 'impressa' }),
+    });
+    setStatus(`${ids.length} etiquetas marcadas como impressas.`);
+};
+
+window.baixarPdf = function() {
+    const t = getSelectedTemplate(); if (!t) return;
+    window.open(`/api/lotes/${LOTE_ID}/etiquetas/render.pdf?empresaId=${EMPRESA_ID}&templateOrigem=${t.origem}&templateId=${t.id}`, '_blank');
+};
+
+function etqToDados(e) {
+    return { produto: e.Produto, etiqueta: { Codigo: e.Codigo, Sequencial: e.Sequencial },
+             lote: { Codigo: e.LoteCodigo, ValidadeEm: e.LoteValidadeEm, CriadoEm: e.LoteCriadoEm },
+             empresa: _payload?.Empresa };
+}
+
+function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function setStatus(text) { document.getElementById('status-msg').textContent = text; }
+function setStatusHtml(trustedHtml) { document.getElementById('status-msg').innerHTML = trustedHtml; }
+
+async function apiFetch(url) {
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+init();
+</script>
+</body>
+</html>

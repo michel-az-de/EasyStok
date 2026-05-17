@@ -86,7 +86,7 @@ public class ItemEstoqueTests
         item.RegistrarSaida(Quantidade.From(3), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
 
         item.QuantidadeAtual.Value.Should().Be(0);
-        item.Status.Should().Be(StatusItemEstoque.Critical);
+        item.Status.Should().Be(StatusItemEstoque.Esgotado);
     }
 
     [Fact]
