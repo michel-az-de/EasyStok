@@ -328,6 +328,31 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.RelatorioExpirado,
             assuntoTemplate: "Arquivo removido: {{ reportLabel }}",
             corpoTemplate: "O arquivo do relatório {{ reportLabel }} foi removido após 30 dias. Gere novamente para baixar.");
+
+        // ===== Templates F5 — Agendamento de Pedidos =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_agendado_hoje_inapp_v1",
+            nome: "Pedido agendado hoje — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoAgendadoHoje,
+            assuntoTemplate: "Pedido agendado para hoje",
+            corpoTemplate: "Pedido de {{ clienteNome }} agendado para hoje ({{ scheduledFor }}).");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_agendado_1h_inapp_v1",
+            nome: "Pedido agendado em 1 hora — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoAgendadoEm1Hora,
+            assuntoTemplate: "Pedido em 1 hora",
+            corpoTemplate: "Pedido de {{ clienteNome }} em 1 hora ({{ scheduledFor }}).");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_agendado_10min_inapp_v1",
+            nome: "Pedido agendado em 10 minutos — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoAgendadoEm10Minutos,
+            assuntoTemplate: "Pedido em 10 minutos",
+            corpoTemplate: "Pedido de {{ clienteNome }} em 10 minutos — prepare-se ({{ scheduledFor }}).");
     }
 
     private static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
@@ -416,6 +441,19 @@ public static class NotificacoesGlobaisSeed
 
         yield return MakeRotina("relatorio_expirado_global", "Relatório Expirado",
             TipoEventoNotificacao.RelatorioExpirado, "relatorio_expirado_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        // ===== Rotinas F5 — Agendamento de Pedidos =====
+        yield return MakeRotina("pedido_agendado_hoje_global", "Pedido agendado hoje",
+            TipoEventoNotificacao.PedidoAgendadoHoje, "pedido_agendado_hoje_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        yield return MakeRotina("pedido_agendado_1h_global", "Pedido agendado em 1 hora",
+            TipoEventoNotificacao.PedidoAgendadoEm1Hora, "pedido_agendado_1h_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        yield return MakeRotina("pedido_agendado_10min_global", "Pedido agendado em 10 minutos",
+            TipoEventoNotificacao.PedidoAgendadoEm10Minutos, "pedido_agendado_10min_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
     }
 

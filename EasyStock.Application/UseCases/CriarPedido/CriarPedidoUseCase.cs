@@ -53,6 +53,13 @@ public class CriarPedidoUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
+        // F5 — agendamento precisa ser no futuro. PWA valida client-side, mas
+        // API publica e SyncController nao validam — espelha a checagem aqui
+        // pra impedir pedido agendado pro passado (worker ignoraria silenciosamente
+        // via filtro de status, mas dado corrompido fica registrado).
+        if (cmd.AgendadoParaEm.HasValue && cmd.AgendadoParaEm.Value <= DateTime.UtcNow)
+            throw new UseCaseValidationException("Data agendada precisa ser no futuro.");
+
         // Pedido sem itens é permitido (operador pode adicionar depois via
         // AdicionarItemPedido), mas se itens vieram, todos devem ser válidos.
         if (cmd.Itens != null && cmd.Itens.Count > 0)
