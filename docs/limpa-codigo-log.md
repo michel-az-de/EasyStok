@@ -4,6 +4,68 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 
 ---
 
+## 2026-05-11 — Commit 7cd88e8: fix(web) a11y WCAG 2.1 AA
+
+### Arquivos analisados (28 arquivos do commit 7cd88e8)
+
+Commit de contraste/acessibilidade. Mudanças foram: `text-emerald-700 → text-emerald-800`, `text-amber-700 → text-amber-800` em pills/badges, `aria-label` em botões ícone, `for`+`id` em form labels, dark mode focus ring, `_ConfirmModal` width responsiva.
+
+| Arquivo | Status |
+|---|---|
+| `Fornecedores/Detail.cshtml` | **Fix aplicado** — variável alias removida + classe CSS morta removida |
+| `Produtos/Detail.cshtml` | **Fix aplicado** — `hover:text-emerald-800` corrigido para `hover:text-emerald-900` |
+| Demais 26 arquivos | Limpos — mudanças de contraste são corretas, sem código morto |
+
+### Fixes aplicados
+
+#### 1. `Fornecedores/Detail.cshtml` — variável alias e classe CSS morta removidas
+
+- `var visiveis = Model.Alteracoes;` era alias puro sem propósito. Substituído por `Model.Alteracoes` direto no loop `for`.
+- `var classeOculta = idx >= 10 ? "alt-extra" : "";` adicionava classe `alt-extra` que não existe em nenhum arquivo CSS (nem `components.css`, nem `app.css`, nem `tokens.css`). A visibilidade dos itens extras é controlada inteiramente por `x-show="expanded"` do Alpine.js — a classe era 100% código morto.
+- Linha resultante fica `<li class="py-2 text-sm"` (sem classe fantasma e sem espaço trailing).
+
+#### 2. `Produtos/Detail.cshtml` — hover state sem efeito corrigido
+
+- O fix de contraste `text-emerald-700 → text-emerald-800` foi feito corretamente no estado normal, mas a classe hover não foi ajustada: ficou `hover:text-emerald-800`, igual ao estado padrão.
+- Hover de cor não tinha efeito visual (o `hover:underline` ainda funcionava, mas o escurecimento foi perdido).
+- Corrigido para `hover:text-emerald-900` — restaura feedback visual de hover.
+
+### Verificações desta rodada (nenhuma alteração necessária)
+
+| Arquivo / Elemento | Resultado |
+|---|---|
+| `console.*` em Diagnóstico, Entradas, Produtos/Form, Pedidos, Saídas, Topbar | Intencional — logging de diagnóstico e error handling com toast |
+| Sem código comentado (`@* old/remov/... *@`) | Nenhum encontrado |
+| Sem TODO/FIXME nos arquivos | Nenhum encontrado |
+| `_ConfirmModal.cshtml` | Limpo — componente Alpine bem estruturado |
+| `components.css` — focus ring dark mode | Correto — comentário explicativo presente |
+| Back links com SVG em Lotes/Detail, Fornecedores/Detail, Movimentacoes, PedidosAbertos | Corretos — `aria-label` no `<a>` e `aria-hidden="true"` no SVG |
+| `Clientes/Detail.cshtml` — `@d.EmitidoEm.Value.ToLocalTime():dd/MM/yyyy` | Correto — sintaxe Razor para `IFormattable`, equivalente a `.ToString("dd/MM/yyyy")` |
+| Produtos/Detail back link (SVG sem `aria-hidden`) | Mantido — `<a>` tem texto visível "Produtos", link é acessível sem o atributo |
+
+### Arquivos fora do commit com contraste pendente (não corrigidos nesta rodada)
+
+A busca por `text-emerald-700` e `text-amber-700` revelou ocorrências em arquivos NÃO incluídos no commit 7cd88e8 que têm o mesmo padrão de contraste insuficiente:
+
+| Arquivo | Classes encontradas | Contexto |
+|---|---|---|
+| `InteligenciaLojas/Index.cshtml` | `bg-amber-100 text-amber-700`, `bg-emerald-100 text-emerald-700` | Pills de insight/saúde |
+| `InteligenciaLojas/Detalhe.cshtml` | `bg-amber-100 text-amber-700`, `bg-emerald-100 text-emerald-700` | Pills de recomendação |
+| `Shared/_BottomNav.cshtml` | `bg-emerald-50 text-emerald-700`, `bg-amber-50 text-amber-700` | Quick-action items |
+| `Shared/_Topbar.cshtml` | `bg-emerald-50 text-emerald-700`, `bg-amber-100 text-amber-700` | Badge de confirmação e tags de resultado de busca |
+| `Estoque/Index.cshtml` | `bg-emerald-50 text-emerald-700`, `bg-amber-50 text-amber-700` | Tabs de natureza |
+| `Produtos/Form.cshtml` | `bg-emerald-50 text-emerald-700` | Status pill de item de fila |
+
+Ação sugerida: estender o fix de contraste para esses arquivos em uma próxima tarefa dedicada.
+
+### Padrões observados
+
+- Fix de contraste sistemático via replace_all pode introduzir hover states sem efeito (ex: `hover:text-emerald-800` após o base ser promovido para 800). Ao fazer replace de cores em lote, sempre checar pares `text-X / hover:text-X`.
+- Variáveis alias em Razor (ex: `var visiveis = Model.Foo;`) surgem quando o dev começa a filtrar a lista mas abandona. Monitorar em código de paginação/collapso.
+- Classes CSS "placeholder" (ex: `alt-extra`) podem ser criadas com intenção de estilizar depois mas esquecidas quando o Alpine.js resolve a funcionalidade — sempre confirmar existência no CSS antes de usar em Razor.
+
+---
+
 ## 2026-05-11 — Commit 5bc4648: fix(pedidos) reset no reabrir + cadastrar produto sempre visível
 
 ### Arquivos analisados (2 arquivos do commit 5bc4648)
