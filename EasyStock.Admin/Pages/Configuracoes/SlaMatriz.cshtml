@@ -3,86 +3,94 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = "Matriz SLA";
+
+    var prioridadesOrdenadas = new[] { "Critica", "Alta", "Normal", "Baixa" };
+    var existentesGlobais = Model.Itens
+        .Where(i => (!i.TryGetProperty("empresaId", out var ep) || ep.ValueKind == JsonValueKind.Null)
+                 && (!i.TryGetProperty("planoId", out var pp) || pp.ValueKind == JsonValueKind.Null))
+        .ToDictionary(i => i.GetProperty("prioridade").GetString() ?? "", i => i);
+
+    var overrides = Model.Itens.Where(i =>
+        (i.TryGetProperty("empresaId", out var ep2) && ep2.ValueKind != JsonValueKind.Null)
+        || (i.TryGetProperty("planoId", out var pp2) && pp2.ValueKind != JsonValueKind.Null)).ToList();
 }
 
-<div class="flex items-center justify-between mb-6">
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
     <div>
-        <h1 class="text-es-ink text-xl font-semibold">⚙ Matriz de SLA</h1>
-        <p class="text-es-ink-mute text-sm">Tempos default de resposta e resolução por prioridade. Editáveis.</p>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Configuracoes">Configurações</es-breadcrumb-item>
+            <es-breadcrumb-item>Matriz SLA</es-breadcrumb-item>
+        </es-breadcrumb>
+        <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Matriz de SLA</h2>
+        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Tempos default de resposta e resolução por prioridade</p>
     </div>
-    <a href="/Tickets" class="btn-secondary text-sm">← Voltar</a>
+    <es-button variant="ghost" href="/Tickets" icon="arrow-left">Voltar para tickets</es-button>
 </div>
 
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
-}
-
-<div class="card">
-    <form method="post">
+<es-card title="SLAs globais" description="Aplicado a todos os tenants/planos quando não há override específico">
+    <form method="post" style="display:flex; flex-direction:column; gap:14px;">
         @Html.AntiForgeryToken()
-        <table class="table-admin">
-            <thead>
-                <tr>
-                    <th>Escopo</th>
-                    <th>Prioridade</th>
-                    <th>Minutos para resposta</th>
-                    <th>Minutos para resolução</th>
-                </tr>
-            </thead>
-            <tbody>
-                @{
-                    var prioridadesOrdenadas = new[] { "Critica", "Alta", "Normal", "Baixa" };
-                    var idx = 0;
-                    var existentesGlobais = Model.Itens
-                        .Where(i => (!i.TryGetProperty("empresaId", out var ep) || ep.ValueKind == JsonValueKind.Null)
-                                 && (!i.TryGetProperty("planoId", out var pp) || pp.ValueKind == JsonValueKind.Null))
-                        .ToDictionary(i => i.GetProperty("prioridade").GetString() ?? "", i => i);
-                }
-                @foreach (var prio in prioridadesOrdenadas)
-                {
-                    var minResp = existentesGlobais.TryGetValue(prio, out var ex) && ex.TryGetProperty("minutosResposta", out var mr) ? mr.GetInt32() : 0;
-                    var minResol = existentesGlobais.TryGetValue(prio, out var ex2) && ex2.TryGetProperty("minutosResolucao", out var mres) ? mres.GetInt32() : 0;
+
+        <div style="margin:-20px;">
+            <table class="es-data-table">
+                <thead>
                     <tr>
-                        <td class="text-es-ink-mute text-sm">Global (default)</td>
-                        <td>
-                            <input type="hidden" name="Prioridades" value="@prio" />
-                            <span class="status-badge @(prio == "Critica" ? "badge-critica" : prio == "Alta" ? "badge-alta" : "badge-normal")">@prio</span>
-                        </td>
-                        <td>
-                            <input type="number" name="MinutosResposta" value="@minResp" min="1" class="form-input" style="max-width:140px" />
-                            <span class="text-es-ink-mute text-xs">(@(minResp / 60)h @(minResp % 60)m)</span>
-                        </td>
-                        <td>
-                            <input type="number" name="MinutosResolucao" value="@minResol" min="1" class="form-input" style="max-width:140px" />
-                            <span class="text-es-ink-mute text-xs">(@(minResol / 60)h)</span>
-                        </td>
+                        <th scope="col">Escopo</th>
+                        <th scope="col">Prioridade</th>
+                        <th scope="col" class="es-data-table-td-numeric">Resposta (min)</th>
+                        <th scope="col" class="es-data-table-td-numeric">Resolução (min)</th>
                     </tr>
-                    idx++;
-                }
-            </tbody>
-        </table>
-        <div class="flex justify-end mt-4">
-            <button type="submit" class="btn-primary">Salvar matriz</button>
+                </thead>
+                <tbody>
+                    @foreach (var prio in prioridadesOrdenadas)
+                    {
+                        var minResp = existentesGlobais.TryGetValue(prio, out var ex) && ex.TryGetProperty("minutosResposta", out var mr) ? mr.GetInt32() : 0;
+                        var minResol = existentesGlobais.TryGetValue(prio, out var ex2) && ex2.TryGetProperty("minutosResolucao", out var mres) ? mres.GetInt32() : 0;
+                        var prioVariant = prio == "Critica" ? "crit" : prio == "Alta" ? "warn" : "neutral";
+                        <tr>
+                            <td data-label="Escopo" style="color:var(--text-muted); font-size:13px;">Global (default)</td>
+                            <td data-label="Prioridade">
+                                <input type="hidden" name="Prioridades" value="@prio" />
+                                <es-badge variant="@prioVariant">@prio</es-badge>
+                            </td>
+                            <td data-label="Resposta (min)" class="es-data-table-td-numeric" style="display:flex; gap:8px; align-items:center; justify-content:flex-end;">
+                                <input type="number" name="MinutosResposta" value="@minResp" min="1" class="es-form-input" style="max-width:120px;" />
+                                <span style="color:var(--text-muted); font-size:11px;">(@(minResp / 60)h @(minResp % 60)m)</span>
+                            </td>
+                            <td data-label="Resolução (min)" class="es-data-table-td-numeric" style="display:flex; gap:8px; align-items:center; justify-content:flex-end;">
+                                <input type="number" name="MinutosResolucao" value="@minResol" min="1" class="es-form-input" style="max-width:120px;" />
+                                <span style="color:var(--text-muted); font-size:11px;">(@(minResol / 60)h)</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end;">
+            <es-button type="submit" variant="primary" icon="check">Salvar matriz</es-button>
         </div>
     </form>
+</es-card>
 
-    <div class="border-t border-es-ink-mute/20 mt-6 pt-4">
-        <h3 class="text-es-ink font-semibold mb-2 text-sm">Overrides existentes (por plano ou empresa)</h3>
-        @{
-            var overrides = Model.Itens.Where(i =>
-                (i.TryGetProperty("empresaId", out var ep) && ep.ValueKind != JsonValueKind.Null)
-                || (i.TryGetProperty("planoId", out var pp) && pp.ValueKind != JsonValueKind.Null)).ToList();
-        }
-        @if (!overrides.Any())
-        {
-            <p class="text-es-ink-mute text-xs">Nenhum override cadastrado. Tudo segue o default global.</p>
-        }
-        else
-        {
-            <table class="table-admin">
+<es-card title="Overrides por plano ou empresa" description="Personalizações que substituem o default global" card-class="mt-4">
+    @if (!overrides.Any())
+    {
+        <es-empty-state icon="shield" title="Nenhum override" description="Tudo segue o default global. Crie overrides via API quando necessário." />
+    }
+    else
+    {
+        <div style="margin:-20px;">
+            <table class="es-data-table">
                 <thead>
-                    <tr><th>EmpresaId</th><th>PlanoId</th><th>Prioridade</th><th>Resposta</th><th>Resolução</th></tr>
+                    <tr>
+                        <th scope="col">EmpresaId</th>
+                        <th scope="col">PlanoId</th>
+                        <th scope="col">Prioridade</th>
+                        <th scope="col" class="es-data-table-td-numeric">Resposta</th>
+                        <th scope="col" class="es-data-table-td-numeric">Resolução</th>
+                    </tr>
                 </thead>
                 <tbody>
                     @foreach (var o in overrides)
@@ -93,15 +101,15 @@
                         var mr = o.TryGetProperty("minutosResposta", out var mrp) ? mrp.GetInt32() : 0;
                         var mres = o.TryGetProperty("minutosResolucao", out var mrep) ? mrep.GetInt32() : 0;
                         <tr>
-                            <td class="text-es-ink-mute text-xs font-mono">@emp</td>
-                            <td class="text-es-ink-mute text-xs font-mono">@pl</td>
-                            <td class="text-es-ink-dim">@pr</td>
-                            <td class="text-es-ink-dim">@mr min</td>
-                            <td class="text-es-ink-dim">@mres min</td>
+                            <td data-label="EmpresaId" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">@emp</td>
+                            <td data-label="PlanoId" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">@pl</td>
+                            <td data-label="Prioridade" style="color:var(--text-secondary);">@pr</td>
+                            <td data-label="Resposta" class="es-data-table-td-numeric" style="color:var(--text-secondary);">@mr min</td>
+                            <td data-label="Resolução" class="es-data-table-td-numeric" style="color:var(--text-secondary);">@mres min</td>
                         </tr>
                     }
                 </tbody>
             </table>
-        }
-    </div>
-</div>
+        </div>
+    }
+</es-card>

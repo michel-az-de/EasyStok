@@ -16,9 +16,19 @@
       quando ativadas (evita 3 chamadas pesadas no GET).
 *@
 
+<div style="margin-bottom:12px;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item>Diagnóstico</es-breadcrumb-item>
+    </es-breadcrumb>
+</div>
+
 @if (Model.Erro != null)
 {
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+    <div style="background:rgba(192,59,42,.10); border:1px solid rgba(192,59,42,.35); border-left:3px solid var(--crit-600); border-radius:var(--r-md); padding:12px 16px; font-size:13px; color:var(--crit-700); margin-bottom:14px; display:flex; align-items:center; gap:10px;">
+        <es-icon name="alert-triangle" size="16" />
+        <span>@Model.Erro</span>
+    </div>
 }
 
 <div x-data="diagnosticoPage()" x-init="init()">

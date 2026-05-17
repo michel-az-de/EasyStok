@@ -4,161 +4,132 @@
     ViewData["Title"] = "Planos";
 }
 
-<div class="flex items-center justify-between mb-6" x-data="{ modalNovo: false }">
-    <div class="text-es-ink-mute text-sm">@(Model.Planos.Count() == 1 ? "1 plano" : $"{Model.Planos.Count()} planos")</div>
-    <button type="button" @@click="modalNovo = true" class="btn-primary">+ Novo Plano</button>
-
-    <!-- Modal novo plano -->
-    <div x-show="modalNovo" x-cloak class="modal-overlay" @@click.self="modalNovo = false">
-        <div class="modal-box" @@click.stop>
-            <h3 class="text-es-ink font-semibold mb-4">Novo Plano</h3>
-            <form method="post" asp-page-handler="Criar" class="space-y-4">
-                @Html.AntiForgeryToken()
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="col-span-2">
-                        <label class="form-label">Nome</label>
-                        <input type="text" name="nome" class="form-input" required />
-                    </div>
-                    <div class="col-span-2">
-                        <label class="form-label">Descrição</label>
-                        <input type="text" name="descricao" class="form-input" />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite Lojas <small class="text-es-ink-mute">(-1 = ilimitado)</small></label>
-                        <input type="number" name="limiteLojas" value="1" class="form-input" required />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite Usuários</label>
-                        <input type="number" name="limiteUsuarios" value="5" class="form-input" required />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite Produtos</label>
-                        <input type="number" name="limiteProdutos" value="500" class="form-input" required />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite IA/mês</label>
-                        <input type="number" name="limiteGeracoesIaMensais" value="10" class="form-input" required />
-                    </div>
-                    <div class="col-span-2">
-                        <label class="form-label">Preço Mensal (R$)</label>
-                        <input type="number" name="precoMensal" value="0" step="0.01" class="form-input" required />
-                    </div>
-                </div>
-                <div class="flex gap-3 justify-end pt-2">
-                    <button type="button" @@click="modalNovo = false" class="btn-secondary">Cancelar</button>
-                    <button type="submit" class="btn-primary">Criar</button>
-                </div>
-            </form>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Planos</es-breadcrumb-item>
+        </es-breadcrumb>
+        <div style="margin-top:4px; color: var(--text-muted); font-size: 13px;">
+            <strong style="color: var(--text-primary);">@Model.Planos.Count()</strong> plano(s) configurados
         </div>
     </div>
+    <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-plano')">Novo plano</es-button>
 </div>
 
-@if (Model.Erro != null)
+@if (!Model.Planos.Any())
 {
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+    <es-card>
+        <es-empty-state icon="list-checks"
+                        title="Nenhum plano configurado"
+                        description="Defina os planos de assinatura disponíveis com seus limites e preços.">
+            <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-plano')">Criar primeiro plano</es-button>
+        </es-empty-state>
+    </es-card>
+}
+else
+{
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px;" x-data="{ editingId: '' }">
+        @foreach (var p in Model.Planos)
+        {
+            var pid = p.TryGetProperty("id", out var pidP) ? pidP.GetString() : "";
+            var nome = p.TryGetProperty("nome", out var nP) ? nP.GetString() : "";
+            var descricao = p.TryGetProperty("descricao", out var dP) && dP.ValueKind != System.Text.Json.JsonValueKind.Null ? dP.GetString() : "";
+            var limLojas = p.TryGetProperty("limiteLojas", out var llP) ? llP.GetInt32() : 0;
+            var limUsuarios = p.TryGetProperty("limiteUsuarios", out var luP) ? luP.GetInt32() : 0;
+            var limProdutos = p.TryGetProperty("limiteProdutos", out var lpP) ? lpP.GetInt32() : 0;
+            var limIa = p.TryGetProperty("limiteGeracoesIaMensais", out var liaP) ? liaP.GetInt32() : 0;
+            var preco = p.TryGetProperty("precoMensal", out var prP) ? prP.GetDecimal() : 0m;
+            var ativo = p.TryGetProperty("ativo", out var atP) && atP.GetBoolean();
+            var totalTenants = p.TryGetProperty("totalTenants", out var ttP) ? ttP.GetInt32() : 0;
+
+            <es-card padding="none" card-class="@(ativo ? "" : "")">
+                <div style="padding:20px 20px 16px; border-bottom:1px solid var(--border-soft);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                        <h3 style="margin:0; font-size:16px; font-weight:600; color:var(--text-primary);">@nome</h3>
+                        <es-badge variant="@(ativo ? "ok" : "neutral")" with-dot="true">@(ativo ? "ATIVO" : "INATIVO")</es-badge>
+                    </div>
+                    <div style="font-size:13px; color:var(--text-muted); min-height:18px;">@descricao</div>
+                    <div style="display:flex; align-items:baseline; gap:6px; margin-top:14px;">
+                        <span style="font-family:var(--font-display); font-size:32px; font-weight:700; color:var(--text-primary); letter-spacing:-0.02em; line-height:1;">R$ @preco.ToString("N2")</span>
+                        <span style="font-size:13px; color:var(--text-muted);">/ mês</span>
+                    </div>
+                </div>
+
+                <ul style="list-style:none; padding:16px 20px; margin:0; display:flex; flex-direction:column; gap:8px; font-size:13px; color:var(--text-secondary);">
+                    <li style="display:flex; align-items:center; gap:8px;">
+                        <es-icon name="check-circle" size="14" />
+                        <span><strong style="color:var(--text-primary);">@(limLojas == -1 ? "∞" : limLojas.ToString())</strong> loja(s)</span>
+                    </li>
+                    <li style="display:flex; align-items:center; gap:8px;">
+                        <es-icon name="check-circle" size="14" />
+                        <span><strong style="color:var(--text-primary);">@(limUsuarios == -1 ? "∞" : limUsuarios.ToString())</strong> usuário(s)</span>
+                    </li>
+                    <li style="display:flex; align-items:center; gap:8px;">
+                        <es-icon name="check-circle" size="14" />
+                        <span><strong style="color:var(--text-primary);">@(limProdutos == -1 ? "∞" : limProdutos.ToString())</strong> produtos</span>
+                    </li>
+                    <li style="display:flex; align-items:center; gap:8px;">
+                        <es-icon name="check-circle" size="14" />
+                        <span><strong style="color:var(--text-primary);">@(limIa == -1 ? "∞" : limIa.ToString())</strong> gerações de IA/mês</span>
+                    </li>
+                </ul>
+
+                <div style="padding:12px 20px; border-top:1px solid var(--border-soft); background:var(--surface-sunken); display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    <span style="font-size:12px; color:var(--text-muted);"><strong style="color:var(--text-primary);">@totalTenants</strong> tenant(s)</span>
+                    <div style="display:flex; gap:6px;">
+                        <es-button variant="ghost" size="xs" icon="edit-2" x-on:click="editingId = (editingId === '@pid' ? '' : '@pid')">
+                            <span x-text="editingId === '@pid' ? 'Cancelar' : 'Editar'"></span>
+                        </es-button>
+                        <form method="post" asp-page-handler="Toggle" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@pid" />
+                            <es-button type="submit" variant="@(ativo ? "ghost" : "primary")" size="xs">@(ativo ? "Desativar" : "Ativar")</es-button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Inline edit -->
+                <div x-show="editingId === '@pid'" x-cloak style="padding:16px 20px; border-top:1px solid var(--border-soft);">
+                    <form method="post" asp-page-handler="Editar" style="display:flex; flex-direction:column; gap:10px;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@pid" />
+                        <es-input name="nome" label="Nome" value="@nome" required="true" />
+                        <es-input name="descricao" label="Descrição" value="@descricao" label-optional="true" />
+                        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
+                            <es-input name="limiteLojas" type="number" label="Limite Lojas" value="@limLojas" required="true" helper="-1 = ∞" />
+                            <es-input name="limiteUsuarios" type="number" label="Limite Usuários" value="@limUsuarios" required="true" />
+                            <es-input name="limiteProdutos" type="number" label="Limite Produtos" value="@limProdutos" required="true" />
+                            <es-input name="limiteGeracoesIaMensais" type="number" label="Limite IA/mês" value="@limIa" required="true" />
+                        </div>
+                        <es-input name="precoMensal" type="number" label="Preço mensal" value="@preco" step="0.01" prefix="R$" required="true" />
+                        <es-button type="submit" variant="primary" icon="check" block="true">Salvar alterações</es-button>
+                    </form>
+                </div>
+            </es-card>
+        }
+    </div>
 }
 
-<div class="space-y-4">
-    @foreach (var p in Model.Planos)
-    {
-        var pid = p.TryGetProperty("id", out var pidP) ? pidP.GetString() : "";
-        var nome = p.TryGetProperty("nome", out var nP) ? nP.GetString() : "";
-        var descricao = p.TryGetProperty("descricao", out var dP) && dP.ValueKind != System.Text.Json.JsonValueKind.Null ? dP.GetString() : "";
-        var limLojas = p.TryGetProperty("limiteLojas", out var llP) ? llP.GetInt32() : 0;
-        var limUsuarios = p.TryGetProperty("limiteUsuarios", out var luP) ? luP.GetInt32() : 0;
-        var limProdutos = p.TryGetProperty("limiteProdutos", out var lpP) ? lpP.GetInt32() : 0;
-        var limIa = p.TryGetProperty("limiteGeracoesIaMensais", out var liaP) ? liaP.GetInt32() : 0;
-        var preco = p.TryGetProperty("precoMensal", out var prP) ? prP.GetDecimal() : 0m;
-        var ativo = p.TryGetProperty("ativo", out var atP) && atP.GetBoolean();
-        var totalTenants = p.TryGetProperty("totalTenants", out var ttP) ? ttP.GetInt32() : 0;
+<!-- Modal Novo Plano -->
+<es-modal id="novo-plano" title="Novo plano" description="Defina nome, limites e preço mensal." size="md">
+    <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;">
+        @Html.AntiForgeryToken()
+        <es-input name="nome" label="Nome" required="true" placeholder="Ex.: Profissional" />
+        <es-input name="descricao" label="Descrição" label-optional="true" placeholder="Para empresas em crescimento" />
 
-        <div class="card" x-data="{ editing: false }">
-            <div class="flex items-start justify-between gap-4">
-                <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-1">
-                        <h3 class="text-es-ink font-semibold">@nome</h3>
-                        <span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span>
-                        <span class="text-es-ink-mute text-xs">@totalTenants @(totalTenants == 1 ? "tenant" : "tenants")</span>
-                    </div>
-                    <div class="text-es-ink-dim text-sm">@descricao</div>
-                    <div class="flex gap-4 mt-2 text-xs text-es-ink-mute">
-                        <span>Lojas: <b class="text-es-ink">@(limLojas == -1 ? "∞" : limLojas.ToString())</b></span>
-                        <span>Usuários: <b class="text-es-ink">@(limUsuarios == -1 ? "∞" : limUsuarios.ToString())</b></span>
-                        <span>Produtos: <b class="text-es-ink">@(limProdutos == -1 ? "∞" : limProdutos.ToString())</b></span>
-                        <span>IA/mês: <b class="text-es-ink">@(limIa == -1 ? "∞" : limIa.ToString())</b></span>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <div class="text-es-accent font-bold text-xl">R$ @preco.ToString("N2")</div>
-                    <div class="text-es-ink-mute text-xs">/ mês</div>
-                </div>
-            </div>
-            <div class="flex gap-2 mt-4 pt-4" style="border-top:1px solid rgba(247,242,232,0.10)">
-                <button type="button" @@click="editing = !editing" class="btn-secondary text-sm">
-                    <span x-text="editing ? 'Cancelar' : 'Editar'"></span>
-                </button>
-                <form method="post" asp-page-handler="Toggle" class="inline">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="id" value="@pid" />
-                    @if (ativo && totalTenants > 0)
-                    {
-                        <button type="button" disabled
-                                class="btn-danger text-sm opacity-50 cursor-not-allowed"
-                                title="Não é possível desativar: @totalTenants @(totalTenants == 1 ? "tenant ativo" : "tenants ativos") neste plano">
-                            Desativar
-                        </button>
-                    }
-                    else
-                    {
-                        <button type="submit" class="@(ativo ? "btn-danger" : "btn-primary") text-sm">
-                            @(ativo ? "Desativar" : "Ativar")
-                        </button>
-                    }
-                </form>
-            </div>
-
-            <!-- Inline edit form -->
-            <div x-show="editing" x-cloak class="mt-4 pt-4" style="border-top:1px solid rgba(247,242,232,0.10)">
-                <form method="post" asp-page-handler="Editar" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="id" value="@pid" />
-                    <div class="col-span-2 lg:col-span-4">
-                        <label class="form-label">Nome</label>
-                        <input type="text" name="nome" value="@nome" class="form-input" required />
-                    </div>
-                    <div class="col-span-2 lg:col-span-4">
-                        <label class="form-label">Descrição</label>
-                        <input type="text" name="descricao" value="@descricao" class="form-input" />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite Lojas</label>
-                        <input type="number" name="limiteLojas" value="@limLojas" class="form-input" required />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite Usuários</label>
-                        <input type="number" name="limiteUsuarios" value="@limUsuarios" class="form-input" required />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite Produtos</label>
-                        <input type="number" name="limiteProdutos" value="@limProdutos" class="form-input" required />
-                    </div>
-                    <div>
-                        <label class="form-label">Limite IA/mês</label>
-                        <input type="number" name="limiteGeracoesIaMensais" value="@limIa" class="form-input" required />
-                    </div>
-                    <div class="col-span-2">
-                        <label class="form-label">Preço Mensal</label>
-                        <input type="number" name="precoMensal" value="@preco" step="0.01" class="form-input" required />
-                    </div>
-                    <div class="col-span-2 flex justify-end items-end">
-                        <button type="submit" class="btn-primary">Salvar Alterações</button>
-                    </div>
-                </form>
-            </div>
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
+            <es-input name="limiteLojas" type="number" label="Limite Lojas" value="1" required="true" helper="-1 = ∞" />
+            <es-input name="limiteUsuarios" type="number" label="Limite Usuários" value="5" required="true" />
+            <es-input name="limiteProdutos" type="number" label="Limite Produtos" value="500" required="true" />
+            <es-input name="limiteGeracoesIaMensais" type="number" label="Limite IA/mês" value="10" required="true" />
         </div>
-    }
-    @if (!Model.Planos.Any())
-    {
-        <div class="card text-center text-es-ink-mute py-8">Nenhum plano cadastrado.</div>
-    }
-</div>
+
+        <es-input name="precoMensal" type="number" label="Preço mensal" value="0" step="0.01" prefix="R$" required="true" />
+
+        <es-modal-footer>
+            <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
+            <es-button type="submit" variant="primary" icon="check">Criar plano</es-button>
+        </es-modal-footer>
+    </form>
+</es-modal>
