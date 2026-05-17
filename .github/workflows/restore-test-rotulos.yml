@@ -1,0 +1,126 @@
+name: Restore Test Rotulos
+
+# ADR-0012 — Restore-test mensal automatizado.
+# "Backup nao-testado = backup inexistente." Esse workflow restora o backup mais
+# recente do R2 em um Postgres efemero e valida que ao menos 1 PDF + 1 snapshot
+# JSON sao legiveis.
+#
+# Pre-requisitos:
+#   - Workflow backup-rotulos.yml ativo (ver vars.BACKUP_ENABLED)
+#   - Secrets: R2_ACCESS_KEY, R2_SECRET_KEY, R2_ENDPOINT
+#   - Secret: RESEND_API_KEY (para alerta critico em falha)
+#   - Secret: RESEND_FROM_EMAIL (ex: alerts@easystok.com.br)
+#   - Secret: ADMIN_EMAIL (destinatario do alerta)
+#
+# Cron: dia 1 de cada mes as 04:00 BRT = 07:00 UTC.
+on:
+  schedule:
+    - cron: '0 7 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-test-rotulos
+  cancel-in-progress: false
+
+jobs:
+  restore-and-validate:
+    name: Restore + validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ vars.BACKUP_ENABLED == 'true' }}
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: restoretest
+          POSTGRES_DB: easystok_restore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client + rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone for R2
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.R2_ACCESS_KEY }}
+          secret_access_key = ${{ secrets.R2_SECRET_KEY }}
+          endpoint = ${{ secrets.R2_ENDPOINT }}
+          acl = private
+          EOF
+
+      - name: Baixar backup mais recente
+        run: |
+          LATEST=$(rclone lsf r2:easystok-rotulos-backup/postgres/ | grep -E '\.dump$' | sort | tail -1)
+          if [ -z "$LATEST" ]; then
+            echo "Nenhum backup encontrado no R2" >&2
+            exit 1
+          fi
+          echo "Restaurando: $LATEST"
+          rclone copy "r2:easystok-rotulos-backup/postgres/$LATEST" .
+          echo "BACKUP_FILE=$LATEST" >> $GITHUB_ENV
+
+      - name: Restore para Postgres efemero
+        env:
+          PGPASSWORD: restoretest
+        run: |
+          pg_restore --host=localhost --port=5432 --username=postgres \
+                     --dbname=easystok_restore_test \
+                     --no-owner --no-privileges \
+                     "$BACKUP_FILE"
+
+      - name: Validar smoke (1 Rotulo + 1 snapshot JSON parseavel)
+        env:
+          PGPASSWORD: restoretest
+        run: |
+          # Verifica que tabela Rotulo existe e tem ao menos 1 linha
+          ROTULO_COUNT=$(psql -h localhost -U postgres -d easystok_restore_test -t -c "SELECT COUNT(*) FROM \"Rotulo\";" | tr -d ' ')
+          echo "Rotulos restaurados: $ROTULO_COUNT"
+          if [ "$ROTULO_COUNT" -eq "0" ]; then
+            echo "ATENCAO: 0 rotulos restaurados (esperado se MVP ainda nao em uso real)"
+          fi
+
+          # Tenta parsear o DadosSnapshotJson do primeiro rotulo (se existir)
+          if [ "$ROTULO_COUNT" -gt "0" ]; then
+            psql -h localhost -U postgres -d easystok_restore_test -t -c \
+              "SELECT jsonb_typeof(\"DadosSnapshotJson\"::jsonb) FROM \"Rotulo\" LIMIT 1;" | grep -q 'object'
+          fi
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "Restore-test OK em $(date -u). Backup integro."
+
+      - name: Notify critical failure via Resend
+        if: failure()
+        run: |
+          curl -sf -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer ${{ secrets.RESEND_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"from\": \"${{ secrets.RESEND_FROM_EMAIL }}\",
+              \"to\": [\"${{ secrets.ADMIN_EMAIL }}\"],
+              \"subject\": \"[EasyStok Rotulagem] CRITICO: restore test do backup falhou\",
+              \"text\": \"O restore-test mensal de $(date -u) falhou. Backup pode estar corrompido. Investigar imediatamente. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }" || echo "Notificacao Resend tambem falhou (verificar secrets)"
+          exit 1

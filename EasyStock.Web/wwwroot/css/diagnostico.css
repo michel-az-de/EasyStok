@@ -1,0 +1,30 @@
+/* Estilos da view Diagnostico (admin/devops). */
+body { font-family: 'Inter', sans-serif; }
+[x-cloak] { display: none !important; }
+.log-mono { font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.75rem; }
+.tab-active {
+    border-bottom: 2px solid var(--navy-500);
+    color: var(--navy-700);
+    font-weight: 600;
+}
+.tab-inactive {
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+}
+.tab-inactive:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+.fade-in { animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.pulse-dot { animation: pulse 2s infinite; }
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--ink-100); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--ink-400); border-radius: 3px; }
