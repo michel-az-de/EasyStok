@@ -17,7 +17,7 @@
 // recebido com cdb-pwa-installed-version local; quando diferente, pede update.
 // Web Admin pode forçar isso via comando remoto pwa_update (ver sync.js).
 
-const CACHE_VERSION = 'cdb-v25-kanban-wa-jsstring';
+const CACHE_VERSION = 'cdb-v27-calculadora-cesta';
 const STATIC_ASSETS = [
   './',
   './index.html',

@@ -144,6 +144,29 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             .SortByDescending(x => x.EntradaEm)
             .ToListAsync();
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
+        Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+    {
+        var ids = produtoIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>();
+
+        var filter = Builders<ItemEstoque>.Filter.Where(x =>
+            x.EmpresaId == empresaId &&
+            ids.Contains(x.ProdutoId) &&
+            (!lojaId.HasValue || x.LojaId == lojaId.Value));
+
+        var todos = await Collection.Find(filter)
+            .SortByDescending(x => x.EntradaEm)
+            .ToListAsync(ct);
+
+        return todos
+            .GroupBy(i => i.ProdutoId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
+    }
+
     public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
     {
         var filter = Builders<ItemEstoque>.Filter.And(

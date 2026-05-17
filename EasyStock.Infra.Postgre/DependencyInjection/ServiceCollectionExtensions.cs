@@ -83,6 +83,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IProdutoAlteracaoRepository, ProdutoAlteracaoRepository>();
+            services.AddScoped<IProdutoComposicaoRepository, ProdutoComposicaoRepository>();
+            services.AddScoped<IProdutoComposicaoAlteracaoRepository, ProdutoComposicaoAlteracaoRepository>();
             services.AddScoped<IMovimentacaoEstoqueAlteracaoRepository, MovimentacaoEstoqueAlteracaoRepository>();
             services.AddScoped<IIdempotencyKeyRepository, IdempotencyKeyRepository>();
             services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();

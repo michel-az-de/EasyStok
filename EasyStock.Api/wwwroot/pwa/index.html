@@ -7314,6 +7314,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="section-label">Catálogo de produção</div>
       <div class="screen-tabs" id="producaoTabs">
         <button class="screen-tab active" data-ptab="catalogo" onclick="goProducaoTab('catalogo')">Catálogo</button>
+        <button class="screen-tab" data-ptab="calculadora" onclick="goProducaoTab('calculadora')">Calculadora</button>
         <button class="screen-tab" data-ptab="lotes" onclick="goProducaoTab('lotes')">Lotes</button>
       </div>
       <section class="producao-tab-section active" data-ptab="catalogo">
@@ -7348,6 +7349,56 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Registrar produção</button>
       </div>
       </section>
+
+      <!-- CALCULADORA DE PRODUÇÃO (Onda 3.1) -->
+      <section class="producao-tab-section" data-ptab="calculadora">
+        <div class="prod-hero">
+          <div>
+            <div class="prod-eyebrow">Calculadora</div>
+            <h2>O que vamos produzir?</h2>
+            <p>Calcule quanto de cada insumo precisa e gere lista de compras dos itens em falta.</p>
+          </div>
+        </div>
+
+        <div class="section-label">Receita base</div>
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="calcProdSearch" placeholder="Buscar produto com receita..." oninput="calcBuscarProdutos()" autocomplete="off">
+        </div>
+        <div id="calcProdSuggestions" class="suggestions"></div>
+        <div id="calcProdSelected" style="display:none;font-size:13px;color:var(--ink-dim);margin-top:6px;"></div>
+
+        <div class="section-label">Quantidade desejada</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input id="calcQtd" type="text" inputmode="decimal" placeholder="0" oninput="calcOnQtdChange()" style="flex:1;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--ink);">
+          <select id="calcUnidade" onchange="calcOnUnidadeChange()" style="background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 12px;color:var(--ink);">
+            <option value="Un">Un</option>
+          </select>
+        </div>
+        <div class="doc-hint" id="calcQtdHint"></div>
+
+        <div class="cta-row" style="margin-top:14px;">
+          <button class="cta-btn" onclick="calcLimpar()">Limpar</button>
+          <button class="cta-btn primary" id="calcCalcularBtn" onclick="calcExecutar()" disabled>Calcular</button>
+        </div>
+
+        <!-- Resultado -->
+        <div id="calcResultadoBox" style="display:none;margin-top:18px;" role="status" aria-live="polite" aria-busy="false">
+          <div id="calcResultadoBadge" style="padding:14px;border-radius:14px;font-weight:700;text-align:center;margin-bottom:12px;"></div>
+          <div id="calcResultadoCustoTotal" style="font-size:13px;color:var(--ink-dim);text-align:center;margin-bottom:10px;"></div>
+          <div id="calcInsumosList"></div>
+          <div class="cta-row" style="margin-top:14px;">
+            <button class="cta-btn" id="calcEditarReceitaBtn" onclick="calcAbrirAjusteReceita()" style="display:none;">Editar receita</button>
+            <button class="cta-btn primary" id="calcGerarCompraBtn" onclick="calcGerarCompra()" style="display:none;">Gerar lista de compras</button>
+          </div>
+        </div>
+
+        <!-- Empty state quando sem busca -->
+        <div id="calcEmptyState" class="attention-empty" style="margin-top:18px;">
+          <span>Digite o nome do produto para começar.</span>
+        </div>
+      </section>
+
       <section class="producao-tab-section" data-ptab="lotes">
         <div class="batch-tools">
           <button data-bfilter="open" class="active" onclick="setBatchFilter('open')">Abertos</button>
@@ -7382,6 +7433,9 @@ body.ux-calm [data-screen="producao"] .section-label {
             <span class="ods-sub" id="odsSub">0 itens</span>
           </div>
           <div class="ods-total" id="odsTotal">R$ 0</div>
+        </div>
+        <div id="odsActions" style="display:none;margin-top:8px;">
+          <button class="cta-btn" onclick="openCestaCalcFromDraft()">Conferir insumos</button>
         </div>
         <div class="section-label">Cliente</div>
         <div id="clientPicker">
@@ -7791,6 +7845,36 @@ body.ux-calm [data-screen="producao"] .section-label {
         <input id="itemSearch" placeholder="lasanha, ravioli, molho..." oninput="searchItem()" autocomplete="off">
       </div>
       <div id="itemPickerList" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- Modal Calculadora de Cesta (Onda 1, in-context a partir de Pedido) -->
+  <div class="modal-overlay" id="cestaCalcModal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Conferir <span class="accent">insumos</span></div>
+      <div class="modal-sub" id="cestaCalcSub">Carregando…</div>
+
+      <div id="cestaCalcItensWrap">
+        <label class="modal-label">Itens do pedido</label>
+        <div id="cestaCalcItensList"></div>
+      </div>
+
+      <div id="cestaCalcResultadoBox" style="display:none;" role="status" aria-live="polite" aria-busy="false">
+        <div id="cestaCalcBadge" style="padding:14px;border-radius:14px;font-weight:700;text-align:center;margin-bottom:12px;"></div>
+        <div id="cestaCalcCustoTotal" style="font-size:13px;color:var(--ink-dim);text-align:center;margin-bottom:10px;"></div>
+
+        <label class="modal-label">Por produto</label>
+        <div id="cestaCalcPorProduto"></div>
+
+        <label class="modal-label">Total consolidado</label>
+        <div id="cestaCalcConsolidado"></div>
+      </div>
+
+      <div class="modal-ctas">
+        <button class="cta-btn" id="cestaCalcBtnFechar" onclick="cestaCalcFechar()">Fechar</button>
+        <button class="cta-btn primary" id="cestaCalcBtnCalcular" onclick="cestaCalcCalcular()">Calcular</button>
+      </div>
     </div>
   </div>
 
@@ -13280,6 +13364,7 @@ function renderKanbanCard(o, col) {
       <div class="k-foot">
         <div class="k-actions">
           <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
+          ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
           <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
           <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
           <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
@@ -16483,7 +16568,726 @@ function goProducaoTab(tab) {
   document.querySelectorAll('[data-screen="producao"] .producao-tab-section').forEach(s => s.classList.toggle('active', s.dataset.ptab === producaoTab));
   if (producaoTab === 'lotes') renderProducaoBatches();
   if (producaoTab === 'catalogo') renderProductionDemand(); // F6
+  if (producaoTab === 'calculadora') calcOnEntrarTab(); // Onda 3.1
 }
+
+// === Calculadora de Producao (Onda 3.1) ===
+// Estado em memoria — produto selecionado, ultimo resultado, debounce timer
+let calcProdutoSelecionado = null;
+let calcUltimoResultado = null;
+let calcSearchTimer = null;
+// Cache de produtos da busca atual (chave = id) para event-delegation segura,
+// evitando JSON.stringify embutido em onclick= (XSS persistente quando nome
+// do produto contem aspas/HTML). Reescrito a cada nova busca.
+let calcProdutosBusca = {};
+
+// Escape HTML helper — evita XSS persistente em pontos que ainda usam innerHTML
+// com dados vindos do servidor (nome de produto, nome de insumo, aviso, etc).
+// Sempre que possivel, prefira textContent ou createElement. Use este helper
+// apenas quando a estrutura HTML precisar ser montada inline.
+function calcEscapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[c]);
+}
+
+function calcOnEntrarTab() {
+  // Pre-fill via prod-demand chip (G1): se localStorage tem flag, popula form
+  try {
+    const prefillRaw = localStorage.getItem('cdb-calc-prefill');
+    if (prefillRaw) {
+      const prefill = JSON.parse(prefillRaw);
+      localStorage.removeItem('cdb-calc-prefill');
+      if (prefill.produtoId && prefill.produtoNome) {
+        calcSelecionarProduto({ id: prefill.produtoId, nome: prefill.produtoNome,
+          unidadeMedidaBase: prefill.unidadeMedidaBase || 'Un',
+          rendimentoBase: prefill.rendimentoBase, rendimentoUnidade: prefill.rendimentoUnidade });
+        if (prefill.qty) {
+          document.getElementById('calcQtd').value = prefill.qty;
+          calcOnQtdChange();
+        }
+      }
+    }
+  } catch (_) { /* silent */ }
+}
+
+function calcApiBase() {
+  return (window.CDB_CONFIG && window.CDB_CONFIG.apiBaseUrl) || '';
+}
+
+function calcAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const token = localStorage.getItem('cdb-auth-token') || localStorage.getItem('authToken');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  } catch (_) {}
+  return headers;
+}
+
+async function calcBuscarProdutos() {
+  if (calcSearchTimer) clearTimeout(calcSearchTimer);
+  calcSearchTimer = setTimeout(async () => {
+    const q = document.getElementById('calcProdSearch').value.trim();
+    const box = document.getElementById('calcProdSuggestions');
+    if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+    try {
+      const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+      const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
+      const res = await fetch(url, { headers: calcAuthHeaders() });
+      const json = await res.json();
+      const produtos = (json && json.data) || [];
+      if (produtos.length === 0) {
+        box.classList.add('show');
+        box.innerHTML = '<div style="padding:10px;color:var(--ink-mute);font-size:13px;">Nenhum produto com receita encontrado.</div>';
+        return;
+      }
+      box.classList.add('show');
+      // Cache produtos para event-delegation segura (sem JSON.stringify em onclick=)
+      calcProdutosBusca = {};
+      produtos.forEach(p => { if (p && p.id) calcProdutosBusca[String(p.id)] = p; });
+      box.innerHTML = produtos.map(p => {
+        const rendNum = Number(p.rendimentoBase);
+        const rendimento = isFinite(rendNum) ? rendNum : 0;
+        return `
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
+             data-calc-prod-id="${calcEscapeHtml(p.id)}">
+          <div style="font-weight:600;">${calcEscapeHtml(p.nome)}</div>
+          <div style="font-size:11px;color:var(--ink-mute);">Rende ${rendimento} ${calcEscapeHtml(p.rendimentoUnidade)}</div>
+        </div>
+      `;
+      }).join('');
+      // Event-delegation: substitui onclick='calcSelecionarProduto(...)' inline
+      box.querySelectorAll('[data-calc-prod-id]').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-calc-prod-id');
+          const prod = calcProdutosBusca[id];
+          if (prod) calcSelecionarProduto(prod);
+        });
+      });
+    } catch (e) {
+      showToast('Erro ao buscar produtos');
+    }
+  }, 300);
+}
+
+function calcSelecionarProduto(p) {
+  calcProdutoSelecionado = p;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSuggestions').classList.remove('show');
+  document.getElementById('calcProdSelected').style.display = 'block';
+  document.getElementById('calcProdSelected').textContent = `${p.nome} (rende ${p.rendimentoBase} ${p.rendimentoUnidade})`;
+  document.getElementById('calcEmptyState').style.display = 'none';
+
+  // G7: chips de unidade contextual — filtra por compativeis.
+  // calcUnidadesCompativeis retorna constantes do enum (Un/G/Kg/...) mas escapamos
+  // por defesa em profundidade — assim qualquer regressao futura nao vira XSS.
+  const unidadeBase = p.unidadeMedidaBase || 'Un';
+  const select = document.getElementById('calcUnidade');
+  const compativeis = calcUnidadesCompativeis(unidadeBase);
+  select.innerHTML = compativeis.map(u => {
+    const safe = calcEscapeHtml(u);
+    return `<option value="${safe}"${u === unidadeBase ? ' selected' : ''}>${safe}</option>`;
+  }).join('');
+
+  calcOnQtdChange();
+}
+
+function calcUnidadesCompativeis(base) {
+  const massa = ['Mg', 'G', 'Kg'];
+  const volume = ['Ml', 'L'];
+  const contagem = ['Un', 'Dz'];
+  if (massa.includes(base)) return massa;
+  if (volume.includes(base)) return volume;
+  if (contagem.includes(base)) return contagem;
+  return [base];
+}
+
+function calcOnQtdChange() {
+  const qtdStr = document.getElementById('calcQtd').value.replace(',', '.');
+  const qtd = parseFloat(qtdStr);
+  const hint = document.getElementById('calcQtdHint');
+  const btn = document.getElementById('calcCalcularBtn');
+  hint.classList.remove('invalid');
+  hint.textContent = '';
+  if (!calcProdutoSelecionado) { btn.disabled = true; return; }
+  if (!isFinite(qtd) || qtd < 0.0001) {
+    if (qtdStr) {
+      hint.classList.add('invalid');
+      hint.textContent = 'Quantidade minima 0.0001.';
+    }
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+}
+
+function calcOnUnidadeChange() {
+  // Recalcula valido novamente quando troca unidade
+  calcOnQtdChange();
+}
+
+async function calcExecutar() {
+  if (!calcProdutoSelecionado) return;
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+
+  const qtd = parseFloat(document.getElementById('calcQtd').value.replace(',', '.'));
+  const unidade = document.getElementById('calcUnidade').value;
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  const box = document.getElementById('calcResultadoBox');
+  box.setAttribute('aria-busy', 'true');
+  box.style.display = 'block';
+  document.getElementById('calcResultadoBadge').textContent = 'Calculando...';
+  document.getElementById('calcResultadoBadge').style.background = 'var(--bg-elev)';
+  document.getElementById('calcInsumosList').innerHTML = '';
+  document.getElementById('calcResultadoCustoTotal').textContent = '';
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        produtoFinalId: calcProdutoSelecionado.id,
+        quantidadeDesejada: qtd,
+        unidadeDesejada: unidade,
+        lojaId
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      showToast(`${code}: ${msg}`);
+      box.style.display = 'none';
+      return;
+    }
+    calcUltimoResultado = json.data;
+    calcRenderResultado(json.data);
+    calcSalvarHistorico(calcProdutoSelecionado, qtd, unidade);
+  } catch (e) {
+    showToast('Erro de conexao');
+    box.style.display = 'none';
+  } finally {
+    box.setAttribute('aria-busy', 'false');
+  }
+}
+
+function calcRenderResultado(r) {
+  const badge = document.getElementById('calcResultadoBadge');
+  const editarBtn = document.getElementById('calcEditarReceitaBtn');
+  const gerarBtn = document.getElementById('calcGerarCompraBtn');
+
+  if (r.tudoDisponivel) {
+    badge.innerHTML = '<span>✓ TUDO DISPONIVEL</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Voce pode produzir agora.</div>';
+    badge.style.background = 'var(--basil-soft)';
+    badge.style.color = 'var(--basil)';
+    badge.style.border = '1px solid var(--basil)';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'none';
+  } else {
+    const faltantes = r.insumos.filter(i => i.falta != null && i.falta > 0).length;
+    badge.innerHTML = `<span>⚠ FALTAM ${faltantes} INSUMO${faltantes > 1 ? 'S' : ''}</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Gere lista de compras pra repor.</div>`;
+    badge.style.background = 'rgba(239, 107, 107, 0.16)';
+    badge.style.color = '#ef6b6b';
+    badge.style.border = '1px solid #ef6b6b';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'inline-block';
+  }
+
+  if (r.custoEstimadoTotal != null) {
+    document.getElementById('calcResultadoCustoTotal').textContent = `Custo estimado total: R$ ${r.custoEstimadoTotal.toFixed(2).replace('.', ',')}`;
+  }
+
+  const list = document.getElementById('calcInsumosList');
+  list.innerHTML = r.insumos.map(i => {
+    // Cor e literal — escolha entre constantes seguras de tema. Nao escapar aqui.
+    let cor = 'var(--basil)';
+    // Status texto pode conter unidade vinda do servidor — escapar abaixo na injecao.
+    const unidadeReceitaSafe = calcEscapeHtml(i.unidadeReceita);
+    const unidadeSaldoSafe = calcEscapeHtml(i.unidadeSaldo);
+    let status = 'Cobre';
+    if (i.conversaoFalhou) { cor = '#ef6b6b'; status = 'Unidade incompativel'; }
+    else if (i.falta != null && i.falta > 0) {
+      cor = '#ef6b6b';
+      const faltaNum = Number(i.falta);
+      status = `Falta ${isFinite(faltaNum) ? faltaNum.toFixed(3) : '0'} ${unidadeReceitaSafe}`;
+    }
+
+    const custoNum = Number(i.custoEstimadoLinha);
+    const custoTxt = (i.custoEstimadoLinha != null && isFinite(custoNum))
+      ? `R$ ${custoNum.toFixed(2).replace('.', ',')}`
+      : '—';
+
+    const qtdNum = Number(i.quantidadeNecessaria);
+    const saldoNum = Number(i.saldoAtual);
+    const qtdNec = isFinite(qtdNum) ? qtdNum.toFixed(3) : '0';
+    const saldo = isFinite(saldoNum) ? saldoNum.toFixed(3) : '0';
+
+    return `
+      <div style="background:var(--bg-elev);border-radius:12px;padding:12px;margin-bottom:8px;border-left:3px solid ${cor};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <strong style="font-size:14px;">${calcEscapeHtml(i.insumoNome)}</strong>
+          <span style="font-size:11px;color:var(--ink-mute);">${custoTxt}</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">
+          Precisa ${qtdNec} ${unidadeReceitaSafe} • Saldo ${saldo} ${unidadeSaldoSafe}
+        </div>
+        <div style="font-size:11px;color:${cor};margin-top:4px;font-weight:600;">${status}</div>
+        ${i.aviso ? `<div style="font-size:11px;color:var(--gold);margin-top:4px;">${calcEscapeHtml(i.aviso)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function calcGerarCompra() {
+  if (!calcUltimoResultado) return;
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  // Coleta insumos faltantes
+  const insumosFaltantes = calcUltimoResultado.insumos
+    .filter(i => i.falta != null && i.falta > 0 && !i.conversaoFalhou)
+    .map(i => ({
+      insumoId: i.insumoId,
+      quantidadeFaltante: i.falta,
+      unidade: i.unidadeReceita
+    }));
+
+  if (insumosFaltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return;
+  }
+
+  // Step 1: preview (sem idempotency, livre pra refazer)
+  try {
+    const previewUrl = `${calcApiBase()}/api/mobile/calculadora/preview-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(previewUrl, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({ empresaId: empresaId || null, lojaId, insumos: insumosFaltantes })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      showToast(`${code}: ${json.error?.message || ''}`);
+      return;
+    }
+    const preview = json.data;
+    // Mostra resumo via confirm nativo (padrao do PWA pra confirmacoes destrutivas)
+    const grupos = preview.porFornecedor || [];
+    const semFornecedor = grupos.find(g => !g.fornecedorId);
+    if (semFornecedor) {
+      showToast('Alguns insumos nao tem fornecedor preferido. Cadastre antes ou edite manualmente no admin.');
+      return;
+    }
+    const resumo = grupos.map(g => `${g.fornecedorNome}: ${g.linhas.length} itens (R$ ${(g.subtotalEstimado || 0).toFixed(2)})`).join('\n');
+    const total = preview.totalEstimado != null ? `\nTotal: R$ ${preview.totalEstimado.toFixed(2)}` : '';
+    if (!confirm(`Criar ${grupos.length} pedido(s) de compra?\n\n${resumo}${total}`)) return;
+
+    // Step 2: criar com idempotency-key
+    const idempotencyKey = calcGerarUuid();
+    const fornecedores = grupos.map(g => ({
+      fornecedorId: g.fornecedorId,
+      itens: g.linhas.map(l => ({
+        insumoId: l.insumoId,
+        nome: l.insumoNome,
+        quantidade: l.quantidade,
+        unidade: l.unidade,
+        custoUnitario: l.custoUnitarioReferencia || 0,
+        observacao: null
+      }))
+    }));
+
+    const criarUrl = `${calcApiBase()}/api/mobile/calculadora/criar-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res2 = await fetch(criarUrl, {
+      method: 'POST',
+      headers: { ...calcAuthHeaders(), 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId,
+        canal: 'calculadora-pwa',
+        observacoes: null,
+        fornecedores
+      })
+    });
+    const json2 = await res2.json();
+    if (!res2.ok) {
+      const code = (json2 && json2.error && json2.error.code) || 'ERROR';
+      showToast(`${code}: ${json2.error?.message || ''}`);
+      return;
+    }
+    showToast(`${json2.data?.pedidosCriados?.length || 0} pedido(s) de compra criado(s).`);
+  } catch (e) {
+    showToast('Erro de conexao');
+  }
+}
+
+function calcAbrirAjusteReceita() {
+  // MVP: para versao 1 deixamos esse fluxo no admin web. Aqui apenas redireciona com toast.
+  showToast('Edicao de receita: acesse o admin web por enquanto.');
+}
+
+function calcLimpar() {
+  calcProdutoSelecionado = null;
+  calcUltimoResultado = null;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSelected').style.display = 'none';
+  document.getElementById('calcQtd').value = '';
+  document.getElementById('calcQtdHint').textContent = '';
+  document.getElementById('calcCalcularBtn').disabled = true;
+  document.getElementById('calcResultadoBox').style.display = 'none';
+  document.getElementById('calcEmptyState').style.display = 'block';
+}
+
+function calcSalvarHistorico(produto, qtd, unidade) {
+  try {
+    const raw = localStorage.getItem('cdb-calc-history') || '[]';
+    let history = JSON.parse(raw);
+    if (!Array.isArray(history)) history = [];
+    history.unshift({ produto: { id: produto.id, nome: produto.nome }, qtd, unidade, ts: Date.now() });
+    history = history.slice(0, 5);
+    localStorage.setItem('cdb-calc-history', JSON.stringify(history));
+  } catch (_) {}
+}
+
+function calcGerarUuid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback UUID v4 pseudo (suficiente p/ idempotency)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// === Calculadora de Cesta (Onda 1) — in-context a partir de Pedido ===
+// Read-only: calcula consumo de insumos para a cesta do pedido, agrupa por produto
+// e consolida total. Onda 1 entrega so leitura — sem "lista de compras" nem PF.
+let cestaCalcContexto = null; // { tipo: 'draft'|'order', orderId?, label, items: [...] }
+let cestaCalcResultadoAtual = null;
+let produtosComReceitaCacheSet = null; // Set<produtoId> — populado 1x por sessao
+
+async function cestaCalcCarregarCacheReceitas() {
+  if (produtosComReceitaCacheSet !== null) return;
+  try {
+    const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+    const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?limit=200${empresaId ? '&empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, { headers: calcAuthHeaders() });
+    const json = await res.json();
+    const ids = ((json && json.data) || []).map(p => String(p.id));
+    produtosComReceitaCacheSet = new Set(ids);
+  } catch (_) {
+    produtosComReceitaCacheSet = new Set();
+  }
+}
+
+function cestaCalcInstalarObservadorDraft() {
+  const list = document.getElementById('orderItemsList');
+  if (!list) return;
+  const sync = () => {
+    const el = document.getElementById('odsActions');
+    if (!el) return;
+    el.style.display = list.children.length > 0 ? '' : 'none';
+  };
+  try {
+    new MutationObserver(sync).observe(list, { childList: true });
+  } catch (_) {}
+  sync();
+}
+
+async function openCestaCalcFromDraft() {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  const items = (typeof currentOrderItems !== 'undefined' && Array.isArray(currentOrderItems)) ? currentOrderItems : [];
+  if (items.length === 0) { showToast('Adicione itens ao pedido primeiro'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  cestaCalcContexto = {
+    tipo: 'draft',
+    orderId: null,
+    label: 'Pedido em montagem',
+    items: items.map(i => ({
+      produtoId: i.productId || (i.product && i.product.id) || i.id,
+      nome: i.name || (i.product && i.product.name) || 'Item',
+      qty: Number(i.qty || i.quantity || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+async function openCestaCalcFromOrder(orderId) {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  const ordersList = (typeof orders !== 'undefined' && Array.isArray(orders)) ? orders : [];
+  const order = ordersList.find(o => o.id === orderId);
+  if (!order || !Array.isArray(order.items)) { showToast('Pedido nao encontrado'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  const idShort = (order.id || '').slice(-6);
+  cestaCalcContexto = {
+    tipo: 'order',
+    orderId: order.id,
+    label: 'Pedido ' + idShort,
+    items: order.items.map(i => ({
+      produtoId: i.productId || i.product_id || (i.product && i.product.id),
+      nome: i.name || (i.product && i.product.name) || 'Item',
+      qty: Number(i.qty || i.quantity || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+function cestaCalcAbrirModal() {
+  const modal = document.getElementById('cestaCalcModal');
+  const ctx = cestaCalcContexto;
+  if (!ctx) return;
+
+  const semReceitaCount = produtosComReceitaCacheSet
+    ? ctx.items.filter(i => !produtosComReceitaCacheSet.has(String(i.produtoId))).length
+    : 0;
+  const sub = ctx.label + ' · ' + ctx.items.length + ' iten' + (ctx.items.length === 1 ? '' : 's') +
+              (semReceitaCount > 0 ? ' · ' + semReceitaCount + ' sem receita' : '');
+  document.getElementById('cestaCalcSub').textContent = sub;
+
+  const list = document.getElementById('cestaCalcItensList');
+  list.innerHTML = '';
+  ctx.items.forEach(item => {
+    const semReceita = produtosComReceitaCacheSet !== null && !produtosComReceitaCacheSet.has(String(item.produtoId));
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:10px;background:var(--bg-elev);margin-bottom:6px;' + (semReceita ? 'opacity:0.6;' : '');
+    const left = document.createElement('div');
+    left.style.cssText = 'flex:1;min-width:0;';
+    const nm = document.createElement('div');
+    nm.style.cssText = 'font-weight:600;';
+    nm.textContent = item.nome;
+    left.appendChild(nm);
+    if (semReceita) {
+      const sr = document.createElement('div');
+      sr.style.cssText = 'font-size:11px;color:var(--ink-mute);';
+      sr.textContent = 'sem receita';
+      left.appendChild(sr);
+    }
+    const right = document.createElement('div');
+    right.style.cssText = 'font-weight:600;color:var(--ink-dim);font-size:13px;';
+    right.textContent = item.qty + ' ' + item.unidade;
+    row.appendChild(left);
+    row.appendChild(right);
+    list.appendChild(row);
+  });
+
+  document.getElementById('cestaCalcResultadoBox').style.display = 'none';
+  document.getElementById('cestaCalcItensWrap').style.display = '';
+  const btnCalcular = document.getElementById('cestaCalcBtnCalcular');
+  btnCalcular.style.display = '';
+  btnCalcular.disabled = ctx.items.length === 0;
+
+  modal.classList.add('show');
+}
+
+async function cestaCalcCalcular() {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!cestaCalcContexto || cestaCalcContexto.items.length === 0) return;
+
+  const btn = document.getElementById('cestaCalcBtnCalcular');
+  btn.disabled = true;
+
+  const resultBox = document.getElementById('cestaCalcResultadoBox');
+  resultBox.setAttribute('aria-busy', 'true');
+  resultBox.style.display = 'block';
+  const badge = document.getElementById('cestaCalcBadge');
+  badge.textContent = 'Calculando...';
+  badge.style.background = 'var(--bg-elev)';
+  badge.style.color = 'var(--ink)';
+  document.getElementById('cestaCalcPorProduto').innerHTML = '';
+  document.getElementById('cestaCalcConsolidado').innerHTML = '';
+  document.getElementById('cestaCalcCustoTotal').textContent = '';
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular-cesta${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId: lojaId,
+        itens: cestaCalcContexto.items.map(i => ({
+          produtoFinalId: i.produtoId,
+          quantidade: i.qty,
+          unidade: i.unidade
+        }))
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      badge.textContent = msg;
+      badge.style.background = 'rgba(231,104,69,0.15)';
+      badge.style.color = 'var(--accent)';
+      btn.disabled = false;
+      return;
+    }
+    cestaCalcResultadoAtual = json.data;
+    cestaCalcRender(json.data);
+    document.getElementById('cestaCalcItensWrap').style.display = 'none';
+    btn.style.display = 'none';
+  } catch (e) {
+    badge.textContent = 'Erro ao calcular';
+    badge.style.background = 'rgba(231,104,69,0.15)';
+    badge.style.color = 'var(--accent)';
+    btn.disabled = false;
+  } finally {
+    resultBox.setAttribute('aria-busy', 'false');
+  }
+}
+
+function cestaCalcRender(data) {
+  const badge = document.getElementById('cestaCalcBadge');
+  if (data.tudoDisponivel) {
+    badge.textContent = '✓ Tudo certo, pode produzir';
+    badge.style.background = 'rgba(79,191,159,0.15)';
+    badge.style.color = 'var(--basil)';
+  } else {
+    const faltaCount = (data.consolidado || []).filter(c => (c.falta != null && Number(c.falta) > 0) || c.conversaoFalhou).length;
+    badge.textContent = '⚠ Faltam ' + faltaCount + ' insumo' + (faltaCount === 1 ? '' : 's');
+    badge.style.background = 'rgba(231,104,69,0.15)';
+    badge.style.color = 'var(--accent)';
+  }
+
+  const custo = document.getElementById('cestaCalcCustoTotal');
+  if (data.custoEstimadoTotal != null) {
+    const v = Number(data.custoEstimadoTotal);
+    custo.textContent = 'Custo estimado: R$ ' + v.toFixed(2).replace('.', ',');
+  } else {
+    custo.textContent = '';
+  }
+
+  const porProd = document.getElementById('cestaCalcPorProduto');
+  porProd.innerHTML = '';
+  (data.itens || []).forEach(item => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--bg-elev);border-radius:12px;padding:10px 12px;margin-bottom:8px;';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px;';
+    const nm = document.createElement('span');
+    nm.textContent = item.produtoNome;
+    head.appendChild(nm);
+
+    const statusStr = String(item.status || '').toLowerCase();
+    if (statusStr === 'semreceita' || statusStr === '1') {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:11px;color:var(--ink-mute);';
+      tag.textContent = 'sem receita';
+      head.appendChild(tag);
+      card.appendChild(head);
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--ink-mute);';
+      note.textContent = 'Cadastre a composição em Produção > Catálogo.';
+      card.appendChild(note);
+    } else if (statusStr === 'erro' || statusStr === '2') {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:11px;color:var(--accent);';
+      tag.textContent = 'erro';
+      head.appendChild(tag);
+      card.appendChild(head);
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--accent);';
+      note.textContent = item.erro || 'Erro ao calcular';
+      card.appendChild(note);
+    } else {
+      card.appendChild(head);
+      const lista = document.createElement('div');
+      ((item.resultado && item.resultado.insumos) || []).forEach(ins => {
+        lista.appendChild(cestaCalcRenderInsumoLinha(ins));
+      });
+      card.appendChild(lista);
+    }
+    porProd.appendChild(card);
+  });
+
+  const cons = document.getElementById('cestaCalcConsolidado');
+  cons.innerHTML = '';
+  (data.consolidado || []).forEach(c => {
+    cons.appendChild(cestaCalcRenderInsumoLinha({
+      insumoNome: c.insumoNome,
+      quantidadeNecessaria: c.precisa,
+      unidadeReceita: c.unidadeReceita,
+      saldoAtual: c.saldo,
+      unidadeSaldo: c.unidadeSaldo,
+      falta: c.falta,
+      conversaoFalhou: c.conversaoFalhou,
+      aviso: c.aviso
+    }));
+  });
+  if ((data.consolidado || []).length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:12px;color:var(--ink-mute);text-align:center;padding:8px;';
+    empty.textContent = 'Nenhum insumo a consolidar.';
+    cons.appendChild(empty);
+  }
+}
+
+function cestaCalcRenderInsumoLinha(ins) {
+  const row = document.createElement('div');
+  let borderColor = 'var(--basil)';
+  let statusText = 'ok';
+  let statusColor = 'var(--basil)';
+  if (ins.conversaoFalhou) {
+    borderColor = 'var(--gold)';
+    statusText = 'unidade incompativel';
+    statusColor = 'var(--gold)';
+  } else if (ins.falta != null && Number(ins.falta) > 0) {
+    borderColor = 'var(--accent)';
+    statusText = 'faltam ' + Number(ins.falta).toFixed(2).replace('.', ',') + ' ' + (ins.unidadeReceita || '');
+    statusColor = 'var(--accent)';
+  }
+  row.style.cssText = 'padding:8px 10px;border-left:3px solid ' + borderColor + ';background:rgba(0,0,0,0.04);border-radius:0 8px 8px 0;margin-bottom:4px;';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;font-size:13px;';
+  const nm = document.createElement('span');
+  nm.style.cssText = 'font-weight:600;';
+  nm.textContent = ins.insumoNome;
+  const qt = document.createElement('span');
+  qt.style.cssText = 'color:var(--ink-dim);';
+  qt.textContent = Number(ins.quantidadeNecessaria || 0).toFixed(3).replace('.', ',') + ' ' + (ins.unidadeReceita || '');
+  head.appendChild(nm);
+  head.appendChild(qt);
+  row.appendChild(head);
+  const sub = document.createElement('div');
+  sub.style.cssText = 'font-size:11px;color:' + statusColor + ';margin-top:2px;';
+  sub.textContent = statusText;
+  row.appendChild(sub);
+  if (ins.aviso) {
+    const av = document.createElement('div');
+    av.style.cssText = 'font-size:11px;color:var(--gold);margin-top:2px;';
+    av.textContent = ins.aviso;
+    row.appendChild(av);
+  }
+  return row;
+}
+
+function cestaCalcFechar() {
+  document.getElementById('cestaCalcModal').classList.remove('show');
+  cestaCalcContexto = null;
+  cestaCalcResultadoAtual = null;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    cestaCalcInstalarObservadorDraft();
+    cestaCalcCarregarCacheReceitas();
+  });
+}
+
 function setBatchFilter(next) {
   batchFilter = next || 'open';
   document.querySelectorAll('[data-bfilter]').forEach(b => b.classList.toggle('active', b.dataset.bfilter === batchFilter));

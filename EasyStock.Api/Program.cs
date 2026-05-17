@@ -689,7 +689,8 @@ EasyStock.Api.Middleware.IdempotencyMiddlewareExtensions.UseIdempotency(app, opt
     .Add("/api/vendas")
     .Add("/api/mobile/vendas")
     .Add("/api/movimentacoes")
-    .Add("/api/itensestoque/repor"));
+    .Add("/api/itensestoque/repor")
+    .Add("/api/mobile/calculadora/criar-compra"));
 app.MapControllers();
 
 app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
