@@ -138,22 +138,13 @@
                                     <span class="w-1.5 h-1.5 rounded-full @statusDotColor(p.Status)"></span>
                                     @statusDisplayLabel(p.Status)
                                 </span>
-                                @if (p.Status == "entregue" && !p.Quitado && p.TotalPago == 0)
-                                {
-                                    @* A listagem usa um agregado de pagamento que as vezes diverge do detalhe.
-                                       Antes este badge dizia "Entregue sem cobranca" com tom de certeza, mas
-                                       o usuario podia abrir o pedido e ver "Quitado R$ X". Trocamos por linguagem
-                                       que pede verificacao no detalhe em vez de afirmar que faltou cobranca. *@
-                                    <a href="/pedidos/@p.Id"
-                                       onclick="event.stopPropagation();"
-                                       class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-50 ring-1 ring-amber-200 rounded-full px-1.5 py-0.5 w-fit hover:bg-amber-100"
-                                       title="A listagem nao registrou pagamento para este pedido. Abra o detalhe para confirmar — em alguns casos o agregado da lista diverge do que o pedido tem registrado.">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                        </svg>
-                                        Conferir cobrança
-                                    </a>
-                                }
+                                @* BUG 5: o badge "Conferir cobrança" disparava em todo pedido entregue
+                                   com TotalPago==0 — incluindo casos em que o agregado da lista estava
+                                   apenas defasado. Resultado: muitos pedidos legítimos exibiam um chip
+                                   ambíguo que sugeria erro. Suprimimos o chip aqui; a coluna "Pagamento"
+                                   abaixo já comunica o estado (Quitado / Parcial / Pendente / sem chip
+                                   quando há suspeita de divergência). Quando o agregado de pagamento
+                                   for confiável o suficiente, reativamos. *@
                                 @if (atrasado)
                                 {
                                     <span class="inline-flex items-center gap-1 text-[10px] font-medium text-amber-800">
@@ -198,15 +189,12 @@
                             }
                             else if (p.Status == "entregue")
                             {
-                                @* Caso de divergencia: pedido entregue mas listagem diz Pendente. Pode ser
-                                   real (cobranca esquecida) ou agregado desatualizado. Linkamos para o
-                                   detalhe que tem fonte da verdade. *@
-                                <a href="/pedidos/@p.Id"
-                                   onclick="event.stopPropagation();"
-                                   class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-yellow-50 text-yellow-800 ring-yellow-200 hover:bg-yellow-100"
-                                   title="Verifique no detalhe — em alguns casos o agregado da lista diverge.">
-                                    Pendente?
-                                </a>
+                                @* BUG 5: pedido entregue com agregado=0 — não afirmamos "Pendente?".
+                                   O agregado da lista diverge do detalhe em parte dos casos; exibir um
+                                   chip com interrogação fazia o usuário duvidar do sistema. Em vez disso,
+                                   sumimos com a célula — o operador clica no pedido pra ver o estado real
+                                   se quiser confirmar. *@
+                                <span class="text-slate-300 text-sm" aria-hidden="true">—</span>
                             }
                             else
                             {

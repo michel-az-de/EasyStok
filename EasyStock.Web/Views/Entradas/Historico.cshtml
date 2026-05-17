@@ -31,10 +31,12 @@
             }
         </div>
 
-        <input type="date" name="periodoInicio" value="@Model.PeriodoInicio"
+        @* BUG 10: trunca em yyyy-MM-dd para que valores legados com ":T23:59:59"
+           ainda apareçam no input — input type="date" descarta horas. *@
+        <input type="date" name="periodoInicio" value="@(Model.PeriodoInicio is { Length: >= 10 } d ? d[..10] : Model.PeriodoInicio)"
                class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
         <span class="text-slate-400 text-sm">até</span>
-        <input type="date" name="periodoFim" value="@Model.PeriodoFim"
+        <input type="date" name="periodoFim" value="@(Model.PeriodoFim is { Length: >= 10 } a ? a[..10] : Model.PeriodoFim)"
                class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
         <button type="submit"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
