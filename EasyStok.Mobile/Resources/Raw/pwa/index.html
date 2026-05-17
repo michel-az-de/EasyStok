@@ -7434,6 +7434,9 @@ body.ux-calm [data-screen="producao"] .section-label {
           </div>
           <div class="ods-total" id="odsTotal">R$ 0</div>
         </div>
+        <div id="odsActions" style="display:none;margin-top:8px;">
+          <button class="cta-btn" onclick="openCestaCalcFromDraft()">Conferir insumos</button>
+        </div>
         <div class="section-label">Cliente</div>
         <div id="clientPicker">
           <div class="search-box">
@@ -7842,6 +7845,36 @@ body.ux-calm [data-screen="producao"] .section-label {
         <input id="itemSearch" placeholder="lasanha, ravioli, molho..." oninput="searchItem()" autocomplete="off">
       </div>
       <div id="itemPickerList" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- Modal Calculadora de Cesta (Onda 1, in-context a partir de Pedido) -->
+  <div class="modal-overlay" id="cestaCalcModal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Conferir <span class="accent">insumos</span></div>
+      <div class="modal-sub" id="cestaCalcSub">Carregando…</div>
+
+      <div id="cestaCalcItensWrap">
+        <label class="modal-label">Itens do pedido</label>
+        <div id="cestaCalcItensList"></div>
+      </div>
+
+      <div id="cestaCalcResultadoBox" style="display:none;" role="status" aria-live="polite" aria-busy="false">
+        <div id="cestaCalcBadge" style="padding:14px;border-radius:14px;font-weight:700;text-align:center;margin-bottom:12px;"></div>
+        <div id="cestaCalcCustoTotal" style="font-size:13px;color:var(--ink-dim);text-align:center;margin-bottom:10px;"></div>
+
+        <label class="modal-label">Por produto</label>
+        <div id="cestaCalcPorProduto"></div>
+
+        <label class="modal-label">Total consolidado</label>
+        <div id="cestaCalcConsolidado"></div>
+      </div>
+
+      <div class="modal-ctas">
+        <button class="cta-btn" id="cestaCalcBtnFechar" onclick="cestaCalcFechar()">Fechar</button>
+        <button class="cta-btn primary" id="cestaCalcBtnCalcular" onclick="cestaCalcCalcular()">Calcular</button>
+      </div>
     </div>
   </div>
 
@@ -13331,6 +13364,7 @@ function renderKanbanCard(o, col) {
       <div class="k-foot">
         <div class="k-actions">
           <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
+          ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
           <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
           <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
           <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
@@ -16934,6 +16968,326 @@ function calcGerarUuid() {
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
+
+// === Calculadora de Cesta (Onda 1) — in-context a partir de Pedido ===
+// Read-only: calcula consumo de insumos para a cesta do pedido, agrupa por produto
+// e consolida total. Onda 1 entrega so leitura — sem "lista de compras" nem PF.
+let cestaCalcContexto = null; // { tipo: 'draft'|'order', orderId?, label, items: [...] }
+let cestaCalcResultadoAtual = null;
+let produtosComReceitaCacheSet = null; // Set<produtoId> — populado 1x por sessao
+
+async function cestaCalcCarregarCacheReceitas() {
+  if (produtosComReceitaCacheSet !== null) return;
+  try {
+    const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+    const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?limit=200${empresaId ? '&empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, { headers: calcAuthHeaders() });
+    const json = await res.json();
+    const ids = ((json && json.data) || []).map(p => String(p.id));
+    produtosComReceitaCacheSet = new Set(ids);
+  } catch (_) {
+    produtosComReceitaCacheSet = new Set();
+  }
+}
+
+function cestaCalcInstalarObservadorDraft() {
+  const list = document.getElementById('orderItemsList');
+  if (!list) return;
+  const sync = () => {
+    const el = document.getElementById('odsActions');
+    if (!el) return;
+    el.style.display = list.children.length > 0 ? '' : 'none';
+  };
+  try {
+    new MutationObserver(sync).observe(list, { childList: true });
+  } catch (_) {}
+  sync();
+}
+
+async function openCestaCalcFromDraft() {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  const items = (typeof currentOrderItems !== 'undefined' && Array.isArray(currentOrderItems)) ? currentOrderItems : [];
+  if (items.length === 0) { showToast('Adicione itens ao pedido primeiro'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  cestaCalcContexto = {
+    tipo: 'draft',
+    orderId: null,
+    label: 'Pedido em montagem',
+    items: items.map(i => ({
+      produtoId: i.productId || (i.product && i.product.id) || i.id,
+      nome: i.name || (i.product && i.product.name) || 'Item',
+      qty: Number(i.qty || i.quantity || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+async function openCestaCalcFromOrder(orderId) {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  const ordersList = (typeof orders !== 'undefined' && Array.isArray(orders)) ? orders : [];
+  const order = ordersList.find(o => o.id === orderId);
+  if (!order || !Array.isArray(order.items)) { showToast('Pedido nao encontrado'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  const idShort = (order.id || '').slice(-6);
+  cestaCalcContexto = {
+    tipo: 'order',
+    orderId: order.id,
+    label: 'Pedido ' + idShort,
+    items: order.items.map(i => ({
+      produtoId: i.productId || i.product_id || (i.product && i.product.id),
+      nome: i.name || (i.product && i.product.name) || 'Item',
+      qty: Number(i.qty || i.quantity || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+function cestaCalcAbrirModal() {
+  const modal = document.getElementById('cestaCalcModal');
+  const ctx = cestaCalcContexto;
+  if (!ctx) return;
+
+  const semReceitaCount = produtosComReceitaCacheSet
+    ? ctx.items.filter(i => !produtosComReceitaCacheSet.has(String(i.produtoId))).length
+    : 0;
+  const sub = ctx.label + ' · ' + ctx.items.length + ' iten' + (ctx.items.length === 1 ? '' : 's') +
+              (semReceitaCount > 0 ? ' · ' + semReceitaCount + ' sem receita' : '');
+  document.getElementById('cestaCalcSub').textContent = sub;
+
+  const list = document.getElementById('cestaCalcItensList');
+  list.innerHTML = '';
+  ctx.items.forEach(item => {
+    const semReceita = produtosComReceitaCacheSet !== null && !produtosComReceitaCacheSet.has(String(item.produtoId));
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:10px;background:var(--bg-elev);margin-bottom:6px;' + (semReceita ? 'opacity:0.6;' : '');
+    const left = document.createElement('div');
+    left.style.cssText = 'flex:1;min-width:0;';
+    const nm = document.createElement('div');
+    nm.style.cssText = 'font-weight:600;';
+    nm.textContent = item.nome;
+    left.appendChild(nm);
+    if (semReceita) {
+      const sr = document.createElement('div');
+      sr.style.cssText = 'font-size:11px;color:var(--ink-mute);';
+      sr.textContent = 'sem receita';
+      left.appendChild(sr);
+    }
+    const right = document.createElement('div');
+    right.style.cssText = 'font-weight:600;color:var(--ink-dim);font-size:13px;';
+    right.textContent = item.qty + ' ' + item.unidade;
+    row.appendChild(left);
+    row.appendChild(right);
+    list.appendChild(row);
+  });
+
+  document.getElementById('cestaCalcResultadoBox').style.display = 'none';
+  document.getElementById('cestaCalcItensWrap').style.display = '';
+  const btnCalcular = document.getElementById('cestaCalcBtnCalcular');
+  btnCalcular.style.display = '';
+  btnCalcular.disabled = ctx.items.length === 0;
+
+  modal.classList.add('show');
+}
+
+async function cestaCalcCalcular() {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  if (!cestaCalcContexto || cestaCalcContexto.items.length === 0) return;
+
+  const btn = document.getElementById('cestaCalcBtnCalcular');
+  btn.disabled = true;
+
+  const resultBox = document.getElementById('cestaCalcResultadoBox');
+  resultBox.setAttribute('aria-busy', 'true');
+  resultBox.style.display = 'block';
+  const badge = document.getElementById('cestaCalcBadge');
+  badge.textContent = 'Calculando...';
+  badge.style.background = 'var(--bg-elev)';
+  badge.style.color = 'var(--ink)';
+  document.getElementById('cestaCalcPorProduto').innerHTML = '';
+  document.getElementById('cestaCalcConsolidado').innerHTML = '';
+  document.getElementById('cestaCalcCustoTotal').textContent = '';
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular-cesta${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId: lojaId,
+        itens: cestaCalcContexto.items.map(i => ({
+          produtoFinalId: i.produtoId,
+          quantidade: i.qty,
+          unidade: i.unidade
+        }))
+      })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      badge.textContent = msg;
+      badge.style.background = 'rgba(231,104,69,0.15)';
+      badge.style.color = 'var(--accent)';
+      btn.disabled = false;
+      return;
+    }
+    cestaCalcResultadoAtual = json.data;
+    cestaCalcRender(json.data);
+    document.getElementById('cestaCalcItensWrap').style.display = 'none';
+    btn.style.display = 'none';
+  } catch (e) {
+    badge.textContent = 'Erro ao calcular';
+    badge.style.background = 'rgba(231,104,69,0.15)';
+    badge.style.color = 'var(--accent)';
+    btn.disabled = false;
+  } finally {
+    resultBox.setAttribute('aria-busy', 'false');
+  }
+}
+
+function cestaCalcRender(data) {
+  const badge = document.getElementById('cestaCalcBadge');
+  if (data.tudoDisponivel) {
+    badge.textContent = '✓ Tudo certo, pode produzir';
+    badge.style.background = 'rgba(79,191,159,0.15)';
+    badge.style.color = 'var(--basil)';
+  } else {
+    const faltaCount = (data.consolidado || []).filter(c => (c.falta != null && Number(c.falta) > 0) || c.conversaoFalhou).length;
+    badge.textContent = '⚠ Faltam ' + faltaCount + ' insumo' + (faltaCount === 1 ? '' : 's');
+    badge.style.background = 'rgba(231,104,69,0.15)';
+    badge.style.color = 'var(--accent)';
+  }
+
+  const custo = document.getElementById('cestaCalcCustoTotal');
+  if (data.custoEstimadoTotal != null) {
+    const v = Number(data.custoEstimadoTotal);
+    custo.textContent = 'Custo estimado: R$ ' + v.toFixed(2).replace('.', ',');
+  } else {
+    custo.textContent = '';
+  }
+
+  const porProd = document.getElementById('cestaCalcPorProduto');
+  porProd.innerHTML = '';
+  (data.itens || []).forEach(item => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--bg-elev);border-radius:12px;padding:10px 12px;margin-bottom:8px;';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px;';
+    const nm = document.createElement('span');
+    nm.textContent = item.produtoNome;
+    head.appendChild(nm);
+
+    const statusStr = String(item.status || '').toLowerCase();
+    if (statusStr === 'semreceita' || statusStr === '1') {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:11px;color:var(--ink-mute);';
+      tag.textContent = 'sem receita';
+      head.appendChild(tag);
+      card.appendChild(head);
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--ink-mute);';
+      note.textContent = 'Cadastre a composição em Produção > Catálogo.';
+      card.appendChild(note);
+    } else if (statusStr === 'erro' || statusStr === '2') {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:11px;color:var(--accent);';
+      tag.textContent = 'erro';
+      head.appendChild(tag);
+      card.appendChild(head);
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--accent);';
+      note.textContent = item.erro || 'Erro ao calcular';
+      card.appendChild(note);
+    } else {
+      card.appendChild(head);
+      const lista = document.createElement('div');
+      ((item.resultado && item.resultado.insumos) || []).forEach(ins => {
+        lista.appendChild(cestaCalcRenderInsumoLinha(ins));
+      });
+      card.appendChild(lista);
+    }
+    porProd.appendChild(card);
+  });
+
+  const cons = document.getElementById('cestaCalcConsolidado');
+  cons.innerHTML = '';
+  (data.consolidado || []).forEach(c => {
+    cons.appendChild(cestaCalcRenderInsumoLinha({
+      insumoNome: c.insumoNome,
+      quantidadeNecessaria: c.precisa,
+      unidadeReceita: c.unidadeReceita,
+      saldoAtual: c.saldo,
+      unidadeSaldo: c.unidadeSaldo,
+      falta: c.falta,
+      conversaoFalhou: c.conversaoFalhou,
+      aviso: c.aviso
+    }));
+  });
+  if ((data.consolidado || []).length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:12px;color:var(--ink-mute);text-align:center;padding:8px;';
+    empty.textContent = 'Nenhum insumo a consolidar.';
+    cons.appendChild(empty);
+  }
+}
+
+function cestaCalcRenderInsumoLinha(ins) {
+  const row = document.createElement('div');
+  let borderColor = 'var(--basil)';
+  let statusText = 'ok';
+  let statusColor = 'var(--basil)';
+  if (ins.conversaoFalhou) {
+    borderColor = 'var(--gold)';
+    statusText = 'unidade incompativel';
+    statusColor = 'var(--gold)';
+  } else if (ins.falta != null && Number(ins.falta) > 0) {
+    borderColor = 'var(--accent)';
+    statusText = 'faltam ' + Number(ins.falta).toFixed(2).replace('.', ',') + ' ' + (ins.unidadeReceita || '');
+    statusColor = 'var(--accent)';
+  }
+  row.style.cssText = 'padding:8px 10px;border-left:3px solid ' + borderColor + ';background:rgba(0,0,0,0.04);border-radius:0 8px 8px 0;margin-bottom:4px;';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;font-size:13px;';
+  const nm = document.createElement('span');
+  nm.style.cssText = 'font-weight:600;';
+  nm.textContent = ins.insumoNome;
+  const qt = document.createElement('span');
+  qt.style.cssText = 'color:var(--ink-dim);';
+  qt.textContent = Number(ins.quantidadeNecessaria || 0).toFixed(3).replace('.', ',') + ' ' + (ins.unidadeReceita || '');
+  head.appendChild(nm);
+  head.appendChild(qt);
+  row.appendChild(head);
+  const sub = document.createElement('div');
+  sub.style.cssText = 'font-size:11px;color:' + statusColor + ';margin-top:2px;';
+  sub.textContent = statusText;
+  row.appendChild(sub);
+  if (ins.aviso) {
+    const av = document.createElement('div');
+    av.style.cssText = 'font-size:11px;color:var(--gold);margin-top:2px;';
+    av.textContent = ins.aviso;
+    row.appendChild(av);
+  }
+  return row;
+}
+
+function cestaCalcFechar() {
+  document.getElementById('cestaCalcModal').classList.remove('show');
+  cestaCalcContexto = null;
+  cestaCalcResultadoAtual = null;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    cestaCalcInstalarObservadorDraft();
+    cestaCalcCarregarCacheReceitas();
+  });
+}
+
 function setBatchFilter(next) {
   batchFilter = next || 'open';
   document.querySelectorAll('[data-bfilter]').forEach(b => b.classList.toggle('active', b.dataset.bfilter === batchFilter));
