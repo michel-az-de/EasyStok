@@ -21,7 +21,12 @@ public record Pedido
     public DateTime AlteradoEm { get; init; }
     public DateTime? EntreguEm { get; init; }
     public DateTime? CanceladoEm { get; init; }
+    public DateTime? AgendadoParaEm { get; init; }
 
+    public bool IsScheduled => AgendadoParaEm.HasValue;
+    public bool IsAtrasado => AgendadoParaEm.HasValue
+        && AgendadoParaEm.Value < DateTime.UtcNow
+        && Status != "entregue" && Status != "cancelado";
     public decimal Pendente => Math.Max(0m, Total - TotalPago);
     public bool Quitado => TotalPago >= Total && Total > 0;
 }
@@ -69,4 +74,10 @@ public record MobilePedidoSummary
     public string? LastDeviceId { get; init; }
     public string? LastOperatorName { get; init; }
     public bool Linked => ErpPedidoId.HasValue && ErpPedidoId.Value != Guid.Empty;
+    // F5 — agendamento (MVP). NULL = pedido pra agora.
+    public DateTime? ScheduledDeliveryAt { get; init; }
+    public bool IsScheduled => ScheduledDeliveryAt.HasValue;
+    public bool IsAtrasado => ScheduledDeliveryAt.HasValue
+        && ScheduledDeliveryAt.Value < DateTime.UtcNow
+        && Status != "entregue" && Status != "cancelado";
 }

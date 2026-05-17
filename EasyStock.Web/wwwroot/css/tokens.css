@@ -5,6 +5,7 @@
 
 :root {
   /* ----- Color: neutrals (cool gray) ----- */
+  --ink-950: #050B1B;          /* extremo: overlays opacos, sombras */
   --ink-900: #0A1530;          /* texto principal — segue o tom do navy */
   --ink-800: #122042;
   --ink-700: #2A3556;
@@ -52,18 +53,27 @@
   /* ----- Color: status ----- */
   --warn-700: #8A5A00;
   --warn-600: #B57A00;            /* alerta validade próxima */
+  --warn-500: #D89A1A;
+  --warn-400: #E2B854;
+  --warn-300: #ECCC7A;
   --warn-200: #F0DC9A;
   --warn-100: #FBEBC4;
   --warn-50:  #FCF5E0;
 
   --crit-700: #8E2A1E;
   --crit-600: #C03B2A;            /* crítico / vencido / sem estoque */
+  --crit-500: #D45744;
+  --crit-400: #E07566;
+  --crit-300: #E8978A;
   --crit-200: #EFB7AD;
   --crit-100: #F8D8D2;
   --crit-50:  #FBEAE6;
 
   --ok-700: #0E6B3D;
   --ok-600: #18874E;              /* sucesso */
+  --ok-500: #2DA365;
+  --ok-400: #56B883;
+  --ok-300: #8ACAA6;
   --ok-200: #BFE0CC;
   --ok-100: #D6EFDF;
   --ok-50:  #ECF7F0;
@@ -89,11 +99,29 @@
   --r-lg: 14px;
   --r-xl: 20px;
   --r-pill: 999px;
+  /* Semantic aliases (pente fino onda 1 item 30): use --radius-card em vez de
+     escolher tamanho ad-hoc nas views. Cards inconsistentes (8/12/16) era ruido. */
+  --radius-card: var(--r-lg);
+  --radius-control: var(--r-md);
+  --radius-pill: var(--r-pill);
+
+  /* ----- Gap scale (pente fino onda 1 item 36) -----
+     Aliases semanticos sobre --s-* para uso consistente em grids/flex. */
+  --gap-tight: var(--s-2); /* 8px  — listas densas, badges */
+  --gap-base:  var(--s-4); /* 16px — cards, secoes */
+  --gap-loose: var(--s-6); /* 24px — separacao entre blocos grandes */
 
   /* ----- Shadows (cool tone) ----- */
   --shadow-sm: 0 1px 2px rgba(10, 21, 48, 0.06), 0 1px 1px rgba(10, 21, 48, 0.04);
   --shadow-md: 0 4px 12px rgba(10, 21, 48, 0.08), 0 2px 4px rgba(10, 21, 48, 0.04);
   --shadow-lg: 0 16px 40px rgba(10, 21, 48, 0.14), 0 4px 12px rgba(10, 21, 48, 0.06);
+
+  /* ----- Motion (duration + easing) ----- */
+  --motion-fast: 120ms;          /* micro: hover, tap feedback */
+  --motion-base: 200ms;          /* default: modal open, toast slide */
+  --motion-slow: 320ms;          /* large: drawer slide, page transition */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* ----- Spacing scale ----- */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
@@ -277,6 +305,32 @@ html, body {
 .btn-sm { padding: 10px 14px; font-size: 14px; }
 .btn-lg { padding: 18px 28px; font-size: 17px; }
 
+/* loading state — mantem texto, prefixa spinner inline */
+.btn[aria-busy="true"] {
+  pointer-events: none;
+  cursor: progress;
+}
+.btn[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin var(--motion-slow) linear infinite;
+  flex: none;
+}
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* touch target — viewports estreitos garantem 44x44px */
+@media (max-width: 640px) {
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+}
+
 /* ----- Cards ----- */
 .card {
   background: var(--bg-surface);
@@ -314,6 +368,100 @@ html, body {
 
 /* dot indicator */
 .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; display: inline-block; }
+
+/* ----- Form field primitive (consumido por _FormField.cshtml) ----- */
+.ui-form-field { display: flex; flex-direction: column; gap: 6px; }
+.ui-form-field__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ui-form-field__required { color: var(--crit-600); font-weight: 600; }
+.ui-form-field__input { display: flex; flex-direction: column; }
+.ui-form-field__helper { font-size: 13px; color: var(--text-muted); margin: 0; }
+.ui-form-field__error {
+  font-size: 13px;
+  color: var(--crit-700);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-form-field--error .ui-field,
+.ui-form-field--error input,
+.ui-form-field--error select,
+.ui-form-field--error textarea {
+  border-color: var(--crit-500);
+  box-shadow: 0 0 0 1px var(--crit-500);
+}
+.ui-form-field--error .ui-form-field__label { color: var(--crit-700); }
+
+/* ----- KDS status — leitura a 2m de distancia precisa de maiusculo (visual, nao dado) ----- */
+.kds-status {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* ----- Tooltip primitive (CSS-only via [data-tooltip]) ----- */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--ink-900);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: var(--z-dropdown);
+  animation: tooltip-fade var(--motion-base) var(--ease-out) 400ms forwards;
+  opacity: 0;
+}
+@keyframes tooltip-fade {
+  to { opacity: 1; }
+}
+.ui-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--ink-100);
+  color: var(--ink-700);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: help;
+  user-select: none;
+}
+.ui-tooltip:hover { background: var(--ink-200); color: var(--ink-900); }
+
+/* ----- Form actions sticky — rodape pegajoso em forms longos ----- */
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-soft);
+  padding: var(--s-4);
+  display: flex;
+  gap: var(--s-3);
+  justify-content: flex-end;
+  align-items: center;
+  margin: var(--s-6) calc(var(--s-6) * -1) 0;
+  z-index: var(--z-sticky);
+  box-shadow: 0 -4px 8px -4px rgba(10, 21, 48, 0.06);
+}
+.form-actions-sticky .form-actions-sticky__cancel { margin-right: auto; }
 
 /* ----- Logo (cube + wordmark) ----- */
 .logo {

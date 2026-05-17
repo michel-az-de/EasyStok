@@ -1,7 +1,7 @@
 // Dashboard: splash com info markdown + grid de 8 módulos.
 
 import { modulesWithCounts } from '../modules-config.js';
-import { md, escapeHtml } from '../components/markdown.js';
+import { escapeHtml } from '../components/markdown.js';
 import { icon } from '../components/icons.js';
 import { renderHud } from '../components/hud.js';
 
@@ -20,26 +20,43 @@ export function renderDashboard(root, state) {
             <section class="es-splash">
                 <div class="es-splash-grid">
                     <aside class="es-splash-headline">
-                        <span class="es-section-tag">// runtime</span>
+                        <span class="es-section-tag">// visão geral</span>
                         <h1>${escapeHtml(info.title || 'EasyStock API')} ${cacheBadge}</h1>
-                        <p class="es-splash-version">${formatVersion(info.version)}</p>
-                        <dl class="es-splash-stats">
-                            <div><dt>endpoints</dt><dd>${counts.endpoints}</dd></div>
-                            <div><dt>paths</dt><dd>${counts.paths}</dd></div>
-                            <div><dt>tags</dt><dd>${counts.tags}</dd></div>
-                            <div><dt>schemas</dt><dd>${counts.schemas}</dd></div>
-                        </dl>
+                        <p class="es-splash-meta">${mods.filter(m => m.count).length} módulos · ${counts.tags} tags · ${formatVersion(info.version)}</p>
                     </aside>
-                    <article class="es-splash-doc es-md">
-                        ${md(info.description || '_(sem descrição)_')}
-                    </article>
+                    <div class="es-quickstart">
+                        <span class="es-section-tag">// quick start</span>
+                        <ol class="es-qs-steps">
+                            <li>
+                                <span class="es-qs-num">01</span>
+                                <span class="es-qs-body">
+                                    <strong>Registre empresa e usuário</strong>
+                                    <code>POST /api/empresas/registrar</code>
+                                </span>
+                            </li>
+                            <li>
+                                <span class="es-qs-num">02</span>
+                                <span class="es-qs-body">
+                                    <strong>Faça login e copie o token</strong>
+                                    <code>POST /api/auth/login</code>
+                                </span>
+                            </li>
+                            <li>
+                                <span class="es-qs-num">03</span>
+                                <span class="es-qs-body">
+                                    <strong>Clique em Authorize e explore</strong>
+                                    <a href="#/m/auth" data-nav class="es-qs-cta">Ir para Auth →</a>
+                                </span>
+                            </li>
+                        </ol>
+                    </div>
                 </div>
             </section>
             <section class="es-modules">
                 <header class="es-section-header">
-                    <span class="es-section-tag">// modules</span>
-                    <h2>Selecione um módulo</h2>
-                    <p>${spec.byTag.size} tags agrupadas em ${mods.filter(m => m.count).length} módulos ativos. Use Ctrl+K pra buscar direto.</p>
+                    <span class="es-section-tag">// módulos</span>
+                    <h2>Escolha um módulo para explorar</h2>
+                    <p>${spec.byTag.size} tags agrupadas em ${mods.filter(m => m.count).length} módulos ativos. Use Ctrl+K para buscar por endpoints, schemas e tags.</p>
                 </header>
                 <div class="es-modules-grid">
                     ${mods.map((m, i) => renderCard(m, i)).join('')}
@@ -70,7 +87,6 @@ function renderCard(m, i) {
             <div class="es-module-meta">
                 <span class="es-module-count">${m.count}</span>
                 <span class="es-module-count-label">endpoints</span>
-                ${m.requiresAuth ? '<span class="es-badge es-badge-auth">AUTH</span>' : ''}
             </div>
             <span class="es-module-arrow" aria-hidden="true">${icon('chevron', 18)}</span>
         </a>

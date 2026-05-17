@@ -53,10 +53,10 @@ export function renderTryIt(spec, ep, state) {
     // Injeta auto-headers que não foram declarados no swagger
     const extraHeaders = [];
     if (requiresIdempotency(ep) && !declaredHeaders.find(p => (p.name || '').toLowerCase() === 'x-idempotency-key')) {
-        extraHeaders.push({ name: 'X-Idempotency-Key', in: 'header', schema: { type: 'string', format: 'uuid' }, description: 'Idempotência (gerada auto se vazio)', _auto: true });
+        extraHeaders.push({ name: 'X-Idempotency-Key', in: 'header', schema: { type: 'string', format: 'uuid' }, description: 'Idempotência (gerada automaticamente se vazio)', _auto: true });
     }
     if (!declaredHeaders.find(p => (p.name || '').toLowerCase() === 'x-correlation-id')) {
-        extraHeaders.push({ name: 'X-Correlation-Id', in: 'header', schema: { type: 'string', format: 'uuid' }, description: 'Correlation ID (gerado auto)', _auto: true });
+        extraHeaders.push({ name: 'X-Correlation-Id', in: 'header', schema: { type: 'string', format: 'uuid' }, description: 'Correlation ID (gerado automaticamente)', _auto: true });
     }
     const headerParams = declaredHeaders;
 
@@ -68,17 +68,17 @@ export function renderTryIt(spec, ep, state) {
         <div class="es-tryit" data-ep-id="${escapeHtml(ep.id)}">
             ${showAuthWarn ? authBanner() : ''}
             <form class="es-tryit-form" id="es-tryit-form" novalidate>
-                ${pathParams.length ? renderParamsBlock('Path parameters', pathParams) : ''}
-                ${queryParams.length ? renderParamsBlock('Query parameters', queryParams) : ''}
+                ${pathParams.length ? renderParamsBlock('Parâmetros de path', pathParams) : ''}
+                ${queryParams.length ? renderParamsBlock('Parâmetros de query', queryParams) : ''}
                 ${(headerParams.length || extraHeaders.length) ? renderParamsBlock('Headers', [...headerParams, ...extraHeaders]) : ''}
                 ${ep.requestBody ? renderBodyBlock(initialBody) : ''}
                 <div class="es-tryit-actions">
                     <button type="submit" class="es-btn es-btn-fire" id="es-tryit-fire">
-                        ${icon('play', 14)} <span>FIRE</span>
+                        ${icon('play', 14)} <span>EXECUTAR</span>
                     </button>
                     <span class="es-tryit-method es-method es-method-${ep.method.toLowerCase()}">${ep.method}</span>
                     <code class="es-tryit-url" id="es-tryit-url">${escapeHtml(ep.path)}</code>
-                    <span class="es-tryit-hint">enter pra disparar</span>
+                    <span class="es-tryit-hint">Enter para executar</span>
                 </div>
             </form>
             <section class="es-tryit-result" id="es-tryit-result" aria-live="polite" hidden></section>
@@ -91,10 +91,10 @@ function authBanner() {
         <div class="es-tryit-banner es-tryit-banner-auth">
             <span class="es-tryit-banner-icon">${icon('lock', 18)}</span>
             <div>
-                <strong>Autenticação JWT obrigatória.</strong>
-                <span>Esse endpoint requer token bearer.</span>
+                <strong>Autenticação necessária.</strong>
+                <span>Este endpoint requer autenticação Bearer.</span>
             </div>
-            <button type="button" class="es-btn es-btn-primary es-btn-sm" data-action="open-login">${icon('lock', 14)} <span>Login</span></button>
+            <button type="button" class="es-btn es-btn-primary es-btn-sm" data-action="open-login">${icon('lock', 14)} <span>Fazer login</span></button>
         </div>
     `;
 }
@@ -106,7 +106,7 @@ function renderBodyBlock(initialBody) {
             <textarea class="es-tryit-body" name="__body" spellcheck="false" autocomplete="off" data-default="${escapeHtml(initialBody)}">${escapeHtml(initialBody)}</textarea>
             <div class="es-tryit-body-actions">
                 <button type="button" class="es-btn es-btn-ghost es-btn-sm" data-action="format-body">Formatar</button>
-                <button type="button" class="es-btn es-btn-ghost es-btn-sm" data-action="reset-body">Restaurar exemplo</button>
+                <button type="button" class="es-btn es-btn-ghost es-btn-sm" data-action="reset-body">Restaurar</button>
                 <span class="es-tryit-bytes" id="es-tryit-bytes">${initialBody ? new Blob([initialBody]).size + ' bytes' : ''}</span>
             </div>
         </fieldset>
@@ -190,7 +190,7 @@ export async function executeRequest(ep, state, formData) {
     let bodyText = null;
     if (ep.requestBody && formData.body && formData.body.trim()) {
         try { JSON.parse(formData.body); }
-        catch (e) { throw new Error('Body inválido — não é JSON: ' + e.message); }
+        catch (e) { throw new Error('JSON inválido: ' + e.message); }
         headers['Content-Type'] = 'application/json';
         bodyText = formData.body;
     }
@@ -201,7 +201,7 @@ export async function executeRequest(ep, state, formData) {
     try {
         resp = await fetch(url, { method: ep.method, headers, body: bodyText });
     } catch (e) {
-        throw new Error(`Falha de rede: ${e.message || e}`);
+        throw new Error(`Erro de rede: ${e.message || e}`);
     }
     const elapsed = Math.round(performance.now() - start);
 
@@ -247,7 +247,7 @@ export function renderResult(target, result) {
         : (result.responseBody || '');
     let truncatedNote = '';
     if (bodyText.length > MAX_BODY_RENDER) {
-        truncatedNote = `<p class="es-mute" style="font-size:11px;padding:0 var(--sp-4)">⚠ truncado em ${MAX_BODY_RENDER} chars · response total ${bodyText.length}</p>`;
+        truncatedNote = `<p class="es-mute" style="font-size:11px;padding:0 var(--sp-4)">Resposta truncada em ${MAX_BODY_RENDER.toLocaleString('pt-BR')} caracteres (total: ${bodyText.length.toLocaleString('pt-BR')})</p>`;
         bodyText = bodyText.slice(0, MAX_BODY_RENDER) + '\n…';
     }
     const bodyRendered = result.responseJson != null
@@ -261,26 +261,26 @@ export function renderResult(target, result) {
                 <span class="es-tryit-result-status">${result.status} ${escapeHtml(result.statusText || '')}</span>
                 <span class="es-tryit-result-elapsed">${result.elapsed}ms</span>
                 <code class="es-tryit-result-url">${escapeHtml(result.method)} ${escapeHtml(result.url)}</code>
-                <button type="button" class="es-btn es-btn-ghost es-btn-sm" data-action="copy-response">${icon('copy', 12)} <span>copy</span></button>
+                <button type="button" class="es-btn es-btn-ghost es-btn-sm" data-action="copy-response">${icon('copy', 12)} <span>copiar</span></button>
             </header>
             ${is401 ? `
                 <div class="es-tryit-banner es-tryit-banner-auth">
                     <span class="es-tryit-banner-icon">${icon('alert', 18)}</span>
-                    <div><strong>401 — token expirado ou inválido.</strong> Refaça o login pra continuar.</div>
+                    <div><strong>Token expirado ou inválido.</strong> Refaça o login para continuar.</div>
                     <button type="button" class="es-btn es-btn-primary es-btn-sm" data-action="open-login">${icon('lock', 14)} <span>Refazer login</span></button>
                 </div>
             ` : ''}
             <details class="es-tryit-result-section" open>
-                <summary>Response body</summary>
+                <summary>Corpo da resposta</summary>
                 ${truncatedNote}
                 ${bodyRendered}
             </details>
             <details class="es-tryit-result-section">
-                <summary>Response headers <small>(${Object.keys(result.responseHeaders).length})</small></summary>
+                <summary>Headers da resposta <small>(${Object.keys(result.responseHeaders).length})</small></summary>
                 <dl class="es-headers-list">${headersList}</dl>
             </details>
             <details class="es-tryit-result-section">
-                <summary>Request enviado</summary>
+                <summary>Requisição enviada</summary>
                 <dl class="es-headers-list">
                     ${Object.entries(result.requestHeaders).map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('')}
                 </dl>

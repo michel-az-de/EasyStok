@@ -8,6 +8,9 @@ using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
+using EasyStock.Worker.DependencyInjection;
+using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -85,10 +88,32 @@ builder.Services
 // SlaMonitorService monitora tickets e gera EventoNotificacao — pertence ao Worker mesmo.
 builder.Services.AddHostedService<SlaMonitorService>();
 
+// Lembretes de pedidos agendados (mobile_orders.scheduled_delivery_at):
+// no dia, 1h antes, 10min antes. Idempotencia via colunas agendamento_notificado_*_em.
+builder.Services.AddHostedService<AgendamentoNotificacaoService>();
+
+// Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets
+// quando >threshold falhas consecutivas. Idempotencia via tabela
+// endpoint_health_state + cooldown 24h.
+builder.Services.AddHttpClient("endpoint-health");
+builder.Services.AddHostedService<EndpointHealthMonitorService>();
+
 // Outbox de eventos de integração externa (F4.c) — consome
 // OutboxEventoIntegracao e despacha via handlers registrados.
 // Pode ser desligado via Integration:Outbox:Enabled=false (default true).
 builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
+
+// Motor de relatórios assíncrono (PR-C0 — ADR-R02/R03/R04/R06/R07)
+// Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
+// WorkerCurrentUserAccessor (override ADR-R06) + ReportExecutionContext (AsyncLocal).
+builder.Services.AddReportingWorker();
+
+// Modulo Fiscal NFC-e (F4) — Polly pipelines + adapter Focus NFe + jobs background
+builder.Services.AddEasyStockIntegrationResilience();
+builder.Services.AddFocusNFeAdapter(builder.Configuration);
+builder.Services.AddDataProtection();
+builder.Services.AddHostedService<ReprocessarContingenciaBackgroundService>();
+builder.Services.AddHostedService<RenovacaoCertificadoA1BackgroundService>();
 
 // Health checks
 builder.Services.AddHealthChecks();

@@ -1,8 +1,12 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Helpdesk;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.UseCases.TicketSuporte
 {
@@ -10,10 +14,12 @@ namespace EasyStock.Application.UseCases.TicketSuporte
 
     public sealed class ResponderTicketClienteUseCase(
         IClienteTicketRepository ticketRepo,
+        ISlaResolver slaResolver,
+        INotificadorService notificador,
         IUnitOfWork unitOfWork,
         ICurrentUserAccessor currentUser)
     {
-        public async Task ExecuteAsync(ResponderTicketClienteCommand cmd)
+        public async Task ExecuteAsync(ResponderTicketClienteCommand cmd, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(cmd.Resposta) || cmd.Resposta.Length > 5000)
                 throw new UseCaseValidationException("Resposta inválida");
@@ -26,21 +32,72 @@ namespace EasyStock.Application.UseCases.TicketSuporte
             if (ticket == null)
                 throw new KeyNotFoundException("Ticket não encontrado");
 
-            ticket.Mensagens.Add(new AdminTicketMensagem
-            {
-                Id = Guid.NewGuid(),
-                TicketId = cmd.TicketId,
-                Conteudo = cmd.Resposta,
-                AutorId = currentUser.UsuarioId,
-                IsAdmin = false,
-                CriadoEm = DateTime.UtcNow
-            });
+            var agora = DateTime.UtcNow;
+            var statusAntes = ticket.Status;
 
+            ticket.Mensagens.Add(AdminTicketMensagem.Criar(
+                ticketId: cmd.TicketId,
+                autorId: currentUser.UsuarioId,
+                conteudo: cmd.Resposta,
+                isAdmin: false));
+            ticket.AlteradoEm = agora;
+
+            // Reabertura: cliente respondendo a ticket Resolvido/Fechado reabre o
+            // atendimento. SLA precisa ser recalculado — senao prazo antigo (ja
+            // estourado) faria ticket nascer "violado" no SlaMonitor.
+            var reaberto = false;
             if (ticket.Status is TicketStatus.Resolvido or TicketStatus.Fechado)
+            {
                 ticket.Status = TicketStatus.Aberto;
+                ticket.ResolvidoEm = null;
+                ticket.SlaRespostaViolado = false;
+                ticket.SlaResolucaoViolado = false;
+                ticket.UltimoAlerta50PctEm = null;
+                ticket.UltimoAlerta80PctEm = null;
+                ticket.PrimeiraRespostaEm = null;
+
+                var sla = await slaResolver.ResolverAsync(ticket.EmpresaId, ticket.Prioridade, agora, ct);
+                ticket.PrazoResposta = sla.PrazoResposta;
+                ticket.PrazoResolucao = sla.PrazoResolucao;
+                reaberto = true;
+            }
 
             await ticketRepo.UpdateAsync(ticket);
+            await ticketRepo.AddHistoricoAsync(TicketHistorico.Criar(
+                ticketId: ticket.Id,
+                autorId: currentUser.UsuarioId,
+                acao: TicketAcaoHistorico.Comentario,
+                metadadosJson: JsonSerializer.Serialize(new
+                {
+                    porCliente = true,
+                    reaberto,
+                    statusAntes = statusAntes.ToString()
+                })));
+
+            if (reaberto)
+            {
+                await ticketRepo.AddHistoricoAsync(TicketHistorico.Criar(
+                    ticketId: ticket.Id,
+                    autorId: currentUser.UsuarioId,
+                    acao: TicketAcaoHistorico.StatusAlterado,
+                    valorAntes: statusAntes.ToString(),
+                    valorDepois: ticket.Status.ToString()));
+            }
+
             await unitOfWork.CommitAsync();
+
+            await notificador.PublicarEventoAsync(
+                TipoEventoNotificacao.TicketRespondidoCliente,
+                ticket.EmpresaId,
+                usuarioDestinoId: ticket.AtendenteId,
+                payloadJson: JsonSerializer.Serialize(new
+                {
+                    ticketId = ticket.Id,
+                    titulo = ticket.Titulo,
+                    reaberto,
+                    autorId = currentUser.UsuarioId
+                }),
+                ct: ct);
         }
     }
 }

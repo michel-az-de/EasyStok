@@ -127,13 +127,45 @@
 .btn-danger:hover  { background: rgba(239, 68, 68, .22); }
 .btn-danger:active { transform: scale(0.97); }
 
+/* Ação reversível (ex: Suspender — pode Reativar depois). */
+.btn-warning {
+    background:    rgba(240, 184, 74, .12);
+    color:         var(--es-gold);
+    border:        1px solid rgba(240, 184, 74, .30);
+    padding:       0.4rem 0.8rem;
+    border-radius: var(--es-radius-sm);
+    font-size:     0.8rem;
+    font-weight:   600;
+    transition:    background var(--es-transition), transform var(--es-transition);
+}
+.btn-warning:hover  { background: rgba(240, 184, 74, .22); }
+.btn-warning:active { transform: scale(0.97); }
+
+/* Ação irreversível total (ex: Anonimizar — não tem desfazer). */
+.btn-destructive {
+    background:    #dc2626;
+    color:         #fff;
+    border:        1px solid #b91c1c;
+    padding:       0.4rem 0.8rem;
+    border-radius: var(--es-radius-sm);
+    font-size:     0.8rem;
+    font-weight:   700;
+    transition:    background var(--es-transition), transform var(--es-transition);
+}
+.btn-destructive:hover  { background: #b91c1c; }
+.btn-destructive:active { transform: scale(0.97); }
+
 /* Estado :disabled — feedback visual consistente em todos os botões. */
 .btn-primary:disabled,
 .btn-secondary:disabled,
 .btn-danger:disabled,
+.btn-warning:disabled,
+.btn-destructive:disabled,
 .btn-primary[disabled],
 .btn-secondary[disabled],
-.btn-danger[disabled] {
+.btn-danger[disabled],
+.btn-warning[disabled],
+.btn-destructive[disabled] {
     opacity:        0.5;
     cursor:         not-allowed;
     pointer-events: none;

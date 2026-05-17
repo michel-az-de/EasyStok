@@ -1,0 +1,18 @@
+@*
+    Tooltip CSS-only — adicione data-tooltip="texto" em qualquer elemento e ja funciona.
+    Este partial e um wrapper documentado para casos como icones de ajuda.
+
+    Exemplo:
+    <partial name="_Tooltip" model='new { Text = "Validade nominal — sera estendida ate domingo", Content = "?" }' />
+
+    Para casos diretos basta adicionar data-tooltip em qualquer elemento existente:
+    <button data-tooltip="Atalho: Ctrl+S">Salvar</button>
+*@
+@model dynamic
+@{
+    var text = (string?)Model.Text ?? "";
+    var content = (string?)(Model.Content) ?? "?";
+}
+<span class="ui-tooltip" tabindex="0" data-tooltip="@text" aria-label="@text" role="tooltip">
+    @Html.Raw(content)
+</span>

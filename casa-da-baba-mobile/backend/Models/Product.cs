@@ -36,6 +36,17 @@ public class Product
     /// <summary>Quantidade atual disponivel em estoque (unidades).</summary>
     public int Stock { get; set; }
 
+    /// <summary>
+    /// Unidade padrão da produção: "gramas" ou "unidades". Quando "gramas",
+    /// a UI de cadastro de produção pede gramagem e a visão consolidada
+    /// agrega WeightGrams; quando "unidades", agrega Qty.
+    /// </summary>
+    [MaxLength(16)]
+    public string? DefaultUnit { get; set; }
+
+    /// <summary>Gramagem padrão sugerida ao cadastrar produção (ex: 300).</summary>
+    public int? DefaultGrams { get; set; }
+
     /// <summary>True se foi criado ad-hoc pelo app e ainda nao foi revisado.</summary>
     public bool IsCustom { get; set; }
 

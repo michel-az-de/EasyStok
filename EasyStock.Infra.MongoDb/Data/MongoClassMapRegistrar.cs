@@ -102,11 +102,22 @@ internal static class MongoClassMapRegistrar
 
     private sealed class QuantidadeSerializer : SerializerBase<Quantidade>
     {
-        public override Quantidade Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args) =>
-            Quantidade.From(context.Reader.ReadInt32());
+        public override Quantidade Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+        {
+            // Backward-compatible: existing documents stored as Int32; new writes use Decimal128.
+            var bsonType = context.Reader.GetCurrentBsonType();
+            return bsonType switch
+            {
+                BsonType.Int32     => Quantidade.From((decimal)context.Reader.ReadInt32()),
+                BsonType.Int64     => Quantidade.From((decimal)context.Reader.ReadInt64()),
+                BsonType.Double    => Quantidade.From((decimal)context.Reader.ReadDouble()),
+                BsonType.Decimal128 => Quantidade.From((decimal)context.Reader.ReadDecimal128()),
+                _                  => Quantidade.From((decimal)context.Reader.ReadInt32()),
+            };
+        }
 
         public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, Quantidade value) =>
-            context.Writer.WriteInt32(value.Value);
+            context.Writer.WriteDecimal128(new MongoDB.Bson.Decimal128(value.Value));
     }
 
     private sealed class DinheiroSerializer : SerializerBase<Dinheiro>

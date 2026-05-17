@@ -43,8 +43,9 @@
                         var sClass = item.Status?.ToLower() switch
                         {
                             "ok" or "normal" => "badge-ok",
-                            "critico" or "crítico" => "badge-critical",
-                            "parado" => "badge-slow",
+                            "critico" or "crítico" or "critical" => "badge-critical",
+                            "esgotado" => "badge-warn",
+                            "parado" or "slow" => "badge-slow",
                             _ => "badge-warn"
                         };
                     }

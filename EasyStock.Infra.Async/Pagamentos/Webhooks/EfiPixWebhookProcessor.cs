@@ -43,7 +43,9 @@ public sealed class EfiPixWebhookProcessor(
         JsonElement payload;
         try
         {
-            payload = JsonDocument.Parse(rawBody).RootElement;
+            // Clone libera o JsonDocument (e o ArrayPool interno) mantendo o payload acessivel.
+            using var doc = JsonDocument.Parse(rawBody);
+            payload = doc.RootElement.Clone();
         }
         catch (JsonException jx)
         {

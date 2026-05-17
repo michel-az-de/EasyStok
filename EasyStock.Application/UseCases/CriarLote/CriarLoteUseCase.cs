@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Lotes;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using LoteEntity = EasyStock.Domain.Entities.Lote;
 
@@ -37,6 +38,7 @@ public sealed record CriarLoteCommand(
 /// </summary>
 public class CriarLoteUseCase(
     ILoteRepository repo,
+    IProdutoRepository produtoRepo,
     IUnitOfWork uow,
     ILogger<CriarLoteUseCase> logger)
 {
@@ -71,10 +73,41 @@ public class CriarLoteUseCase(
 
         if (cmd.Itens != null)
         {
+            // C2 (RDC 727/2022): consulta tipo de embalagem dos produtos referenciados
+            // em UMA query, para validar peso obrigatorio condicional. Itens com
+            // ProdutoId null nao podem existir (ver guard abaixo - R1).
+            var produtoIds = cmd.Itens
+                .Where(i => i.ProdutoId.HasValue)
+                .Select(i => i.ProdutoId!.Value)
+                .Distinct()
+                .ToList();
+            var tipoEmbalagemMap = produtoIds.Count > 0
+                ? await produtoRepo.GetTipoEmbalagemMapAsync(cmd.EmpresaId, produtoIds)
+                : new Dictionary<Guid, TipoEmbalagem>();
+
             foreach (var input in cmd.Itens)
             {
                 if (input.Quantidade <= 0)
                     throw new UseCaseValidationException("Quantidade deve ser maior que zero.");
+
+                if (string.IsNullOrWhiteSpace(input.Nome))
+                    throw new UseCaseValidationException("Nome do item é obrigatório.");
+
+                // R1: ProdutoId obrigatório — sem vínculo, não há como validar
+                // TipoEmbalagem e o bypass silencioso da RDC 727 fica possível.
+                if (!input.ProdutoId.HasValue)
+                    throw new UseCaseValidationException(
+                        $"Item '{input.Nome}' precisa estar vinculado a um produto cadastrado.");
+
+                // R5: peso obrigatório APENAS quando produto é Embalado (RDC 727/2022).
+                if (tipoEmbalagemMap.TryGetValue(input.ProdutoId.Value, out var tipoEmb)
+                    && tipoEmb == TipoEmbalagem.Embalado
+                    && (!input.PesoG.HasValue || input.PesoG.Value <= 0))
+                {
+                    throw new UseCaseValidationException(
+                        $"Peso por unidade obrigatório para o item '{input.Nome}' " +
+                        $"(produto está marcado como Embalado — RDC 727/2022).");
+                }
 
                 var expira = input.ValidadeDias.HasValue ? lote.DataProducao.AddDays(input.ValidadeDias.Value) : (DateTime?)null;
                 lote.Itens.Add(new LoteItem

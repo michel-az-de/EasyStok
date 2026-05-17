@@ -49,6 +49,10 @@ public static partial class ServiceCollectionExtensions
         // LGPD operacional (admin dispara em nome do cliente)
         services.AddScoped<EasyStock.Application.UseCases.Admin.AnonimizarUsuarioPorAdmin.AnonimizarUsuarioPorAdminUseCase>();
 
+        // Cadastro manual via back-office (operador SuperAdmin)
+        services.AddScoped<EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin.CriarTenantPorAdminUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Admin.CriarUsuarioTenantPorAdmin.CriarUsuarioTenantPorAdminUseCase>();
+
         return services;
     }
 }

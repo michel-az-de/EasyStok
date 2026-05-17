@@ -5,7 +5,7 @@
 }
 
 <div class="flex items-center justify-between mb-6" x-data="{ modalNovo: false }">
-    <div class="text-es-ink-mute text-sm">@Model.Planos.Count() plano(s)</div>
+    <div class="text-es-ink-mute text-sm">@(Model.Planos.Count() == 1 ? "1 plano" : $"{Model.Planos.Count()} planos")</div>
     <button type="button" @@click="modalNovo = true" class="btn-primary">+ Novo Plano</button>
 
     <!-- Modal novo plano -->
@@ -78,7 +78,7 @@
                     <div class="flex items-center gap-3 mb-1">
                         <h3 class="text-es-ink font-semibold">@nome</h3>
                         <span class="status-badge @(ativo ? "badge-ativa" : "badge-suspensa")">@(ativo ? "Ativo" : "Inativo")</span>
-                        <span class="text-es-ink-mute text-xs">@totalTenants tenant(s)</span>
+                        <span class="text-es-ink-mute text-xs">@totalTenants @(totalTenants == 1 ? "tenant" : "tenants")</span>
                     </div>
                     <div class="text-es-ink-dim text-sm">@descricao</div>
                     <div class="flex gap-4 mt-2 text-xs text-es-ink-mute">
@@ -100,9 +100,20 @@
                 <form method="post" asp-page-handler="Toggle" class="inline">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" value="@pid" />
-                    <button type="submit" class="@(ativo ? "btn-danger" : "btn-primary") text-sm">
-                        @(ativo ? "Desativar" : "Ativar")
-                    </button>
+                    @if (ativo && totalTenants > 0)
+                    {
+                        <button type="button" disabled
+                                class="btn-danger text-sm opacity-50 cursor-not-allowed"
+                                title="Não é possível desativar: @totalTenants @(totalTenants == 1 ? "tenant ativo" : "tenants ativos") neste plano">
+                            Desativar
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="@(ativo ? "btn-danger" : "btn-primary") text-sm">
+                            @(ativo ? "Desativar" : "Ativar")
+                        </button>
+                    }
                 </form>
             </div>
 

@@ -4,6 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Version>1.10.0</Version>
+    <AssemblyVersion>1.10.0.0</AssemblyVersion>
+    <FileVersion>1.10.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +30,16 @@
   <Target Name="TailwindBuild" BeforeTargets="BeforeBuild" Inputs="@(TailwindInputs)" Outputs="wwwroot/css/tailwind.dist.css" Condition="'$(SkipTailwind)' != 'true'">
     <Message Text="Building Tailwind CSS..." Importance="high" />
     <Exec Command="npm run css:build" />
+  </Target>
+
+  <!-- Sync etiqueta assets from PWA (source of truth) to Web -->
+  <ItemGroup>
+    <EtiquetaAssets Include="..\EasyStock.Api\wwwroot\pwa\etiqueta\**\*.*" />
+  </ItemGroup>
+  <Target Name="CopyEtiquetaAssets" BeforeTargets="Build">
+    <Copy SourceFiles="@(EtiquetaAssets)"
+          DestinationFolder="wwwroot\etiqueta\%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

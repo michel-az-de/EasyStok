@@ -62,7 +62,7 @@ public class FornecedorUseCasesTests
 
         var empresaId = Guid.NewGuid();
         var fornecedorId = Guid.NewGuid();
-        fornecedorRepository.GetByIdAsync(fornecedorId).Returns(new Fornecedor
+        fornecedorRepository.GetByIdAsync(empresaId, fornecedorId).Returns(new Fornecedor
         {
             Id = fornecedorId,
             EmpresaId = empresaId,

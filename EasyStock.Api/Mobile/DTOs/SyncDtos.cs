@@ -25,7 +25,14 @@ public record MutationDto(string Id, string DeviceId, string Type, JsonElement P
 /// </summary>
 public record SyncPushResponse(List<string> AcceptedIds, List<SyncConflict>? Rejected = null);
 
-public record SyncConflict(string MutationId, string Reason);
+/// <summary>
+/// Mutation rejeitada. <c>Reason</c> tem prefixo: "conflict:..." (last-write-loser),
+/// "migrate:N" (schema antigo, PWA precisa transformar pra v{N}), ou texto livre
+/// pra outros erros. <c>WinningPayload</c> (C3): quando reason e' "conflict:..."
+/// e existe a versao server vencedora, vai aqui — PWA exibe diff visual ao operador
+/// (versao local x versao server) antes de sobrescrever.
+/// </summary>
+public record SyncConflict(string MutationId, string Reason, JsonElement? WinningPayload = null);
 
 /// <summary>
 /// Resposta do pull: mudanças feitas no servidor ou por outros devices

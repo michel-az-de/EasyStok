@@ -116,6 +116,38 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// C4 — Notifica todos devices da mesma loja (exceto o device origem) que
+    /// um pedido transicionou pro status "pronto". PWA escuta e dispara
+    /// notification API (web/native) pra alertar o garcom imediatamente,
+    /// sem esperar a tela de pedidos refrescar via polling.
+    /// </summary>
+    public Task NotifyOrderReadyAsync(
+        Guid? empresaId,
+        Guid? lojaId,
+        string originDeviceId,
+        string orderId,
+        string? clientName,
+        decimal total,
+        int itemCount)
+    {
+        if (!lojaId.HasValue) return Task.CompletedTask;
+        var data = JsonSerializer.Serialize(new
+        {
+            type = "order.ready",
+            orderId,
+            clientName,
+            total,
+            itemCount,
+            originDeviceId,
+            serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        });
+        Broadcast(slot =>
+            slot.LojaId == lojaId &&
+            slot.DeviceId != originDeviceId, data);
+        return Task.CompletedTask;
+    }
+
     private void Broadcast(Func<ListenerSlot, bool> predicate, string data)
     {
         var sent = 0;

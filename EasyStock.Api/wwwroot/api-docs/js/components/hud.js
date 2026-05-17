@@ -29,19 +29,19 @@ export function renderHud(state) {
                 <kbd>Ctrl K</kbd>
             </button>
             <nav class="es-hud-nav" aria-label="Status">
-                <button class="es-hud-chip" id="es-hud-auth" data-active="${!!auth?.token}" type="button" title="${auth?.token ? 'Logado · clique pra sair' : 'Login JWT'}">
+                <button class="es-hud-chip" id="es-hud-auth" data-active="${!!auth?.token}" type="button" title="${auth?.token ? 'Logado — clique para sair' : 'Fazer login'}">
                     <span>${authText}</span>
                 </button>
-                <button class="es-hud-icon" id="es-hud-theme" type="button" title="Trocar tema (Ctrl+L)" aria-label="Tema ${theme}">
+                <button class="es-hud-icon" id="es-hud-theme" type="button" title="Alternar tema (Ctrl+L)" aria-label="Tema ${theme}">
                     ${icon(themeLabel, 18)}
                 </button>
                 <button class="es-hud-icon" id="es-hud-sound" type="button" data-active="${soundOn}" title="${soundOn ? 'Sons ligados' : 'Sons desligados'}" aria-label="Sons ${soundOn ? 'ligados' : 'desligados'}">
                     ${icon(soundOn ? 'sound-on' : 'sound-off', 18)}
                 </button>
-                <button class="es-hud-chip es-hud-lang" id="es-hud-lang" type="button" title="Trocar idioma (Ctrl+I)">
+                <button class="es-hud-chip es-hud-lang" id="es-hud-lang" type="button" title="Alternar idioma (Ctrl+I)">
                     <span>${langLabel}</span>
                 </button>
-                <span class="es-hud-health" title="Health check / latência" aria-label="Latência ${healthMs}">
+                <span class="es-hud-health" title="Status da API" aria-label="Latência ${healthMs}">
                     <span class="es-hud-pulse" style="background:${healthColor}"></span>
                     <span class="es-hud-health-ms">${healthMs}</span>
                 </span>
