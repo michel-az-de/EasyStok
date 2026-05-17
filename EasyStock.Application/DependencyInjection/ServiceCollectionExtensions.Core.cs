@@ -60,6 +60,7 @@ using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
 using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
 using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
 using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
+using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -173,6 +174,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ConsultarNfeUseCase>();
         services.AddScoped<ProcessarWebhookFocusNFeUseCase>();
         services.AddScoped<ReprocessarContingenciaUseCase>();
+
+        // Modulo Financeiro AR/AP — Lancamentos
+        services.AddScoped<BaixarLancamentoUseCase>();
 
         return services;
     }
