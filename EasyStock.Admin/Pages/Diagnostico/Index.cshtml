@@ -104,6 +104,16 @@
                 class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
             🛠 Operações
         </button>
+        <button type="button" @@click="setTab('infra')"
+                :class="tab === 'infra' ? 'text-es-ink border-es-accent' : 'text-es-ink-mute border-transparent hover:text-es-ink'"
+                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
+            🔧 Infraestrutura
+        </button>
+        <button type="button" @@click="setTab('performance')"
+                :class="tab === 'performance' ? 'text-es-ink border-es-accent' : 'text-es-ink-mute border-transparent hover:text-es-ink'"
+                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
+            📊 Performance
+        </button>
     </div>
 
     <!-- ════════════════════════════════════════════════════════════════════════ -->
@@ -722,16 +732,295 @@
             </div>
         </div>
 
-        <!-- Diagnóstico avançado (links pra endpoints existentes da API) -->
-        <div class="card">
-            <h3 class="text-es-ink font-semibold text-sm mb-2">🔬 Diagnóstico avançado</h3>
-            <p class="text-es-ink-mute text-xs mb-3">Endpoints técnicos da API — abrem em nova aba.</p>
-            <div class="flex flex-wrap gap-2">
-                <a href="/api/diagnostico" target="_blank" rel="noopener" class="btn-secondary text-xs">📊 Diagnóstico completo</a>
-                <a href="/api/diagnostico/endpoints" target="_blank" rel="noopener" class="btn-secondary text-xs">🔌 Testar endpoints</a>
-                <a href="/api/diagnostico/queries-lentas" target="_blank" rel="noopener" class="btn-secondary text-xs">🐢 Queries lentas</a>
-                <a href="/api/diagnostico/slo" target="_blank" rel="noopener" class="btn-secondary text-xs">📈 SLO</a>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB: INFRAESTRUTURA — snapshot completo de infra (banco, redis, etc.)   -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'infra'" x-cloak>
+
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-es-ink-mute text-sm">Status detalhado de cada componente de infra. Auto-refresh a cada 60s.</div>
+            <button type="button" @@click="infra.refresh()" class="btn-secondary text-sm">↻ Atualizar</button>
+        </div>
+
+        <template x-if="infra.erro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4" x-text="infra.erro"></div>
+        </template>
+
+        <div x-show="infra.loading && !infra.data" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-8 justify-center">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-es-accent animate-pulse"></span> Carregando…
+        </div>
+
+        <!-- Banner de causas prováveis quando há problemas -->
+        <template x-if="(infra.data.causasProvaveis ?? []).length > 0">
+            <div class="mb-4 rounded-lg px-4 py-3 text-sm" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25)">
+                <div class="text-red-400 font-semibold mb-1.5">⚠ Causas prováveis detectadas</div>
+                <ul class="text-red-300 text-xs space-y-0.5 list-disc pl-4">
+                    <template x-for="causa in (infra.data.causasProvaveis ?? [])" :key="causa">
+                        <li x-text="causa"></li>
+                    </template>
+                </ul>
             </div>
+        </template>
+
+        <div x-show="infra.data.status" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+
+            <!-- Database -->
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span :class="infra.dotClass(infra.data.banco?.conexao)" class="w-2.5 h-2.5 rounded-full inline-block shrink-0"></span>
+                    <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Database</span>
+                    <span class="ml-auto text-[10px] font-mono text-es-ink-mute" x-text="infra.data.banco?.provider ?? '—'"></span>
+                </div>
+                <div class="text-2xl font-bold text-es-ink" x-text="infra.data.banco?.latenciaMs != null ? (infra.data.banco.latenciaMs + ' ms') : '—'">—</div>
+                <div class="text-xs mt-1.5 space-y-0.5 font-mono text-es-ink-mute">
+                    <div>Conexão: <span :class="infra.data.banco?.conexao ? 'text-es-basil' : 'text-red-400'" x-text="infra.data.banco?.conexao ? 'ok' : 'falha'"></span></div>
+                    <div x-show="infra.data.banco?.migracoesAplicadas != null">Migrations: <span class="text-es-ink" x-text="infra.data.banco?.migracoesAplicadas"></span></div>
+                    <div x-show="infra.data.banco?.fallback" class="text-amber-300">⚠ Usando fallback</div>
+                    <div x-show="infra.data.banco?.erro" class="text-red-400 truncate" x-text="infra.data.banco?.causaProvavel ?? infra.data.banco?.erro"></div>
+                </div>
+            </div>
+
+            <!-- Redis -->
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span :class="infra.dotClassRedis()" class="w-2.5 h-2.5 rounded-full inline-block shrink-0"></span>
+                    <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Redis</span>
+                </div>
+                <template x-if="!infra.data.redis?.configurado">
+                    <div class="text-es-ink-mute text-sm">Não configurado</div>
+                </template>
+                <template x-if="infra.data.redis?.configurado">
+                    <div>
+                        <div class="text-2xl font-bold text-es-ink" x-text="infra.data.redis?.latenciaMs != null ? (infra.data.redis.latenciaMs + ' ms') : '—'">—</div>
+                        <div class="text-xs mt-1.5 font-mono text-es-ink-mute">
+                            Conexão: <span :class="infra.data.redis?.conexao ? 'text-es-basil' : 'text-red-400'" x-text="infra.data.redis?.conexao ? 'ok' : 'falha'"></span>
+                        </div>
+                        <div x-show="infra.data.redis?.erro" class="text-red-400 text-xs mt-1 truncate" x-text="infra.data.redis?.causaProvavel ?? infra.data.redis?.erro"></div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- SMTP -->
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span :class="infra.data.smtp?.configurado ? 'bg-green-400' : 'bg-es-ink-mute/30'" class="w-2.5 h-2.5 rounded-full inline-block shrink-0"></span>
+                    <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">SMTP</span>
+                </div>
+                <div class="text-sm font-semibold text-es-ink" x-text="infra.data.smtp?.configurado ? 'Configurado' : 'Não configurado'">—</div>
+                <div class="text-xs mt-1.5 font-mono text-es-ink-mute space-y-0.5">
+                    <div x-show="infra.data.smtp?.tipo">Tipo: <span class="text-es-ink" x-text="infra.data.smtp?.tipo"></span></div>
+                    <div x-show="infra.data.smtp?.host">Host: <span class="text-es-ink" x-text="infra.data.smtp?.host"></span></div>
+                </div>
+            </div>
+
+            <!-- Storage -->
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span :class="infra.dotClassStorage()" class="w-2.5 h-2.5 rounded-full inline-block shrink-0"></span>
+                    <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Storage</span>
+                    <span class="ml-auto text-[10px] font-mono text-es-ink-mute" x-text="infra.data.storage?.provider ?? '—'"></span>
+                </div>
+                <div class="text-sm font-semibold text-es-ink" x-text="infra.data.storage?.configurado ? 'Configurado' : 'Não configurado'">—</div>
+                <div class="text-xs mt-1.5 font-mono text-es-ink-mute space-y-0.5">
+                    <div x-show="infra.data.storage?.configurado">
+                        Diretório: <span :class="infra.data.storage?.diretorioExiste ? 'text-es-basil' : 'text-red-400'" x-text="infra.data.storage?.diretorioExiste ? 'existe' : 'não encontrado'"></span>
+                    </div>
+                    <div x-show="infra.data.storage?.erro" class="text-red-400 truncate" x-text="infra.data.storage?.erro"></div>
+                </div>
+            </div>
+
+            <!-- IA -->
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span :class="infra.data.ia?.habilitado ? 'bg-green-400' : 'bg-es-ink-mute/30'" class="w-2.5 h-2.5 rounded-full inline-block shrink-0"></span>
+                    <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">IA</span>
+                </div>
+                <div class="text-sm font-semibold text-es-ink" x-text="infra.data.ia?.habilitado ? 'Habilitada' : 'Desabilitada'">—</div>
+                <div class="text-xs mt-1.5 font-mono text-es-ink-mute">
+                    API Key: <span :class="infra.data.ia?.apiKeyPresente ? 'text-es-basil' : 'text-red-400'" x-text="infra.data.ia?.apiKeyPresente ? 'presente' : 'ausente'"></span>
+                </div>
+            </div>
+
+            <!-- Configurações -->
+            <div class="card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span :class="infra.dotClassConfig()" class="w-2.5 h-2.5 rounded-full inline-block shrink-0"></span>
+                    <span class="text-es-ink-mute text-xs uppercase tracking-wide font-bold">Configurações</span>
+                </div>
+                <div class="text-xs font-mono text-es-ink-mute space-y-0.5">
+                    <div>JWT Secret: <span :class="infra.data.configuracoes?.jwtSecretPresente ? (infra.data.configuracoes?.jwtSecretSeguro ? 'text-es-basil' : 'text-amber-300') : 'text-red-400'"
+                        x-text="infra.data.configuracoes?.jwtSecretPresente ? (infra.data.configuracoes?.jwtSecretSeguro ? 'seguro' : 'fraco') : 'ausente'"></span></div>
+                    <div>ConnString: <span :class="infra.data.configuracoes?.connectionStringPresente ? 'text-es-basil' : 'text-red-400'"
+                        x-text="infra.data.configuracoes?.connectionStringPresente ? 'presente' : 'ausente'"></span></div>
+                    <div x-show="(infra.data.configuracoes?.corsOrigins ?? []).length > 0" class="text-es-ink-mute">
+                        CORS: <span class="text-es-ink" x-text="(infra.data.configuracoes?.corsOrigins ?? []).join(', ')"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé: versão + ambiente + uptime -->
+        <div x-show="infra.data.status" class="flex flex-wrap gap-4 text-xs text-es-ink-mute font-mono">
+            <span>Status geral: <b :class="infra.data.status === 'ok' ? 'text-es-basil' : infra.data.status === 'degraded' ? 'text-amber-300' : 'text-red-400'" x-text="infra.data.status ?? '—'"></b></span>
+            <span x-show="infra.data.versao">v<span x-text="infra.data.versao"></span></span>
+            <span x-show="infra.data.ambiente">Env: <span x-text="infra.data.ambiente"></span></span>
+            <span x-show="infra.data.uptime">Uptime: <span x-text="infra.formatUptime(infra.data.uptime)"></span></span>
+            <span x-show="infra.lastUpdated" class="ml-auto text-es-ink-mute">Atualizado às <span x-text="infra.lastUpdated"></span></span>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB: PERFORMANCE — SLO + endpoint health + queries lentas               -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'performance'" x-cloak>
+
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-es-ink-mute text-sm">SLO, health de endpoints e queries lentas no PostgreSQL.</div>
+            <div class="flex gap-2 items-center">
+                <select x-model="perf.sloHours" @@change="perf.refreshSlo()" class="form-input text-xs w-20">
+                    <option value="6">6h</option>
+                    <option value="24">24h</option>
+                    <option value="72">3d</option>
+                </select>
+                <button type="button" @@click="perf.refreshAll()" class="btn-secondary text-sm">↻ Tudo</button>
+            </div>
+        </div>
+
+        <!-- ── SLO ── -->
+        <h3 class="text-es-ink font-semibold text-sm mb-3">📈 SLO</h3>
+        <template x-if="perf.sloErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="perf.sloErro"></div>
+        </template>
+        <div x-show="perf.sloLoading && !perf.slo" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-4 mb-4">
+            <span class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse"></span> Carregando SLO…
+        </div>
+        <div x-show="perf.slo" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div class="card text-center">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-1">Uptime</div>
+                <div class="text-2xl font-bold" :class="(perf.slo?.uptime24h ?? 100) >= 99.9 ? 'text-es-basil' : (perf.slo?.uptime24h ?? 100) >= 99 ? 'text-amber-300' : 'text-red-400'"
+                     x-text="perf.slo?.uptime24h != null ? perf.slo.uptime24h.toFixed(2) + '%' : '—'">—</div>
+                <div class="text-[10px] text-es-ink-mute mt-1" x-text="perf.slo?.periodoHoras ? perf.slo.periodoHoras + 'h' : ''"></div>
+            </div>
+            <div class="card text-center">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-1">Avg Response</div>
+                <div class="text-2xl font-bold" :class="(perf.slo?.avgResponseTimeMs ?? 0) < 300 ? 'text-es-ink' : (perf.slo?.avgResponseTimeMs ?? 0) < 800 ? 'text-amber-300' : 'text-red-400'"
+                     x-text="perf.slo?.avgResponseTimeMs != null ? Math.round(perf.slo.avgResponseTimeMs) + ' ms' : '—'">—</div>
+                <div class="text-[10px] text-es-ink-mute mt-1">média</div>
+            </div>
+            <div class="card text-center">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-1">P95</div>
+                <div class="text-2xl font-bold" :class="(perf.slo?.p95ResponseTimeMs ?? 0) < 800 ? 'text-es-ink' : (perf.slo?.p95ResponseTimeMs ?? 0) < 2000 ? 'text-amber-300' : 'text-red-400'"
+                     x-text="perf.slo?.p95ResponseTimeMs != null ? Math.round(perf.slo.p95ResponseTimeMs) + ' ms' : '—'">—</div>
+                <div class="text-[10px] text-es-ink-mute mt-1">percentil 95</div>
+            </div>
+            <div class="card text-center">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-1">Error Rate</div>
+                <div class="text-2xl font-bold" :class="(perf.slo?.errorRate ?? 0) < 1 ? 'text-es-ink' : (perf.slo?.errorRate ?? 0) < 5 ? 'text-amber-300' : 'text-red-400'"
+                     x-text="perf.slo?.errorRate != null ? perf.slo.errorRate.toFixed(2) + '%' : '—'">—</div>
+                <div class="text-[10px] text-es-ink-mute mt-1" x-text="perf.slo?.totalRequests != null ? perf.slo.totalRequests + ' reqs' : ''"></div>
+            </div>
+        </div>
+
+        <!-- ── Endpoint Health ── -->
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-es-ink font-semibold text-sm">🔌 Health de Endpoints</h3>
+            <button type="button" @@click="perf.refreshEndpoints()" class="btn-secondary text-xs">↻</button>
+        </div>
+        <template x-if="perf.endpointsErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="perf.endpointsErro"></div>
+        </template>
+        <div x-show="perf.endpointsLoading && !perf.endpoints" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-4 mb-4">
+            <span class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse"></span> Testando endpoints…
+        </div>
+        <div x-show="perf.endpoints" class="card p-0 overflow-hidden mb-6">
+            <div class="flex gap-4 px-4 py-2.5 text-xs text-es-ink-mute" style="background:rgba(247,242,232,.03);border-bottom:1px solid rgba(247,242,232,.06)">
+                <span>✅ Saudáveis: <b class="text-es-basil" x-text="perf.endpoints?.saudaveis ?? 0"></b></span>
+                <span>🐢 Lentos: <b class="text-amber-300" x-text="perf.endpoints?.lentos ?? 0"></b></span>
+                <span>❌ Falhas: <b class="text-red-400" x-text="perf.endpoints?.falhas ?? 0"></b></span>
+                <span class="ml-auto font-mono text-[10px]" x-show="perf.endpoints?.testadoEm" x-text="new Date(perf.endpoints.testadoEm).toLocaleTimeString('pt-BR')"></span>
+            </div>
+            <table class="w-full text-xs">
+                <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Método</th>
+                        <th class="px-3 py-2 text-left">Rota</th>
+                        <th class="px-3 py-2 text-right">HTTP</th>
+                        <th class="px-3 py-2 text-right">ms</th>
+                        <th class="px-3 py-2 text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(ep, i) in (perf.endpoints?.resultados ?? [])" :key="i">
+                        <tr style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td class="px-3 py-2 font-mono text-es-ink-mute" x-text="ep.metodo ?? '—'"></td>
+                            <td class="px-3 py-2 font-mono text-es-ink" x-text="ep.rota ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="ep.statusCode ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono" :class="(ep.latenciaMs ?? 0) > 1000 ? 'text-amber-400' : 'text-es-ink-mute'" x-text="ep.latenciaMs != null ? Math.round(ep.latenciaMs) : '—'"></td>
+                            <td class="px-3 py-2">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                      :class="ep.status === 'ok' ? 'bg-es-basil/20 text-es-basil' : ep.status === 'slow' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-400'"
+                                      x-text="ep.status ?? '—'"></span>
+                                <span x-show="ep.erro" class="ml-1 text-red-400 text-[10px]" x-text="ep.erro"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── Queries Lentas ── -->
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-es-ink font-semibold text-sm">🐢 Queries Lentas</h3>
+            <button type="button" @@click="perf.refreshQueries()" class="btn-secondary text-xs">↻</button>
+        </div>
+        <template x-if="perf.queriesErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="perf.queriesErro"></div>
+        </template>
+        <div x-show="perf.queriesLoading && !perf.queries" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-4">
+            <span class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse"></span> Consultando pg_stat_statements…
+        </div>
+        <template x-if="perf.queries && perf.queries.disponivel === false">
+            <div class="card text-sm text-es-ink-mute" x-text="perf.queries.instrucoesPgStatStatements ?? 'pg_stat_statements não disponível.'"></div>
+        </template>
+        <div x-show="perf.queries?.disponivel && (perf.queries?.queries ?? []).length === 0" x-cloak class="card text-center py-8">
+            <div class="text-3xl mb-2">✓</div>
+            <p class="text-es-ink-mute text-sm">Nenhuma query lenta registrada.</p>
+        </div>
+        <div x-show="perf.queries?.disponivel && (perf.queries?.queries ?? []).length > 0" class="card p-0 overflow-hidden">
+            <table class="w-full text-xs">
+                <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Query</th>
+                        <th class="px-3 py-2 text-right">Calls</th>
+                        <th class="px-3 py-2 text-right">Avg ms</th>
+                        <th class="px-3 py-2 text-right">Stddev</th>
+                        <th class="px-3 py-2 text-right">Avg rows</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(q, i) in (perf.queries?.queries ?? [])" :key="i">
+                        <tr class="hover:bg-es-surface-2/40 cursor-pointer" @@click="perf.toggleQuery(i)"
+                            style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td class="px-3 py-2 font-mono text-es-ink max-w-xs">
+                                <span x-text="perf.shortQuery(q.query)"></span>
+                                <span x-show="perf.queries.queries.length > 0" class="ml-1 text-es-ink-mute text-[10px]" x-text="perf.expandedQueries[i] ? '▼' : '▶'"></span>
+                            </td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="q.calls ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono" :class="(q.avgMs ?? 0) > 500 ? 'text-red-400' : (q.avgMs ?? 0) > 100 ? 'text-amber-300' : 'text-es-ink'" x-text="q.avgMs != null ? Math.round(q.avgMs) : '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="q.stddevMs != null ? Math.round(q.stddevMs) : '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="q.avgRows != null ? Math.round(q.avgRows) : '—'"></td>
+                        </tr>
+                        <tr x-show="perf.expandedQueries[i]" x-cloak style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td colspan="5" class="bg-black/30 px-4 py-3">
+                                <pre class="text-es-ink-dim whitespace-pre-wrap break-all font-mono text-[11px] max-h-48 overflow-auto" x-text="q.query"></pre>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -751,22 +1040,28 @@ function diagnosticoPage() {
         cidInput: '',
 
         header: {
-            ultimaHora: null,
-            total24h: null,
-            lastUpdated: ''
+            ultimaHora: 0,
+            total24h: 0,
+            lastUpdated: null
         },
 
         // ── Sub-states (factories internas) ──────────────────────────────────
-        resumo: null,
-        erros: null,
-        sysErros: null,
-        logMode: null,
+        // Stub mínimo para evitar `Cannot read properties of null` quando Alpine
+        // avalia bindings reativos antes do init() trocar pelos factories reais.
+        resumo: { data: {}, loading: false },
+        erros: { _loadedOnce: false, items: [], total: 0 },
+        sysErros: { _loadedOnce: false, total: 0 },
+        logMode: { loaded: false, verbose: false },
+        infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
+        perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
 
         init() {
             this.resumo = resumoState.call(this);
             this.erros = errosState.call(this);
             this.sysErros = systemErrosState.call(this);
             this.logMode = loggingModeState.call(this);
+            this.infra = infraState.call(this);
+            this.perf = perfState.call(this);
 
             this.resumo.init();
             this.logMode.init();
@@ -780,6 +1075,8 @@ function diagnosticoPage() {
                 this._syncUrl();
                 if (val === 'erros' && !this.erros._loadedOnce) this.erros.refresh();
                 if (val === 'sistema' && !this.sysErros._loadedOnce) this.sysErros.refresh();
+                if (val === 'infra' && !this.infra._loadedOnce) this.infra.refresh();
+                if (val === 'performance' && !this.perf._loadedOnce) this.perf.refreshAll();
             });
 
             // Hidrata erros se entrou direto na tab.
@@ -809,7 +1106,7 @@ function diagnosticoPage() {
                 const key = now.toISOString().slice(0, 13).replace('T', ' ');
                 this.header.ultimaHora = (resumo.errorsByHour && resumo.errorsByHour[key]) || 0;
                 this.header.lastUpdated = now.toLocaleTimeString('pt-BR');
-            } catch { /* mantém último valor */ }
+            } catch { this.header.lastUpdated = 'Erro ao atualizar'; }
         },
 
         onRangeChange() {
@@ -1131,6 +1428,130 @@ function systemErrosState() {
         shortMsg(msg) { return msg && msg.length > 120 ? msg.slice(0, 120) + '…' : (msg || '—'); },
         formatTime(iso) { if (!iso) return '—'; return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }); },
         prettyJson(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } }
+    };
+}
+
+// ─── Factory: Tab Infraestrutura ──────────────────────────────────────────
+function infraState() {
+    return {
+        _loadedOnce: false,
+        loading: false,
+        erro: '',
+        data: {},
+        lastUpdated: null,
+        _timer: null,
+
+        async refresh() {
+            this.loading = true;
+            this.erro = '';
+            this._loadedOnce = true;
+            try {
+                const r = await fetch('/api-proxy/diag/infra', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) {
+                    this.erro = `HTTP ${r.status} ao carregar infra. Se a API está dormindo (Render), pode levar 30-60s pra acordar.`;
+                    return;
+                }
+                this.data = await r.json();
+                this.lastUpdated = new Date().toLocaleTimeString('pt-BR');
+                // Auto-refresh a cada 60s
+                if (!this._timer) this._timer = setInterval(() => this.refresh(), 60_000);
+            } catch (e) {
+                this.erro = 'Falha de rede: ' + (e.message || e);
+                sendFrontendError('admin_frontend', 'component_load', e.message, e.stack, '/Diagnostico?tab=infra');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        dotClass(connected) {
+            return connected ? 'bg-green-400' : 'bg-red-400';
+        },
+        dotClassRedis() {
+            if (!this.data.redis?.configurado) return 'bg-es-ink-mute/30';
+            return this.data.redis?.conexao ? 'bg-green-400' : 'bg-red-400';
+        },
+        dotClassStorage() {
+            if (!this.data.storage?.configurado) return 'bg-es-ink-mute/30';
+            return this.data.storage?.diretorioExiste ? 'bg-green-400' : 'bg-amber-400';
+        },
+        dotClassConfig() {
+            const cfg = this.data.configuracoes;
+            if (!cfg) return 'bg-es-ink-mute/30';
+            if (!cfg.jwtSecretPresente || !cfg.connectionStringPresente) return 'bg-red-400';
+            if (!cfg.jwtSecretSeguro) return 'bg-amber-400';
+            return 'bg-green-400';
+        },
+        formatUptime(seconds) {
+            if (!seconds) return '—';
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
+        }
+    };
+}
+
+// ─── Factory: Tab Performance (SLO + endpoints + queries lentas) ──────────
+function perfState() {
+    return {
+        _loadedOnce: false,
+
+        sloLoading: false, sloErro: '', slo: null, sloHours: '24',
+        endpointsLoading: false, endpointsErro: '', endpoints: null,
+        queriesLoading: false, queriesErro: '', queries: null,
+        expandedQueries: {},
+
+        async refreshAll() {
+            this._loadedOnce = true;
+            this.refreshSlo();
+            this.refreshEndpoints();
+            this.refreshQueries();
+        },
+
+        async refreshSlo() {
+            this.sloLoading = true; this.sloErro = '';
+            try {
+                const r = await fetch(`/api-proxy/diag/slo?hours=${this.sloHours}`, { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.sloErro = `HTTP ${r.status} ao carregar SLO.`; return; }
+                this.slo = await r.json();
+            } catch (e) {
+                this.sloErro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.sloLoading = false; }
+        },
+
+        async refreshEndpoints() {
+            this.endpointsLoading = true; this.endpointsErro = '';
+            try {
+                const r = await fetch('/api-proxy/diag/endpoints', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.endpointsErro = `HTTP ${r.status} ao testar endpoints.`; return; }
+                this.endpoints = await r.json();
+            } catch (e) {
+                this.endpointsErro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.endpointsLoading = false; }
+        },
+
+        async refreshQueries() {
+            this.queriesLoading = true; this.queriesErro = '';
+            try {
+                const r = await fetch('/api-proxy/diag/queries-lentas', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.queriesErro = `HTTP ${r.status} ao buscar queries.`; return; }
+                this.queries = await r.json();
+            } catch (e) {
+                this.queriesErro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.queriesLoading = false; }
+        },
+
+        toggleQuery(i) {
+            this.expandedQueries = { ...this.expandedQueries, [i]: !this.expandedQueries[i] };
+        },
+        shortQuery(q) {
+            if (!q) return '—';
+            return q.length > 80 ? q.slice(0, 80) + '…' : q;
+        }
     };
 }
 

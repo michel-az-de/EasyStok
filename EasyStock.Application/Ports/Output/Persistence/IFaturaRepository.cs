@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 
@@ -9,7 +5,7 @@ namespace EasyStock.Application.Ports.Output.Persistence;
 
 /// <summary>
 /// Repositorio do agregado <see cref="Fatura"/>. Todas as queries respeitam
-/// multi-tenancy via <see cref="EmpresaId"/> obrigatorio (exceto admin global).
+/// multi-tenancy via <c>EmpresaId</c> obrigatorio (exceto admin global).
 /// </summary>
 public interface IFaturaRepository
 {

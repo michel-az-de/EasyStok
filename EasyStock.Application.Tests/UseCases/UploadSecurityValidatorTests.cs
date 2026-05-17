@@ -93,6 +93,7 @@ public class UploadSecurityValidatorTests
     [InlineData("text/csv; charset=utf-8")]                                     // com parâmetro
     [InlineData("IMAGE/JPEG")]                                                   // case insensitive
     [InlineData("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [InlineData("application/vnd.openxmlformats-officedocument.wordprocessingml.document")]
     public void EnsureValidMime_aceita_whitelist(string contentType)
     {
         var act = () => UploadSecurityValidator.EnsureValidMime(contentType);

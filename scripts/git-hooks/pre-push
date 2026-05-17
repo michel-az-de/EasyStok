@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# pre-push hook: bloqueia push direto em master/main.
+# Toda mudanca deve ir via Pull Request.
+# Para aplicar este hook neste clone: git config core.hooksPath scripts/git-hooks
+
+protected_branches="^(refs/heads/master|refs/heads/main)$"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_ref" =~ $protected_branches ]]; then
+    echo ""
+    echo "ERRO: push direto em $remote_ref bloqueado." >&2
+    echo "   Toda mudanca vai via Pull Request (economiza pipeline minutes do Render)." >&2
+    echo ""
+    echo "   Fluxo correto:" >&2
+    echo "     1. git checkout -b feat/<escopo> ou fix/<escopo>" >&2
+    echo "     2. git push -u origin <branch>" >&2
+    echo "     3. gh pr create --base master" >&2
+    echo "" >&2
+    echo "   Se realmente precisar bypassar (hotfix critico):" >&2
+    echo "     git push --no-verify origin master" >&2
+    echo "" >&2
+    exit 1
+  fi
+done
+
+exit 0

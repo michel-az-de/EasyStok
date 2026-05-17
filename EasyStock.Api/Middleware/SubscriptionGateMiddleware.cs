@@ -25,6 +25,9 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
     {
         "/api/auth",
         "/api/empresas/registrar",
+        "/api/empresas/email-disponivel",
+        "/api/empresas/cnpj-disponivel",
+        "/api/onboarding",
         "/api/assinatura",
         "/api/webhooks",
         "/api/admin",

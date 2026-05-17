@@ -47,7 +47,7 @@
     <form method="get" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         <div class="col-span-2 lg:col-span-2">
             <label class="form-label">Busca</label>
-            <input type="text" name="busca" value="@Model.Busca" placeholder="Numero, observacao..." class="form-input" />
+            <input type="text" name="busca" value="@Model.Busca" placeholder="Número, observação..." class="form-input" />
         </div>
         <div>
             <label class="form-label">Status</label>
@@ -75,7 +75,7 @@
             <input type="date" name="vencimentoDe" value="@(Model.VencimentoDe?.ToString("yyyy-MM-dd"))" class="form-input" />
         </div>
         <div>
-            <label class="form-label">Vencimento ate</label>
+            <label class="form-label">Vencimento até</label>
             <input type="date" name="vencimentoAte" value="@(Model.VencimentoAte?.ToString("yyyy-MM-dd"))" class="form-input" />
         </div>
         <div>
@@ -103,7 +103,7 @@
         <table class="table-admin">
             <thead>
                 <tr>
-                    <th>Numero</th>
+                    <th>Número</th>
                     <th>Empresa</th>
                     <th>Faturado</th>
                     <th>Origem</th>
@@ -111,7 +111,7 @@
                     <th class="text-right">Total</th>
                     <th class="text-right">Pago</th>
                     <th class="text-right">Pendente</th>
-                    <th>Emissao</th>
+                    <th>Emissão</th>
                     <th>Vencimento</th>
                 </tr>
             </thead>
@@ -162,10 +162,10 @@
         {
             <a href="?page=@(Model.Page-1)&status=@Model.Status&origem=@Model.Origem&busca=@Model.Busca" class="btn-secondary text-sm">← Anterior</a>
         }
-        <span class="text-es-ink-mute text-sm">@Model.Page / @Model.TotalPages — @Model.Total fatura(s)</span>
+        <span class="text-es-ink-mute text-sm">@Model.Page / @Model.TotalPages — @(Model.Total == 1 ? "1 fatura" : $"{Model.Total} faturas")</span>
         @if (Model.Page < Model.TotalPages)
         {
-            <a href="?page=@(Model.Page+1)&status=@Model.Status&origem=@Model.Origem&busca=@Model.Busca" class="btn-secondary text-sm">Proximo →</a>
+            <a href="?page=@(Model.Page+1)&status=@Model.Status&origem=@Model.Origem&busca=@Model.Busca" class="btn-secondary text-sm">Próximo →</a>
         }
     </div>
 }

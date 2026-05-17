@@ -42,14 +42,24 @@ function copy(src, dst) {
 }
 
 function injectConfigBeforeSyncJs(htmlPath) {
-  const marker = '<script src="sync.js"></script>';
-  const inject = '<script src="config.js"></script>\n' + marker;
   let html = fs.readFileSync(htmlPath, 'utf8');
-  if (html.includes(marker) && !html.includes('config.js')) {
-    html = html.replace(marker, inject);
-    fs.writeFileSync(htmlPath, html, 'utf8');
-    console.log('[copy-web] injetou <script src="config.js"> antes de sync.js');
+  // Idempotente: se config.js ja referenciado, nao mexe (build incremental).
+  if (/<script[^>]+src=["']config\.js/i.test(html)) {
+    console.log('[copy-web] config.js ja injetado (idempotente)');
+    return;
   }
+  // Match flexivel: aceita cache-buster `?v=...` que o workflow CI injeta
+  // (rewrite-cache-version.ps1) — antes a regex era literal e quebrava
+  // silenciosamente, deixando o config.js orfao no APK.
+  const re = /<script\s+src=["']sync\.js[^"']*["']\s*><\/script>/i;
+  if (!re.test(html)) {
+    console.error('[copy-web] ERRO: nao encontrei <script src="sync.js..."> em index.html');
+    console.error('[copy-web]   config.js NAO sera carregado pelo HTML - build invalido.');
+    process.exit(1);
+  }
+  html = html.replace(re, '<script src="config.js"></script>\n  $&');
+  fs.writeFileSync(htmlPath, html, 'utf8');
+  console.log('[copy-web] injetou <script src="config.js"> antes de sync.js');
 }
 
 function stampVersionInHtml(htmlPath) {
@@ -88,9 +98,30 @@ function main() {
   copy(SRC, DST);
 
   // config.js: define window.CDB_CONFIG.apiBaseUrl antes do sync.js carregar.
+  // Opcionalmente injeta forcedPairingCode/forcedPairingLabel (lido de env vars
+  // PAIRING_CODE/PAIRING_LABEL) — usado pelo workflow build-casadababa-release
+  // pra que o APK pareie sozinho no primeiro boot, sem operador digitar codigo.
+  // Em build normal (sem env vars) o objeto fica vazio nesse campo e o sync.js
+  // ignora — comportamento idêntico ao da PWA producao.
   const configPath = path.join(DST, 'config.js');
-  const cfg = `window.CDB_CONFIG = { apiBaseUrl: ${JSON.stringify(apiBaseUrl)} };\n`;
-  fs.writeFileSync(configPath, cfg, 'utf8');
+  const cfg = {
+    apiBaseUrl: apiBaseUrl
+  };
+  if (process.env.PAIRING_CODE) {
+    cfg.forcedPairingCode = String(process.env.PAIRING_CODE).trim();
+    cfg.forcedPairingLabel = String(process.env.PAIRING_LABEL || 'Casa da Baba (auto-pair)');
+    console.log('[copy-web] forcedPairingCode injetado (length=' + cfg.forcedPairingCode.length + ')');
+  }
+  // PROVISIONING_SECRET: token de longa vida bate com AppProvisioning:Secret
+  // no server (3 env vars no server setam empresa/loja default). APK pareia
+  // sozinho via POST /api/mobile/devices/pair-auto, sem expirar como o pairing
+  // code de 6 digitos. Recomendado pra APK distribuido pre-configurado.
+  if (process.env.PROVISIONING_SECRET) {
+    cfg.forcedProvisioningSecret = String(process.env.PROVISIONING_SECRET).trim();
+    cfg.forcedProvisioningLabel = String(process.env.PROVISIONING_LABEL || 'Casa da Baba (provisioned)');
+    console.log('[copy-web] forcedProvisioningSecret injetado (length=' + cfg.forcedProvisioningSecret.length + ')');
+  }
+  fs.writeFileSync(configPath, 'window.CDB_CONFIG = ' + JSON.stringify(cfg) + ';\n', 'utf8');
   console.log('[copy-web] Gerou', configPath, `(apiBaseUrl=${apiBaseUrl || '""'})`);
 
   injectConfigBeforeSyncJs(path.join(DST, 'index.html'));

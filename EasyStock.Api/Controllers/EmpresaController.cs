@@ -6,8 +6,10 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEmpresa;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
 using IJwtTokenService = EasyStock.Api.Services.IJwtTokenService;
@@ -21,11 +23,36 @@ public class EmpresaController(
     RegistrarEmpresaUseCase registrarUseCase,
     IJwtTokenService jwtService,
     IRefreshTokenRepository refreshTokenRepository,
-    IUnitOfWork unitOfWork) : EasyStockControllerBase
+    IUnitOfWork unitOfWork,
+    IUsuarioRepository usuarioRepository,
+    IEmpresaRepository empresaRepository) : EasyStockControllerBase
 {
+    [AllowAnonymous]
+    [EnableRateLimiting("disponibilidade")]
+    [SwaggerOperation(Summary = "Verifica se email esta livre pra signup")]
+    [HttpGet("email-disponivel")]
+    public async Task<IActionResult> EmailDisponivel([FromQuery] string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return DataOk(new { disponivel = false });
+        var existente = await usuarioRepository.GetByEmailAsync(email.Trim());
+        return DataOk(new { disponivel = existente is null });
+    }
+
+    [AllowAnonymous]
+    [EnableRateLimiting("disponibilidade")]
+    [SwaggerOperation(Summary = "Verifica se CNPJ/CPF esta livre pra signup")]
+    [HttpGet("cnpj-disponivel")]
+    public async Task<IActionResult> CnpjDisponivel([FromQuery] string doc)
+    {
+        if (string.IsNullOrWhiteSpace(doc)) return DataOk(new { disponivel = false });
+        var existente = await empresaRepository.GetByDocumentoAsync(doc.Trim());
+        return DataOk(new { disponivel = existente is null });
+    }
+
     [SwaggerOperation(Summary = "Register a new company", Description = "Creates company account with initial admin user, 14-day trial, and returns a JWT for immediate access.")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [EnableRateLimiting("signup")]
     [HttpPost("registrar")]
     public async Task<IActionResult> Registrar([FromBody] RegistrarEmpresaCommand command)
     {

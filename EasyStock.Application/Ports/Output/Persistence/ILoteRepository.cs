@@ -31,5 +31,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddEtiquetaAsync(LoteEtiqueta etiqueta);
         Task<LoteEtiqueta?> FindEtiquetaPorCodigoAsync(Guid empresaId, string codigo);
         Task UpdateEtiquetaAsync(LoteEtiqueta etiqueta);
+
+        // Render + snapshot
+        Task<IEnumerable<LoteEtiqueta>> GetEtiquetasForRenderAsync(Guid empresaId, Guid loteId);
+        Task UpdateEtiquetasSnapshotAsync(IEnumerable<Guid> ids, string layoutJson, string layoutMeta, string status);
+        Task UpdateEtiquetasStatusAsync(IEnumerable<Guid> ids, string status);
     }
 }

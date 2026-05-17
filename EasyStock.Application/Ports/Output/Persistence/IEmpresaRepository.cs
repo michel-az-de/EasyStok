@@ -13,5 +13,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         IAsyncEnumerable<Empresa> StreamAllAsync(CancellationToken ct = default);
         Task AddAsync(Empresa empresa);
+        Task UpdateAsync(Empresa empresa);
     }
 }

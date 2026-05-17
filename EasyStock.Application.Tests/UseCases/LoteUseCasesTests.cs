@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.ConferirEtiqueta;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -18,6 +19,7 @@ namespace EasyStock.Application.Tests.UseCases;
 public class LoteUseCasesTests
 {
     private readonly ILoteRepository _repo = Substitute.For<ILoteRepository>();
+    private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     // ════════════════════════════════════════════════════════════════════
@@ -27,7 +29,7 @@ public class LoteUseCasesTests
     [Fact]
     public async Task CriarLote_DeveLancarValidation_QuandoEmpresaIdVazio()
     {
-        var useCase = new CriarLoteUseCase(_repo, _uow,
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<CriarLoteUseCase>>());
 
         var act = () => useCase.ExecuteAsync(new CriarLoteCommand(Guid.Empty));
@@ -42,7 +44,7 @@ public class LoteUseCasesTests
         var existente = Lote.Criar(empresaId, "LOT-CUSTOM-1");
         _repo.FindByCodigoAsync(empresaId, "LOT-CUSTOM-1").Returns(existente);
 
-        var useCase = new CriarLoteUseCase(_repo, _uow,
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<CriarLoteUseCase>>());
 
         var act = () => useCase.ExecuteAsync(new CriarLoteCommand(empresaId,
@@ -63,7 +65,7 @@ public class LoteUseCasesTests
         Lote? capturado = null;
         await _repo.AddAsync(Arg.Do<Lote>(l => capturado = l));
 
-        var useCase = new CriarLoteUseCase(_repo, _uow,
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<CriarLoteUseCase>>());
 
         var result = await useCase.ExecuteAsync(new CriarLoteCommand(empresaId,
@@ -80,7 +82,7 @@ public class LoteUseCasesTests
         var empresaId = Guid.NewGuid();
         _repo.GetNextSequencialDoDiaAsync(empresaId, Arg.Any<DateOnly>()).Returns(1);
 
-        var useCase = new CriarLoteUseCase(_repo, _uow,
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<CriarLoteUseCase>>());
 
         var act = () => useCase.ExecuteAsync(new CriarLoteCommand(empresaId, Itens: new[]
@@ -100,18 +102,23 @@ public class LoteUseCasesTests
         var dataProd = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc);
         _repo.GetNextSequencialDoDiaAsync(empresaId, Arg.Any<DateOnly>()).Returns(1);
 
+        var produtoPaoId = Guid.NewGuid();
+        var produtoBoloId = Guid.NewGuid();
+        _produtoRepo.GetTipoEmbalagemMapAsync(empresaId, Arg.Any<IEnumerable<Guid>>())
+            .Returns((IReadOnlyDictionary<Guid, TipoEmbalagem>)new Dictionary<Guid, TipoEmbalagem>());
+
         Lote? capturado = null;
         await _repo.AddAsync(Arg.Do<Lote>(l => capturado = l));
 
-        var useCase = new CriarLoteUseCase(_repo, _uow,
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<CriarLoteUseCase>>());
 
         await useCase.ExecuteAsync(new CriarLoteCommand(empresaId,
             DataProducao: dataProd,
             Itens: new[]
             {
-                new CriarLoteItemInput("Pão de queijo", 10, ValidadeDias: 5),
-                new CriarLoteItemInput("Bolo", 3, ValidadeDias: null)  // sem validade
+                new CriarLoteItemInput("Pão de queijo", 10, ProdutoId: produtoPaoId, ValidadeDias: 5),
+                new CriarLoteItemInput("Bolo", 3, ProdutoId: produtoBoloId, ValidadeDias: null)  // sem validade
             }));
 
         capturado!.Itens.Should().HaveCount(2);
@@ -132,7 +139,7 @@ public class LoteUseCasesTests
         var loteId = Guid.NewGuid();
         _repo.GetByIdWithDetailsAsync(empresaId, loteId).Returns((Lote?)null);
 
-        var useCase = new FinalizarLoteUseCase(_repo, _uow,
+        var useCase = new FinalizarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<FinalizarLoteUseCase>>());
 
         var result = await useCase.ExecuteAsync(new FinalizarLoteCommand(empresaId, loteId));
@@ -149,7 +156,7 @@ public class LoteUseCasesTests
         lote.Finalizar();
         _repo.GetByIdWithDetailsAsync(empresaId, lote.Id).Returns(lote);
 
-        var useCase = new FinalizarLoteUseCase(_repo, _uow,
+        var useCase = new FinalizarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<FinalizarLoteUseCase>>());
 
         var result = await useCase.ExecuteAsync(new FinalizarLoteCommand(empresaId, lote.Id));
@@ -167,7 +174,7 @@ public class LoteUseCasesTests
         var lote = Lote.Criar(empresaId, "LOT-002");
         _repo.GetByIdWithDetailsAsync(empresaId, lote.Id).Returns(lote);
 
-        var useCase = new FinalizarLoteUseCase(_repo, _uow,
+        var useCase = new FinalizarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<FinalizarLoteUseCase>>());
 
         var act = () => useCase.ExecuteAsync(new FinalizarLoteCommand(empresaId, lote.Id));
@@ -190,7 +197,7 @@ public class LoteUseCasesTests
         var etiquetas = new List<LoteEtiqueta>();
         await _repo.AddEtiquetaAsync(Arg.Do<LoteEtiqueta>(e => etiquetas.Add(e)));
 
-        var useCase = new FinalizarLoteUseCase(_repo, _uow,
+        var useCase = new FinalizarLoteUseCase(_repo, _produtoRepo, _uow,
             Substitute.For<ILogger<FinalizarLoteUseCase>>());
 
         var result = await useCase.ExecuteAsync(new FinalizarLoteCommand(empresaId, lote.Id));

@@ -31,9 +31,11 @@ namespace EasyStock.Api.Mobile.Services;
 /// </summary>
 public class MobileStockReconciler(
     EasyStockDbContext db,
+    MobileSystemUserResolver systemUserResolver,
     ILogger<MobileStockReconciler> log)
 {
     private readonly EasyStockDbContext _db = db;
+    private readonly MobileSystemUserResolver _systemUserResolver = systemUserResolver;
     private readonly ILogger<MobileStockReconciler> _log = log;
 
     /// <summary>
@@ -69,12 +71,15 @@ public class MobileStockReconciler(
             // só cai pro fallback (loja=null) se o app está em modo sem loja
             // amarrada. Isso evita que device A consuma estoque da loja B
             // silenciosamente em multi-loja.
+            // IgnoreQueryFilters: chamado de endpoints mobile sem JWT (CurrentTenantId=Empty),
+            // o Global Query Filter zeraria o resultado. Tenant isolation ja garantido
+            // pelo filtro manual i.EmpresaId == empresaId (vem de mobileProduct.EmpresaId).
             var item = lojaId.HasValue
-                ? await _db.Set<ItemEstoque>().FirstOrDefaultAsync(i =>
+                ? await _db.Set<ItemEstoque>().IgnoreQueryFilters().FirstOrDefaultAsync(i =>
                     i.EmpresaId == empresaId &&
                     i.ProdutoId == produtoId &&
                     i.LojaId == lojaId, ct)
-                : await _db.Set<ItemEstoque>().FirstOrDefaultAsync(i =>
+                : await _db.Set<ItemEstoque>().IgnoreQueryFilters().FirstOrDefaultAsync(i =>
                     i.EmpresaId == empresaId &&
                     i.ProdutoId == produtoId &&
                     i.LojaId == null, ct);
@@ -131,8 +136,28 @@ public class MobileStockReconciler(
             };
             _db.Add(movimentacao);
 
+            // F9-F: audit criacao da movimentacao em movimentacao_estoque_alteracoes.
+            // UsuarioId NOT NULL no schema; resolve "Sistema Mobile Sync" lazily.
+            var sysUserId = await _systemUserResolver.GetOrCreateAsync(empresaId, ct);
+            _db.Add(new MovimentacaoEstoqueAlteracao
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                MovimentacaoEstoqueId = movimentacao.Id,
+                UsuarioId = sysUserId,
+                NomeUsuario = "Sistema Mobile Sync",
+                EmailUsuario = null,
+                Acao = "criada",
+                Motivo = $"Sync mobile · {natureza}",
+                Observacao = descricao,
+                AlteracoesJson = null,
+                Ip = null,
+                UserAgent = $"mobile_product={mobileProduct.Id}; doc={referenciaDocumento}",
+                AlteradoEm = DateTime.UtcNow
+            });
+
             // Espelha a quantidade no mobile_product (fonte da verdade local pro app)
-            mobileProduct.Stock = novo;
+            mobileProduct.Stock = (int)novo;
             mobileProduct.UpdatedAt = DateTime.UtcNow;
 
             // Marcador de divergência: registra MovimentacaoEstoque adicional

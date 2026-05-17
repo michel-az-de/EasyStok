@@ -1,0 +1,168 @@
+@using EasyStock.Web.Services
+@{
+    Layout = "_Layout";
+    var run = ViewBag.Run as ReportRunApi;
+    if (run == null) { return; }
+
+    string StatusBadge(string status) => status switch
+    {
+        "Pending"   => "bg-yellow-100 text-yellow-800",
+        "Running"   => "bg-blue-100 text-blue-800",
+        "Succeeded" => "bg-green-100 text-green-800",
+        "Canceled"  => "bg-gray-100 text-gray-500",
+        "Canceling" => "bg-orange-100 text-orange-700",
+        "Failed"    => "bg-red-100 text-red-800",
+        _           => "bg-gray-100 text-gray-600"
+    };
+
+    string StatusLabel(string status) => status switch
+    {
+        "Pending"   => "Pendente",
+        "Running"   => "Executando",
+        "Succeeded" => "Concluído",
+        "Canceled"  => "Cancelado",
+        "Canceling" => "Cancelando",
+        "Failed"    => "Falhou",
+        _           => status
+    };
+}
+
+<div class="mb-4">
+    <a href="/relatorios" class="text-xs text-slate-400 hover:text-slate-200 transition-colors">
+        &larr; Voltar para relatórios
+    </a>
+</div>
+
+<div class="rounded-lg border border-white/10 bg-white/[0.02] p-6">
+    <div class="flex items-start justify-between mb-6">
+        <div>
+            <h2 class="text-xl font-semibold text-slate-100">@run.ReportLabel</h2>
+            <p class="text-xs text-slate-500 font-mono mt-1">@run.ReportKey &middot; @run.Categoria</p>
+        </div>
+        <span class="text-xs px-3 py-1 rounded-full font-medium @StatusBadge(run.Status)">
+            @StatusLabel(run.Status)
+        </span>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Formato</div>
+            <div class="text-sm text-slate-200 font-mono">@run.Format</div>
+        </div>
+        <div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Linhas</div>
+            <div class="text-sm text-slate-200 tabular-nums">@(run.RowCount?.ToString("N0") ?? "-")</div>
+        </div>
+        <div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Tamanho</div>
+            <div class="text-sm text-slate-200 tabular-nums">
+                @{
+                    var bytes = run.ArtifactSizeBytes;
+                    var sizeLabel = bytes is null or 0 ? "-"
+                        : bytes < 1024 ? $"{bytes} B"
+                        : bytes < 1024 * 1024 ? $"{bytes / 1024.0:F1} KB"
+                        : $"{bytes / (1024.0 * 1024.0):F1} MB";
+                }
+                @sizeLabel
+            </div>
+        </div>
+        <div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Tentativas</div>
+            <div class="text-sm text-slate-200 tabular-nums">@run.Tentativas / @run.MaxTentativas</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-xs">
+        <div>
+            <div class="text-slate-500 mb-0.5">Enfileirado</div>
+            <div class="text-slate-300 tabular-nums">@run.EnqueuedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+        </div>
+        @if (run.StartedAt.HasValue)
+        {
+            <div>
+                <div class="text-slate-500 mb-0.5">Iniciado</div>
+                <div class="text-slate-300 tabular-nums">@run.StartedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+            </div>
+        }
+        @if (run.FinishedAt.HasValue)
+        {
+            <div>
+                <div class="text-slate-500 mb-0.5">Finalizado</div>
+                <div class="text-slate-300 tabular-nums">@run.FinishedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+            </div>
+        }
+    </div>
+
+    @if (run.ErrorMessage != null)
+    {
+        <div class="rounded-lg bg-red-500/10 border border-red-500/20 p-3 mb-6">
+            <div class="text-xs font-medium text-red-400 mb-1">Erro</div>
+            <pre class="text-xs text-red-300 whitespace-pre-wrap font-mono">@run.ErrorMessage</pre>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(run.ParamsJson) && run.ParamsJson != "{}")
+    {
+        <div class="mb-6">
+            <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Parâmetros</div>
+            <pre class="text-xs text-slate-300 bg-white/5 rounded p-3 overflow-x-auto font-mono">@run.ParamsJson</pre>
+        </div>
+    }
+
+    <!-- Ações -->
+    <div class="flex items-center gap-3 pt-4 border-t border-white/5">
+        @if (run.CanDownload && run.DownloadUrl != null)
+        {
+            <a href="@run.DownloadUrl" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Baixar relatório
+            </a>
+            @if (run.DownloadExpiresAt.HasValue)
+            {
+                <span class="text-[11px] text-slate-500">
+                    Link expira em @run.DownloadExpiresAt.Value.ToLocalTime().ToString("dd/MM HH:mm")
+                </span>
+            }
+        }
+
+        @if (run.Status is "Pending" or "Running")
+        {
+            <form method="post" action="/relatorios/cancel/@run.Id" class="inline">
+                @Html.AntiForgeryToken()
+                <button type="submit"
+                        class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors">
+                    Cancelar
+                </button>
+            </form>
+        }
+
+        @if (run.Status is "Succeeded" or "Failed")
+        {
+            <form method="post" action="/relatorios/repeat/@run.Id" class="inline">
+                @Html.AntiForgeryToken()
+                <button type="submit"
+                        class="px-4 py-2 rounded-lg bg-white/5 text-slate-300 text-sm font-medium hover:bg-white/10 transition-colors">
+                    Gerar novamente
+                </button>
+            </form>
+        }
+
+        @if (run.Status is "Pending" or "Running")
+        {
+            <span class="text-xs text-slate-400 ml-auto" id="auto-refresh-hint">
+                Atualiza automaticamente...
+            </span>
+        }
+    </div>
+</div>
+
+@if (run.Status is "Pending" or "Running")
+{
+    <script>
+        // Auto-refresh a cada 5s enquanto pendente/executando
+        setTimeout(function() { location.reload(); }, 5000);
+    </script>
+}

@@ -72,9 +72,88 @@ public class MobileDiagnosticsController(ILogger<MobileDiagnosticsController> lo
         return Ok(new { received = capped.Length });
     }
 
+    /// <summary>
+    /// Heartbeat do PWA. Chamado a cada boot do app — permite saber qual
+    /// fração da frota está em cada CACHE_VERSION, qual o tamanho da fila
+    /// pendente e a versão de schema instalada. Não persiste em DB ainda;
+    /// apenas Serilog estruturado para consulta no dashboard de logs.
+    /// </summary>
+    /// <remarks>
+    /// Quando o volume justificar, materializar em tabela
+    /// <c>mobile_device_heartbeat</c> para queries agregadas por loja/empresa.
+    /// </remarks>
+    [HttpPost("heartbeat")]
+    public IActionResult Heartbeat([FromBody] MobileHeartbeat req)
+    {
+        if (req == null) return BadRequest(new { error = "payload vazio" });
+
+        _log.LogInformation(
+            "[mobile-heartbeat] device={DeviceId} cache={CacheVersion} schema={SchemaVersion} queue={QueueSize} lastSync={LastSyncAt} online={Online}",
+            req.DeviceId ?? "unknown",
+            req.CacheVersion ?? "unknown",
+            req.SchemaVersion,
+            req.QueueSize,
+            req.LastSyncAt,
+            req.Online);
+
+        return Ok(new { received = true, serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+    }
+
+    /// <summary>
+    /// F10-D — Telemetria de storage exhausted.
+    /// Chamado pelo PWA quando quota IDB ou localStorage estoura.
+    /// Loga via Serilog para dashboard de alertas.
+    /// </summary>
+    [HttpPost("storage")]
+    public IActionResult ReportStorage([FromBody] MobileStorageReport req)
+    {
+        if (req == null) return BadRequest(new { error = "payload vazio" });
+
+        _log.LogWarning(
+            "[mobile-storage-alert] device={DeviceId} type={StorageType} exhausted={Exhausted} queueSize={QueueSize} deadletterSize={DeadletterSize} photosPending={PhotosPending}",
+            req.DeviceId ?? "unknown",
+            req.StorageType ?? "unknown",
+            req.Exhausted,
+            req.QueueSize,
+            req.DeadletterSize,
+            req.PhotosPending);
+
+        return Ok(new { received = true });
+    }
+
+    /// <summary>
+    /// F10-D — Device reporta foto-upload stats.
+    /// Permite saber se fotos estão sincronizando ou acumulando.
+    /// </summary>
+    [HttpPost("photo-stats")]
+    public IActionResult ReportPhotoStats([FromBody] MobilePhotoStatsReport req)
+    {
+        if (req == null) return BadRequest(new { error = "payload vazio" });
+
+        _log.LogInformation(
+            "[mobile-photo-stats] device={DeviceId} total={Total} pending={Pending} uploaded={Uploaded} sizeEstimate={SizeEstimate}",
+            req.DeviceId ?? "unknown",
+            req.Total,
+            req.Pending,
+            req.Uploaded,
+            req.SizeEstimate);
+
+        return Ok(new { received = true });
+    }
+
     private static string Truncate(string s, int max)
         => s.Length <= max ? s : s[..max] + "…";
 }
+
+/// <summary>Heartbeat do PWA: snapshot do que o app local enxerga.</summary>
+public record MobileHeartbeat(
+    string? DeviceId,
+    string? CacheVersion,
+    int SchemaVersion,
+    int QueueSize,
+    long LastSyncAt,
+    bool Online
+);
 
 /// <summary>Payload do report de erros enviado pelo PWA.</summary>
 public record MobileErrorReport(
@@ -92,4 +171,23 @@ public record MobileErrorEntry(
     string? Stack,
     string? Screen,
     string? Operator
+);
+
+/// <summary>F10-D — Telemetria de storage exhausted do PWA.</summary>
+public record MobileStorageReport(
+    string? DeviceId,
+    string? StorageType,
+    bool Exhausted,
+    int QueueSize,
+    int DeadletterSize,
+    int PhotosPending
+);
+
+/// <summary>F10-D — Stats de fotos do photo-store do PWA.</summary>
+public record MobilePhotoStatsReport(
+    string? DeviceId,
+    int Total,
+    int Pending,
+    int Uploaded,
+    long SizeEstimate
 );

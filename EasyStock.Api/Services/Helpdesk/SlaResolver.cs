@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -5,14 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Services.Helpdesk;
 
-public sealed record SlaResolvido(int MinutosResposta, int MinutosResolucao, DateTime PrazoResposta, DateTime PrazoResolucao);
-
 /// <summary>
 /// Resolve a configuracao de SLA aplicavel a uma empresa+prioridade. Hierarquia:
 /// (1) Override por empresa, (2) por plano da assinatura ativa, (3) default global.
 /// Retorna sempre uma resolucao — fallback final usa 8h/24h se nada estiver configurado.
 /// </summary>
-public sealed class SlaResolver(EasyStockDbContext db)
+public sealed class SlaResolver(EasyStockDbContext db) : ISlaResolver
 {
     public async Task<SlaResolvido> ResolverAsync(Guid empresaId, TicketPrioridade prioridade, DateTime? referencia = null, CancellationToken ct = default)
     {
@@ -53,7 +52,17 @@ public sealed class SlaResolver(EasyStockDbContext db)
             return Build(global, agora);
 
         // 4. Fallback final hardcoded — defesa contra DB vazio.
-        var (resp, resol) = prioridade switch
+        var (resp, resol) = FallbackHardcoded(prioridade);
+        return new SlaResolvido(resp, resol, agora.AddMinutes(resp), agora.AddMinutes(resol));
+    }
+
+    /// <summary>
+    /// Defaults hardcoded por prioridade (em minutos). Usado como ultimo
+    /// recurso quando nao ha override por empresa/plano nem default global no DB.
+    /// Exposto para teste — manter alinhado com expectativa de produto.
+    /// </summary>
+    public static (int MinutosResposta, int MinutosResolucao) FallbackHardcoded(TicketPrioridade prioridade) =>
+        prioridade switch
         {
             TicketPrioridade.Critica => (30, 240),
             TicketPrioridade.Alta => (120, 480),
@@ -61,8 +70,6 @@ public sealed class SlaResolver(EasyStockDbContext db)
             TicketPrioridade.Baixa => (1440, 4320),
             _ => (480, 1440)
         };
-        return new SlaResolvido(resp, resol, agora.AddMinutes(resp), agora.AddMinutes(resol));
-    }
 
     private static SlaResolvido Build(SlaConfiguracao s, DateTime agora) =>
         new(s.MinutosResposta, s.MinutosResolucao, agora.AddMinutes(s.MinutosResposta), agora.AddMinutes(s.MinutosResolucao));

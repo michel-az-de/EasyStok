@@ -13,8 +13,8 @@ export function openLoginModal(onSuccess) {
         <div class="es-modal-card" role="dialog" aria-modal="true" aria-labelledby="es-login-title">
             <header class="es-modal-head">
                 <div>
-                    <h2 id="es-login-title">Login JWT</h2>
-                    <p class="es-modal-sub">Autentica via <code>POST /api/auth/login</code> e salva o token em localStorage.</p>
+                    <h2 id="es-login-title">Autenticar</h2>
+                    <p class="es-modal-sub">Faça login para obter um token JWT e testar endpoints autenticados.</p>
                 </div>
                 <button class="es-modal-close" type="button" aria-label="Fechar" data-close>${icon('close', 18)}</button>
             </header>
@@ -28,7 +28,7 @@ export function openLoginModal(onSuccess) {
                     <input type="password" name="senha" required autocomplete="current-password" minlength="1" placeholder="••••••••">
                 </label>
                 <label class="es-field">
-                    <span class="es-field-label">EmpresaId <small>(opcional, UUID)</small></span>
+                    <span class="es-field-label">EmpresaId <small>(opcional — UUID da empresa)</small></span>
                     <input type="text" name="empresaId" placeholder="3fa85f64-5717-4562-b3fc-2c963f66afa6">
                 </label>
                 <div class="es-modal-error" id="es-login-error" role="alert" hidden></div>

@@ -19,7 +19,7 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         [property: Required] Guid EmpresaId,
         [property: Required] Guid ProdutoId,
         Guid? ProdutoVariacaoId,
-        [property: Range(1, int.MaxValue)] int Quantidade,
+        [property: Range(typeof(decimal), "0.001", "999999999999")] decimal Quantidade,
         [property: Range(0, double.MaxValue)] decimal CustoUnitario,
         decimal? PrecoVendaSugerido,
         DateTime DataEntrada,

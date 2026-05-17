@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Models.ViewModels.Saidas;
@@ -20,8 +21,11 @@ public class SaidaFormViewModel
 
     public decimal? Valor { get; set; }
 
+    // BrazilTime.Today em vez de DateTime.Today — server roda UTC; na janela
+    // 21h–23:59 BRT, DateTime.Today retornava o dia seguinte e a tela pre-fillava
+    // a data errada.
     [Required(ErrorMessage = "Data é obrigatória")]
-    public DateOnly DtVenda { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DateOnly DtVenda { get; set; } = BrazilTime.Today();
 
     public DateOnly? DtSaida { get; set; }
     public DateOnly? DtEnvio { get; set; }

@@ -42,7 +42,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 ## Bloco 4 — Segurança operacional (P1)
 
 - [ ] **Rotação de secrets**: JWT key, Efí keys, SMTP. Mover de `appsettings` pra Secret Manager + processo documentado.
-- [ ] **Rate limiting** nos endpoints públicos: `/auth/login`, `/auth/registrar`, `/api/webhooks/pix`.
+- [ ] **Rate limiting `/api/webhooks/pix`** (login/register/refresh/forgot/reset cobertos pela policy `auth` desde B-015 — ver "Itens resolvidos").
 - [ ] **Auditoria de `[AllowAnonymous]` restantes**: DiagnosticoController OK; conferir Mobile e outros Webhooks.
 - [ ] **HTTPS-only + HSTS** no Cloud Run.
 - [ ] **CSP / anti-XSS** no Web e Admin (Razor escapa por padrão, mas inline scripts são comuns).
@@ -93,6 +93,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 - [x] **Helpdesk core E2E** — 2026-05-06. AdminTicket reformado + SLA monitor + 9 eventos globais + UI multi-nível.
 - [x] **Dual frontend formalizado** — 2026-05-06 (`4e9ffda`). Política PWA → MAUI unidirecional em `dual-frontend-policy.md`.
 - [x] **Cascata API+Worker mitigada (parcial)** — 2026-05-07. `/health/dispatcher` separado de `/health/api`; heartbeat singleton dos 3 loops Hosted; warning de startup quando `Notifications:Hosting:Mode=Hosted` na API. Bulkhead real continua sendo Worker como deploy separado (default).
+- [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` fixed-window 10/min/IP cobre login + register + refresh + forgot-password + reset-password. Teste em `AuthRateLimitTests.cs`. Webhook Pix segue como item residual.
 
 ---
 
