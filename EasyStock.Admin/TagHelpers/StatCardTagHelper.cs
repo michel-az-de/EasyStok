@@ -82,7 +82,7 @@ public sealed class StatCardTagHelper : TagHelper
         if (Animated && AnimatedTarget.HasValue)
         {
             var target = AnimatedTarget.Value.ToString(CultureInfo.InvariantCulture);
-            var displayInit = WebUtility.HtmlEncode(Value ?? "0");
+            var displayInit = WebUtility.HtmlEncode(Value ?? "0").Replace("\\", "\\\\").Replace("'", "\\'");
             sb.Append("<div class=\"es-stat-value\" ");
             sb.Append("x-data=\"{ display: '").Append(displayInit).Append("' }\" ");
             sb.Append("x-init=\"(() => { const t = ").Append(target).Append("; const d = 800; const s = performance.now(); const f = (n) => ");

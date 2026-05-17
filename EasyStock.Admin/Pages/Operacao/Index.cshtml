@@ -96,6 +96,33 @@
         </div>
     </template>
 
+    <!-- Onda 1.4 — widget Tickets críticos do helpdesk SaaS -->
+    <template x-if="empresaId && tk.total > 0">
+        <es-card padding="none">
+            <header class="es-card-header" style="display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                    <h3 class="es-card-title">Tickets críticos</h3>
+                    <div class="es-card-desc">SLA violado ou prioridade Alta/Crítica · atualiza a cada 60s</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px; font-size:12px;">
+                    <span style="color:var(--crit-600); font-weight:700;"><span x-text="tk.slaViolados"></span> SLA</span>
+                    <span style="color:var(--warn-600); font-weight:700;"><span x-text="tk.altaOuCritica"></span> alta/crit</span>
+                    <a :href="'/Tickets?empresaId=' + empresaId + '&slaStatus=violado'" style="color:var(--orange-500); text-decoration:none;">ver todos →</a>
+                </div>
+            </header>
+            <div style="padding:0 0 8px;">
+                <template x-for="t in tk.top" :key="t.id">
+                    <div style="display:flex; align-items:center; gap:10px; padding:10px 20px; border-top:1px solid var(--border-soft); font-size:13px;">
+                        <es-badge :variant="t.prioridade === 'Critica' ? 'crit' : 'warn'" x-text="t.prioridade"></es-badge>
+                        <a :href="'/Tickets/Detail/' + t.id" style="color:var(--text-primary); font-weight:500; text-decoration:none; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="t.titulo"></a>
+                        <span style="color:var(--text-muted); font-size:12px;" x-text="t.status"></span>
+                        <es-icon x-show="t.slaRespostaViolado || t.slaResolucaoViolado" name="clock" size="14" style="color:var(--crit-600);" title="SLA violado"></es-icon>
+                    </div>
+                </template>
+            </div>
+        </es-card>
+    </template>
+
     <p x-show="erro" x-cloak style="color:var(--crit-600); font-size:13px;" x-text="erro"></p>
 </div>
 
