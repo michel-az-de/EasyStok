@@ -1,4 +1,5 @@
 using EasyStock.Api.Http;
+using EasyStock.Api.Models.Fiscal;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -144,6 +145,95 @@ public class ConfiguracaoFiscalController(
         }
     }
 
+    [SwaggerOperation(Summary = "Configurar CSC (Codigo de Seguranca do Contribuinte) para NFC-e")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("csc")]
+    public async Task<IActionResult> ConfigurarCsc(
+        [FromBody] ConfigurarCscRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+        if (string.IsNullOrWhiteSpace(req.CscId)) return DataBadRequest("CSC ID obrigatorio.");
+        if (string.IsNullOrWhiteSpace(req.CscToken)) return DataBadRequest("CSC Token obrigatorio.");
+
+        try
+        {
+            await uow.ExecuteInTransactionAsync(async txCt =>
+            {
+                var config = await db.EmpresaConfiguracoesFiscais
+                    .FirstOrDefaultAsync(c => c.EmpresaId == eid, txCt)
+                    ?? throw new InvalidOperationException("Config fiscal nao encontrada. Subir certificado primeiro.");
+
+                config.ConfigurarCsc(req.CscId, req.CscToken);
+                db.EmpresaConfiguracoesFiscais.Update(config);
+            });
+
+            logger.LogInformation("CSC configurado para empresa {Empresa}", eid);
+            return DataOk(new { mensagem = "CSC configurado com sucesso." });
+        }
+        catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
+        catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
+    }
+
+    [SwaggerOperation(Summary = "Alterar serie e ambiente fiscal do tenant")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("serie-ambiente")]
+    public async Task<IActionResult> AlterarSerieAmbiente(
+        [FromBody] AlterarSerieAmbienteRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        try
+        {
+            await uow.ExecuteInTransactionAsync(async txCt =>
+            {
+                var config = await db.EmpresaConfiguracoesFiscais
+                    .FirstOrDefaultAsync(c => c.EmpresaId == eid, txCt)
+                    ?? throw new InvalidOperationException("Config fiscal nao encontrada. Subir certificado primeiro.");
+
+                if (req.Ambiente.HasValue)
+                    config.AlterarAmbiente(req.Ambiente.Value);
+
+                if (req.SerieNfce.HasValue)
+                    config.AlterarSerieNfce(req.SerieNfce.Value);
+
+                db.EmpresaConfiguracoesFiscais.Update(config);
+            });
+
+            return DataOk(new { mensagem = "Serie e ambiente atualizados." });
+        }
+        catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
+        catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
+    }
+
+    [SwaggerOperation(Summary = "Desabilita emissao fiscal (killswitch)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpPost("desabilitar")]
+    public async Task<IActionResult> Desabilitar(
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        await uow.ExecuteInTransactionAsync(async txCt =>
+        {
+            var config = await db.EmpresaConfiguracoesFiscais
+                .FirstOrDefaultAsync(c => c.EmpresaId == eid, txCt);
+            if (config is null) return;
+
+            config.Desabilitar();
+            db.EmpresaConfiguracoesFiscais.Update(config);
+        });
+
+        logger.LogWarning("Emissao fiscal DESABILITADA para empresa {Empresa}", eid);
+        return DataOk(new { habilitada = false });
+    }
+
     [SwaggerOperation(Summary = "Obter status fiscal atual do tenant")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet]
@@ -171,6 +261,8 @@ public class ConfiguracaoFiscalController(
             regimeTributario = config.RegimeTributario.ToString(),
             serieNfce = config.SerieNfce,
             proximoNumeroNfce = config.ProximoNumeroNfce,
+            temCsc = !string.IsNullOrWhiteSpace(config.CscId),
+            cscId = config.CscId,
             certificado = cert is null
                 ? null
                 : new

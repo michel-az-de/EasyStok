@@ -52,6 +52,12 @@ public class EmpresaConfiguracaoFiscal
     /// <summary>Proximo numero a ser reservado por <see cref="ReservarProximoNumero"/>. Inicia em 1.</summary>
     public long ProximoNumeroNfce { get; set; } = 1;
 
+    /// <summary>Identificador sequencial do CSC ativo na SEFAZ (normalmente "1" ou "2").</summary>
+    public string? CscId { get; set; }
+
+    /// <summary>Token CSC (Codigo de Seguranca do Contribuinte) fornecido pela SEFAZ. Usado na geracao do QR Code da NFC-e.</summary>
+    public string? CscToken { get; set; }
+
     /// <summary>FK opcional a <see cref="CredencialIntegracao"/> com o certificado digital A1/A3 cifrado (KEK rotacionavel).</summary>
     public Guid? CertificadoCredencialId { get; set; }
 
@@ -146,6 +152,28 @@ public class EmpresaConfiguracaoFiscal
     {
         if (!Habilitada) return;
         Habilitada = false;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void ConfigurarCsc(string cscId, string cscToken)
+    {
+        if (string.IsNullOrWhiteSpace(cscId))
+            throw new ArgumentException("CSC ID obrigatorio.", nameof(cscId));
+        if (string.IsNullOrWhiteSpace(cscToken))
+            throw new ArgumentException("CSC Token obrigatorio.", nameof(cscToken));
+
+        CscId = cscId.Trim();
+        CscToken = cscToken.Trim();
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    public void AlterarSerieNfce(short serie)
+    {
+        if (serie <= 0)
+            throw new ArgumentException("Serie deve ser positiva.", nameof(serie));
+
+        if (SerieNfce == serie) return;
+        SerieNfce = serie;
         AlteradoEm = DateTime.UtcNow;
     }
 

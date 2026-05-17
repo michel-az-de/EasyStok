@@ -62,8 +62,8 @@ public sealed class ConfigFiscalResolver(
         string? credencialToken = null;
         byte[]? certA1Bytes = null;
         string? certA1Senha = null;
-        string? cscId = null;
-        string? cscToken = null;
+        string? cscId = config.CscId;
+        string? cscToken = config.CscToken;
 
         var credenciaisFiscais = await db.Set<CredencialIntegracao>()
             .AsNoTracking()
