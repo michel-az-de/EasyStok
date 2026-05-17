@@ -15,7 +15,11 @@ public record ProductDto(
     // Etiquetas de produção (opcionais — APKs antigos não enviam).
     string? Sku = null,
     int? DefaultWeightG = null,
-    int? DefaultValidityDays = null
+    int? DefaultValidityDays = null,
+    // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
+    // PWA usa para validar peso obrigatorio em confirmProduction.
+    // Inserido 2026-05-16. Lido do Produto(ERP) ligado via ErpProductId.
+    string TipoEmbalagem = "Avulso"
 );
 
 public record ClientDto(
@@ -53,7 +57,9 @@ public record OrderDto(
     System.Text.Json.JsonElement? History = null,
     string? ConfirmedBy = null,
     long? ConfirmedAt = null,
-    long? FactAt = null
+    long? FactAt = null,
+    // F5 — agendamento de pedido (MVP). NULL = pedido pra agora (caso padrão).
+    long? ScheduledDeliveryAt = null
 );
 
 public record BatchItemDto(
@@ -84,5 +90,27 @@ public record CashEntryDto(
     string Type,
     decimal Amount,
     string Description,
-    long CreatedAt
+    long CreatedAt,
+    // F7-B — estorno propagado. Web seta EstornadoEm, server reflete pro APK
+    // como flag. Mobile aplica como soft-delete visual (a mutation traz o item
+    // mas com flag estornado; mobile pode esconder).
+    bool? Estornado = null,
+    // F7-C — fechamento de caixa pode carregar metodo/categoria. Mobile cria
+    // entradas type=income/expense; web tem Metodo (pix/dinheiro/etc) opcional.
+    string? Metodo = null
+);
+
+/// <summary>
+/// F7-C — Fechamento de caixa snapshot. Mobile (cashClosings) ↔ Web
+/// (FechamentoCaixa). DTO carrega o sumário consolidado do dia.
+/// </summary>
+public record CashClosingDto(
+    string Id,
+    string DateKey,           // "YYYY-MM-DD" — chave do dia
+    long ClosedAt,
+    string? ClosedByName,
+    decimal TotalPagamentosPedidos,
+    decimal TotalSaidasExtras,
+    decimal SaldoFinal,
+    string? Notes
 );

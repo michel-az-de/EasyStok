@@ -12,13 +12,19 @@ public class CriarPedidoWebRequest
     public string? TelefoneAdHoc { get; set; }
     public string? Observacoes { get; set; }
     public List<CriarItemInput>? Itens { get; set; }
+    public DateTime? AgendadoParaEm { get; set; }
 }
 
 public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
+    ProdutosService produtosSvc,
+    TicketsApiService ticketsSvc,
     SessionService session) : BaseController(session)
 {
+    [HttpGet("/pedidos/novo")]
+    public IActionResult Novo() => RedirectToAction(nameof(Index));
+
     [HttpGet("/pedidos")]
     public async Task<IActionResult> Index(string? search = null, string? status = null)
     {
@@ -33,10 +39,14 @@ public class PedidosController(
         var cli = await clientesSvc.ListarAsync(status: "ativo");
         if (cli.Success && cli.Data is not null) vm.Clientes = cli.Data;
 
+        // Categorias para o cadastro rápido de produto inline no modal Novo pedido.
+        var cats = await produtosSvc.ListarCategoriasAsync();
+        if (cats.Success && cats.Data is not null) vm.Categorias = cats.Data;
+
         return View(vm);
     }
 
-    [HttpGet("/pedidos/{id}")]
+    [HttpGet("/pedidos/{id:guid}")]
     public async Task<IActionResult> Detail(string id)
     {
         ViewBag.Title = "Pedido";
@@ -67,12 +77,24 @@ public class PedidosController(
     public async Task<IActionResult> CriarJson([FromBody] CriarPedidoWebRequest req)
     {
         if (req.ClienteId == null && string.IsNullOrWhiteSpace(req.NomeAdHoc))
-            return BadRequest(new { success = false, errorMessage = "Informe um cliente OU um nome ad-hoc." });
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Informe um cliente OU um nome ad-hoc." }
+            });
 
         var result = await svc.CriarAsync(req.ClienteId, req.NomeAdHoc, req.AptAdHoc, req.TelefoneAdHoc,
-            req.Observacoes, req.Itens);
+            req.Observacoes, req.Itens, req.AgendadoParaEm);
         if (!result.Success)
-            return BadRequest(new { success = false, errorMessage = result.ErrorMessage ?? "Erro ao criar pedido." });
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao criar pedido."
+                }
+            });
 
         return Ok(new { success = true, id = result.Data?.Id });
     }
@@ -88,6 +110,20 @@ public class PedidosController(
         return RedirectToAction(nameof(Detail), new { id });
     }
 
+    [HttpPost("/pedidos/{id}/agendar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Agendar(string id, DateTime? agendadoParaEm)
+    {
+        var result = await svc.AlterarAgendamentoAsync(id, agendadoParaEm);
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
+        var msg = agendadoParaEm.HasValue
+            ? $"Pedido agendado para {agendadoParaEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}."
+            : "Agendamento removido.";
+        Toast("success", msg);
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
     [HttpPost("/pedidos/{id}/cancelar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancelar(string id, string? motivo)
@@ -97,6 +133,36 @@ public class PedidosController(
 
         Toast("success", "Pedido cancelado.");
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Onda 1.1 — abre ticket SaaS pra EasyStok reportando problema sobre
+    /// um pedido especifico. Vincula via PedidoId (cross-tenant validado no
+    /// use case). Cliente nao escolhe prioridade; categoria default Solicitacao.
+    /// </summary>
+    [HttpPost("/pedidos/{id:guid}/reportar-problema")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReportarProblema(Guid id, string motivo, string? descricao, string? categoria)
+    {
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            Toast("error", "Informe o motivo da reclamacao.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var titulo = $"Pedido {id.ToString().Substring(0, 8)} — {motivo}";
+        var desc = string.IsNullOrWhiteSpace(descricao) ? motivo : descricao;
+        var cat = string.IsNullOrWhiteSpace(categoria) ? "Solicitacao" : categoria;
+
+        var result = await ticketsSvc.AbrirAsync(titulo, desc, cat, pedidoId: id);
+        if (HasError(result))
+        {
+            Toast("error", $"Falha ao abrir ticket: {result.ErrorMessage}");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        Toast("success", $"Ticket aberto. Acompanhe em Suporte.");
+        return RedirectToAction(nameof(Detail), new { id });
     }
 
     [HttpPost("/pedidos/{id}/itens")]
@@ -143,5 +209,48 @@ public class PedidosController(
 
         Toast("success", "Pagamento removido.");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    /// <summary>
+    /// Ultimo pedido NAO cancelado do cliente — usado pelo modal Novo pedido pro
+    /// atalho "Repetir ultimo". Retorna {found:false} quando o cliente nao tem
+    /// historico ou todos os pedidos estao cancelados.
+    /// </summary>
+    [HttpGet("/pedidos/cliente/{clienteId}/ultimo")]
+    public async Task<IActionResult> UltimoDoCliente(Guid clienteId)
+    {
+        if (clienteId == Guid.Empty)
+            return Json(new { found = false });
+
+        var lista = await svc.ListarAsync(clienteId: clienteId);
+        if (!lista.Success || lista.Data is null || lista.Data.Count == 0)
+            return Json(new { found = false });
+
+        var ultimo = lista.Data
+            .Where(p => !string.Equals(p.Status, "cancelado", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(p => p.CriadoEm)
+            .FirstOrDefault();
+        if (ultimo is null)
+            return Json(new { found = false });
+
+        var detalhe = await svc.ObterAsync(ultimo.Id);
+        if (!detalhe.Success || detalhe.Data is null)
+            return Json(new { found = false });
+
+        return Json(new
+        {
+            found = true,
+            pedidoId = ultimo.Id,
+            criadoEm = ultimo.CriadoEm,
+            total = ultimo.Total,
+            itensCount = ultimo.ItensCount,
+            itens = detalhe.Data.Itens.Select(i => new
+            {
+                nome = i.Nome,
+                quantidade = i.Quantidade,
+                precoUnitario = i.PrecoUnitario,
+                produtoId = i.ProdutoId
+            })
+        });
     }
 }

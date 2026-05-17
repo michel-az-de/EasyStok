@@ -1,5 +1,7 @@
+using System.IO.Compression;
 using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.ResponseCompression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,7 +62,35 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+// Response compression — Brotli/Gzip pra Razor Pages + JSON dos /api-proxy/*.
+// Render cobra bandwidth; CPU overhead marginal.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "application/javascript",
+        "image/svg+xml"
+    });
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+
 var app = builder.Build();
+
+// ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
+// X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
+app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
+    KnownNetworks = { },
+    KnownProxies = { }
+});
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 if (!app.Environment.IsDevelopment())
@@ -69,6 +99,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
@@ -525,6 +556,92 @@ app.MapPost("/api-proxy/diag/logging-mode", async (
     }
 });
 
+// Snapshot completo de infra (banco, redis, smtp, storage, ia, config).
+app.MapGet("/api-proxy/diag/infra", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/diagnostico");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/infra falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Health de cada endpoint-chave (latência, status, timeout).
+app.MapGet("/api-proxy/diag/endpoints", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/diagnostico/endpoints");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/endpoints falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// SLO — uptime 24h, avg/p95 response time, error rate (pass-through de ?hours=).
+app.MapGet("/api-proxy/diag/slo", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/slo?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/slo falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Queries lentas do PostgreSQL via pg_stat_statements.
+app.MapGet("/api-proxy/diag/queries-lentas", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken()))
+        return Results.Unauthorized();
+    try
+    {
+        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/diagnostico/queries-lentas");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/queries-lentas falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 // ──────────────────────────────────────────────────────────────────────
 // Proxies /api-proxy/mobile/* — alimentam as páginas /Operacao e /Dispositivos
 // (gestão de devices PWA pareados, dashboard live, comandos remotos OTA).
@@ -550,6 +667,74 @@ app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
     catch (Exception ex)
     {
         log.LogWarning(ex, "Proxy mobile/operacao/dashboard falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Onda 1.3 — proxy do diagnostico de email (envia teste pelo provedor ativo).
+app.MapPost("/api-proxy/diag/email-teste", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var body = await ctx.Request.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/admin/diagnostico/email/teste", body);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/email-teste falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Onda 2.1 — proxy do diagnostico de WhatsApp (envia texto ou template via Meta Cloud).
+app.MapPost("/api-proxy/diag/whatsapp-teste", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var body = await ctx.Request.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/admin/diagnostico/whatsapp/teste", body);
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy diag/whatsapp-teste falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Onda 1.4 — proxy do resumo de tickets criticos.
+// - Sem empresaId: cross-tenant (badge global no _Layout admin)
+// - Com empresaId: por empresa (widget na pagina Operacao)
+app.MapGet("/api-proxy/admin/tickets/criticos-resumo", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/admin/tickets/criticos-resumo?{qs}");
+        return Results.Ok(data);
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy admin/tickets/criticos-resumo falhou");
         return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
@@ -714,6 +899,33 @@ app.MapGet("/api-proxy/mobile/version", async (
     catch (Exception ex)
     {
         log.LogWarning(ex, "Proxy mobile/version falhou");
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+// Proxy /api-proxy/notificacoes/templates/preview-raw — usado pelo editor de
+// templates (Notificacoes/Templates/Edit) para render Scriban ao vivo sem
+// precisar salvar. Aceita { assuntoTemplate, corpoTemplate, variaveis } e
+// devolve { assuntoRenderizado, corpoRenderizado, erro? }.
+app.MapPost("/api-proxy/notificacoes/templates/preview-raw", async (
+    EasyStock.Admin.Services.AdminApiClient api,
+    EasyStock.Admin.Services.AdminSessionService session,
+    HttpContext ctx,
+    ILogger<Program> log) =>
+{
+    if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+    try
+    {
+        using var doc = await System.Text.Json.JsonDocument.ParseAsync(ctx.Request.Body);
+        var body = doc.RootElement.Clone();
+        var data = await api.PostAsync<System.Text.Json.JsonElement>(
+            "api/admin/notificacoes/templates/preview-raw", body);
+        return Results.Ok(new { data });
+    }
+    catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+    catch (Exception ex)
+    {
+        log.LogWarning(ex, "Proxy templates/preview-raw falhou");
         return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
     }
 });

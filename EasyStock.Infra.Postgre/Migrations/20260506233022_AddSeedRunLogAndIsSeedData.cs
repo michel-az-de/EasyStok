@@ -1,4 +1,3 @@
-using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,48 +5,26 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     /// <summary>
-    /// Migration escrita manualmente porque a auto-geração saiu vazia
-    /// (snapshot avançou sem SQL na primeira tentativa). Aplica:
-    ///   1. Coluna IsSeedData (bool, default false) na tabela Empresas — marca
-    ///      registros criados pelo seed pra cleanup inteligente.
-    ///   2. Tabela SeedRunLogs — auditoria de cada execução de seed.
+    /// NO-OP. Migration original tentava ALTER TABLE "Empresas" (PascalCase) em
+    /// um schema que estava com naming snake_case ("empresas") — falha hard
+    /// (42P01: relation does not exist) em bancos fresh.
     ///
-    /// Idempotente: usa "IF NOT EXISTS" via raw SQL pra tolerar bancos que
-    /// já tenham parte do schema (ex.: rodaram a migration vazia antes).
+    /// O trabalho real (coluna IsSeedData em empresas + tabela SeedRunLogs) foi
+    /// movido para a migration AddNotificationsCore (anterior, 22:15:16) com
+    /// SQL idempotente em snake_case. Em bancos antigos que ja aplicaram esta
+    /// migration via legado, o registro permanece em __EFMigrationsHistory e
+    /// nada e' desfeito.
     /// </summary>
     public partial class AddSeedRunLogAndIsSeedData : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // 1. IsSeedData em Empresas
-            migrationBuilder.Sql(@"
-                ALTER TABLE ""Empresas""
-                ADD COLUMN IF NOT EXISTS ""IsSeedData"" boolean NOT NULL DEFAULT false;
-            ");
-
-            // 2. Tabela SeedRunLogs
-            migrationBuilder.Sql(@"
-                CREATE TABLE IF NOT EXISTS ""SeedRunLogs"" (
-                    ""Id"" uuid NOT NULL,
-                    ""AdminEmail"" text NOT NULL,
-                    ""TipoSeed"" text NOT NULL,
-                    ""Volume"" text NULL,
-                    ""StartedAt"" timestamp with time zone NOT NULL,
-                    ""CompletedAt"" timestamp with time zone NULL,
-                    ""Status"" text NOT NULL,
-                    ""EtapasJson"" text NULL,
-                    ""BackupJson"" text NULL,
-                    ""Erro"" text NULL,
-                    ""Resumo"" text NULL,
-                    CONSTRAINT ""PK_SeedRunLogs"" PRIMARY KEY (""Id"")
-                );
-            ");
+            // Intencionalmente vazio. Veja XML doc da classe.
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(@"DROP TABLE IF EXISTS ""SeedRunLogs"";");
-            migrationBuilder.Sql(@"ALTER TABLE ""Empresas"" DROP COLUMN IF EXISTS ""IsSeedData"";");
+            // Intencionalmente vazio. Veja XML doc da classe.
         }
     }
 }

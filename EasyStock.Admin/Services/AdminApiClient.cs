@@ -218,6 +218,14 @@ public class AdminApiClient(HttpClient httpClient)
         return UnwrapData<T>(json.RootElement);
     }
 
+    /// <summary>PUT sem corpo de retorno relevante (204 NoContent ou similar).</summary>
+    public async Task PutAsync(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Put, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+    }
+
     public async Task PatchRawAsync(string path, object body)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Patch, path, body));

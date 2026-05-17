@@ -4,7 +4,7 @@
 >
 > Princípio: **código está em ~40% parity, operação em ~15%**. Estabilizar = fechar deploy, CI, backup, alerta, testes de integração.
 
-Última atualização: 2026-05-06
+Última atualização: 2026-05-07
 
 ---
 
@@ -42,7 +42,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 ## Bloco 4 — Segurança operacional (P1)
 
 - [ ] **Rotação de secrets**: JWT key, Efí keys, SMTP. Mover de `appsettings` pra Secret Manager + processo documentado.
-- [ ] **Rate limiting** nos endpoints públicos: `/auth/login`, `/auth/registrar`, `/api/webhooks/pix`.
+- [ ] **Rate limiting `/api/webhooks/pix`** (login/register/refresh/forgot/reset cobertos pela policy `auth` desde B-015 — ver "Itens resolvidos").
 - [ ] **Auditoria de `[AllowAnonymous]` restantes**: DiagnosticoController OK; conferir Mobile e outros Webhooks.
 - [ ] **HTTPS-only + HSTS** no Cloud Run.
 - [ ] **CSP / anti-XSS** no Web e Admin (Razor escapa por padrão, mas inline scripts são comuns).
@@ -92,6 +92,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 - [x] **Notifications PR1–PR7 completo** — 2026-05-06. Outbox + adapters + Worker + painel Admin + LGPD + métricas OTel.
 - [x] **Helpdesk core E2E** — 2026-05-06. AdminTicket reformado + SLA monitor + 9 eventos globais + UI multi-nível.
 - [x] **Dual frontend formalizado** — 2026-05-06 (`4e9ffda`). Política PWA → MAUI unidirecional em `dual-frontend-policy.md`.
+- [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` fixed-window 10/min/IP cobre login + register + refresh + forgot-password + reset-password. Teste em `AuthRateLimitTests.cs`. Webhook Pix segue como item residual.
 
 ---
 

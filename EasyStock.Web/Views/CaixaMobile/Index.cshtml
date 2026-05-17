@@ -30,9 +30,9 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "💰" },
+            { "EmptyIllustration", "inbox" },
             { "EmptyTitle", "Nenhum lançamento do app" },
-            { "EmptyDescription", "Entradas e saídas extras feitas no app aparecerão aqui pra revisão." }
+            { "EmptyDescription", "Entradas e saídas extras feitas no app aparecem aqui para revisão." }
         })
     }
     else
@@ -61,7 +61,7 @@
                         }
                         else
                         {
-                            <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">pendente</span>
+                            <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">pendente</span>
                         }
                     </td>
                     <td class="text-right">
@@ -74,10 +74,15 @@
                         }
                         else
                         {
-                            <form asp-action="Unlink" asp-controller="CaixaMobile" asp-route-id="@c.Id" method="post" onsubmit="return confirm('Desfazer link com ERP?');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
-                            </form>
+                            <button type="button"
+                                    @@click="$dispatch('confirm-action', {
+                                        titulo: 'Desfazer link com o ERP?',
+                                        mensagem: 'O lançamento volta pra lista de pendentes e some do caixa do ERP.',
+                                        textoBotao: 'Desfazer link',
+                                        classBotao: 'bg-red-600 hover:bg-red-700',
+                                        formAction: '@Url.Action("Unlink", "CaixaMobile", new { id = c.Id })'
+                                    })"
+                                    class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
                         }
                     </td>
                 </tr>

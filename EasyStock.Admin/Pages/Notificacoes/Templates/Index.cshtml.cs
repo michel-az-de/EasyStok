@@ -42,10 +42,12 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         }
     }
 
-    public async Task<IActionResult> OnPostAprovarAsync(Guid id)
+    public async Task<IActionResult> OnPostAprovarAsync(Guid id, string? motivo = null)
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(motivo))
+                logger.LogInformation("Aprovando template {Id}. Motivo: {Motivo}", id, motivo);
             await api.PostRawAsync($"api/admin/notificacoes/templates/{id}/aprovar", new { });
             SetSucesso("Template aprovado com sucesso.");
         }

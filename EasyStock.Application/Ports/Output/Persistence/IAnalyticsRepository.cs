@@ -157,6 +157,141 @@ namespace EasyStock.Application.Ports.Output.Persistence
         string? NomeLoja,
         Guid? ReferenciaId);
 
+    // ── Receita × Custo DTOs ────────────────────────────────────────────
+
+    public sealed record ReceitaCustoDia(
+        string Label,
+        decimal Receita,
+        decimal Custo,
+        decimal Lucro);
+
+    // ── Dashboard Full DTOs ─────────────────────────────────────────────
+
+    public sealed record DashboardKpis(
+        decimal Receita,
+        decimal TicketMedio,
+        int Pedidos,
+        int PedidosEntregues,
+        int PedidosPendentes,
+        int ItensEmEstoque,
+        decimal CustoEstoque,
+        decimal? MargemBruta,
+        int LotesProduzidos,
+        int ClientesAtivos,
+        decimal PercentualCritico,
+        int LotesAtivos);
+
+    public sealed record DashboardKpisDelta(
+        decimal? Receita,
+        decimal? TicketMedio,
+        decimal? Pedidos,
+        decimal? ItensEmEstoque,
+        decimal? CustoEstoque,
+        decimal? MargemBruta,
+        decimal? LotesProduzidos,
+        decimal? ClientesAtivos);
+
+    public sealed record EstoqueStatusDistribuicao(
+        int Ok,
+        int Atencao,
+        int Critico,
+        int Parado,
+        int Total);
+
+    public sealed record PedidoPendenteResumo(
+        Guid Id,
+        string? ClienteNome,
+        string ItensResumo,
+        decimal Total,
+        decimal TotalPago,
+        decimal EmAberto,
+        DateTime CriadoEm,
+        string Status);
+
+    public sealed record AlertaEstoqueResumo(
+        Guid ItemEstoqueId,
+        Guid ProdutoId,
+        string? NomeProduto,
+        string Tipo,
+        int Quantidade,
+        int Dias);
+
+    public sealed record InsightDto(
+        string Componente,
+        string Severidade,
+        string Texto);
+
+    public sealed record DashboardFullResult(
+        DashboardKpis Kpis,
+        DashboardKpisDelta Delta,
+        EstoqueStatusDistribuicao EstoqueStatus,
+        IReadOnlyList<PedidoPendenteResumo> PedidosPendentes,
+        decimal PedidosPendentesTotal,
+        IReadOnlyList<AlertaEstoqueResumo> AlertasEstoque,
+        int EntreguesSemVenda,
+        IReadOnlyList<InsightDto> Insights);
+
+    // ── Dashboard Extras DTOs ──────────────────────────────────────────────────
+
+    public sealed record FluxoCaixaDia(
+        string Label,
+        decimal Entradas,
+        decimal Saidas,
+        decimal SaldoAcumulado);
+
+    public sealed record ValidadeSemanaItem(
+        string Semana,
+        int Quantidade,
+        string[] NomesProdutos,
+        int DiasMedia);
+
+    public sealed record TopProdutoDashboard(
+        Guid ProdutoId,
+        string Nome,
+        int Quantidade,
+        decimal Receita);
+
+    public sealed record TopClienteDashboard(
+        Guid ClienteId,
+        string Nome,
+        decimal TotalPago,
+        int Pedidos,
+        decimal TicketMedio);
+
+    public sealed record ProducaoPorOperador(
+        string Operador,
+        int Lotes,
+        int Unidades);
+
+    public sealed record EntradasSaidasSemana(
+        string Label,
+        decimal Entradas,
+        decimal Saidas);
+
+    public sealed record FornecedorResumoItem(
+        Guid Id,
+        string Nome,
+        bool Ativo);
+
+    public sealed record FornecedoresResumo(
+        int Ativos,
+        int Inativos,
+        IReadOnlyList<FornecedorResumoItem> Lista);
+
+    public sealed record NovosClientesMes(
+        string Label,
+        int Novos);
+
+    public sealed record DashboardExtrasResult(
+        IReadOnlyList<FluxoCaixaDia> FluxoCaixa,
+        IReadOnlyList<ValidadeSemanaItem> ValidadeTimeline,
+        IReadOnlyList<TopProdutoDashboard> TopProdutos,
+        IReadOnlyList<TopClienteDashboard> TopClientes,
+        IReadOnlyList<ProducaoPorOperador> ProducaoPorOperador,
+        IReadOnlyList<EntradasSaidasSemana> EntradasSaidasSemanal,
+        FornecedoresResumo Fornecedores,
+        IReadOnlyList<NovosClientesMes> NovosClientes);
+
     // Interface
 
     public interface IAnalyticsRepository
@@ -216,6 +351,36 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>Vendas agrupadas por canal de venda.</summary>
         Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
 
+        // ── Receita × Custo ─────────────────────────────────────────────
+
+        /// <summary>Série temporal de Receita/Custo/Lucro: por dia (≤30d) ou por mês (>30d).</summary>
+        Task<IReadOnlyList<ReceitaCustoDia>> GetReceitaCustoSerieAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null, int timezoneOffsetMinutes = 0);
+
+        // ── Alertas ──────────────────────────────────────────────────────
+
+        /// <summary>Itens com status Crítico ou abaixo do mínimo (top N).</summary>
+        Task<IReadOnlyList<AlertaEstoqueResumo>> GetItensCriticosResumoAsync(Guid empresaId, int top = 20, Guid? lojaId = null);
+
+        // ── Dashboard Full ───────────────────────────────────────────────
+
+        /// <summary>Distribuição dos itens de estoque por status.</summary>
+        Task<EstoqueStatusDistribuicao> GetEstoqueStatusDistribuicaoAsync(Guid empresaId, Guid? lojaId = null);
+
+        /// <summary>Pedidos com pagamento pendente (Total > TotalPago, não cancelados).</summary>
+        Task<IReadOnlyList<PedidoPendenteResumo>> GetPedidosPendentesAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null, int pageSize = 50);
+
+        /// <summary>Contagem de pedidos entregues sem Venda associada.</summary>
+        Task<int> GetEntreguesSemVendaCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null);
+
+        /// <summary>KPIs completos do dashboard com dados de Vendas como fonte de receita.</summary>
+        Task<DashboardKpis> GetDashboardKpisAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+
+        /// <summary>Contagem de lotes finalizados no período.</summary>
+        Task<int> GetLotesFinalizadosCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null);
+
+        /// <summary>Clientes distintos com pedido no período.</summary>
+        Task<int> GetClientesAtivosCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null);
+
         // ── Store Intelligence ───────────────────────────────────────────
 
         /// <summary>Comparativo de inteligência entre todas as lojas da empresa.</summary>
@@ -229,5 +394,31 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         /// <summary>Indicadores acionáveis por loja ou para toda a empresa.</summary>
         Task<IReadOnlyList<IndicadorAcao>> GetIndicadoresAcaoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null);
+
+        // ── Dashboard Extras ─────────────────────────────────────────────────────
+
+        /// <summary>Fluxo de caixa agrupado por dia (≤30d) ou mês (>30d) a partir de FechamentosCaixa.</summary>
+        Task<IReadOnlyList<FluxoCaixaDia>> GetFluxoCaixaAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+
+        /// <summary>Timeline de validades: itens agrupados por semana futura (próximas 4 semanas).</summary>
+        Task<IReadOnlyList<ValidadeSemanaItem>> GetValidadeTimelineAsync(Guid empresaId, Guid? lojaId = null);
+
+        /// <summary>Top N produtos mais vendidos no período (via MovimentacoesEstoque Saida/Venda).</summary>
+        Task<IReadOnlyList<TopProdutoDashboard>> GetTopProdutosAsync(Guid empresaId, DateTime de, DateTime ate, int top = 5, Guid? lojaId = null);
+
+        /// <summary>Top N clientes por valor pago no período (via Pedidos).</summary>
+        Task<IReadOnlyList<TopClienteDashboard>> GetTopClientesAsync(Guid empresaId, DateTime de, DateTime ate, int top = 5, Guid? lojaId = null);
+
+        /// <summary>Produção por operador: lotes finalizados + unidades (etiquetas) no período.</summary>
+        Task<IReadOnlyList<ProducaoPorOperador>> GetProducaoPorOperadorAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+
+        /// <summary>Entradas vs saídas agrupadas por semana no período.</summary>
+        Task<IReadOnlyList<EntradasSaidasSemana>> GetEntradasSaidasSemanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+
+        /// <summary>Resumo de fornecedores: contagem ativo/inativo + lista.</summary>
+        Task<FornecedoresResumo> GetFornecedoresResumoAsync(Guid empresaId, Guid? lojaId = null);
+
+        /// <summary>Novos clientes por mês nos últimos N meses.</summary>
+        Task<IReadOnlyList<NovosClientesMes>> GetNovosClientesPorMesAsync(Guid empresaId, int meses = 6, Guid? lojaId = null);
     }
 }

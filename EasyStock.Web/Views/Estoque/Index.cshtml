@@ -1,12 +1,18 @@
 @model EstoqueListViewModel
 @{
-    var statusOpcoes = new[] { ("", "Tudo"), ("ok", "OK"), ("atencao", "Atenção"), ("critico", "Crítico"), ("parado", "Parado") };
+    var statusOpcoes = new[] { ("", "Todos"), ("ok", "OK"), ("atencao", "Atenção"), ("critico", "Crítico"), ("parado", "Parado") };
 }
 
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
-        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "item no estoque" : "itens no estoque") <span class="text-slate-400 text-xs font-normal">· por lote/entrada</span></p>
+        <p title="Cada linha do estoque é um lote distinto (ItemEstoque). O KPI 'Lotes Produzidos' do dashboard conta apenas lotes finalizados no período.">
+            @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote em estoque" : "lotes em estoque")
+            @if (Model.LotesComSaldo.HasValue && Model.LotesComSaldo.Value != Model.Paginacao.Total)
+            {
+                <span class="text-slate-400">· @Model.LotesComSaldo com saldo</span>
+            }
+        </p>
     </div>
     <div class="flex items-center gap-2">
         <a href="/estoque/exportar-csv"
@@ -28,11 +34,12 @@
 
 <!-- Filtros -->
 <div class="ws mb-4">
-    <form method="get" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar estoque">
+    <form method="get" x-data="{}" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar estoque">
         <input type="hidden" name="status" value="@Model.StatusFiltro" />
         <input type="hidden" name="categoria" value="@Model.Categoria" />
         <input type="search" name="search" value="@Model.Search" placeholder="Buscar produto ou SKU..."
                aria-label="Buscar produto ou SKU"
+               @@input.debounce.600ms="$el.form.requestSubmit()"
                class="flex-1 min-w-48 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
 
         <!-- Pills de status -->
@@ -46,64 +53,148 @@
                 </a>
             }
         </div>
-
-        <button type="submit"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            Buscar
-        </button>
     </form>
 </div>
 
 <!-- Modal saída rápida (Alpine global) -->
 <div x-data="saidaModal()" id="saida-modal-wrapper">
-    <div x-show="open" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" x-transition>
-        <div @@click.stop class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
-            <h3 class="font-bold text-slate-900 text-lg mb-1">Registrar saída</h3>
-            <p class="text-slate-500 text-sm mb-4" x-text="produtoNome"></p>
-
-            <div class="flex gap-2 mb-4">
-                <button @@click="natureza = 'venda'"
-                        :class="natureza === 'venda' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'"
-                        class="flex-1 py-2 text-xs font-semibold rounded-lg transition-colors">Venda</button>
-                <button @@click="natureza = 'perda'"
-                        :class="natureza === 'perda' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'"
-                        class="flex-1 py-2 text-xs font-semibold rounded-lg transition-colors">Perda</button>
-                <button @@click="natureza = 'prejuizo'"
-                        :class="natureza === 'prejuizo' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'"
-                        class="flex-1 py-2 text-xs font-semibold rounded-lg transition-colors">Prejuízo</button>
+    <div x-show="open" x-cloak
+         class="modal-backdrop"
+         @@click.self="open = false"
+         @@keydown.window.escape="open = false"
+         x-transition>
+        <div class="modal-panel modal-sm"
+             role="dialog" aria-modal="true" aria-labelledby="saida-title">
+            <!-- Header -->
+            <div class="modal-header">
+                <div class="flex-1">
+                    <h3 id="saida-title" class="text-base font-semibold m-0">Registrar saída</h3>
+                    <p class="text-sm text-slate-500 mt-0.5" x-text="produtoNome"></p>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="open = false">✕</button>
             </div>
 
-            <div class="space-y-3 mb-4">
+            <!-- Body -->
+            <div class="modal-body space-y-4">
+                <!-- Erro inline -->
+                <div x-show="erroMsg" x-cloak
+                     class="text-sm rounded-lg px-3 py-2 bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800"
+                     x-text="erroMsg" role="alert"></div>
+
+                <!-- Tipo de saída: segmented com descrição -->
                 <div>
-                    <label class="text-xs font-semibold text-slate-700 mb-1 block">Quantidade *</label>
-                    <input type="number" x-model.number="qty" min="1" :max="qtyDisponivel"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <p class="text-xs text-slate-400 mt-1" x-text="'Disponível: ' + qtyDisponivel"></p>
+                    <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block uppercase tracking-wide">
+                        Tipo de saída
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" @@click="setNatureza('venda')"
+                                :aria-pressed="natureza === 'venda'"
+                                :class="natureza === 'venda' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'"
+                                class="py-2 text-xs font-semibold rounded-lg border-2 transition-colors">
+                            Venda
+                        </button>
+                        <button type="button" @@click="setNatureza('perda')"
+                                :aria-pressed="natureza === 'perda'"
+                                :class="natureza === 'perda' ? 'border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'"
+                                class="py-2 text-xs font-semibold rounded-lg border-2 transition-colors">
+                            Perda
+                        </button>
+                        <button type="button" @@click="setNatureza('prejuizo')"
+                                :aria-pressed="natureza === 'prejuizo'"
+                                :class="natureza === 'prejuizo' ? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'"
+                                class="py-2 text-xs font-semibold rounded-lg border-2 transition-colors">
+                            Prejuízo
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5" x-text="naturezaHint"></p>
                 </div>
-                <div x-show="natureza === 'venda'">
-                    <label class="text-xs font-semibold text-slate-700 mb-1 block">Valor (R$)</label>
-                    <input type="number" x-model.number="valor" step="0.01" min="0"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
+
+                <!-- Quantidade -->
                 <div>
-                    <label class="text-xs font-semibold text-slate-700 mb-1 block">Data *</label>
+                    <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block uppercase tracking-wide">
+                        Quantidade
+                    </label>
+                    @* U4 (2026-05-16): :disabled visual nos botoes +/- de quantidade.
+                       Math.max(1,...) ja existia, mas faltava aria-disabled e estilo
+                       opacity-50 cursor-not-allowed para feedback visual claro.
+                       Max 9999 limita o + para evitar overflow. *@
+                    <div class="flex items-center gap-2">
+                        <button type="button" @@click="qty = Math.max(1, qty - 1)"
+                                :disabled="qty <= 1"
+                                :aria-disabled="qty <= 1 ? 'true' : 'false'"
+                                :class="qty <= 1 ? 'opacity-50 cursor-not-allowed' : ''"
+                                class="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">−</button>
+                        <input type="number" x-model.number="qty" min="1" max="9999"
+                               class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-base text-center focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        <button type="button" @@click="qty = Math.min(9999, qty + 1)"
+                                :disabled="qty >= 9999"
+                                :aria-disabled="qty >= 9999 ? 'true' : 'false'"
+                                :class="qty >= 9999 ? 'opacity-50 cursor-not-allowed' : ''"
+                                class="w-9 h-9 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">+</button>
+                    </div>
+                    <p class="text-xs mt-1"
+                       :class="qty > qtyDisponivel ? 'text-amber-600 font-medium' : 'text-slate-500 dark:text-slate-400'">
+                        <span x-show="qty <= qtyDisponivel">Disponível: <span x-text="qtyDisponivel"></span></span>
+                        <span x-show="qty > qtyDisponivel" x-cloak>
+                            ⚠ Excede estoque atual (<span x-text="qtyDisponivel"></span>un). Sistema vai repor <span x-text="qty - qtyDisponivel"></span>un automaticamente — revise depois.
+                        </span>
+                    </p>
+                </div>
+
+                <!-- Valor (somente Venda e Prejuízo) -->
+                <div x-show="natureza === 'venda' || natureza === 'prejuizo'" x-cloak>
+                    <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block uppercase tracking-wide">
+                        <span x-show="natureza === 'venda'">Valor unitário (R$) <span class="text-red-500">*</span></span>
+                        <span x-show="natureza === 'prejuizo'" x-cloak>Custo perdido por unidade (R$, opcional)</span>
+                    </label>
+                    <input type="number" x-model.number="valor" step="0.01" min="0.01"
+                           placeholder="0,00"
+                           :class="natureza === 'venda' && semPreco ? 'border-amber-400 focus:ring-amber-300' : 'border-slate-300 dark:border-slate-600 focus:ring-indigo-300'"
+                           class="w-full px-3 py-2 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 border" />
+                    <p x-show="natureza === 'venda' && semPreco" x-cloak
+                       class="text-xs text-amber-600 mt-1">
+                        Produto sem preço cadastrado. Informe o valor de venda para calcular a receita.
+                    </p>
+                </div>
+
+                <!-- Motivo (Perda e Prejuízo) -->
+                <div x-show="natureza === 'perda' || natureza === 'prejuizo'" x-cloak>
+                    <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block uppercase tracking-wide">
+                        Motivo
+                    </label>
+                    <input type="text" x-model="motivo"
+                           placeholder="Ex: validade vencida, danificado no transporte…"
+                           class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Registrado na auditoria — explique em uma frase.
+                    </p>
+                </div>
+
+                <!-- Data -->
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block uppercase tracking-wide">
+                        Data
+                    </label>
                     <input type="date" x-model="data"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
             </div>
 
             <!-- CSRF token para o fetch -->
             @Html.AntiForgeryToken()
 
-            <div class="flex gap-3">
-                <button @@click="open = false"
-                        class="flex-1 py-2.5 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button type="button" @@click="open = false"
+                        class="flex-1 py-2.5 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
                     Cancelar
                 </button>
-                <button @@click="confirmarSaida()"
-                        :disabled="loading"
-                        class="flex-1 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50">
-                    <span x-text="loading ? 'Salvando...' : 'Confirmar'"></span>
+                <button type="button" @@click="confirmarSaida()"
+                        :disabled="loading || !podeEnviar()"
+                        :class="loading || !podeEnviar() ? 'opacity-50 cursor-not-allowed' : ''"
+                        class="flex-1 py-2.5 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+                    <span x-show="!loading" x-text="ctaLabel"></span>
+                    <span x-show="loading" x-cloak>Salvando…</span>
                 </button>
             </div>
         </div>
@@ -117,10 +208,10 @@
             <table class="tbl-full">
                 <thead>
                     <tr>
-                        <th>Produto / Variação</th>
+                        <th class="sticky left-0 z-10 bg-white">Produto / Variação</th>
                         <th>SKU</th>
                         <th class="text-center">Qtd</th>
-                        <th class="text-center hidden md:table-cell">Rotatividade</th>
+                        <th class="text-center hidden md:table-cell">Giro</th>
                         <th class="hidden md:table-cell">Último mov.</th>
                         <th>Validade</th>
                         <th class="text-center">Status</th>
@@ -135,9 +226,15 @@
                             : (int?)null;
                         var velInt = (int)Math.Min(Math.Round(item.Vel * 5), 5);
                         <tr id="row-@item.Id">
-                            <td>
+                            <td class="sticky left-0 z-10 bg-white">
                                 <div class="font-semibold text-slate-900">@(item.Produto?.Nome ?? item.Sku)</div>
-                                <div class="text-xs text-slate-400">@(item.Variacao?.Nome ?? "Padrão")</div>
+                                <div class="text-xs text-slate-400">
+                                    @(item.Variacao?.Nome ?? "Padrão")
+                                    @if (!string.IsNullOrEmpty(item.Lote))
+                                    {
+                                        <span class="ml-1 text-slate-400">· Lote: @item.Lote</span>
+                                    }
+                                </div>
                             </td>
                             <td class="font-mono text-xs text-slate-500">@item.Sku</td>
                             <td class="text-center">
@@ -146,24 +243,31 @@
                                 </span>
                             </td>
                             <td class="text-center hidden md:table-cell">
-                                <div class="vel-bar justify-center" title="@item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) un/dia (últimos 30 dias)">
-                                    @for (int seg = 1; seg <= 5; seg++)
-                                    {
-                                        var segClass = seg <= velInt
-                                            ? (velInt >= 4 ? "g" : velInt >= 2 ? "a" : "r")
-                                            : "";
-                                        <div class="vel-seg @segClass"></div>
-                                    }
-                                </div>
+                                @if (item.Vel == 0)
+                                {
+                                    <span class="text-xs text-slate-400" title="Sem saídas nos últimos 30 dias">Parado</span>
+                                }
+                                else
+                                {
+                                    <div class="vel-bar justify-center" title="@item.Vel.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) un/dia (últimos 30 dias) — cada barra = 0,5 un/dia">
+                                        @for (int seg = 1; seg <= 5; seg++)
+                                        {
+                                            var segClass = seg <= velInt
+                                                ? (velInt >= 4 ? "g" : velInt >= 2 ? "a" : "r")
+                                                : "";
+                                            <div class="vel-seg @segClass"></div>
+                                        }
+                                    </div>
+                                }
                             </td>
                             <td class="text-slate-500 text-xs hidden md:table-cell">
-                                @item.LastMov.ToString("dd/MM/yyyy")
+                                @item.LastMov.AsDate()
                             </td>
                             <td>
                                 @if (item.Validade.HasValue)
                                 {
                                     <span class="@(diasParaVencer <= 7 ? "text-red-600 font-semibold" : "text-slate-600") text-xs">
-                                        @item.Validade.Value.ToString("dd/MM/yyyy")
+                                        @item.Validade.Value.AsDate()
                                         @if (diasParaVencer <= 7)
                                         {
                                             <span class="badge-critical ml-1 px-1.5 py-0.5 rounded text-xs font-semibold">@diasParaVencer d</span>
@@ -172,34 +276,58 @@
                                 }
                                 else
                                 {
-                                    <span class="text-slate-400">—</span>
+                                    @if (item.Qty == 0)
+                                    {
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sem validade</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-400">—</span>
+                                    }
                                 }
                             </td>
                             <td class="text-center">
                                 @{
-                                    var sClass = item.Status?.ToLower() switch
+                                    // Defesa em profundidade: Qty 0 SEMPRE renderiza como Esgotado, mesmo se
+                                    // Status no banco ficou desatualizado (itens legacy zerados antes da regra).
+                                    var statusEffective = item.Qty == 0 ? "esgotado" : (item.Status?.ToLower() ?? "");
+                                    var sClass = statusEffective switch
                                     {
                                         "ok" or "normal" => "badge-ok",
-                                        "critico" or "crítico" => "badge-critical",
-                                        "parado" => "badge-slow",
+                                        "critico" or "crítico" or "critical" => "badge-critical",
+                                        "esgotado" => "badge-warn",
+                                        "parado" or "slow" => "badge-slow",
                                         _ => "badge-warn"
                                     };
+                                    var statusLabel = statusEffective switch {
+                                        "critico" or "critical" => "Crítico",
+                                        "esgotado" => "Esgotado",
+                                        "atencao" or "warn" => "Atenção",
+                                        "ok" => "OK",
+                                        "parado" or "slow" => "Parado",
+                                        "vencido" => "Vencido",
+                                        "descartado" => "Descartado",
+                                        "bloqueado" => "Bloqueado",
+                                        _ => item.Status ?? "—"
+                                    };
                                 }
-                                <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@item.Status</span>
+                                <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@statusLabel</span>
                             </td>
-                            <td>
+                            <td class="min-w-48 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
-                                       class="grid-action-btn grid-action-btn--primary">
+                                       class="grid-action-btn grid-action-btn--ghost"
+                                       aria-label="Repor estoque de @(item.Produto?.Nome ?? item.Sku)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m14.836 2A8.001 8.001 0 005.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-14.837-2m14.837 2H15" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
                                         Repor
                                     </a>
-                                    <button @@click="openModal('@item.Id', '@(item.Produto?.Nome ?? item.Sku)'.replace(/'/g, ''), @item.Qty)"
-                                            class="grid-action-btn grid-action-btn--danger">
+                                    <button @@click="openModal('@item.Id', '@(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(item.Produto?.Nome ?? item.Sku ?? ""))', @item.Qty, @(item.PrecoVendaSugerido?.Valor.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "null"))"
+                                            class="grid-action-btn grid-action-btn--warning"
+                                            aria-label="Registrar saída de @(item.Produto?.Nome ?? item.Sku)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                                         </svg>
                                         Saída
                                     </button>
@@ -217,7 +345,11 @@
                 var estPgStart = Math.Max(1, Model.Paginacao.Page - 2);
                 var estPgEnd = Math.Min(Model.Paginacao.Pages, Model.Paginacao.Page + 2);
                 <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-                    <span class="text-sm text-slate-500">Página @Model.Paginacao.Page de @Model.Paginacao.Pages</span>
+                    @{
+                        var pgStart = (Model.Paginacao.Page - 1) * Model.Paginacao.Limit + 1;
+                        var pgEnd = Math.Min(Model.Paginacao.Page * Model.Paginacao.Limit, Model.Paginacao.Total);
+                    }
+                    <span class="text-sm text-slate-500">Mostrando @pgStart–@pgEnd de @Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "lote" : "lotes")</span>
                     <div class="flex items-center gap-1">
                         @if (Model.Paginacao.HasPrevious)
                         {
@@ -266,33 +398,77 @@
         function saidaModal() {
             return {
                 open: false,
+                loading: false,
+                erroMsg: '',
                 estoqueId: null,
                 produtoNome: '',
                 qtyDisponivel: 0,
                 natureza: 'venda',
                 qty: 1,
                 valor: null,
+                motivo: '',
                 data: new Date().toLocaleDateString('en-CA'),
-                loading: false,
 
-                openModal(id, nome, qty) {
+                precoSugerido: null,
+                semPreco: false,
+
+                openModal(id, nome, qty, precoSugerido) {
                     this.estoqueId = id;
                     this.produtoNome = nome;
                     this.qtyDisponivel = qty;
                     this.qty = 1;
-                    this.valor = null;
+                    this.precoSugerido = precoSugerido && precoSugerido !== 'null' ? Number(precoSugerido) : null;
+                    this.valor = this.precoSugerido;
+                    this.semPreco = this.precoSugerido === null;
+                    this.motivo = '';
+                    this.erroMsg = '';
                     this.natureza = 'venda';
+                    this.data = new Date().toLocaleDateString('en-CA');
                     this.open = true;
+                },
+
+                setNatureza(n) {
+                    this.natureza = n;
+                    this.erroMsg = '';
+                },
+
+                get naturezaHint() {
+                    if (this.natureza === 'venda') return 'Saída comercial — informe o valor unitário.';
+                    if (this.natureza === 'perda') return 'Item retirado sem venda (vencido, quebrado). Motivo é registrado na auditoria.';
+                    if (this.natureza === 'prejuizo') return 'Saída com custo conhecido mas sem receita (devolução, reposição grátis). Motivo é registrado.';
+                    return '';
+                },
+
+                get ctaLabel() {
+                    if (this.natureza === 'venda') return 'Registrar venda';
+                    if (this.natureza === 'perda') return 'Registrar perda';
+                    if (this.natureza === 'prejuizo') return 'Registrar prejuízo';
+                    return 'Confirmar';
+                },
+
+                podeEnviar() {
+                    // Excesso vs estoque NAO bloqueia mais — servidor faz reposicao automatica
+                    // mantendo a operacao fluindo (regra do Felipe).
+                    if (!this.qty || this.qty < 1) return false;
+                    if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) return false;
+                    if ((this.natureza === 'perda' || this.natureza === 'prejuizo') && !this.motivo.trim()) return false;
+                    return true;
                 },
 
                 async confirmarSaida() {
                     if (this.loading) return;
-                    if (!this.qty || this.qty < 1) return;
-                    if (this.qty > this.qtyDisponivel) {
-                        window.showToast('Quantidade excede o estoque disponível (' + this.qtyDisponivel + ').', 'error');
+                    if (!this.podeEnviar()) {
+                        if (!this.qty || this.qty < 1) {
+                            this.erroMsg = 'Quantidade deve ser maior ou igual a 1.';
+                        } else if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) {
+                            this.erroMsg = 'Informe o valor unitário da venda.';
+                        } else {
+                            this.erroMsg = 'Informe o motivo para registrar essa saída.';
+                        }
                         return;
                     }
                     this.loading = true;
+                    this.erroMsg = '';
                     const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
                     try {
                         const r = await fetch('/estoque/saida', {
@@ -305,22 +481,50 @@
                                 estoqueId: this.estoqueId,
                                 natureza: this.natureza,
                                 qty: this.qty,
-                                valor: this.natureza === 'venda' ? this.valor : null,
+                                valor: (this.natureza === 'venda' || this.natureza === 'prejuizo') ? this.valor : null,
+                                motivo: (this.natureza === 'perda' || this.natureza === 'prejuizo') ? this.motivo.trim() : null,
                                 data: this.data
                             })
                         });
                         if (r.ok) {
-                            window.showToast('Saída registrada com sucesso!', 'success');
+                            let msg = 'Saída registrada com sucesso!';
+                            let type = 'success';
+                            let delay = 800;
+                            try {
+                                const d = await r.json();
+                                if (d && d.ajusteAutomatico) {
+                                    msg = d.mensagemAjuste || 'Saída registrada com ajuste automático de estoque. Revise o cadastro depois.';
+                                    type = 'warning';
+                                    delay = 1800;
+                                }
+                            } catch { /* corpo vazio ou não-JSON */ }
+                            window.showToast(msg, type);
                             this.open = false;
-                            setTimeout(() => location.reload(), 800);
+                            setTimeout(() => location.reload(), delay);
                         } else {
-                            const d = await r.json().catch(() => ({}));
-                            window.showToast(d.errorMessage || 'Erro ao registrar saída.', 'error');
+                            const raw = await r.text();
+                            let d = null;
+                            try { d = raw ? JSON.parse(raw) : null; } catch { /* não-JSON */ }
+                            const msg = (d && (d.errorMessage || d.error?.detail || d.error?.message))
+                                || friendlyHttpSaida(r.status);
+                            this.erroMsg = msg;
+                            window.showToast(msg, 'error');
                         }
                     } catch {
-                        window.showToast('Não foi possível conectar ao servidor.', 'error');
+                        this.erroMsg = 'Não foi possível conectar ao servidor.';
+                        window.showToast(this.erroMsg, 'error');
                     } finally {
                         this.loading = false;
+                    }
+
+                    function friendlyHttpSaida(s) {
+                        if (s === 400) return 'Dados inválidos. Verifique quantidade, valor e motivo.';
+                        if (s === 401 || s === 403) return 'Sessão expirou. Recarregue a página e tente de novo.';
+                        if (s === 404) return 'Item de estoque não encontrado.';
+                        if (s === 409) return 'Conflito de dados. Recarregue a página.';
+                        if (s === 501) return 'Operação não suportada nesta versão. Avise o suporte.';
+                        if (s >= 500) return 'Erro no servidor. Tente novamente em alguns instantes.';
+                        return 'Erro ao registrar saída (HTTP ' + s + ').';
                     }
                 }
             };

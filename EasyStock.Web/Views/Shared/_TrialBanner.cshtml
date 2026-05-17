@@ -1,0 +1,38 @@
+@*
+    Banner persistente de status do trial. Renderiza vazio no SSR
+    e popula via /api/assinatura no client. Some quando trial nao
+    ativo OU quando ja tem plano pago.
+*@
+<div id="trial-banner" class="hidden" data-trial-banner>
+    <div class="px-4 py-2 text-sm flex items-center justify-between gap-3"
+         style="background-color: var(--accent-soft, #fff7ed); border-bottom: 1px solid var(--border-soft, #fed7aa); color: var(--text-primary, #0c0a09);">
+        <span>
+            <strong>Trial:</strong>
+            <span data-trial-msg></span>
+        </span>
+        <a href="/assinatura" class="font-semibold underline">Fazer upgrade</a>
+    </div>
+</div>
+<script>
+(function(){
+    var el = document.getElementById('trial-banner');
+    if (!el) return;
+    fetch('/api/assinatura', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(json){
+            if (!json || !json.data) return;
+            var d = json.data;
+            if (!d.trialAtivo) return;
+            if (d.dataFim && new Date(d.dataFim) >= new Date()) return; // ja tem plano pago vigente
+            var fim = d.trialFim ? new Date(d.trialFim) : null;
+            if (!fim) return;
+            var dias = Math.max(0, Math.ceil((fim - new Date()) / 86400000));
+            var msg = el.querySelector('[data-trial-msg]');
+            if (msg) msg.textContent = dias === 0
+                ? 'expira hoje. Faca upgrade pra continuar.'
+                : 'restam ' + dias + ' dia' + (dias === 1 ? '' : 's') + '. Faca upgrade pra ativar mais recursos.';
+            el.classList.remove('hidden');
+        })
+        .catch(function(){ /* silencia */ });
+})();
+</script>

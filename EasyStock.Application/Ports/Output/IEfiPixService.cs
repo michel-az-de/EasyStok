@@ -1,6 +1,6 @@
 namespace EasyStock.Application.Ports.Output;
 
-public record EfiCobrancaResult(
+public sealed record EfiCobrancaResult(
     string Txid,
     string PixCopiaCola,
     string QrCodeBase64,
@@ -42,8 +42,9 @@ public sealed record EfiEstornoResult(
 public interface IEfiPixService
 {
     /// <summary>
-    /// Emite uma cobranca Pix imediata via <c>POST /v2/cob/{txid}</c>.
-    /// Retorna QR code Base64 e copia-e-cola prontos para exibir ao pagador.
+    /// Emite uma cobranca Pix imediata via <c>PUT /v2/cob/{txid}</c> (txid
+    /// definido pelo cliente, idempotente). Retorna QR code Base64 e
+    /// copia-e-cola prontos para exibir ao pagador.
     /// </summary>
     Task<EfiCobrancaResult> CriarCobrancaAsync(
         string txid,

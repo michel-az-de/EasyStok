@@ -40,6 +40,17 @@ public class Order
     [Required, MaxLength(16)]
     public string Status { get; set; } = "aguardando";
 
+    /// <summary>
+    /// Data agendada de entrega (apenas data, sem hora). Null = pedido pronta-entrega.
+    /// Usado pelo dashboard "Encomendas de hoje" e pela cobertura de produção.
+    /// </summary>
+    [Column(TypeName = "date")]
+    public DateTime? ScheduledFor { get; set; }
+
+    /// <summary>Janela de entrega: "manha", "tarde" ou "noite".</summary>
+    [MaxLength(16)]
+    public string? ScheduledWindow { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

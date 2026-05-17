@@ -18,8 +18,14 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
     [BindProperty] public string Idioma { get; set; } = "pt-BR";
 
     public JsonElement? TemplateAtual { get; private set; }
-    public JsonElement? PreviewResult { get; private set; }
+    public List<VariavelOpcao> VariaveisDisponiveis { get; private set; } = new();
+    public Dictionary<string, object?> InitialVars { get; private set; } = new();
+    public int Versao { get; private set; }
+    public bool Aprovado { get; private set; }
+    public bool Ativo { get; private set; }
     public string? Erro { get; private set; }
+
+    public sealed record VariavelOpcao(string Nome, string Tipo, string Descricao, string Exemplo);
 
     public async Task OnGetAsync()
     {
@@ -37,6 +43,9 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                 AssuntoTemplate = t.GetProperty("assuntoTemplate").GetString()!;
                 CorpoTemplate = t.GetProperty("corpoTemplate").GetString()!;
                 Idioma = t.TryGetProperty("idioma", out var id) ? id.GetString() ?? "pt-BR" : "pt-BR";
+                Versao = t.TryGetProperty("versao", out var v) ? v.GetInt32() : 0;
+                Aprovado = t.TryGetProperty("aprovado", out var ap) && ap.GetBoolean();
+                Ativo = t.TryGetProperty("ativo", out var at) && at.GetBoolean();
             }
             catch (SessionExpiredException) { throw; }
             catch (Exception ex)
@@ -45,6 +54,53 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                 Erro = "Erro ao carregar template.";
             }
         }
+        await CarregarVariaveisAsync();
+        PopularInitialVars();
+    }
+
+    private async Task CarregarVariaveisAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TipoEvento)) return;
+        try
+        {
+            var result = await api.GetRawAsync($"api/admin/notificacoes/variaveis-catalogo?tipoEvento={TipoEvento}");
+            var data = result.GetProperty("data");
+            if (data.ValueKind != JsonValueKind.Array) return;
+            foreach (var v in data.EnumerateArray())
+            {
+                VariaveisDisponiveis.Add(new VariavelOpcao(
+                    v.GetProperty("nomeVariavel").GetString() ?? "",
+                    v.TryGetProperty("tipo", out var tp) ? tp.GetString() ?? "" : "",
+                    v.TryGetProperty("descricao", out var ds) ? ds.GetString() ?? "" : "",
+                    v.TryGetProperty("exemplo", out var ex) ? ex.GetString() ?? "" : ""));
+            }
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao carregar variáveis disponíveis para TipoEvento {TipoEvento}", TipoEvento);
+        }
+    }
+
+    private void PopularInitialVars()
+    {
+        foreach (var v in VariaveisDisponiveis)
+        {
+            object? valor = v.Tipo.ToLowerInvariant() switch
+            {
+                "int" or "integer" or "number" => int.TryParse(v.Exemplo, out var n) ? n : 0,
+                "bool" or "boolean" => bool.TryParse(v.Exemplo, out var b) && b,
+                _ => string.IsNullOrEmpty(v.Exemplo) ? v.Nome : v.Exemplo
+            };
+            InitialVars[v.Nome] = valor;
+        }
+
+        // Fallback defaults para variáveis comuns (caso não catalogadas).
+        if (!InitialVars.ContainsKey("nomeProduto")) InitialVars["nomeProduto"] = "Produto Exemplo";
+        if (!InitialVars.ContainsKey("nomeUsuario")) InitialVars["nomeUsuario"] = "Usuário Exemplo";
+        if (!InitialVars.ContainsKey("email")) InitialVars["email"] = "usuario@exemplo.com";
+        if (!InitialVars.ContainsKey("diasRestantes")) InitialVars["diasRestantes"] = 3;
+        if (!InitialVars.ContainsKey("__unsubscribe_url")) InitialVars["__unsubscribe_url"] = "#";
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -80,40 +136,20 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         }
     }
 
-    public async Task<IActionResult> OnPostPreviewAsync()
+    public async Task<IActionResult> OnPostAprovarAsync(string? motivo = null)
     {
         if (!Id.HasValue)
         {
-            SetErro("Salve o template antes de visualizar o preview.");
+            SetErro("Salve antes de aprovar.");
             return Page();
         }
         try
         {
-            var result = await api.PostRawAsync("api/admin/notificacoes/templates/preview", new
-            {
-                templateId = Id.Value,
-                variaveis = new Dictionary<string, object?>
-                {
-                    // ProdutoVencendo / AlertaEstoque
-                    ["nomeProduto"] = "Produto Exemplo",
-                    ["diasRestantes"] = 3,
-                    ["expiraEm"] = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
-                    ["quantidade"] = 5,
-                    // AssinaturaExpirando
-                    ["dataExpiracao"] = DateTime.UtcNow.AddDays(3).ToString("yyyy-MM-dd"),
-                    ["eTrial"] = false,
-                    // ResetSenha / ConfirmacaoEmail
-                    ["nomeUsuario"] = "Usuário Exemplo",
-                    ["email"] = "usuario@exemplo.com",
-                    ["linkRedefinicao"] = "#",
-                    ["linkConfirmacao"] = "#",
-                    // Footer LGPD
-                    ["__unsubscribe_url"] = "#"
-                }
-            });
-            PreviewResult = result.GetProperty("data");
-            await OnGetAsync();
-            return Page();
+            if (!string.IsNullOrWhiteSpace(motivo))
+                logger.LogInformation("Aprovando template {Id}. Motivo: {Motivo}", Id, motivo);
+            await api.PostRawAsync($"api/admin/notificacoes/templates/{Id}/aprovar", new { });
+            SetSucesso("Template aprovado com sucesso.");
+            return RedirectToPage("Index");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
