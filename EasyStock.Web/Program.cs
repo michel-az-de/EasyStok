@@ -96,6 +96,7 @@ builder.Services.AddScoped<MobileDevicesService>();
 builder.Services.AddScoped<MobileProductsService>();
 builder.Services.AddScoped<OperacaoMobileService>();
 builder.Services.AddScoped<RelatoriosService>();
+builder.Services.AddScoped<NotasFiscaisService>();
 
 // 6b. Marketing options + Leads API service (landing publica)
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));

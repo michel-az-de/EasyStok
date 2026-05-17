@@ -1,0 +1,152 @@
+@model EasyStock.Web.Models.ViewModels.NotasFiscais.NotasFiscaisListViewModel
+@{
+    ViewBag.Title = "Notas Fiscais";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Notas Fiscais</h1>
+        <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "nota emitida" : "notas emitidas")</p>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form method="get" action="/notas-fiscais" class="ws mb-6">
+    <div class="flex flex-wrap gap-3 items-end">
+        <!-- Pill filters por status -->
+        <div class="flex gap-2 flex-wrap">
+            @{
+                var statusOpts = new[] {
+                    ("", "Todos"), ("Autorizada", "Autorizada"), ("Cancelada", "Cancelada"),
+                    ("Rejeitada", "Rejeitada"), ("FalhaTransiente", "Contingencia"), ("Enviada", "Aguardando")
+                };
+            }
+            @foreach (var (val, label) in statusOpts)
+            {
+                var isActive = string.Equals(Model.FiltroStatus, val, StringComparison.OrdinalIgnoreCase)
+                    || (string.IsNullOrEmpty(val) && string.IsNullOrEmpty(Model.FiltroStatus));
+                <a href="/notas-fiscais?status=@val&desde=@Model.PeriodoInicio&ate=@Model.PeriodoFim&search=@Model.Busca"
+                   class="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
+                          @(isActive ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50")">
+                    @label
+                </a>
+            }
+        </div>
+
+        <div class="flex items-center gap-2 ml-auto">
+            <input type="hidden" name="status" value="@Model.FiltroStatus" />
+            <input type="date" name="desde" value="@Model.PeriodoInicio"
+                   class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" placeholder="De" />
+            <input type="date" name="ate" value="@Model.PeriodoFim"
+                   class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" placeholder="Ate" />
+            <input type="text" name="search" value="@Model.Busca"
+                   class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-48"
+                   placeholder="Chave de acesso..." />
+            <button type="submit"
+                    class="px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                Filtrar
+            </button>
+        </div>
+    </div>
+</form>
+
+@if (Model.Itens.Count == 0)
+{
+    <div class="ws text-center py-12">
+        <svg class="w-12 h-12 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        @if (string.IsNullOrEmpty(Model.FiltroStatus) && string.IsNullOrEmpty(Model.Busca))
+        {
+            <p class="text-slate-500 text-sm">Nenhuma nota fiscal emitida ainda.</p>
+            <p class="text-slate-400 text-xs mt-1">As emissoes aparecem aqui automaticamente apos confirmacao pelo SEFAZ.</p>
+        }
+        else
+        {
+            <p class="text-slate-500 text-sm">Nenhuma nota encontrada com esses filtros.</p>
+            <p class="text-slate-400 text-xs mt-1">Tente ampliar o periodo ou remover filtros.</p>
+        }
+    </div>
+}
+else
+{
+    <div class="ws overflow-x-auto">
+        <table class="tbl-full">
+            <thead>
+                <tr>
+                    <th scope="col">Numero</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Valor</th>
+                    <th scope="col">Data emissao</th>
+                    <th scope="col">Chave de acesso</th>
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var nf in Model.Itens)
+                {
+                    var statusCss = (nf.Status ?? "").ToLowerInvariant() switch
+                    {
+                        "autorizada" => "badge-ok",
+                        "cancelada" or "inutilizada" => "badge-neutral",
+                        "rejeitada" => "badge-crit",
+                        "falhatransiente" => "badge-warn",
+                        "enviada" => "badge-info",
+                        _ => "badge-neutral"
+                    };
+                    var statusLabel = (nf.Status ?? "").ToLowerInvariant() switch
+                    {
+                        "autorizada" => "Autorizada",
+                        "cancelada" => "Cancelada",
+                        "rejeitada" => "Rejeitada",
+                        "falhatransiente" => "Em contingencia",
+                        "enviada" => "Aguardando",
+                        "rascunho" => "Rascunho",
+                        "inutilizada" => "Inutilizada",
+                        _ => nf.Status ?? "-"
+                    };
+                    <tr class="cursor-pointer hover:bg-slate-50 transition-colors" onclick="window.location='/notas-fiscais/@nf.Id'">
+                        <td class="font-medium">@nf.Serie-@nf.Numero</td>
+                        <td>
+                            <span class="badge @statusCss" aria-label="Status: @statusLabel">@statusLabel</span>
+                        </td>
+                        <td>R$ @nf.TotalNota.ToString("N2")</td>
+                        <td class="text-slate-600">
+                            @(nf.DataAutorizacao?.ToString("dd/MM/yyyy HH:mm") ?? nf.CriadoEm.ToString("dd/MM/yyyy HH:mm"))
+                        </td>
+                        <td class="text-slate-500 text-xs font-mono">
+                            @if (!string.IsNullOrEmpty(nf.ChaveAcesso))
+                            {
+                                <span title="@nf.ChaveAcesso">@(nf.ChaveAcesso.Length > 20 ? nf.ChaveAcesso[..20] + "..." : nf.ChaveAcesso)</span>
+                            }
+                            else
+                            {
+                                <span class="text-slate-300">-</span>
+                            }
+                        </td>
+                        <td>
+                            <a href="/notas-fiscais/@nf.Id" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                                Detalhes
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginacao -->
+    @if (Model.Paginacao.Pages > 1)
+    {
+        <div class="flex justify-center gap-2 mt-6">
+            @for (int p = 1; p <= Model.Paginacao.Pages; p++)
+            {
+                <a href="/notas-fiscais?page=@p&status=@Model.FiltroStatus&desde=@Model.PeriodoInicio&ate=@Model.PeriodoFim&search=@Model.Busca"
+                   class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                    @p
+                </a>
+            }
+        </div>
+    }
+}

@@ -162,4 +162,88 @@ public class EmpresaConfiguracaoFiscalTests
 
         c.Habilitada.Should().BeFalse();
     }
+
+    [Fact]
+    public void ConfigurarCsc_com_dados_validos_armazena()
+    {
+        var c = CriarValida();
+        c.ConfigurarCsc("1", "abc123def456");
+
+        c.CscId.Should().Be("1");
+        c.CscToken.Should().Be("abc123def456");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ConfigurarCsc_cscId_vazio_lanca(string? cscId)
+    {
+        var c = CriarValida();
+        Action act = () => c.ConfigurarCsc(cscId!, "token-valido");
+        act.Should().Throw<ArgumentException>().WithMessage("*CSC ID*");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ConfigurarCsc_cscToken_vazio_lanca(string? cscToken)
+    {
+        var c = CriarValida();
+        Action act = () => c.ConfigurarCsc("1", cscToken!);
+        act.Should().Throw<ArgumentException>().WithMessage("*CSC Token*");
+    }
+
+    [Fact]
+    public void ConfigurarCsc_atualiza_AlteradoEm()
+    {
+        var c = CriarValida();
+        var antes = c.AlteradoEm;
+
+        c.ConfigurarCsc("1", "abc123");
+
+        c.AlteradoEm.Should().BeOnOrAfter(antes);
+    }
+
+    [Fact]
+    public void ConfigurarCsc_sobrescreve_valores_anteriores()
+    {
+        var c = CriarValida();
+        c.ConfigurarCsc("1", "token-antigo");
+        c.ConfigurarCsc("2", "token-novo");
+
+        c.CscId.Should().Be("2");
+        c.CscToken.Should().Be("token-novo");
+    }
+
+    [Fact]
+    public void AlterarSerieNfce_valor_valido_atualiza()
+    {
+        var c = CriarValida();
+        c.AlterarSerieNfce(5);
+
+        c.SerieNfce.Should().Be((short)5);
+    }
+
+    [Theory]
+    [InlineData((short)0)]
+    [InlineData((short)-1)]
+    public void AlterarSerieNfce_valor_invalido_lanca(short serie)
+    {
+        var c = CriarValida();
+        Action act = () => c.AlterarSerieNfce(serie);
+        act.Should().Throw<ArgumentException>().WithMessage("*Serie*");
+    }
+
+    [Fact]
+    public void AlterarSerieNfce_mesmo_valor_nao_atualiza_timestamp()
+    {
+        var c = CriarValida();
+        var antes = c.AlteradoEm;
+
+        c.AlterarSerieNfce(1);
+
+        c.AlteradoEm.Should().Be(antes);
+    }
 }
