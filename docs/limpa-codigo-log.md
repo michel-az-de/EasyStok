@@ -178,3 +178,29 @@ Janela "30min" da tarefa agendada nao tinha commits novos; varredura focou em re
 - Factories `AddTransient<T>(sp => ...)` com DI manual sao foco de FQN residual: typar via `using` em vez de soletrar. Procurar mesmo padrao em demais `AddX<T>(sp => ...)` ao longo do projeto.
 - `using` de namespace ancestral (`EasyStock.Infra.Async` em arquivo `EasyStock.Infra.Async.DependencyInjection.*`) nao quebra o build mas polui — varrer demais `DependencyInjection/` em rodadas futuras.
 - Records de DTO/result em ports devem ser sempre `sealed` por convencao — proxima rodada checar `Application/Ports/Output/*` em massa.
+
+---
+
+## 2026-05-07 — Auditoria #2 (rodada agendada apos limpeza F10-F14, commit 4f9c259)
+
+### Bug de seguranca encontrado e corrigido
+
+**`MercadoPagoSignatureValidator.cs` — replay protection ausente.** O validador parseava o campo `ts` do header `x-signature` mas usava apenas dentro do `toSign` (corpo do HMAC). **Sem comparacao com o tempo atual**, um atacante que capturasse uma chamada de webhook MP podia replayar indefinidamente. O validador Stripe ja tinha `±5min` validado — paridade quebrada.
+
+**Fix**: janela `±5min` no MP. MP envia `ts` em **unix milissegundos** (Stripe usa segundos) — heuristica `< 10_000_000_000L → segundos` aceita os dois formatos (sandbox MP antigo enviava em seg). `ts` invalido (nao parseavel) tambem recusa.
+
+**Cobertura de teste**: novo `EasyStock.Api.UnitTests/Pagamentos/MercadoPagoSignatureValidatorTests.cs` com 7 cenarios — sem header, hmac correto, hmac incorreto, ts atual em ms, ts atual em s, ts fora-da-janela, allow-unsigned, payload invalido. `dotnet test` passou em 29/29.
+
+### Outros achados (sem patch — deliberado)
+
+| Item | Decisao |
+|---|---|
+| `AutoTicketFalhaPagamento`: param `empresaId` nao e validado contra `fatura.EmpresaId` | OK — ticket usa `fatura.EmpresaId` (ground truth do agregado), entao mismatch nao causa vazamento. Param fica defensivo (poderia logar warning, mas nao e bug). |
+| `MediaDiasAtrasoVencidasAsync` materializa `DateTime` em memoria pra calcular media | OK — comentario explica que EF nao traduz `DateDiff` cross-provider. Para ~1000s de vencidas e aceitavel. |
+| Webhook MP/Stripe registrados sem `IGatewayWebhookProcessor` correspondente | OK — adapters sao stubs documentados. Quando F12-real for feita, o processor entra junto. |
+
+### Padrao novo (registrar)
+
+- **Webhook signature validators precisam de paridade.** Ao adicionar um novo validator (Stripe/MP/Pix/etc.), conferir se ele tem **todas** as protecoes que os outros ja tem: replay window, fixed-time hash compare, allow-unsigned guard, secret obrigatorio, header obrigatorio. Quebra de paridade = vulnerabilidade silenciosa.
+- MP usa `ts` em **milissegundos** unix epoch; Stripe usa **segundos**. Diferenca facil de errar — verificar a doc do gateway antes.
+- Quando criar adapter stub, criar **teste correspondente** ao validator/processor mesmo que basico — garante que cobertura nao fica desigual entre gateways.
