@@ -61,6 +61,16 @@ public class PedidosService(ApiClient api, SessionService session)
         });
     }
 
+    public Task<ApiResult<Pedido>> AlterarAgendamentoAsync(string id, DateTime? agendadoParaEm)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
+        return api.PatchAsync<Pedido>($"pedidos/{id}/agendamento", new
+        {
+            empresaId, pedidoId = Guid.Parse(id), agendadoParaEm, origem = "web"
+        });
+    }
+
     public Task<ApiResult<Pedido>> AtualizarStatusAsync(string id, string status)
     {
         var empresaId = GetEmpresaId();

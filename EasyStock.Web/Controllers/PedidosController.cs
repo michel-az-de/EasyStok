@@ -110,6 +110,20 @@ public class PedidosController(
         return RedirectToAction(nameof(Detail), new { id });
     }
 
+    [HttpPost("/pedidos/{id}/agendar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Agendar(string id, DateTime? agendadoParaEm)
+    {
+        var result = await svc.AlterarAgendamentoAsync(id, agendadoParaEm);
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
+        var msg = agendadoParaEm.HasValue
+            ? $"Pedido agendado para {agendadoParaEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}."
+            : "Agendamento removido.";
+        Toast("success", msg);
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
     [HttpPost("/pedidos/{id}/cancelar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancelar(string id, string? motivo)
