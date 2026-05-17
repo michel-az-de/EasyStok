@@ -1500,8 +1500,14 @@
                             const raw = sessionStorage.getItem(this._draftKey);
                             if (raw) {
                                 const d = JSON.parse(raw);
-                                if (d.nome && confirm('Existe um rascunho salvo. Deseja restaurar?')) {
-                                    this._applyDraft(d);
+                                if (d.nome) {
+                                    const self = this;
+                                    window.easyConfirm({
+                                        titulo: 'Restaurar rascunho?',
+                                        mensagem: 'Existe um rascunho salvo de um produto que voce nao concluiu. Deseja restaurar os dados?',
+                                        textoBotao: 'Restaurar',
+                                        classBotao: 'bg-indigo-600 hover:bg-indigo-700'
+                                    }, () => self._applyDraft(d));
                                 } else {
                                     sessionStorage.removeItem(this._draftKey);
                                 }
@@ -1555,8 +1561,8 @@
                             dropOnElement: true,
                             labelIdle: '<div style="padding:20px;text-align:center;touch-action:manipulation">'
                                 + '<div style="font-size:32px;margin-bottom:8px">&#128247;</div>'
-                                + '<div style="font-size:15px;font-weight:700;color:#0F172A">Adicionar fotos</div>'
-                                + '<div style="font-size:13px;color:#64748B;margin-top:4px">Toque aqui ou <span class="filepond--label-action">selecione do dispositivo</span></div>'
+                                + '<div style="font-size:15px;font-weight:700;color:var(--text-primary)">Adicionar fotos</div>'
+                                + '<div style="font-size:13px;color:var(--text-muted);margin-top:4px">Toque aqui ou <span class="filepond--label-action">selecione do dispositivo</span></div>'
                                 + '</div>',
                             labelMaxFileSizeExceeded: 'Arquivo muito grande',
                             labelMaxFileSize: 'Maximo: {filesize}',
@@ -1642,7 +1648,14 @@
                     }
                     const temDados = this.descricao || this.sku;
                     if (temDados) {
-                        if (!confirm('⚡ Preencher automaticamente\n\nSKU será gerado e a descrição será criada com IA usando nome e categoria.\n\nCampos já preenchidos podem ser alterados. Deseja continuar?')) return;
+                        const self = this;
+                        window.easyConfirm({
+                            titulo: 'Preencher automaticamente?',
+                            mensagem: 'O SKU sera gerado e a descricao sera reescrita com IA. Campos ja preenchidos podem ser alterados. Deseja continuar?',
+                            textoBotao: 'Preencher',
+                            classBotao: 'bg-indigo-600 hover:bg-indigo-700'
+                        }, () => self.autoFill());
+                        return;
                     }
                     this.autoFill();
                 },
@@ -1855,7 +1868,15 @@ removePondFile(idx) {
 },
 async deleteExistingPhoto(fotoId) {
     if (!this.productId) return;
-    if (!confirm('Remover esta foto do produto?')) return;
+    const self = this;
+    window.easyConfirm({
+        titulo: 'Remover foto do produto?',
+        mensagem: 'Esta acao nao pode ser desfeita.',
+        textoBotao: 'Remover',
+        classBotao: 'bg-red-600 hover:bg-red-700'
+    }, () => self._doDeletePhoto(fotoId));
+},
+async _doDeletePhoto(fotoId) {
     try {
         const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
         const resp = await fetch(`/produtos/${this.productId}/fotos/${fotoId}/remover`, {

@@ -14,9 +14,7 @@
             aria-label="Abrir menu"
             class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
             style="color: var(--text-secondary);">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <es-icon name="menu" class="w-5 h-5"></es-icon>
     </button>
 
     <!-- Page title (mobile only) -->
@@ -35,12 +33,9 @@
             <button @@click="abrir()"
                     class="app-search-trigger flex items-center gap-3 px-4 py-2.5 border rounded-lg text-sm transition-colors w-full max-w-md focus:outline-none focus:ring-2 focus:ring-navy-500"
                     style="background: var(--bg-surface); border-color: var(--border-soft); color: var(--text-muted);">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-                </svg>
+                <es-icon name="search" class="w-4 h-4 flex-shrink-0"></es-icon>
                 <span class="flex-1 text-left truncate">Buscar produto, SKU ou fornecedor</span>
-                <kbd class="inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px]"
-                     style="background: var(--ink-100); border-color: var(--border-soft); color: var(--text-muted);">Ctrl K</kbd>
+                <span class="inline-flex items-center gap-1"><es-kbd>Ctrl</es-kbd><es-kbd>K</es-kbd></span>
             </button>
         </div>
 
@@ -49,9 +44,7 @@
                 aria-label="Buscar"
                 class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
                 style="color: var(--text-secondary);">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-            </svg>
+            <es-icon name="search" class="w-5 h-5"></es-icon>
         </button>
 
         <!-- Command palette overlay -->
@@ -69,9 +62,7 @@
                 <!-- Input -->
                 <div class="search-command-header flex items-center gap-3 px-4 py-3"
                      style="border-bottom: 1px solid var(--border-soft);">
-                    <svg class="w-5 h-5 flex-shrink-0" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-                    </svg>
+                    <es-icon name="search" class="w-5 h-5 flex-shrink-0" style="color: var(--text-muted);"></es-icon>
                     <input type="text" placeholder="Buscar produto, SKU, fornecedor, loja, usuário..."
                            x-ref="input"
                            x-model="query"
@@ -79,8 +70,7 @@
                            class="flex-1 text-sm bg-transparent border-none outline-none"
                            style="color: var(--text-primary); placeholder-color: var(--text-muted);" />
                     <div x-show="carregando" class="w-4 h-4 border-2 border-navy-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                    <kbd class="flex-shrink-0 text-xs px-1.5 py-0.5 rounded border"
-                         style="color: var(--text-muted); background: var(--ink-100); border-color: var(--border-soft);">Esc</kbd>
+                    <es-kbd>Esc</es-kbd>
                 </div>
 
                 <!-- Resultados -->
@@ -139,9 +129,7 @@
                     <div x-show="semResultados && !carregando && query.length >= 2"
                          class="px-4 py-8 text-center">
                         <div class="mb-2" style="color: var(--border-strong);">
-                            <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-                            </svg>
+                            <es-icon name="search" class="w-10 h-10 mx-auto"></es-icon>
                         </div>
                         <p class="text-sm" style="color: var(--text-muted);">Nenhum resultado para <strong x-text="query" style="color: var(--text-secondary);"></strong></p>
                         <p class="text-xs mt-1" style="color: var(--text-muted);">Tente por nome, SKU, código interno ou fornecedor</p>
@@ -157,9 +145,9 @@
                 <!-- Rodapé dicas -->
                 <div class="search-command-footer px-4 py-2 flex items-center gap-4 text-xs"
                      style="border-top: 1px solid var(--border-soft); color: var(--text-muted);">
-                    <span><kbd class="px-1 rounded border" style="background: var(--ink-100); border-color: var(--border-soft);">↑↓</kbd> navegar</span>
-                    <span><kbd class="px-1 rounded border" style="background: var(--ink-100); border-color: var(--border-soft);">Enter</kbd> abrir</span>
-                    <span><kbd class="px-1 rounded border" style="background: var(--ink-100); border-color: var(--border-soft);">Esc</kbd> fechar</span>
+                    <span><es-kbd>&uarr;&darr;</es-kbd> navegar</span>
+                    <span><es-kbd>Enter</es-kbd> abrir</span>
+                    <span><es-kbd>Esc</es-kbd> fechar</span>
                 </div>
             </div>
         </div>
@@ -268,14 +256,10 @@
                 title="Ativar tema escuro"
                 aria-label="Ativar tema escuro">
             <span class="theme-icon-light" aria-hidden="true">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364 6.364-1.591-1.591M7.227 7.227 5.636 5.636m12.728 0-1.591 1.591M7.227 16.773l-1.591 1.591M12 16a4 4 0 100-8 4 4 0 000 8z" />
-                </svg>
+                <es-icon name="sun" class="w-4 h-4"></es-icon>
             </span>
             <span class="theme-icon-dark hidden" aria-hidden="true">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1012 21a8.96 8.96 0 008.354-5.646z" />
-                </svg>
+                <es-icon name="moon" class="w-4 h-4"></es-icon>
             </span>
             <span class="hidden md:inline theme-toggle-label">Ativar tema escuro</span>
         </button>
@@ -285,54 +269,46 @@
          gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo
          escuro. Removida — botao continua secundario branco (consistente com tema). -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
-        <button @@click="open = !open"
-                type="button"
-                aria-haspopup="menu"
-                :aria-expanded="open ? 'true' : 'false'"
-                aria-label="Abrir ações rápidas"
-                class="ui-secondary-btn flex items-center gap-2 whitespace-nowrap bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
+        <es-button variant="navy" size="sm" icon="plus" class="app-primary-btn" @@click="open = !open">
             <span class="hidden sm:inline">Ação rápida</span>
-        </button>
+        </es-button>
         <div x-show="open" x-cloak @@click.outside="open = false"
              role="menu"
              aria-label="Ações rápidas"
              class="app-dropdown absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
             <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Estoque</div>
-            <a href="/entradas/nova" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">📥</span> Nova entrada
+            <a href="/entradas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="arrow-down-to-line" class="es-icon--sm"></es-icon> Nova entrada
             </a>
-            <a href="/saidas/nova" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">📤</span> Nova saída
+            <a href="/saidas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="arrow-up-from-line" class="es-icon--sm"></es-icon> Registrar Saída
             </a>
-            <a href="/entradas/reposicao" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">🔄</span> Repor estoque
+            <a href="/entradas/reposicao" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="refresh-cw" class="es-icon--sm"></es-icon> Repor estoque
             </a>
-            <a href="/estoque" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">📦</span> Ver estoque
+            <a href="/estoque" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="package" class="es-icon--sm"></es-icon> Ver estoque
             </a>
             <div class="border-t border-slate-100 my-1" role="separator"></div>
             <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Vendas</div>
-            <a href="/pedidos" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">📋</span> Ver pedidos
+            <a href="/pedidos" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="shopping-cart" class="es-icon--sm"></es-icon> Pedidos
             </a>
-            <a href="/kds" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">👨‍🍳</span> Abrir KDS (cozinha)
+            <a href="/kds" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="chef-hat" class="es-icon--sm"></es-icon> Abrir KDS (cozinha)
             </a>
-            <a href="/clientes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">👥</span> Ver clientes
+            <a href="/clientes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="users" class="es-icon--sm"></es-icon> Clientes
             </a>
-            <a href="/caixa" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">💰</span> Abrir caixa
+            <a href="/caixa" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="wallet" class="es-icon--sm"></es-icon> Caixa
             </a>
-            <div class="border-t border-slate-100 my-1" role="separator"></div>
-            <a href="/anuncios" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">🤖</span> Gerar anúncio com IA
+            <div class="border-t border-slate-100 my-1"></div>
+            <a href="/anuncios" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="sparkles" class="es-icon--sm"></es-icon> Gerar anúncio com IA
             </a>
-            <a href="/analytics/movimentacoes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span aria-hidden="true">📊</span> Ver movimentações
+            <a href="/analytics/movimentacoes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="bar-chart-3" class="es-icon--sm"></es-icon> Ver movimentações
             </a>
         </div>
     </div>
@@ -346,11 +322,7 @@
                 :aria-label="resumo && resumo.totalNaoLidas > 0 ? ('Notificações: ' + resumo.totalNaoLidas + ' não lida' + (resumo.totalNaoLidas > 1 ? 's' : '')) : 'Notificações'"
                 :class="open ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-md shadow-indigo-100/80' : ''"
                 class="app-icon-btn relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-            <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            @* Pente-fino 2026-05-16: badge com aria-live e role=status pra leitores de tela
-               anunciarem a contagem quando ela muda. aria-atomic garante leitura completa. *@
+            <es-icon name="bell" id="notif-bell-icon" class="w-5 h-5"></es-icon>
             <span id="topbar-notif-badge"
                   class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"
                   role="status"
@@ -387,22 +359,16 @@
                     <div class="px-4 py-8 text-center text-slate-400 text-sm" role="status" aria-live="polite">Carregando notificações…</div>
                 </template>
                 <template x-if="!loading && erro">
-                    <div class="px-4 py-8 text-center text-slate-500" role="alert">
-                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                        </svg>
-                        <p class="text-sm font-medium text-slate-700">Não conseguimos carregar suas notificações</p>
-                        <p class="text-xs text-slate-400 mt-1">Verifique sua conexão e tente novamente.</p>
-                        <button @@click="erro=false; load()" class="mt-3 text-xs text-indigo-600 hover:underline font-medium">Tentar de novo</button>
+                    <div class="px-4 py-8 text-center text-slate-400">
+                        <es-icon name="alert-triangle" class="w-8 h-8 mx-auto mb-2 opacity-40"></es-icon>
+                        <p class="text-sm">Não foi possível carregar notificações</p>
+                        <button @@click="erro=false; load()" class="mt-2 text-xs text-indigo-600 hover:underline">Tentar novamente</button>
                     </div>
                 </template>
                 <template x-if="!loading && !erro && items.length === 0">
-                    <div class="px-4 py-8 text-center text-slate-500" role="status">
-                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        <p class="text-sm font-medium text-slate-700">Você está em dia</p>
-                        <p class="text-xs text-slate-400 mt-1">Sem notificações pendentes no momento.</p>
+                    <div class="px-4 py-8 text-center text-slate-400">
+                        <es-icon name="check" class="w-8 h-8 mx-auto mb-2 opacity-40"></es-icon>
+                        <p class="text-sm">Nenhuma notificação pendente</p>
                     </div>
                 </template>
                 <template x-for="n in items" :key="n.id">
@@ -639,9 +605,7 @@
             <div class="text-left hidden sm:block min-w-0 flex-1">
                 <div class="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[150px]" title="@usuarioNome">@usuarioNome</div>
             </div>
-            <svg class="hidden sm:block w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+            <es-icon name="chevron-down" class="hidden sm:block w-4 h-4 text-slate-400"></es-icon>
         </button>
         <div x-show="open" x-cloak @@click.outside="open = false"
              role="menu"
@@ -661,15 +625,11 @@
                 }
             </div>
             <a href="/configuracoes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+                <es-icon name="settings" class="w-4 h-4 text-slate-400"></es-icon>
                 Configurações
             </a>
             <a href="/usuarios" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
+                <es-icon name="users" class="w-4 h-4 text-slate-400"></es-icon>
                 Gerenciar usuários
             </a>
             <div class="border-t border-slate-100 my-1" role="separator"></div>
@@ -679,9 +639,7 @@
                     style="color: var(--crit-600);"
                     onmouseover="this.style.background='var(--crit-50)'"
                     onmouseout="this.style.background=''">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+                <es-icon name="log-out" class="w-4 h-4"></es-icon>
                 Sair
             </button>
         </div>

@@ -343,16 +343,18 @@ else if (Model.ResumoApiFalhou)
     @if (Model.GraficoLabels.Any())
     {
     <script>
-        (function() {
+        (function () {
             const ctx = document.getElementById('grafico-receita');
             if (!ctx) return;
+            const css = getComputedStyle(document.documentElement);
+            const navy = css.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
+            const ink  = css.getPropertyValue('--text-muted').trim() || 'rgb(112, 120, 146)';
             const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels));
             const dados = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados));
 
             const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
             gradient.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
             gradient.addColorStop(1, 'rgba(30, 72, 168, 0)');
-
             new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -360,7 +362,7 @@ else if (Model.ResumoApiFalhou)
                     datasets: [{
                         label: 'Vendas',
                         data: dados,
-                        borderColor: '#1E48A8',
+                        borderColor: navy,
                         backgroundColor: gradient,
                         borderWidth: 2.5,
                         fill: true,
@@ -392,12 +394,12 @@ else if (Model.ResumoApiFalhou)
                     },
                     scales: {
                         x: {
-                            ticks: { color: '#64748B' },
+                            ticks: { color: ink },
                             grid: { display: false }
                         },
                         y: {
                             ticks: {
-                                color: '#64748B',
+                                color: ink,
                                 callback: v => 'R$ ' + v.toLocaleString('pt-BR')
                             },
                             grid: { color: 'rgba(148, 163, 184, 0.18)' }

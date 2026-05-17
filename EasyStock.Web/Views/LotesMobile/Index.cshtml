@@ -84,15 +84,10 @@
                         }
                         else
                         {
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: 'Desfazer link com o ERP?',
-                                        mensagem: 'O lote do app volta pra lista de pendentes e some dos lotes do ERP.',
-                                        textoBotao: 'Desfazer link',
-                                        classBotao: 'bg-red-600 hover:bg-red-700',
-                                        formAction: '@Url.Action("Unlink", "LotesMobile", new { id = m.Id })'
-                                    })"
-                                    class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
+                            <form asp-action="Unlink" asp-controller="LotesMobile" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Desfazer link?","mensagem":"Este lote voltara a ser tratado como mobile-only.","textoBotao":"Desfazer","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
+                            </form>
                         }
                     </td>
                 </tr>

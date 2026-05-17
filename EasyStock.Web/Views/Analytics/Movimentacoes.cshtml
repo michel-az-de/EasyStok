@@ -52,7 +52,7 @@
     @if (!Model.Itens.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "chart" },
+            { "EmptyIconName", "list-checks" },
             { "EmptyTitle", "Nenhuma movimentação encontrada" },
             { "EmptyDescription", "Tente ajustar os filtros ou registre uma nova entrada." },
             { "EmptyCta", "Nova entrada" },

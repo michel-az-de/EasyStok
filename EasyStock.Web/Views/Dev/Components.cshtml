@@ -7,7 +7,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>DS Components — EasyStock</title>
+<title>DS Components - EasyStock</title>
 <script>(function(){var t=localStorage.getItem('easystock-theme');if(t==='dark'){document.documentElement.dataset.theme='dark';document.documentElement.classList.add('theme-dark');}})();</script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,7 +15,18 @@
 <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
-<style>body{background:var(--bg-app,#fff);color:var(--text-primary);font-family:Inter,system-ui;padding:24px}section{padding:18px 0;border-bottom:1px solid var(--border-soft,#e5e7eb)} .toolbar{position:sticky;top:0;background:var(--bg-surface,#fff);padding:8px 0;margin-bottom:12px;display:flex;gap:8px;align-items:center;z-index:10}</style>
+<style>
+  body { background: var(--bg-app); color: var(--text-primary); font-family: Inter, system-ui; padding: 24px; }
+  section { padding: 18px 0; border-bottom: 1px solid var(--border-soft); }
+  .toolbar { position: sticky; top: 0; background: var(--bg-surface); padding: 8px 0; margin-bottom: 12px; display: flex; gap: 8px; align-items: center; z-index: var(--z-sticky); }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .icon-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-surface); font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); text-align: center; }
+  .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .side-by-side > div { padding: 16px; border-radius: 12px; border: 1px solid var(--border-soft); }
+  .side-by-side .light-pane { background: #F8FAFD; color: #0A1530; }
+  .side-by-side .dark-pane  { background: #06143A; color: #F2F4F9; }
+  .side-by-side .pane-label { font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin-bottom: 8px; }
+</style>
 </head>
 <body>
 <script src="~/js/masks.js" asp-append-version="true"></script>
@@ -28,11 +39,191 @@
 </div>
 
     <header class="anim-fadeInUp">
-        <h1 class="text-2xl font-bold mb-1">EasyStock — Design System</h1>
-        <p class="text-sm text-[color:var(--text-muted)]">Storybook interno. Cada bloco abaixo demonstra um componente do DS.</p>
+        <h1 class="text-2xl font-bold mb-1">EasyStock - Design System</h1>
+        <p class="text-sm text-[color:var(--text-muted)]">Storybook interno. Cada bloco abaixo demonstra um componente do DS. Sessao "Fase 1" mostra primitivos via TagHelper (es-icon, es-button, es-badge, es-status-pill, es-kbd).</p>
     </header>
 
-    <!-- Buttons -->
+    <!-- Fase 1: Icones (Lucide via es-icon) -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-icon (Lucide)</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">SVG inline server-side a partir de <code>wwwroot/lib/lucide/icons/</code>. Tamanhos via classe <code>es-icon--sm/md/lg</code> ou utilities <code>w-* h-*</code>. Cor via <code>color: currentColor</code>.</p>
+        <div class="icon-grid">
+            @{
+                var iconNames = new[] {
+                    "package", "box", "store", "warehouse",
+                    "layout-dashboard", "shopping-cart", "wallet", "users",
+                    "truck", "tag", "barcode", "scan-line",
+                    "alert-circle", "check-circle-2", "info", "x",
+                    "search", "filter", "plus", "minus",
+                    "pencil", "trash-2", "eye", "eye-off",
+                    "moon", "sun", "settings", "log-out",
+                    "chevron-down", "chevron-up", "chevron-left", "chevron-right",
+                    "arrow-up-down", "arrow-down-to-line", "arrow-up-from-line", "refresh-cw",
+                    "loader-2", "menu", "bell", "printer"
+                };
+            }
+            @foreach (var name in iconNames)
+            {
+                <div class="icon-cell">
+                    <es-icon name="@name" class="es-icon--lg" stroke-width="2"></es-icon>
+                    <span>@name</span>
+                </div>
+            }
+        </div>
+        <div class="mt-4 flex items-center gap-3 flex-wrap">
+            <span class="text-xs" style="color: var(--text-muted); font-family: var(--font-mono);">tamanhos:</span>
+            <es-icon name="package" class="es-icon--xs"></es-icon>
+            <es-icon name="package" class="es-icon--sm"></es-icon>
+            <es-icon name="package"></es-icon>
+            <es-icon name="package" class="es-icon--lg"></es-icon>
+            <span class="text-xs ml-4" style="color: var(--text-muted); font-family: var(--font-mono);">fallback (nome invalido):</span>
+            <es-icon name="nao-existe" class="es-icon--lg"></es-icon>
+        </div>
+    </section>
+
+    <!-- Fase 1: Botoes (es-button) -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-button</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Wrapper sobre <code>.btn</code>. Variantes: primary, navy, secondary, ghost, danger, success, dark. Tamanhos: sm, md, lg. Suporta <code>icon</code>, <code>icon-trailing</code>, <code>icon-only</code>, <code>loading</code>, <code>disabled</code>, <code>href</code> (renderiza &lt;a&gt;).</p>
+        <div class="flex flex-wrap gap-2 mb-3">
+            <es-button variant="primary" icon="plus">Novo produto</es-button>
+            <es-button variant="navy" icon="save">Salvar</es-button>
+            <es-button variant="secondary" icon="filter">Filtrar</es-button>
+            <es-button variant="ghost" icon="refresh-cw">Atualizar</es-button>
+            <es-button variant="danger" icon="trash-2">Excluir</es-button>
+            <es-button variant="success" icon="check">Confirmar</es-button>
+            <es-button variant="dark" icon="moon">Dark</es-button>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3 items-center">
+            <es-button variant="primary" size="sm" icon="plus">Small</es-button>
+            <es-button variant="primary" icon="plus">Default</es-button>
+            <es-button variant="primary" size="lg" icon="plus">Large</es-button>
+            <es-button variant="primary" disabled>Disabled</es-button>
+            <es-button variant="primary" loading>Salvando</es-button>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3 items-center">
+            <es-button variant="secondary" icon-only icon="pencil" aria-label="Editar"></es-button>
+            <es-button variant="ghost" icon-only icon="trash-2" aria-label="Excluir"></es-button>
+            <es-button variant="navy" icon-only icon="printer" aria-label="Imprimir"></es-button>
+            <es-button variant="primary" icon="external-link" icon-trailing="chevron-right" href="/dev/components">Como link</es-button>
+        </div>
+    </section>
+
+    <!-- Fase 1: Badges -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-badge</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Variantes: default, primary, navy, ok, success, warn, crit, danger, info, accent, neutral, soft. Suporta <code>icon</code> e <code>dot</code>.</p>
+        <div class="flex flex-wrap gap-2 items-center">
+            <es-badge>Default</es-badge>
+            <es-badge variant="primary">Primary</es-badge>
+            <es-badge variant="navy">Navy</es-badge>
+            <es-badge variant="success">OK</es-badge>
+            <es-badge variant="warn">Atencao</es-badge>
+            <es-badge variant="danger">Critico</es-badge>
+            <es-badge variant="info">Info</es-badge>
+            <es-badge variant="accent">Accent</es-badge>
+            <es-badge variant="soft">Soft</es-badge>
+            <es-badge variant="success" dot>Online</es-badge>
+            <es-badge variant="danger" dot>Offline</es-badge>
+        </div>
+    </section>
+
+    <!-- Fase 1: Status pills -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-status-pill</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Status semantico genericoo (ok, warn, crit, info, accent, ink, neutral). Status especificos de pedidos seguem usando <code>.stp.aguardando/.preparando/.pronto/.entregue/.vencendo/.critico</code>.</p>
+        <div class="flex flex-wrap gap-2 items-center">
+            <es-status-pill status="ok">Em estoque</es-status-pill>
+            <es-status-pill status="warn">Vencendo em 3 dias</es-status-pill>
+            <es-status-pill status="crit">Sem estoque</es-status-pill>
+            <es-status-pill status="info">Em transferencia</es-status-pill>
+            <es-status-pill status="accent">Promocao ativa</es-status-pill>
+            <es-status-pill status="ink">Arquivado</es-status-pill>
+            <es-status-pill status="neutral">Rascunho</es-status-pill>
+        </div>
+    </section>
+
+    <!-- Fase 1: es-kbd -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-kbd (atalhos)</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Use <code>&lt;es-kbd&gt;</code> em cheatsheets, tooltips e command palette para teclas de atalho.</p>
+        <div class="space-y-2">
+            <div class="kbd-row">
+                <span class="kbd-label">Abrir busca unificada</span>
+                <span class="kbd-keys"><es-kbd>Ctrl</es-kbd><es-kbd>K</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Focar busca</span>
+                <span class="kbd-keys"><es-kbd>/</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Fechar modal</span>
+                <span class="kbd-keys"><es-kbd>Esc</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Cheatsheet (Fase 5)</span>
+                <span class="kbd-keys"><es-kbd>Shift</es-kbd><es-kbd>?</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Ir para Produtos (Fase 5)</span>
+                <span class="kbd-keys"><es-kbd>g</es-kbd><es-kbd>p</es-kbd></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Fase 4 / 5: dispatchers -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 4/5 - Confirm, Cheatsheet, Scanner</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Disparadores globais via <code>window.easyConfirm()</code>, <code>cheatsheet:toggle</code> e <code>barcode:open</code>.</p>
+        <div class="flex flex-wrap gap-2">
+            <es-button variant="danger" icon="trash-2"
+                       onclick="window.easyConfirm({ titulo: 'Excluir item?', mensagem: 'Esta acao nao pode ser desfeita.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700' }, () => window.showToast('Item excluido (simulado)', 'success'))">
+                easyConfirm
+            </es-button>
+            <es-button variant="ghost" icon="help-circle"
+                       onclick="window.dispatchEvent(new CustomEvent('cheatsheet:toggle'))">
+                Abrir cheatsheet
+            </es-button>
+            <es-button variant="navy" icon="scan-line"
+                       onclick="window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: (code) => window.showToast('Lido: ' + code, 'success') } }))">
+                Abrir scanner
+            </es-button>
+            <form data-confirm='{"titulo":"Form com data-confirm?","mensagem":"Forms com atributo data-confirm sao interceptados automaticamente pelo confirm.js.","textoBotao":"OK","classBotao":"bg-indigo-600 hover:bg-indigo-700"}'
+                  onsubmit="event.preventDefault(); window.showToast('Form submetido (simulado)', 'success')">
+                <es-button variant="primary" type="submit" icon="check">Form data-confirm</es-button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Fase 1: Side-by-side light/dark de primitivos -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Fase 1 - Side-by-side (light + dark)</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Verificacao visual de regressao em ambos os temas, ignorando tema atual da pagina.</p>
+        <div class="side-by-side">
+            <div class="light-pane" data-theme="light">
+                <div class="pane-label">light</div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <es-button variant="primary" icon="plus">Novo</es-button>
+                    <es-button variant="secondary" icon="filter">Filtrar</es-button>
+                    <es-badge variant="success">OK</es-badge>
+                    <es-status-pill status="warn">Vencendo</es-status-pill>
+                    <es-icon name="package" class="es-icon--lg"></es-icon>
+                </div>
+            </div>
+            <div class="dark-pane" data-theme="dark">
+                <div class="pane-label">dark</div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <es-button variant="primary" icon="plus">Novo</es-button>
+                    <es-button variant="secondary" icon="filter">Filtrar</es-button>
+                    <es-badge variant="success">OK</es-badge>
+                    <es-status-pill status="warn">Vencendo</es-status-pill>
+                    <es-icon name="package" class="es-icon--lg"></es-icon>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Buttons (legado .btn diretamente) -->
     <section>
         <h2 class="text-lg font-semibold mb-3">Botões</h2>
         <div class="flex flex-wrap gap-2 mb-3">
@@ -210,10 +401,10 @@
             <div class="relative">
                 <button class="btn btn-ghost" @@click="pop = !pop">Ações ▾</button>
                 <div class="popover-panel" x-show="pop" x-cloak @@click.outside="pop = false" style="right:0;top:calc(100% + 4px)" role="menu">
-                    <button class="popover-item" role="menuitem"><span aria-hidden="true">✏️</span><span>Editar</span></button>
-                    <button class="popover-item" role="menuitem"><span aria-hidden="true">📄</span><span>Duplicar</span></button>
+                    <button class="popover-item" role="menuitem"><es-icon name="pencil" class="es-icon--sm"></es-icon><span>Editar</span></button>
+                    <button class="popover-item" role="menuitem"><es-icon name="copy" class="es-icon--sm"></es-icon><span>Duplicar</span></button>
                     <div class="popover-divider"></div>
-                    <button class="popover-item danger" role="menuitem"><span aria-hidden="true">🗑️</span><span>Excluir</span></button>
+                    <button class="popover-item danger" role="menuitem"><es-icon name="trash-2" class="es-icon--sm"></es-icon><span>Excluir</span></button>
                 </div>
             </div>
         </div>
@@ -226,9 +417,9 @@
             <div class="modal-panel modal-md">
                 <div class="modal-header">
                     <h3 class="text-base font-semibold m-0">Confirmar ação</h3>
-                    <button class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="modal = false">✕</button>
+                    <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="modal = false"></es-button>
                 </div>
-                <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja prosseguir? Esta ação pode ser revertida em até 5 segundos via toast.</p></div>
+                <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja prosseguir? Esta acao pode ser revertida em ate 5 segundos via toast.</p></div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @@click="modal = false">Cancelar</button>
                     <button class="btn btn-primary" @@click="modal = false">Confirmar</button>
@@ -241,8 +432,8 @@
             <div class="drawer-backdrop" @@click="drawer = false"></div>
             <aside class="drawer-panel" role="dialog" aria-modal="true" @@keydown.escape.window="drawer = false">
                 <div class="drawer-header">
-                    <h3 class="text-base font-semibold m-0">Edição rápida</h3>
-                    <button class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="drawer = false">✕</button>
+                    <h3 class="text-base font-semibold m-0">Edicao rapida</h3>
+                    <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="drawer = false"></es-button>
                 </div>
                 <div class="drawer-body">
                     <p class="text-sm">Drawer slide-right para ações sem trocar de página.</p>

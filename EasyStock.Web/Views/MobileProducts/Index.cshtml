@@ -62,17 +62,13 @@
                                 Linkar ao ERP
                             </button>
                             <span class="text-xs text-slate-300">|</span>
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: 'Aprovar @p.Name como mobile-only?',
-                                        mensagem: 'O produto fica disponível só no app — não cria registro no ERP. Você pode desfazer depois.',
-                                        textoBotao: 'Aprovar mobile-only',
-                                        classBotao: 'bg-emerald-600 hover:bg-emerald-700',
-                                        formAction: '/produtos-mobile/@p.Id/aprovar'
-                                    })"
-                                    class="text-xs text-emerald-600 hover:text-emerald-800 font-medium">
-                                Aprovar (mobile-only)
-                            </button>
+                            <form method="post" action="/produtos-mobile/@p.Id/aprovar" class="inline"
+                                  data-confirm='{"titulo":"Aprovar produto mobile-only?","mensagem":"O produto sera aprovado sem link com ERP. Voce ainda pode linkar manualmente depois.","textoBotao":"Aprovar","classBotao":"bg-emerald-600 hover:bg-emerald-700"}'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium">
+                                    Aprovar (mobile-only)
+                                </button>
+                            </form>
                         </td>
                     </tr>
 
@@ -167,17 +163,13 @@
                         </td>
                         <td class="px-4 py-3 text-sm text-slate-700">@p.ApprovedAt?.ToString("dd/MM HH:mm")</td>
                         <td class="px-4 py-3 text-right">
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: 'Desfazer aprovação de @p.Name?',
-                                        mensagem: 'O produto volta pra lista de pendentes do app e some dos revisados.',
-                                        textoBotao: 'Desfazer aprovação',
-                                        classBotao: 'bg-red-600 hover:bg-red-700',
-                                        formAction: '/produtos-mobile/@p.Id/desfazer'
-                                    })"
-                                    class="text-xs text-slate-500 hover:text-red-600 font-medium">
-                                Desfazer
-                            </button>
+                            <form method="post" action="/produtos-mobile/@p.Id/desfazer" class="inline"
+                                  data-confirm='{"titulo":"Desfazer aprovacao?","mensagem":"O produto volta para a lista de pendentes.","textoBotao":"Desfazer","classBotao":"bg-slate-600 hover:bg-slate-700"}'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-slate-500 hover:text-red-600 font-medium">
+                                    Desfazer
+                                </button>
+                            </form>
                         </td>
                     </tr>
                 }

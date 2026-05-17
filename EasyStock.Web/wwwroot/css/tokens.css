@@ -607,4 +607,22 @@ html, body {
   --z-toast:           60;
   --z-command:         70;
   --z-loading:         80;
+
+  /* ----- Icon sizing (Lucide via es-icon TagHelper) ----- */
+  --icon-size-xs: 14px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-stroke:  2;
+
+  /* ----- Table/list density ----- */
+  --table-row-h:       44px;
+  --table-row-h-dense: 36px;
+
+  /* ----- Chip/kbd ----- */
+  --chip-bg: var(--ink-100);
+  --chip-fg: var(--ink-700);
+  --kbd-bg: var(--bg-surface);
+  --kbd-fg: var(--text-secondary);
+  --kbd-border: var(--border-soft);
 }
