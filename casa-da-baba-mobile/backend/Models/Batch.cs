@@ -55,6 +55,14 @@ public class BatchItem
 
     public int Qty { get; set; }
 
+    /// <summary>
+    /// Gramagem real produzida (quando o produto é vendido por peso). Nullable
+    /// porque produtos antigos vão continuar sem peso e itens contados em
+    /// unidades não preenchem. A UI consolidada soma WeightGrams quando o
+    /// produto for do tipo gramas; senão soma Qty.
+    /// </summary>
+    public int? WeightGrams { get; set; }
+
     /// <summary>Foto do item individual (opcional).</summary>
     public string? Photo { get; set; }
 

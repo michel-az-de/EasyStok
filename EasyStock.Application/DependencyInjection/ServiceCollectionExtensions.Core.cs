@@ -12,6 +12,7 @@ using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
 using EasyStock.Application.UseCases.ListarPedidosCliente;
+using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
@@ -22,10 +23,12 @@ using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.RemoverItemLote;
+using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.ConferirEtiqueta;
+using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.ListasCompras;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.GerenciarProduto;
@@ -37,6 +40,11 @@ using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
+using EasyStock.Application.UseCases.CalcularProducao;
+using EasyStock.Application.UseCases.PreviewSugestaoCompra;
+using EasyStock.Application.UseCases.CriarSugestaoCompra;
+using EasyStock.Application.UseCases.GerenciarComposicao;
+using EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
 using EasyStock.Application.UseCases.AnuncioIa;
 using EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio;
 using EasyStock.Application.UseCases.ListarPlanos;
@@ -52,6 +60,13 @@ using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
+using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
+using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
+using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
+using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
+using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
+using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
+using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -78,6 +93,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
         services.AddScoped<ListarPedidosUseCase>();
+        services.AddScoped<AlterarAgendamentoPedidoUseCase>();
 
         // Onda P3 — Caixa
         services.AddScoped<AbrirCaixaUseCase>();
@@ -93,9 +109,20 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AdicionarItemLoteUseCase>();
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
+        services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
         services.AddScoped<ConferirEtiquetaUseCase>();
+
+        // Módulo Etiquetas (F2)
+        services.AddScoped<ListarTemplatesUseCase>();
+        services.AddScoped<CriarTemplateUseCase>();
+        services.AddScoped<AtualizarTemplateUseCase>();
+        services.AddScoped<RemoverTemplateUseCase>();
+        services.AddScoped<DefinirPadraoUseCase>();
+        services.AddScoped<MontarPayloadRenderUseCase>();
+        services.AddScoped<MarcarEtiquetasImpressasUseCase>();
+        services.AddScoped<SalvarFichaTecnicaUseCase>();
 
         // Onda P5.B — Listas de Compras
         services.AddScoped<ListarListasComprasUseCase>();
@@ -113,6 +140,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();
         services.AddScoped<GerenciarCategoriaUseCase>();
+
+        // Calculadora de Producao (Ondas 1.3 + 1.4 single; Onda 1 cesta in-context)
+        services.AddScoped<CalcularProducaoUseCase>();
+        services.AddScoped<CalcularCestaProducaoUseCase>();
+        services.AddScoped<PreviewSugestaoCompraUseCase>();
+        services.AddScoped<CriarSugestaoCompraUseCase>();
+        services.AddScoped<GerenciarComposicaoUseCase>();
+        services.AddScoped<AdicionarItemPedidoFornecedorUseCase>();
 
         // Estoque
         services.AddScoped<RegistrarEntradaEstoqueUseCase>();
@@ -146,6 +181,17 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerarPdfFaturaUseCase>();
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
+
+        // Modulo Fiscal NFC-e (F1) — 6 use cases sobre Nfe*
+        services.AddScoped<EmitirNfceUseCase>();
+        services.AddScoped<CancelarNfeUseCase>();
+        services.AddScoped<InutilizarNumeracaoUseCase>();
+        services.AddScoped<ConsultarNfeUseCase>();
+        services.AddScoped<ProcessarWebhookFocusNFeUseCase>();
+        services.AddScoped<ReprocessarContingenciaUseCase>();
+
+        // Modulo Financeiro AR/AP — Lancamentos
+        services.AddScoped<BaixarLancamentoUseCase>();
 
         return services;
     }

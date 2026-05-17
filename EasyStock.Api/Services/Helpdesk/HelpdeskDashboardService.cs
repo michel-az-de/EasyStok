@@ -6,6 +6,25 @@ namespace EasyStock.Api.Services.Helpdesk;
 
 public sealed record DashboardItemContagem(string Chave, int Quantidade);
 
+/// <summary>
+/// Resumo de tickets criticos para widget Operacao + badge global.
+/// "Critico" = aberto/emAtendimento com SLA violado OU prioridade >= Alta.
+/// </summary>
+public sealed record TicketCriticoResumo(
+    Guid Id,
+    string Titulo,
+    string Status,
+    string Prioridade,
+    bool SlaRespostaViolado,
+    bool SlaResolucaoViolado,
+    DateTime CriadoEm);
+
+public sealed record TicketsCriticosResultado(
+    int Total,
+    int SlaViolados,
+    int AltaOuCritica,
+    IReadOnlyList<TicketCriticoResumo> Top);
+
 public sealed record HelpdeskDashboardResultado(
     int Abertos,
     int EmAtendimento,
@@ -127,5 +146,47 @@ public sealed class HelpdeskDashboardService(EasyStockDbContext db)
             TotalAvaliacoes: totalAvaliacoes,
             TicketsPorCategoria: porCategoria,
             TicketsPorPrioridade: porPrioridade);
+    }
+
+    /// <summary>
+    /// Onda 1.4 — resumo dos tickets criticos para widget operacao e badge navbar.
+    /// "Critico" = Aberto/EmAtendimento/AguardandoCliente E (SLA violado OU prioridade Alta/Critica).
+    /// Quando empresaId == null, SuperAdmin ve cross-tenant (badge global).
+    /// </summary>
+    public async Task<TicketsCriticosResultado> ObterCriticosAsync(Guid? empresaId = null, int limit = 5, CancellationToken ct = default)
+    {
+        var query = db.AdminTickets.AsNoTracking()
+            .Where(t => t.Status != TicketStatus.Resolvido && t.Status != TicketStatus.Fechado);
+
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            query = query.Where(t => t.EmpresaId == empresaId.Value);
+
+        query = query.Where(t =>
+            t.SlaRespostaViolado
+            || t.SlaResolucaoViolado
+            || t.Prioridade == TicketPrioridade.Alta
+            || t.Prioridade == TicketPrioridade.Critica);
+
+        var total = await query.CountAsync(ct);
+        var slaViolados = await query.CountAsync(t => t.SlaRespostaViolado || t.SlaResolucaoViolado, ct);
+        var altaOuCritica = await query.CountAsync(t => t.Prioridade == TicketPrioridade.Alta || t.Prioridade == TicketPrioridade.Critica, ct);
+
+        var top = await query
+            .OrderByDescending(t => t.Prioridade == TicketPrioridade.Critica)
+            .ThenByDescending(t => t.SlaResolucaoViolado)
+            .ThenByDescending(t => t.SlaRespostaViolado)
+            .ThenBy(t => t.CriadoEm)
+            .Take(limit)
+            .Select(t => new TicketCriticoResumo(
+                t.Id,
+                t.Titulo,
+                t.Status.ToString(),
+                t.Prioridade.ToString(),
+                t.SlaRespostaViolado,
+                t.SlaResolucaoViolado,
+                t.CriadoEm))
+            .ToListAsync(ct);
+
+        return new TicketsCriticosResultado(total, slaViolados, altaOuCritica, top);
     }
 }

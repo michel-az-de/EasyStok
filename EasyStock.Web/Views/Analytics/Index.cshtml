@@ -8,7 +8,7 @@
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Análises</h1>
-        <p>Visão geral do desempenho do seu estoque</p>
+        <p>Tendências, alertas e projeções do seu estoque</p>
     </div>
     <a href="/analytics/movimentacoes"
        class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
@@ -19,7 +19,7 @@
 <!-- KPIs do estoque atual -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="ws">
-        <div class="kpi-lbl">Receita est. (período)</div>
+        <div class="kpi-lbl">Receita no período</div>
         <div class="kpi-val text-green-600">@Model.ReceitaEstimadaPeriodo.ToString("C", ptBR)</div>
     </div>
     <div class="ws">
@@ -44,23 +44,28 @@
     <p class="text-xs text-slate-400 mb-4">Baseado na velocidade média de saída: @Model.MediaVendasDiaria.ToString("N1") un./dia</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="text-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-            <div class="text-sm text-slate-400 mb-1">📈</div>
             <div class="text-xl font-bold text-slate-900">@Model.ProjUnidadesDia.ToString("N0")</div>
             <div class="text-xs text-slate-500 mt-1">unidades/dia</div>
         </div>
         <div class="text-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-            <div class="text-sm text-slate-400 mb-1">📅</div>
             <div class="text-xl font-bold text-slate-900">@Model.ProjUnidades7d.ToString("N0")</div>
             <div class="text-xs text-slate-500 mt-1">próximos 7 dias</div>
         </div>
         <div class="text-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-            <div class="text-sm text-slate-400 mb-1">📆</div>
             <div class="text-xl font-bold text-slate-900">@Model.ProjUnidades30d.ToString("N0")</div>
             <div class="text-xs text-slate-500 mt-1">próximos 30 dias</div>
         </div>
         <div class="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-            <div class="text-sm text-slate-400 mb-1">💰</div>
-            <div class="text-xl font-bold text-indigo-600">@Model.ProjReceita30d.ToString("C", ptBR)</div>
+            @if (Model.ReceitaProjetadaDisponivel)
+            {
+                <div class="text-xl font-bold text-indigo-600">@Model.ProjReceita30d.ToString("C", ptBR)</div>
+            }
+            else
+            {
+                <div class="text-sm font-semibold text-slate-500">Receita indisponível</div>
+                <div class="text-xs text-slate-400 mt-1">Produtos sem preço cadastrado</div>
+                <a href="/produtos" class="text-xs text-indigo-500 hover:underline">Cadastrar preços →</a>
+            }
             <div class="text-xs text-slate-500 mt-1">receita proj. 30d</div>
         </div>
     </div>
@@ -71,9 +76,9 @@ else
 <div class="ws mb-6">
     <h2 class="font-semibold text-slate-900 mb-1">Projeções de Demanda</h2>
     <div class="flex flex-col items-center justify-center py-8 text-slate-400">
-        <div class="text-3xl mb-2">📊</div>
-        <p class="text-sm font-semibold text-slate-500">Dados insuficientes para projeção</p>
-        <p class="text-xs mt-1">Registre saídas para habilitar as projeções de demanda.</p>
+        <p class="text-sm font-semibold text-slate-500">Sem projeções ainda</p>
+        <p class="text-xs mt-1">Registre pelo menos 7 dias de saídas para ver as projeções.</p>
+        <a href="/saidas/nova" class="mt-3 text-xs text-indigo-600 hover:text-indigo-700 font-medium">Registrar saída →</a>
     </div>
 </div>
 }
@@ -81,12 +86,15 @@ else
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Reposição urgente -->
     <div class="ws">
-        <h2 class="font-semibold text-slate-900 mb-4">Reposição Urgente</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-slate-900">Reposição necessária</h2>
+            <a href="/listas-compras/nova" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Criar lista de compras →</a>
+        </div>
         @if (!Model.ItensReposicaoUrgente.Any())
         {
             <div class="text-center py-6 text-slate-400">
-                <p class="font-semibold text-slate-500">Nenhum item crítico</p>
-                <p class="text-xs mt-1">Todos os produtos estão com estoque adequado.</p>
+                <p class="font-semibold text-slate-500">Tudo em ordem</p>
+                <p class="text-xs mt-1">Nenhum produto precisa de reposição agora.</p>
             </div>
         }
         else
@@ -126,7 +134,7 @@ else
         {
             <div class="text-center py-6 text-slate-400">
                 <p class="font-semibold text-slate-500">Sem alertas ativos</p>
-                <p class="text-xs mt-1">Nenhum alerta no momento. Seu estoque está sob controle.</p>
+                <p class="text-xs mt-1">Tudo certo por aqui.</p>
             </div>
         }
         else
@@ -155,7 +163,7 @@ else
 </div>
 
 <!-- Gráfico receita mensal -->
-@if (Model.GraficoLabels.Any())
+@if (Model.GraficoLabels.Any() && Model.GraficoDados.Any(d => d > 0))
 {
     <div class="ws mb-6">
         <div class="flex items-center justify-between mb-4">
@@ -176,7 +184,7 @@ else
 }
 
 @section Scripts {
-    @if (Model.GraficoLabels.Any())
+    @if (Model.GraficoLabels.Any() && Model.GraficoDados.Any(d => d > 0))
     {
         <script>
             const ctx = document.getElementById('grafico-receita-analytics');

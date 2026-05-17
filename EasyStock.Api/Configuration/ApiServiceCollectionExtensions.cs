@@ -181,6 +181,26 @@ public static class ApiServiceCollectionExtensions
                 limiter.QueueLimit = 20;
             });
 
+            // Modulo Fiscal (F3) — particionado por tenant para nao deixar um cliente
+            // saturar a quota global. 10/min e suficiente para PDV varejista normal;
+            // emissoes em rajada (batch) devem ir por outro canal (futuro).
+            options.AddPolicy("nfe-emitir", context =>
+            {
+                var partitionKey = context.User.FindFirst("empresaId")?.Value
+                    ?? context.User.FindFirst("EmpresaId")?.Value
+                    ?? context.Connection.RemoteIpAddress?.ToString()
+                    ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                    });
+            });
+
             // Onda 7 — Rate limit pra endpoints mobile anônimos.
             // Cobre: GET /api/mobile/version, POST /api/mobile/devices/pair,
             // POST /api/mobile/diagnostics/errors. Particionado por IP pra
@@ -229,6 +249,37 @@ public static class ApiServiceCollectionExtensions
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
+            // FAQ publico — leitura anonima (busca, listar categorias, obter item).
+            // Generoso para nao quebrar SEO/scrapers legitimos.
+            options.AddPolicy("public-read", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 10
+                    });
+            });
+
+            // FAQ publico — feedback POST. Limite mais apertado.
+            options.AddPolicy("public-post", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
@@ -323,7 +374,16 @@ public static class ApiServiceCollectionExtensions
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 
                 if (environment.IsDevelopment())
+                {
                     tracing.AddConsoleExporter();
+                }
+                else
+                {
+                    // Em prod, amostra 10% das traces pra reduzir custo de egress
+                    // OTLP e backend (Honeycomb/Tempo cobram por span). Health checks
+                    // e polling endpoints ja sao filtrados pelo Serilog request logging.
+                    tracing.SetSampler(new TraceIdRatioBasedSampler(0.1));
+                }
             })
             .WithMetrics(metrics =>
             {

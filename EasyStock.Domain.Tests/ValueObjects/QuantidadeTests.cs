@@ -95,4 +95,89 @@ public class QuantidadeTests
 
         str.Should().Be("10");
     }
+
+    // Testes para suporte a quantidades fracionárias (PR-A: int → decimal)
+
+    [Fact]
+    public void Deve_criar_quantidade_fracionaria_quando_valor_for_valido()
+    {
+        var quantidade = Quantidade.From(0.5m);
+
+        quantidade.Value.Should().Be(0.5m);
+    }
+
+    [Fact]
+    public void Deve_criar_quantidade_com_tres_casas_decimais()
+    {
+        var quantidade = Quantidade.From(1.001m);
+
+        quantidade.Value.Should().Be(1.001m);
+    }
+
+    [Fact]
+    public void Deve_adicionar_quantidades_fracionarias_corretamente()
+    {
+        var q1 = Quantidade.From(1.5m);
+        var q2 = Quantidade.From(0.5m);
+
+        var resultado = q1.Add(q2);
+
+        resultado.Value.Should().Be(2.0m);
+    }
+
+    [Fact]
+    public void Deve_subtrair_quantidades_fracionarias_corretamente()
+    {
+        var q1 = Quantidade.From(1.5m);
+        var q2 = Quantidade.From(0.5m);
+
+        var resultado = q1.Subtract(q2);
+
+        resultado.Value.Should().Be(1.0m);
+    }
+
+    [Fact]
+    public void Nao_deve_permitir_valor_fracionario_negativo()
+    {
+        Action act = () => Quantidade.From(-0.001m);
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithMessage("*Quantidade não pode ser negativa.*");
+    }
+
+    [Fact]
+    public void Deve_retornar_string_do_valor_decimal()
+    {
+        var quantidade = Quantidade.From(1.5m);
+
+        quantidade.ToString().Should().Be("1.5");
+    }
+
+    [Fact]
+    public void Deve_converter_implicitamente_para_decimal()
+    {
+        Quantidade quantidade = Quantidade.From(2.75m);
+
+        decimal valor = quantidade;
+
+        valor.Should().Be(2.75m);
+    }
+
+    [Fact]
+    public void Deve_manter_compatibilidade_com_int_via_from_overload()
+    {
+        var quantidade = Quantidade.From(10);
+
+        quantidade.Value.Should().Be(10m);
+    }
+
+    [Fact]
+    public void Deve_manter_compatibilidade_com_conversao_implicita_para_int()
+    {
+        var quantidade = Quantidade.From(5);
+
+        int valor = quantidade;
+
+        valor.Should().Be(5);
+    }
 }

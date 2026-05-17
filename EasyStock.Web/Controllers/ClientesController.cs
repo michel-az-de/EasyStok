@@ -29,6 +29,9 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         return View(vm);
     }
 
+    [HttpGet("/clientes/novo")]
+    public IActionResult Novo() => RedirectToAction(nameof(Index));
+
     [HttpGet("/clientes/{id}")]
     public async Task<IActionResult> Detail(string id)
     {
@@ -48,10 +51,19 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         string? email, string? documento, string? observacoes)
     {
         var result = await svc.CriarAsync(nome, apt, endereco, telefone, email, documento, observacoes);
-        if (HasError(result)) return RedirectToAction(nameof(Index));
+        if (HasErrorVerbose(result, "Criar cliente")) return RedirectToAction(nameof(Index));
 
         Toast("success", "Cliente criado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id = result.Data?.Id });
+    }
+
+    [HttpGet("/clientes/buscar-json")]
+    public async Task<IActionResult> BuscarJson(string? q = null, int limit = 5)
+    {
+        if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
+        var result = await svc.ListarAsync(null, q);
+        if (!result.Success || result.Data is null) return Ok(Array.Empty<object>());
+        return Ok(result.Data.Take(limit).Select(c => new { id = c.Id, nome = c.Nome, telefone = c.Telefone }));
     }
 
     [HttpPost("/clientes/json")]
@@ -89,7 +101,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         string? email, string? documento, string? observacoes)
     {
         var result = await svc.EditarAsync(id, nome, apt, endereco, telefone, email, documento, observacoes);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Editar cliente")) return RedirectToAction(nameof(Detail), new { id });
 
         Toast("success", "Cliente atualizado com sucesso!");
         return RedirectToAction(nameof(Detail), new { id });
@@ -100,7 +112,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> Excluir(string id)
     {
         var result = await svc.ExcluirAsync(id);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Desativar cliente")) return RedirectToAction(nameof(Detail), new { id });
 
         Toast("success", "Cliente desativado.", $"/clientes/{id}/reativar");
         return RedirectToAction(nameof(Index));
@@ -111,7 +123,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> Reativar(string id)
     {
         var result = await svc.ReativarAsync(id);
-        if (HasError(result)) return RedirectToAction(nameof(Index));
+        if (HasErrorVerbose(result, "Reativar cliente")) return RedirectToAction(nameof(Index));
 
         Toast("success", "Cliente reativado.");
         return RedirectToAction(nameof(Detail), new { id });
@@ -128,7 +140,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     {
         var result = await svc.AddEnderecoAsync(id, tipo, logradouro, numero, complemento,
             bairro, cidade, estado, cep, pais, referencia, padrao);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Adicionar endereço")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Endereço adicionado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -138,7 +150,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> RemoveEndereco(string id, string enderecoId)
     {
         var result = await svc.RemoveEnderecoAsync(id, enderecoId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Remover endereço")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Endereço removido.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -151,7 +163,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         string numero, string? tipo, bool whatsapp = false, bool principal = false, string? observacao = null)
     {
         var result = await svc.AddTelefoneAsync(id, numero, tipo, whatsapp, principal, observacao);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Adicionar telefone")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Telefone adicionado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -161,7 +173,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> RemoveTelefone(string id, string telefoneId)
     {
         var result = await svc.RemoveTelefoneAsync(id, telefoneId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Remover telefone")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Telefone removido.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -174,7 +186,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
         string tipo, string valor, string? emissor, DateTime? emitidoEm, DateTime? validoAte, bool principal = false)
     {
         var result = await svc.AddDocumentoAsync(id, tipo, valor, emissor, emitidoEm, validoAte, principal);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Adicionar documento")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Documento adicionado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -184,8 +196,9 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> RemoveDocumento(string id, string documentoId)
     {
         var result = await svc.RemoveDocumentoAsync(id, documentoId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasErrorVerbose(result, "Remover documento")) return RedirectToAction(nameof(Detail), new { id });
         Toast("success", "Documento removido.");
         return RedirectToAction(nameof(Detail), new { id });
     }
+
 }

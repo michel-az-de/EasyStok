@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0066cc" />
+    <title>Caixa NFC-e — EasyStok</title>
+    <link rel="manifest" href="../manifest.json" />
+    <link rel="icon" href="../icons/icon-192.png" />
+    <link rel="stylesheet" href="./caixa.css" />
+    <link rel="stylesheet" href="./danfe.css" media="print" />
+</head>
+<body>
+    <header class="caixa-header">
+        <h1>Caixa NFC-e</h1>
+        <div class="caixa-info">
+            <span id="ambienteIndicator" class="badge badge-homologacao">Homologação</span>
+            <span id="usuarioInfo"></span>
+        </div>
+    </header>
+
+    <main class="caixa-main">
+        <section class="caixa-itens">
+            <h2>Itens da venda</h2>
+
+            <div class="adicionar-item">
+                <div class="field field--wide">
+                    <label class="field__label" for="inputNome">Nome do produto</label>
+                    <input type="text" id="inputNome" autocomplete="off" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="inputQtd">Quantidade</label>
+                    <input type="number" id="inputQtd" step="0.001" min="0.001" value="1" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="inputPreco">Preço unitário (R$)</label>
+                    <input type="number" id="inputPreco" step="0.01" min="0.01" placeholder="0,00" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="inputUnidade">Unidade</label>
+                    <input type="text" id="inputUnidade" maxlength="6" value="UN" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="inputNcm">NCM</label>
+                    <input type="text" id="inputNcm" maxlength="8" placeholder="8 dígitos" inputmode="numeric" />
+                </div>
+                <div class="field">
+                    <label class="field__label" for="inputCfop">CFOP</label>
+                    <input type="text" id="inputCfop" maxlength="4" value="5102" inputmode="numeric" />
+                </div>
+                <button id="btnAddItem" class="btn-add-item">+ Adicionar item</button>
+            </div>
+
+            <ul id="listaItens" class="lista-itens"></ul>
+
+            <div class="caixa-total">
+                <strong>Total:</strong>
+                <span id="totalNota">R$ 0,00</span>
+            </div>
+        </section>
+
+        <section class="caixa-acoes">
+            <h2>Finalizar venda</h2>
+
+            <div class="field">
+                <label class="field__label" for="inputCpfDestinatario">
+                    CPF ou CNPJ do consumidor
+                    <span class="field__hint">opcional — deixe vazio para "Consumidor Final"</span>
+                </label>
+                <input type="text" id="inputCpfDestinatario" maxlength="14" inputmode="numeric" autocomplete="off" />
+            </div>
+
+            <div class="field">
+                <label class="field__label" for="inputNomeDestinatario">
+                    Nome do consumidor
+                    <span class="field__hint">opcional</span>
+                </label>
+                <input type="text" id="inputNomeDestinatario" autocomplete="name" />
+            </div>
+
+            <button id="btnEmitir" class="btn-primary btn-large" disabled aria-describedby="statusMsg">
+                <span class="btn__label">Emitir NFC-e e Finalizar</span>
+                <span class="btn__spinner" aria-hidden="true"></span>
+            </button>
+
+            <div id="statusMsg" class="status-msg" role="status" aria-live="polite" aria-atomic="true"></div>
+        </section>
+    </main>
+
+    <!-- Modal DANFE -->
+    <div id="modalDanfe" class="modal" hidden>
+        <div class="modal-content">
+            <button id="btnFecharModal" class="modal-fechar">×</button>
+
+            <div id="danfePrintArea" class="danfe-print">
+                <h3 class="danfe-titulo">DANFE NFC-e</h3>
+                <p class="danfe-emissor">
+                    <strong id="danfeEmitenteRazao"></strong><br />
+                    CNPJ: <span id="danfeEmitenteCnpj"></span><br />
+                    IE: <span id="danfeEmitenteIE"></span>
+                </p>
+
+                <table class="danfe-itens">
+                    <thead><tr><th>#</th><th>Descrição</th><th>Qtd</th><th>Preço</th><th>Total</th></tr></thead>
+                    <tbody id="danfeItensBody"></tbody>
+                </table>
+
+                <p class="danfe-totais">
+                    <strong>Valor total: <span id="danfeTotal"></span></strong>
+                </p>
+
+                <p class="danfe-chave">
+                    Chave de acesso:<br />
+                    <span id="danfeChave" class="danfe-chave-valor"></span>
+                </p>
+
+                <div id="danfeQrCode" class="danfe-qr"></div>
+
+                <p class="danfe-protocolo">
+                    Protocolo: <span id="danfeProtocolo"></span><br />
+                    Autorizada em: <span id="danfeDataAuth"></span>
+                </p>
+
+                <p class="danfe-consumidor" id="danfeConsumidorBox" hidden>
+                    Consumidor: <span id="danfeConsumidor"></span>
+                </p>
+            </div>
+
+            <div class="modal-actions">
+                <button id="btnImprimirDanfe" class="btn-primary">Imprimir DANFE 80mm</button>
+                <button id="btnNovaVenda" class="btn-secondary">Nova venda</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../qrcode.min.js"></script>
+    <script src="./caixa.js"></script>
+</body>
+</html>

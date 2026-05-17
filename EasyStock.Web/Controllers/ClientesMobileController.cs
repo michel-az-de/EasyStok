@@ -18,12 +18,18 @@ public class ClientesMobileController(ClientesService svc, SessionService sessio
         ViewBag.ActiveMenuItem = "ClientesMobile";
 
         var vm = new ClientesMobileViewModel { PendingOnly = pendingOnly };
+        try
+        {
+            var mobile = await svc.ListarMobileAsync(pendingOnly);
+            if (mobile.Success && mobile.Data is not null) vm.Items = mobile.Data;
 
-        var mobile = await svc.ListarMobileAsync(pendingOnly);
-        if (mobile.Success && mobile.Data is not null) vm.Items = mobile.Data;
-
-        var erp = await svc.ListarAsync(status: "ativo");
-        if (erp.Success && erp.Data is not null) vm.ErpClientes = erp.Data;
+            var erp = await svc.ListarAsync(status: "ativo");
+            if (erp.Success && erp.Data is not null) vm.ErpClientes = erp.Data;
+        }
+        catch
+        {
+            Toast("error", "Não foi possível carregar os dados. Tente novamente.");
+        }
 
         return View(vm);
     }

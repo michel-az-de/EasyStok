@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using EasyStock.Web.Helpers;
 
 namespace EasyStock.Web.Models.ViewModels.Entradas;
 
@@ -27,5 +28,5 @@ public class EntradaFormViewModel
     public string? Observacoes { get; set; }
 
     [Required(ErrorMessage = "Data é obrigatória")]
-    public DateOnly Data { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DateOnly Data { get; set; } = BrazilTime.Today();
 }

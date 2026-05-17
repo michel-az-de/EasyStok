@@ -14,8 +14,25 @@
     </a>
 </div>
 
+@{
+    // F5 — filtro client-side adicional (agendamento).
+    var filtroAgenda = Context.Request.Query["agenda"].ToString();
+    var itemsFiltrados = Model.Items.AsEnumerable();
+    if (filtroAgenda == "agendados")
+    {
+        itemsFiltrados = itemsFiltrados.Where(i => i.IsScheduled);
+    }
+    else if (filtroAgenda == "atrasados")
+    {
+        itemsFiltrados = itemsFiltrados.Where(i => i.IsAtrasado);
+    }
+    var visiveis = itemsFiltrados.ToList();
+    var totalAgendados = Model.Items.Count(i => i.IsScheduled);
+    var totalAtrasados = Model.Items.Count(i => i.IsAtrasado);
+}
+
 <div class="ws mb-6">
-    <form method="get" class="flex gap-3 items-center">
+    <form method="get" class="flex gap-3 items-center flex-wrap">
         @foreach (var (val, label) in new[] { ("false", "Todos"), ("true", "Pendentes (sem link)") })
         {
             var isActive = (val == "true") == Model.PendingOnly;
@@ -24,12 +41,28 @@
                 @label
             </a>
         }
-        <span class="text-sm text-slate-500 ml-auto">@Model.Items.Count pedido(s)</span>
+        @* F5 — filtros de agendamento (chips secundários) *@
+        @{
+            var agendaActive = filtroAgenda == "agendados";
+            var atrasadosActive = filtroAgenda == "atrasados";
+        }
+        <a href="@Url.Action("Index", "PedidosMobile", new { pendingOnly = Model.PendingOnly, agenda = "agendados" })"
+           class="px-3 py-2 rounded-lg text-sm font-medium @(agendaActive ? "bg-blue-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+            📅 Agendados (@totalAgendados)
+        </a>
+        @if (totalAtrasados > 0)
+        {
+            <a href="@Url.Action("Index", "PedidosMobile", new { pendingOnly = Model.PendingOnly, agenda = "atrasados" })"
+               class="px-3 py-2 rounded-lg text-sm font-medium @(atrasadosActive ? "bg-red-600 text-white" : "ui-secondary-btn bg-white border border-red-300 text-red-700 hover:bg-red-50")">
+                ⚠ Atrasados (@totalAtrasados)
+            </a>
+        }
+        <span class="text-sm text-slate-500 ml-auto">@visiveis.Count pedido(s)</span>
     </form>
 </div>
 
 <div class="ws">
-    @if (!Model.Items.Any())
+    @if (!visiveis.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIllustration", "inbox" },
@@ -41,9 +74,9 @@
     {
         <div class="overflow-x-auto">
         <table class="tbl-full">
-            <thead><tr><th>Cliente</th><th>Status</th><th>Total</th><th>Origem</th><th>ERP</th><th></th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Status</th><th>Agendado</th><th>Total</th><th>Origem</th><th>ERP</th><th></th></tr></thead>
             <tbody>
-                @foreach (var m in Model.Items)
+                @foreach (var m in visiveis)
                 {
                     <tr>
                         <td>
@@ -54,6 +87,20 @@
                             }
                         </td>
                         <td><span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">@m.Status</span></td>
+                        <td>
+                            @if (m.IsScheduled)
+                            {
+                                var classe = m.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
+                                var prefix = m.IsAtrasado ? "⚠ atrasado:" : "📅";
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @classe" title="@m.ScheduledDeliveryAt?.ToLocalTime():dd/MM HH:mm">
+                                    @prefix @(m.ScheduledDeliveryAt?.ToLocalTime().ToString("dd/MM HH:mm"))
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-xs text-slate-400">—</span>
+                            }
+                        </td>
                         <td class="text-slate-600">@m.Total.ToString("C")</td>
                         <td class="text-xs text-slate-500">
                             @(m.LastOperatorName ?? "—") @if (!string.IsNullOrEmpty(m.LastDeviceId)) { <div class="text-slate-400">@m.LastDeviceId</div> }

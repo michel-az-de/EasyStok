@@ -19,6 +19,7 @@ public class AbrirTicketClienteUseCaseTests
 {
     private readonly IClienteTicketRepository _ticketRepo = Substitute.For<IClienteTicketRepository>();
     private readonly IFaturaRepository _faturaRepo = Substitute.For<IFaturaRepository>();
+    private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
     private readonly ISlaResolver _slaResolver = Substitute.For<ISlaResolver>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -41,7 +42,7 @@ public class AbrirTicketClienteUseCaseTests
     }
 
     private AbrirTicketClienteUseCase Sut() =>
-        new(_ticketRepo, _faturaRepo, _slaResolver, _notificador, _uow, _currentUser);
+        new(_ticketRepo, _faturaRepo, _pedidoRepo, _slaResolver, _notificador, _uow, _currentUser);
 
     [Fact]
     public async Task Abrir_deve_aplicar_SLA_e_publicar_evento_TicketCriado_e_gravar_historico()
@@ -125,6 +126,44 @@ public class AbrirTicketClienteUseCaseTests
         await _notificador.DidNotReceive().PublicarEventoAsync(
             Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<Guid?>(),
             Arg.Any<string>(), Arg.Any<IDictionary<string, object?>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Abrir_com_PedidoId_inexistente_para_empresa_deve_falhar()
+    {
+        var pedidoId = Guid.NewGuid();
+        _pedidoRepo.GetByIdAsync(EmpresaId, pedidoId).Returns((EasyStock.Domain.Entities.Pedido?)null);
+
+        var act = () => Sut().ExecuteAsync(new AbrirTicketClienteCommand(
+            "Pedido travado", "Esta no preparando ha 2 dias", TicketCategoria.Incidente,
+            PedidoId: pedidoId));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Pedido*");
+        await _ticketRepo.DidNotReceive().InsertAsync(Arg.Any<AdminTicket>());
+        await _pedidoRepo.DidNotReceive().AddEventoAsync(Arg.Any<PedidoEvento>());
+    }
+
+    [Fact]
+    public async Task Abrir_com_PedidoId_valido_deve_vincular_ticket_e_registrar_PedidoEvento()
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(EmpresaId);
+        _pedidoRepo.GetByIdAsync(EmpresaId, pedido.Id).Returns(pedido);
+
+        AdminTicket? capturadoTicket = null;
+        PedidoEvento? capturadoEvento = null;
+        await _ticketRepo.InsertAsync(Arg.Do<AdminTicket>(t => capturadoTicket = t));
+        await _pedidoRepo.AddEventoAsync(Arg.Do<PedidoEvento>(e => capturadoEvento = e));
+
+        await Sut().ExecuteAsync(new AbrirTicketClienteCommand(
+            "Pedido nao saiu da preparacao", "Cliente reclamando", TicketCategoria.Incidente,
+            PedidoId: pedido.Id));
+
+        capturadoTicket.Should().NotBeNull();
+        capturadoTicket!.PedidoId.Should().Be(pedido.Id);
+        capturadoEvento.Should().NotBeNull();
+        capturadoEvento!.PedidoId.Should().Be(pedido.Id);
+        capturadoEvento.Tipo.Should().Be("ticket_aberto");
+        capturadoEvento.Detalhes.Should().Contain(capturadoTicket.Id.ToString());
     }
 
     [Fact]

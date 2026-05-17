@@ -261,10 +261,16 @@
         }
     </script>
 
-    <div class="relative">
+    @* BUG 3: toggle de tema oculto. tokens.css tem :root[data-theme="dark"] mas a
+       maior parte do admin usa Tailwind utility classes (bg-white, text-slate-900,
+       etc.) que NÃO reagem a data-theme — o botão trocava o atributo mas a tela
+       seguia clara. Ocultamos o controle até implementarmos dark mode completo;
+       o handler window.EasyStockTheme abaixo permanece (sem dano) pra retomar
+       quando o tema for prioridade. *@
+    @* <div class="relative">
         <button type="button"
                 onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
-                class="theme-toggle-btn app-surface-btn flex items-center gap-2 px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
+                class="theme-toggle-btn app-surface-btn flex items-center gap-2 whitespace-nowrap px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 title="Ativar tema escuro"
                 aria-label="Ativar tema escuro">
             <span class="theme-icon-light" aria-hidden="true">
@@ -279,16 +285,18 @@
             </span>
             <span class="hidden md:inline theme-toggle-label">Ativar tema escuro</span>
         </button>
-    </div>
+    </div> *@
 
-    <!-- Ação rápida (desktop only) -->
+    <!-- Acao rapida (desktop only). Antes tinha classe `app-primary-btn` que aplica
+         gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo
+         escuro. Removida — botao continua secundario branco (consistente com tema). -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
         <button @@click="open = !open"
                 type="button"
                 aria-haspopup="menu"
                 :aria-expanded="open ? 'true' : 'false'"
                 aria-label="Abrir ações rápidas"
-                class="app-primary-btn flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                class="ui-secondary-btn flex items-center gap-2 whitespace-nowrap bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
@@ -347,7 +355,14 @@
             <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span id="topbar-notif-badge" aria-hidden="true" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"></span>
+            @* Pente-fino 2026-05-16: badge com aria-live e role=status pra leitores de tela
+               anunciarem a contagem quando ela muda. aria-atomic garante leitura completa. *@
+            <span id="topbar-notif-badge"
+                  class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label="Notificacoes nao lidas"></span>
         </button>
 
         <div x-show="open" @@click.outside="open = false" x-cloak x-transition
@@ -614,13 +629,16 @@
     </script>
 
     <!-- Avatar / usuário -->
-    <div x-data="{ open: false }" class="relative">
+    <div x-data="{ open: false, logoutAsk: false }" class="relative">
         <button @@click="open = !open"
                 type="button"
                 aria-haspopup="menu"
                 :aria-expanded="open ? 'true' : 'false'"
                 aria-label="Abrir menu da conta"
-                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors max-w-[220px]">
+                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg transition-colors max-w-[220px]"
+                style="color: var(--text-primary);"
+                onmouseover="this.style.background='var(--ink-100)'"
+                onmouseout="this.style.background=''">
             <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold" aria-hidden="true">
                 @iniciais
             </div>
@@ -661,15 +679,54 @@
                 Gerenciar usuários
             </a>
             <div class="border-t border-slate-100 my-1" role="separator"></div>
-            <form asp-controller="Auth" asp-action="Logout" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" role="menuitem" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sair
-                </button>
-            </form>
+            <button type="button"
+                    @@click="open = false; logoutAsk = true; $nextTick(() => document.getElementById('logoutCancelBtn')?.focus())"
+                    class="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                    style="color: var(--crit-600);"
+                    onmouseover="this.style.background='var(--crit-50)'"
+                    onmouseout="this.style.background=''">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sair
+            </button>
         </div>
+
+        <!-- Modal de confirmação de logout -->
+        <template x-teleport="body">
+            <div x-show="logoutAsk" x-cloak
+                 class="auth-prem-modal-backdrop"
+                 role="alertdialog"
+                 aria-labelledby="logoutTitle"
+                 aria-describedby="logoutText"
+                 @@keydown.escape.window="logoutAsk = false"
+                 @@click.self="logoutAsk = false">
+                <div class="auth-prem-modal" @@click.stop>
+                    <div class="auth-prem-modal-icon" aria-hidden="true">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </div>
+                    <h2 id="logoutTitle" class="auth-prem-modal-title">Sair da conta?</h2>
+                    <p id="logoutText" class="auth-prem-modal-text">
+                        Você precisará entrar novamente para continuar. Suas alterações estão salvas.
+                    </p>
+                    <div class="auth-prem-modal-actions">
+                        <button type="button"
+                                id="logoutCancelBtn"
+                                @@click="logoutAsk = false"
+                                class="auth-prem-modal-btn auth-prem-modal-btn--ghost">
+                            Cancelar
+                        </button>
+                        <form asp-controller="Auth" asp-action="Logout" method="post" style="flex: 1; display: flex;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="auth-prem-modal-btn auth-prem-modal-btn--danger" style="width: 100%;">
+                                Sair
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </header>

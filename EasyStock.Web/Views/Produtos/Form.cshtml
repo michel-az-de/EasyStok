@@ -82,7 +82,13 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nome do produto *</label>
                     <input name="Nome" x-model="nome"
                            placeholder="Ex: Camiseta Basica Masculina Algodao"
-                           class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                           minlength="3" maxlength="200"
+                           @* Destaca borda vermelha quando usuario tentou avancar sem preencher (step1AttemptedAdvance true). *@
+                           :class="step1AttemptedAdvance && (!nome || nome.trim().length < 3) ? 'w-full px-3 py-2.5 border border-red-400 ring-1 ring-red-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300' : 'w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300'" />
+                    <span x-show="nome && nome.trim().length > 0 && nome.trim().length < 3" x-cloak
+                          class="text-red-500 text-xs mt-1 block">O nome deve ter pelo menos 3 caracteres.</span>
+                    <span x-show="step1AttemptedAdvance && !nome" x-cloak
+                          class="text-red-500 text-xs mt-1 block">Informe o nome do produto para avançar.</span>
                     <span asp-validation-for="Nome" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
 
@@ -92,7 +98,7 @@
                     {
                         <select name="CategoriaId" x-model="categoriaId"
                                 @@change="subcategoriaId = ''"
-                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                :class="step1AttemptedAdvance && !categoriaId ? 'w-full px-3 py-2.5 border border-red-400 ring-1 ring-red-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300' : 'w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300'">
                             <option value="">Selecione...</option>
                             @foreach (var cat in roots)
                             {
@@ -204,6 +210,24 @@
                        class="text-xs text-indigo-500 mt-1 cursor-pointer hover:underline"
                        @@click="tipo = tipoSugerido; controlaValidade = (tipoSugerido === 1)">
                         <span x-text="tipoSugerido === 1 ? '💡 Sugestão: usar tipo Alimento para esta categoria' : ''"></span>
+                    </p>
+                </div>
+                @* C2 (RDC 727/2022): novo campo TipoEmbalagem. Define se peso e
+                   obrigatorio na etiqueta. Default Avulso (sem peso obrigatorio).
+                   Embalado = produto pre-embalado, exige peso por unidade. *@
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Embalagem</label>
+                    <select name="TipoEmbalagem"
+                            class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        @{
+                            var isAvulso = string.Equals(Model.TipoEmbalagem, "Avulso", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(Model.TipoEmbalagem);
+                            var isEmbalado = string.Equals(Model.TipoEmbalagem, "Embalado", StringComparison.OrdinalIgnoreCase);
+                        }
+                        <option value="Avulso" selected="@(isAvulso ? "selected" : null)">Avulso</option>
+                        <option value="Embalado" selected="@(isEmbalado ? "selected" : null)">Embalado</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1">
+                        <strong>Avulso</strong>: pão por kg, granel. <strong>Embalado</strong>: massa fresca, vácuo, pacote fechado (peso obrigatório RDC 727/2022).
                     </p>
                 </div>
                 <div class="sm:col-span-2">
@@ -445,10 +469,12 @@
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
                     </div>
-                    <template x-if="margem > 0">
+                    @* Margem positiva: indica saude (baixa/moderada/saudavel). Margem negativa
+                       (preco abaixo do custo): alerta de prejuizo, antes ficava silenciosa. *@
+                    <template x-if="margem !== null && margem !== 0">
                         <span class="text-xs mt-1 block font-medium"
-                              :class="margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
-                              x-text="margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
+                              :class="margem < 0 ? 'text-red-600 font-bold' : margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
+                              x-text="margem < 0 ? '⚠ Prejuízo: preço abaixo do custo (' + margem.toFixed(1).replace('.', ',') + '%)' : margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
                     </template>
                     <div x-show="margemSugestoes.length > 0" class="flex gap-2 mt-1 flex-wrap">
                         <template x-for="s in margemSugestoes" :key="s.pct">
@@ -901,10 +927,10 @@
                             <span class="text-3xl font-black text-slate-900 tracking-tight"
                                   x-text="preco > 0 ? 'R$ ' + preco.toFixed(2).replace('.', ',') : 'Preço não definido'"
                                   :class="{ 'text-lg text-slate-300': preco <= 0 }"></span>
-                            <span x-show="margem > 0" x-cloak
-                                  :class="margem < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margem < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
+                            <span x-show="margem !== null && margem !== 0" x-cloak
+                                  :class="margem < 0 ? 'bg-red-100 text-red-700 ring-red-200' : margem < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margem < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
                                   class="text-xs font-bold px-2.5 py-1 rounded-full ring-1 mb-1"
-                                  x-text="margem.toFixed(1).replace('.', ',') + '% margem'"></span>
+                                  x-text="(margem < 0 ? '⚠ ' : '') + margem.toFixed(1).replace('.', ',') + '% margem'"></span>
                         </div>
                         <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2).replace('.', ',')"></div>
                     </div>
@@ -1157,11 +1183,23 @@
                 // ── Wizard ──
                 step: isEdit ? (parseInt(new URLSearchParams(location.search).get('step') ?? '1') || 1) : 1,
                 maxStepReached: isEdit ? 4 : 1,
+                // Liga ao clicar Proximo sem preencher — destaca borda vermelha nos campos
+                // que estao em falta. Antes so toast aparecia (mensageria silenciosa que o
+                // auditor reportou nao perceber).
+                step1AttemptedAdvance: false,
 
                 nextStep() {
                     if (this.step === 1 && !this.step1Valid) {
+                        this.step1AttemptedAdvance = true;
+                        console.warn('[Produto] nextStep bloqueado em step 1: nome="' + (this.nome || '') + '" categoriaId="' + (this.categoriaId || '') + '"');
                         if (!this.nome) window.showToast('Informe o nome do produto.', 'warning');
                         else window.showToast('Selecione uma categoria.', 'warning');
+                        return;
+                    }
+                    // SKU em verificacao assincrona: aguardar resposta antes de avancar.
+                    // Antes esse estado era silencioso e o usuario via "tela travada" se clicasse rapido.
+                    if (this.step === 1 && this.skuStatus === 'verificando') {
+                        window.showToast('Aguarde a verificação do SKU...', 'info');
                         return;
                     }
                     if (this.step === 1 && this.skuStatus === 'indisponivel') {
@@ -1169,6 +1207,7 @@
                         return;
                     }
                     if (this.step < 4) {
+                        this.step1AttemptedAdvance = false;
                         this.step++;
                         this.maxStepReached = Math.max(this.maxStepReached, this.step);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1185,6 +1224,7 @@
                 uploadQueue: [],
                 async submitForm() {
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
+                    if (this.nome.trim().length < 3) { this.step = 1; window.showToast('O nome deve ter pelo menos 3 caracteres.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
                     // No modo edição, se o SKU não foi alterado, ignorar status "indisponivel"
                     if (isEdit && this.sku === this._originalSku && this.skuStatus === 'indisponivel') {
