@@ -21,7 +21,7 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
         var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
         var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
-        var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>($"analytics/receita?meses={meses}");
+        var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>("analytics/receita?meses=6");
         var iaUsoTask = api.GetAsync<IaUsoApi>("ia/uso");
 
         var dashResult = await dashTask;

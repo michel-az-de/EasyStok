@@ -261,13 +261,7 @@
         }
     </script>
 
-    @* BUG 3: toggle de tema oculto. tokens.css tem :root[data-theme="dark"] mas a
-       maior parte do admin usa Tailwind utility classes (bg-white, text-slate-900,
-       etc.) que NÃO reagem a data-theme — o botão trocava o atributo mas a tela
-       seguia clara. Ocultamos o controle até implementarmos dark mode completo;
-       o handler window.EasyStockTheme abaixo permanece (sem dano) pra retomar
-       quando o tema for prioridade. *@
-    @* <div class="relative">
+    <div class="relative">
         <button type="button"
                 onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
                 class="theme-toggle-btn app-surface-btn flex items-center gap-2 whitespace-nowrap px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
@@ -285,7 +279,7 @@
             </span>
             <span class="hidden md:inline theme-toggle-label">Ativar tema escuro</span>
         </button>
-    </div> *@
+    </div>
 
     <!-- Acao rapida (desktop only). Antes tinha classe `app-primary-btn` que aplica
          gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo

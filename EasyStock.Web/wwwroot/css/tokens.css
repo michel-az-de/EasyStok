@@ -523,8 +523,10 @@ html, body {
 }
 
 /* ----- Dark mode overrides for legacy hardcoded Tailwind classes -----
-   Many Razor views still ship `text-slate-900`, `text-gray-900`, `bg-white`, etc.
+   Many Razor views still ship `text-slate-900`, `bg-white`, `border-slate-200`, etc.
    Until each view is migrated to tokens, these rules ensure dark mode stays legible. */
+
+/* Text */
 [data-theme="dark"] .text-slate-900,
 [data-theme="dark"] .text-slate-800,
 [data-theme="dark"] .text-gray-900,
@@ -537,6 +539,37 @@ html, body {
 [data-theme="dark"] .text-slate-400,
 [data-theme="dark"] .text-gray-500,
 [data-theme="dark"] .text-gray-400 { color: var(--text-muted) !important; }
+
+/* Backgrounds */
+[data-theme="dark"] .bg-white      { background-color: var(--bg-surface) !important; }
+[data-theme="dark"] .bg-slate-50,
+[data-theme="dark"] .bg-gray-50    { background-color: var(--bg-app) !important; }
+[data-theme="dark"] .bg-slate-100,
+[data-theme="dark"] .bg-gray-100   { background-color: var(--bg-elevated) !important; }
+[data-theme="dark"] .bg-slate-200,
+[data-theme="dark"] .bg-gray-200   { background-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .hover\:bg-white:hover,
+[data-theme="dark"] .hover\:bg-slate-50:hover,
+[data-theme="dark"] .hover\:bg-gray-50:hover  { background-color: var(--bg-elevated) !important; }
+[data-theme="dark"] .hover\:bg-slate-100:hover { background-color: rgba(255,255,255,0.10) !important; }
+
+/* Borders */
+[data-theme="dark"] .border-slate-100,
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-gray-100,
+[data-theme="dark"] .border-gray-200 { border-color: var(--border-soft) !important; }
+[data-theme="dark"] .border-slate-300,
+[data-theme="dark"] .border-gray-300 { border-color: var(--border-strong) !important; }
+[data-theme="dark"] .hover\:border-slate-300:hover { border-color: var(--border-strong) !important; }
+
+/* Dividers & rings */
+[data-theme="dark"] .divide-slate-100 > * + *,
+[data-theme="dark"] .divide-slate-200 > * + * { border-color: var(--border-soft) !important; }
+[data-theme="dark"] .ring-slate-200,
+[data-theme="dark"] .ring-slate-300 { --tw-ring-color: var(--border-soft) !important; }
+
+/* Placeholder text */
+[data-theme="dark"] .placeholder\:text-slate-400::placeholder { color: var(--text-muted) !important; }
 
 /* ----- Accessibility: respect prefers-reduced-motion ----- */
 @media (prefers-reduced-motion: reduce) {
