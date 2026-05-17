@@ -2,12 +2,16 @@ using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Financeiro;
+using EasyStock.Domain.Financeiro.Events;
+using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.Integration;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
 using Microsoft.Extensions.Logging;
 
@@ -60,6 +64,66 @@ namespace EasyStock.Infra.Postgre.Data
         /// </summary>
         public bool IsSuperAdmin => _currentUser is { IsAuthenticated: true, Nivel: NivelAcesso.SuperAdmin };
 
+        /// <summary>
+        /// Quando <c>true</c>, o <c>SetTenantOnConnectionInterceptor</c> emite
+        /// <c>SET app.bypass_rls = 'true'</c> na próxima abertura de conexão,
+        /// fazendo a policy <c>tenant_isolation</c> aceitar qualquer linha.
+        /// <para>
+        /// É usado por código cross-tenant deliberado: migrations, schema
+        /// bootstrap, SuperAdmin seed, jobs de reconciliação, login pré-auth
+        /// (sem <c>CurrentTenantId</c>). Nunca expor a flag a controllers/handlers
+        /// — eles devem confiar em <see cref="IsSuperAdmin"/>, que vem do JWT.
+        /// </para>
+        /// <para>
+        /// Use <see cref="UseRowLevelSecurityBypass"/> para escopo curto via
+        /// <c>using</c> — defesa em profundidade real, já que
+        /// <c>IgnoreQueryFilters</c> sozinho não basta: ele desliga o filtro
+        /// EF, mas a policy do Postgres ainda zera as linhas.
+        /// </para>
+        /// </summary>
+        public bool BypassRowLevelSecurity { get; private set; }
+
+        /// <summary>
+        /// Liga <see cref="BypassRowLevelSecurity"/> e devolve um
+        /// <see cref="IDisposable"/> que desliga ao sair do escopo. Cobre os
+        /// casos onde precisamos ler/escrever cross-tenant: jobs noturnos,
+        /// reconciliação de pagamento, login pré-JWT, seed de SuperAdmin.
+        /// <para>
+        /// O interceptor reaplica o setting na próxima abertura de conexão.
+        /// Se a sua operação roda dentro de uma única conexão já aberta, force
+        /// reabertura ou execute <c>SET app.bypass_rls</c> manualmente — mas o
+        /// caso normal (cada use case abre conexão nova via repository) já
+        /// funciona transparente.
+        /// </para>
+        /// </summary>
+        public IDisposable UseRowLevelSecurityBypass()
+        {
+            var previous = BypassRowLevelSecurity;
+            BypassRowLevelSecurity = true;
+            return new RlsBypassScope(this, previous);
+        }
+
+        private sealed class RlsBypassScope : IDisposable
+        {
+            private readonly EasyStockDbContext _ctx;
+            private readonly bool _previous;
+            private bool _disposed;
+
+            public RlsBypassScope(EasyStockDbContext ctx, bool previous)
+            {
+                _ctx = ctx;
+                _previous = previous;
+            }
+
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _ctx.BypassRowLevelSecurity = _previous;
+            }
+        }
+
 
         // Domain DbSets
         public DbSet<Empresa> Empresas { get; set; } = null!;
@@ -83,12 +147,19 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FornecedorAlteracao> FornecedorAlteracoes { get; set; } = null!;
         public DbSet<VendaAlteracao> VendaAlteracoes { get; set; } = null!;
         public DbSet<Lote> Lotes { get; set; } = null!;
+        public DbSet<EtiquetaTemplateSistema> EtiquetaTemplatesSistema { get; set; } = null!;
+        public DbSet<EtiquetaTemplate> EtiquetaTemplates { get; set; } = null!;
+        public DbSet<EtiquetaEmpresaDefault> EtiquetaEmpresaDefaults { get; set; } = null!;
         public DbSet<ListaCompras> ListasCompras { get; set; } = null!;
         public DbSet<PedidoFornecedor> PedidosFornecedor { get; set; } = null!;
         public DbSet<ConfiguracaoLoja> ConfiguracoesLoja { get; set; } = null!;
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
+        public DbSet<ProdutoComposicao> ProdutosComposicao { get; set; } = null!;
+        public DbSet<ProdutoComposicaoAlteracao> ProdutosComposicaoAlteracoes { get; set; } = null!;
+        public DbSet<EntityAlteracao> EntityAlteracoes { get; set; } = null!;
+        public DbSet<MobileProcessedMutation> MobileProcessedMutations { get; set; } = null!;
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
 
         // Admin Module DbSets
@@ -100,11 +171,24 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<TicketHistorico> TicketHistoricos { get; set; } = null!;
         public DbSet<AdminTicketTecnicoMeta> AdminTicketTecnicoMetas { get; set; } = null!;
         public DbSet<SlaConfiguracao> SlaConfiguracoes { get; set; } = null!;
+
+        // FAQ — base global publica (sem multi-tenant)
+        public DbSet<FaqCategoria> FaqCategorias { get; set; } = null!;
+        public DbSet<FaqItem> FaqItens { get; set; } = null!;
+        public DbSet<FaqVisualizacao> FaqVisualizacoes { get; set; } = null!;
+        public DbSet<FaqFeedback> FaqFeedbacks { get; set; } = null!;
+
         public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
         public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;
         public DbSet<AdminNotaTenant> AdminNotasTenant { get; set; } = null!;
         public DbSet<Cupom> Cupons { get; set; } = null!;
+
+        // Endpoint health monitoring (Worker EndpointHealthMonitorService)
+        public DbSet<EndpointHealthState> EndpointHealthStates { get; set; } = null!;
+
+        // Releases de APK distribuidos via CapacitorUpdater (Casa da Baba e outros).
+        public DbSet<EasyStock.Domain.Entities.Mobile.ApkRelease> ApkReleases { get; set; } = null!;
 
         // Identity / SaaS DbSets
         public DbSet<Usuario> Usuarios { get; set; } = null!;
@@ -129,6 +213,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
         public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
+        // Modulo Financeiro AR/AP — lancamentos previstos/realizados do tenant
+        public DbSet<Lancamento> Lancamentos { get; set; } = null!;
+        public DbSet<LancamentoBaixa> LancamentoBaixas { get; set; } = null!;
+
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
         public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
 
@@ -137,6 +225,15 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Modulo Integration (F4+) — outbox transacional de eventos externos
         public DbSet<OutboxEventoIntegracao> OutboxEventosIntegracao { get; set; } = null!;
+
+        // Modulo Fiscal (NFC-e Corte 1) — fundacao Domain pra emissao via Focus/eNotas
+        public DbSet<EmpresaConfiguracaoFiscal> EmpresaConfiguracoesFiscais { get; set; } = null!;
+        public DbSet<NfeDocumento> NfeDocumentos { get; set; } = null!;
+        public DbSet<NfeItem> NfeItens { get; set; } = null!;
+        public DbSet<NfeEvento> NfeEventos { get; set; } = null!;
+
+        // Módulo de Relatórios — motor assíncrono multi-tenant
+        public DbSet<ReportRun> ReportRuns { get; set; } = null!;
 
         // Notifications module DbSets
         public DbSet<TemplateNotificacao> NotifTemplates { get; set; } = null!;
@@ -149,6 +246,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<ConfiguracaoCanal> NotifConfiguracoesCanal { get; set; } = null!;
         public DbSet<BloqueioNotificacao> NotifBloqueios { get; set; } = null!;
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
+        public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {
@@ -256,6 +354,11 @@ namespace EasyStock.Infra.Postgre.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Domain events nao sao entidades persistidas — sao publicados pelo UseCase
+            // apos commit. EF Core descobriria via convencao a partir das colecoes
+            // de eventos pendentes nos agregados, daria erro de PK obrigatoria.
+            modelBuilder.Ignore<LancamentoBaixadoEvent>();
+
             // Apply all IEntityTypeConfiguration implementations in this assembly
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
@@ -319,9 +422,22 @@ namespace EasyStock.Infra.Postgre.Data
             if (clrType.Namespace?.StartsWith("EasyStock.Domain.Entities.Mobile", StringComparison.Ordinal) == true)
                 return true;
 
+            // ReportRun — EmpresaId é nullable (null para contexto AdminSaaS).
+            // Isolamento multi-tenant tratado manualmente em WorkerCurrentUserAccessor
+            // e ITenantScopedQueryBuilder (defesa em profundidade §ADR-R07).
+            // Se aplicarmos o filtro global, runs AdminSaaS (EmpresaId=null)
+            // jamais seriam retornadas e o filter quebraria para elas.
+            if (clrType == typeof(ReportRun)) return true;
+
             // Admin tooling — auditoria/feature flags cross-tenant.
+            // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).
+            // Acesso direto via SQL raw (INSERT...ON CONFLICT) ou lookup por PK no
+            // fallback; sem necessidade de filter — em background sem JWT o filter
+            // global zeraria a leitura no fallback nao-PG e o numerador retornaria
+            // contador zerado, gerando reset silencioso de numeracao por race.
             return clrType == typeof(AdminImpersonationLog)
-                || clrType == typeof(TenantFeatureFlag);
+                || clrType == typeof(TenantFeatureFlag)
+                || clrType == typeof(FaturaContador);
         }
     }
 }

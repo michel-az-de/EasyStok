@@ -4,7 +4,7 @@ namespace EasyStock.Domain.Exceptions
 {
     public class QuantidadeInvalidaException : RegraDeDominioVioladaException
     {
-        public QuantidadeInvalidaException(int quantidade)
+        public QuantidadeInvalidaException(decimal quantidade)
         : base($"Quantidade inválida: {quantidade}.")
         {
         }

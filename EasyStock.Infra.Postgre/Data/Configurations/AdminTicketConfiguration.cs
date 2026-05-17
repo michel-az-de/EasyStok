@@ -19,6 +19,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(t => t.SlaRespostaViolado).HasDefaultValue(false);
             builder.Property(t => t.SlaResolucaoViolado).HasDefaultValue(false);
 
+            builder.Property(t => t.ComentarioCsat).HasMaxLength(500);
+
+            // Garante NotaCsat coerente quando preenchida — DB-side defense em
+            // adicao a validacao no endpoint POST avaliacao.
+            builder.ToTable(t => t.HasCheckConstraint(
+                "ck_admin_tickets_nota_csat_range",
+                "\"NotaCsat\" IS NULL OR (\"NotaCsat\" BETWEEN 1 AND 5)"));
+
             builder.HasOne(t => t.Empresa)
                 .WithMany()
                 .HasForeignKey(t => t.EmpresaId)
@@ -47,6 +55,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasForeignKey(t => t.FaturaId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // FK opcional para Pedido (cliente reporta problema sobre pedido especifico)
+            builder.HasOne(t => t.Pedido)
+                .WithMany()
+                .HasForeignKey(t => t.PedidoId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.HasMany(t => t.Mensagens)
                 .WithOne(m => m.Ticket)
                 .HasForeignKey(m => m.TicketId)
@@ -65,6 +79,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasIndex(t => t.FaturaId)
                 .HasDatabaseName("ix_admin_tickets_fatura_id")
                 .HasFilter("\"FaturaId\" IS NOT NULL");
+            builder.HasIndex(t => t.PedidoId)
+                .HasDatabaseName("ix_admin_tickets_pedido_id")
+                .HasFilter("\"PedidoId\" IS NOT NULL");
             builder.HasIndex(t => new { t.Status, t.PrazoResposta })
                 .HasDatabaseName("ix_admin_tickets_status_prazo_resposta")
                 .HasFilter("\"Status\" IN ('Aberto','EmAtendimento','AguardandoCliente') AND \"PrazoResposta\" IS NOT NULL");

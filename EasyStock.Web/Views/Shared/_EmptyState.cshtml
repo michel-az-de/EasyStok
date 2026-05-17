@@ -2,6 +2,7 @@
     // EmptyIcon aceita um nome Lucide (ex.: "package", "search"); aceita tambem um
     // string raw com SVG/emoji para retrocompatibilidade quando ainda em migracao.
     var iconRaw = ViewData["EmptyIcon"] as string;
+    var explicitIcon = iconRaw;
     var iconName = ViewData["EmptyIconName"] as string ?? (iconRaw != null && iconRaw.All(c => char.IsLetterOrDigit(c) || c == '-') ? iconRaw : null);
     var iconFallback = string.IsNullOrEmpty(iconName) ? (iconRaw ?? string.Empty) : null;
     var title = ViewData["EmptyTitle"] as string ?? "Nenhum item encontrado";
@@ -10,6 +11,12 @@
     var ctaHref = ViewData["EmptyCtaHref"] as string;
     var ctaModal = ViewData["EmptyCtaModal"] as string;
     var illustration = ViewData["EmptyIllustration"] as string; // box | search | inbox | chart
+    // Quando nada for passado, mostra a ilustração genérica em vez do emoji 📋.
+    if (string.IsNullOrEmpty(illustration) && string.IsNullOrEmpty(explicitIcon))
+    {
+        illustration = "box";
+    }
+    var icon = explicitIcon ?? "📋";
 }
 
 <div class="text-center py-12 anim-fadeInUp" style="color: var(--text-muted);">

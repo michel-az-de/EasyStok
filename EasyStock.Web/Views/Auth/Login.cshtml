@@ -1,16 +1,18 @@
-@model LoginViewModel
+﻿@model LoginViewModel
 @{
     Layout = null;
     ViewBag.Title = "Login";
     var sessionExpired = ViewBag.SessionExpired == true;
     var apiUnavailable = ViewBag.ApiUnavailable == true;
+    var logoutSuccess = ViewBag.LogoutSuccess == true;
+    var returnUrl = (ViewBag.ReturnUrl as string) ?? string.Empty;
 }
 <!DOCTYPE html>
 <html lang="pt-BR" class="h-full">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login - EasyStock</title>
+    <title>Login — EasyStock</title>
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
@@ -19,192 +21,363 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <!-- tailwind: build local em ~/css/tailwind.dist.css (config em tailwind.config.js) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
-<body class="h-full font-[Inter] antialiased min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
-    <div class="auth-login-shell min-h-screen px-4 py-6 md:px-6 lg:px-8">
-        <div class="auth-login-layout mx-auto w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/60 shadow-2xl shadow-slate-900/10" x-data="loginForm()">
-            <section class="auth-login-brand hidden lg:flex lg:flex-col lg:justify-between">
+<body class="font-[Inter] antialiased" data-toast="@(logoutSuccess ? "success|Você saiu com segurança." : null)">
+    <div class="auth-prem-shell" x-data="loginForm()">
+        <div class="auth-prem-layout auth-prem-enter">
+
+            <!-- ============ BRAND PANEL (esquerda) ============ -->
+            <section class="auth-prem-brand">
                 <div>
-                    <div class="inline-flex items-center gap-3 mb-6">
-                        <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg">
-                            <partial name="_LogoEasyStock" model='new { Size = 36, ShowText = false }' />
-                        </span>
-                        <span class="es-logo-word es-logo-word--inverted text-3xl">
-                            <span class="es-logo-easy">Easy</span><span class="es-logo-stok">Stok</span>
-                        </span>
+                    <div class="auth-prem-wordmark">
+                        <div class="auth-prem-cube" aria-hidden="true">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+                                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+                                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
+                            </svg>
+                        </div>
+                        <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
                     </div>
-                    <p class="text-sm uppercase tracking-[0.35em] text-white/65 mb-4">Operação em tempo real</p>
-                    <h1 class="text-4xl font-extrabold leading-tight text-white max-w-md">Controle estoque, validade e saída em um fluxo mais claro.</h1>
-                    <p class="mt-4 max-w-lg text-base leading-7 text-white/78">Uma entrada mais alinhada ao restante do produto, com foco em rotina, leitura rápida e confiança para quem opera o dia inteiro.</p>
+
+                    <p class="auth-prem-eyebrow" aria-hidden="true">
+                        <span id="loginTyped"></span><span class="auth-prem-cursor">_</span>
+                    </p>
+
+                    <h1 class="auth-prem-headline">Controle estoque, validade e saída em um fluxo mais claro.</h1>
+                    <p class="auth-prem-lede">Uma entrada mais alinhada ao restante do produto, com foco em rotina, leitura rápida e confiança para quem opera o dia inteiro.</p>
+
+                    <div class="auth-prem-cards" style="margin-top: 28px;">
+                        <div class="auth-prem-mini-card">
+                            <div class="auth-prem-mini-card-title">Visão</div>
+                            <div class="auth-prem-mini-card-desc">Dashboards, alertas e histórico num único lugar.</div>
+                        </div>
+                        <div class="auth-prem-mini-card">
+                            <div class="auth-prem-mini-card-title">Execução</div>
+                            <div class="auth-prem-mini-card-desc">Entradas e saídas com menos atrito operacional.</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3 text-sm text-white/78">
-                    <div class="auth-login-brand-stat">
-                        <span class="auth-login-brand-stat__value">Visão</span>
-                        <span class="auth-login-brand-stat__label">Dashboards, alertas e histórico num único lugar</span>
-                    </div>
-                    <div class="auth-login-brand-stat">
-                        <span class="auth-login-brand-stat__value">Execução</span>
-                        <span class="auth-login-brand-stat__label">Entradas e saídas com menos atrito operacional</span>
-                    </div>
+
+                <div class="auth-prem-brand-bottom">
+                    SISTEMA ESTÁVEL · v2026
                 </div>
             </section>
 
-            <section class="auth-login-panel">
-                <div class="w-full max-w-md mx-auto">
-                    <div class="text-center mb-8 lg:text-left">
-                        <div class="inline-flex items-center gap-3 mb-3 lg:hidden">
-                            <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg">
-                                <partial name="_LogoEasyStock" model='new { Size = 36, ShowText = false }' />
-                            </span>
-                            <span class="es-logo-word es-logo-word--auth auth-title">
-                                <span class="es-logo-easy">Easy</span><span class="es-logo-stok">Stok</span>
+            <!-- ============ FORM PANEL (direita) ============ -->
+            <section class="auth-prem-panel">
+                <div class="auth-prem-card auth-prem-enter-2">
+
+                    <h2 class="auth-prem-card-title" x-show="!returningUser" x-cloak>Entrar</h2>
+                    <h2 class="auth-prem-card-title" x-show="returningUser" x-cloak>
+                        Bem-vindo de volta<span x-show="emailHint" x-cloak>, <span x-text="emailHint"></span></span>
+                    </h2>
+                    <p class="auth-prem-card-subtitle" x-show="!returningUser" x-cloak>Continue de onde parou</p>
+                    <p class="auth-prem-card-subtitle" x-show="returningUser" x-cloak>Confirme sua senha para continuar</p>
+
+                    @if (logoutSuccess)
+                    {
+                        <div class="auth-prem-alert auth-prem-alert--ok" role="status" aria-live="polite">
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            <span>Você saiu com segurança. Entre novamente quando quiser.</span>
+                        </div>
+                    }
+
+                    @if (sessionExpired)
+                    {
+                        <div class="auth-prem-alert auth-prem-alert--warn" role="status" aria-live="polite">
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm-.75 7a.875.875 0 100-1.75.875.875 0 000 1.75z" clip-rule="evenodd"/>
+                            </svg>
+                            <span>Sua sessão expirou. Entre novamente para continuar.</span>
+                        </div>
+                    }
+
+                    @if (apiUnavailable)
+                    {
+                        <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                            </svg>
+                            <span>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</span>
+                        </div>
+                    }
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                            </svg>
+                            <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
+                        </div>
+                    }
+
+                    <form asp-action="Login" asp-controller="Auth" method="post"
+                          x-ref="form"
+                          :aria-busy="loading ? 'true' : 'false'"
+                          @@submit.prevent="handleSubmit">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+                        <!-- Email -->
+                        <div class="auth-prem-field">
+                            <label asp-for="Email" class="auth-prem-field-label">E-mail</label>
+                            <div class="auth-prem-input-wrap">
+                                <input asp-for="Email" type="email" autocomplete="email" required
+                                       x-model="email"
+                                       x-ref="emailInput"
+                                       @@input="onEmailInput"
+                                       class="auth-prem-input auth-prem-input--with-icon-right"
+                                       placeholder="seu@email.com"
+                                       :disabled="loading" />
+                                <span class="auth-prem-input-check" :class="emailValid ? 'is-show' : ''" aria-hidden="true">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                        <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </span>
+                            </div>
+                            <span asp-validation-for="Email" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <!-- Senha -->
+                        <div class="auth-prem-field">
+                            <div class="flex items-center justify-between" style="margin-bottom: 6px;">
+                                <label asp-for="Senha" class="auth-prem-field-label" style="margin-bottom: 0;">Senha</label>
+                                <a href="/auth/esqueci-senha" class="auth-prem-link" style="font-size: 12px;">Esqueci minha senha</a>
+                            </div>
+                            <div class="auth-prem-input-wrap">
+                                <input asp-for="Senha" autocomplete="current-password" required
+                                       x-bind:type="showPass ? 'text' : 'password'"
+                                       @@keyup="onPasswordKey($event)"
+                                       @@keydown="onPasswordKey($event)"
+                                       class="auth-prem-input auth-prem-input--with-icon-right"
+                                       placeholder="Sua senha"
+                                       :disabled="loading" />
+                                <button type="button"
+                                        @@click="showPass = !showPass"
+                                        class="auth-prem-icon-btn"
+                                        tabindex="-1"
+                                        :aria-label="showPass ? 'Ocultar senha' : 'Mostrar senha'">
+                                    <svg x-show="!showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <svg x-show="showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <span asp-validation-for="Senha" class="auth-prem-field-error"></span>
+                            <span class="auth-prem-caps" :class="capsOn ? 'is-show' : ''" role="status">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 3l8 9h-5v6h-6v-6H4l8-9z" fill="currentColor"/>
+                                </svg>
+                                Caps Lock ativado
                             </span>
                         </div>
-                        <p class="auth-subtitle text-sm mt-2">Acesse sua conta para continuar a operação</p>
-                    </div>
 
-            @if (sessionExpired)
-            {
-                <div class="auth-alert-warn text-sm rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
-                    <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm-.75 7a.875.875 0 100-1.75.875.875 0 000 1.75z" clip-rule="evenodd"/>
-                    </svg>
-                    <span>Sua sessão expirou. Faça login novamente para continuar.</span>
+                        <!-- Manter conectado -->
+                        <div style="margin: 20px 0 24px;">
+                            <label for="ManterLogado" class="auth-prem-check">
+                                <input asp-for="ManterLogado" type="checkbox" id="ManterLogado"
+                                       x-model="manterLogado" />
+                                <span class="auth-prem-check-indicator" aria-hidden="true">
+                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                                        <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                                <span>Lembrar deste dispositivo por 30 dias</span>
+                            </label>
+                        </div>
+
+                        <button type="submit"
+                                :disabled="loading"
+                                :aria-busy="loading ? 'true' : 'false'"
+                                class="auth-prem-launch">
+                            <span x-show="!loading" x-text="returningUser ? 'Continuar' : 'Entrar'">Entrar</span>
+                            <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
+                                <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
+                                Validando…
+                            </span>
+                            <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                        </button>
+                    </form>
+
+                    <p class="auth-prem-footer" style="margin-top: 22px;">
+                        Primeiro acesso?
+                        <a href="/auth/registrar" class="auth-prem-link">Comece agora</a>
+                    </p>
+                    <p class="auth-prem-footer" style="margin-top: 6px;">
+                        &copy; @DateTime.Now.Year EasyStock · Todos os direitos reservados
+                    </p>
                 </div>
-            }
+            </section>
+        </div>
 
-            @if (apiUnavailable)
-            {
-                <div class="auth-alert-error text-sm rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
-                    <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+        <!-- Stepped loading overlay (aparece se rede > 800ms) -->
+        <div class="auth-prem-loading"
+             :class="successing ? 'is-active' : ''"
+             x-cloak
+             role="status"
+             aria-live="polite"
+             aria-label="Validando credenciais">
+            <div class="auth-prem-loading-inner">
+                <div class="auth-prem-loading-cube" aria-hidden="true">
+                    <svg viewBox="0 0 64 64" fill="none">
+                        <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+                        <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+                        <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
                     </svg>
-                    <span>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</span>
                 </div>
-            }
-
-                    <div class="auth-card rounded-3xl shadow-2xl p-8">
-                <h1 class="text-xl font-bold auth-card-title mb-1">Entrar</h1>
-                <p class="auth-card-subtitle text-sm mb-6">Acesse sua conta para continuar</p>
-
-                @if (!ViewData.ModelState.IsValid)
-                {
-                    <div class="auth-alert-error text-sm rounded-lg px-4 py-3 mb-4 flex items-start gap-2">
-                        <svg class="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
-                        </svg>
-                        <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
-                    </div>
-                }
-
-                <form asp-action="Login" asp-controller="Auth" method="post" @@submit.prevent="handleSubmit">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
-
-                    <div class="mb-4">
-                        <label asp-for="Email" class="block text-sm font-semibold auth-label mb-1.5">E-mail</label>
-                        <input asp-for="Email" type="email" autocomplete="email" required
-                               class="auth-input w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all"
-                               placeholder="seu@email.com"
-                               :disabled="loading" />
-                        <span asp-validation-for="Email" class="text-red-500 text-xs mt-1 block"></span>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="flex items-center justify-between mb-1.5">
-                            <label asp-for="Senha" class="block text-sm font-semibold auth-label">Senha</label>
-                            <a href="/auth/esqueci-senha" class="text-xs text-indigo-500 hover:text-indigo-400">Esqueceu a senha?</a>
-                        </div>
-                        <div class="relative">
-                            <input asp-for="Senha" autocomplete="current-password" required
-                                   x-bind:type="showPass ? 'text' : 'password'"
-                                   class="auth-input w-full px-4 py-3 pr-11 rounded-xl text-sm focus:outline-none transition-all"
-                                   placeholder="Sua senha"
-                                   :disabled="loading" />
-                            <button type="button"
-                                    @@click="showPass = !showPass"
-                                    class="absolute inset-y-0 right-0 px-3 flex items-center auth-icon-btn transition-colors"
-                                    tabindex="-1"
-                                    :aria-label="showPass ? 'Ocultar senha' : 'Mostrar senha'">
-                                <svg x-show="!showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                                <svg x-show="showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <span asp-validation-for="Senha" class="text-red-500 text-xs mt-1 block"></span>
-                    </div>
-
-                    <div class="mb-6">
-                        <label for="ManterLogado" class="auth-check-control">
-                            <input asp-for="ManterLogado" type="checkbox" id="ManterLogado"
-                                   class="auth-checkbox sr-only peer" />
-                            <span class="auth-check-indicator" aria-hidden="true">
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
-                                    <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </span>
-                            <span class="text-sm auth-label cursor-pointer select-none">Manter-me conectado</span>
-                        </label>
-                    </div>
-
-                    <button type="submit"
-                            :disabled="loading"
-                            class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25">
-                        <svg x-show="loading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" x-cloak>
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        <span x-text="loading ? 'Entrando...' : 'Entrar'">Entrar</span>
-                    </button>
-                </form>
+                <div class="auth-prem-loading-steps">
+                    <span class="auth-prem-loading-step" :class="stepClass(0)" :aria-current="loadingStep === 0 ? 'step' : null">VERIFICANDO CREDENCIAIS</span>
+                    <span class="auth-prem-loading-step" :class="stepClass(1)" :aria-current="loadingStep === 1 ? 'step' : null">CARREGANDO SUA OPERAÇÃO</span>
+                    <span class="auth-prem-loading-step" :class="stepClass(2)" :aria-current="loadingStep === 2 ? 'step' : null">PREPARANDO PAINEL</span>
+                </div>
             </div>
-
-                    <p class="text-center text-sm auth-subtitle mt-4 lg:text-left">
-                Não tem conta?
-                <a href="/auth/registrar" class="text-indigo-500 hover:text-indigo-400 font-medium">Criar conta grátis</a>
-            </p>
-
-                    <p class="text-center text-xs auth-footer mt-4 lg:text-left">
-                &copy; @DateTime.Now.Year EasyStock. Todos os direitos reservados.
-            </p>
-                </div>
-            </section>
+            <div class="auth-prem-loading-bar" aria-hidden="true"></div>
         </div>
     </div>
 
     <script src="~/js/toast.js"></script>
     <script>
+        // Typed effect no eyebrow do brand panel
+        (function () {
+            const target = document.getElementById('loginTyped');
+            if (!target) return;
+            const txt = 'OPERAÇÃO EM TEMPO REAL';
+            // Respeita reduced motion: mostra texto direto sem typewriter.
+            const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce) { target.textContent = txt; return; }
+            let i = 0;
+            function type() {
+                if (i <= txt.length) {
+                    target.textContent = txt.slice(0, i);
+                    i++;
+                    setTimeout(type, 38);
+                }
+            }
+            setTimeout(type, 280);
+        })();
+
         function loginForm() {
+            const STORAGE_EMAIL = 'easystock-login-email';
+            const STORAGE_KEEP = 'easystock-login-manter';
+
             return {
                 loading: false,
                 showPass: false,
-                handleSubmit(e) {
+                email: '',
+                emailValid: false,
+                emailHint: '',
+                returningUser: false,
+                manterLogado: false,
+                capsOn: false,
+                successing: false,
+                loadingStep: -1,
+
+                init() {
+                    // Auto-preenche email salvo (so se nao tiver erro de validacao server-side).
+                    const serverEmail = this.$refs.emailInput?.value || '';
+                    if (!serverEmail) {
+                        const saved = localStorage.getItem(STORAGE_EMAIL) || '';
+                        if (saved) {
+                            this.email = saved;
+                            this.emailHint = saved.split('@@')[0];
+                            this.returningUser = true;
+                        }
+                    } else {
+                        this.email = serverEmail;
+                    }
+                    this.emailValid = this.isValidEmail(this.email);
+
+                    const keep = localStorage.getItem(STORAGE_KEEP);
+                    if (keep === 'true') this.manterLogado = true;
+
+                    // Foco inteligente: tem email salvo → vai pra senha; senao → email.
+                    this.$nextTick(() => {
+                        if (this.email) {
+                            const senha = document.querySelector('input[name="Senha"]');
+                            senha?.focus();
+                        } else {
+                            this.$refs.emailInput?.focus();
+                        }
+                    });
+                },
+
+                isValidEmail(v) {
+                    if (!v) return false;
+                    return /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(v.trim());
+                },
+
+                onEmailInput() {
+                    this.emailValid = this.isValidEmail(this.email);
+                    this.returningUser = false;
+                },
+
+                onPasswordKey(e) {
+                    if (e.getModifierState) {
+                        this.capsOn = e.getModifierState('CapsLock');
+                    }
+                },
+
+                stepClass(idx) {
+                    const cls = [];
+                    if (idx <= this.loadingStep) cls.push('is-show');
+                    if (idx < this.loadingStep) cls.push('is-done');
+                    if (idx === this.loadingStep) cls.push('is-active');
+                    return cls.join(' ');
+                },
+
+                advanceSteps() {
+                    // Sequencia cosmetica — o form POST ja foi enviado em paralelo.
+                    // Em rede rapida, redirect acontece antes da animacao terminar.
+                    const delays = [0, 700, 1300, 1900];
+                    delays.forEach((d, idx) => {
+                        setTimeout(() => {
+                            if (idx < 3) this.loadingStep = idx;
+                            else this.loadingStep = 2; // ultima permanece active ate redirect
+                        }, d);
+                    });
+                },
+
+                handleSubmit() {
                     if (this.loading) return;
-                    const form = e.target;
+                    const form = this.$refs.form;
                     if (!form.checkValidity()) {
                         form.reportValidity();
                         return;
                     }
+
+                    try {
+                        if (this.email) localStorage.setItem(STORAGE_EMAIL, this.email);
+                        localStorage.setItem(STORAGE_KEEP, this.manterLogado ? 'true' : 'false');
+                    } catch { /* localStorage off / privado */ }
+
                     this.loading = true;
+                    setTimeout(() => {
+                        if (this.loading) {
+                            this.successing = true;
+                            this.advanceSteps();
+                        }
+                    }, 800);
                     form.submit();
                 }
             };
         }
     </script>
-
-    <style>
-        [x-cloak] { display: none !important; }
-    </style>
 </body>
 </html>

@@ -87,16 +87,34 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
             page,
             pageSize);
 
-    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null)
+    public Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null)
     {
         var filter = Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
 
         if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
-        {
             filter = Builders<ItemEstoque>.Filter.And(filter, Builders<ItemEstoque>.Filter.Eq(x => x.Status, statusEnum));
-        }
+
+        // categoriaId filter not supported in MongoDB (no join to Produto); silently ignored.
 
         return PaginateAsync(filter, Builders<ItemEstoque>.Sort.Ascending(x => x.ProdutoId), page, pageSize);
+    }
+
+    public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+    {
+        var filter = Builders<ItemEstoque>.Filter.Eq(x => x.EmpresaId, empresaId);
+        if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
+            filter = Builders<ItemEstoque>.Filter.And(filter, Builders<ItemEstoque>.Filter.Eq(x => x.Status, statusEnum));
+        // categoriaId silently ignored (no Produto join in Mongo).
+
+        var cadastrados = (int)await Collection.CountDocumentsAsync(filter);
+        // Alinhado com o estilo das linhas 52/84/164/167 deste arquivo: LINQ
+        // sobre `QuantidadeAtual.Value` em vez de comparar com VO Quantidade.Zero
+        // (cuja serializacao escalar funciona hoje mas trava futuras trocas).
+        var comSaldoFilter = Builders<ItemEstoque>.Filter.And(
+            filter,
+            Builders<ItemEstoque>.Filter.Where(x => x.QuantidadeAtual.Value > 0));
+        var comSaldo = (int)await Collection.CountDocumentsAsync(comSaldoFilter);
+        return (cadastrados, comSaldo);
     }
 
     public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)
@@ -125,6 +143,29 @@ public sealed class ItemEstoqueRepository(MongoEasyStockContext context, MongoUn
         await Collection.Find(x => x.EmpresaId == empresaId && x.ProdutoId == produtoId)
             .SortByDescending(x => x.EntradaEm)
             .ToListAsync();
+
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
+        Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+    {
+        var ids = produtoIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>();
+
+        var filter = Builders<ItemEstoque>.Filter.Where(x =>
+            x.EmpresaId == empresaId &&
+            ids.Contains(x.ProdutoId) &&
+            (!lojaId.HasValue || x.LojaId == lojaId.Value));
+
+        var todos = await Collection.Find(filter)
+            .SortByDescending(x => x.EntradaEm)
+            .ToListAsync(ct);
+
+        return todos
+            .GroupBy(i => i.ProdutoId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
+    }
 
     public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
     {

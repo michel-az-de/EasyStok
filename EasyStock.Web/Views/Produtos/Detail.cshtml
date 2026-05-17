@@ -5,9 +5,17 @@
     var ptBR = new CultureInfo("pt-BR");
     var p = Model.Produto;
     var fotosJson = JsonSerializer.Serialize(p.Fotos.Select(f => new { fotoId = f.FotoId.ToString(), url = f.Url }));
+    // Serializa duplamente: serializer transforma a string JSON em literal JS string com
+    // aspas escapadas. Permite passar com seguranca via atributo x-data sem quebrar
+    // o HTML parser. JS recebe string e parsea internamente em fichaTecnicaForm._hidratar.
+    var atributosJsonRaw = JsonSerializer.Serialize(p.AtributosJson);
+    var temFicha = !string.IsNullOrWhiteSpace(p.AtributosJson) && p.AtributosJson.Trim() != "{}";
+    // Tab so aparece pra produto Alimento ou pra qualquer produto que ja tenha ficha
+    // (preserva visibilidade caso operador tenha cadastrado em produto Fisico antes).
+    var mostrarFichaNutricional = p.Tipo == 1 || temFicha;
 
     // ── Integrity score ──
-    var iFields = new (bool ok, string label, int pts)[]
+    var iFieldsBase = new (bool ok, string label, int pts)[]
     {
         (p.Fotos.Any(),                               "Foto",        20),
         (!string.IsNullOrWhiteSpace(p.DescricaoBase), "Descrição",   15),
@@ -20,6 +28,9 @@
         (true,                                        "Nome",         3),
         (true,                                        "Categoria",    2),
     };
+    var iFields = mostrarFichaNutricional
+        ? iFieldsBase.Concat(new (bool ok, string label, int pts)[] { (temFicha, "Nutricional", 10) }).ToArray()
+        : iFieldsBase;
     var score = iFields.Where(f => f.ok).Sum(f => f.pts);
     var missing = iFields.Where(f => !f.ok).Select(f => f.label).ToList();
     // Map missing labels to edit form step
@@ -28,6 +39,7 @@
         ["Foto"] = 2, ["Preço"] = 2, ["Custo"] = 2,
         ["Variações"] = 3, ["Dimensões"] = 3,
         ["Descrição"] = 1, ["Cód.Barras"] = 1, ["Marca"] = 1, ["Nome"] = 1, ["Categoria"] = 1,
+        ["Nutricional"] = 0, // tab dedicada no detalhe, nao etapa do form
     };
     var barCss = score >= 80 ? "bg-emerald-500" : score >= 50 ? "bg-amber-400" : "bg-red-500";
     var scoreCss = score >= 80 ? "text-emerald-600" : score >= 50 ? "text-amber-600" : "text-red-600";
@@ -139,7 +151,7 @@
                     {
                         <span class="produto-chip produto-chip--danger text-[11px] bg-red-50 text-red-600 px-2.5 py-0.5 rounded-full font-semibold">Sem estoque</span>
                         <a href="/entradas/reposicao?produtoId=@p.ProdutoId"
-                           class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline transition-colors">
+                           class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-900 hover:underline transition-colors">
                             Repor estoque
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -148,7 +160,7 @@
                     }
                     else
                     {
-                        <span class="produto-chip produto-chip--success text-[11px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque un. em estoque</span>
+                        <span class="produto-chip produto-chip--success text-[11px] bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-full font-semibold">@p.QuantidadeTotalEstoque un. em estoque</span>
                     }
                 </div>
                 <h1 class="produto-detail-title text-2xl font-extrabold text-slate-900 leading-tight mb-1">@p.Nome</h1>
@@ -293,7 +305,7 @@
                     Editar
                 </a>
                 <a href="/entradas/nova?produtoId=@p.ProdutoId"
-                   class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-colors">
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -360,6 +372,22 @@
         <button @@click="tab='detalhes'"
                 :class="tab==='detalhes' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
                 class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors">Detalhes</button>
+        @if (mostrarFichaNutricional)
+        {
+            <button @@click="tab='nutricional'"
+                    :class="tab==='nutricional' ? 'border-b-2 border-indigo-600 text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-700'"
+                    class="flex-shrink-0 px-4 py-2.5 text-sm transition-colors inline-flex items-center gap-1.5">
+                Nutricional
+                @if (temFicha)
+                {
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" title="Ficha cadastrada"></span>
+                }
+                else
+                {
+                    <span class="w-2 h-2 rounded-full bg-slate-300 flex-shrink-0" title="Sem ficha"></span>
+                }
+            </button>
+        }
     </div>
 
 <!-- ═══ TAB: VARIACOES ═══ -->
@@ -643,7 +671,7 @@
                                 <td>
                                     <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
                                           :class="{
-                                              'bg-emerald-50 text-emerald-700': alt.acao==='cadastrado'||alt.acao==='restaurado',
+                                              'bg-emerald-50 text-emerald-800': alt.acao==='cadastrado'||alt.acao==='restaurado',
                                               'bg-blue-50 text-blue-700': alt.acao==='atualizado',
                                               'bg-red-50 text-red-600': alt.acao==='inativado'
                                           }"
@@ -715,7 +743,7 @@
                                 <td>
                                     <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
                                           :class="(item.natureza||'').toLowerCase().includes('entrada')
-                                              ? 'bg-emerald-50 text-emerald-700'
+                                              ? 'bg-emerald-50 text-emerald-800'
                                               : 'bg-red-50 text-red-600'"
                                           x-text="item.natureza ?? '-'"></span>
                                 </td>
@@ -795,6 +823,151 @@
         }
     </div>
 
+    <!-- ═══ TAB: NUTRICIONAL ═══ -->
+    @if (mostrarFichaNutricional)
+    {
+    <div x-show="tab==='nutricional'" x-cloak>
+        <div class="ws produto-detail-tab-card"
+             x-data='fichaTecnicaForm("@p.ProdutoId", @Html.Raw(atributosJsonRaw))'
+             x-init="init()">
+
+            <!-- Banner regulatorio -->
+            <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                <strong>Tabela informativa.</strong> Esta ficha é para uso interno e identificação operacional do produto. Para venda comercial sujeita a fiscalização Anvisa, é necessária rotulagem nutricional completa (RDC 429/2020) — feature em planejamento.
+            </div>
+
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-slate-800">Ficha nutricional</h3>
+                <span x-show="savedAt" x-cloak class="text-xs text-emerald-600 font-medium">
+                    <svg class="inline w-4 h-4 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Salvo
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- ── COLUNA ESQUERDA: NUTRIENTES ── -->
+                <div class="space-y-3">
+                    <h4 class="text-sm font-semibold text-slate-600 uppercase tracking-wide">Informação nutricional</h4>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Porção (g)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="porcaoG"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                   placeholder="ex: 100" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Calorias (kcal)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="kcal"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                   placeholder="ex: 250" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Carboidratos (g)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="carbsG"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Proteínas (g)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="proteinaG"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Gorduras totais (g)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="gorduraG"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Gorduras saturadas (g)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="gorduraSaturadaG"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Fibras (g)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="fibrasG"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </label>
+                        <label class="block">
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Sódio (mg)</span>
+                            <input type="number" min="0" max="9999" step="0.01" x-model.number="sodioMg"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        </label>
+                    </div>
+
+                    <label class="block mt-4">
+                        <span class="text-xs font-semibold text-slate-600 mb-1 block">Modo de preparo</span>
+                        <textarea x-model="modoPreparo" maxlength="4000" rows="3"
+                                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                  placeholder="ex: Cozinhar por 5 minutos em água fervente."></textarea>
+                        <span class="text-[11px] text-slate-400 mt-0.5 block" x-text="(modoPreparo?.length ?? 0) + ' / 4000'"></span>
+                    </label>
+                </div>
+
+                <!-- ── COLUNA DIREITA: INGREDIENTES + ALERGENOS ── -->
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Ingredientes</h4>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="ingredientesInput" maxlength="200"
+                                   @@keydown.enter.prevent="adicionarIngrediente()"
+                                   class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                   placeholder="ex: farinha de trigo (pressione Enter)" />
+                            <button type="button" @@click="adicionarIngrediente()"
+                                    class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                                Adicionar
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mt-3" x-show="ingredientes.length > 0" x-cloak>
+                            <template x-for="(ing, idx) in ingredientes" :key="idx">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-full text-xs">
+                                    <span x-text="ing"></span>
+                                    <button type="button" @@click="removerIngrediente(idx)" class="text-slate-400 hover:text-red-500 ml-0.5" title="Remover">×</button>
+                                </span>
+                            </template>
+                        </div>
+                        <p x-show="ingredientes.length === 0" x-cloak class="text-xs text-slate-400 mt-2">
+                            Nenhum ingrediente adicionado. Adicione em ordem decrescente de quantidade.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Alérgenos</h4>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <template x-for="al in ALERGENOS_DISPONIVEIS" :key="al.codigo">
+                                <label class="inline-flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50"
+                                       :class="temAlergeno(al.codigo) ? 'bg-indigo-50 border-indigo-300' : ''">
+                                    <input type="checkbox" :checked="temAlergeno(al.codigo)" @@change="toggleAlergeno(al.codigo)"
+                                           class="rounded text-indigo-600 focus:ring-indigo-500" />
+                                    <span class="text-sm" x-text="al.label"></span>
+                                </label>
+                            </template>
+                        </div>
+                        <label class="block mt-3" x-show="temAlergeno('outros')" x-cloak>
+                            <span class="text-xs font-semibold text-slate-600 mb-1 block">Especifique outros alérgenos *</span>
+                            <input type="text" x-model="alergenosOutros" maxlength="200"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                   :class="attemptedSubmit && temAlergeno('outros') && !alergenosOutros.trim() ? 'border-red-400 ring-1 ring-red-200' : ''"
+                                   placeholder="ex: aipo, mostarda, sulfitos" />
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── BOTAO SALVAR ── -->
+            <div class="flex justify-end mt-6 pt-4 border-t border-slate-200">
+                <button type="button" @@click="salvar()" :disabled="salvando"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors inline-flex items-center gap-2">
+                    <svg x-show="salvando" x-cloak class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span x-text="salvando ? 'Salvando...' : 'Salvar ficha nutricional'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+    }
+
     <!-- ═══ MODAL: EXCLUIR ═══ -->
     <div x-show="showExcluir" x-cloak
          class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
@@ -848,6 +1021,7 @@
     <style>
         .foto-reorder-target { outline: 2px solid var(--navy-500); outline-offset: 2px; border-radius: 0.75rem; }
     </style>
+    <script src="/js/ficha-tecnica.js"></script>
     @if (!string.IsNullOrEmpty(p.CodigoBarras))
     {
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -892,7 +1066,7 @@
 
                 init() {
                     const t = new URLSearchParams(window.location.search).get('tab');
-                    if (['variacoes','fotos','estoque','historico','detalhes'].includes(t)) {
+                    if (['variacoes','fotos','estoque','historico','detalhes','nutricional'].includes(t)) {
                         this.tab = t;
                         if (t === 'historico') { this.loadHistorico(); this.loadAlteracoes(); }
                     }

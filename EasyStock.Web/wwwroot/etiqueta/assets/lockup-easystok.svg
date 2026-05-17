@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+  <!-- Icon mark (simplified from logo.svg) -->
+  <path d="M24 4 L44 14 L24 24 L4 14 Z" fill="#E85814"/>
+  <path d="M4 14 L24 24 L24 44 L4 34 Z" fill="#1A2E5A"/>
+  <path d="M44 14 L24 24 L24 44 L44 34 Z" fill="#243B6E"/>
+  <!-- Wordmark -->
+  <text x="52" y="30" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="18" font-weight="700" fill="#1A2E5A">EasyStok</text>
+</svg>

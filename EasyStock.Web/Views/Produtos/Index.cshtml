@@ -18,6 +18,37 @@
     </a>
 </div>
 
+@* C2 (R4 — 2026-05-16): banner pos-migration AddTipoEmbalagemToProduto.
+   Avisa o operador que produtos viram Avulso por default e precisam de
+   triagem manual. Dismissable via localStorage ("c2_banner_dismissed").
+   Sem este banner, regra TipoEmbalagem fica decorativa - operador
+   nao sabe que precisa marcar massa fresca como Embalado.
+   Felipe deve revisar produtos Casa da Baba apos primeiro deploy. *@
+<div x-data="{ visible: localStorage.getItem('c2_banner_dismissed') !== '1' }"
+     x-show="visible" x-cloak
+     class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div class="flex-1">
+            <h3 class="text-sm font-semibold text-amber-900">Revise o tipo de embalagem dos produtos</h3>
+            <p class="text-xs text-amber-800 mt-1">
+                Massa fresca, congelados e pacotes vácuo precisam ser marcados como
+                <strong>Embalado</strong> para etiqueta com peso obrigatório (RDC 727/2022).
+                Produtos avulsos (pão por kg, granel) ficam como <strong>Avulso</strong>.
+            </p>
+        </div>
+        <button type="button"
+                @@click="visible = false; localStorage.setItem('c2_banner_dismissed', '1')"
+                class="text-amber-600 hover:text-amber-800 text-sm font-medium"
+                aria-label="Dispensar aviso">
+            Dispensar
+        </button>
+    </div>
+</div>
+
 <!-- Filtros -->
 <div class="ws mb-4">
     <form method="get" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar produtos">
@@ -103,7 +134,9 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }" class="cursor-pointer hover:bg-slate-50 transition-colors" @@click="window.location.href='/produtos/@p.Id'">
+                    <tr x-data="{ menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }"
+                        data-row-href="/produtos/@p.Id"
+                        class="cursor-pointer hover:bg-slate-50 transition-colors">
                         <td>
                             <div class="flex items-center gap-3">
                                 @if (p.PrimeiraFotoUrl is not null)

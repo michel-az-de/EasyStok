@@ -1,87 +1,158 @@
-@model ForgotPasswordViewModel
+﻿@model ForgotPasswordViewModel
 @{
     Layout = null;
     ViewBag.Title = "Esqueci minha senha";
+    var sent = ViewBag.Sent == true;
 }
 <!DOCTYPE html>
 <html lang="pt-BR" class="h-full">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Esqueci minha senha - EasyStock</title>
-    <!-- tailwind: build local em ~/css/tailwind.dist.css -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <title>Esqueci minha senha — EasyStock</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
+    <style>
+        [x-cloak] { display: none !important; }
+        .esq-success-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--ok-50);
+            color: var(--ok-700);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 4px auto 16px;
+            border: 1px solid var(--ok-200);
+        }
+        [data-theme="dark"] .esq-success-icon {
+            background: rgba(14, 107, 61, 0.22);
+            color: #86EFAC;
+            border-color: rgba(34, 197, 94, 0.35);
+        }
+    </style>
 </head>
-<body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen">
-    <div class="w-full max-w-sm mx-auto px-4">
-        <div class="text-center mb-8">
-            <partial name="_LogoEasyStock" model='new { Size = 40, Variant = "auth" }' />
-            <p class="text-slate-500 text-sm mt-3">Recuperação de senha</p>
-        </div>
+<body class="font-[Inter] antialiased">
+    <div class="auth-prem-shell" x-data="{ loading: false }">
+        <div class="auth-prem-layout auth-prem-enter">
 
-        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
-            <h1 class="text-xl font-bold text-slate-900 mb-1">Esqueci minha senha</h1>
-
-            @if (ViewBag.Sent == true)
-            {
-                <div class="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-4">
-                    Se o e-mail estiver cadastrado, você receberá as instruções para redefinir sua senha em breve.
-                </div>
-                <a href="/auth/login" class="block text-center text-sm text-indigo-600 hover:text-indigo-700 font-medium mt-4">
-                    Voltar para o login
-                </a>
-            }
-            else
-            {
-                <p class="text-slate-500 text-sm mb-6">Informe seu e-mail e enviaremos as instruções de redefinição.</p>
-
-                @if (!ViewData.ModelState.IsValid)
-                {
-                    <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
-                        @Html.ValidationSummary(false, "", new { @class = "" })
-                    </div>
-                }
-
-                <form asp-action="EsqueciSenha" asp-controller="Auth" method="post"
-                      x-data="{ loading: false }" @@submit="loading = true">
-                    @Html.AntiForgeryToken()
-                    <div class="mb-6">
-                        <label asp-for="Email" class="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
-                        <input asp-for="Email" type="email" autocomplete="email" required
-                               :disabled="loading"
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all disabled:opacity-60"
-                               placeholder="seu@email.com" />
-                        <span asp-validation-for="Email" class="text-red-500 text-xs mt-1 block"></span>
-                    </div>
-
-                    <button type="submit"
-                            :disabled="loading"
-                            :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
-                            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
-                        <span x-show="!loading">Enviar instruções</span>
-                        <span x-show="loading" x-cloak class="flex items-center gap-2">
-                            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            <!-- ============ BRAND PANEL ============ -->
+            <section class="auth-prem-brand">
+                <div>
+                    <div class="auth-prem-wordmark">
+                        <div class="auth-prem-cube" aria-hidden="true">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+                                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+                                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
                             </svg>
-                            Enviando…
-                        </span>
-                    </button>
-                </form>
+                        </div>
+                        <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
+                    </div>
 
-                <a href="/auth/login" class="block text-center text-sm text-slate-500 hover:text-slate-700 mt-4">
-                    Voltar para o login
-                </a>
-            }
+                    <p class="auth-prem-eyebrow">RECUPERAÇÃO DE ACESSO</p>
+
+                    <h1 class="auth-prem-headline">Recupere o acesso em segundos.</h1>
+                    <p class="auth-prem-lede">Enviamos um link de redefinição direto para o seu e-mail. Você cria uma nova senha e volta para a operação.</p>
+                </div>
+
+                <div class="auth-prem-brand-bottom">
+                    SUPORTE · SEGURANÇA · v2026
+                </div>
+            </section>
+
+            <!-- ============ FORM PANEL ============ -->
+            <section class="auth-prem-panel">
+                <div class="auth-prem-card auth-prem-enter-2">
+
+                    @if (sent)
+                    {
+                        <div style="text-align: center;">
+                            <div class="esq-success-icon" aria-hidden="true">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                                    <path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M16 14l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2 class="auth-prem-card-title">Verifique seu e-mail</h2>
+                            <p class="auth-prem-card-subtitle" style="margin-bottom: 18px;">
+                                Se este e-mail estiver cadastrado, enviamos um link de recuperação. <strong>Verifique sua caixa de entrada</strong> — e a pasta de spam, por garantia. O link expira em 30 minutos.
+                            </p>
+                            <a href="/auth/login" class="auth-prem-launch" style="text-decoration: none;">
+                                <span>Voltar ao login</span>
+                                <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <h2 class="auth-prem-card-title">Recuperar acesso</h2>
+                        <p class="auth-prem-card-subtitle">Informe seu e-mail. Enviamos um link para criar uma nova senha.</p>
+
+                        @if (!ViewData.ModelState.IsValid)
+                        {
+                            <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
+                                <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                                </svg>
+                                <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
+                            </div>
+                        }
+
+                        <form asp-action="EsqueciSenha" asp-controller="Auth" method="post"
+                              :aria-busy="loading ? 'true' : 'false'"
+                              @@submit="loading = true">
+                            @Html.AntiForgeryToken()
+
+                            <div class="auth-prem-field">
+                                <label asp-for="Email" class="auth-prem-field-label">E-mail</label>
+                                <input asp-for="Email" type="email" autocomplete="email" required autofocus
+                                       class="auth-prem-input"
+                                       placeholder="seu@email.com"
+                                       :disabled="loading" />
+                                <span asp-validation-for="Email" class="auth-prem-field-error"></span>
+                            </div>
+
+                            <button type="submit"
+                                    :disabled="loading"
+                                    :aria-busy="loading ? 'true' : 'false'"
+                                    class="auth-prem-launch"
+                                    style="margin-top: 8px;">
+                                <span x-show="!loading">Enviar link de recuperação</span>
+                                <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
+                                    <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
+                                    Enviando…
+                                </span>
+                                <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                            </button>
+                        </form>
+
+                        <p class="auth-prem-footer" style="margin-top: 20px;">
+                            <a href="/auth/login" class="auth-prem-link">Voltar ao login</a>
+                        </p>
+                    }
+
+                    <p class="auth-prem-footer" style="margin-top: 18px;">
+                        &copy; @DateTime.Now.Year EasyStock · Todos os direitos reservados
+                    </p>
+                </div>
+            </section>
         </div>
-
-        <p class="text-center text-xs text-slate-400 mt-6">
-            &copy; @DateTime.Now.Year EasyStock. Todos os direitos reservados.
-        </p>
     </div>
 </body>
 </html>

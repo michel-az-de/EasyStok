@@ -27,7 +27,15 @@
     };
     string LatBadgeClass(long ms) => ms < 200 ? "text-green-700 bg-green-50" : ms < 1000 ? "text-yellow-700 bg-yellow-50" : "text-red-700 bg-red-50";
 
-    var overallStatus = apiOk && Model is not null ? (Model!.Status ?? "ok") : "critical";
+    // Normaliza valores desconhecidos pra "critical" — assim header (que cai no _ default
+    // pra qualquer coisa fora de ok/degraded) e a aba Insights (que so reconhecia
+    // critical/degraded) param de divergir quando a API devolve Status vazio/desconhecido.
+    var rawStatus = apiOk && Model is not null ? Model!.Status : null;
+    var overallStatus = rawStatus switch
+    {
+        "ok" or "degraded" or "critical" => rawStatus!,
+        _ => "critical"
+    };
     var overallIcon = overallStatus switch { "ok" => "check_circle", "degraded" => "warning", _ => "error" };
     var overallText = overallStatus switch { "ok" => "Todos os sistemas operacionais", "degraded" => "Sistema degradado", _ => "Falha critica detectada" };
     var overallHero = overallStatus switch { "ok" => "from-green-500 to-emerald-600", "degraded" => "from-yellow-500 to-amber-600", _ => "from-red-500 to-rose-600" };
@@ -39,8 +47,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Central de Operacoes — EasyStock</title>
     <!-- tailwind: build local em ~/css/tailwind.dist.css -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    @* pinned 2026-05-15 — recalculate SRI on upgrade *@
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"
+            integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh"
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"
+            integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG"
+            crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -59,7 +72,7 @@
             <div class="flex items-center gap-3">
                 <span class="material-icons-round text-3xl opacity-90">@overallIcon</span>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight">Central de Operacoes</h1>
+                    <h1 class="text-xl font-bold tracking-tight">Saúde do sistema</h1>
                     <p class="text-sm opacity-90">
                         @overallText
                         @if (apiOk && Model is not null)
@@ -89,6 +102,15 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
+    <!-- ── Banner contextual ──────────────────────────────────────────── -->
+    <div class="mb-6 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3 text-sm text-blue-900">
+        <span class="material-icons-round text-blue-600 text-base flex-shrink-0 mt-0.5">info</span>
+        <div>
+            <strong class="font-semibold">Esta página é para admins e suporte.</strong>
+            Se tudo aqui está verde, suas operações estão rodando bem — você não precisa olhar.
+        </div>
+    </div>
+
     <!-- ── TABS ──────────────────────────────────────────────────────── -->
     <div class="flex gap-6 border-b border-slate-200 mb-6 overflow-x-auto">
         <button @@click="activeTab='overview'" class="pb-3 px-1 text-sm whitespace-nowrap transition-all"
@@ -116,7 +138,7 @@
             {
                 <span class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold" title="Estado crítico/degradado detectado">!</span>
             }
-            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+            <span x-show="patterns.length > 0" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800"
                 x-text="patterns.length"></span>
         </button>
     </div>
@@ -911,7 +933,7 @@
                                 <span class="text-[10px] text-slate-400 mr-1">Marcar como:</span>
                                 <template x-for="ackOpt in [
                                     { status: 'visto', label: 'Visto', icon: 'visibility', cls: 'text-slate-600 bg-slate-50 border-slate-200 hover:bg-slate-100' },
-                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
+                                    { status: 'em_investigacao', label: 'Investigando', icon: 'manage_search', cls: 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100' },
                                     { status: 'resolvido', label: 'Resolvido', icon: 'task_alt', cls: 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100' }
                                 ]" :key="ackOpt.status">
                                     <button @@click="ackAlerta(p, ackOpt.status)"
@@ -938,6 +960,7 @@
             <div class="flex flex-wrap gap-2">
                 <a href="/diagnostico/json" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">JSON Diagnostico</a>
                 <a href="@(apiBase)/swagger" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">Swagger</a>
+                <a href="@(apiBase)/api-docs/index.html" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">Console</a>
                 <a href="@(apiBase)/health" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">/health</a>
                 <a href="@(apiBase)/health/ready" target="_blank" rel="noopener noreferrer" class="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-slate-600">/health/ready</a>
             </div>

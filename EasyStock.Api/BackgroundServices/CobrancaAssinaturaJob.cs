@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,7 +19,6 @@ public sealed class CobrancaAssinaturaJob(
     ILogger<CobrancaAssinaturaJob> logger) : BackgroundService
 {
     private readonly BackgroundJobOptions _options = options.Value;
-    private const long LockKeyJob = 0x4B69_6C6C_4561_7379L; // arbitrary stable key
 
     private async Task RunWithAdvisoryLockAsync(long key, Func<CancellationToken, Task> action, CancellationToken ct)
     {
@@ -94,7 +94,7 @@ public sealed class CobrancaAssinaturaJob(
                 // job no mesmo dia. Sem isso, múltiplas réplicas geram
                 // cobranças Pix duplicadas. Lock é liberado ao fim da
                 // transação. Key arbitrária estável: hash de "easystock-cobranca-job".
-                await RunWithAdvisoryLockAsync(LockKeyJob, async ct =>
+                await RunWithAdvisoryLockAsync(LockKeys.CobrancaAssinatura, async ct =>
                 {
                     await ProcessarCobrancasAsync(ct);
                     await SuspenderVencidasAsync(ct);

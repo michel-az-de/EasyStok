@@ -31,6 +31,7 @@ public class DesativarClienteUseCase(
         await repo.AddAlteracaoAsync(new ClienteAlteracao
         {
             Id = Guid.NewGuid(),
+            EmpresaId = cliente.EmpresaId,
             ClienteId = cliente.Id,
             AlteradoPorUserId = cmd.AlteradoPorUserId,
             AlteradoPorNome = cmd.AlteradoPorNome,

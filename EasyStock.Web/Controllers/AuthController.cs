@@ -14,7 +14,7 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 {
     [AllowAnonymous]
     [HttpGet("/auth/login")]
-    public IActionResult Login(string? returnUrl = null)
+    public IActionResult Login(string? returnUrl = null, string? bye = null)
     {
         if (session.IsLoggedIn())
             return RedirectToAction("Index", "Dashboard");
@@ -24,6 +24,12 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         {
             ViewBag.SessionExpired = true;
             Response.Cookies.Delete("_se");
+        }
+        else if (bye == "1")
+        {
+            // Logout intencional — mostra confirmação no toast/banner.
+            // Expiração prevalece se ambos vierem juntos.
+            ViewBag.LogoutSuccess = true;
         }
 
         ViewBag.ReturnUrl = returnUrl;
@@ -35,6 +41,11 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel vm, string? returnUrl = null)
     {
+        // Preserva returnUrl em qualquer re-render da view (validacao falhou,
+        // api fora, credenciais erradas) — sem isso o deep link e perdido apos
+        // o primeiro POST com erro.
+        ViewBag.ReturnUrl = returnUrl;
+
         if (!ModelState.IsValid) return View(vm);
 
         var result = await api.PostAsync<JsonElement>("auth/login", new { email = vm.Email, senha = vm.Senha });
@@ -135,7 +146,10 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
             return RedirectToAction(nameof(SelecionarLoja));
         }
 
-        return SafeRedirect(returnUrl);
+        // 0 lojas (ou falha ao listar): manda pro wizard/aviso. Sem isso o usuario
+        // cairia direto no Dashboard sem LojaId, conseguindo navegar e tentar criar
+        // recursos numa loja inexistente.
+        return RedirectToAction(nameof(SelecionarLoja));
     }
 
     [Authorize]
@@ -308,11 +322,11 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 
         if (!jaTemLoja)
         {
-            TempData["Toast"] = "success|Conta criada! Configure sua primeira loja para começar.";
-            return RedirectToAction(nameof(SelecionarLoja));
+            TempData["Toast"] = "success|Conta criada! Vamos configurar sua loja em poucos passos.";
+            return Redirect("/onboarding");
         }
 
-        TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias está ativo.";
+        TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias esta ativo.";
         return RedirectToAction("Index", "Dashboard");
     }
 
@@ -383,7 +397,9 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         session.Clear();
         Response.Cookies.Delete("_rt");
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToAction(nameof(Login));
+        // bye=1 sinaliza pro GET Login mostrar feedback de logout intencional
+        // (toast verde + banner). Veja AuthController.Login (GET).
+        return RedirectToAction(nameof(Login), new { bye = "1" });
     }
 
     [Authorize]

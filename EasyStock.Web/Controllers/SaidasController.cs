@@ -8,7 +8,6 @@ namespace EasyStock.Web.Controllers;
 
 public class SaidasController(SaidasService svc, SessionService session) : BaseController(session)
 {
-    [HttpGet("/saidas")]
     [HttpGet("/saidas/nova")]
     public IActionResult Nova(string? produtoId = null)
     {
@@ -53,16 +52,29 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
             return View("Nova", vm);
         }
 
-        Toast("success", "Saída registrada com sucesso!");
+        Toast("success", "Saída registrada.");
         return RedirectToAction(nameof(Historico));
     }
 
+    [HttpGet("/saidas")]
     [HttpGet("/saidas/historico")]
     public async Task<IActionResult> Historico(
         int page = 1, string? natureza = null, string? de = null, string? ate = null)
     {
         ViewBag.Title = "Histórico de Saídas";
         ViewBag.ActiveMenuItem = "Saidas";
+
+        // BUG 10: defaults usavam UTC e concatenavam ":T23:59:59" em "ate". Input
+        // <input type="date"> não aceita componente de hora, então o campo ficava
+        // visualmente vazio — usuário via "de" preenchido e "ate" em branco,
+        // achando que o filtro estava incompleto. Agora ambos chegam em yyyy-MM-dd
+        // puro e usam fuso BR (servidor pode rodar em UTC no Render).
+        if (string.IsNullOrEmpty(de) && string.IsNullOrEmpty(ate))
+        {
+            var hojeBr = DateTime.UtcNow.AddHours(-3).Date;
+            de = hojeBr.AddDays(-30).ToString("yyyy-MM-dd");
+            ate = hojeBr.ToString("yyyy-MM-dd");
+        }
 
         var result = await svc.ListarAsync(page, natureza, de, ate);
         var kpisResult = await svc.ObterKpisAsync(natureza, de, ate);

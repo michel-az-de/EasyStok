@@ -13,8 +13,11 @@
     </div>
     <button type="button"
             x-data @@click="$dispatch('open-modal', 'convidar')"
-            class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-        + Novo Usuário
+            class="app-primary-btn inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Convidar usuário
     </button>
 </div>
 
@@ -22,10 +25,10 @@
     @if (!Model.Usuarios.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "👤" },
+            { "EmptyIllustration", "inbox" },
             { "EmptyTitle", "Nenhum usuário cadastrado" },
-            { "EmptyDescription", "Crie o primeiro usuário para dar acesso à equipe." },
-            { "EmptyCta", "+ Novo Usuário" },
+            { "EmptyDescription", "Convide o primeiro usuário para dar acesso à equipe." },
+            { "EmptyCta", "Convidar usuário" },
             { "EmptyCtaModal", "convidar" }
         })
     }

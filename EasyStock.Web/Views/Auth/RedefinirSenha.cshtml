@@ -1,4 +1,4 @@
-@model ResetPasswordViewModel
+﻿@model ResetPasswordViewModel
 @{
     Layout = null;
     ViewBag.Title = "Redefinir senha";
@@ -8,72 +8,214 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Redefinir senha - EasyStock</title>
-    <!-- tailwind: build local em ~/css/tailwind.dist.css -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <title>Redefinir senha — EasyStock</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
-<body class="h-full bg-slate-100 font-[Inter] antialiased flex items-center justify-center min-h-screen">
-    <div class="w-full max-w-sm mx-auto px-4">
-        <div class="text-center mb-8">
-            <partial name="_LogoEasyStock" model='new { Size = 40, Variant = "auth" }' />
-            <p class="text-slate-500 text-sm mt-3">Redefinição de senha</p>
+<body class="font-[Inter] antialiased">
+    <div class="auth-prem-shell" x-data="redefinirForm()">
+        <div class="auth-prem-layout auth-prem-enter">
+
+            <!-- ============ BRAND PANEL ============ -->
+            <section class="auth-prem-brand">
+                <div>
+                    <div class="auth-prem-wordmark">
+                        <div class="auth-prem-cube" aria-hidden="true">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
+                                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
+                                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
+                            </svg>
+                        </div>
+                        <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
+                    </div>
+
+                    <p class="auth-prem-eyebrow">NOVA SENHA</p>
+
+                    <h1 class="auth-prem-headline">Crie uma senha forte. Você no controle.</h1>
+                    <p class="auth-prem-lede">Combine letras maiúsculas, números e símbolos para garantir o acesso da sua operação.</p>
+
+                    <ul class="auth-prem-bullets" style="margin-top: 28px;">
+                        <li class="auth-prem-bullet">
+                            <span class="auth-prem-bullet-mark">✓</span>
+                            <span>Ao menos 8 caracteres</span>
+                        </li>
+                        <li class="auth-prem-bullet">
+                            <span class="auth-prem-bullet-mark">✓</span>
+                            <span>Letras maiúsculas e minúsculas</span>
+                        </li>
+                        <li class="auth-prem-bullet">
+                            <span class="auth-prem-bullet-mark">✓</span>
+                            <span>Números e símbolos para mais segurança</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="auth-prem-brand-bottom">
+                    SEGURANÇA · v2026
+                </div>
+            </section>
+
+            <!-- ============ FORM PANEL ============ -->
+            <section class="auth-prem-panel">
+                <div class="auth-prem-card auth-prem-enter-2">
+
+                    <h2 class="auth-prem-card-title">Defina sua nova senha</h2>
+                    <p class="auth-prem-card-subtitle">Sua nova senha precisa ter 8+ caracteres. Letras, números e símbolos garantem mais segurança.</p>
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                            </svg>
+                            <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
+                        </div>
+                    }
+
+                    <form asp-action="RedefinirSenha" asp-controller="Auth" method="post"
+                          :aria-busy="loading ? 'true' : 'false'"
+                          @@submit="loading = true">
+                        @Html.AntiForgeryToken()
+                        <input asp-for="Token" type="hidden" />
+
+                        <div class="auth-prem-field">
+                            <label asp-for="NovaSenha" class="auth-prem-field-label">Nova senha</label>
+                            <div class="auth-prem-input-wrap">
+                                <input asp-for="NovaSenha" minlength="8" required
+                                       x-bind:type="showNova ? 'text' : 'password'"
+                                       x-model="senha"
+                                       @@input="onSenhaInput"
+                                       autocomplete="new-password"
+                                       class="auth-prem-input auth-prem-input--with-icon-right"
+                                       placeholder="Mínimo 8 caracteres"
+                                       :disabled="loading" />
+                                <button type="button"
+                                        @@click="showNova = !showNova"
+                                        class="auth-prem-icon-btn"
+                                        tabindex="-1"
+                                        :aria-label="showNova ? 'Ocultar senha' : 'Mostrar senha'">
+                                    <svg x-show="!showNova" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <svg x-show="showNova" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="auth-prem-strength" :data-level="senhaLevel" aria-hidden="true">
+                                <span class="auth-prem-strength-bar"></span>
+                                <span class="auth-prem-strength-bar"></span>
+                                <span class="auth-prem-strength-bar"></span>
+                                <span class="auth-prem-strength-bar"></span>
+                            </div>
+                            <span class="auth-prem-strength-label" :data-level="senhaLevel" x-text="senhaLabel" x-show="senha.length > 0" x-cloak></span>
+                            <span asp-validation-for="NovaSenha" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <div class="auth-prem-field">
+                            <label asp-for="ConfirmarSenha" class="auth-prem-field-label">Confirmar nova senha</label>
+                            <div class="auth-prem-input-wrap">
+                                <input asp-for="ConfirmarSenha" minlength="8" required
+                                       x-bind:type="showConf ? 'text' : 'password'"
+                                       x-model="senhaConf"
+                                       autocomplete="new-password"
+                                       class="auth-prem-input auth-prem-input--with-icon-right"
+                                       placeholder="Repita a senha"
+                                       :disabled="loading" />
+                                <button type="button"
+                                        @@click="showConf = !showConf"
+                                        class="auth-prem-icon-btn"
+                                        tabindex="-1"
+                                        :aria-label="showConf ? 'Ocultar senha' : 'Mostrar senha'">
+                                    <svg x-show="!showConf" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <svg x-show="showConf" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <span class="auth-prem-inline-feedback auth-prem-inline-feedback--ok"
+                                  x-show="senhaConf.length > 0 && senhaConf === senha" x-cloak>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                    <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Senhas conferem.
+                            </span>
+                            <span class="auth-prem-inline-feedback auth-prem-inline-feedback--err"
+                                  x-show="senhaConf.length > 0 && senhaConf !== senha" x-cloak>
+                                As senhas não conferem.
+                            </span>
+                            <span asp-validation-for="ConfirmarSenha" class="auth-prem-field-error"></span>
+                        </div>
+
+                        <button type="submit"
+                                :disabled="loading"
+                                :aria-busy="loading ? 'true' : 'false'"
+                                class="auth-prem-launch"
+                                style="margin-top: 8px;">
+                            <span x-show="!loading">Salvar senha</span>
+                            <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
+                                <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
+                                Redefinindo…
+                            </span>
+                            <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                        </button>
+                    </form>
+
+                    <p class="auth-prem-footer" style="margin-top: 22px;">
+                        <a href="/auth/login" class="auth-prem-link">Voltar ao login</a>
+                    </p>
+                    <p class="auth-prem-footer" style="margin-top: 6px;">
+                        &copy; @DateTime.Now.Year EasyStock · Todos os direitos reservados
+                    </p>
+                </div>
+            </section>
         </div>
-
-        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
-            <h1 class="text-xl font-bold text-slate-900 mb-1">Criar nova senha</h1>
-            <p class="text-slate-500 text-sm mb-6">Escolha uma senha forte com ao menos 8 caracteres.</p>
-
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
-                    @Html.ValidationSummary(false, "", new { @class = "" })
-                </div>
-            }
-
-            <form asp-action="RedefinirSenha" asp-controller="Auth" method="post"
-                  x-data="{ loading: false }" @@submit="loading = true">
-                @Html.AntiForgeryToken()
-                <input asp-for="Token" type="hidden" />
-
-                <div class="mb-4">
-                    <label asp-for="NovaSenha" class="block text-sm font-semibold text-slate-700 mb-1.5">Nova senha</label>
-                    <input asp-for="NovaSenha" type="password" autocomplete="new-password" minlength="8" required
-                           class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
-                           placeholder="Mínimo 8 caracteres" />
-                    <span asp-validation-for="NovaSenha" class="text-red-500 text-xs mt-1 block"></span>
-                </div>
-
-                <div class="mb-6">
-                    <label asp-for="ConfirmarSenha" class="block text-sm font-semibold text-slate-700 mb-1.5">Confirmar nova senha</label>
-                    <input asp-for="ConfirmarSenha" type="password" autocomplete="new-password" minlength="8" required
-                           class="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all"
-                           placeholder="Repita a senha" />
-                    <span asp-validation-for="ConfirmarSenha" class="text-red-500 text-xs mt-1 block"></span>
-                </div>
-
-                <button type="submit"
-                        :disabled="loading"
-                        :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
-                    <span x-show="!loading">Redefinir senha</span>
-                    <span x-show="loading" x-cloak class="flex items-center gap-2">
-                        <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                        </svg>
-                        Redefinindo…
-                    </span>
-                </button>
-            </form>
-        </div>
-
-        <p class="text-center text-xs text-slate-400 mt-6">
-            &copy; @DateTime.Now.Year EasyStock. Todos os direitos reservados.
-        </p>
     </div>
+
+    <script>
+        function redefinirForm() {
+            return {
+                loading: false,
+                showNova: false,
+                showConf: false,
+                senha: '',
+                senhaConf: '',
+                senhaLevel: 0,
+                senhaLabel: '',
+
+                onSenhaInput() {
+                    const v = this.senha || '';
+                    let score = 0;
+                    if (v.length >= 8) score++;
+                    if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
+                    if (/\d/.test(v)) score++;
+                    if (/[^A-Za-z0-9]/.test(v)) score++;
+                    this.senhaLevel = score;
+                    this.senhaLabel = ['Muito curta', 'Fraca', 'Razoável', 'Boa', 'Forte'][score];
+                }
+            };
+        }
+    </script>
 </body>
 </html>

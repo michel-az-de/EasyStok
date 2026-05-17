@@ -4,29 +4,44 @@
     ViewBag.Title = $"Lote {l.Codigo}";
     Layout = "_Layout";
 
-    string statusClass = l.Status switch {
-        "em_producao" => "bg-blue-100 text-blue-700",
-        "finalizado"  => "bg-green-100 text-green-700",
-        "expirado"    => "bg-red-100 text-red-700",
-        _             => "bg-slate-100 text-slate-600"
+    string statusPill = l.Status switch {
+        "em_producao" => "bg-blue-50 text-blue-700 ring-blue-200",
+        "finalizado"  => "bg-emerald-50 text-emerald-800 ring-emerald-200",
+        "expirado"    => "bg-red-50 text-red-700 ring-red-200",
+        _             => "bg-slate-50 text-slate-600 ring-slate-200"
+    };
+    string statusDot = l.Status switch {
+        "em_producao" => "bg-blue-500",
+        "finalizado"  => "bg-emerald-500",
+        "expirado"    => "bg-red-500",
+        _             => "bg-slate-400"
+    };
+    string statusLabel = l.Status switch {
+        "em_producao" => "Em produção",
+        "finalizado"  => "Finalizado",
+        "expirado"    => "Expirado",
+        _             => l.Status ?? "—"
     };
 
     string etqStatusClass(string s) => s switch {
-        "conferida"  => "bg-green-100 text-green-700",
-        "divergente" => "bg-red-100 text-red-700",
-        "consumida"  => "bg-slate-200 text-slate-600",
-        _            => "bg-amber-100 text-amber-700"
+        "conferida"  => "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200",
+        "divergente" => "bg-red-50 text-red-700 ring-1 ring-red-200",
+        "consumida"  => "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
+        _            => "bg-amber-50 text-amber-800 ring-1 ring-amber-200"
     };
 }
 
 <div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="Lotes" class="text-slate-400 hover:text-slate-600">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <a asp-action="Index" asp-controller="Lotes" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para lotes">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-slate-900 font-mono">@l.Codigo</h1>
-    <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusClass">@l.Status</span>
+    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 @statusPill">
+        <span class="w-1.5 h-1.5 rounded-full @statusDot"></span>
+        @statusLabel
+    </span>
     <div class="ml-auto flex gap-2">
         @if (l.Status == "em_producao")
         {
@@ -66,7 +81,7 @@
             <div class="flex border-b border-slate-200 px-4 pt-2 gap-1">
                 @foreach (var (key, label, count) in new[] {
                     ("itens",     "Itens",     Model.Detalhe.Itens.Count),
-                    ("etiquetas", "Etiquetas", Model.Detalhe.Etiquetas.Count)
+                    ("etiquetas", "Etiquetas", (int)l.TotalUnidades)
                 })
                 {
                     <button type="button" @@click="tab = '@key'"
@@ -86,10 +101,50 @@
                         <tbody class="divide-y divide-slate-100">
                         @foreach (var it in Model.Detalhe.Itens)
                         {
-                            <tr>
-                                <td class="py-2"><span class="font-medium">@it.Emoji @it.Nome</span> @if (!string.IsNullOrEmpty(it.Unidade)) {<span class="text-xs text-slate-400">@it.Unidade</span>}</td>
-                                <td class="text-right">@it.Quantidade</td>
-                                <td class="text-right">@(it.PesoG.HasValue ? it.PesoG + "g" : "—")</td>
+                            var isEmbalado = string.Equals(it.TipoEmbalagem, "Embalado", StringComparison.OrdinalIgnoreCase);
+                            var pesoFaltando = isEmbalado && (!it.PesoG.HasValue || it.PesoG.Value <= 0);
+                            <tr x-data="@($"itemPesoRow({{ itemId: '{it.Id}', loteId: '{l.Id}', pesoAtual: {(it.PesoG.HasValue ? it.PesoG.Value.ToString() : "null")}, podeEditar: {(l.Status == "em_producao" ? "true" : "false")} }})")">
+                                <td class="py-2">
+                                    <span class="font-medium">@it.Emoji @it.Nome</span>
+                                    @if (!string.IsNullOrEmpty(it.Unidade)) { <span class="text-xs text-slate-400">@it.Unidade</span> }
+                                    @if (isEmbalado)
+                                    {
+                                        <span class="ml-2 inline-flex items-center px-1.5 py-0 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="Produto marcado como Embalado — peso obrigatório por RDC 727/2022">Embalado</span>
+                                    }
+                                </td>
+                                <td class="text-right">@it.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
+                                <td class="text-right">
+                                    @* C2 (R3 + backfill): inline edit do peso. Bloqueado se lote finalizado. *@
+                                    <div x-show="!editando">
+                                        <span x-show="peso !== null && peso > 0" x-text="peso + 'g'"></span>
+                                        @if (pesoFaltando)
+                                        {
+                                            <span x-show="peso === null || peso <= 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-800 border border-red-200" title="Embalado sem peso: RDC 727 exige. Clique em Backfill para preencher.">
+                                                ⚠ Sem peso
+                                            </span>
+                                        }
+                                        @if (!isEmbalado && !it.PesoG.HasValue)
+                                        {
+                                            <span class="text-slate-400">—</span>
+                                        }
+                                        @if (l.Status == "em_producao")
+                                        {
+                                            <button type="button" @@click="editando = true; $nextTick(() => $refs.inputPeso.focus())"
+                                                    class="ml-1 text-[10px] text-indigo-600 hover:text-indigo-700"
+                                                    title="Editar peso">@(pesoFaltando ? "Backfill" : "editar")</button>
+                                        }
+                                    </div>
+                                    <div x-show="editando" x-cloak class="flex items-center gap-1 justify-end">
+                                        <input type="number" x-model.number="pesoEdit" x-ref="inputPeso"
+                                               min="1" step="1" placeholder="g/un"
+                                               class="ui-field text-sm w-20 text-right"
+                                               @@keydown.enter.prevent="salvarPeso()"
+                                               @@keydown.escape="editando = false; pesoEdit = peso" />
+                                        <button type="button" @@click="salvarPeso()" :disabled="salvando" class="text-xs text-emerald-600 hover:text-emerald-700">✓</button>
+                                        <button type="button" @@click="editando = false; pesoEdit = peso" class="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                                    </div>
+                                    <p x-show="erro" x-cloak class="text-[10px] text-red-600 mt-0.5" x-text="erro"></p>
+                                </td>
                                 <td class="text-right text-xs">@(it.ExpiraEm.HasValue ? it.ExpiraEm.Value.ToLocalTime().ToString("dd/MM/yy") : "—")</td>
                                 <td class="text-right">
                                     @if (l.Status == "em_producao")
@@ -140,7 +195,7 @@
                             }
                             @if (!string.IsNullOrEmpty(e.ObservacaoConferencia))
                             {
-                                <div class="text-[10px] text-amber-700 mt-1">⚠ @e.ObservacaoConferencia</div>
+                                <div class="text-[10px] text-amber-800 mt-1">⚠ @e.ObservacaoConferencia</div>
                             }
                         </div>
                     }
@@ -157,3 +212,49 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+// C2 (R3 + backfill): inline edit do peso de um item de lote. Bloqueado
+// se lote ja finalizado (server retorna 422 LOTE_FINALIZADO).
+function itemPesoRow({ itemId, loteId, pesoAtual, podeEditar }) {
+    return {
+        editando: false,
+        salvando: false,
+        peso: pesoAtual,
+        pesoEdit: pesoAtual,
+        erro: '',
+        async salvarPeso() {
+            this.erro = '';
+            const novo = parseInt(this.pesoEdit, 10);
+            if (!novo || novo <= 0) { this.erro = 'Peso > 0.'; return; }
+            if (!podeEditar) { this.erro = 'Lote ja finalizado.'; return; }
+            this.salvando = true;
+            try {
+                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const res = await fetch(`/lotes/${loteId}/itens/${itemId}/peso`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({ pesoG: novo })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    this.peso = novo;
+                    this.editando = false;
+                    if (window.showToast) window.showToast('Peso atualizado.', 'success');
+                } else {
+                    this.erro = (data.error && data.error.message) || 'Falha ao salvar.';
+                }
+            } catch {
+                this.erro = 'Sem conexão.';
+            } finally {
+                this.salvando = false;
+            }
+        }
+    };
+}
+</script>
+}

@@ -13,11 +13,18 @@ public class LotesMobileController(LotesService svc, SessionService session) : B
         ViewBag.ActiveMenuItem = "LotesMobile";
 
         var vm = new LotesMobileViewModel { PendingOnly = pendingOnly };
-        var mobile = await svc.ListarMobileAsync(pendingOnly);
-        if (mobile.Success && mobile.Data is not null) vm.Items = mobile.Data;
+        try
+        {
+            var mobile = await svc.ListarMobileAsync(pendingOnly);
+            if (mobile.Success && mobile.Data is not null) vm.Items = mobile.Data;
 
-        var erp = await svc.ListarAsync();
-        if (erp.Success && erp.Data is not null) vm.ErpLotes = erp.Data;
+            var erp = await svc.ListarAsync();
+            if (erp.Success && erp.Data is not null) vm.ErpLotes = erp.Data;
+        }
+        catch
+        {
+            Toast("error", "Não foi possível carregar os dados. Tente novamente.");
+        }
 
         return View(vm);
     }

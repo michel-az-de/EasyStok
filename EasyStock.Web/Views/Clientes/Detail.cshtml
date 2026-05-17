@@ -5,36 +5,66 @@
     Layout = "_Layout";
 }
 
-<div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="Clientes" class="text-slate-400 hover:text-slate-600">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<div class="mb-6">
+    <a asp-action="Index" asp-controller="Clientes"
+       class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
+        Clientes
     </a>
-    <h1 class="text-2xl font-bold text-slate-900">@c.Nome</h1>
-    <span class="px-2 py-0.5 rounded-full text-xs font-medium @(c.Ativo ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
-        @(c.Ativo ? "Ativo" : "Inativo")
-    </span>
-    <div class="ml-auto flex gap-2">
-        @if (c.Ativo)
-        {
-            <form asp-action="Excluir" asp-controller="Clientes" asp-route-id="@c.Id" method="post"
-                  data-confirm='{"titulo":"Desativar cliente?","mensagem":"O cliente sera desativado mas seu historico permanece. Voce pode reativar a qualquer momento.","textoBotao":"Desativar","classBotao":"bg-red-600 hover:bg-red-700"}'>
-                @Html.AntiForgeryToken()
-                <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
-                    Desativar
-                </button>
-            </form>
-        }
-        else
-        {
-            <form asp-action="Reativar" asp-controller="Clientes" asp-route-id="@c.Id" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="px-3.5 py-2 bg-white border border-green-300 text-green-700 text-sm font-semibold rounded-lg hover:bg-green-50">
-                    Reativar
-                </button>
-            </form>
-        }
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-2xl font-bold text-slate-900">@c.Nome</h1>
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
+                            @(c.Ativo ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                    <span class="w-1.5 h-1.5 rounded-full @(c.Ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
+                    @(c.Ativo ? "Ativo" : "Inativo")
+                </span>
+            </div>
+            @{
+                var lastOrderLocal = c.LastOrderAt?.ToLocalTime();
+                var criadoLocal = c.CriadoEm.ToLocalTime();
+                var pedidoAntesDoCadastro = lastOrderLocal.HasValue && lastOrderLocal.Value < criadoLocal;
+            }
+            <p class="text-sm text-slate-500 mt-1">
+                @c.OrderCount @(c.OrderCount == 1 ? "pedido" : "pedidos")
+                @if (lastOrderLocal.HasValue)
+                {
+                    <text> · último em @lastOrderLocal.Value.AsDate()</text>
+                }
+                @if (pedidoAntesDoCadastro)
+                {
+                    <text> · ficha cadastral criada em @criadoLocal.AsDate() (a partir de pedido anterior)</text>
+                }
+                else
+                {
+                    <text> · cadastrado em @criadoLocal.AsDate()</text>
+                }
+            </p>
+        </div>
+        <div class="flex gap-2 shrink-0">
+            @if (c.Ativo)
+            {
+                <form asp-action="Excluir" asp-controller="Clientes" asp-route-id="@c.Id" method="post"
+                      data-confirm='{"titulo":"Desativar cliente?","mensagem":"O cliente sera desativado mas seu historico permanece. Voce pode reativar a qualquer momento.","textoBotao":"Desativar","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
+                        Desativar
+                    </button>
+                </form>
+            }
+            else
+            {
+                <form asp-action="Reativar" asp-controller="Clientes" asp-route-id="@c.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="px-3.5 py-2 bg-white border border-emerald-300 text-emerald-800 text-sm font-semibold rounded-lg hover:bg-emerald-50 transition-colors">
+                        Reativar
+                    </button>
+                </form>
+            }
+        </div>
     </div>
 </div>
 
@@ -51,28 +81,31 @@
 
             <div x-show="!editando">
                 <dl class="space-y-3 text-sm">
-                    @if (!string.IsNullOrEmpty(c.Apt))      { <div><dt class="text-slate-500">Apt</dt><dd class="font-medium">@c.Apt</dd></div> }
+                    @if (!string.IsNullOrEmpty(c.Apt))      { <div><dt class="text-slate-500">Unidade</dt><dd class="font-medium">@c.Apt</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Endereco)) { <div><dt class="text-slate-500">Endereço</dt><dd class="font-medium">@c.Endereco</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Telefone)) { <div><dt class="text-slate-500">Telefone</dt><dd class="font-medium">@c.Telefone</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Email))    { <div><dt class="text-slate-500">E-mail</dt><dd class="font-medium">@c.Email</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Documento)){ <div><dt class="text-slate-500">CPF/CNPJ</dt><dd class="font-medium">@c.Documento</dd></div> }
                     @if (!string.IsNullOrEmpty(c.Observacoes)) { <div><dt class="text-slate-500">Observações</dt><dd class="font-medium whitespace-pre-line">@c.Observacoes</dd></div> }
-                    <div class="pt-2 border-t"><dt class="text-slate-500">Pedidos</dt><dd class="font-medium">@c.OrderCount @(c.LastOrderAt.HasValue ? $"(último: {c.LastOrderAt.Value.ToLocalTime().ToString("dd/MM/yy")})" : "")</dd></div>
-                    <div><dt class="text-slate-500">Cadastrado em</dt><dd class="font-medium">@c.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
+                    @if (string.IsNullOrEmpty(c.Apt) && string.IsNullOrEmpty(c.Endereco) && string.IsNullOrEmpty(c.Telefone)
+                        && string.IsNullOrEmpty(c.Email) && string.IsNullOrEmpty(c.Documento) && string.IsNullOrEmpty(c.Observacoes))
+                    {
+                        <p class="text-slate-500">Sem dados de contato. Clique em <strong>Editar</strong> para preencher.</p>
+                    }
                 </dl>
             </div>
 
             <form asp-action="Editar" asp-controller="Clientes" asp-route-id="@c.Id" method="post" x-show="editando" x-cloak>
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
-                    <div><label class="block text-xs text-slate-500 mb-1">Nome *</label><input type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Apt</label><input type="text" name="apt" value="@c.Apt" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Endereço</label><input type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Telefone</label><input type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">E-mail</label><input type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Observações</label><textarea name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
-                    <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar</button>
+                    <div><label for="cli-edit-nome" class="block text-xs text-slate-500 mb-1">Nome *</label><input id="cli-edit-nome" type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-apt" class="block text-xs text-slate-500 mb-1">Unidade</label><input id="cli-edit-apt" type="text" name="apt" value="@c.Apt" placeholder="Ex: 304B, Bloco 2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-endereco" class="block text-xs text-slate-500 mb-1">Endereço</label><input id="cli-edit-endereco" type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-telefone" class="block text-xs text-slate-500 mb-1">Telefone</label><input id="cli-edit-telefone" type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-email" class="block text-xs text-slate-500 mb-1">E-mail</label><input id="cli-edit-email" type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-documento" class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input id="cli-edit-documento" type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-observacoes" class="block text-xs text-slate-500 mb-1">Observações</label><textarea id="cli-edit-observacoes" name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
+                    <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar alterações</button>
                 </div>
             </form>
         </div>
@@ -86,13 +119,18 @@
                     ("enderecos", "Endereços",   Model.Detalhe.Enderecos.Count),
                     ("telefones", "Telefones",   Model.Detalhe.Telefones.Count),
                     ("documentos","Documentos",  Model.Detalhe.Documentos.Count),
-                    ("alteracoes","Histórico",   Model.Detalhe.Alteracoes.Count)
+                    ("alteracoes","Atividade",   Model.Detalhe.Alteracoes.Count),
+                    ("timeline",  "Timeline",    -1)
                 })
                 {
                     <button type="button" @@click="tab = '@key'"
                             :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                            class="px-3 py-2 text-sm font-medium border-b-2">
-                        @label <span class="text-xs text-slate-400">(@count)</span>
+                            class="px-3 py-2 text-sm font-medium border-b-2 inline-flex items-center gap-2">
+                        @label
+                        @if (count >= 0) {
+                        <span class="text-[11px] px-1.5 py-0.5 rounded-full"
+                              :class="tab === '@key' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'">@count</span>
+                        }
                     </button>
                 }
             </div>
@@ -104,6 +142,9 @@
                     <ul class="divide-y divide-slate-100 mb-4">
                     @foreach (var e in Model.Detalhe.Enderecos)
                     {
+                        var tituloRemover = string.IsNullOrEmpty(e.Logradouro)
+                            ? $"Remover {(e.Tipo ?? "endereço")}?"
+                            : $"Remover {(e.Tipo ?? "endereço")} — {e.Logradouro}?";
                         <li class="py-3 flex items-start justify-between gap-2">
                             <div class="text-sm">
                                 <div class="font-medium text-slate-900">
@@ -121,11 +162,18 @@
                     }
                     </ul>
                 }
-                else { <p class="text-sm text-slate-500 mb-4">Nenhum endereço extra cadastrado.</p> }
+                else
+                {
+                    @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+                        { "EmptyIllustration", "inbox" },
+                        { "EmptyTitle", "Nenhum endereço adicional" },
+                        { "EmptyDescription", "Cadastre um endereço para entregas e cobranças." }
+                    })
+                }
 
                 <form asp-action="AddEndereco" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <input type="text" name="tipo" placeholder="Tipo (residencial/comercial)" class="ui-field text-sm" />
+                    <input type="text" name="tipo" placeholder="Tipo · ex: residencial, comercial" class="ui-field text-sm" />
                     <input type="text" name="cep" placeholder="CEP" data-mask="cep" inputmode="numeric" maxlength="9" class="ui-field text-sm" />
                     <input type="text" name="logradouro" placeholder="Logradouro" class="ui-field text-sm col-span-2" />
                     <input type="text" name="numero" placeholder="Número" class="ui-field text-sm" />
@@ -134,9 +182,9 @@
                     <input type="text" name="cidade" placeholder="Cidade" class="ui-field text-sm" />
                     <input type="text" name="estado" placeholder="UF" maxlength="2" style="text-transform:uppercase" class="ui-field text-sm" />
                     <input type="text" name="pais" placeholder="País" class="ui-field text-sm" />
-                    <input type="text" name="referencia" placeholder="Referência" class="ui-field text-sm col-span-2" />
-                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="padrao" value="true" /> padrão</label>
-                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Adicionar Endereço</button>
+                    <input type="text" name="referencia" placeholder="Referência (ponto de apoio)" class="ui-field text-sm col-span-2" />
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="padrao" value="true" /> Endereço padrão</label>
+                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar endereço</button>
                 </form>
             </div>
 
@@ -163,16 +211,26 @@
                     }
                     </ul>
                 }
-                else { <p class="text-sm text-slate-500 mb-4">Nenhum telefone extra.</p> }
+                else
+                {
+                    @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+                        { "EmptyIllustration", "inbox" },
+                        { "EmptyTitle", "Nenhum telefone adicional" },
+                        { "EmptyDescription", "Cadastre números extras para contato e WhatsApp." }
+                    })
+                }
 
                 <form asp-action="AddTelefone" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <input type="tel" name="numero" placeholder="Número *" required data-mask="phone" inputmode="numeric" maxlength="15" class="ui-field text-sm col-span-2" />
-                    <input type="text" name="tipo" placeholder="Tipo (celular/fixo/...)" class="ui-field text-sm" />
+                    <div class="col-span-2">
+                        <input type="tel" name="numero" placeholder="Número *" required data-mask="phone" inputmode="numeric" maxlength="15" class="ui-field text-sm w-full" />
+                        <span class="block text-xs text-slate-500 mt-1">Com DDD, ex: (11) 98765-4321</span>
+                    </div>
+                    <input type="text" name="tipo" placeholder="Tipo · ex: celular, fixo, trabalho" class="ui-field text-sm" />
                     <input type="text" name="observacao" placeholder="Observação" class="ui-field text-sm" />
-                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> principal</label>
-                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="whatsapp" value="true" /> whatsapp</label>
-                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Adicionar Telefone</button>
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> Telefone principal</label>
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="whatsapp" value="true" /> Aceita WhatsApp</label>
+                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar telefone</button>
                 </form>
             </div>
 
@@ -202,35 +260,44 @@
                     }
                     </ul>
                 }
-                else { <p class="text-sm text-slate-500 mb-4">Nenhum documento extra cadastrado.</p> }
+                else
+                {
+                    @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+                        { "EmptyIllustration", "inbox" },
+                        { "EmptyTitle", "Nenhum documento adicional" },
+                        { "EmptyDescription", "Cadastre RG, CNH, passaporte ou outros documentos extras." }
+                    })
+                }
 
                 <form asp-action="AddDocumento" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask); else $refs.docValor.value = $refs.docValor.value.replace(/\D/g,'')">
+                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask)">
                         <option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="rg">RG</option>
                         <option value="cnh">CNH</option><option value="passaporte">Passaporte</option><option value="outro">Outro</option>
                     </select>
                     <input type="text" name="valor" placeholder="Valor *" required data-mask="cpf" inputmode="numeric" x-ref="docValor" class="ui-field text-sm" />
-                    <input type="text" name="emissor" placeholder="Emissor" class="ui-field text-sm" />
-                    <input type="date" name="emitidoEm" class="ui-field text-sm" />
-                    <input type="date" name="validoAte" class="ui-field text-sm" />
-                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> principal</label>
-                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Adicionar Documento</button>
+                    <input type="text" name="emissor" placeholder="Emissor (ex: SSP-SP)" class="ui-field text-sm" />
+                    <input type="date" name="emitidoEm" class="ui-field text-sm" title="Emitido em" />
+                    <input type="date" name="validoAte" class="ui-field text-sm" title="Válido até" />
+                    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="principal" value="true" /> Documento principal</label>
+                    <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar documento</button>
                 </form>
             </div>
 
-            <!-- Histórico de Alterações ────────────────────── -->
+            <!-- Atividade ────────────────────────────────────── -->
             <div x-show="tab === 'alteracoes'" x-cloak class="p-4">
                 @if (Model.Detalhe.Alteracoes.Any())
                 {
                     <ul class="divide-y divide-slate-100">
-                    @foreach (var a in Model.Detalhe.Alteracoes)
+                    @foreach (var a in Model.Detalhe.Alteracoes.Where(a =>
+                        string.IsNullOrEmpty(a.Origem) ||
+                        !a.Origem.Contains("sync", StringComparison.OrdinalIgnoreCase)))
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
                                 <span class="font-medium text-slate-900">@a.Campo</span>
-                                <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@(a.Origem ?? "?")</span>
+                                <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@(string.IsNullOrEmpty(a.Origem) ? "—" : a.Origem)</span>
                             </div>
                             <div class="text-xs text-slate-600 ml-2">
                                 <span class="line-through text-slate-400">@(a.ValorAntigo ?? "—")</span>
@@ -245,8 +312,70 @@
                     }
                     </ul>
                 }
-                else { <p class="text-sm text-slate-500">Nenhuma alteração registrada ainda.</p> }
+                else
+                {
+                    @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+                        { "EmptyIllustration", "chart" },
+                        { "EmptyTitle", "Nenhuma atividade registrada" },
+                        { "EmptyDescription", "Edições e alterações do cadastro aparecem aqui." }
+                    })
+                }
+            </div>
+
+            <!-- F10-D: Timeline cross-entidade (entity_alteracoes via AJAX) -->
+            <div x-show="tab === 'timeline'" x-cloak class="p-4"
+                 x-init="$watch('tab', v => { if (v === 'timeline') loadTimeline(); })">
+                <div id="timeline-content">
+                    <p class="text-sm text-slate-500">Carregando timeline...</p>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function loadTimeline() {
+    var el = document.getElementById('timeline-content');
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = '1';
+    fetch('/api/audit/client-timeline/@c.Id')
+        .then(r => r.json())
+        .then(res => {
+            var items = (res.data && res.data.items) || [];
+            if (items.length === 0) {
+                el.innerHTML = '<p class="text-sm text-slate-500">Nenhuma atividade cross-entidade registrada.</p>';
+                return;
+            }
+            var html = '<ul class="divide-y divide-slate-100">';
+            items.forEach(function(a) {
+                var dt = new Date(a.alteradoEm);
+                var fmt = dt.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' ' +
+                          dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+                var icon = a.tipoEntidade === 'Pedido' ? '📋' : a.tipoEntidade === 'PedidoPagamento' ? '💳' : '👤';
+                html += '<li class="py-2 text-sm">';
+                html += '<div class="flex items-center gap-2 flex-wrap">';
+                html += '<span class="text-xs text-slate-400 font-mono">' + fmt + '</span>';
+                html += '<span>' + icon + '</span>';
+                html += '<span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">' + escHtml(a.tipoEntidade) + '</span>';
+                html += '<span class="font-medium text-slate-900">' + escHtml(a.acao) + '</span>';
+                if (a.campo) html += '<span class="text-xs text-slate-600">' + escHtml(a.campo) + '</span>';
+                if (a.valorAntigo != null || a.valorNovo != null) {
+                    html += '<span class="text-xs text-slate-500">';
+                    if (a.valorAntigo != null) html += '<del class="text-red-400">' + escHtml(trunc(a.valorAntigo, 40)) + '</del> ';
+                    if (a.valorNovo != null) html += '<ins class="text-green-600 no-underline">' + escHtml(trunc(a.valorNovo, 40)) + '</ins>';
+                    html += '</span>';
+                }
+                if (a.origem) html += '<span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">' + escHtml(a.origem) + '</span>';
+                html += '</div>';
+                if (a.alteradoPorNome) html += '<div class="text-xs text-slate-400 ml-2">por ' + escHtml(a.alteradoPorNome) + '</div>';
+                html += '</li>';
+            });
+            html += '</ul>';
+            if (res.data.total > 50) html += '<p class="text-xs text-slate-400 mt-2">Mostrando 50 de ' + res.data.total + '.</p>';
+            el.innerHTML = html;
+        })
+        .catch(function() { el.innerHTML = '<p class="text-sm text-red-500">Erro ao carregar timeline.</p>'; });
+}
+function escHtml(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '...' : s; }
+</script>

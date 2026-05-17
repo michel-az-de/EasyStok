@@ -15,6 +15,7 @@ namespace EasyStock.Domain.Enums
         AnexoRemovido,
         BugFixGerado,
         ClienteRevelado,
-        Comentario
+        Comentario,
+        AvaliacaoCsat
     }
 }
