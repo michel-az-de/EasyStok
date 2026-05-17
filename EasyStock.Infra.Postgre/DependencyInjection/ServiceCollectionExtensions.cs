@@ -1,7 +1,9 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
@@ -30,6 +32,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             connectionString = EnsurePoolLimits(connectionString, configuration);
 
             services.AddSingleton<AuditTimestampsInterceptor>();
+            services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
+            services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
             services.AddScoped<EntityChangeInterceptor>();
             services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
@@ -44,6 +48,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 })
                 .AddInterceptors(
                     sp.GetRequiredService<AuditTimestampsInterceptor>(),
+                    sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>(),
                     sp.GetRequiredService<EntityChangeInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());

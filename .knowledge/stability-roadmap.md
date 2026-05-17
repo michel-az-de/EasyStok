@@ -50,7 +50,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 ## Bloco 5 — Tech debt que vira incidente (P1)
 
 - [ ] **Decisão `Infra.MongoDb`**: mata ou alinha. Hoje código parcial divergente do Postgre, com fallback exótico em transação que vai dar bug em prod.
-- [ ] **Cache no `SubscriptionGateMiddleware`**: bate no DB toda request autenticada. Em escala = latência cumulativa.
+- [x] **Cache no `SubscriptionGateMiddleware`** — 2026-05-07. `ISubscriptionStatusCache` (IMemoryCache, TTL 60s, `Cache:SubscriptionStatusDuration` configurável) + `AssinaturaCacheInvalidationInterceptor` (EF SaveChangesInterceptor) invalidando o tenant após qualquer mutação em `AssinaturaEmpresa`. Snapshot imutável `SubscriptionStatusSnapshot` evita cachear entidade rastreada cross-request.
 - [ ] **Auditoria de `Math.Round`/`Quantidade`** em todas movimentações: transferência, devolução, ajuste, inventário (já fixado em saída de pedido).
 - [ ] **Idempotência de webhook duplicado**: Efí pode mandar 2x simultâneo dentro da janela de replay (5 min) — race condition possível em `ProcessarPagamentoAsync`.
 
