@@ -213,8 +213,11 @@ Pendencias documentadas para sessoes futuras:
 - 2 dirs fisicos travados em .claude/worktrees/ (process lock)
 - Warning CS8602 SyncController.cs:903 (pequeno)
 
-PR aberto sem decisao: PR #99 (NotaFiscal* vs Nfe* em master).
-ADR-0018 pendente.
+Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018 (Aceito, 2026-05-17).
+Master mantem Nfe* em codigo + "Nota Fiscal" em UI + "notas-fiscais" em REST.
+PR #99 fechado como superseded (ver ADR-0018).
+
+Plano avanco NF: docs/plan/nota-fiscal/00-README.md
 
 Branch backup de seguranca: backup/master-pre-fase1-2026-05-16
 
