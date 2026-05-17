@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  build-and-test:
+    name: Build + dotnet test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore EasyStok.CI.slnf
+
+      - name: Build
+        run: dotnet build EasyStok.CI.slnf -c Release --no-restore -warnaserror
+
+      - name: Test
+        run: >-
+          dotnet test EasyStok.CI.slnf
+          -c Release --no-build --no-restore
+          --logger "trx;LogFileName=test-results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults/**/*.trx
+          retention-days: 14
+
+      - name: Open helpdesk ticket on failure
+        if: failure() && env.CI_TICKETS_API_URL != ''
+        env:
+          CI_TICKETS_API_URL: ${{ secrets.CI_TICKETS_API_URL }}
+          CI_AUTO_TICKET_KEY: ${{ secrets.CI_AUTO_TICKET_KEY }}
+        run: |
+          # Auto-ticket em falha de CI. Signature deterministico (run_id + ref)
+          # garante idempotencia diaria — re-trigger do mesmo workflow nao
+          # multiplica tickets. /api/ci/tickets coalesca como comentario.
+          SIG=$(echo -n "ci-${GITHUB_RUN_ID}-${GITHUB_REF}" | sha256sum | awk '{print $1}')
+          # Anexa ultimas 80 linhas do test results (best-effort)
+          CONTEXTO=$(find ./TestResults -name '*.trx' -print0 \
+            | xargs -0 grep -h '<Message>' 2>/dev/null \
+            | tail -n 80 \
+            | sed 's/"/\\"/g' \
+            | tr -d '\r' \
+            | awk '{printf "%s\\n", $0}' \
+            || echo "(sem trx)")
+          curl -sS -X POST "${CI_TICKETS_API_URL}/api/ci/tickets" \
+            -H "Content-Type: application/json" \
+            -H "X-Ci-Key: ${CI_AUTO_TICKET_KEY}" \
+            -d "{
+              \"origin\": \"ci\",
+              \"signature\": \"${SIG}\",
+              \"titulo\": \"CI falhou em ${GITHUB_REF_NAME} (${GITHUB_RUN_ID})\",
+              \"descricao\": \"Run ${GITHUB_RUN_ID} falhou no commit ${GITHUB_SHA}\",
+              \"contexto\": \"${CONTEXTO}\"
+            }" || echo "(auto-ticket falhou — checar manualmente)"

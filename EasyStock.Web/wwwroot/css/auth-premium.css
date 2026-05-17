@@ -1,0 +1,1154 @@
+/* EasyStok — Auth Premium
+   Vocabulario visual compartilhado pelas 5 telas auth Web (Login, Registrar,
+   EsqueciSenha, RedefinirSenha) + modal de logout.
+   Identidade: navy + laranja, com glassmorphism, orbs, HUD bracket, shimmer.
+   Reaproveita tokens de tokens.css (--orange-600, --navy-700, etc).
+*/
+
+/* =========================================================================
+   1. Layout split-screen
+   ========================================================================= */
+
+.auth-prem-shell {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: stretch;
+    overflow: hidden;
+    isolation: isolate;
+    background:
+        radial-gradient(ellipse 75% 55% at 75% 0%, rgba(244, 121, 32, 0.13) 0%, transparent 55%),
+        radial-gradient(ellipse 55% 65% at 0% 100%, rgba(79, 191, 159, 0.07) 0%, transparent 55%),
+        linear-gradient(160deg, #0E2A6E 0%, #06143A 50%, #02081f 100%);
+}
+
+.auth-prem-layout {
+    position: relative;
+    z-index: 1;
+    margin: auto;
+    width: 100%;
+    max-width: 1180px;
+    border-radius: 28px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    box-shadow: 0 32px 80px -16px rgba(6, 20, 58, 0.55),
+                0 0 0 1px rgba(255, 255, 255, 0.12),
+                0 0 60px -20px rgba(244, 121, 32, 0.08);
+}
+
+.auth-prem-brand {
+    position: relative;
+    overflow: hidden;
+    padding: 56px 48px 48px;
+    color: #F7F2E8;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 32px;
+    background:
+        radial-gradient(ellipse 90% 60% at 0% 100%, rgba(244, 121, 32, 0.22) 0%, transparent 60%),
+        radial-gradient(ellipse 70% 80% at 100% 0%, rgba(30, 72, 168, 0.45) 0%, transparent 60%),
+        linear-gradient(160deg, #0E2A6E 0%, #06143A 60%, #02081f 100%);
+    min-height: 600px;
+}
+
+.auth-prem-panel {
+    position: relative;
+    padding: 56px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--white);
+}
+
+[data-theme="dark"] .auth-prem-panel {
+    background: rgba(6, 20, 58, 0.42);
+}
+
+/* Mobile: brand panel desaparece, panel cobre tudo */
+@media (max-width: 960px) {
+    .auth-prem-layout {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        border-radius: 22px;
+    }
+    .auth-prem-brand {
+        display: none;
+    }
+    .auth-prem-panel {
+        padding: 36px 24px;
+        background: transparent;
+    }
+}
+
+/* =========================================================================
+   2. Background ambient (orbs + grid sutil no panel direito)
+   ========================================================================= */
+
+.auth-prem-brand::before {
+    content: '';
+    position: absolute;
+    top: -25%;
+    left: -15%;
+    width: 520px;
+    height: 520px;
+    background: radial-gradient(circle, rgba(244, 121, 32, 0.18) 0%, transparent 65%);
+    border-radius: 50%;
+    filter: blur(38px);
+    animation: authprem-orb-drift 24s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.auth-prem-brand::after {
+    content: '';
+    position: absolute;
+    bottom: -20%;
+    right: -10%;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(30, 72, 168, 0.35) 0%, transparent 65%);
+    border-radius: 50%;
+    filter: blur(48px);
+    animation: authprem-orb-drift 32s ease-in-out infinite reverse;
+    pointer-events: none;
+}
+
+@keyframes authprem-orb-drift {
+    0%, 100% { transform: translate(0, 0); }
+    33%      { transform: translate(18vw, 12vh); }
+    66%      { transform: translate(28vw, -8vh); }
+}
+
+.auth-prem-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(14, 42, 110, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 42, 110, 0.04) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 100% 70% at 50% 40%, black 0%, transparent 75%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+[data-theme="dark"] .auth-prem-panel::before {
+    background-image:
+        linear-gradient(rgba(247, 242, 232, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(247, 242, 232, 0.04) 1px, transparent 1px);
+}
+
+.auth-prem-panel > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* =========================================================================
+   3. Cube orbital (logo flutuante com aneis)
+   ========================================================================= */
+
+.auth-prem-cube {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    flex-shrink: 0;
+}
+
+.auth-prem-cube svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 60px;
+    height: 60px;
+    filter: drop-shadow(0 8px 24px rgba(244, 121, 32, 0.4));
+    animation: authprem-cube-float 4s ease-in-out infinite;
+    z-index: 2;
+}
+
+.auth-prem-cube::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1.5px solid rgba(244, 121, 32, 0.55);
+    border-radius: 50%;
+    border-top-color: transparent;
+    border-right-color: transparent;
+    animation: authprem-spin 6s linear infinite;
+}
+
+.auth-prem-cube::after {
+    content: '';
+    position: absolute;
+    inset: 10px;
+    border: 1px dashed rgba(220, 228, 242, 0.28);
+    border-radius: 50%;
+    animation: authprem-spin 14s linear infinite reverse;
+}
+
+@keyframes authprem-cube-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+}
+
+@keyframes authprem-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Wordmark no brand (alinha com cube) */
+.auth-prem-wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 28px;
+}
+
+.auth-prem-wordmark-text {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: 36px;
+    letter-spacing: -0.02em;
+    color: #fff;
+    line-height: 1;
+}
+.auth-prem-wordmark-text .stok { color: #F26B25; }
+
+/* =========================================================================
+   4. Glass card com border luminoso animado
+   ========================================================================= */
+
+.auth-prem-card {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 38px 36px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 253, 0.99) 100%);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(14, 42, 110, 0.12);
+    box-shadow:
+        0 24px 60px -12px rgba(6, 20, 58, 0.30),
+        0 0 0 1px rgba(14, 42, 110, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    overflow: hidden;
+}
+
+[data-theme="dark"] .auth-prem-card {
+    background: linear-gradient(135deg, rgba(14, 42, 110, 0.82) 0%, rgba(10, 31, 82, 0.92) 100%);
+    border-color: rgba(247, 242, 232, 0.18);
+    box-shadow:
+        0 24px 60px -8px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(247, 242, 232, 0.14),
+        inset 0 1px 0 rgba(247, 242, 232, 0.10);
+}
+
+.auth-prem-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14%;
+    right: 14%;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(232, 88, 20, 0.65) 30%,
+        rgba(232, 88, 20, 0.65) 70%,
+        transparent 100%);
+    animation: authprem-glow-line 3s ease-in-out infinite;
+}
+
+@keyframes authprem-glow-line {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 1; }
+}
+
+.auth-prem-card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+}
+
+.auth-prem-card-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 24px;
+}
+
+/* =========================================================================
+   5. Inputs HUD com bracket lateral
+   ========================================================================= */
+
+.auth-prem-field {
+    position: relative;
+    margin-bottom: 18px;
+}
+
+.auth-prem-field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    transition: color 0.25s ease;
+}
+
+.auth-prem-field:focus-within .auth-prem-field-label {
+    color: var(--orange-600);
+}
+
+.auth-prem-field::before {
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 28px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--orange-600);
+    border-radius: 2px;
+    opacity: 0;
+    transform: scaleY(0.4);
+    transform-origin: center;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    box-shadow: 0 0 8px rgba(232, 88, 20, 0.6);
+    pointer-events: none;
+}
+
+.auth-prem-field:focus-within::before {
+    opacity: 1;
+    transform: scaleY(1);
+}
+
+.auth-prem-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(14, 42, 110, 0.12);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+}
+
+.auth-prem-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.auth-prem-input:focus {
+    border-color: var(--orange-600);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow:
+        0 0 0 3px rgba(232, 88, 20, 0.16),
+        inset 0 0 18px rgba(232, 88, 20, 0.04);
+}
+
+.auth-prem-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+[data-theme="dark"] .auth-prem-input {
+    background: rgba(2, 8, 31, 0.55);
+    border-color: rgba(247, 242, 232, 0.14);
+    color: #F1F5F9;
+}
+
+[data-theme="dark"] .auth-prem-input::placeholder {
+    color: rgba(247, 242, 232, 0.42);
+}
+
+[data-theme="dark"] .auth-prem-input:focus {
+    background: rgba(2, 8, 31, 0.82);
+    border-color: var(--orange-600);
+    box-shadow:
+        0 0 0 3px rgba(232, 88, 20, 0.22),
+        inset 0 0 18px rgba(232, 88, 20, 0.06);
+}
+
+.auth-prem-input-wrap {
+    position: relative;
+}
+
+.auth-prem-input--with-icon-right {
+    padding-right: 44px;
+}
+
+.auth-prem-icon-btn {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.auth-prem-icon-btn:hover {
+    color: var(--text-primary);
+    background: rgba(14, 42, 110, 0.06);
+}
+
+.auth-prem-icon-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(232, 88, 20, 0.4);
+    color: var(--orange-600);
+}
+
+[data-theme="dark"] .auth-prem-icon-btn:hover {
+    background: rgba(247, 242, 232, 0.08);
+}
+
+.auth-prem-field-error {
+    display: block;
+    font-size: 12px;
+    color: var(--crit-600);
+    margin-top: 6px;
+    min-height: 1em;
+}
+
+.auth-prem-field-help {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* =========================================================================
+   6. Botao premium com shimmer + seta
+   ========================================================================= */
+
+.auth-prem-launch {
+    position: relative;
+    width: 100%;
+    background: linear-gradient(135deg, #F47920 0%, #E85814 100%);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
+    box-shadow:
+        0 10px 24px -6px rgba(232, 88, 20, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    font-family: var(--font-sans);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.auth-prem-launch::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.28) 50%, transparent 100%);
+    transition: left 0.6s ease;
+    pointer-events: none;
+}
+
+.auth-prem-launch:hover:not(:disabled)::before {
+    left: 100%;
+}
+
+.auth-prem-launch:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+        0 14px 32px -6px rgba(232, 88, 20, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.auth-prem-launch:active:not(:disabled) {
+    transform: translateY(0) scale(0.99);
+}
+
+.auth-prem-launch:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.auth-prem-launch:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 3px var(--bg-app),
+        0 0 0 5px var(--orange-600),
+        0 10px 24px -6px rgba(232, 88, 20, 0.45);
+}
+
+.auth-prem-launch .auth-prem-launch-arrow {
+    transition: transform 0.2s ease;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.auth-prem-launch:hover:not(:disabled) .auth-prem-launch-arrow {
+    transform: translateX(3px);
+}
+
+.auth-prem-launch[aria-busy="true"] .auth-prem-launch-arrow,
+.auth-prem-launch:disabled .auth-prem-launch-arrow {
+    display: none;
+}
+
+.auth-prem-launch-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    animation: authprem-spin 0.8s linear infinite;
+}
+
+/* =========================================================================
+   7. Stepped loading overlay
+   ========================================================================= */
+
+.auth-prem-loading {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(180deg, #06143A 0%, #02081f 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+.auth-prem-loading.is-active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.auth-prem-loading::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(247, 242, 232, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(247, 242, 232, 0.04) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.auth-prem-loading-inner {
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.auth-prem-loading-cube {
+    width: 84px;
+    height: 84px;
+    margin: 0 auto 28px;
+    animation: authprem-cube-spin 2s ease-in-out infinite;
+}
+
+.auth-prem-loading-cube svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 20px rgba(244, 121, 32, 0.55));
+}
+
+@keyframes authprem-cube-spin {
+    0%   { transform: rotateY(0) rotateX(0); }
+    50%  { transform: rotateY(180deg) rotateX(12deg); }
+    100% { transform: rotateY(360deg) rotateX(0); }
+}
+
+.auth-prem-loading-steps {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: rgba(247, 242, 232, 0.72);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    min-height: 24px;
+}
+
+.auth-prem-loading-step {
+    display: block;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    line-height: 1.9;
+}
+
+.auth-prem-loading-step.is-show { opacity: 1; transform: translateY(0); }
+
+.auth-prem-loading-step.is-done::before {
+    content: '✓ ';
+    color: #4FBF9F;
+    font-weight: 700;
+}
+
+.auth-prem-loading-step.is-active::before {
+    content: '▸ ';
+    color: var(--orange-500);
+    animation: authprem-blink 1s steps(2) infinite;
+}
+
+@keyframes authprem-blink {
+    50% { opacity: 0.3; }
+}
+
+.auth-prem-loading-bar {
+    position: absolute;
+    bottom: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    height: 2px;
+    background: rgba(247, 242, 232, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.auth-prem-loading-bar::before {
+    content: '';
+    display: block;
+    width: 30%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--orange-500), transparent);
+    animation: authprem-bar-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes authprem-bar-slide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+
+/* =========================================================================
+   8. Indicador de forca da senha
+   ========================================================================= */
+
+.auth-prem-strength {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.auth-prem-strength-bar {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(14, 42, 110, 0.12);
+    transition: background 0.2s ease;
+}
+
+[data-theme="dark"] .auth-prem-strength-bar {
+    background: rgba(247, 242, 232, 0.10);
+}
+
+.auth-prem-strength[data-level="1"] .auth-prem-strength-bar:nth-child(-n+1) { background: var(--crit-600); }
+.auth-prem-strength[data-level="2"] .auth-prem-strength-bar:nth-child(-n+2) { background: var(--warn-600); }
+.auth-prem-strength[data-level="3"] .auth-prem-strength-bar:nth-child(-n+3) { background: var(--ok-600); }
+.auth-prem-strength[data-level="4"] .auth-prem-strength-bar:nth-child(-n+4) { background: var(--orange-600); }
+
+.auth-prem-strength-label {
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 6px;
+    color: var(--text-muted);
+}
+.auth-prem-strength-label[data-level="1"] { color: var(--crit-600); }
+.auth-prem-strength-label[data-level="2"] { color: var(--warn-700); }
+.auth-prem-strength-label[data-level="3"] { color: var(--ok-700); }
+.auth-prem-strength-label[data-level="4"] { color: var(--orange-700); }
+
+[data-theme="dark"] .auth-prem-strength-label[data-level="2"] { color: #FCD34D; }
+[data-theme="dark"] .auth-prem-strength-label[data-level="3"] { color: #86EFAC; }
+
+/* =========================================================================
+   9. Spinner inline (validacao async, match check)
+   ========================================================================= */
+
+.auth-prem-spinner-inline {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(14, 42, 110, 0.15);
+    border-top-color: var(--orange-600);
+    animation: authprem-spin 0.8s linear infinite;
+    pointer-events: none;
+}
+
+.auth-prem-input-check {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%) scale(0);
+    opacity: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--ok-600);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s cubic-bezier(.18, .89, .32, 1.4), opacity 0.2s ease;
+    pointer-events: none;
+}
+.auth-prem-input-check.is-show { transform: translateY(-50%) scale(1); opacity: 1; }
+
+/* Avisos inline (email disponivel/em uso, senha bate) */
+.auth-prem-inline-feedback {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    margin-top: 6px;
+    font-weight: 500;
+}
+.auth-prem-inline-feedback--ok    { color: var(--ok-700); }
+.auth-prem-inline-feedback--err   { color: var(--crit-600); }
+[data-theme="dark"] .auth-prem-inline-feedback--ok  { color: #86EFAC; }
+[data-theme="dark"] .auth-prem-inline-feedback--err { color: #FCA5A5; }
+
+/* =========================================================================
+   10. Typed effect helper
+   ========================================================================= */
+
+.auth-prem-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 18px;
+    min-height: 16px;
+}
+
+.auth-prem-cursor {
+    display: inline-block;
+    opacity: 0.7;
+    animation: authprem-blink 1s steps(2) infinite;
+}
+
+.auth-prem-headline {
+    font-family: var(--font-sans);
+    font-weight: 800;
+    font-size: clamp(28px, 3.2vw, 40px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    color: #fff;
+    max-width: 460px;
+    margin: 0 0 14px;
+    text-wrap: balance;
+}
+
+.auth-prem-lede {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 480px;
+    margin: 0;
+    text-wrap: pretty;
+}
+
+.auth-prem-bullets {
+    display: grid;
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.auth-prem-bullet {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.auth-prem-bullet-mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 8px;
+    background: rgba(232, 88, 20, 0.25);
+    color: #FFB084;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.auth-prem-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.auth-prem-mini-card {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 14px 16px;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.auth-prem-mini-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(244, 121, 32, 0.4);
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.auth-prem-mini-card-title {
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.auth-prem-mini-card-desc {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+/* =========================================================================
+   11. Modal logout (Alpine)
+   ========================================================================= */
+
+.auth-prem-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 20, 58, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    animation: authprem-backdrop-in 180ms ease both;
+}
+
+@keyframes authprem-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.auth-prem-modal {
+    width: 100%;
+    max-width: 380px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-radius: 18px;
+    padding: 28px 26px 22px;
+    box-shadow:
+        0 24px 60px -16px rgba(6, 20, 58, 0.45),
+        0 0 0 1px var(--border-soft);
+    text-align: center;
+    animation: authprem-modal-in 220ms cubic-bezier(.18, .89, .32, 1.15) both;
+}
+
+@keyframes authprem-modal-in {
+    from { opacity: 0; transform: scale(0.92) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.auth-prem-modal-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(192, 59, 42, 0.10);
+    color: var(--crit-600);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+}
+
+[data-theme="dark"] .auth-prem-modal-icon {
+    background: rgba(248, 113, 113, 0.16);
+    color: #FCA5A5;
+}
+
+.auth-prem-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+}
+
+.auth-prem-modal-text {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 22px;
+    line-height: 1.5;
+}
+
+.auth-prem-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: stretch;
+}
+
+.auth-prem-modal-btn {
+    flex: 1;
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.08s;
+}
+
+.auth-prem-modal-btn:active { transform: translateY(1px); }
+
+.auth-prem-modal-btn--ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border-strong);
+}
+.auth-prem-modal-btn--ghost:hover {
+    background: var(--ink-100);
+    color: var(--text-primary);
+}
+.auth-prem-modal-btn--ghost:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(14, 42, 110, 0.2);
+}
+
+.auth-prem-modal-btn--danger {
+    background: var(--crit-600);
+    color: #fff;
+}
+.auth-prem-modal-btn--danger:hover { background: #A0301F; }
+.auth-prem-modal-btn--danger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(192, 59, 42, 0.3);
+}
+
+/* =========================================================================
+   12. Helpers comuns
+   ========================================================================= */
+
+.auth-prem-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    margin-bottom: 16px;
+    line-height: 1.45;
+}
+
+.auth-prem-alert-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+}
+
+.auth-prem-alert--warn {
+    background: var(--warn-50);
+    color: var(--warn-700);
+    border: 1px solid var(--warn-200);
+}
+.auth-prem-alert--error {
+    background: var(--crit-50);
+    color: var(--crit-700);
+    border: 1px solid var(--crit-200);
+}
+.auth-prem-alert--info {
+    background: var(--navy-50);
+    color: var(--navy-700);
+    border: 1px solid var(--navy-200);
+}
+.auth-prem-alert--ok {
+    background: var(--ok-50);
+    color: var(--ok-700);
+    border: 1px solid var(--ok-200);
+}
+
+[data-theme="dark"] .auth-prem-alert--warn {
+    background: rgba(120, 53, 15, 0.25);
+    color: #FCD34D;
+    border-color: rgba(217, 119, 6, 0.35);
+}
+[data-theme="dark"] .auth-prem-alert--error {
+    background: rgba(127, 29, 29, 0.22);
+    color: #FCA5A5;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+[data-theme="dark"] .auth-prem-alert--info {
+    background: rgba(14, 42, 110, 0.28);
+    color: #BCC8E5;
+    border-color: rgba(30, 72, 168, 0.4);
+}
+[data-theme="dark"] .auth-prem-alert--ok {
+    background: rgba(14, 107, 61, 0.22);
+    color: #86EFAC;
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.auth-prem-link {
+    color: var(--orange-700);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.auth-prem-link:hover { color: var(--orange-900); text-decoration: underline; }
+[data-theme="dark"] .auth-prem-link { color: var(--orange-400); }
+[data-theme="dark"] .auth-prem-link:hover { color: var(--orange-200); }
+
+.auth-prem-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.auth-prem-check input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.auth-prem-check-indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: var(--bg-surface);
+    border: 1.5px solid var(--border-strong);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.auth-prem-check input:checked + .auth-prem-check-indicator {
+    background: var(--orange-600);
+    border-color: var(--orange-600);
+    color: #fff;
+}
+
+.auth-prem-check input:focus-visible + .auth-prem-check-indicator {
+    box-shadow: 0 0 0 3px rgba(232, 88, 20, 0.25);
+}
+
+.auth-prem-footer {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 18px;
+}
+
+.auth-prem-brand-bottom {
+    position: relative;
+    z-index: 1;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 20px;
+}
+
+/* Entrada faseada do card e brand */
+.auth-prem-enter        { animation: authprem-enter 0.55s cubic-bezier(.18, .89, .32, 1.15) both; }
+.auth-prem-enter-2      { animation: authprem-enter 0.55s 0.08s cubic-bezier(.18, .89, .32, 1.15) both; }
+.auth-prem-enter-3      { animation: authprem-enter 0.55s 0.15s cubic-bezier(.18, .89, .32, 1.15) both; }
+
+@keyframes authprem-enter {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* CapsLock badge */
+.auth-prem-caps {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--warn-700);
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--warn-50);
+    border: 1px solid var(--warn-200);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+.auth-prem-caps.is-show { opacity: 1; transform: none; }
+
+[data-theme="dark"] .auth-prem-caps {
+    background: rgba(120, 53, 15, 0.32);
+    color: #FCD34D;
+    border-color: rgba(217, 119, 6, 0.35);
+}
+
+/* =========================================================================
+   13. Reduced motion overrides
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-prem-brand::before,
+    .auth-prem-brand::after,
+    .auth-prem-cube svg,
+    .auth-prem-cube::before,
+    .auth-prem-cube::after,
+    .auth-prem-card::before,
+    .auth-prem-loading-cube,
+    .auth-prem-loading-bar::before,
+    .auth-prem-cursor,
+    .auth-prem-loading-step.is-active::before {
+        animation: none !important;
+    }
+    .auth-prem-cube svg { transform: none !important; }
+    .auth-prem-launch::before { transition: none !important; }
+    .auth-prem-launch:hover:not(:disabled) { transform: none !important; }
+    .auth-prem-enter,
+    .auth-prem-enter-2,
+    .auth-prem-enter-3 {
+        animation-duration: 0.01ms !important;
+    }
+}

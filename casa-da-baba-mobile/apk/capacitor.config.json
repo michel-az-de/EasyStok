@@ -13,8 +13,9 @@
   },
   "plugins": {
     "CapacitorUpdater": {
-      "autoUpdate": false,
-      "updateUrl": "https://ashy-pebble-0a13dc11e.7.azurestaticapps.net/api/updates",
+      "autoUpdate": true,
+      "updateUrl": "https://easystok-api.onrender.com/api/mobile/apk/manifest?appId=casa-da-baba",
+      "statsUrl": "",
       "directUpdate": "never",
       "responseTimeout": 20,
       "appReadyTimeout": 30000,

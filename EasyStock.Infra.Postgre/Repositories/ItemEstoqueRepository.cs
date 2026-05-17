@@ -135,17 +135,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
 
-            // Filtrar por status se fornecido
             if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
-            {
                 query = query.Where(i => i.Status == statusEnum);
-            }
+
+            if (categoriaId.HasValue)
+                query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -157,6 +157,23 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
             return (items, totalCount);
+        }
+
+        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+        {
+            var query = dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId);
+
+            if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
+                query = query.Where(i => i.Status == statusEnum);
+
+            if (categoriaId.HasValue)
+                query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
+
+            var cadastrados = await query.CountAsync();
+            var comSaldo = await query.CountAsync(i => (int)i.QuantidadeAtual > 0);
+            return (cadastrados, comSaldo);
         }
 
         public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)
@@ -190,6 +207,31 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId)
                 .OrderByDescending(i => i.EntradaEm)
                 .ToListAsync();
+
+        public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(
+            Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default)
+        {
+            var ids = produtoIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>>();
+
+            var query = dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && ids.Contains(i.ProdutoId));
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
+
+            var todos = await query
+                .OrderByDescending(i => i.EntradaEm)
+                .ToListAsync(ct);
+
+            return todos
+                .GroupBy(i => i.ProdutoId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
+        }
 
         public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
         {

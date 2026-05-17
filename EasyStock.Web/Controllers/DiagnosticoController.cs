@@ -12,7 +12,7 @@ namespace EasyStock.Web.Controllers;
 /// </summary>
 public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : Controller
 {
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [HttpGet]
     [Route("diagnostico")]
     public async Task<IActionResult> Index()
@@ -87,7 +87,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/limpar")]
@@ -99,7 +99,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [HttpGet]
     [Route("diagnostico/api/logs/exportar")]
     public async Task<IActionResult> ProxyExportarLogs([FromQuery] int hours = 48)
@@ -111,7 +111,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return File(stream, "text/plain; charset=utf-8", fileName ?? $"easystock-logs-{DateTime.UtcNow:yyyyMMdd-HHmm}.log");
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/salvar-storage")]
@@ -125,7 +125,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
 
     // ── Novos proxies ──────────────────────────────────────────────────────
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [HttpGet]
     [Route("diagnostico/api/logs/lixeira")]
     public async Task<IActionResult> ProxyLixeira()
@@ -135,7 +135,7 @@ public class DiagnosticoController(DiagnosticoWebService diagnosticoService) : C
         return base.Json(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     [IgnoreAntiforgeryToken]
     [HttpPost]
     [Route("diagnostico/api/logs/lixeira/esvaziar")]

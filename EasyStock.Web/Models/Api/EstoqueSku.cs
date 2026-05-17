@@ -16,6 +16,6 @@ public record EstoqueSku
     public required string Status { get; init; }
     public DinheiroDto? CustoUnitario { get; init; }
     public DinheiroDto? PrecoVendaSugerido { get; init; }
-    public Produto? Produto { get; init; }
+    public ProdutoResumoApi? Produto { get; init; }
     public Variacao? Variacao { get; init; }
 }

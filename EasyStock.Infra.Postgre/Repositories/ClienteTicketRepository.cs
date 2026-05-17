@@ -61,5 +61,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             db.AdminTickets.Update(ticket);
             return Task.CompletedTask;
         }
+
+        public async Task AddHistoricoAsync(TicketHistorico historico)
+        {
+            await db.TicketHistoricos.AddAsync(historico);
+        }
     }
 }

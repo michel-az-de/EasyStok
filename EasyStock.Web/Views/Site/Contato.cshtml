@@ -3,7 +3,7 @@
 @{
     Layout = "_LayoutSite";
     ViewBag.Title = "Fale com a gente";
-    ViewBag.Description = "Duvida, parceria, suporte: a gente responde em ate 1 dia util.";
+    ViewBag.Description = "Dúvida, parceria, suporte: a gente responde em até 1 dia útil.";
     var marketing = MarketingOpts.Value;
 }
 
@@ -11,8 +11,8 @@
     <div class="site-container">
         <div class="site-section-h">
             <span class="eyebrow">Fale com a gente</span>
-            <h2>Sem formulario de 12 campos. <span class="hl">Direto ao ponto.</span></h2>
-            <p>A gente responde em ate 1 dia util. Se for urgente, fala no <a href="@marketing.LinkWhatsApp" target="_blank" rel="noopener noreferrer" style="color:var(--orange-600);font-weight:600">WhatsApp</a>.</p>
+            <h2>Sem formulário de 12 campos. <span class="hl">Direto ao ponto.</span></h2>
+            <p>A gente responde em até 1 dia útil. Se for urgente, fala no <a href="@marketing.LinkWhatsApp" target="_blank" rel="noopener noreferrer" style="color:var(--orange-600);font-weight:600">WhatsApp</a>.</p>
         </div>
 
         <form asp-controller="Site" asp-action="Contato" method="post" class="site-form" novalidate>
@@ -42,27 +42,27 @@
                     <span asp-validation-for="Empresa" class="site-form-error"></span>
                 </div>
                 <div class="site-form-field" style="grid-column:1/-1">
-                    <label asp-for="TipoNegocio">Tipo de negocio (opcional)</label>
+                    <label asp-for="TipoNegocio">Tipo de negócio (opcional)</label>
                     <select asp-for="TipoNegocio">
                         <option value="">Escolha...</option>
                         <option value="Marmitaria">Marmitaria</option>
-                        <option value="Cafe">Cafe / cafeteria</option>
+                        <option value="Cafe">Café / cafeteria</option>
                         <option value="Hamburgueria">Hamburgueria</option>
                         <option value="Pizzaria">Pizzaria</option>
                         <option value="DarkKitchen">Dark kitchen</option>
                         <option value="Restaurante">Restaurante</option>
-                        <option value="Conveniencia">Conveniencia</option>
+                        <option value="Conveniencia">Conveniência</option>
                         <option value="Outro">Outro</option>
                     </select>
                 </div>
                 <div class="site-form-field" style="grid-column:1/-1">
                     <label asp-for="Mensagem">Mensagem</label>
-                    <textarea asp-for="Mensagem" required maxlength="2000" placeholder="Conta um pouco do seu cenario, da operacao, da duvida..."></textarea>
+                    <textarea asp-for="Mensagem" required maxlength="2000" placeholder="Conta um pouco do seu cenário, da operação, da dúvida..."></textarea>
                     <span asp-validation-for="Mensagem" class="site-form-error"></span>
                 </div>
             </div>
 
-            @* Honeypot: bots preenchem; humanos nao veem (CSS .site-honeypot esconde fora do viewport). *@
+            @* Honeypot: bots preenchem; humanos não veem (CSS .site-honeypot esconde fora do viewport). *@
             <input asp-for="Website" type="text" tabindex="-1" autocomplete="off" class="site-honeypot" aria-hidden="true" />
             <input asp-for="UtmSource" type="hidden" />
             <input asp-for="UtmMedium" type="hidden" />
@@ -70,11 +70,11 @@
 
             <label class="site-form-check">
                 <input asp-for="ReceberNewsletter" type="checkbox" />
-                <span>Quero receber novidades do EasyStok no e-mail (sem spam, voce sai quando quiser).</span>
+                <span>Quero receber novidades do EasyStok no e-mail (sem spam, você sai quando quiser).</span>
             </label>
             <label class="site-form-check">
                 <input asp-for="ConsentimentoLgpd" type="checkbox" required />
-                <span>Concordo com a <a href="/privacidade" target="_blank" rel="noopener noreferrer">Politica de Privacidade</a> e autorizo o EasyStok a entrar em contato.</span>
+                <span>Concordo com a <a href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</a> e autorizo o EasyStok a entrar em contato.</span>
             </label>
             <span asp-validation-for="ConsentimentoLgpd" class="site-form-error"></span>
 

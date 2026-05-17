@@ -269,6 +269,90 @@ public static class NotificacoesGlobaisSeed
                 <p>Acesse o painel para detalhes tecnicos.</p>
                 </body></html>
                 """);
+
+        // ===== Templates do módulo de Relatórios (PR-N) =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "relatorio_pronto_inapp_v1",
+            nome: "Relatório Pronto — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.RelatorioPronto,
+            assuntoTemplate: "{{ reportLabel }} está pronto",
+            corpoTemplate: "{{ reportLabel }} está pronto para download.");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "relatorio_pronto_email_v1",
+            nome: "Relatório Pronto — Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.RelatorioPronto,
+            assuntoTemplate: "Seu relatório está pronto: {{ reportLabel }}",
+            corpoTemplate: """
+                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
+                <h2 style="color:#4f46e5">Seu relatório está pronto</h2>
+                <p>Olá, <strong>{{ primeiroNome }}</strong>.</p>
+                <p>O relatório <strong>{{ reportLabel }}</strong> foi gerado com sucesso.</p>
+                <p>Formato: {{ format }} | Linhas: {{ rowCount }}</p>
+                <p>Acesse o EasyStock para baixar o arquivo.</p>
+                <p style="color:#6b7280;font-size:12px">O arquivo fica disponível por 30 dias.</p>
+                </body></html>
+                """);
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "relatorio_falhou_inapp_v1",
+            nome: "Relatório Falhou — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.RelatorioFalhou,
+            assuntoTemplate: "Não conseguimos gerar: {{ reportLabel }}",
+            corpoTemplate: "Não conseguimos gerar {{ reportLabel }}. {{ errorMensagem }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "relatorio_falhou_email_v1",
+            nome: "Relatório Falhou — Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.RelatorioFalhou,
+            assuntoTemplate: "Não conseguimos gerar: {{ reportLabel }}",
+            corpoTemplate: """
+                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
+                <h2 style="color:#dc2626">Não conseguimos gerar o relatório</h2>
+                <p>Olá, <strong>{{ primeiroNome }}</strong>.</p>
+                <p>Tentamos gerar o relatório <strong>{{ reportLabel }}</strong>, mas não foi possível.</p>
+                <p>{{ errorMensagem }}</p>
+                <p>Acesse o EasyStock para tentar novamente.</p>
+                <p style="color:#6b7280;font-size:12px">Código: {{ runId }}</p>
+                </body></html>
+                """);
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "relatorio_expirado_inapp_v1",
+            nome: "Relatório Expirado — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.RelatorioExpirado,
+            assuntoTemplate: "Arquivo removido: {{ reportLabel }}",
+            corpoTemplate: "O arquivo do relatório {{ reportLabel }} foi removido após 30 dias. Gere novamente para baixar.");
+
+        // ===== Templates F5 — Agendamento de Pedidos =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_agendado_hoje_inapp_v1",
+            nome: "Pedido agendado hoje — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoAgendadoHoje,
+            assuntoTemplate: "Pedido agendado para hoje",
+            corpoTemplate: "Pedido de {{ clienteNome }} agendado para hoje ({{ scheduledFor }}).");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_agendado_1h_inapp_v1",
+            nome: "Pedido agendado em 1 hora — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoAgendadoEm1Hora,
+            assuntoTemplate: "Pedido em 1 hora",
+            corpoTemplate: "Pedido de {{ clienteNome }} em 1 hora ({{ scheduledFor }}).");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_agendado_10min_inapp_v1",
+            nome: "Pedido agendado em 10 minutos — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoAgendadoEm10Minutos,
+            assuntoTemplate: "Pedido em 10 minutos",
+            corpoTemplate: "Pedido de {{ clienteNome }} em 10 minutos — prepare-se ({{ scheduledFor }}).");
     }
 
     private static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
@@ -345,6 +429,32 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("bug_fix_criado_global", "Bug-fix Encaminhado para Desenvolvimento",
             TipoEventoNotificacao.BugFixCriado, "bug_fix_criado_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\",\"Email\"]");
+
+        // ===== Rotinas do módulo de Relatórios (PR-N) =====
+        yield return MakeRotina("relatorio_pronto_global", "Relatório Pronto",
+            TipoEventoNotificacao.RelatorioPronto, "relatorio_pronto_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\",\"Email\"]");
+
+        yield return MakeRotina("relatorio_falhou_global", "Relatório Falhou",
+            TipoEventoNotificacao.RelatorioFalhou, "relatorio_falhou_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\",\"Email\"]");
+
+        yield return MakeRotina("relatorio_expirado_global", "Relatório Expirado",
+            TipoEventoNotificacao.RelatorioExpirado, "relatorio_expirado_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        // ===== Rotinas F5 — Agendamento de Pedidos =====
+        yield return MakeRotina("pedido_agendado_hoje_global", "Pedido agendado hoje",
+            TipoEventoNotificacao.PedidoAgendadoHoje, "pedido_agendado_hoje_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        yield return MakeRotina("pedido_agendado_1h_global", "Pedido agendado em 1 hora",
+            TipoEventoNotificacao.PedidoAgendadoEm1Hora, "pedido_agendado_1h_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        yield return MakeRotina("pedido_agendado_10min_global", "Pedido agendado em 10 minutos",
+            TipoEventoNotificacao.PedidoAgendadoEm10Minutos, "pedido_agendado_10min_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
     }
 
     private static RotinaNotificacao MakeRotina(

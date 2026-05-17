@@ -19,7 +19,7 @@ public record Movimentacao
     public string? DocumentoReferencia { get; init; }
     public DateTime? EstornadaEm { get; init; }
     public string? MovimentacaoEstornadaId { get; init; }
-    public Produto? Produto { get; init; }
+    public ProdutoResumoApi? Produto { get; init; }
     public Variacao? ProdutoVariacao { get; init; }
 
     // Auditoria de movimentacao (P0-2): quem/de onde/qual dispositivo.
@@ -68,7 +68,7 @@ internal sealed class QuantidadeDtoJsonConverter : JsonConverter<QuantidadeDto>
     {
         if (reader.TokenType == JsonTokenType.Null) return null;
         if (reader.TokenType == JsonTokenType.Number)
-            return new QuantidadeDto { Value = reader.GetInt32() };
+            return new QuantidadeDto { Value = (int)reader.GetDecimal() };
 
         if (reader.TokenType == JsonTokenType.StartObject)
         {
@@ -79,7 +79,7 @@ internal sealed class QuantidadeDtoJsonConverter : JsonConverter<QuantidadeDto>
                     reader.GetString()!.Equals("value", StringComparison.OrdinalIgnoreCase))
                 {
                     reader.Read();
-                    val = reader.GetInt32();
+                    val = (int)reader.GetDecimal();
                 }
             }
             return new QuantidadeDto { Value = val };

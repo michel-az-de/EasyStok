@@ -214,6 +214,12 @@ namespace EasyStock.Domain.Entities
             AtualizarDiasSemMovimentacao(dataReferencia);
             AtualizarPrevisao();
 
+            if (QuantidadeAtual.Value == 0)
+            {
+                Status = StatusItemEstoque.Esgotado;
+                return;
+            }
+
             if (QuantidadeAtual.Value <= QuantidadeCritica)
             {
                 Status = StatusItemEstoque.Critical;

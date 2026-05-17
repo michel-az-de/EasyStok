@@ -35,6 +35,10 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
     public string? OrigemTicketTitulo => Str("origemTicketTitulo");
     public string? FaturaId => Str("faturaId");
     public string? FaturaNumero => Str("faturaNumero");
+    public string? PedidoId => Str("pedidoId");
+    public string? PedidoStatus => Str("pedidoStatus");
+    public string? PedidoClienteNome => Str("pedidoClienteNome");
+    public decimal? PedidoTotal => Decimal("pedidoTotal");
 
     public IEnumerable<JsonElement> Mensagens =>
         TicketData.ValueKind != JsonValueKind.Undefined && TicketData.TryGetProperty("mensagens", out var v)
@@ -65,6 +69,13 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
     private bool Bool(string k) =>
         TicketData.ValueKind != JsonValueKind.Undefined && TicketData.TryGetProperty(k, out var v)
         && v.ValueKind == JsonValueKind.True;
+
+    private decimal? Decimal(string k)
+    {
+        if (TicketData.ValueKind == JsonValueKind.Undefined) return null;
+        if (!TicketData.TryGetProperty(k, out var v) || v.ValueKind == JsonValueKind.Null) return null;
+        return v.TryGetDecimal(out var d) ? d : null;
+    }
 
     private DateTime? Date(string k)
     {

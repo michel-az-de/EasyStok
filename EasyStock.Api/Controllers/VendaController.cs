@@ -59,7 +59,7 @@ public class VendaController(
         Guid? ProdutoVariacaoId,
         string? DescricaoSnapshot,
         string? VariacaoSnapshot,
-        int Quantidade,
+        decimal Quantidade,
         decimal PrecoUnitario,
         decimal PrecoTotal,
         DateTime CriadoEm);
@@ -96,7 +96,7 @@ public class VendaController(
 
     public sealed record CriarVendaItemRequest(
         [Required] Guid ItemEstoqueId,
-        [Range(1, int.MaxValue)] int Quantidade,
+        [Range(0.001, 99999.0)] decimal Quantidade,
         [Range(0.01, double.MaxValue)] decimal PrecoUnitario,
         string? Descricao = null);
 
@@ -108,7 +108,9 @@ public class VendaController(
         Guid? LojaId = null,
         string? NumeroNotaFiscal = null,
         string? Observacoes = null,
-        DateTime? DataVenda = null);
+        DateTime? DataVenda = null,
+        Guid? VendedorId = null,
+        string? FormaPagamentoPrincipal = null);
 
     [SwaggerOperation(
         Summary = "Create a sale (canonical)",
@@ -141,7 +143,9 @@ public class VendaController(
             NotaFiscal: request.NumeroNotaFiscal,
             Natureza: request.Natureza,
             Canal: request.Canal,
-            Observacoes: request.Observacoes);
+            Observacoes: request.Observacoes,
+            VendedorId: request.VendedorId,
+            FormaPagamentoPrincipal: request.FormaPagamentoPrincipal);
 
         var result = await registrarSaidaUseCase.ExecuteAsync(command);
 

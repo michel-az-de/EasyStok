@@ -101,6 +101,13 @@ namespace EasyStock.Domain.Entities
         public DateTime? EntreguEm { get; set; }
         public DateTime? CanceladoEm { get; set; }
 
+        /// <summary>
+        /// Data/hora agendada para entrega. NULL = pedido pra agora (caso padrão).
+        /// Espelha <see cref="Mobile.Order.ScheduledDeliveryAt"/> para sync com app.
+        /// MVP: sem alertas/recorrência — só ordenação visual no PWA/KDS/grid web.
+        /// </summary>
+        public DateTime? AgendadoParaEm { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 

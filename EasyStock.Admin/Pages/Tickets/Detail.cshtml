@@ -58,6 +58,15 @@
                         {
                             <a href="/Faturas/Detail/@Model.FaturaId" class="text-es-accent hover:text-es-cream text-xs px-2 py-0.5 bg-es-accent/10 border border-es-accent/30 rounded">💰 Fatura @Model.FaturaNumero</a>
                         }
+                        @if (!string.IsNullOrEmpty(Model.PedidoId))
+                        {
+                            var pedidoLabel = !string.IsNullOrEmpty(Model.PedidoClienteNome)
+                                ? Model.PedidoClienteNome
+                                : Model.PedidoId.Substring(0, 8);
+                            var totalFmt = Model.PedidoTotal.HasValue ? $" · R$ {Model.PedidoTotal.Value:F2}" : "";
+                            var statusFmt = !string.IsNullOrEmpty(Model.PedidoStatus) ? $" · {Model.PedidoStatus}" : "";
+                            <span class="text-es-accent text-xs px-2 py-0.5 bg-es-accent/10 border border-es-accent/30 rounded" title="Pedido @Model.PedidoId">📦 Pedido @pedidoLabel@(statusFmt)@(totalFmt)</span>
+                        }
                     </div>
                 </div>
                 <div class="flex gap-2 flex-wrap">

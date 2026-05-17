@@ -1,0 +1,85 @@
+/* DANFE NFC-e 80mm — CSS específico para impressão térmica.
+   Aplicado apenas em media=print no <link rel="stylesheet">. */
+
+@page {
+    size: 80mm auto;
+    margin: 2mm;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    #danfePrintArea, #danfePrintArea * {
+        visibility: visible;
+    }
+
+    #danfePrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 76mm;
+        font-family: "Courier New", monospace;
+        font-size: 9pt;
+        color: #000;
+        padding: 0;
+        border: none;
+    }
+
+    .modal {
+        background: white;
+        padding: 0;
+    }
+
+    .modal-content {
+        box-shadow: none;
+        max-width: none;
+        max-height: none;
+        padding: 0;
+    }
+
+    .modal-fechar,
+    .modal-actions {
+        display: none;
+    }
+
+    .danfe-titulo {
+        font-size: 11pt;
+        text-align: center;
+        margin-bottom: 2mm;
+    }
+
+    .danfe-emissor,
+    .danfe-totais,
+    .danfe-chave,
+    .danfe-protocolo,
+    .danfe-consumidor {
+        font-size: 8pt;
+        line-height: 1.2;
+    }
+
+    .danfe-itens {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8pt;
+    }
+
+    .danfe-itens th,
+    .danfe-itens td {
+        border-bottom: 1px dotted #000;
+        padding: 1mm 1mm;
+    }
+
+    .danfe-qr {
+        display: flex;
+        justify-content: center;
+        margin: 2mm 0;
+    }
+
+    .danfe-qr canvas {
+        max-width: 40mm;
+        height: auto;
+        border: none;
+    }
+}
