@@ -44,6 +44,48 @@ Mantido pela tarefa agendada `limpa-codigo`. Cada entrada registra o que foi enc
 
 ---
 
+## 2026-05-08 — Sweep dos commits de cleanup do dia anterior (4f9c259, fb4f08e)
+
+Tarefa agendada `revisao-diaria-de-codigo` rodando em worktree `dev/festive-clarke-80b3f4`.
+
+### Arquivos re-auditados
+
+| Arquivo | Status |
+|---|---|
+| `EasyStock.Infra.Async/EfiPixService.cs` | Limpo (bloco vazio já removido em 4f9c259) |
+| `EasyStock.Infra.Async/EfiBoletoService.cs` | Limpo — reusa mesmo `Efi:ClientId/Secret` que Pix |
+| `EasyStock.Infra.Async/DependencyInjection/ServiceCollectionExtensions.cs` | Limpo — refactor `efiClientIdBoleto` reuso confirmado correto |
+| `EasyStock.Infra.Async/Pagamentos/Webhooks/MercadoPagoSignatureValidator.cs` | Limpo |
+| `EasyStock.Api/Controllers/AdminFaturasController.cs` | Limpo |
+| `EasyStock.Api/BackgroundServices/BackgroundJobServiceCollectionExtensions.cs` | Limpo |
+| `EasyStock.Application/Ports/Output/Persistence/IFaturaRepository.cs` | **Fix aplicado** (cref XML inválido) |
+| `EasyStock.Application/Ports/Output/IEfiPixService.cs` | Limpo |
+| `EasyStock.Infra.MongoDb/Repositories/MongoIdentityRepositories.cs` | **Fix aplicado** (comentário enganoso pós-ADR 0001) |
+
+### Fixes aplicados
+
+#### 1. `IFaturaRepository.cs` — `<see cref="EmpresaId"/>` inválido
+- `EmpresaId` é uma propriedade da entidade `Fatura`, não um símbolo top-level. O cref XML não resolve para nada.
+- Trocado por `<c>EmpresaId</c>` (texto monoespaçado).
+- Sem warning de build (`EasyStock.Application` não tem `<GenerateDocumentationFile>`), mas a ref ainda assim é incorreta — corrigida por consistência.
+
+#### 2. `MongoIdentityRepositories.cs` — comentário enganoso sobre ativação de Mongo
+- O commit fb4f08e corrigiu um comentário stub→funcional, porém afirmou "lê e grava em Mongo se o backend Mongo for ativado".
+- Conflita com ADR 0001 (`docs/adr/0001-mongo-discarded.md`, 2026-05-01): runtime lança `NotSupportedException` quando `Database:Provider=MongoDB` — não há como "ativar" o backend.
+- Reescrito como: "Mongo backend descartado (ADR 0001) — runtime lança NotSupportedException. Código mantido fisicamente para histórico; lê/grava normalmente caso alguém revigore o branch Mongo no futuro."
+
+### Build
+
+`dotnet build EasyStok.sln` — 0 erros, 17 avisos (todos pré-existentes: deprecação `Window.SetStatusBarColor` MAUI, XAML XC0025/XC0045 bindings, XA0141 Android 16 page-size, xUnit1031 em `EstoqueConcurrencyTests.cs`). Nada introduzido pela limpeza.
+
+### Padrões observados
+
+- Stale comments seguem sendo o principal vetor de defeito após cleanup parcial — corrigir um comentário sobre stub→funcional sem checar a ADR levou a um segundo comentário enganoso.
+- ADRs (`docs/adr/`) precisam ser consultadas ao reescrever comentários sobre infra alternativa (Mongo, gateways stub, etc).
+- `<see cref="..."/>` em XML doc só gera warning quando o projeto tem `<GenerateDocumentationFile>true</GenerateDocumentationFile>` — `EasyStock.Application` não tem, então crefs inválidos passam silenciosamente.
+
+---
+
 ## 2026-05-07 — Cleanup fb4f08e: polish billing F12 + Mongo (segunda passagem)
 
 ### Arquivos analisados (4 arquivos .cs do commit fb4f08e)
