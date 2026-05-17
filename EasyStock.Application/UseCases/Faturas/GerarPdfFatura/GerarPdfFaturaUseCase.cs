@@ -8,12 +8,15 @@ using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 
+/// <summary>Command de geracao (ou recuperacao) de PDF de fatura.</summary>
+/// <param name="EmpresaId">Empresa do cliente quando <c>Admin == false</c>; ignorado em modo admin.</param>
+/// <param name="FaturaId">Identificador da fatura.</param>
+/// <param name="Admin">true = admin (sem filtro EmpresaId); false = cliente (filtra por currentUser).</param>
+/// <param name="ForcarRegenerar">true = ignora cache e regenera. Padrao false (usa cache se existir).</param>
 public sealed record GerarPdfFaturaCommand(
     Guid? EmpresaId,
     Guid FaturaId,
-    /// <summary>true = admin (sem filtro EmpresaId); false = cliente (filtra por currentUser).</summary>
     bool Admin = false,
-    /// <summary>true = ignora cache e regenera. Padrao false (usa cache se existir).</summary>
     bool ForcarRegenerar = false
 );
 

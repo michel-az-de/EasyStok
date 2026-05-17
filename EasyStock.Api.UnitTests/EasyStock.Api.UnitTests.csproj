@@ -26,6 +26,7 @@
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
     <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
+    <ProjectReference Include="..\EasyStock.TestHelpers\EasyStock.TestHelpers.csproj" />
   </ItemGroup>
 
 </Project>

@@ -116,7 +116,6 @@ namespace EasyStock.Infra.Postgre.Data
                 _previous = previous;
             }
 
-
             public void Dispose()
             {
                 if (_disposed) return;

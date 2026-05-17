@@ -4,10 +4,13 @@ using EasyStock.Application.UseCases.Faturas.Common;
 
 namespace EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 
+/// <summary>Command de leitura de detalhe de fatura (cliente ou admin).</summary>
+/// <param name="EmpresaId">Empresa do cliente quando <c>Admin == false</c>; ignorado em modo admin.</param>
+/// <param name="FaturaId">Identificador da fatura.</param>
+/// <param name="Admin">true = admin (sem filtro EmpresaId); false = cliente (filtra).</param>
 public sealed record ObterFaturaDetalheCommand(
     Guid? EmpresaId,
     Guid FaturaId,
-    /// <summary>true = admin (sem filtro EmpresaId); false = cliente (filtra).</summary>
     bool Admin = false
 );
 

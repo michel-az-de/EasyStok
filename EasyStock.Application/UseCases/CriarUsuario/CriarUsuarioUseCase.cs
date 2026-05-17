@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -25,6 +26,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
         IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
         ILogger<CriarUsuarioUseCase> logger)
     {
         public async Task<CriarUsuarioResult> ExecuteAsync(CriarUsuarioCommand command)
@@ -43,7 +45,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
                 throw new PlanoLimiteAtingidoException("usuarios");
 
             var agora = DateTime.UtcNow;
-            var senhaHash = BCrypt.Net.BCrypt.HashPassword(command.Senha);
+            var senhaHash = passwordHasher.Hash(command.Senha);
             var usuario = Usuario.Criar(command.Nome.Trim(), command.Email.Trim(), senhaHash);
 
             await usuarioRepository.AddAsync(usuario);

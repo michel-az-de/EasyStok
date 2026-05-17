@@ -17,7 +17,14 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Cache Service
+        // Password Hasher (BCrypt). Stateless, singleton.
+        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+
+        // Cache Service. <see cref="RedisCacheService"/> envelopa
+        // <see cref="IDistributedCache"/> — quem registra o backend (Redis real
+        // em prod ou MemoryDistributedCache em dev) e o host (ApiServiceCollectionExtensions
+        // .AddEasyStockCache). <see cref="InMemoryCacheService"/> existe como
+        // alternativa explicita pra fluxos in-process sem serializacao JSON.
         services.AddSingleton<ICacheService, RedisCacheService>();
 
         // Queue Service

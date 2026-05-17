@@ -10,6 +10,15 @@ using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.UseCases.TicketSuporte
 {
+    /// <summary>Command de abertura de ticket pelo cliente do tenant.</summary>
+    /// <param name="Titulo">Titulo curto do ticket.</param>
+    /// <param name="Descricao">Descricao detalhada (vai como primeira mensagem).</param>
+    /// <param name="Categoria">Categoria do helpdesk.</param>
+    /// <param name="FaturaId">
+    /// FK opcional a uma <see cref="Fatura"/> que motivou o ticket.
+    /// Quando informado, valida pertencimento a empresa do user e
+    /// vincula a fatura ao ticket bidirecionalmente (F9).
+    /// </param>
     public sealed record AbrirTicketClienteCommand(
         string Titulo,
         string Descricao,

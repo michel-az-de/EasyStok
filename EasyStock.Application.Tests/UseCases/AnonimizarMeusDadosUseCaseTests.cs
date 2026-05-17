@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -31,7 +32,7 @@ public class AnonimizarMeusDadosUseCaseTests
             Nome = "Joao Silva",
             Email = "joao@empresa.com",
             AvatarUrl = "https://cdn/avatar.png",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("Senha@123"),
+            SenhaHash = FakePasswordHasher.MakeHash("Senha@123"),
             Ativo = true,
             EmailConfirmado = true,
             CriadoEm = DateTime.UtcNow,

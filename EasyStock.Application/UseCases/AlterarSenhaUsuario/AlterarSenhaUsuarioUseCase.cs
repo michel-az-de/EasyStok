@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions;
@@ -13,6 +14,7 @@ namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
     public class AlterarSenhaUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
         ILogger<AlterarSenhaUsuarioUseCase> logger)
     {
         public async Task ExecuteAsync(AlterarSenhaCommand command)
@@ -22,10 +24,10 @@ namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
-            if (!BCrypt.Net.BCrypt.Verify(command.SenhaAtual, usuario.SenhaHash))
+            if (!passwordHasher.Verify(command.SenhaAtual, usuario.SenhaHash))
                 throw new UseCaseValidationException("Senha atual incorreta.");
 
-            usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(command.NovaSenha);
+            usuario.SenhaHash = passwordHasher.Hash(command.NovaSenha);
             usuario.AlteradoEm = DateTime.UtcNow;
 
             await usuarioRepository.UpdateAsync(usuario);

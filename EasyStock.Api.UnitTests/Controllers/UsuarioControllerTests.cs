@@ -40,9 +40,10 @@ public class UsuarioControllerTests
         var desativarLogger = Substitute.For<ILogger<DesativarUsuarioUseCase>>();
         var atribuirPerfilLogger = Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>();
 
-        _criarUseCase = new CriarUsuarioUseCase(_usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _unitOfWork, criarLogger);
+        var passwordHasher = Substitute.For<IPasswordHasher>();
+        _criarUseCase = new CriarUsuarioUseCase(_usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _unitOfWork, passwordHasher, criarLogger);
         _atualizarUseCase = new AtualizarUsuarioUseCase(_usuarioRepository, _unitOfWork, atualizarLogger);
-        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, _unitOfWork, alterarSenhaLogger);
+        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, _unitOfWork, passwordHasher, alterarSenhaLogger);
         _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
         _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, _unitOfWork, atribuirPerfilLogger);

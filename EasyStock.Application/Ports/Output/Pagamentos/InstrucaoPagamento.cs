@@ -10,6 +10,7 @@ namespace EasyStock.Application.Ports.Output.Pagamentos;
 ///   <item>Cartao (gateway): <c>UrlCheckout</c> ou <c>SessionId</c> via metadados</item>
 ///   <item>Manual: vazio — admin registra pagamento sem cobrar via gateway</item>
 /// </list>
+/// <param name="DadosGatewayJson">JSON livre com dados adicionais do gateway para auditoria.</param>
 public sealed record InstrucaoPagamento(
     string Provedor,
     string TransactionId,
@@ -19,7 +20,6 @@ public sealed record InstrucaoPagamento(
     string? BoletoUrl = null,
     string? UrlCheckout = null,
     DateTime? ExpiracaoEm = null,
-    /// <summary>JSON livre com dados adicionais do gateway para auditoria.</summary>
     string? DadosGatewayJson = null
 );
 
