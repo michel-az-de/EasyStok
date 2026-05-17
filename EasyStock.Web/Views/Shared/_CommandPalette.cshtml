@@ -1,0 +1,138 @@
+@*
+    Command Palette global — abre com Ctrl/Cmd+K.
+    Mount via @await Html.PartialAsync("_CommandPalette") no _Layout.
+    JS factory em wwwroot/js/command-palette.js.
+*@
+<div x-data="commandPalette()" x-init="init()" x-cloak>
+    @* Cheatsheet — atalho ? abre, Esc fecha *@
+    <div x-show="showCheatsheet"
+         class="fixed inset-0 z-[71] flex items-center justify-center p-4 modal-backdrop"
+         @@click.self="closeCheatsheet()"
+         @@keydown.escape.window="closeCheatsheet()"
+         x-transition.opacity>
+        <div class="modal-panel modal-sm" role="dialog" aria-modal="true" aria-label="Atalhos de teclado">
+            <div class="modal-header">
+                <h3 class="text-lg font-semibold text-slate-900">Atalhos de teclado</h3>
+                <button type="button" @@click="closeCheatsheet()" class="text-slate-400 hover:text-slate-600" aria-label="Fechar">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <dl class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-slate-700">Buscar e abrir páginas</dt>
+                        <dd><kbd class="inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-500">Ctrl</kbd>+<kbd class="inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-500">K</kbd></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-slate-700">Criar novo na página atual</dt>
+                        <dd><kbd class="inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-500">N</kbd></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-slate-700">Fechar modal/painel</dt>
+                        <dd><kbd class="inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-500">Esc</kbd></dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-slate-700">Mostrar esta ajuda</dt>
+                        <dd><kbd class="inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-500">?</kbd></dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="open"
+         class="fixed inset-0 z-[70] flex items-start justify-center pt-[15vh] px-4 bg-black/40"
+         @@click.self="close()"
+         x-transition.opacity>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200"
+             @@keydown="onKeydown($event)">
+
+            <!-- Search input -->
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-200">
+                <svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text"
+                       x-ref="input"
+                       x-model="query"
+                       @@input="onQuery()"
+                       placeholder="Buscar clientes, abrir páginas, criar registros..."
+                       class="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+                       aria-label="Buscar comandos e clientes" />
+                <kbd class="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-500">
+                    ESC
+                </kbd>
+            </div>
+
+            <!-- Resultados -->
+            <div class="max-h-[60vh] overflow-y-auto py-2">
+
+                <template x-if="loading && clienteResults.length === 0">
+                    <div class="px-4 py-2 text-xs text-slate-400">Buscando clientes…</div>
+                </template>
+
+                <template x-if="allResults().length === 0 && !loading">
+                    <div class="px-4 py-6 text-center">
+                        <p class="text-sm text-slate-500">Nenhum resultado para "<span x-text="query"></span>".</p>
+                        <p class="text-xs text-slate-400 mt-1">Tente buscar pelo nome de uma página ou cliente.</p>
+                    </div>
+                </template>
+
+                <!-- Render grouped -->
+                <template x-for="(group, gIdx) in [
+                    { name: 'Ações',    items: staticResults.filter(c => c.group === 'Ações') },
+                    { name: 'Ir para',  items: staticResults.filter(c => c.group === 'Ir para') },
+                    { name: 'Clientes', items: clienteResults }
+                ]" :key="group.name">
+                    <div x-show="group.items.length > 0">
+                        <div class="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
+                        <template x-for="(item, iIdx) in group.items" :key="group.name + '-' + iIdx">
+                            <button type="button"
+                                    :data-cmdpal-item="allResults().indexOf(item)"
+                                    @@click="activate(allResults().indexOf(item))"
+                                    @@mouseenter="selectedIdx = allResults().indexOf(item)"
+                                    :class="selectedIdx === allResults().indexOf(item) ? 'bg-indigo-50' : 'hover:bg-slate-50'"
+                                    class="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors">
+                                <span class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
+                                      :class="selectedIdx === allResults().indexOf(item) ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="getIconPath(item.icon)" />
+                                    </svg>
+                                </span>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-slate-900 truncate" x-text="item.label"></div>
+                                    <template x-if="item.hint">
+                                        <div class="text-xs text-slate-500 truncate" x-text="item.hint"></div>
+                                    </template>
+                                </div>
+                                <template x-if="selectedIdx === allResults().indexOf(item)">
+                                    <kbd class="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-slate-300 bg-white text-[11px] font-mono text-slate-500">
+                                        ↵
+                                    </kbd>
+                                </template>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+
+            </div>
+
+            <!-- Footer hint -->
+            <div class="border-t border-slate-200 bg-slate-50 px-4 py-2 flex items-center justify-between text-[11px] text-slate-500">
+                <span>
+                    <kbd class="inline-flex items-center px-1 py-0.5 rounded border border-slate-300 bg-white font-mono">↑↓</kbd>
+                    navegar
+                </span>
+                <span>
+                    <kbd class="inline-flex items-center px-1 py-0.5 rounded border border-slate-300 bg-white font-mono">Enter</kbd>
+                    abrir
+                </span>
+                <span>
+                    <kbd class="inline-flex items-center px-1 py-0.5 rounded border border-slate-300 bg-white font-mono">Ctrl</kbd>+<kbd class="inline-flex items-center px-1 py-0.5 rounded border border-slate-300 bg-white font-mono">K</kbd>
+                    abrir/fechar
+                </span>
+            </div>
+
+        </div>
+    </div>
+</div>

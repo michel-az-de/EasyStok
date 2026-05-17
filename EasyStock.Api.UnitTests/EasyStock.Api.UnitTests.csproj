@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="FluentAssertions" Version="8.9.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\EasyStock.Api\EasyStock.Api.csproj" />
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
     <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
+    <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
     <ProjectReference Include="..\EasyStock.TestHelpers\EasyStock.TestHelpers.csproj" />
   </ItemGroup>
 

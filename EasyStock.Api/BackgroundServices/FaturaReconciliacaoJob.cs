@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,8 +42,6 @@ public sealed class FaturaReconciliacaoJob(
     IServiceProvider serviceProvider,
     ILogger<FaturaReconciliacaoJob> logger) : BackgroundService
 {
-    private const long LockKeyJob = 0x4661_7475_5265_636FL; // "FaturRec\0"
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("FaturaReconciliacaoJob iniciado");
@@ -55,7 +54,7 @@ public sealed class FaturaReconciliacaoJob(
         {
             try
             {
-                await RunWithAdvisoryLockAsync(LockKeyJob, ProcessarReconciliacaoAsync, stoppingToken);
+                await RunWithAdvisoryLockAsync(LockKeys.FaturaReconciliacao, ProcessarReconciliacaoAsync, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
@@ -117,6 +116,13 @@ public sealed class FaturaReconciliacaoJob(
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var router = scope.ServiceProvider.GetRequiredService<IPagamentoGatewayRouter>();
 
+        // Reconciliação varre faturas de TODOS os tenants — webhook caído num
+        // tenant qualquer cai aqui. RLS exige bypass explícito ou a policy
+        // tenant_isolation zeraria o batch (CurrentTenantId=Guid.Empty fora de
+        // request). IgnoreQueryFilters já desligava o filtro EF; bypass cobre
+        // a camada do banco.
+        using var _ = db.UseRowLevelSecurityBypass();
+
         var agora = DateTime.UtcNow;
         var idadeMinima = agora.AddHours(-1);
         var idadeMaxima = agora.AddDays(-30);
@@ -175,29 +181,29 @@ public sealed class FaturaReconciliacaoJob(
 
                     if (status == StatusGateway.Confirmado)
                     {
-                        // Fecha o gap operando direto no agregado ja tracked: o use case
-                        // RegistrarPagamentoFaturaUseCase nao serve aqui porque o repo dele
-                        // aplica Global Query Filter de tenant — em background sem
-                        // ICurrentUserAccessor o GetByIdAsync sempre retorna null. Trabalhar
-                        // direto na entidade evita o filtro e mantem a operacao atomica.
+                        // Fecha o gap CONFIRMANDO o pagamento Pendente original em vez de
+                        // criar um FaturaPagamento novo. Criar novo deixa o original
+                        // intocado (Pendente) — proxima rodada da janela 1h-30d ainda
+                        // pegaria a fatura (se Status=ParcialmentePaga apos confirmacao
+                        // parcial), e o gateway responderia Confirmado de novo, gerando
+                        // pagamento duplicado e TotalPago > Total. Confirmar in-place
+                        // mantem Pagamentos.Count estavel e idempotencia natural via
+                        // FaturaPagamento.Confirmar() (no-op se ja Confirmado).
                         try
                         {
-                            var pagamentoConfirmado = FaturaPagamento.CriarConfirmado(
-                                faturaId: fatura.Id,
-                                metodo: pag.Metodo,
-                                valor: pag.Valor,
-                                gatewayProvedor: pag.GatewayProvedor,
-                                gatewayTransactionId: pag.GatewayTransactionId,
-                                dadosGatewayJson: pag.DadosGatewayJson,
-                                observacao: "Confirmado via reconciliacao (webhook perdido).");
+                            pag.Confirmar();
+                            pag.Observacao = string.IsNullOrWhiteSpace(pag.Observacao)
+                                ? "Confirmado via reconciliacao (webhook perdido)."
+                                : $"{pag.Observacao}\nConfirmado via reconciliacao (webhook perdido).";
 
-                            fatura.RegistrarPagamento(pagamentoConfirmado);
+                            // Recalcula Status da fatura com o pagamento agora confirmado.
+                            fatura.AtualizarStatusPorPagamentos();
 
                             db.FaturaEventos.Add(FaturaEvento.Criar(
                                 fatura.Id,
                                 TipoEventoFatura.PagamentoConfirmado,
                                 origem: "job-reconciliacao",
-                                valorDepois: $"+{pagamentoConfirmado.Valor:F2} {fatura.Moeda} via {pagamentoConfirmado.Metodo} ({pagamentoConfirmado.GatewayProvedor})"));
+                                valorDepois: $"+{pag.Valor:F2} {fatura.Moeda} via {pag.Metodo} ({pag.GatewayProvedor})"));
 
                             db.FaturaEventos.Add(FaturaEvento.Criar(
                                 fatura.Id,

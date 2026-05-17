@@ -19,7 +19,10 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
     [BindProperty] public string? ParametrosJson { get; set; }
 
     public JsonElement? RotinaAtual { get; private set; }
+    public List<TemplateOpcao> TemplatesDisponiveis { get; private set; } = new();
     public string? Erro { get; private set; }
+
+    public sealed record TemplateOpcao(string Codigo, string Nome, string Canal, string TipoEvento);
 
     public async Task OnGetAsync()
     {
@@ -45,6 +48,34 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                 logger.LogError(ex, "Erro ao carregar rotina {Id}", Id);
                 Erro = "Erro ao carregar rotina.";
             }
+        }
+        else
+        {
+            await CarregarTemplatesDisponiveisAsync();
+        }
+    }
+
+    private async Task CarregarTemplatesDisponiveisAsync()
+    {
+        try
+        {
+            var result = await api.GetRawAsync("api/admin/notificacoes/templates?pageSize=200");
+            var data = result.GetProperty("data");
+            if (data.ValueKind != JsonValueKind.Array) return;
+
+            foreach (var t in data.EnumerateArray())
+            {
+                TemplatesDisponiveis.Add(new TemplateOpcao(
+                    t.GetProperty("codigo").GetString() ?? "",
+                    t.GetProperty("nome").GetString() ?? "",
+                    t.GetProperty("canal").GetString() ?? "",
+                    t.GetProperty("tipoEvento").GetString() ?? ""));
+            }
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Falha ao carregar templates disponíveis para o dropdown");
         }
     }
 

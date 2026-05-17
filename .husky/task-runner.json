@@ -1,0 +1,19 @@
+{
+   "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
+   "tasks": [
+      {
+         "name": "rotulagem-architecture-tests",
+         "group": "pre-commit",
+         "command": "dotnet",
+         "args": [
+            "test",
+            "EasyStock.ArchitectureTests/EasyStock.ArchitectureTests.csproj",
+            "--filter",
+            "Category=Architecture",
+            "--nologo",
+            "--verbosity",
+            "minimal"
+         ]
+      }
+   ]
+}

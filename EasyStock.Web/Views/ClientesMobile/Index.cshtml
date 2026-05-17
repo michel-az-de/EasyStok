@@ -34,9 +34,9 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "📱" },
+            { "EmptyIllustration", "inbox" },
             { "EmptyTitle", "Nenhum cliente do app" },
-            { "EmptyDescription", "Quando os operadores criarem clientes pelo app, eles aparecerão aqui para revisão." }
+            { "EmptyDescription", "Quando os operadores criarem clientes pelo app, eles aparecem aqui para revisão." }
         })
     }
     else
@@ -93,7 +93,7 @@
                             }
                             else
                             {
-                                <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">pendente</span>
+                                <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">pendente</span>
                             }
                         </td>
                         <td class="text-right">
@@ -129,7 +129,7 @@
                             }
                             else
                             {
-                                <form asp-action="Unlink" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" onsubmit="return confirm('Desfazer link com ERP?');">
+                                <form asp-action="Unlink" asp-controller="ClientesMobile" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Desfazer link com ERP?","mensagem":"Este cliente voltara a ser tratado como mobile-only.","textoBotao":"Desfazer","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-sm text-red-600 hover:text-red-700">Desfazer link</button>
                                 </form>

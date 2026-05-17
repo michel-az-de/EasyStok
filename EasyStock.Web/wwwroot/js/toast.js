@@ -1,19 +1,25 @@
 /**
  * EasyStock Toast System v2
- * window.showToast(message, type, duration?)
- * type: 'success' | 'error' | 'warning' | 'info'
+ * window.showToast(message, type, duration?, undoAction?)
+ * type: 'success' | 'success-undo' | 'error' | 'warning' | 'info'
+ *
+ * C3 (2026-05-16): botao "Desfazer" agora APENAS em type === 'success-undo'
+ * com undoAction funcao. Antes, qualquer toast com 4o argumento callback
+ * mostrava o botao - causou bug "Thatiane viu DESFAZER em busca por codigo
+ * inexistente".
  */
 (function () {
     'use strict';
 
     const CONFIG = {
-        success: { bg: '#059669', icon: '✓' },
-        error:   { bg: '#DC2626', icon: '✕' },
-        warning: { bg: '#D97706', icon: '⚠' },
-        info:    { bg: '#4F46E5', icon: 'ℹ' },
+        success:        { bg: '#059669', icon: '✓' },
+        'success-undo': { bg: '#059669', icon: '✓' }, // C3: alias visual de success
+        error:          { bg: '#DC2626', icon: '✕' },
+        warning:        { bg: '#D97706', icon: '⚠' },
+        info:           { bg: '#4F46E5', icon: 'ℹ' },
     };
 
-    const DURATION = { success: 3500, error: 6000, warning: 5000, info: 3500 };
+    const DURATION = { success: 3500, 'success-undo': 5000, error: 6000, warning: 5000, info: 3500 };
 
     let container = null;
 
@@ -57,11 +63,27 @@
         return container;
     }
 
-    window.showToast = function (message, type, duration, undoAction) {
+    window.showToast = function (message, type, durationOrOptions, undoAction) {
         type = type || 'info';
         const cfg = CONFIG[type] || CONFIG.info;
-        // Force 5s minimum when undo is available so user has time to react
-        const dur = undoAction ? 5000 : ((duration != null) ? duration : (DURATION[type] || 3500));
+
+        // Aceita assinatura legada (duration: number) ou objeto rico:
+        //   { duration?, correlationId?, errorCode?, retryFn?, undoAction? }
+        let duration = durationOrOptions;
+        let correlationId = null;
+        let errorCode = null;
+        let retryFn = null;
+        if (durationOrOptions && typeof durationOrOptions === 'object') {
+            duration = durationOrOptions.duration;
+            correlationId = durationOrOptions.correlationId || null;
+            errorCode = durationOrOptions.errorCode || null;
+            retryFn = typeof durationOrOptions.retryFn === 'function' ? durationOrOptions.retryFn : null;
+            undoAction = durationOrOptions.undoAction || undoAction;
+        }
+
+        // Force 8s minimum quando há retry/correlationId para o usuário copiar o CID.
+        const baseDur = (retryFn || correlationId) ? 8000 : (DURATION[type] || 3500);
+        const dur = undoAction ? 5000 : ((duration != null) ? duration : baseDur);
         const c = getContainer();
 
         // Wrapper handles animation
@@ -128,7 +150,69 @@
         body.appendChild(iconEl);
         body.appendChild(msgEl);
 
-        if (undoAction) {
+        // Para erros, anexa código + correlation ID copiável e botão de retry.
+        if (errorCode || correlationId) {
+            const metaWrap = document.createElement('div');
+            Object.assign(metaWrap.style, {
+                display:    'flex',
+                flexDirection: 'column',
+                fontSize:   '10.5px',
+                opacity:    '0.85',
+                marginLeft: 'auto',
+                flexShrink: '0',
+                gap:        '2px',
+                alignItems: 'flex-end',
+            });
+            if (errorCode) {
+                const codeEl = document.createElement('span');
+                codeEl.textContent = errorCode;
+                Object.assign(codeEl.style, { fontFamily: "'JetBrains Mono', monospace", fontWeight: '600' });
+                metaWrap.appendChild(codeEl);
+            }
+            if (correlationId) {
+                const cidEl = document.createElement('button');
+                cidEl.textContent = 'CID: ' + correlationId.slice(0, 8);
+                cidEl.title = 'Clique para copiar o ID ' + correlationId;
+                Object.assign(cidEl.style, {
+                    background: 'none', border: 'none', color: 'inherit',
+                    fontFamily: "'JetBrains Mono', monospace", fontSize: '10.5px',
+                    cursor: 'pointer', padding: '0', textDecoration: 'underline',
+                });
+                cidEl.onclick = function () {
+                    try { navigator.clipboard.writeText(correlationId); cidEl.textContent = 'copiado ✓'; } catch (e) {}
+                };
+                metaWrap.appendChild(cidEl);
+            }
+            body.appendChild(metaWrap);
+        }
+
+        if (retryFn) {
+            const retryBtn = document.createElement('button');
+            retryBtn.textContent = 'Tentar novamente';
+            Object.assign(retryBtn.style, {
+                background:    'rgba(255,255,255,.22)',
+                border:        '1px solid rgba(255,255,255,.45)',
+                color:         '#ffffff',
+                fontSize:      '12px',
+                fontWeight:    '600',
+                lineHeight:    '1',
+                cursor:        'pointer',
+                padding:       '4px 9px',
+                borderRadius:  '6px',
+                flexShrink:    '0',
+                whiteSpace:    'nowrap',
+            });
+            retryBtn.onclick = function () {
+                dismiss();
+                try { retryFn(); } catch (e) {}
+            };
+            body.appendChild(retryBtn);
+        }
+
+        // C3 guard: botao "Desfazer" SO em success-undo COM funcao executavel.
+        // Antes desse guard, qualquer tipo de toast com 4o argumento callback
+        // mostrava "Desfazer" - bug encontrado em busca por codigo inexistente.
+        if (type === 'success-undo' && typeof undoAction === 'function') {
             const undoBtn = document.createElement('button');
             undoBtn.textContent = 'Desfazer';
             Object.assign(undoBtn.style, {
@@ -146,7 +230,7 @@
             });
             undoBtn.onclick = function () {
                 dismiss();
-                undoAction();
+                try { undoAction(); } catch (e) { console.warn('[toast] undo falhou:', e); }
             };
             body.appendChild(undoBtn);
         }

@@ -22,7 +22,8 @@ public static class UploadSecurityValidator
         "application/pdf",
         "text/csv",
         "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

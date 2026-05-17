@@ -9,12 +9,23 @@ namespace EasyStock.Domain.Enums;
 /// Transicoes:
 /// </para>
 /// <list type="bullet">
-///   <item>Pendente → Confirmado (webhook gateway confirma)</item>
-///   <item>Pendente → Falhou (gateway recusa ou timeout)</item>
+///   <item>Pendente → EmProcessamento (orchestrator iniciou attempt em algum gateway)</item>
+///   <item>Pendente → Confirmado (webhook gateway confirma — pagamento manual em dinheiro)</item>
+///   <item>EmProcessamento → Confirmado (webhook gateway confirma)</item>
+///   <item>EmProcessamento → Falhou (todos gateways exauridos)</item>
+///   <item>EmProcessamento → Cancelado (admin cancela)</item>
+///   <item>Pendente → Falhou (legado: gateway recusa ou timeout)</item>
 ///   <item>Confirmado → EstornoSolicitado (admin solicita refund)</item>
 ///   <item>EstornoSolicitado → Estornado (gateway confirma refund)</item>
 ///   <item>EstornoSolicitado → Confirmado (refund recusado, volta ao estado anterior)</item>
 /// </list>
+///
+/// <para>
+/// Os valores <c>EmProcessamento</c> e <c>Cancelado</c> foram adicionados na
+/// Onda P0 do Payment Orchestration. Pagamentos legados que estavam em
+/// <c>Pendente</c> antes do orchestrator continuam validos — o orchestrator
+/// novo cria com <c>EmProcessamento</c> direto.
+/// </para>
 /// </summary>
 public enum StatusFaturaPagamento
 {
@@ -22,5 +33,7 @@ public enum StatusFaturaPagamento
     Confirmado,
     EstornoSolicitado,
     Estornado,
-    Falhou
+    Falhou,
+    EmProcessamento,
+    Cancelado
 }

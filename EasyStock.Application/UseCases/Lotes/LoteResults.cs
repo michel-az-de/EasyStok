@@ -33,12 +33,16 @@ public sealed record LoteItemResult(
     Guid Id, Guid LoteId, Guid? ProdutoId,
     string Nome, string? Emoji, string? Unidade,
     int Quantidade, int? PesoG, int? ValidadeDias, DateTime? ExpiraEm,
-    string? FotoUrl, DateTime CriadoEm
+    string? FotoUrl, DateTime CriadoEm,
+    // C2 (RDC 727/2022): tipo do produto vinculado (Avulso default | Embalado).
+    // Usado pela UI para exibir badge "Sem peso" e habilitar backfill.
+    string TipoEmbalagem = "Avulso"
 );
 
 public sealed record LoteEtiquetaResult(
     Guid Id, Guid LoteId, Guid LoteItemId,
     int Sequencial, string Codigo, string Status,
     DateTime? ConferidaEm, Guid? ConferidaPorUserId, string? ConferidaPorNome,
-    string? ObservacaoConferencia, DateTime CriadoEm
+    string? ObservacaoConferencia, DateTime CriadoEm,
+    string? LayoutSnapshotJson, string? LayoutSnapshotMeta
 );

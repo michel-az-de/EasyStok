@@ -54,10 +54,10 @@
                     });
                     const data = await res.json().catch(() => ({}));
                     if (res.ok && data.success) {
-                        if (status) { status.className = 'site-newsletter-status ok'; status.textContent = data.message || 'Beleza, voce esta na lista.'; }
+                        if (status) { status.className = 'site-newsletter-status ok'; status.textContent = data.message || 'Beleza, você está na lista.'; }
                         form.reset();
                     } else {
-                        if (status) { status.className = 'site-newsletter-status err'; status.textContent = data.message || 'Nao deu pra inscrever agora. Tenta de novo.'; }
+                        if (status) { status.className = 'site-newsletter-status err'; status.textContent = data.message || 'Não deu pra inscrever agora. Tenta de novo.'; }
                     }
                 } catch (err) {
                     if (status) { status.className = 'site-newsletter-status err'; status.textContent = 'Erro de rede. Tenta de novo.'; }

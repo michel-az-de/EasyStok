@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.ListarPedidosCliente;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
@@ -25,6 +26,7 @@ public class PedidosController(
     CriarPedidoUseCase criarUseCase,
     AtualizarStatusPedidoUseCase statusUseCase,
     CancelarPedidoUseCase cancelarUseCase,
+    AlterarAgendamentoPedidoUseCase agendamentoUseCase,
     ListarPedidosUseCase listarUseCase,
     ObterPedidoDetalhesUseCase obterUseCase,
     AdicionarItemPedidoUseCase addItemUseCase,
@@ -106,6 +108,22 @@ public class PedidosController(
         {
             EmpresaId = emp,
             Id = id,
+            UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            Origem = command.Origem ?? "web"
+        });
+        return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
+    }
+
+    [SwaggerOperation(Summary = "Alter or remove scheduling date")]
+    [HttpPatch("{id}/agendamento")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> AlterarAgendamento(Guid id, [FromBody] AlterarAgendamentoPedidoCommand command)
+    {
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
+        var result = await agendamentoUseCase.ExecuteAsync(command with
+        {
+            EmpresaId = emp,
+            PedidoId = id,
             UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
             Origem = command.Origem ?? "web"
         });

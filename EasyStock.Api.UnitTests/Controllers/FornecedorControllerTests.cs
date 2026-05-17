@@ -41,7 +41,7 @@ public class FornecedorControllerTests
         var estatisticas = new ObterEstatisticasFornecedorUseCase(_fornecedorRepository, _pedidoFornecedorRepository);
         var pedidosAbertos = new ListarPedidosAbertosUseCase(_pedidoFornecedorRepository);
         var criarPedido = new CriarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _fornecedorRepository, _unitOfWork, Substitute.For<ILogger<CriarPedidoFornecedorUseCase>>());
-        var receberPedido = new ReceberPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<ReceberPedidoFornecedorUseCase>>());
+        var receberPedido = new ReceberPedidoFornecedorUseCase(_pedidoFornecedorRepository, null!, _unitOfWork, Substitute.For<ILogger<ReceberPedidoFornecedorUseCase>>());
         var cancelarPedido = new CancelarPedidoFornecedorUseCase(_pedidoFornecedorRepository, _unitOfWork, Substitute.For<ILogger<CancelarPedidoFornecedorUseCase>>());
         var entradaUseCase = new RegistrarEntradaEstoqueUseCase(
             Substitute.For<IProdutoRepository>(),

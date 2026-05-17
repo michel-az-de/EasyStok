@@ -9,11 +9,11 @@ import { renderTryIt, defaultBody, requiresIdempotency } from '../components/try
 import { generateCurl, generateFetch } from '../components/code.js';
 
 const TABS = [
-    { id: 'briefing', label: 'Briefing', icon: 'book' },
-    { id: 'schema',   label: 'Schema',   icon: 'grid' },
-    { id: 'examples', label: 'Examples', icon: 'flag' },
-    { id: 'try',      label: 'Try It',   icon: 'play' },
-    { id: 'code',     label: 'Code',     icon: 'copy' }
+    { id: 'briefing', label: 'Visão geral', icon: 'book' },
+    { id: 'schema',   label: 'Schema',      icon: 'grid' },
+    { id: 'examples', label: 'Exemplos',    icon: 'flag' },
+    { id: 'try',      label: 'Testar',      icon: 'play' },
+    { id: 'code',     label: 'Código',      icon: 'copy' }
 ];
 
 export function renderEndpointEmpty(mod, eps) {
@@ -21,7 +21,7 @@ export function renderEndpointEmpty(mod, eps) {
         <div class="es-endpoint-empty">
             <span class="es-endpoint-empty-icon">${icon(mod.icon, 64)}</span>
             <h2>${escapeHtml(mod.name)}</h2>
-            <p>${eps.length} endpoints disponíveis. Selecione um na lista à esquerda.</p>
+            <p>${eps.length} endpoints disponíveis — selecione um na lista ao lado.</p>
             <div class="es-endpoint-empty-tip">
                 <kbd>↑</kbd> <kbd>↓</kbd> navega · <kbd>Enter</kbd> abre · <kbd>/</kbd> filtra
             </div>
@@ -110,22 +110,24 @@ function renderBriefing(spec, ep) {
             </section>` : ''}
             ${groups.length ? `<section class="es-tab-block">
                 <h3>Parâmetros</h3>
-                ${groups.map(g => `
+                ${groups.map(g => {
+                    const hasDesc = g.items.some(p => p.description);
+                    return `
                     <h4 class="es-param-loc">${g.loc}</h4>
                     <table class="es-param-table">
-                        <thead><tr><th>nome</th><th>tipo</th><th>req</th><th>descrição</th></tr></thead>
+                        <thead><tr><th>nome</th><th>tipo</th><th>req</th>${hasDesc ? '<th>descrição</th>' : ''}</tr></thead>
                         <tbody>
                             ${g.items.map(p => `
                                 <tr>
                                     <td><code>${escapeHtml(p.name)}</code></td>
                                     <td><span class="es-st-type">${escapeHtml((p.schema && p.schema.type) || 'string')}${p.schema && p.schema.format ? ':' + escapeHtml(p.schema.format) : ''}</span></td>
                                     <td>${p.required ? '<span class="es-st-req-badge">req</span>' : '<span class="es-mute">—</span>'}</td>
-                                    <td>${escapeHtml(p.description || '')}</td>
+                                    ${hasDesc ? `<td>${escapeHtml(p.description || '')}</td>` : ''}
                                 </tr>
                             `).join('')}
                         </tbody>
-                    </table>
-                `).join('')}
+                    </table>`;
+                }).join('')}
             </section>` : ''}
             <section class="es-tab-block">
                 <h3>Respostas</h3>
@@ -161,7 +163,7 @@ function renderSchemaTab(spec, ep) {
                 <h3>Response 200/201</h3>
                 ${okSchema
                     ? schemaTree(spec, okSchema)
-                    : '<p class="es-mute">sem schema JSON pra resposta de sucesso</p>'}
+                    : '<p class="es-mute">sem schema JSON para a resposta de sucesso</p>'}
             </section>
         </div>
     `;
@@ -182,7 +184,7 @@ function renderExamples(spec, ep, state) {
         .filter(g => g.examples.length);
 
     if (reqExamples.length === 0 && respGroups.length === 0) {
-        return `<p class="es-mute es-tab-empty">Sem exemplos pré-definidos. Use a aba <strong>Schema</strong> pra estrutura, ou <strong>Try It</strong> pra testar.</p>`;
+        return `<p class="es-mute es-tab-empty">Sem exemplos cadastrados. Consulte a aba <strong>Schema</strong> para ver a estrutura ou <strong>Testar</strong> para executar.</p>`;
     }
 
     return `
@@ -270,7 +272,7 @@ function renderCode(spec, ep, state) {
                 <pre class="es-code es-code-shell" data-payload-id="fetch-block">${escapeHtml(fetchJs)}</pre>
             </section>
             <p class="es-mute" style="font-size:12px">
-                Use a aba <strong>Try It</strong> pra preencher params e body, executar de verdade e copiar o cURL com os valores enviados.
+                Use a aba <strong>Testar</strong> para preencher params e body, executar de verdade e copiar o cURL com os valores reais.
             </p>
         </div>
     `;

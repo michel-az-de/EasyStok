@@ -1,14 +1,45 @@
 @page
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @model EasyStock.Admin.Pages.Tenants.IndexModel
 @{
     ViewData["Title"] = "Tenants";
+    var afCriar = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken;
+    var sucesso = TempData["Sucesso"] as string;
+    var erro = TempData["Erro"] as string;
 }
 
-<!-- Filtros -->
+<div x-data="tenantsPage()" @@keydown.window="onKey($event)" class="contents">
+
+@* Banner verde (sucesso) — toast inline padrão Admins *@
+@if (!string.IsNullOrEmpty(sucesso))
+{
+    <div class="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm mb-4">@sucesso</div>
+}
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@erro</div>
+}
+
+@* Banner dourado — senha temporária do tenant recém-criado. Aparece só uma vez. *@
+@if (!string.IsNullOrEmpty(Model.NovaSenhaTemporaria))
+{
+    <div class="bg-es-gold/10 border border-es-gold/30 text-es-gold rounded-lg px-4 py-3 text-sm mb-4">
+        <div class="font-semibold mb-1">
+            Senha temporária do admin de <strong>@Model.NovoTenantNome</strong> — anote agora, não será reexibida:
+        </div>
+        <code class="font-mono text-base select-all">@Model.NovaSenhaTemporaria</code>
+        <div class="text-xs text-es-ink-mute mt-2">
+            Enviada também por e-mail para <span class="font-mono">@Model.NovoTenantAdminEmail</span> (se o serviço de e-mail estiver disponível).
+        </div>
+    </div>
+}
+
+<!-- Filtros + ação principal -->
 <div class="flex items-center gap-3 mb-6 flex-wrap">
     <form method="get" class="flex items-center gap-3 flex-1 flex-wrap">
-        <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome ou CNPJ..."
-               class="form-input max-w-xs" />
+        <input type="text" name="search" value="@Model.Search" placeholder="Buscar por nome ou CNPJ…  ( / )"
+               x-ref="busca" class="form-input max-w-xs"
+               @@input="clearTimeout($data._debounce); $data._debounce = setTimeout(() => $el.form.submit(), 300)" />
         <select name="status" class="form-input max-w-[180px]">
             <option value="">Todos os status</option>
             <option value="Ativa" selected="@(Model.Status == "Ativa")">Ativa</option>
@@ -21,7 +52,12 @@
             <a href="/Tenants" class="btn-secondary">Limpar</a>
         }
     </form>
-    <div class="text-es-ink-mute text-sm">@Model.Total resultado(s)</div>
+    <div class="flex items-center gap-3">
+        <div class="text-es-ink-mute text-sm">@(Model.Total == 1 ? "1 resultado" : $"{Model.Total} resultados")</div>
+        <button type="button" @@click="modalCadastro = true"
+                title="Atalho: N"
+                class="btn-primary">+ Cadastrar cliente</button>
+    </div>
 </div>
 
 @if (Model.Erro != null)
@@ -34,9 +70,9 @@
         <table class="table-admin">
             <thead>
                 <tr>
-                    <th>Nome</th>
+                    <th class="min-w-[160px]">Nome</th>
                     <th>Documento</th>
-                    <th>Plano</th>
+                    <th class="whitespace-nowrap">Plano</th>
                     <th>Status</th>
                     <th>Usuários</th>
                     <th>Lojas</th>
@@ -63,9 +99,9 @@
                         _ => "badge-expirada"
                     };
                     <tr>
-                        <td class="font-medium text-es-ink">@nome</td>
+                        <td class="font-medium text-es-ink whitespace-nowrap">@nome</td>
                         <td class="text-es-ink-dim">@(doc ?? "—")</td>
-                        <td class="text-es-ink-dim">@(plano ?? "—")</td>
+                        <td class="text-es-ink-dim whitespace-nowrap overflow-hidden text-ellipsis max-w-[160px]" title="@(plano ?? "—")">@(plano ?? "—")</td>
                         <td><span class="status-badge @statusClass">@(status ?? "—")</span></td>
                         <td class="text-es-ink-dim text-center">@usuarios</td>
                         <td class="text-es-ink-dim text-center">@lojas</td>
@@ -75,6 +111,7 @@
                                 <a href="/Tenants/Detail/@id" class="text-es-accent hover:text-es-cream text-xs font-medium">Ver</a>
                                 @if (status == "Ativa")
                                 {
+                                    <span class="text-es-ink-mute/30 select-none">|</span>
                                     <button type="button"
                                             @@click="confirmId = '@id'; confirmAcao = 'suspender'"
                                             class="text-es-gold hover:text-es-cream text-xs font-medium">
@@ -83,12 +120,14 @@
                                 }
                                 else if (status == "Suspensa")
                                 {
+                                    <span class="text-es-ink-mute/30 select-none">|</span>
                                     <button type="button"
                                             @@click="confirmId = '@id'; confirmAcao = 'reativar'"
                                             class="text-es-basil hover:text-es-cream text-xs font-medium">
                                         Reativar
                                     </button>
                                 }
+                                <span class="text-es-ink-mute/30 select-none">|</span>
                                 <form method="post" asp-page-handler="Impersonar">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@id" />
@@ -145,7 +184,7 @@
                 <div class="flex gap-3 justify-end">
                     <button type="button" @@click="confirmId = null" class="btn-secondary">Cancelar</button>
                     <button type="submit"
-                            x-bind:class="confirmAcao === 'suspender' ? 'btn-danger' : 'btn-primary'">
+                            x-bind:class="confirmAcao === 'suspender' ? 'btn-warning' : 'btn-primary'">
                         <span x-text="confirmAcao === 'suspender' ? 'Suspender' : 'Reativar'"></span>
                     </button>
                 </div>
@@ -171,3 +210,111 @@
         }
     </div>
 }
+
+<!-- Modal Cadastrar Cliente -->
+<div x-show="modalCadastro" x-cloak class="modal-overlay"
+     @@click.self="modalCadastro = false" @@keydown.escape.window="modalCadastro = false"
+     role="dialog" aria-modal="true" aria-labelledby="modal-cadastro-title">
+    <div class="modal-box max-w-lg" @@click.stop>
+        <div class="flex items-start justify-between gap-3 mb-1">
+            <div>
+                <h2 id="modal-cadastro-title" class="text-es-ink font-semibold">Cadastrar cliente</h2>
+                <p class="text-es-ink-dim text-xs mt-1">
+                    Cria a empresa, o usuário admin inicial e ativa o trial de 14 dias.
+                </p>
+            </div>
+            <button type="button" @@click="modalCadastro = false" aria-label="Fechar"
+                    class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
+        </div>
+
+        <form method="post" asp-page-handler="Criar" @@submit="submittingCadastro = true" class="mt-4 space-y-3">
+            <input type="hidden" name="__RequestVerificationToken" value="@afCriar" />
+
+            <div>
+                <label class="form-label">Razão social ou nome</label>
+                <input type="text" name="nomeEmpresa" required minlength="2" maxlength="200"
+                       x-ref="nomeEmpresa"
+                       placeholder="Mercearia da Esquina LTDA"
+                       class="form-input w-full" />
+            </div>
+
+            <div>
+                <label class="form-label">CNPJ ou CPF <span class="text-es-ink-mute">(opcional)</span></label>
+                <input type="text" name="documento" data-mask="doc" maxlength="18"
+                       placeholder="00.000.000/0000-00 ou 000.000.000-00"
+                       class="form-input w-full font-mono" />
+                <p class="text-xs text-es-ink-mute mt-1">
+                    Deixe em branco se ainda não tiver — pode preencher depois.
+                </p>
+            </div>
+
+            <div class="border-t border-es-ink/10 pt-3">
+                <p class="text-es-ink-dim text-xs mb-2">Usuário admin inicial:</p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="form-label">Nome do responsável</label>
+                        <input type="text" name="nomeAdmin" required minlength="2" maxlength="120"
+                               placeholder="Maria Silva" class="form-input w-full" />
+                    </div>
+                    <div>
+                        <label class="form-label">E-mail do responsável</label>
+                        <input type="email" name="emailAdmin" required maxlength="160"
+                               placeholder="maria@mercearia.com.br" class="form-input w-full font-mono" />
+                        <p class="text-xs text-es-ink-mute mt-1">Vai receber a senha temporária por aqui.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-es-ink/10 pt-3">
+                <label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
+                <textarea name="motivo" x-model="motivoCadastro" rows="2" minlength="10" maxlength="1000" required
+                          placeholder="Ex.: cliente abriu chamado #1234 sem conseguir se cadastrar pelo site"
+                          class="form-input w-full font-mono text-sm"></textarea>
+                <p class="text-xs mt-1" :class="motivoCadastro.trim().length >= 10 ? 'text-es-basil' : 'text-es-ink-mute'">
+                    <span x-text="motivoCadastro.trim().length"></span> / 10 mínimo
+                </p>
+            </div>
+
+            <label class="flex items-center gap-2 text-xs text-es-ink-dim">
+                <input type="checkbox" name="enviarEmail" value="true" checked class="form-checkbox" />
+                Enviar a senha temporária por e-mail também
+            </label>
+
+            <div class="flex gap-3 justify-end pt-2">
+                <button type="button" @@click="modalCadastro = false" :disabled="submittingCadastro"
+                        class="btn-secondary">Cancelar</button>
+                <button type="submit" :disabled="motivoCadastro.trim().length < 10 || submittingCadastro"
+                        class="btn-primary">
+                    <span x-show="!submittingCadastro">Cadastrar cliente</span>
+                    <span x-show="submittingCadastro" x-cloak>Cadastrando…</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</div><!-- /x-data tenantsPage -->
+
+<script>
+function tenantsPage() {
+    return {
+        modalCadastro: false,
+        submittingCadastro: false,
+        motivoCadastro: '',
+        onKey(e) {
+            // Ignora atalhos quando o usuário está digitando em input/textarea/select.
+            const tag = (e.target?.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            if (e.key === '/') {
+                e.preventDefault();
+                this.$refs.busca?.focus();
+            } else if (e.key === 'n' || e.key === 'N') {
+                e.preventDefault();
+                this.modalCadastro = true;
+                // Foca no primeiro campo após o modal montar.
+                setTimeout(() => this.$refs.nomeEmpresa?.focus(), 50);
+            }
+        }
+    };
+}
+</script>

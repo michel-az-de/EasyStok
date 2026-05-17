@@ -15,8 +15,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(iv => iv.VariacaoSnapshot).HasMaxLength(180);
             builder.Property(iv => iv.Quantidade)
                 .HasConversion(
-                    q => q == null ? 0 : q.Value,
-                    value => value >= 0 ? Quantidade.From(value) : Quantidade.Zero);
+                    q => q == null ? 0m : q.Value,
+                    value => value >= 0 ? Quantidade.From(value) : Quantidade.Zero)
+                .HasColumnType("numeric(18,3)");
             builder.Property(iv => iv.PrecoUnitario)
                 .HasConversion(
                     d => d == null ? 0m : d.Valor,

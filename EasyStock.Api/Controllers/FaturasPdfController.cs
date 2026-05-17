@@ -5,6 +5,7 @@ using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -24,7 +25,8 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 public class FaturasPdfController(
     GerarPdfFaturaUseCase gerarPdfUseCase,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    ILogger<FaturasPdfController> logger) : EasyStockControllerBase
 {
     /// <summary>Cliente: baixa PDF de uma fatura propria.</summary>
     [SwaggerOperation(Summary = "Baixar PDF da fatura (cliente)")]
@@ -73,11 +75,18 @@ public class FaturasPdfController(
 
         if (result is null) return DataNotFound("Fatura nao encontrada.");
 
-        // Admin operacional: bloqueia acesso a fatura de outra empresa.
-        // (Usamos a fatura ja carregada — recurso ja foi baixado, mas como o
-        // endpoint admin precisa permissao explicita, e aceitavel.)
-        // Para uma checagem stricta antes do download, pode-se carregar so o
-        // cabecalho da fatura — opcional na proxima iteracao.
+        // Admin operacional: bloqueia acesso a fatura de outra empresa. Antes do fix
+        // do GetByIdAdminAsync isso era garantido por acidente pelo GlobalQueryFilter;
+        // agora o filter foi removido (interface promete "sem filtro EmpresaId") e
+        // a checagem precisa ser explicita aqui. SuperAdmin passa por design.
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin
+            && result.EmpresaId != currentUser.EmpresaId)
+        {
+            logger.LogWarning(
+                "Tentativa de acesso cross-tenant a PDF de fatura. UserEmpresaId={UserEmpresaId} FaturaEmpresaId={FaturaEmpresaId} FaturaId={FaturaId}",
+                currentUser.EmpresaId, result.EmpresaId, id);
+            return DataNotFound("Fatura nao encontrada.");
+        }
 
         return File(result.Bytes, result.ContentType, result.FileName);
     }

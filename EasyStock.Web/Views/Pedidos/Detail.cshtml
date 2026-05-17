@@ -4,15 +4,7 @@
     ViewBag.Title = $"Pedido {p.Id.Substring(0, 8)}";
     Layout = "_Layout";
 
-    string statusBadgeClass(string? s) => s switch
-    {
-        "aguardando" => "bg-amber-100 text-amber-700",
-        "preparando" => "bg-blue-100 text-blue-700",
-        "pronto"     => "bg-violet-100 text-violet-700",
-        "entregue"   => "bg-green-100 text-green-700",
-        "cancelado"  => "bg-slate-100 text-slate-500",
-        _            => "bg-slate-100 text-slate-600"
-    };
+    var statusInfo = StatusHelper.Resolve(p.Status);
     string nextStatus(string s) => s switch
     {
         "aguardando" => "preparando",
@@ -22,26 +14,40 @@
     } ?? "";
     string nextLabel(string s) => s switch
     {
-        "aguardando" => "▶ Iniciar preparo",
-        "preparando" => "✓ Marcar pronto",
-        "pronto"     => "✓ Marcar entregue",
+        "aguardando" => "Iniciar preparo",
+        "preparando" => "Marcar como pronto",
+        "pronto"     => "Confirmar entrega",
         _            => ""
     };
+
+    // Timeline de status
+    var statusOrder = new[] { "aguardando", "preparando", "pronto", "entregue" };
+    var statusLabels = new Dictionary<string, string> {
+        { "aguardando", "Recebido" },
+        { "preparando", "Em preparo" },
+        { "pronto",     "Pronto" },
+        { "entregue",   "Entregue" }
+    };
+    var currentIdx = Array.IndexOf(statusOrder, p.Status);
+    var isCancelado = p.Status == "cancelado";
+
+    // Progresso de pagamento
+    var progressoPagamento = p.Total > 0 ? Math.Min(100, (int)Math.Round((double)(p.TotalPago / p.Total) * 100)) : 0;
 }
 
-<div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="Pedidos" class="text-slate-400 hover:text-slate-600">
+<div class="flex items-center gap-3 mb-4">
+    <a asp-action="Index" asp-controller="Pedidos" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para pedidos">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
-    <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status)">@p.Status</span>
+    <span class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
     <div class="ml-auto flex gap-2">
         <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
             🖨 Recibo
         </a>
-        @if (p.Status != "entregue" && p.Status != "cancelado")
+        @if (p.Status != "entregue" && !isCancelado)
         {
             var nxt = nextStatus(p.Status);
             if (!string.IsNullOrEmpty(nxt))
@@ -55,20 +61,165 @@
                 </form>
             }
             <form asp-action="Cancelar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
-                  onsubmit="return confirm('Cancelar pedido?');">
+                  data-confirm='{"titulo":"Cancelar pedido?","mensagem":"O pedido sera marcado como cancelado e nao pode ser revertido.","textoBotao":"Cancelar pedido","classBotao":"bg-red-600 hover:bg-red-700"}'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
                     Cancelar
                 </button>
             </form>
         }
+        @if (!isCancelado && p.Status != "entregue")
+        {
+            <div x-data="{ showAgendar: false }" class="relative">
+                @if (p.IsScheduled)
+                {
+                    <form asp-action="Agendar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50"
+                                title="Pedido vira imediato (sem data agendada)">
+                            Remover agendamento
+                        </button>
+                    </form>
+                }
+                <button type="button" @@click="showAgendar = !showAgendar"
+                        class="px-3.5 py-2 bg-white border border-blue-300 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-50">
+                    📅 @(p.IsScheduled ? "Reagendar" : "Agendar")
+                </button>
+                <div x-show="showAgendar" x-cloak @@click.outside="showAgendar = false"
+                     class="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg p-3 w-72">
+                    <form asp-action="Agendar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <label class="block text-sm text-slate-700 mb-1">Data e hora</label>
+                        <input type="datetime-local" name="agendadoParaEm" required
+                               class="ui-field w-full text-sm mb-2" />
+                        <button type="submit" class="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+                            Confirmar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        }
+        <button type="button" x-data @@click="$dispatch('open-modal', 'reportar-problema')"
+                class="px-3.5 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-semibold rounded-lg hover:bg-amber-50"
+                title="Abre ticket pra EasyStok sobre este pedido">
+            ⚠ Reportar problema
+        </button>
     </div>
 </div>
 
+<!-- Timeline de status -->
+@if (!isCancelado)
+{
+    <div class="ped-timeline mb-6" aria-label="Progresso do pedido">
+        @for (var i = 0; i < statusOrder.Length; i++)
+        {
+            var key = statusOrder[i];
+            var isCurrent = i == currentIdx;
+            var isDone = i < currentIdx;
+            var statusClass = isDone ? "ped-timeline__step--done" : isCurrent ? "ped-timeline__step--current" : "ped-timeline__step--future";
+            <div class="ped-timeline__step @statusClass">
+                <div class="ped-timeline__dot" aria-hidden="true">
+                    @if (isDone) { <span>✓</span> } else { <span>@(i + 1)</span> }
+                </div>
+                <div class="ped-timeline__label">@statusLabels[key]</div>
+            </div>
+            @if (i < statusOrder.Length - 1)
+            {
+                <div class="ped-timeline__connector @(i < currentIdx ? "ped-timeline__connector--done" : "")"></div>
+            }
+        }
+    </div>
+}
+else
+{
+    <div class="ped-cancel-banner mb-6">
+        <span class="text-base">🚫</span>
+        <div>
+            <div class="font-semibold">Pedido cancelado</div>
+            @if (p.CanceladoEm.HasValue)
+            {
+                <div class="text-xs opacity-80">em @p.CanceladoEm.Value.ToLocalTime().AsDateTime()</div>
+            }
+        </div>
+    </div>
+}
+
+@if (p.Status == "entregue" && !p.Quitado)
+{
+    <div class="flex items-start gap-3 p-4 mb-6 bg-yellow-50 border border-yellow-200 rounded-xl">
+        <svg class="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <div class="flex-1">
+            <div class="font-semibold text-yellow-900 text-sm">Pagamento pendente</div>
+            <div class="text-xs text-yellow-800 mt-0.5">Este pedido foi entregue mas o pagamento ainda não foi registrado.</div>
+        </div>
+        <button type="button" x-data @@click="$dispatch('open-modal', 'registrar-pagamento')"
+                class="shrink-0 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-lg">
+            Registrar recebimento
+        </button>
+    </div>
+}
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-1 space-y-4">
+        <!-- Card de pagamento (destaque) -->
         <div class="ws">
-            <h2 class="font-semibold text-slate-900 mb-3">Resumo</h2>
+            <div class="flex items-baseline justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pagamento</span>
+                @if (isCancelado)
+                {
+                    @* Pedido cancelado nao gera cobranca em aberto. *@
+                    if (p.TotalPago > 0)
+                    {
+                        <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full" title="Pagamento recebido antes do cancelamento — verifique se ha reembolso pendente.">Pago antes do cancelamento</span>
+                    }
+                    else
+                    {
+                        <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">Sem cobrança</span>
+                    }
+                }
+                else if (p.Quitado)
+                {
+                    <span class="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Quitado</span>
+                }
+                else if (p.TotalPago > 0)
+                {
+                    <span class="text-xs font-medium px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">Parcial</span>
+                }
+                else
+                {
+                    <span class="text-xs font-medium px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full">Pendente</span>
+                }
+            </div>
+            <div class="text-3xl font-bold @(isCancelado ? "text-slate-400 line-through" : "text-slate-900") mb-1 tabular-nums">@p.Total.AsMoney()</div>
+            @if (!isCancelado)
+            {
+                <div class="ped-progress" role="progressbar" aria-valuenow="@progressoPagamento" aria-valuemin="0" aria-valuemax="100">
+                    <div class="ped-progress__bar @(p.Quitado ? "ped-progress__bar--done" : "")" style="width: @(progressoPagamento)%"></div>
+                </div>
+                <div class="flex items-baseline justify-between text-sm mt-2">
+                    <div>
+                        <span class="text-slate-500">Pago</span>
+                        <span class="font-semibold text-slate-900 ml-1 tabular-nums">@p.TotalPago.AsMoney()</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500">Falta</span>
+                        <span class="font-semibold ml-1 tabular-nums @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.AsMoney()</span>
+                    </div>
+                </div>
+            }
+            else if (p.TotalPago > 0)
+            {
+                <p class="text-xs text-slate-500 mt-2">
+                    Já havia <span class="font-semibold text-slate-700">@p.TotalPago.ToString("C")</span> recebido antes do cancelamento — verifique se há reembolso a processar.
+                </p>
+            }
+        </div>
+
+        <!-- Card de detalhes -->
+        <div class="ws">
+            <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Detalhes</h2>
             <dl class="space-y-2 text-sm">
                 @if (p.ClienteId.HasValue)
                 {
@@ -77,31 +228,40 @@
                 }
                 else if (!string.IsNullOrEmpty(p.ClienteNome))
                 {
-                    <div><dt class="text-slate-500">Cliente (ad-hoc)</dt><dd class="font-medium">@p.ClienteNome</dd></div>
+                    <div>
+                        <dt class="text-slate-500">Cliente</dt>
+                        <dd class="font-medium">@p.ClienteNome <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded ml-1">Sem cadastro</span></dd>
+                    </div>
                 }
-                @if (!string.IsNullOrEmpty(p.ClienteApt))      { <div><dt class="text-slate-500">Apt</dt><dd>@p.ClienteApt</dd></div> }
+                @if (!string.IsNullOrEmpty(p.ClienteApt))      { <div><dt class="text-slate-500">Apt / Mesa</dt><dd>@p.ClienteApt</dd></div> }
                 @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <div><dt class="text-slate-500">Telefone</dt><dd>@p.ClienteTelefone</dd></div> }
-                <div class="pt-2 border-t"><dt class="text-slate-500">Total</dt><dd class="text-lg font-bold text-slate-900">@p.Total.ToString("C")</dd></div>
-                <div><dt class="text-slate-500">Pago</dt>
-                     <dd>@p.TotalPago.ToString("C") @if (p.Quitado) {<span class="ml-1 text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded">quitado</span>}
-                                                   else if (p.TotalPago > 0) {<span class="ml-1 text-xs px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded">parcial</span>}
-                     </dd></div>
-                <div><dt class="text-slate-500">Pendente</dt><dd class="font-medium @(p.Pendente > 0 ? "text-amber-700" : "text-green-700")">@p.Pendente.ToString("C")</dd></div>
                 <div class="pt-2 border-t"><dt class="text-slate-500">Origem</dt><dd>@(p.Origem ?? "—")</dd></div>
-                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
-                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
-                @if (p.CanceladoEm.HasValue){ <div><dt class="text-slate-500">Cancelado</dt><dd>@p.CanceladoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
+                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().AsDateTime()</dd></div>
+                @if (p.AgendadoParaEm.HasValue)
+                {
+                    var agBadge = p.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
+                    var agPrefix = p.IsAtrasado ? "⚠ Atrasado:" : "📅";
+                    <div>
+                        <dt class="text-slate-500">Agendado para</dt>
+                        <dd>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @agBadge">
+                                @agPrefix @p.AgendadoParaEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </span>
+                        </dd>
+                    </div>
+                }
+                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().AsDateTime()</dd></div> }
                 @if (!string.IsNullOrEmpty(p.MobileOrderId))
                 {
-                    <div><dt class="text-slate-500">Mobile order</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
+                    <div><dt class="text-slate-500">ID externo (app)</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
                 }
                 @if (p.VendaId.HasValue)
                 {
-                    <div><dt class="text-slate-500">Venda ERP</dt><dd class="font-mono text-xs">@p.VendaId</dd></div>
+                    <div><dt class="text-slate-500">Referência interna</dt><dd class="font-mono text-xs">@p.VendaId</dd></div>
                 }
                 @if (!string.IsNullOrEmpty(p.Observacoes))
                 {
-                    <div class="pt-2 border-t"><dt class="text-slate-500">Observações</dt><dd class="whitespace-pre-line">@p.Observacoes</dd></div>
+                    <div class="pt-2 border-t"><dt class="text-slate-500">Observações</dt><dd class="whitespace-pre-line text-slate-700">@p.Observacoes</dd></div>
                 }
             </dl>
         </div>
@@ -113,13 +273,14 @@
                 @foreach (var (key, label, count) in new[] {
                     ("itens",       "Itens",       Model.Detalhe.Itens.Count),
                     ("pagamentos",  "Pagamentos",  Model.Detalhe.Pagamentos.Count),
-                    ("eventos",     "Histórico",   Model.Detalhe.Eventos.Count)
+                    ("eventos",     "Eventos",     Model.Detalhe.Eventos.Count),
+                    ("auditoria",   "Auditoria",   -1)
                 })
                 {
                     <button type="button" @@click="tab = '@key'"
                             :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
                             class="px-3 py-2 text-sm font-medium border-b-2">
-                        @label <span class="text-xs text-slate-400">(@count)</span>
+                        @label @if (count >= 0) { <span class="text-xs text-slate-400">(@count)</span> }
                     </button>
                 }
             </div>
@@ -129,40 +290,71 @@
                 @if (Model.Detalhe.Itens.Any())
                 {
                     <table class="w-full text-sm mb-4">
-                        <thead class="text-xs text-slate-500"><tr><th class="text-left py-1">Item</th><th class="text-right py-1">Qtd</th><th class="text-right py-1">Preço</th><th class="text-right py-1">Subtotal</th><th></th></tr></thead>
+                        <thead class="text-xs text-slate-500 uppercase tracking-wider">
+                            <tr>
+                                <th class="text-left py-2">Item</th>
+                                <th class="col-num py-2">Qtd</th>
+                                <th class="col-num py-2">Preço</th>
+                                <th class="col-num py-2">Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
                         <tbody class="divide-y divide-slate-100">
                         @foreach (var i in Model.Detalhe.Itens)
                         {
                             <tr>
-                                <td class="py-2"><span class="font-medium">@i.Emoji @i.Nome</span> @if (!string.IsNullOrEmpty(i.Unidade)) {<span class="text-xs text-slate-400">@i.Unidade</span>}</td>
-                                <td class="text-right">@i.Quantidade</td>
-                                <td class="text-right">@i.PrecoUnitario.ToString("C")</td>
-                                <td class="text-right font-medium">@i.Subtotal.ToString("C")</td>
+                                <td class="py-3">
+                                    <span class="font-medium text-slate-900">@i.Emoji @i.Nome</span>
+                                    @if (!string.IsNullOrEmpty(i.Unidade)) {<span class="text-xs text-slate-400 ml-1">@i.Unidade</span>}
+                                </td>
+                                @* Antes mostrava "3,000" quando a quantidade era decimal 3.000M
+                                   (precisao do tipo). 0.## suprime trailing zeros — vira "3" ou "3,5". *@
+                                <td class="col-num text-slate-700">@i.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
+                                <td class="col-num text-slate-700">@i.PrecoUnitario.AsMoney()</td>
+                                <td class="col-num font-semibold text-slate-900">@i.Subtotal.AsMoney()</td>
                                 <td class="text-right">
-                                    @if (p.Status != "entregue" && p.Status != "cancelado")
+                                    @if (p.Status != "entregue" && !isCancelado)
                                     {
-                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" onsubmit="return confirm('Remover item?');">
+                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do pedido?","mensagem":"O item sera removido do pedido. Estoque sera ajustado.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                             @Html.AntiForgeryToken()
-                                            <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                                            <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Remover @i.Nome">✕</button>
                                         </form>
                                     }
                                 </td>
                             </tr>
                         }
                         </tbody>
+                        <tfoot>
+                            <tr class="border-t-2 border-slate-200">
+                                <td colspan="3" class="pt-3 text-right text-sm font-semibold text-slate-500 uppercase tracking-wider">Total</td>
+                                <td class="pt-3 col-num text-base font-bold text-slate-900">@p.Total.AsMoney()</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 }
-                else { <p class="text-sm text-slate-500 mb-4">Nenhum item.</p> }
-
-                @if (p.Status != "entregue" && p.Status != "cancelado")
+                else
                 {
-                    <form asp-action="AddItem" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t" aria-label="Adicionar item ao pedido">
+                    <div class="text-center py-8 mb-4">
+                        <div class="text-3xl mb-1">🛒</div>
+                        <p class="text-sm font-medium text-slate-600">Nenhum item neste pedido</p>
+                        <p class="text-xs text-slate-500 mt-1">Adicione itens abaixo para começar</p>
+                    </div>
+                }
+
+                @if (p.Status != "entregue" && !isCancelado)
+                {
+                    <form asp-action="AddItem" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                          class="ped-add-row" aria-label="Adicionar item ao pedido">
                         @Html.AntiForgeryToken()
-                        <input type="text"   name="nome"          placeholder="Nome *"      required aria-label="Nome do item" class="ui-field text-sm col-span-5" />
-                        <input type="number" name="quantidade"    placeholder="Qtd"   step="0.01" min="0.01" required aria-label="Quantidade" class="ui-field text-sm col-span-2" />
-                        <input type="number" name="precoUnitario" placeholder="Preço" step="0.01" min="0"   required aria-label="Preço unitário" class="ui-field text-sm col-span-2" />
-                        <input type="text"   name="unidade"       placeholder="Un"          aria-label="Unidade de medida" class="ui-field text-sm col-span-1" />
-                        <button type="submit" class="app-primary-btn col-span-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Item</button>
+                        <div class="ped-add-row__title">Adicionar item</div>
+                        <div class="ped-add-row__grid">
+                            <input type="text"   name="nome"          placeholder="Nome do item *" required aria-label="Nome do item" class="ui-field text-sm" style="grid-area: nome;" />
+                            <input type="number" name="quantidade"    placeholder="Qtd" step="0.01" min="0.01" required aria-label="Quantidade" class="ui-field text-sm text-right" style="grid-area: qtd;" />
+                            <input type="number" name="precoUnitario" placeholder="Preço" step="0.01" min="0"   required aria-label="Preço unitário" class="ui-field text-sm text-right" style="grid-area: preco;" />
+                            <input type="text"   name="unidade"       placeholder="Un (kg, un...)" aria-label="Unidade de medida" class="ui-field text-sm" style="grid-area: un;" />
+                            <button type="submit" class="app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700" style="grid-area: btn;">+ Adicionar</button>
+                        </div>
                     </form>
                 }
             </div>
@@ -176,32 +368,72 @@
                     {
                         <li class="py-3 flex items-center justify-between gap-2">
                             <div class="text-sm">
-                                <div class="font-medium text-slate-900">@pg.Valor.ToString("C") <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded uppercase">@pg.Metodo</span></div>
-                                <div class="text-xs text-slate-500">@pg.PagoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm") @(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : "· por " + pg.RegistradoPorNome) @(string.IsNullOrEmpty(pg.Referencia) ? "" : "· ref: " + pg.Referencia)</div>
+                                <div class="font-semibold text-slate-900 tabular-nums">@pg.Valor.AsMoney() <span class="text-[10px] font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded uppercase tracking-wider ml-1">@pg.Metodo</span></div>
+                                <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ToLocalTime().AsDateTime()@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
                                 @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
                             </div>
-                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" onsubmit="return confirm('Remover pagamento?');">
+                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" data-confirm='{"titulo":"Remover pagamento?","mensagem":"O pagamento sera estornado do pedido.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                                <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar pagamento">✕</button>
                             </form>
                         </li>
                     }
                     </ul>
                 }
-                else { <p class="text-sm text-slate-500 mb-4">Nenhum pagamento registrado.</p> }
+                else
+                {
+                    <div class="text-center py-8 mb-4">
+                        <div class="text-3xl mb-1">💳</div>
+                        <p class="text-sm font-medium text-slate-600">Nenhum pagamento registrado</p>
+                        <p class="text-xs text-slate-500 mt-1">
+                            @if (p.Pendente > 0)
+                            {
+                                @($"Falta {p.Pendente:C} para quitar")
+                            }
+                            else
+                            {
+                                @:Sem valor a receber
+                            }
+                        </p>
+                    </div>
+                }
 
-                <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="grid grid-cols-12 gap-2 pt-3 border-t" aria-label="Registrar pagamento">
-                    @Html.AntiForgeryToken()
-                    <select name="metodo" required aria-label="Método de pagamento" class="ui-select text-sm col-span-3">
-                        <option value="pix">PIX</option><option value="dinheiro">Dinheiro</option>
-                        <option value="credito">Crédito</option><option value="debito">Débito</option>
-                        <option value="transferencia">Transferência</option><option value="outro">Outro</option>
-                    </select>
-                    <input type="number" name="valor" placeholder="Valor *" step="0.01" min="0.01" required aria-label="Valor do pagamento" class="ui-field text-sm col-span-3" />
-                    <input type="text" name="referencia" placeholder="Referência (txid, NSU)" aria-label="Referência do pagamento" class="ui-field text-sm col-span-3" />
-                    <input type="text" name="observacao" placeholder="Observação" aria-label="Observação" class="ui-field text-sm col-span-3" />
-                    <button type="submit" class="app-primary-btn col-span-12 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">+ Registrar Pagamento</button>
-                </form>
+                @if (!isCancelado && p.Pendente > 0)
+                {
+                    <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                          class="ped-add-row" aria-label="Registrar pagamento"
+                          x-data="{ valor: @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) }">
+                        @Html.AntiForgeryToken()
+                        <div class="flex items-baseline justify-between mb-2">
+                            <div class="ped-add-row__title">Registrar pagamento</div>
+                            <div class="flex gap-2">
+                                <button type="button" class="ped-quick-btn" @@click="valor = @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                                    Pendente (@p.Pendente.AsMoney())
+                                </button>
+                                <button type="button" class="ped-quick-btn" @@click="valor = @p.Total.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                                    Total (@p.Total.AsMoney())
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ped-pag-grid">
+                            <select name="metodo" required aria-label="Método de pagamento" class="ui-select text-sm" style="grid-area: metodo;">
+                                <option value="pix">PIX</option>
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="credito">Crédito</option>
+                                <option value="debito">Débito</option>
+                                <option value="transferencia">Transferência</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                            <input type="number" name="valor" x-model.number="valor" placeholder="Valor *" step="0.01" min="0.01" required
+                                   aria-label="Valor do pagamento" class="ui-field text-sm text-right" style="grid-area: valor;" />
+                            <input type="text" name="referencia" placeholder="Referência (txid, NSU)" aria-label="Referência" class="ui-field text-sm" style="grid-area: ref;" />
+                            <input type="text" name="observacao" placeholder="Observação opcional" aria-label="Observação" class="ui-field text-sm" style="grid-area: obs;" />
+                            <button type="submit" class="app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700" style="grid-area: btn;">
+                                Registrar pagamento
+                            </button>
+                        </div>
+                    </form>
+                }
             </div>
 
             <!-- Eventos -->
@@ -213,7 +445,7 @@
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ToLocalTime().AsDateTime()</span>
                                 <span class="font-medium text-slate-900">@e.Tipo</span>
                                 @if (!string.IsNullOrEmpty(e.StatusAntigo) && !string.IsNullOrEmpty(e.StatusNovo))
                                 {
@@ -229,6 +461,262 @@
                 }
                 else { <p class="text-sm text-slate-500">Nenhum evento.</p> }
             </div>
+
+            <!-- F10-D: Auditoria (entity_alteracoes via AJAX) -->
+            <div x-show="tab === 'auditoria'" x-cloak class="p-4"
+                 x-init="$watch('tab', v => { if (v === 'auditoria') loadAuditoria(); })">
+                <div id="auditoria-content">
+                    <p class="text-sm text-slate-500">Carregando auditoria...</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function loadAuditoria() {
+    var el = document.getElementById('auditoria-content');
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = '1';
+    fetch('/api/audit/entity/Pedido/@p.Id')
+        .then(r => r.json())
+        .then(res => {
+            var items = (res.data && res.data.items) || [];
+            if (items.length === 0) {
+                el.innerHTML = '<p class="text-sm text-slate-500">Nenhuma alteração registrada.</p>';
+                return;
+            }
+            var html = '<ul class="divide-y divide-slate-100">';
+            items.forEach(function(a) {
+                var dt = new Date(a.alteradoEm);
+                var fmt = dt.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' ' +
+                          dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+                html += '<li class="py-2 text-sm">';
+                html += '<div class="flex items-center gap-2 flex-wrap">';
+                html += '<span class="text-xs text-slate-400 font-mono">' + fmt + '</span>';
+                html += '<span class="font-medium text-slate-900">' + escHtml(a.acao) + '</span>';
+                if (a.campo) {
+                    html += '<span class="text-xs text-slate-600">' + escHtml(a.campo) + '</span>';
+                }
+                if (a.valorAntigo != null || a.valorNovo != null) {
+                    html += '<span class="text-xs text-slate-500">';
+                    if (a.valorAntigo != null) html += '<del class="text-red-400">' + escHtml(trunc(a.valorAntigo, 50)) + '</del> ';
+                    if (a.valorNovo != null) html += '<ins class="text-green-600 no-underline">' + escHtml(trunc(a.valorNovo, 50)) + '</ins>';
+                    html += '</span>';
+                }
+                if (a.origem) html += '<span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">' + escHtml(a.origem) + '</span>';
+                if (a.hasPii) html += '<span class="text-xs" title="Contém PII mascarada">🔒</span>';
+                html += '</div>';
+                if (a.alteradoPorNome) html += '<div class="text-xs text-slate-400 ml-2">por ' + escHtml(a.alteradoPorNome) + '</div>';
+                html += '</li>';
+            });
+            html += '</ul>';
+            if (res.data.total > 50) html += '<p class="text-xs text-slate-400 mt-2">Mostrando 50 de ' + res.data.total + ' alterações.</p>';
+            el.innerHTML = html;
+        })
+        .catch(function() { el.innerHTML = '<p class="text-sm text-red-500">Erro ao carregar auditoria.</p>'; });
+}
+function escHtml(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s; }
+</script>
+
+@if (p.Status != "entregue" && !isCancelado)
+{
+    <!-- Modal: confirmar cancelamento -->
+    <div x-data="cancelarPedidoModal()"
+         x-show="open" x-cloak
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition duration-100 ease-in"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="alertdialog" aria-modal="true" aria-labelledby="fm-cancel-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 480px"
+              method="post" action="/pedidos/@p.Id/cancelar"
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-cancel-title" class="fm-header__title text-red-700">Cancelar este pedido?</h2>
+                    <p class="fm-header__subtitle">
+                        @if (p.TotalPago > 0)
+                        {
+                            @($"Já foram registrados {p.TotalPago:C} em pagamentos. Estorne os pagamentos antes de cancelar, se necessário.")
+                        }
+                        else
+                        {
+                            @:Esta ação não pode ser desfeita. O pedido será marcado como cancelado e sairá da lista de pendentes.
+                        }
+                    </p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <div class="fm-body">
+                <div class="fm-field">
+                    <label class="fm-field__label" for="cancel-motivo">Motivo (opcional)</label>
+                    <textarea id="cancel-motivo" name="motivo" rows="2"
+                              placeholder="Ex: cliente desistiu, item indisponível..."
+                              class="ui-textarea w-full text-sm"></textarea>
+                    <span class="fm-field__hint">Fica registrado no histórico do pedido</span>
+                </div>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Voltar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+                    Sim, cancelar pedido
+                </button>
+            </footer>
+        </form>
+    </div>
+
+    <!-- Modal: reportar problema -->
+    <div x-data="reportarProblemaModal()"
+         x-show="open" x-cloak
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition duration-100 ease-in"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @@keydown.escape.window="close()"
+         @@click.self="close()"
+         class="fm-overlay"
+         role="alertdialog" aria-modal="true" aria-labelledby="fm-report-title">
+        <form x-ref="panel" class="fm-panel" style="max-width: 520px"
+              method="post" action="/pedidos/@p.Id/reportar-problema"
+              x-transition:enter="transition duration-150 ease-out"
+              x-transition:enter-start="opacity-0 scale-95"
+              x-transition:enter-end="opacity-100 scale-100">
+            @Html.AntiForgeryToken()
+            <header class="fm-header">
+                <div>
+                    <h2 id="fm-report-title" class="fm-header__title text-amber-700">Reportar problema deste pedido</h2>
+                    <p class="fm-header__subtitle">
+                        Abre ticket pra EasyStok sobre este pedido. Voce pode acompanhar a resposta em Suporte.
+                    </p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+            </header>
+            <div class="fm-body">
+                <div class="fm-field">
+                    <label class="fm-field__label" for="report-motivo">Motivo *</label>
+                    <select id="report-motivo" name="motivo" required class="ui-select w-full text-sm">
+                        <option value="">— escolha —</option>
+                        <option value="Pedido travado / nao avancou status">Pedido travado / nao avancou status</option>
+                        <option value="Sync falhou (mobile <-> web)">Sync falhou (mobile <-> web)</option>
+                        <option value="Item duplicado ou faltando">Item duplicado ou faltando</option>
+                        <option value="Pagamento nao registrou">Pagamento nao registrou</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="fm-field">
+                    <label class="fm-field__label" for="report-categoria">Categoria</label>
+                    <select id="report-categoria" name="categoria" class="ui-select w-full text-sm">
+                        <option value="Solicitacao">Solicitacao</option>
+                        <option value="Incidente">Incidente</option>
+                        <option value="Bug">Bug</option>
+                        <option value="Duvida">Duvida</option>
+                    </select>
+                </div>
+                <div class="fm-field">
+                    <label class="fm-field__label" for="report-descricao">Descricao (opcional)</label>
+                    <textarea id="report-descricao" name="descricao" rows="4"
+                              placeholder="Detalhes adicionais que ajudem a entender o problema..."
+                              class="ui-textarea w-full text-sm"></textarea>
+                    <span class="fm-field__hint">O ticket vai linkar automaticamente ao pedido @p.Id.Substring(0, 8)</span>
+                </div>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="close()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
+                    Abrir ticket
+                </button>
+            </footer>
+        </form>
+    </div>
+
+    @section Scripts {
+    <script>
+    function cancelarPedidoModal() {
+        return {
+            open: false,
+            _previousFocus: null,
+            init() {
+                window.addEventListener('open-modal', (e) => {
+                    if (e.detail !== 'cancelar-pedido') return;
+                    this._previousFocus = document.activeElement;
+                    this.open = true;
+                    this.$nextTick(() => this.$refs.panel.querySelector('textarea')?.focus());
+                });
+                this.$watch('open', (v) => {
+                    document.body.style.overflow = v ? 'hidden' : '';
+                    if (!v && this._previousFocus) this._previousFocus.focus?.();
+                });
+            },
+            close() { this.open = false; }
+        };
+    }
+
+    function reportarProblemaModal() {
+        return {
+            open: false,
+            _previousFocus: null,
+            init() {
+                window.addEventListener('open-modal', (e) => {
+                    if (e.detail !== 'reportar-problema') return;
+                    this._previousFocus = document.activeElement;
+                    this.open = true;
+                    this.$nextTick(() => this.$refs.panel.querySelector('select[name="motivo"]')?.focus());
+                });
+                this.$watch('open', (v) => {
+                    document.body.style.overflow = v ? 'hidden' : '';
+                    if (!v && this._previousFocus) this._previousFocus.focus?.();
+                });
+            },
+            close() { this.open = false; }
+        };
+    }
+
+    // Avisos do modal Novo Pedido: falhas parciais (cliente/produto que viraram avulso)
+    // foram persistidas em sessionStorage por id de pedido. Exibimos como toasts amarelos
+    // ao chegar no detalhe e limpamos a chave.
+    (function exibirAvisosPersistidos() {
+        try {
+            const pedidoId = '@p.Id';
+            const key = 'pedido-avisos-' + pedidoId;
+            const raw = sessionStorage.getItem(key);
+            if (!raw) return;
+            const avisos = JSON.parse(raw);
+            sessionStorage.removeItem(key);
+            if (!Array.isArray(avisos) || avisos.length === 0) return;
+            // Mostra cada aviso como toast com pequeno stagger pra serem legíveis.
+            avisos.forEach((msg, i) => {
+                setTimeout(() => {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast(msg, 'warning');
+                    } else {
+                        console.warn('[Pedido] aviso:', msg);
+                    }
+                }, 400 * i);
+            });
+        } catch (err) {
+            console.warn('[Pedido] Falha ao ler avisos persistidos:', err);
+        }
+    })();
+    </script>
+    }
+}

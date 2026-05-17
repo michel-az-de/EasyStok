@@ -7,7 +7,11 @@ namespace EasyStock.Web.Controllers;
 
 public class AnalyticsController(AnalyticsService svc, SessionService session) : BaseController(session)
 {
+    // /analises = alias PT-BR. O link no menu mostra "Análises", então usuários
+    // digitam /analises na URL e batem em 404. Mantemos /analytics por compatibilidade
+    // com bookmarks e command palette.
     [HttpGet("/analytics")]
+    [HttpGet("/analises")]
     public async Task<IActionResult> Index(int meses = 6)
     {
         ViewBag.Title = "Analytics";
@@ -37,6 +41,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
             vm.ProjUnidades7d = dash.MediaVendasDiaria * 7;
             vm.ProjUnidades30d = dash.MediaVendasDiaria * 30;
             vm.ProjReceita30d = dash.ReceitaEstimadaPeriodo;
+            vm.ReceitaProjetadaDisponivel = dash.ReceitaEstimadaPeriodo > 0;
         }
 
         if (receitaResult.Success && receitaResult.Data is { } receita && receita.Count > 0)
@@ -55,18 +60,32 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
 
         if (alertasResult.Success && alertasResult.Data is { } alertas)
         {
-            vm.Alertas = alertas.Select(a => new AlertaItem(
-                "validade",
-                a.NomeProduto ?? a.CodigoInterno ?? "Produto",
-                $"Vence em {a.DiasAteVencimento} dia(s) — {a.QuantidadeAtual} un. em risco",
-                a.ItemEstoqueId
-            )).ToList();
+            vm.Alertas = alertas
+                .GroupBy(a => a.ProdutoId)
+                .Select(g =>
+                {
+                    var minDias = g.Min(a => a.DiasAteVencimento);
+                    var totalQtd = g.Sum(a => a.QuantidadeAtual);
+                    var lotes = g.Count();
+                    var nome = g.First().NomeProduto ?? g.First().CodigoInterno ?? "Produto";
+                    var lotesStr = lotes > 1 ? $" em {lotes} lotes" : "";
+                    return new AlertaItem(
+                        "validade",
+                        nome,
+                        $"Vence em {minDias} dia(s) — {totalQtd} un. em risco{lotesStr}",
+                        g.Key
+                    );
+                })
+                .OrderBy(a => int.TryParse(
+                    System.Text.RegularExpressions.Regex.Match(a.Mensagem, @"\d+").Value, out var d) ? d : int.MaxValue)
+                .ToList();
         }
 
         return View(vm);
     }
 
     [HttpGet("/analytics/movimentacoes")]
+    [HttpGet("/analises/movimentacoes")]
     public async Task<IActionResult> Movimentacoes(
         int page = 1, string? tipo = null, string? de = null, string? ate = null)
     {

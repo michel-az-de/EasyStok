@@ -1,0 +1,88 @@
+/* print.css — regras globais para qualquer view do app que precise imprimir.
+ * Carregado via <link media="print"> no _Layout, nao tem efeito na renderizacao normal.
+ * Print views especificas (recibo, etiquetas) tem seu proprio CSS dedicado.
+ */
+@media print {
+    /* 1) Esconder chrome de aplicacao em qualquer pagina impressa */
+    .app-sidebar,
+    .app-topbar,
+    .bottom-nav,
+    .quick-actions-sheet,
+    .sheet-overlay,
+    .skip-link,
+    #es-cheatsheet-modal,
+    .toast-container,
+    [role="region"][aria-live],
+    [data-print-hide],
+    .no-print {
+        display: none !important;
+    }
+
+    /* 2) Reset de layout: sem padding lateral, sem max-width forcado */
+    body, html {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .app-main, main, .ws, .container {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+    }
+
+    /* 3) Tipografia A4-friendly */
+    body { font-size: 11pt; line-height: 1.35; }
+    h1 { font-size: 18pt; }
+    h2 { font-size: 15pt; }
+    h3 { font-size: 13pt; }
+
+    /* 4) Tabelas: cabecalho repete em pagina nova, sem quebrar linha em meio a um item */
+    table { page-break-inside: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr, .vrow { page-break-inside: avoid; page-break-after: auto; }
+
+    /* 5) Links: mostrar URL ao lado em href absoluto (mais util impresso) */
+    a[href^="http"]::after {
+        content: " (" attr(href) ")";
+        font-size: 0.85em;
+        color: #555555;
+    }
+    a[href^="/"]::after,
+    a[href^="#"]::after,
+    a[href^="mailto:"]::after,
+    a[href^="tel:"]::after {
+        content: ""; /* URL relativa nao adiciona ruido */
+    }
+
+    /* 6) Forcas de quebra de pagina */
+    .page-break-before { page-break-before: always; }
+    .page-break-after  { page-break-after: always; }
+    .page-break-avoid  { page-break-inside: avoid; }
+
+    /* 7) Esconder controles destrutivos e bulk em print */
+    .btn-danger,
+    .btn-icon,
+    .btn[data-loading="true"],
+    .bulk-bar {
+        display: none !important;
+    }
+
+    /* 8) Restaurar cores tokens em hex direto para impressoras que nao resolvem CSS vars */
+    :root {
+        --orange-600: #E85814;
+        --orange-700: #BF4307;
+        --navy-700: #0E2A6E;
+        --navy-900: #06143A;
+        --ink-700: #2A3556;
+        --ok-700: #0E6B3D;
+        --warn-700: #8A5A00;
+        --crit-700: #8E2A1E;
+    }
+
+    /* 9) SVG Lucide: stroke preto em print para garantir visibilidade */
+    .es-icon { stroke: #000000 !important; }
+}

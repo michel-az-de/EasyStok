@@ -1,4 +1,4 @@
-@model EasyStock.Web.Models.ViewModels.InteligenciaLojas.InteligenciaLojasOverviewViewModel
+﻿@model EasyStock.Web.Models.ViewModels.InteligenciaLojas.InteligenciaLojasOverviewViewModel
 @using System.Globalization
 @{
     var ptBR = new CultureInfo("pt-BR");
@@ -158,18 +158,23 @@ else
 
 @if (Model.Lojas.Count > 1)
 {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             var ctx = document.getElementById('healthChart');
             if (!ctx) return;
+            var css = getComputedStyle(document.documentElement);
+            var ok   = css.getPropertyValue('--ok-600').trim()   || 'rgb(24, 135, 78)';
+            var info = css.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
+            var warn = css.getPropertyValue('--warn-600').trim() || 'rgb(181, 122, 0)';
+            var crit = css.getPropertyValue('--crit-600').trim() || 'rgb(192, 59, 42)';
             var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Lojas.Select(l => l.NomeLoja).ToList()));
             var scores = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Lojas.Select(l => l.HealthScore).ToList()));
             var colors = scores.map(function (s) {
-                if (s >= 80) return '#10b981';
-                if (s >= 60) return '#3b82f6';
-                if (s >= 40) return '#f59e0b';
-                return '#ef4444';
+                if (s >= 80) return ok;
+                if (s >= 60) return info;
+                if (s >= 40) return warn;
+                return crit;
             });
             new Chart(ctx, {
                 type: 'bar',

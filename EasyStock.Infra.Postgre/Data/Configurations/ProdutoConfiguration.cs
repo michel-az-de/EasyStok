@@ -23,6 +23,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(p => p.Nome).IsRequired().HasMaxLength(180);
             builder.Property(p => p.Marca).HasMaxLength(120);
             builder.Property(p => p.Tipo).HasConversion<string>().IsRequired().HasMaxLength(50);
+            // Inserido 2026-05-16 (correcao C2 / RDC 727/2022). Persistido como string
+            // (padrao do projeto - veja Tipo/Status acima). Default "Avulso" para
+            // produtos existentes nao bloqueia comportamento atual ate triagem manual.
+            builder.Property(p => p.TipoEmbalagem)
+                .HasConversion<string>()
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue(EasyStock.Domain.Enums.TipoEmbalagem.Avulso);
             builder.Property(p => p.Status).HasConversion<string>().IsRequired().HasMaxLength(50);
             builder.Property(p => p.SkuBase)
                 .HasConversion(
@@ -50,6 +58,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                     value => value.HasValue ? Dinheiro.FromDecimal(value.Value) : null)
                 .HasColumnType("decimal(18,2)");
             builder.Property(p => p.MargemEstimada).HasColumnType("decimal(8,2)");
+
+            // Receita / Calculadora de Producao (Onda 1.2)
+            builder.Property(p => p.EhInsumo).IsRequired().HasDefaultValue(false);
+            builder.Property(p => p.RendimentoBase).HasColumnType("numeric(19,4)").IsRequired().HasDefaultValue(1m);
+            builder.Property(p => p.RendimentoUnidade).HasConversion<string>().HasMaxLength(8).IsRequired().HasDefaultValue(UnidadeMedida.Un);
+            builder.Property(p => p.UnidadeMedidaBase).HasConversion<string>().HasMaxLength(8).IsRequired().HasDefaultValue(UnidadeMedida.Un);
 
             builder.Property(p => p.CriadoPor).HasColumnType("uuid");
             builder.Property(p => p.AlteradoPor).HasColumnType("uuid");

@@ -24,8 +24,13 @@ public sealed class ManualGatewayAdapter : IPagamentoGateway
     public bool SuportaMetodo(string metodo) =>
         MetodosManual.Contains(metodo?.ToLowerInvariant() ?? "", StringComparer.OrdinalIgnoreCase);
 
-    public Task<InstrucaoPagamento> CriarAsync(Fatura fatura, string metodo, CancellationToken ct = default)
+    public Task<InstrucaoPagamento> CriarAsync(
+        Fatura fatura,
+        string metodo,
+        string? idempotencyKey = null,
+        CancellationToken ct = default)
     {
+        // Manual ignora idempotencyKey — sem chamada externa, sem risco de duplicate charge.
         var txid = $"manual-{fatura.Id:N}";
         return Task.FromResult(new InstrucaoPagamento(
             Provedor: Provedor,

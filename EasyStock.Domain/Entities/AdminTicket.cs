@@ -33,6 +33,14 @@ namespace EasyStock.Domain.Entities
         public DateTime? UltimoAlerta50PctEm { get; set; }
         public DateTime? UltimoAlerta80PctEm { get; set; }
 
+        // CSAT — avaliacao do cliente apos fechamento.
+        // NotaCsat 1..5; preenchido via endpoint POST /api/helpdesk/tickets/{id}/avaliacao.
+        public int? NotaCsat { get; set; }
+        public string? ComentarioCsat { get; set; }
+        public DateTime? AvaliadoEm { get; set; }
+        // Carimbo do convite enviado (idempotencia: nao enviar segundo convite no mesmo ticket).
+        public DateTime? ConviteCsatEnviadoEm { get; set; }
+
         // Auto-relacionamento (bug-fix encaminhado para dev)
         public Guid? OrigemTicketId { get; set; }
 
@@ -43,12 +51,21 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public Guid? FaturaId { get; set; }
 
+        /// <summary>
+        /// FK opcional a um <see cref="Pedido"/> relacionado. Permite a empresa-cliente
+        /// abrir ticket reportando problema/duvida sobre um pedido especifico
+        /// (ex: pedido travado, sync falhou, item errado). Admin SaaS ve o pedido
+        /// linkado no detalhe (read-only). ON DELETE SET NULL.
+        /// </summary>
+        public Guid? PedidoId { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Usuario? CriadoPor { get; set; }
         public Usuario? Atendente { get; set; }
         public AdminTicket? OrigemTicket { get; set; }
         public AdminTicketTecnicoMeta? MetaTecnico { get; set; }
         public Fatura? Fatura { get; set; }
+        public Pedido? Pedido { get; set; }
         public ICollection<AdminTicketMensagem> Mensagens { get; set; } = new List<AdminTicketMensagem>();
 
         public static AdminTicket Criar(
