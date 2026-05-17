@@ -4,7 +4,6 @@ using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarPedido;
-// IClienteRepository nao usado: cliente eh resolvido via mobile_clients.erp_cliente_id (lookup direto no DbContext).
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;

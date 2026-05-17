@@ -119,7 +119,7 @@ public class MobileAdminController(
             );
         }
 
-        var produtoEntries = pedidosPorStatus.Select(kv => new StatusCount(kv.Key, kv.Value))
+        var pedidoStatusEntries = pedidosPorStatus.Select(kv => new StatusCount(kv.Key, kv.Value))
             .OrderBy(s => s.Status).ToArray();
 
         var resp = new IntegrityReport(
@@ -128,7 +128,7 @@ public class MobileAdminController(
             Contagens: new EntityCounts(
                 Produtos: new ProductCounts(produtosTotal, produtosCustom, produtosAprovados, produtosLinkados),
                 Clientes: clientesTotal,
-                Pedidos: new OrderCounts(pedidosTotal, produtoEntries, pedidosLinkados, pedidosPromovidos),
+                Pedidos: new OrderCounts(pedidosTotal, pedidoStatusEntries, pedidosLinkados, pedidosPromovidos),
                 Lotes: new BatchCounts(lotesTotal, lotesPromovidos),
                 CashEntries: caixaTotal
             ),
