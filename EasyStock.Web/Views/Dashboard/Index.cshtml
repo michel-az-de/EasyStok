@@ -1,1043 +1,407 @@
-@model DashboardViewModel
+﻿@model DashboardViewModel
+@using System.Globalization
 @using System.Text.Json
 @{
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
-    var lojas = ViewBag.Lojas as List<EasyStock.Web.Models.Api.LojaApi> ?? new();
-    var lojaAtualId = ViewBag.LojaAtualId as string;
-    var multiLoja = lojas.Count > 1;
+    var dataHoje = DateTime.Now.ToString("dd 'de' MMMM", ptBR);
+
+    // Mensagem de status — prioriza o que exige ação
+    string statusMsg;
+    string statusTone;
+    if (Model.EstoqueCritico > 0 && Model.ProximosVencimento > 0)
+    {
+        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico e {Model.ProximosVencimento} próximo(s) ao vencimento.";
+        statusTone = "critical";
+    }
+    else if (Model.EstoqueCritico > 0)
+    {
+        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico precisando de reposição.";
+        statusTone = "critical";
+    }
+    else if (Model.ProximosVencimento > 0)
+    {
+        statusMsg = $"{Model.ProximosVencimento} item(ns) vencem em até 7 dias. Vale girar antes que estraguem.";
+        statusTone = "warning";
+    }
+    else if (Model.SugestoesReposicao > 0)
+    {
+        statusMsg = $"Nada urgente hoje. {Model.SugestoesReposicao} sugestão(ões) de reposição prontas para revisão.";
+        statusTone = "info";
+    }
+    else if (Model.ReceitaMes > 0)
+    {
+        statusMsg = $"Estoque saudável. Vendas dos últimos 30 dias: {Model.ReceitaMes.ToString("C", ptBR)}.";
+        statusTone = "ok";
+    }
+    else
+    {
+        statusMsg = "Tudo certo por aqui. Comece registrando uma entrada ou venda.";
+        statusTone = "ok";
+    }
+
+    var toneClass = statusTone switch
+    {
+        "critical" => "ds-status--critical",
+        "warning" => "ds-status--warning",
+        "info" => "ds-status--info",
+        _ => "ds-status--ok"
+    };
 }
 
-<div x-data="dashboardApp()" x-init="init()" class="space-y-6">
-
-    @* Header — saudação travada em fuso BR para evitar "Boa noite às 15h" quando o navegador roda em UTC. *@
-    <div class="pg-hd flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div x-data="{
-                get saudacao() {
-                    // Fallback robusto: alguns browsers sem ICU completo (ou casos onde
-                    // Intl.DateTimeFormat retorna string nao-numerica) caem em NaN e
-                    // todas as comparacoes `NaN < N` viram false — gerava 'Boa noite'
-                    // as 15h. Agora se NaN, usa getHours() do navegador como fallback.
-                    let h;
-                    try {
-                        const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false });
-                        h = parseInt(fmt.format(new Date()), 10);
-                    } catch (e) { h = NaN; }
-                    if (Number.isNaN(h)) h = new Date().getHours();
-                    return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-                },
-                get dataLocal() {
-                    try {
-                        return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric' });
-                    } catch (e) {
-                        return new Date().toLocaleDateString('pt-BR');
-                    }
-                }
-            }">
-            <h1><span x-text="saudacao"></span>@(string.IsNullOrEmpty(primeiroNome) ? "!" : $", {primeiroNome}!")</h1>
-            <p class="text-sm text-slate-500">Resumo do seu negócio, <span x-text="dataLocal"></span>.</p>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-            @if (multiLoja)
-            {
-                <select x-model="lojaId" @@change="reload()"
-                        class="inp text-sm py-1.5 px-3 min-w-[140px]">
-                    <option value="">Todas as lojas</option>
-                    @foreach (var l in lojas.Where(l => l.Ativa))
-                    {
-                        @if (l.Id.ToString() == lojaAtualId)
-                        {
-                            <option value="@l.Id" selected>@l.Nome</option>
-                        }
-                        else
-                        {
-                            <option value="@l.Id">@l.Nome</option>
-                        }
-                    }
-                </select>
-            }
-            <button type="button" @@click="exportarPDF()" title="Baixar relatório PDF"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-navy-700 text-white hover:bg-navy-800 transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Baixar PDF
-            </button>
-            <div class="flex gap-1 bg-slate-100 rounded-lg p-0.5">
-                <template x-for="p in periodos" :key="p.value">
-                    <button type="button"
-                            :class="periodo === p.value
-                                ? 'bg-white text-navy-700 shadow-sm font-semibold'
-                                : 'text-slate-500 hover:text-slate-700'"
-                            class="px-2.5 py-1 text-xs rounded-md transition-all"
-                            @@click="periodo = p.value; reload()"
-                            x-text="p.label"></button>
-                </template>
+@if (Model.TodasApisFalharam)
+{
+    <div class="ws ds-api-error mb-6" role="alert">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
+            </svg>
+            <div class="flex-1">
+                <h2 class="font-bold text-slate-800">Não conseguimos carregar seus dados agora</h2>
+                <p class="text-sm text-slate-600 mt-1">Pode ser instabilidade na conexão ou no servidor. Tente recarregar a página em alguns segundos.</p>
+                <button type="button" onclick="window.location.reload()" class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+                    Recarregar
+                </button>
             </div>
-            <button type="button" @@click="reload()" title="Atualizar dados"
-                    class="p-1.5 rounded-lg text-slate-400 hover:text-navy-600 hover:bg-slate-100 transition-colors"
-                    :class="loading && 'animate-spin'">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-            </button>
         </div>
     </div>
-
-    @* Entregues sem venda banner (BUG 2) *@
-    <template x-if="data && data.entreguesSemVenda > 0">
-        <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v4m0 4h.01M10.29 3.86l-7.11 12.3A2 2 0 004.91 19h14.18a2 2 0 001.73-2.84l-7.11-12.3a2 2 0 00-3.42 0z"/>
+}
+else if (Model.ResumoApiFalhou)
+{
+    <div class="ws ds-api-warning mb-6" role="status">
+        <div class="flex items-center gap-3">
+            <svg class="w-4 h-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>
-                <span x-text="data.entreguesSemVenda" class="font-bold"></span>
-                <span x-text="data.entreguesSemVenda === 1 ? 'pedido entregue aguardando registro de venda' : 'pedidos entregues aguardando registro de venda'"></span>
-            </span>
+            <p class="text-sm text-slate-700">Alguns indicadores podem estar desatualizados — não conseguimos atualizar o resumo agora.</p>
         </div>
-    </template>
+    </div>
+}
 
-    @* ===== SEÇÃO 1: VISÃO GERAL (KPI Cards) ===== *@
-    <section>
-        <div class="flex items-center gap-2 mb-4">
-            <h2 class="font-bold text-slate-800">Visão geral</h2>
-            <span x-show="loading" class="inline-block w-4 h-4 border-2 border-slate-200 border-t-navy-600 rounded-full animate-spin"></span>
+<header class="ds-header mb-6">
+    <h1 class="text-2xl font-bold text-slate-900">@saudacao@(string.IsNullOrEmpty(primeiroNome) ? "." : $", {primeiroNome}.")</h1>
+    <p class="ds-status @toneClass mt-1" role="status" aria-live="polite">@statusMsg</p>
+    <p class="text-xs text-slate-400 mt-1">@dataHoje</p>
+</header>
+
+@* ─── KPIs principais (3 cards) ─────────────────────────────── *@
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="ws ds-kpi" title="Receita gerada com saídas nos últimos 30 dias">
+        <div class="ds-kpi-lbl">Vendas</div>
+        <div class="ds-kpi-val text-slate-900">@Model.ReceitaMes.ToString("C", ptBR)</div>
+        @if (Model.TemComparativoReceita)
+        {
+            var pct = Model.VariacaoReceitaPercent;
+            var deltaClass = pct > 0 ? "text-emerald-600" : pct < 0 ? "text-red-600" : "text-slate-500";
+            var arrow = pct > 0 ? "↗" : pct < 0 ? "↘" : "→";
+            <div class="ds-kpi-sub @deltaClass">@arrow @Math.Abs(pct)% vs. mês anterior</div>
+        }
+        else
+        {
+            <div class="ds-kpi-sub text-slate-400">últimos 30 dias</div>
+        }
+    </div>
+
+    <div class="ws ds-kpi" title="Valor de venda estimado de todo o estoque atual">
+        <div class="ds-kpi-lbl">Estoque parado em R$</div>
+        <div class="ds-kpi-val text-slate-900">@Model.ValorEstoque.ToString("C", ptBR)</div>
+        <div class="ds-kpi-sub text-slate-400">@Model.TotalProdutos produto(s) · @Model.QuantidadeTotalEmEstoque unid.</div>
+    </div>
+
+    <div class="ws ds-kpi" title="Média de unidades vendidas por dia">
+        <div class="ds-kpi-lbl">Média de vendas / dia</div>
+        <div class="ds-kpi-val text-slate-900">@Model.MediaVendasDiaria.ToString("N1", ptBR)</div>
+        <div class="ds-kpi-sub text-slate-400">unidades por dia</div>
+    </div>
+</div>
+
+@* ─── Alertas priorizados (só aparece quando há algo) ────────── *@
+@if (Model.TemQualquerAlerta)
+{
+    <section class="ws ds-alerts mb-6" aria-labelledby="ds-alerts-title">
+        <div class="flex items-center justify-between mb-3">
+            <h2 id="ds-alerts-title" class="font-bold text-slate-800 flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
+                </svg>
+                Atenção
+            </h2>
+            <span class="text-xs text-slate-400">prioridade alta primeiro</span>
         </div>
-
-        @* Pente fino onda 1 item 5: `grid-equal-rows` força todas as linhas terem altura
-           igual ao maior card. Antes, "sem custo informado" (3 linhas) deixava o card de
-           Margem mais alto que os outros, criando degraus visuais. *@
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 grid-equal-rows">
-            @* Receita: soma de Vendas confirmadas (Vendas.ValorTotal). Pedido cancelado ou
-               entregue-sem-cobranca nao gera Venda e nao soma aqui. Sub-rotulo expoe a
-               contagem usada pra evitar o cenario "olhei a tela de Pedidos, somei 1.113,
-               e o card diz 795". *@
-            <div class="ws group" title="Soma das vendas confirmadas no período (cada Venda equivale a um Pedido entregue e cobrado).">
-                <div class="kpi-lbl">Receita</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-24 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-emerald-700" x-text="fmt.currency(data.kpis.receita)"></div>
-                        <p class="text-xs text-slate-400 mt-0.5">
-                            <span x-text="data.kpis.pedidosEntregues"></span>
-                            <span x-text="data.kpis.pedidosEntregues === 1 ? 'venda confirmada' : 'vendas confirmadas'"></span>
-                        </p>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.receita)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.receita)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.receita == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            @* Ticket Médio = Receita / Vendas confirmadas. Denominador diferente do
-               card "Pedidos" (que inclui cancelados/pendentes/sem-cobranca) — sub-rotulo
-               visivel pra evitar leitura tipo "795 / 17 = 47 != 61". *@
-            <div class="ws group" title="Receita ÷ vendas confirmadas. Pedidos cancelados, em aberto ou entregues sem cobrança não entram no denominador.">
-                <div class="kpi-lbl">Ticket médio</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-20 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-slate-900" x-text="fmt.currency(data.kpis.ticketMedio)"></div>
-                        <p class="text-xs text-slate-400 mt-0.5">Receita ÷ vendas confirmadas</p>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.ticketMedio)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.ticketMedio)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.ticketMedio == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            @* Pedidos: total criados (entregues + pendentes + cancelados). Sub-rotulo
-               diz quantos viraram venda — ajuda a conciliar com o ticket medio acima. *@
-            <a href="/pedidos" class="ws group hover:border-slate-300 transition-colors" title="Total de pedidos criados no período — inclui entregues, pendentes e cancelados. O ticket médio acima usa só os que viraram venda confirmada.">
-                <div class="kpi-lbl">Pedidos</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-12 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-slate-900" x-text="data.kpis.pedidos"></div>
-                        <p class="text-xs text-slate-400 mt-0.5" x-show="data.kpis.pedidosEntregues != null">
-                            <span x-text="data.kpis.pedidosEntregues"></span>
-                            <span x-text="data.kpis.pedidosEntregues === 1 ? 'entregue' : 'entregues'"></span>
-                        </p>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.pedidos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.pedidos)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.pedidos == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                    </div>
-                </template>
-            </a>
-
-            @* Unidades em estoque = SUM(QuantidadeAtual) sobre lotes com saldo (qty > 0,
-               nao vencidos, nao descartados). Sub-rotulo expoe o numero de lotes pra deixar
-               claro que a unidade do KPI eh UNIDADE, e o "% crítico" eh sobre LOTES — antes
-               grudava "0,0% · 100,0% dos lotes crítico" colando delta + criticidade. *@
-            <a href="/estoque" class="ws group hover:border-slate-300 transition-colors" title="Soma das unidades em lotes ativos (quantidade > 0). O percentual crítico abaixo se refere ao número de lotes, não às unidades.">
-                <div class="kpi-lbl">Unidades em estoque</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-14 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-indigo-600" x-text="fmt.number(data.kpis.itensEmEstoque)"></div>
-                        <p class="text-xs text-slate-400 mt-0.5" x-show="data.kpis.lotesAtivos > 0">
-                            em <span x-text="data.kpis.lotesAtivos"></span>
-                            <span x-text="data.kpis.lotesAtivos === 1 ? 'lote com saldo' : 'lotes com saldo'"></span>
-                        </p>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.itensEmEstoque)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.itensEmEstoque)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.itensEmEstoque == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                        <p class="text-xs text-amber-600 mt-0.5" x-show="data.kpis.percentualCritico > 0">
-                            <span x-text="fmt.pct(data.kpis.percentualCritico)"></span> dos lotes em estado crítico
-                        </p>
-                    </div>
-                </template>
-            </a>
-
-            @* Custo em Estoque *@
-            <div class="ws group" title="Valor investido, pelo custo de compra dos produtos">
-                <div class="kpi-lbl">Custo em estoque</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-24 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-slate-900" x-text="fmt.currency(data.kpis.custoEstoque)"></div>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.custoEstoque, true)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.custoEstoque)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.custoEstoque == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            @* Margem Bruta *@
-            <div class="ws group"
-                 :title="data && data.kpis.margemBruta == null
-                    ? 'Margem indisponível: as movimentações de venda do período não têm custo unitário informado.'
-                    : 'Quanto sobra depois de descontar o custo. Baseado no custo médio de entrada'">
-                <div class="kpi-lbl">Margem bruta</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-16 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val"
-                             :class="data.kpis.margemBruta == null ? 'text-slate-400' : data.kpis.margemBruta >= 20 ? 'text-emerald-700' : 'text-amber-600'"
-                             x-text="fmt.pct(data.kpis.margemBruta)"></div>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.margemBruta)" class="text-xs font-semibold"
-                                  x-text="data.delta.margemBruta == null ? '—' : (data.delta.margemBruta > 0 ? '+' : '') + data.delta.margemBruta.toFixed(1).replace('.', ',') + ' pp'"></span>
-                            <span class="text-xs text-slate-400"
-                                  x-text="data.kpis.margemBruta == null ? 'sem custo informado' : (data.delta.margemBruta == null ? 'sem base de comparação' : 'vs anterior')"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            @* Lotes Produzidos *@
-            <a href="/lotes" class="ws group hover:border-slate-300 transition-colors" title="Lotes de produção finalizados no período">
-                <div class="kpi-lbl">Lotes produzidos</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-10 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-slate-900" x-text="data.kpis.lotesProduzidos"></div>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.lotesProduzidos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.lotesProduzidos)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.lotesProduzidos == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                    </div>
-                </template>
-            </a>
-
-            @* Clientes Ativos *@
-            <a href="/clientes" class="ws group hover:border-slate-300 transition-colors" title="Clientes com pelo menos um pedido no período">
-                <div class="kpi-lbl">Clientes ativos</div>
-                <template x-if="loading && !data">
-                    <div class="h-7 w-10 bg-slate-100 rounded animate-pulse mt-1"></div>
-                </template>
-                <template x-if="data">
-                    <div>
-                        <div class="kpi-val text-slate-900" x-text="data.kpis.clientesAtivos"></div>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="deltaClass(data.delta.clientesAtivos)" class="text-xs font-semibold" x-text="fmt.delta(data.delta.clientesAtivos)"></span>
-                            <span class="text-xs text-slate-400" x-text="data.delta.clientesAtivos == null ? 'sem base de comparação' : 'vs anterior'"></span>
-                        </div>
-                    </div>
-                </template>
-            </a>
-        </div>
-    </section>
-
-    @* Insights *@
-    <template x-if="data && data.insights && data.insights.length > 0">
-        <section class="space-y-2">
-            <template x-for="insight in data.insights" :key="insight.componente + insight.texto">
-                <div class="flex items-start gap-3 px-4 py-3 rounded-xl text-sm border"
-                     :class="{
-                         'bg-red-50 border-red-200 text-red-800': insight.severidade === 'alert',
-                         'bg-amber-50 border-amber-200 text-amber-800': insight.severidade === 'warning',
-                         'bg-emerald-50 border-emerald-200 text-emerald-800': insight.severidade === 'positive'
-                     }">
-                    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        @* x-show no <path> ao inves de <template x-if> dentro de <svg>:
-                           <template> dentro de SVG quebra namespace e Alpine falha em cloneNode. *@
-                        <path x-show="insight.severidade === 'positive'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        <path x-show="insight.severidade !== 'positive'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span x-text="insight.texto"></span>
-                </div>
-            </template>
-        </section>
-    </template>
-
-    @* ===== SEÇÃO 2: VENDAS & FINANCEIRO ===== *@
-    <section x-data="{ open: true }">
-        <button type="button" class="accordion-trigger w-full flex items-center justify-between py-2" @@click="open = !open">
-            <h2 class="font-bold text-slate-800">Vendas e financeiro</h2>
-            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </button>
-        <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
-            @* Pedidos pendentes resumo *@
-            <template x-if="data && data.pedidosPendentesTotal > 0">
-                <div class="ws">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-semibold text-slate-700">Pedidos aguardando pagamento</h3>
-                        <span class="badge badge-warn px-2 py-0.5 rounded-full text-xs font-semibold"
-                              x-text="fmt.currency(data.pedidosPendentesTotal) + ' em aberto'"></span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="tbl-full">
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Itens</th>
-                                    <th class="text-right">Total</th>
-                                    <th class="text-right">Pago</th>
-                                    <th class="text-right">Em aberto</th>
-                                    <th class="text-right">Data</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="p in data.pedidosPendentes.slice(0, 10)" :key="p.id">
-                                    <tr class="cursor-pointer hover:bg-slate-50" @@click="openPedido(p.id)">
-                                        <td x-text="p.clienteNome || 'Sem cliente'"></td>
-                                        <td class="text-slate-500 text-sm max-w-[200px] truncate" x-text="p.itensResumo"></td>
-                                        <td class="text-right font-mono" x-text="fmt.currency(p.total)"></td>
-                                        <td class="text-right font-mono text-slate-500" x-text="fmt.currency(p.totalPago)"></td>
-                                        <td class="text-right font-mono font-semibold text-amber-600" x-text="fmt.currency(p.emAberto)"></td>
-                                        <td class="text-right text-slate-500" x-text="fmt.date(p.criadoEm)"></td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                    <template x-if="data.pedidosPendentes.length > 10">
-                        <a href="/pedidos?status=pendente" class="block text-center text-xs text-indigo-600 hover:underline mt-3">
-                            Ver todos os pedidos pendentes
-                        </a>
-                    </template>
-                </div>
-            </template>
-            <template x-if="data && data.pedidosPendentesTotal === 0">
-                <div class="ws text-center py-6 text-slate-400 text-sm">
-                    Tudo pago! Nenhum pedido aguardando pagamento.
-                </div>
-            </template>
-
-            <div class="ws">
-                <h3 class="font-semibold text-slate-700 mb-3">Receita × Custo × Lucro</h3>
-                <div id="chart-receita-custo" class="relative h-[280px]">
-                    <canvas id="canvas-receita-custo"></canvas>
-                </div>
-            </div>
-
-            @* Fluxo de Caixa *@
-            <div class="ws">
-                <h3 class="font-semibold text-slate-700 mb-3">Fluxo de caixa</h3>
-                <template x-if="!extrasLoaded">
-                    <div class="h-[240px] flex items-center justify-center text-slate-400 text-sm">
-                        <span class="inline-block w-4 h-4 border-2 border-slate-200 border-t-navy-600 rounded-full animate-spin mr-2"></span>
-                        Carregando...
-                    </div>
-                </template>
-                <div id="chart-fluxo-caixa" class="h-[240px]" x-show="extrasLoaded">
-                    <canvas id="canvas-fluxo-caixa"></canvas>
-                </div>
-            </div>
-
-            @* Rankings *@
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-3">Top 5 produtos vendidos</h3>
-                    <template x-if="!extrasLoaded">
-                        <div class="h-[200px] animate-pulse bg-slate-50 rounded-lg"></div>
-                    </template>
-                    <div class="h-[200px]" x-show="extrasLoaded">
-                        <canvas id="canvas-top-produtos"></canvas>
-                    </div>
-                </div>
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-3">Top 5 clientes por receita</h3>
-                    <template x-if="!extrasLoaded">
-                        <div class="h-[200px] animate-pulse bg-slate-50 rounded-lg"></div>
-                    </template>
-                    <div class="h-[200px]" x-show="extrasLoaded">
-                        <canvas id="canvas-top-clientes"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    @* ===== SEÇÃO 3: ESTOQUE & PRODUÇÃO ===== *@
-    <section x-data="{ open: true }">
-        <button type="button" class="accordion-trigger w-full flex items-center justify-between py-2" @@click="open = !open">
-            <h2 class="font-bold text-slate-800">Estoque e produção</h2>
-            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </button>
-        <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
-            @* Estoque status: cards contam LOTES (rows de ItemEstoque com saldo > 0),
-               nao unidades. Manter o sufixo "lotes" pra reforcar diferenca em relacao ao
-               KPI "Unidades em estoque" do topo. *@
-            <template x-if="data">
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="ws flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-ok-500"></div>
-                        <div>
-                            <div class="text-lg font-bold text-slate-900">
-                                <span x-text="data.estoqueStatus.ok"></span>
-                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.ok === 1 ? 'lote' : 'lotes'"></span>
-                            </div>
-                            <div class="text-xs text-slate-500">OK</div>
-                        </div>
-                    </div>
-                    <div class="ws flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-warn-500"></div>
-                        <div>
-                            <div class="text-lg font-bold text-slate-900">
-                                <span x-text="data.estoqueStatus.atencao"></span>
-                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.atencao === 1 ? 'lote' : 'lotes'"></span>
-                            </div>
-                            <div class="text-xs text-slate-500">Atenção</div>
-                        </div>
-                    </div>
-                    <div class="ws flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-crit-500"></div>
-                        <div>
-                            <div class="text-lg font-bold text-slate-900">
-                                <span x-text="data.estoqueStatus.critico"></span>
-                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.critico === 1 ? 'lote' : 'lotes'"></span>
-                            </div>
-                            <div class="text-xs text-slate-500">Crítico</div>
-                        </div>
-                    </div>
-                    <div class="ws flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-slate-400"></div>
-                        <div>
-                            <div class="text-lg font-bold text-slate-900">
-                                <span x-text="data.estoqueStatus.parado"></span>
-                                <span class="text-xs text-slate-400 font-normal ml-1" x-text="data.estoqueStatus.parado === 1 ? 'lote' : 'lotes'"></span>
-                            </div>
-                            <div class="text-xs text-slate-500">Parado</div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
-            @* Alertas de estoque *@
-            <div>
-                <template x-if="data && data.alertasEstoque && data.alertasEstoque.length > 0">
-                    <div class="ws">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                            <div class="flex items-center gap-2">
-                                <h3 class="font-semibold text-slate-700">Alertas de estoque</h3>
-                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-100 text-red-700 text-xs font-bold"
-                                      x-text="data.alertasEstoque.length"></span>
-                            </div>
-                            @* Filtros de tipo *@
-                            <div class="flex gap-1 text-xs">
-                                <button type="button" @@click="filtroAlerta = 'todos'"
-                                        :class="filtroAlerta === 'todos' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                                        class="px-2.5 py-1 rounded-full font-medium transition-colors">
-                                    Todos
-                                </button>
-                                <template x-if="contarTipo('critico') > 0">
-                                    <button type="button" @@click="filtroAlerta = 'critico'"
-                                            :class="filtroAlerta === 'critico' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'"
-                                            class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1">
-                                        <span>Crítico</span>
-                                        <span x-text="contarTipo('critico')" class="font-bold"></span>
-                                    </button>
-                                </template>
-                                <template x-if="contarTipo('vencimento') > 0">
-                                    <button type="button" @@click="filtroAlerta = 'vencimento'"
-                                            :class="filtroAlerta === 'vencimento' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'"
-                                            class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1">
-                                        <span>Vencimento</span>
-                                        <span x-text="contarTipo('vencimento')" class="font-bold"></span>
-                                    </button>
-                                </template>
-                                <template x-if="contarTipo('parado') > 0">
-                                    <button type="button" @@click="filtroAlerta = 'parado'"
-                                            :class="filtroAlerta === 'parado' ? 'bg-slate-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                                            class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1">
-                                        <span>Parado</span>
-                                        <span x-text="contarTipo('parado')" class="font-bold"></span>
-                                    </button>
-                                </template>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            <template x-for="a in alertasFiltrados.slice(0, 9)" :key="a.itemEstoqueId">
-                                <div class="flex items-start gap-3 p-3 rounded-xl border transition-shadow hover:shadow-sm"
-                                     :class="{
-                                         'border-red-200 bg-red-50':    a.tipo === 'critico',
-                                         'border-amber-200 bg-amber-50': a.tipo === 'vencimento',
-                                         'border-slate-200 bg-slate-50': a.tipo === 'parado'
-                                     }">
-                                    @* Ícone *@
-                                    <div class="flex-shrink-0 mt-0.5 rounded-lg p-1.5"
-                                         :class="{
-                                             'bg-red-100 text-red-600':    a.tipo === 'critico',
-                                             'bg-amber-100 text-amber-600': a.tipo === 'vencimento',
-                                             'bg-slate-200 text-slate-500': a.tipo === 'parado'
-                                         }">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="iconeAlerta(a.tipo)"/>
-                                        </svg>
-                                    </div>
-
-                                    @* Conteúdo *@
-                                    <div class="flex-1 min-w-0">
-                                        <p class="font-semibold text-slate-800 text-sm truncate" x-text="a.nomeProduto || 'Produto'"></p>
-                                        <p class="text-xs text-slate-500 mt-0.5" x-text="labelAlerta(a)"></p>
-                                    </div>
-
-                                    @* CTA *@
-                                    <a :href="a.tipo === 'parado'
-                                                ? '/saidas/nova?produtoId=' + a.produtoId
-                                                : '/entradas/reposicao?produtoId=' + a.produtoId"
-                                       class="flex-shrink-0 self-center text-xs font-semibold whitespace-nowrap transition-colors"
-                                       :class="{
-                                           'text-red-700 hover:text-red-900':    a.tipo === 'critico',
-                                           'text-amber-700 hover:text-amber-900': a.tipo === 'vencimento',
-                                           'text-slate-600 hover:text-slate-900': a.tipo === 'parado'
-                                       }"
-                                       x-text="a.tipo === 'parado' ? 'Registrar saída →' : 'Repor →'"></a>
-                                </div>
-                            </template>
-                        </div>
-
-                        <template x-if="alertasFiltrados.length > 9">
-                            <a href="/estoque?status=critico" class="block text-center text-xs text-indigo-600 hover:underline mt-4">
-                                Ver todos os alertas de estoque →
-                            </a>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="data && (!data.alertasEstoque || data.alertasEstoque.length === 0)">
-                    <div class="ws text-center py-8">
-                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 mb-3">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <p class="font-semibold text-slate-700">Estoque em dia!</p>
-                        <p class="text-sm text-slate-400 mt-1">Nenhum produto crítico, vencendo ou parado.</p>
-                    </div>
-                </template>
-            </div>
-
-            @* Estoque: donut + validade timeline *@
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-3">Situação do estoque</h3>
-                    <div id="chart-estoque-donut" class="h-[240px]">
-                        <canvas id="canvas-estoque-donut"></canvas>
-                    </div>
-                </div>
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-3">Validades próximas (4 semanas)</h3>
-                    <template x-if="!extrasLoaded">
-                        <div class="h-[240px] animate-pulse bg-slate-50 rounded-lg"></div>
-                    </template>
-                    <div id="chart-validade-timeline" class="h-[240px]" x-show="extrasLoaded">
-                        <canvas id="canvas-validade-timeline"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            @* Produção por operador + entradas/saídas semanal *@
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-3">Produção por operador</h3>
-                    <template x-if="!extrasLoaded">
-                        <div class="h-[200px] animate-pulse bg-slate-50 rounded-lg"></div>
-                    </template>
-                    <template x-if="extrasLoaded && extras && (!extras.producaoPorOperador || extras.producaoPorOperador.length === 0)">
-                        <div class="h-[200px] flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
-                            <p>Nenhum lote finalizado no período.</p>
-                            <a href="/lotes" class="text-indigo-600 text-xs hover:underline">Ver lotes de produção →</a>
-                        </div>
-                    </template>
-                    <div class="h-[200px]" x-show="extrasLoaded && extras && extras.producaoPorOperador && extras.producaoPorOperador.length > 0">
-                        <canvas id="canvas-producao-operador"></canvas>
-                    </div>
-                </div>
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-3">Entradas × Saídas por semana</h3>
-                    <template x-if="!extrasLoaded">
-                        <div class="h-[200px] animate-pulse bg-slate-50 rounded-lg"></div>
-                    </template>
-                    <div class="h-[200px]" x-show="extrasLoaded">
-                        <canvas id="canvas-entradas-saidas"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    @* ===== SEÇÃO 4: CLIENTES & FORNECEDORES ===== *@
-    <section x-data="{ open: false }">
-        <button type="button" class="accordion-trigger w-full flex items-center justify-between py-2" @@click="open = !open">
-            <h2 class="font-bold text-slate-800">Clientes e fornecedores</h2>
-            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M5.5 7.5L10 12l4.5-4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </button>
-        <div x-show="open" x-transition.duration.180ms class="mt-4 space-y-4">
-
-            @* Novos clientes por mês *@
-            <div class="ws">
-                <h3 class="font-semibold text-slate-700 mb-3">Novos clientes por mês</h3>
-                <template x-if="!extrasLoaded">
-                    <div class="h-[200px] animate-pulse bg-slate-50 rounded-lg"></div>
-                </template>
-                <template x-if="extrasLoaded && extras && (!extras.novosClientes || extras.novosClientes.length === 0)">
-                    <div class="h-[200px] flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
-                        <p>Nenhum cliente cadastrado nos últimos 6 meses.</p>
-                        <a href="/clientes/novo" class="text-indigo-600 text-xs hover:underline">Cadastrar cliente →</a>
-                    </div>
-                </template>
-                <div class="h-[200px]" x-show="extrasLoaded && extras && extras.novosClientes && extras.novosClientes.length > 0">
-                    <canvas id="canvas-novos-clientes"></canvas>
-                </div>
-            </div>
-
-            @* Fornecedores *@
-            <template x-if="extrasLoaded && extras && extras.fornecedores">
-                <div class="ws">
-                    <h3 class="font-semibold text-slate-700 mb-4">Fornecedores</h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                        <div class="text-center p-3 rounded-xl bg-emerald-50">
-                            <div class="text-2xl font-bold text-emerald-700" x-text="extras.fornecedores.ativos"></div>
-                            <div class="text-xs text-slate-500 mt-1">Ativos</div>
-                        </div>
-                        <div class="text-center p-3 rounded-xl bg-slate-50">
-                            <div class="text-2xl font-bold text-slate-500" x-text="extras.fornecedores.inativos"></div>
-                            <div class="text-xs text-slate-500 mt-1">Inativos</div>
-                        </div>
-                    </div>
-                    <template x-if="extras.fornecedores.lista && extras.fornecedores.lista.length > 0">
-                        <div class="space-y-2">
-                            <template x-for="f in extras.fornecedores.lista.slice(0, 8)" :key="f.id">
-                                <div class="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50">
-                                    <span class="text-sm text-slate-700" x-text="f.nome"></span>
-                                    <span class="text-xs px-2 py-0.5 rounded-full font-medium"
-                                          :class="f.ativo ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
-                                          x-text="f.ativo ? 'Ativo' : 'Inativo'"></span>
-                                </div>
-                            </template>
-                            <template x-if="extras.fornecedores.lista.length > 8">
-                                <a href="/fornecedores" class="block text-center text-xs text-indigo-600 hover:underline mt-2">
-                                    Ver todos os fornecedores →
-                                </a>
-                            </template>
-                        </div>
-                    </template>
-                    <template x-if="!extras.fornecedores.lista || extras.fornecedores.lista.length === 0">
-                        <div class="text-center py-6 text-slate-400 text-sm">
-                            Nenhum fornecedor cadastrado.
-                            <a href="/fornecedores/novo" class="block text-indigo-600 text-xs mt-1 hover:underline">Cadastrar fornecedor →</a>
-                        </div>
-                    </template>
-                </div>
-            </template>
-            <template x-if="!extrasLoaded">
-                <div class="ws animate-pulse h-[180px] bg-slate-50 rounded-xl"></div>
-            </template>
-        </div>
-    </section>
-
-    @* IA usage (preserved from original) *@
-    @if (Model.IaConfigurada)
-    {
-        <div class="ws">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="font-bold text-slate-800">Gerações de IA este mês</h2>
-                <a href="/anuncios" class="text-xs text-indigo-600 hover:underline">Gerar anúncio →</a>
-            </div>
-            @if (Model.IaIlimitada)
+        <ul class="ds-alerts-list">
+            @if (Model.EstoqueCritico > 0)
             {
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 bg-emerald-50 text-emerald-800 ring-emerald-200">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Ilimitado
-                    </span>
-                    <span class="text-sm text-slate-500">@Model.GeracoesIaUsadas @(Model.GeracoesIaUsadas == 1 ? "geração realizada" : "gerações realizadas")</span>
-                </div>
+                var lbl = Model.EstoqueCritico == 1 ? "produto crítico" : "produtos críticos";
+                <li>
+                    <a href="/estoque?status=critico" class="ds-alert ds-alert--critical"
+                       aria-label="@(Model.EstoqueCritico) @lbl. Ir para a lista para repor.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
+                        <span class="ds-alert-count">@Model.EstoqueCritico</span>
+                        <span class="ds-alert-text">@lbl</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Repor agora →</span>
+                    </a>
+                </li>
+            }
+            @if (Model.ProximosVencimento > 0)
+            {
+                var lbl = Model.ProximosVencimento == 1 ? "produto vence em 7 dias" : "produtos vencem em 7 dias";
+                <li>
+                    <a href="/estoque?status=atencao" class="ds-alert ds-alert--warning"
+                       aria-label="@(Model.ProximosVencimento) @lbl. Ir para os lotes.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
+                        <span class="ds-alert-count">@Model.ProximosVencimento</span>
+                        <span class="ds-alert-text">@(Model.ProximosVencimento == 1 ? "vence em 7 dias" : "vencem em 7 dias")</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Ver lotes →</span>
+                    </a>
+                </li>
+            }
+            @if (Model.ProdutosParados > 0)
+            {
+                <li>
+                    <a href="/estoque?status=parado" class="ds-alert ds-alert--info"
+                       aria-label="@(Model.ProdutosParados) produto(s) parado(s) há mais de 30 dias. Considerar liquidar.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
+                        <span class="ds-alert-count">@Model.ProdutosParados</span>
+                        <span class="ds-alert-text">parado(s) há +30 dias</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Considerar liquidar →</span>
+                    </a>
+                </li>
+            }
+            @if (Model.SugestoesReposicao > 0)
+            {
+                var lbl = Model.SugestoesReposicao == 1 ? "sugestão de reposição" : "sugestões de reposição";
+                <li>
+                    <a href="/entradas/reposicao" class="ds-alert ds-alert--success"
+                       aria-label="@(Model.SugestoesReposicao) @lbl. Ver a lista.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
+                        <span class="ds-alert-count">@Model.SugestoesReposicao</span>
+                        <span class="ds-alert-text">@lbl</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Ver lista →</span>
+                    </a>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@* ─── Gráfico de vendas por mês ─────────────────────────────── *@
+<div class="ws dashboard-chart-card mb-6">
+    <div class="flex items-start justify-between mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="font-bold text-slate-800">Vendas por mês</h2>
+            @if (Model.TemComparativoReceita)
+            {
+                var pct = Model.VariacaoReceitaPercent;
+                var deltaClass = pct > 0 ? "text-emerald-600" : pct < 0 ? "text-red-600" : "text-slate-500";
+                var arrow = pct > 0 ? "↗" : pct < 0 ? "↘" : "→";
+                <p class="text-xs @deltaClass mt-0.5">@arrow @Math.Abs(pct)% vs. mês anterior</p>
             }
             else
             {
-                var pct = Model.GeracoesIaPercent;
-                var barColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-400" : "bg-emerald-500";
-                var textColor = pct >= 90 ? "text-red-600" : pct >= 70 ? "text-amber-600" : "text-emerald-600";
-                <div class="flex items-center gap-3 mb-2">
-                    <span class="text-2xl font-bold @textColor">@Model.GeracoesIaUsadas</span>
-                    <span class="text-slate-400 text-sm">/ @Model.GeracoesIaLimite gerações</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2">
-                    <div class="@barColor h-2 rounded-full transition-all" style="width:@(pct)%"></div>
-                </div>
-                <p class="text-xs text-slate-400 mt-1">@pct% utilizado</p>
+                <p class="text-xs text-slate-400 mt-0.5">Acompanhe a evolução das vendas mês a mês</p>
             }
         </div>
-    }
-
-    @* Quick actions *@
-    <div class="ws hidden lg:block">
-        <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
-        <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
-            @{
-                var acoes = new[]
-                {
-                    new { IconPath = "M19 14l-7 7m0 0l-7-7m7 7V3", Label = "Nova entrada", Href = "/entradas/nova" },
-                    new { IconPath = "M5 10l7-7m0 0l7 7m-7-7v18", Label = "Registrar saída", Href = "/saidas/nova" },
-                    new { IconPath = "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15", Label = "Repor estoque", Href = "/entradas/reposicao" },
-                    new { IconPath = "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4", Label = "Ver estoque", Href = "/estoque" },
-                    new { IconPath = "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z", Label = "Gerar anúncio", Href = "/anuncios" },
-                    new { IconPath = "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", Label = "Movimentações", Href = "/analytics/movimentacoes" },
-                };
-            }
-            @foreach (var acao in acoes)
+        <div class="flex gap-1">
+            @foreach (var (m, label) in new[] { (3, "3m"), (6, "6m"), (12, "12m") })
             {
-                <a href="@acao.Href"
-                   class="quick-action-card flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center group">
-                    <span class="quick-action-icon w-9 h-9 rounded-full bg-slate-50 group-hover:bg-indigo-100 text-slate-500 group-hover:text-indigo-600 flex items-center justify-center transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="@acao.IconPath" />
-                        </svg>
-                    </span>
-                    <span class="text-xs font-semibold text-slate-600">@acao.Label</span>
+                var isActive = (ViewBag.MesesGrafico as int? ?? 6) == m;
+                <a href="/dashboard?meses=@m"
+                   class="px-2.5 py-1 text-xs font-medium rounded-lg @(isActive ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100")">
+                    @label
                 </a>
             }
         </div>
     </div>
-
-    @* Drawer: detalhes do pedido.
-       Acessibilidade: Esc fecha (handler em window pra capturar mesmo sem foco no drawer).
-       Cleanup explicito de body/footer ao fechar — antes o conteudo HTML ficava no DOM
-       e gerava "fantasma" transparente no primeiro click no X (cleanup de portal falho). *@
-    <div x-show="drawer.open"
-         @@keydown.escape.window="closeDrawer()"
-         role="dialog" aria-modal="true" :aria-label="drawer.title"
-         class="fixed inset-0 z-50 flex justify-end no-print"
-         style="display:none"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0">
-        <div class="fixed inset-0 bg-black/30" @@click="closeDrawer()"></div>
-        <div class="relative w-full max-w-lg bg-white shadow-2xl flex flex-col h-full"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="translate-x-full"
-             x-transition:enter-end="translate-x-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="translate-x-0"
-             x-transition:leave-end="translate-x-full">
-            <div class="flex items-center justify-between px-5 py-4 border-b">
-                <h3 class="font-bold text-slate-800" x-text="drawer.title">Pedido</h3>
-                <button type="button" @@click="closeDrawer()" aria-label="Fechar"
-                        class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="flex-1 overflow-y-auto px-5 py-4" x-html="drawer.body">
-                <div class="space-y-3">
-                    <div class="h-4 bg-slate-100 rounded animate-pulse w-3/4"></div>
-                    <div class="h-4 bg-slate-100 rounded animate-pulse w-1/2"></div>
-                    <div class="h-4 bg-slate-100 rounded animate-pulse w-2/3"></div>
-                </div>
-            </div>
-            <div x-show="drawer.footer" class="px-5 py-4 border-t" x-html="drawer.footer"></div>
+    @if (Model.GraficoLabels.Any())
+    {
+        <div class="dashboard-chart-wrap">
+            <canvas id="grafico-receita" height="260"></canvas>
         </div>
-    </div>
-
-    @* Error state *@
-    <template x-if="error">
-        <div class="ws text-center py-8">
-            <p class="text-red-600 mb-3" x-text="error"></p>
-            <button type="button" @@click="reload()" class="btn btn-sm btn-outline">Tentar novamente</button>
-        </div>
-    </template>
+    }
+    else
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIllustration", "chart" },
+            { "EmptyTitle", "Ainda sem vendas registradas" },
+            { "EmptyDescription", "Quando você registrar a primeira saída, o gráfico mostra a evolução das vendas mês a mês." },
+            { "EmptyCta", "Registrar primeira saída" },
+            { "EmptyCtaHref", "/saidas/nova" }
+        })
+    }
 </div>
 
-@section Styles {
-<style>
-@@media print {
-    nav, aside, header nav, .no-print { display: none !important; }
-    body { background: white !important; color: black !important; }
-    canvas { max-width: 100% !important; }
-    #dashboard-kpis, #section-vendas, #section-estoque, #section-clientes { page-break-inside: avoid; }
+@* ─── Últimas movimentações (agrupadas por data) ─────────────── *@
+<div class="ws mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-bold text-slate-800">Últimas movimentações</h2>
+        <a href="/analytics/movimentacoes" class="text-xs text-indigo-600 hover:underline">Ver todas →</a>
+    </div>
+    @if (Model.MovimentacoesRecentes.Any())
+    {
+        var agrupado = Model.MovimentacoesRecentes
+            .GroupBy(m => m.Data)
+            .OrderByDescending(g => g.Key)
+            .ToList();
+
+        <div class="ds-mov-list">
+            @foreach (var grupo in agrupado)
+            {
+                var hoje = DateOnly.FromDateTime(DateTime.Today);
+                var ontem = hoje.AddDays(-1);
+                string rotuloDia = grupo.Key == hoje ? "Hoje" : grupo.Key == ontem ? "Ontem" : grupo.Key.ToString("dd 'de' MMMM", ptBR);
+
+                <div class="ds-mov-day">
+                    <div class="ds-mov-day-label">@rotuloDia · @grupo.Key.ToString("dd/MM/yyyy")</div>
+                    @foreach (var m in grupo)
+                    {
+                        var tipoNormalizado = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
+                        var label = tipoNormalizado switch
+                        {
+                            "Entrada" => $"{m.TotalMovimentacoes} entrada(s)",
+                            "Saida" => $"{m.TotalMovimentacoes} saída(s)",
+                            _ => $"{m.TotalMovimentacoes} {m.Tipo.ToLower()}"
+                        };
+                        var dotClass = tipoNormalizado switch
+                        {
+                            "Entrada" => "bg-emerald-500",
+                            "Saida" => "bg-red-500",
+                            _ => "bg-slate-400"
+                        };
+                        <a href="/analytics/movimentacoes?data=@grupo.Key.ToString("yyyy-MM-dd")&tipo=@tipoNormalizado"
+                           class="ds-mov-row">
+                            <span class="ds-mov-dot @dotClass"></span>
+                            <span class="ds-mov-main"><strong>@label</strong> · @m.Qty unid.</span>
+                            <span class="ds-mov-val">
+                                @if (m.Valor.HasValue)
+                                {
+                                    @m.Valor.Value.ToString("C", ptBR)
+                                }
+                                else
+                                {
+                                    <span class="text-slate-300">—</span>
+                                }
+                            </span>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIllustration", "chart" },
+            { "EmptyTitle", "Nenhuma movimentação ainda" },
+            { "EmptyDescription", "Registre sua primeira entrada para começar a acompanhar o fluxo do estoque." },
+            { "EmptyCta", "Registrar entrada" },
+            { "EmptyCtaHref", "/entradas/nova" }
+        })
+    }
+</div>
+
+@* ─── Card pequeno de IA (apenas se uso alto) ────────────────── *@
+@if (Model.IaConfigurada && !Model.IaIlimitada && Model.GeracoesIaPercent >= 70)
+{
+    var pct = Model.GeracoesIaPercent;
+    var barColor = pct >= 90 ? "bg-red-500" : "bg-amber-400";
+    var textColor = pct >= 90 ? "text-red-600" : "text-amber-600";
+    <div class="ws mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <div>
+                <h3 class="font-semibold text-slate-700 text-sm">Você usou @pct% das gerações de IA deste mês</h3>
+                <p class="text-xs text-slate-400 mt-0.5">@Model.GeracoesIaUsadas de @Model.GeracoesIaLimite anúncios</p>
+            </div>
+            <a href="/assinatura" class="text-xs text-indigo-600 hover:underline whitespace-nowrap">Ver plano →</a>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-1.5">
+            <div class="@barColor h-1.5 rounded-full transition-all" style="width:@(pct)%"></div>
+        </div>
+    </div>
 }
-</style>
-}
+
+@* ─── Ações rápidas (apenas 2 principais) ────────────────────── *@
+<div class="grid grid-cols-2 gap-3 mb-6">
+    <a href="/entradas/nova"
+       class="ds-quick-action ds-quick-action--primary">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>Registrar entrada</span>
+    </a>
+    <a href="/saidas/nova"
+       class="ds-quick-action ds-quick-action--secondary">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+        <span>Registrar venda</span>
+    </a>
+</div>
 
 @section Scripts {
-    <script src="~/js/dashboard-charts.js"></script>
+    @if (Model.GraficoLabels.Any())
+    {
     <script>
-        function dashboardApp() {
-            // delegado para window.fmt.money — interface Intl.NumberFormat-like mantida pra Chart.js
-            const fmtCurrency = { format: (v) => fmt.money(v ?? 0) };
-            const fmtNumber = new Intl.NumberFormat('pt-BR');
-            const fmtPct = (v) => v != null ? v.toFixed(1).replace('.', ',') + '%' : '—';
-            const fmtDelta = (v) => {
-                if (v == null) return '—';
-                const sign = v > 0 ? '+' : '';
-                return sign + v.toFixed(1).replace('.', ',') + '%';
-            };
-            const fmtDate = (iso) => iso ? fmt.date(iso) : '—';
+        (function() {
+            const ctx = document.getElementById('grafico-receita');
+            if (!ctx) return;
+            const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels));
+            const dados = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados));
 
-            return {
-                periodo: 30,
-                lojaId: '',
-                loading: false,
-                data: null,
-                error: null,
-                filtroAlerta: 'todos',
-                extras: null,
-                extrasLoaded: false,
-                extrasLoading: false,
-                extrasRequestId: 0,
-                drawer: { open: false, title: '', body: '', footer: '' },
-                periodos: [
-                    { value: 1,   label: 'Hoje' },
-                    { value: 7,   label: '7d' },
-                    { value: 30,  label: '30d' },
-                    { value: 90,  label: '3 meses' },
-                    { value: 365, label: '1 ano' },
-                ],
-                fmt: {
-                    currency: (v) => fmtCurrency.format(v ?? 0),
-                    number:   (v) => fmtNumber.format(v ?? 0),
-                    pct:      fmtPct,
-                    delta:    fmtDelta,
-                    date:     fmtDate,
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
+            gradient.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
+            gradient.addColorStop(1, 'rgba(30, 72, 168, 0)');
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Vendas',
+                        data: dados,
+                        borderColor: '#1E48A8',
+                        backgroundColor: gradient,
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        pointHoverBackgroundColor: '#1E48A8',
+                        pointHoverBorderColor: '#FFFFFF',
+                        pointHoverBorderWidth: 2
+                    }]
                 },
-
-                get alertasFiltrados() {
-                    if (!this.data || !this.data.alertasEstoque) return [];
-                    if (this.filtroAlerta === 'todos') return this.data.alertasEstoque;
-                    return this.data.alertasEstoque.filter(a => a.tipo === this.filtroAlerta);
-                },
-                contarTipo(tipo) {
-                    if (!this.data || !this.data.alertasEstoque) return 0;
-                    return this.data.alertasEstoque.filter(a => a.tipo === tipo).length;
-                },
-                iconeAlerta(tipo) {
-                    if (tipo === 'critico') return 'M12 9v4m0 4h.01M10.29 3.86l-7.11 12.3A2 2 0 004.91 19h14.18a2 2 0 001.73-2.84l-7.11-12.3a2 2 0 00-3.42 0z';
-                    if (tipo === 'vencimento') return 'M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
-                    return 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4';
-                },
-                labelAlerta(a) {
-                    if (a.tipo === 'vencimento') return 'Vence em ' + a.dias + (a.dias === 1 ? ' dia' : ' dias');
-                    if (a.tipo === 'parado') return 'Parado há ' + a.dias + (a.dias === 1 ? ' dia' : ' dias');
-                    return 'Apenas ' + a.quantidade + (a.quantidade === 1 ? ' unidade' : ' unidades');
-                },
-
-                deltaClass(val, invert) {
-                    if (val == null || val === 0) return 'text-slate-400';
-                    const positive = invert ? val < 0 : val > 0;
-                    return positive ? 'text-emerald-600' : 'text-red-500';
-                },
-
-                exportarPDF() {
-                    window.print();
-                },
-
-                closeDrawer() {
-                    // Reset explicito do conteudo HTML — antes ficava no DOM e o primeiro
-                    // click no X deixava o body anterior visivel como "fantasma" sobreposto.
-                    this.drawer = { open: false, title: '', body: '', footer: '' };
-                },
-
-                async openPedido(id) {
-                    const safeId = encodeURIComponent(String(id || ''));
-                    this.drawer = {
-                        open: true,
-                        title: 'Carregando pedido...',
-                        body: '<div class="space-y-3"><div class="h-4 bg-slate-100 rounded animate-pulse w-3/4"></div><div class="h-4 bg-slate-100 rounded animate-pulse w-1/2"></div><div class="h-32 bg-slate-50 rounded animate-pulse mt-4"></div></div>',
-                        footer: ''
-                    };
-                    try {
-                        const resp = await window.api.get('/dashboard/pedido/' + safeId);
-                        // API retorna PedidoDetalheResult = { pedido, itens, eventos, pagamentos }.
-                        // Antes lia campos flat em resp e tudo vinha undefined ("Sem cliente / R$ 0").
-                        const root = resp.data ?? resp;
-                        const pedido = root.pedido ?? root;
-                        const detalhes = {
-                            pedido,
-                            itens: root.itens ?? pedido.itens ?? [],
-                            pagamentos: root.pagamentos ?? pedido.pagamentos ?? []
-                        };
-                        this.drawer.title = 'Pedido #' + String(pedido.id || id).substring(0, 8).toUpperCase();
-                        this.drawer.body = this._buildPedidoBody(detalhes);
-                        this.drawer.footer = this._buildPedidoFooter(detalhes);
-                    } catch (e) {
-                        console.error('[dashboard] pedido:', e);
-                        this.drawer.body = '<p class="text-red-600 text-sm">Não foi possível carregar os detalhes.</p>';
-                    }
-                },
-
-                _buildPedidoBody({ pedido, itens, pagamentos }) {
-                    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-                    const currency = (v) => fmt.money(v ?? 0);
-                    const date = (s) => s ? fmt.date(s) : '—';
-                    const statusMap = {
-                        aguardando: { cls: 'bg-amber-100 text-amber-700', label: 'Aguardando' },
-                        preparando: { cls: 'bg-blue-100 text-blue-700',   label: 'Em preparo' },
-                        pronto:     { cls: 'bg-violet-100 text-violet-700', label: 'Pronto' },
-                        entregue:   { cls: 'bg-emerald-100 text-emerald-700', label: 'Entregue' },
-                        cancelado:  { cls: 'bg-red-100 text-red-700', label: 'Cancelado' }
-                    };
-                    const statusBadge = (s) => {
-                        const m = statusMap[s] || { cls: 'bg-slate-100 text-slate-600', label: s || '—' };
-                        return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${m.cls}">${esc(m.label)}</span>`;
-                    };
-
-                    const totalVal = Number(pedido.total) || 0;
-                    const totalPago = Number(pedido.totalPago) || 0;
-                    const cancelado = pedido.status === 'cancelado';
-
-                    let html = `<div class="space-y-4">`;
-                    html += `<div class="grid grid-cols-2 gap-3">
-                        <div><p class="text-xs text-slate-500">Cliente</p><p class="font-semibold text-slate-800">${esc(pedido.clienteNome || 'Sem cliente')}</p></div>
-                        <div><p class="text-xs text-slate-500">Situação</p><p class="mt-0.5">${statusBadge(pedido.status)}</p></div>
-                        <div><p class="text-xs text-slate-500">Data</p><p class="font-medium text-slate-700">${date(pedido.criadoEm)}</p></div>
-                        <div><p class="text-xs text-slate-500">Total</p><p class="font-bold text-slate-900">${currency(totalVal)}</p></div>
-                    </div>`;
-
-                    if (itens && itens.length) {
-                        html += `<div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Itens</p><div class="space-y-1.5">`;
-                        for (const item of itens) {
-                            const nome = esc(item.nome || 'Item');
-                            const qtd = Number(item.quantidade) || 0;
-                            const sub = Number(item.subtotal) || (Number(item.precoUnitario) || 0) * qtd;
-                            html += `<div class="flex justify-between text-sm"><span class="text-slate-700">${nome} × ${qtd}</span><span class="font-mono text-slate-600">${currency(sub)}</span></div>`;
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0F172A',
+                            titleColor: '#E2E8F0',
+                            bodyColor: '#FFFFFF',
+                            padding: 10,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                label: ctx => ' R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                            }
                         }
-                        html += `</div></div>`;
-                    }
-
-                    if (pagamentos && pagamentos.length) {
-                        html += `<div><p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Pagamentos</p><div class="space-y-1.5">`;
-                        for (const pg of pagamentos) {
-                            const valor = Number(pg.valor) || 0;
-                            const metodo = esc(pg.metodo || 'Pagamento');
-                            const dt = date(pg.pagoEm);
-                            html += `<div class="flex justify-between text-sm"><span class="text-slate-600">${metodo} — ${dt}</span><span class="font-mono font-semibold text-emerald-700">${currency(valor)}</span></div>`;
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#64748B' },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#64748B',
+                                callback: v => 'R$ ' + v.toLocaleString('pt-BR')
+                            },
+                            grid: { color: 'rgba(148, 163, 184, 0.18)' }
                         }
-                        html += `</div></div>`;
-                    }
-
-                    // Pedido cancelado nao tem saldo cobravel — nao exibe "Em aberto".
-                    const emAberto = totalVal - totalPago;
-                    if (!cancelado && emAberto > 0) {
-                        html += `<div class="flex justify-between items-center pt-2 border-t"><span class="font-semibold text-slate-700">Em aberto</span><span class="font-bold text-amber-600 text-lg">${currency(emAberto)}</span></div>`;
-                    }
-
-                    html += `</div>`;
-                    return html;
-                },
-
-                _buildPedidoFooter({ pedido }) {
-                    const totalVal = Number(pedido.total) || 0;
-                    const totalPago = Number(pedido.totalPago) || 0;
-                    if (pedido.status === 'cancelado' || (totalVal - totalPago) <= 0) return '';
-                    return `<a href="/pedidos/${pedido.id}" class="btn btn-sm btn-primary w-full text-center">Ver pedido completo →</a>`;
-                },
-
-                async loadExtras() {
-                    const requestId = ++this.extrasRequestId;
-                    this.extrasLoading = true;
-                    try {
-                        const tz = new Date().getTimezoneOffset();
-                        let url = `/dashboard/extras?periodo=${encodeURIComponent(this.periodo)}&tz=${tz}`;
-                        if (this.lojaId) url += `&lojaId=${encodeURIComponent(this.lojaId)}`;
-                        const result = await window.api.get(url);
-                        // Descarta resposta se outro loadExtras foi disparado depois (race).
-                        if (requestId !== this.extrasRequestId) return;
-                        this.extras = result.data ?? result;
-                        this.extrasLoaded = true;
-                        if (typeof window.dashboardCharts !== 'undefined') {
-                            window.dashboardCharts.updateExtras(this.extras);
-                        }
-                    } catch (e) {
-                        if (requestId === this.extrasRequestId) {
-                            console.error('[dashboard] extras:', e);
-                        }
-                    } finally {
-                        if (requestId === this.extrasRequestId) {
-                            this.extrasLoading = false;
-                        }
-                    }
-                },
-
-                async init() {
-                    await this.reload();
-                },
-
-                async reload() {
-                    this.loading = true;
-                    this.error = null;
-                    this.filtroAlerta = 'todos';
-                    this.extrasLoaded = false;
-                    try {
-                        const tz = new Date().getTimezoneOffset();
-                        let url = `/dashboard/data?periodo=${encodeURIComponent(this.periodo)}&tz=${tz}`;
-                        if (this.lojaId) url += `&lojaId=${encodeURIComponent(this.lojaId)}`;
-                        const result = await window.api.get(url);
-                        this.data = result.data ?? result;
-                        if (typeof window.dashboardCharts !== 'undefined') {
-                            window.dashboardCharts.update(this.data, this.periodo, this.lojaId);
-                        }
-                        // Carrega extras em background após dados principais
-                        this.loadExtras();
-                    } catch (e) {
-                        console.error('[dashboard]', e);
-                        this.error = 'Não foi possível carregar os dados. Verifique sua conexão.';
-                    } finally {
-                        this.loading = false;
                     }
                 }
-            };
-        }
+            });
+        })();
     </script>
 }
