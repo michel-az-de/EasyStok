@@ -103,10 +103,10 @@
     else if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "box" },
-            { "EmptyTitle", "Nenhum lote ainda" },
-            { "EmptyDescription", "Crie seu primeiro lote para começar a produzir e gerar etiquetas." },
-            { "EmptyCta", "Novo lote" },
+            { "EmptyIconName", "layers" },
+            { "EmptyTitle", "Nenhum lote" },
+            { "EmptyDescription", "Crie seu primeiro lote pra começar a produzir e gerar etiquetas." },
+            { "EmptyCta", "+ Novo Lote" },
             { "EmptyCtaModal", "novo-lote" }
         })
     }

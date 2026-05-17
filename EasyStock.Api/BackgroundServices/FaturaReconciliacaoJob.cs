@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,8 +42,6 @@ public sealed class FaturaReconciliacaoJob(
     IServiceProvider serviceProvider,
     ILogger<FaturaReconciliacaoJob> logger) : BackgroundService
 {
-    private const long LockKeyJob = 0x4661_7475_5265_636FL; // "FaturRec\0"
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("FaturaReconciliacaoJob iniciado");
@@ -55,7 +54,7 @@ public sealed class FaturaReconciliacaoJob(
         {
             try
             {
-                await RunWithAdvisoryLockAsync(LockKeyJob, ProcessarReconciliacaoAsync, stoppingToken);
+                await RunWithAdvisoryLockAsync(LockKeys.FaturaReconciliacao, ProcessarReconciliacaoAsync, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
@@ -116,6 +115,13 @@ public sealed class FaturaReconciliacaoJob(
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var router = scope.ServiceProvider.GetRequiredService<IPagamentoGatewayRouter>();
+
+        // Reconciliação varre faturas de TODOS os tenants — webhook caído num
+        // tenant qualquer cai aqui. RLS exige bypass explícito ou a policy
+        // tenant_isolation zeraria o batch (CurrentTenantId=Guid.Empty fora de
+        // request). IgnoreQueryFilters já desligava o filtro EF; bypass cobre
+        // a camada do banco.
+        using var _ = db.UseRowLevelSecurityBypass();
 
         var agora = DateTime.UtcNow;
         var idadeMinima = agora.AddHours(-1);

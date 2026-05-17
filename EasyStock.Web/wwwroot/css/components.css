@@ -632,6 +632,162 @@ button:focus-visible {
 /* Fallback CSS-only para main content */
 .app-main > * { animation: anim-fadeInUp 240ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
 
+/* =========================================================================
+   FASE 1 — Design tokens primitivos (es-icon, es-kbd, btn-icon, stp-*)
+   ========================================================================= */
+
+/* ---------- es-icon (Lucide via IconTagHelper) ---------- */
+.es-icon {
+  display: inline-block;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  flex: none;
+  vertical-align: -0.125em;
+  color: currentColor;
+  fill: none;
+  stroke: currentColor;
+}
+.es-icon--xs { width: var(--icon-size-xs); height: var(--icon-size-xs); }
+.es-icon--sm { width: var(--icon-size-sm); height: var(--icon-size-sm); }
+.es-icon--lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+
+/* Placeholder visual quando o ícone não foi resolvido (nome inválido) */
+.es-icon--missing {
+  display: inline-block;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--crit-100) 0 4px,
+    var(--crit-50) 4px 8px
+  );
+  border: 1px dashed var(--crit-600);
+  border-radius: 4px;
+  vertical-align: -0.125em;
+}
+
+/* ---------- es-kbd (tecla, atalho) ---------- */
+.es-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25em;
+  padding: 0 6px;
+  height: 1.5em;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--kbd-fg);
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  vertical-align: 0;
+}
+.es-kbd + .es-kbd { margin-left: 4px; }
+
+/* ---------- Btn variants enriquecidos ---------- */
+.btn .btn-label { display: inline-flex; align-items: center; }
+.btn .es-icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+.btn-icon {
+  /* Icon-only: padding quadrado, sem label */
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  aspect-ratio: 1;
+}
+.btn-icon.btn-sm { padding-left: 0.4rem; padding-right: 0.4rem; }
+.btn-icon.btn-lg { padding-left: 0.85rem; padding-right: 0.85rem; }
+.btn-icon-leading  { /* hook para spacing futuro */ }
+.btn-icon-trailing { margin-left: 4px; }
+
+/* ---------- Status pill modificadores genéricos (.stp-*) ----------
+   Os modificadores antigos (.stp.aguardando, .stp.preparando, etc) seguem válidos.
+   Estes adicionam variantes semânticas alinhadas a status (ok/warn/crit/info/accent/ink/neutral). */
+.stp-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor; opacity: 0.85; flex: none;
+}
+.stp-label { line-height: 1; }
+.stp-ok      { background: var(--ok-50);     border-color: var(--ok-200);     color: var(--ok-700); }
+.stp-warn    { background: var(--warn-50);   border-color: var(--warn-200);   color: var(--warn-700); }
+.stp-crit    { background: var(--crit-50);   border-color: var(--crit-200);   color: var(--crit-700); }
+.stp-info    { background: var(--navy-50);   border-color: var(--navy-200);   color: var(--navy-700); }
+.stp-accent  { background: var(--orange-50); border-color: var(--orange-200); color: var(--orange-700); }
+.stp-ink     { background: var(--ink-100);   border-color: var(--ink-200);    color: var(--ink-700); }
+.stp-neutral { background: var(--ink-50);    border-color: var(--ink-200);    color: var(--ink-600); }
+
+/* ---------- Badge defaults usados pelo EsBadgeTagHelper ---------- */
+.badge-default { background: var(--ink-100); color: var(--ink-700); }
+.badge-ok      { background: var(--ok-100);   color: var(--ok-700); }
+.badge-crit    { background: var(--crit-100); color: var(--crit-700); }
+.badge-info    { background: var(--navy-100); color: var(--navy-700); }
+.badge-accent  { background: var(--orange-100); color: var(--orange-700); }
+.badge-neutral { background: var(--ink-100); color: var(--ink-700); }
+.badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; flex: none;
+}
+.badge-label { line-height: 1.4; }
+
+/* ---------- Cheatsheet hook (Fase 5 vai consumir) ---------- */
+.kbd-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-soft);
+}
+.kbd-row:last-child { border-bottom: 0; }
+.kbd-row .kbd-label { font-size: 13px; color: var(--text-primary); }
+.kbd-row .kbd-keys  { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---------- Logo unificado (es-logo / partial _LogoEasyStock) ---------- */
+.es-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  line-height: 1;
+}
+.es-logo-mark { display: block; flex: none; }
+.es-logo-word {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+}
+.es-logo-easy { color: var(--navy-700); }
+.es-logo-stok { color: var(--orange-600); }
+
+/* Inverted: superficies escuras (sidebar, hero dark) */
+.es-logo-word--inverted .es-logo-easy { color: var(--white); }
+.es-logo-word--inverted .es-logo-stok { color: var(--orange-500); }
+
+/* Auth: superficies claras de login/cadastro com texto maior */
+.es-logo-word--auth { font-size: 1.875rem; font-weight: 800; }
+.es-logo-word--auth .es-logo-easy { color: var(--navy-900); }
+.es-logo-word--auth .es-logo-stok { color: var(--orange-600); }
+
+/* Dark theme: ajusta easy para ler em fundo escuro do app */
+:root[data-theme="dark"] .es-logo-easy { color: var(--white); }
+:root[data-theme="dark"] .es-logo-word--auth .es-logo-easy { color: var(--white); }
+
+/* ---------- Auth info banner (SelecionarLoja primeiro acesso) ---------- */
+.auth-info-banner {
+  background: var(--navy-50);
+  border: 1px solid var(--navy-200);
+}
+.auth-info-banner__icon { color: var(--navy-500); }
+:root[data-theme="dark"] .auth-info-banner {
+  background: rgba(30, 72, 168, 0.18);
+  border-color: rgba(30, 72, 168, 0.35);
+}
+:root[data-theme="dark"] .auth-info-banner__icon { color: var(--navy-200); }
+
 /* ---------- Nav progress (top-of-page loading bar) ---------- */
 .nav-progress {
   position: fixed;

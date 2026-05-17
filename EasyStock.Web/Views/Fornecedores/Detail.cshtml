@@ -247,10 +247,10 @@
         }
         else
         {
-            <div class="ws text-center py-12 text-slate-400">
-                <div class="text-4xl mb-3">📦</div>
-                <p class="text-sm font-medium text-slate-500">Nenhum pedido registrado</p>
-                <p class="text-xs mt-1 text-slate-400">O histórico de pedidos aparece aqui quando pedidos forem criados para este fornecedor.</p>
+            <div class="ws text-center py-12" style="color: var(--text-muted);">
+                <es-icon name="package" class="mx-auto mb-3" style="width:40px; height:40px;"></es-icon>
+                <p class="text-sm font-medium" style="color: var(--text-secondary);">Nenhum pedido registrado</p>
+                <p class="text-xs mt-1" style="color: var(--text-muted);">O histórico de pedidos aparece aqui quando pedidos forem criados para este fornecedor.</p>
             </div>
         }
 
@@ -272,14 +272,10 @@
             else
             {
                 <ul class="divide-y divide-slate-100">
-                @{
-                    var visiveis = Model.Alteracoes;
-                }
-                @for (int idx = 0; idx < visiveis.Count; idx++)
+                @for (int idx = 0; idx < Model.Alteracoes.Count; idx++)
                 {
-                    var a = visiveis[idx];
-                    var classeOculta = idx >= 10 ? "alt-extra" : "";
-                    <li class="py-2 text-sm @classeOculta" @(idx >= 10 ? "x-show=\"expanded\" x-cloak" : "")>
+                    var a = Model.Alteracoes[idx];
+                    <li class="py-2 text-sm" @(idx >= 10 ? "x-show=\"expanded\" x-cloak" : "")>
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
                             <span class="font-medium text-slate-900">@a.Campo</span>

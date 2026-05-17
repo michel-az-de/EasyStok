@@ -52,10 +52,10 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "inbox" },
-            { "EmptyTitle", "Nenhum fornecedor cadastrado ainda" },
-            { "EmptyDescription", "Cadastre o primeiro fornecedor para começar a registrar pedidos de compra e acompanhar prazos de entrega." },
-            { "EmptyCta", "Cadastrar primeiro fornecedor" },
+            { "EmptyIconName", "truck" },
+            { "EmptyTitle", "Nenhum fornecedor cadastrado" },
+            { "EmptyDescription", "Adicione seu primeiro fornecedor para organizar suas compras." },
+            { "EmptyCta", "+ Novo Fornecedor" },
             { "EmptyCtaModal", "novo-fornecedor" }
         })
     }

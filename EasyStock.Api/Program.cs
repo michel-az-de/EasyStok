@@ -174,9 +174,10 @@ switch (resolvedProvider)
     case "postgresql":
         builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready" — Redis degradado não remove pod do LB
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready", "api"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
+            .AddNotificationsHosting();
         // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapter Focus NFe + cert A1
         builder.Services.AddEasyStockIntegrationResilience();
         builder.Services.AddFocusNFeAdapter(builder.Configuration);
@@ -186,9 +187,10 @@ switch (resolvedProvider)
     case "sqlite":
         builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
         builder.Services.AddHealthChecks()
-            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready"
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready", "api"])
+            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready"
+            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
+            .AddNotificationsHosting();
         break;
 
     default:
@@ -217,6 +219,20 @@ builder.Services
     .AddNotificationsHosting(builder.Configuration)
     .AddPostgresOutboxSignaler(builder.Configuration);
 builder.Services.AddScoped<PostgresAdvisoryLock>();
+
+// Aviso explicito quando o pipeline de notificacoes vai rodar in-process: nao ha bulkhead
+// real entre HTTP da API e os 3 loops (compartilham ThreadPool, GC e memoria). Modo
+// suportado para Render free tier ou dev/teste; em producao prefira Worker como deploy
+// separado (Notifications:Hosting:Mode=Disabled aqui + Mode=Hosted no Worker).
+{
+    var notifMode = builder.Configuration["Notifications:Hosting:Mode"];
+    if (string.Equals(notifMode, "Hosted", StringComparison.OrdinalIgnoreCase))
+    {
+        Log.Warning(
+            "Notifications:Hosting:Mode=Hosted na API — pipeline rodando in-process. " +
+            "Sem isolamento de processo entre HTTP e loops; monitore /health/dispatcher.");
+    }
+}
 
 // ── Background Services + misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
@@ -276,6 +292,14 @@ app.Logger.LogInformation(
 
 if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 {
+    // R6: serializa migrations + seeds entre replicas via advisory lock pg_try_advisory_lock.
+    // Replica que adquirir o lock executa todo o bloco; outras logam skip e seguem boot.
+    // Health check /health/ready bloqueia trafego ate a primeira replica concluir.
+    using var lockScope = app.Services.CreateScope();
+    var advisoryLock = lockScope.ServiceProvider.GetRequiredService<PostgresAdvisoryLock>();
+
+    var acquired = await advisoryLock.TentarExecutarAsync(LockKeys.StartupMigrationsAndSeed, async lockToken =>
+    {
     var migrationsHouveErro = false;
     try
     {
@@ -284,6 +308,12 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
         using (var checkScope = app.Services.CreateScope())
         {
             var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            // RLS: queries em __EFMigrationsHistory não dependem da policy
+            // tenant_isolation (tabela não tem EmpresaId), mas a connection
+            // ainda assim entra com tenant=Guid.Empty. Bypass garante que
+            // nada residual de outra request afete a leitura — defesa em
+            // profundidade para o caminho de boot.
+            using var _ = checkDb.UseRowLevelSecurityBypass();
             appliedMigrations = (await checkDb.Database.GetAppliedMigrationsAsync()).ToList();
             pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
         }
@@ -311,6 +341,11 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
             {
                 using var migScope = app.Services.CreateScope();
                 var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                // RLS: migrations criam/alteram tabelas tenant-aware — precisam
+                // rodar com bypass, senão a própria migration AddRowLevelSecurity
+                // (e qualquer DML em seed_data interno) fica sob a policy que
+                // ela mesma criou.
+                using var _ = migDb.UseRowLevelSecurityBypass();
                 var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
                 await migrator.MigrateAsync(migrationId);
                 swMigration.Stop();
@@ -328,6 +363,7 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
                     migrationId, ex.SqlState);
                 using var regScope = app.Services.CreateScope();
                 var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var _ = regDb.UseRowLevelSecurityBypass();
                 const string productVersion = "9.0.0";
                 await regDb.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
@@ -379,6 +415,8 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     {
         using var bootstrapScope = app.Services.CreateScope();
         var bootstrapDb = bootstrapScope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+        // RLS: schema bootstrap mexe em tabelas tenant-aware sem JWT contextual.
+        using var _ = bootstrapDb.UseRowLevelSecurityBypass();
         await EasyStock.Api.Data.SeedSchemaBootstrap.EnsureAsync(bootstrapDb, app.Logger);
     }
     catch (Exception ex)
@@ -389,31 +427,58 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
     // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
     // de empresa). Idempotente: no-op se ja existe.
+    // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
+    // por bug de config (env var ausente, senha fraca) e blocker — melhor falhar deploy
+    // do que subir API silenciosamente quebrada.
     try
     {
         using var superSeedScope = app.Services.CreateScope();
         var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger);
+        // RLS: SuperAdmin seed cria registros sem tenant fixo — bypass obrigatório.
+        using var _ = superSeedDb.UseRowLevelSecurityBypass();
+        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger, app.Environment.IsProduction());
     }
-    catch (Exception ex)
+    catch (Exception ex) when (!app.Environment.IsProduction())
     {
-        app.Logger.LogError(ex, "Erro durante SuperAdminSeed. Painel admin pode ficar inacessivel.");
+        app.Logger.LogError(ex, "Erro durante SuperAdminSeed (nao-Production, continuando). Painel admin pode ficar inacessivel.");
     }
+    // Em Production: nao captura — exception sobe e derruba o startup com mensagem clara.
 
-    try
+    // R6: SeedData popula tenants demo (PastaBella, CasaDaBaba, etc.) — proibido em Production.
+    // Roda apenas se Development OU SEED_DEMO_DATA=true (opt-in explicito pra staging).
+    // SuperAdminSeed e NotificacoesGlobaisSeed seguem rodando (sao infra, nao demo).
+    var seedDemoEnabled = app.Environment.IsDevelopment()
+        || string.Equals(Environment.GetEnvironmentVariable("SEED_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);
+    if (seedDemoEnabled)
     {
-        using var seedScope = app.Services.CreateScope();
-        await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+        try
+        {
+            using var seedScope = app.Services.CreateScope();
+            // RLS: SeedData percorre todos os tenants demo — bypass no DbContext
+            // do scope para que use cases internos enxerguem o universo todo.
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var __ = seedDb.UseRowLevelSecurityBypass();
+            await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+        }
     }
-    catch (Exception ex)
+    else
     {
-        app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+        app.Logger.LogInformation(
+            "[SeedData] Skipped — env={Env}, SEED_DEMO_DATA nao e 'true'. Demo seed bloqueado fora de Development (R6).",
+            app.Environment.EnvironmentName);
     }
 
     try
     {
         using var notifSeedScope = app.Services.CreateScope();
         var notifDb = notifSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // RLS: catalogo de notificacoes globais (sem EmpresaId) + writes em
+        // tabelas tenant-aware — bypass cobre os dois.
+        using var _ = notifDb.UseRowLevelSecurityBypass();
         await NotificacoesGlobaisSeed.ExecutarAsync(notifDb, app.Logger);
     }
     catch (Exception ex)
@@ -429,6 +494,14 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
+    }
+    }, CancellationToken.None);
+
+    if (!acquired)
+    {
+        app.Logger.LogInformation(
+            "[Startup] Outra replica detem advisory lock 0x{LockKey:X} — pulando migrations/seeds. Health check /health/ready confirmara consistencia.",
+            LockKeys.StartupMigrationsAndSeed);
     }
 }
 
@@ -712,6 +785,23 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
+// /health/api: dependencias HTTP da API (PG + Redis + config) — NAO inclui dispatcher.
+// Loop de notificacoes preso nao deve marcar a API inteira como down nos LBs.
+app.MapHealthChecks("/health/api", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("api"),
+    ResponseWriter = WriteHealthCheckJsonResponse
+});
+
+// /health/dispatcher: heartbeats dos 3 BackgroundServices do pipeline de notificacoes.
+// Healthy quando Mode=Disabled (pipeline em Worker separado). Unhealthy quando algum
+// loop nao bate dentro de 5x intervalo configurado — sinal de pendurada.
+app.MapHealthChecks("/health/dispatcher", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("dispatcher"),
     ResponseWriter = WriteHealthCheckJsonResponse
 });
 

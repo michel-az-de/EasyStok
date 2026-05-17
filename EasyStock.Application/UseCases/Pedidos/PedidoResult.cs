@@ -20,7 +20,8 @@ public sealed record PedidoResult(
     DateTime CriadoEm,
     DateTime AlteradoEm,
     DateTime? EntreguEm,
-    DateTime? CanceladoEm
+    DateTime? CanceladoEm,
+    DateTime? AgendadoParaEm = null
 );
 
 public sealed record PedidoDetalheResult(

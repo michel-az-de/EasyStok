@@ -133,18 +133,13 @@
                             @if (!d.Revoked)
                             {
                                 <span class="text-slate-200">·</span>
-                                <button type="button"
-                                        @@click="$dispatch('confirm-action', {
-                                            titulo: 'Revogar este dispositivo?',
-                                            mensagem: 'O app correspondente vai parar de funcionar imediatamente. Para usar de novo, será preciso parear o dispositivo novamente. <strong>Esta ação não pode ser desfeita.</strong>',
-                                            textoBotao: 'Revogar dispositivo',
-                                            classBotao: 'bg-red-600 hover:bg-red-700',
-                                            formAction: '/dispositivos/@d.Id/revogar',
-                                            requireText: 'revogar'
-                                        })"
-                                        class="text-xs text-red-600 hover:text-red-800 font-medium ml-1">
-                                    Revogar
-                                </button>
+                                <form method="post" action="/dispositivos/@d.Id/revogar" class="inline ml-1"
+                                      data-confirm='{"titulo":"Revogar dispositivo?","mensagem":"O app deste dispositivo vai parar de funcionar imediatamente. Voce pode reaprovar gerando um novo codigo.","textoBotao":"Revogar","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="text-xs text-red-600 hover:text-red-800 font-medium">
+                                        Revogar
+                                    </button>
+                                </form>
                             }
                             else
                             {

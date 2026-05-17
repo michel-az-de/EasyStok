@@ -1,8 +1,9 @@
+# syntax=docker/dockerfile:1.7
 # ─── Stage 1: build + publish ────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copiar arquivos de projeto e restaurar (camada cacheada)
+# Copiar arquivos de projeto (camada cacheada — so invalida quando .csproj muda)
 COPY EasyStock.Domain/EasyStock.Domain.csproj                 EasyStock.Domain/
 COPY EasyStock.Application/EasyStock.Application.csproj       EasyStock.Application/
 COPY EasyStock.Infra.Postgre/EasyStock.Infra.Postgre.csproj   EasyStock.Infra.Postgre/
@@ -14,12 +15,22 @@ COPY EasyStock.Contracts/EasyStock.Contracts.csproj           EasyStock.Contract
 COPY EasyStock.Infra.Integrations/EasyStock.Infra.Integrations.csproj EasyStock.Infra.Integrations/
 COPY EasyStock.Api/EasyStock.Api.csproj                       EasyStock.Api/
 
-RUN dotnet restore EasyStock.Api/EasyStock.Api.csproj
+# Restore com cache mount BuildKit (persiste pacotes NuGet entre builds)
+RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
+    dotnet restore EasyStock.Api/EasyStock.Api.csproj
 
-# Copiar tudo e publicar
-COPY . .
+# Copiar codigo fonte (separado dos .csproj pra cache mais granular)
+COPY EasyStock.Domain/             EasyStock.Domain/
+COPY EasyStock.Application/        EasyStock.Application/
+COPY EasyStock.Infra.Postgre/      EasyStock.Infra.Postgre/
+COPY EasyStock.Infra.MongoDb/      EasyStock.Infra.MongoDb/
+COPY EasyStock.Infra.Sqlite/       EasyStock.Infra.Sqlite/
+COPY EasyStock.Infra.Async/        EasyStock.Infra.Async/
+COPY EasyStock.Api/                EasyStock.Api/
+
 WORKDIR /src/EasyStock.Api
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
+    dotnet publish -c Release -o /app/publish --no-restore
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 # Migrations sao aplicadas pelo proprio app no startup (Program.cs com logging

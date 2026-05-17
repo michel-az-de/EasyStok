@@ -24,11 +24,6 @@
                 </span>
             </div>
             @{
-                // CriadoEm vem do banco do cliente; LastOrderAt e do pedido. Quando o cliente
-                // foi promovido a partir de pedido ad-hoc / sync mobile, LastOrderAt pode ser
-                // anterior a CriadoEm — antes a header dizia "cadastrado em 13/05/2026" com
-                // pedido em 28/04/2026 e parecia integridade violada. Aqui explicamos.
-                // Tambem padroniza formato de data (era "dd/MM/yy" + "dd/MM/yyyy" misturados).
                 var lastOrderLocal = c.LastOrderAt?.ToLocalTime();
                 var criadoLocal = c.CriadoEm.ToLocalTime();
                 var pedidoAntesDoCadastro = lastOrderLocal.HasValue && lastOrderLocal.Value < criadoLocal;
@@ -52,17 +47,13 @@
         <div class="flex gap-2 shrink-0">
             @if (c.Ativo)
             {
-                <button type="button"
-                        @@click="$dispatch('confirm-action', {
-                            titulo: 'Desativar @c.Nome?',
-                            mensagem: 'O cliente fica oculto das listagens e dos pedidos novos. Você pode reativar quando quiser.',
-                            textoBotao: 'Desativar cliente',
-                            classBotao: 'bg-red-600 hover:bg-red-700',
-                            formAction: '/clientes/@c.Id/excluir'
-                        })"
-                        class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50 transition-colors">
-                    Desativar
-                </button>
+                <form asp-action="Excluir" asp-controller="Clientes" asp-route-id="@c.Id" method="post"
+                      data-confirm='{"titulo":"Desativar cliente?","mensagem":"O cliente sera desativado mas seu historico permanece. Voce pode reativar a qualquer momento.","textoBotao":"Desativar","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
+                        Desativar
+                    </button>
+                </form>
             }
             else
             {
@@ -163,15 +154,10 @@
                                 <div class="text-xs text-slate-500">@e.Bairro @(string.IsNullOrEmpty(e.Cidade) ? "" : "— ") @e.Cidade @(string.IsNullOrEmpty(e.Estado) ? "" : "/" + e.Estado) @e.Cep</div>
                                 @if (!string.IsNullOrEmpty(e.Referencia)) { <div class="text-xs text-slate-400 mt-1">@e.Referencia</div> }
                             </div>
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: '@tituloRemover',
-                                        mensagem: 'Esse endereço some do cadastro. Você pode adicionar de novo depois.',
-                                        textoBotao: 'Remover endereço',
-                                        classBotao: 'bg-red-600 hover:bg-red-700',
-                                        formAction: '/clientes/@c.Id/enderecos/@e.Id/excluir'
-                                    })"
-                                    class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            <form asp-action="RemoveEndereco" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-enderecoId="@e.Id" method="post" data-confirm='{"titulo":"Remover endereco?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
                         </li>
                     }
                     </ul>
@@ -217,15 +203,10 @@
                                 </div>
                                 <div class="text-xs text-slate-500">@(t.Tipo ?? "—") @(string.IsNullOrEmpty(t.Observacao) ? "" : "· " + t.Observacao)</div>
                             </div>
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: 'Remover telefone @t.Numero?',
-                                        mensagem: 'Esse telefone some do cadastro. Você pode adicionar de novo depois.',
-                                        textoBotao: 'Remover telefone',
-                                        classBotao: 'bg-red-600 hover:bg-red-700',
-                                        formAction: '/clientes/@c.Id/telefones/@t.Id/excluir'
-                                    })"
-                                    class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            <form asp-action="RemoveTelefone" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-telefoneId="@t.Id" method="post" data-confirm='{"titulo":"Remover telefone?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
                         </li>
                     }
                     </ul>
@@ -271,15 +252,10 @@
                                     @if (d.ValidoAte.HasValue) { <text> · válido até @d.ValidoAte.Value.ToLocalTime():dd/MM/yyyy</text> }
                                 </div>
                             </div>
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: 'Remover @d.Tipo.ToUpper() @d.Valor?',
-                                        mensagem: 'Esse documento some do cadastro. Você pode adicionar de novo depois.',
-                                        textoBotao: 'Remover documento',
-                                        classBotao: 'bg-red-600 hover:bg-red-700',
-                                        formAction: '/clientes/@c.Id/documentos/@d.Id/excluir'
-                                    })"
-                                    class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            <form asp-action="RemoveDocumento" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-documentoId="@d.Id" method="post" data-confirm='{"titulo":"Remover documento?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
+                            </form>
                         </li>
                     }
                     </ul>

@@ -95,5 +95,14 @@
         document.querySelectorAll('form[data-form-guard], form[data-autosave-key]').forEach(attach);
     });
 
-    window.EasyFormGuard = { attach };
+    function hasDirtyForm(root) {
+        const scope = root || document;
+        const forms = scope.querySelectorAll('form[data-form-guard], form[data-autosave-key]');
+        for (const f of forms) {
+            if (f.dataset.dirty === 'true' && f.dataset.submitting !== 'true') return true;
+        }
+        return false;
+    }
+
+    window.EasyFormGuard = { attach, hasDirtyForm };
 })();

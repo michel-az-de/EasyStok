@@ -118,7 +118,7 @@ else
                         <td class="text-slate-500 text-xs font-mono">
                             @if (!string.IsNullOrEmpty(nf.ChaveAcesso))
                             {
-                                <span title="@nf.ChaveAcesso">@nf.ChaveAcesso[..20]...</span>
+                                <span title="@nf.ChaveAcesso">@(nf.ChaveAcesso.Length > 20 ? nf.ChaveAcesso[..20] + "..." : nf.ChaveAcesso)</span>
                             }
                             else
                             {

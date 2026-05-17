@@ -26,9 +26,6 @@ public sealed class SlaMonitorService(
     private static readonly Counter<long> SlaResolutionBreached = HelpdeskMeter.CreateCounter<long>("tickets.sla_resolution_breached", "tickets");
     private static readonly Counter<long> SlaProximoCounter = HelpdeskMeter.CreateCounter<long>("tickets.sla_proximo_alerta", "tickets");
 
-    // 0x534C4148 = "SLAH" (SLA Helpdesk) - lock unico para single-instance
-    private const long LockId = 0x534C_4148_0000_0001L;
-
     private static readonly TicketStatus[] StatusAtivos = [TicketStatus.Aberto, TicketStatus.EmAtendimento, TicketStatus.AguardandoCliente];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -59,7 +56,7 @@ public sealed class SlaMonitorService(
         var sp = scope.ServiceProvider;
         var advisoryLock = sp.GetRequiredService<PostgresAdvisoryLock>();
 
-        await advisoryLock.TentarExecutarAsync(LockId, async token =>
+        await advisoryLock.TentarExecutarAsync(LockKeys.SlaMonitor, async token =>
         {
             ct = token;
             var db = sp.GetRequiredService<EasyStockDbContext>();

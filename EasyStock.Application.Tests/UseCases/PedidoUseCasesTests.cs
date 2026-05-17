@@ -169,6 +169,59 @@ public class PedidoUseCasesTests
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // CriarPedido — Agendamento (F5)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task CriarPedido_DevePersistirSemAgendamento_QuandoAgendadoParaEmNulo()
+    {
+        var empresaId = Guid.NewGuid();
+        Pedido? capturado = null;
+        await _pedidoRepo.AddAsync(Arg.Do<Pedido>(p => capturado = p));
+
+        await CriarPedidoUC().ExecuteAsync(new CriarPedidoCommand(empresaId,
+            ClienteNomeAdHoc: "Teste",
+            Itens: new[] { new CriarPedidoItemInput("Pão", 1, 5) }));
+
+        capturado.Should().NotBeNull();
+        capturado!.AgendadoParaEm.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CriarPedido_DevePersistirAgendamento_QuandoAgendadoParaEmFuturo()
+    {
+        var empresaId = Guid.NewGuid();
+        var dataFutura = DateTime.UtcNow.AddHours(2);
+        Pedido? capturado = null;
+        await _pedidoRepo.AddAsync(Arg.Do<Pedido>(p => capturado = p));
+
+        var result = await CriarPedidoUC().ExecuteAsync(new CriarPedidoCommand(empresaId,
+            ClienteNomeAdHoc: "Teste",
+            Itens: new[] { new CriarPedidoItemInput("Bolo", 1, 30) },
+            AgendadoParaEm: dataFutura));
+
+        capturado.Should().NotBeNull();
+        capturado!.AgendadoParaEm.Should().Be(dataFutura);
+        result.AgendadoParaEm.Should().Be(dataFutura);
+    }
+
+    [Fact]
+    public async Task CriarPedido_DeveLancarValidation_QuandoAgendadoParaEmNoPassado()
+    {
+        var empresaId = Guid.NewGuid();
+        var dataPassada = DateTime.UtcNow.AddMinutes(-10);
+
+        var act = () => CriarPedidoUC().ExecuteAsync(new CriarPedidoCommand(empresaId,
+            ClienteNomeAdHoc: "Teste",
+            Itens: new[] { new CriarPedidoItemInput("Café", 1, 8) },
+            AgendadoParaEm: dataPassada));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*futuro*");
+        await _pedidoRepo.DidNotReceive().AddAsync(Arg.Any<Pedido>());
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // CancelarPedido
     // ════════════════════════════════════════════════════════════════════
 

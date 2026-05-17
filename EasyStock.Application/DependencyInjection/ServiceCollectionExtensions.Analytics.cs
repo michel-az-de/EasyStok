@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using EasyStock.Application.UseCases.Analytics.Dashboard;
+using EasyStock.Application.UseCases.Analytics.Dia;
 using EasyStock.Application.UseCases.Analytics.DashboardFull;
 using EasyStock.Application.UseCases.Analytics.Projecoes;
 using EasyStock.Application.UseCases.Analytics.Reposicao;
@@ -41,6 +42,7 @@ public static partial class ServiceCollectionExtensions
     {
         // Analytics — Dashboard e KPIs
         services.AddScoped<GetDashboardUseCase>();
+        services.AddScoped<ObterResumoDiaUseCase>();
         services.AddScoped<GetDashboardFullUseCase>();
         services.AddScoped<CalcularProjecoesUseCase>();
         services.AddScoped<CalcularReposicaoUseCase>();

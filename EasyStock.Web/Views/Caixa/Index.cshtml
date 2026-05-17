@@ -22,20 +22,12 @@
         </h1>
         <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
-    <div class="flex gap-3 flex-wrap">
-        <a href="/caixa-mobile"
-           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Lançamentos do app
+    <div class="flex gap-3">
+        <a href="/caixa-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 inline-flex items-center gap-2">
+            <es-icon name="phone" class="es-icon--sm"></es-icon> Lançamentos do app
         </a>
-        <a href="/caixa/historico"
-           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Histórico
+        <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 inline-flex items-center gap-2">
+            <es-icon name="history" class="es-icon--sm"></es-icon> Histórico
         </a>
     </div>
 </div>
@@ -166,10 +158,14 @@ else
                         class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                     + Lançar entrada/saída
                 </button>
-                <button type="button" x-data @@click="$dispatch('open-modal', 'fechar-caixa')"
-                        class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-800 text-sm font-medium rounded-lg hover:bg-amber-50">
-                    🔒 Fechar caixa
-                </button>
+                <form asp-action="Fechar" asp-controller="Caixa" method="post" class="flex gap-2 items-center"
+                      data-confirm='@($"{{\"titulo\":\"Fechar caixa do dia?\",\"mensagem\":\"Saldo final: {d.SaldoEsperado.ToString("C")}. Esta acao nao pode ser desfeita.\",\"textoBotao\":\"Fechar caixa\",\"classBotao\":\"bg-amber-600 hover:bg-amber-700\"}}")'>
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="observacoes" placeholder="Obs do fechamento (opcional)" aria-label="Observações do fechamento" class="ui-field text-sm" />
+                    <button type="submit" class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 inline-flex items-center gap-2">
+                        <es-icon name="lock" class="es-icon--sm"></es-icon> Fechar caixa
+                    </button>
+                </form>
             }
             @if (d.Fechado && d.Fechamento != null)
             {
@@ -217,8 +213,7 @@ else
                         <td>
                             @if (m.Tipo != "abertura" && m.Tipo != "fechamento" && !d.Fechado)
                             {
-                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post"
-                                      x-data @@submit.prevent="if (confirm('Estornar @m.Tipo de @m.Valor.AsMoney()? Esta ação registra o estorno no histórico.')) $el.submit()">
+                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor sera revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar movimento">Estornar</button>
                                 </form>

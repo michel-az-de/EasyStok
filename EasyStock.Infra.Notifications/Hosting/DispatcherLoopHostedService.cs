@@ -14,6 +14,7 @@ namespace EasyStock.Infra.Notifications.Hosting;
 public sealed class DispatcherLoopHostedService(
     INotificacoesDispatcherOrchestrator orchestrator,
     IOutboxSignaler signaler,
+    INotificationsLoopHeartbeat heartbeat,
     IOptions<NotificationsHostingOptions> options,
     ILogger<DispatcherLoopHostedService> logger) : BackgroundService
 {
@@ -24,6 +25,10 @@ public sealed class DispatcherLoopHostedService(
         logger.LogInformation(
             "DispatcherLoopHostedService iniciado — shards={Shards} batch={Batch}",
             opts.ShardCount, opts.DispatcherBatchSize);
+
+        // Bate uma vez no startup pra diferenciar "loop nunca subiu" de "loop subiu mas
+        // ainda nao processou rodada" no health check.
+        heartbeat.Heartbeat(NotificationsLoops.Dispatcher);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -37,6 +42,8 @@ public sealed class DispatcherLoopHostedService(
             {
                 logger.LogError(ex, "Erro no DispatcherLoopHostedService — continuando próxima rodada.");
             }
+
+            heartbeat.Heartbeat(NotificationsLoops.Dispatcher);
         }
     }
 }
