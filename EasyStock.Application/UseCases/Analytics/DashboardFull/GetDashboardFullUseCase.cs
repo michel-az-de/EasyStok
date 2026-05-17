@@ -20,10 +20,28 @@ public class GetDashboardFullUseCase(
         var de = ate.AddDays(-cmd.PeriodoDias);
         var dePrev = de.AddDays(-cmd.PeriodoDias);
 
+        // BUG 1 (diag): cliente reportou que periodo=365 zera Receita/Pedidos/Lotes/
+        // ClientesAtivos enquanto periodo=30 retorna valores. Log inclui janela e
+        // contadores pra correlacionar com dados do banco. Remover quando o bug
+        // for confirmado/corrigido.
+        logger.LogInformation(
+            "Dashboard full request | empresa={EmpresaId} loja={LojaId} periodoDias={PeriodoDias} tz={Tz} de={De:o} ate={Ate:o}",
+            cmd.EmpresaId, cmd.LojaId, cmd.PeriodoDias, cmd.TimezoneOffsetMinutes, de, ate);
+
         // DbContext scoped não é thread-safe. Queries executadas sequencialmente.
         // A maioria responde do cache Redis (5min TTL) então o custo total fica baixo.
         var kpis = await analyticsRepository.GetDashboardKpisAsync(cmd.EmpresaId, de, ate, cmd.LojaId);
         var kpisPrev = await analyticsRepository.GetDashboardKpisAsync(cmd.EmpresaId, dePrev, de, cmd.LojaId);
+
+        // BUG 1 (diag): se algum KPI principal vier zerado em periodo > 90 dias
+        // (zona suspeita), logamos como Warning pra subir o sinal no observability.
+        if (cmd.PeriodoDias > 90 &&
+            (kpis.Receita == 0 || kpis.Pedidos == 0 || kpis.LotesProduzidos == 0 || kpis.ClientesAtivos == 0))
+        {
+            logger.LogWarning(
+                "Dashboard KPIs suspeitos (zerados em periodo grande) | periodoDias={PeriodoDias} receita={Receita} pedidos={Pedidos} lotes={Lotes} clientes={Clientes} de={De:o} ate={Ate:o}",
+                cmd.PeriodoDias, kpis.Receita, kpis.Pedidos, kpis.LotesProduzidos, kpis.ClientesAtivos, de, ate);
+        }
         var estoqueStatus = await analyticsRepository.GetEstoqueStatusDistribuicaoAsync(cmd.EmpresaId, cmd.LojaId);
         var pendentes = await analyticsRepository.GetPedidosPendentesAsync(cmd.EmpresaId, cmd.PeriodoDias, cmd.LojaId);
         var (alertasValidade, _) = await analyticsRepository.GetAlertasValidadeAsync(cmd.EmpresaId, 30, 1, 10, cmd.LojaId);

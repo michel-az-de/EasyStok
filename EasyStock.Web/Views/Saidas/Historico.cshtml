@@ -159,13 +159,22 @@
                         </td>
                         <td class="font-medium @(isEstornada ? "line-through" : "")">@s.Qty</td>
                         <td>
-                            @if (s.Custo.HasValue)
+                            @* BUG 6: a coluna mostrava `s.Custo` (que é ValorUnitario) em
+                               vez do ValorTotal da movimentação. Em vendas, o usuario
+                               espera ver o valor total da saída (preço de venda × qty),
+                               coincidente com a Receita Total do KPI. Se ValorTotal não
+                               vier do backend, fallback pra ValorUnitario × Qty. *@
+                            @{
+                                var valorExibir = s.ValorTotal?.Valor
+                                    ?? (s.Custo.HasValue ? s.Custo.Value * s.Qty : (decimal?)null);
+                            }
+                            @if (valorExibir.HasValue && valorExibir.Value > 0m)
                             {
-                                <span class="@(isEstornada ? "line-through" : "")">R$ @s.Custo.Value.ToString("N2")</span>
+                                <span class="@(isEstornada ? "line-through" : "")">R$ @valorExibir.Value.ToString("N2")</span>
                             }
                             else
                             {
-                                <span class="text-slate-400">—</span>
+                                <span class="text-slate-400" title="Saída registrada sem valor monetário (perda, doação, uso interno ou venda sem preço informado)">—</span>
                             }
                         </td>
                         <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>
