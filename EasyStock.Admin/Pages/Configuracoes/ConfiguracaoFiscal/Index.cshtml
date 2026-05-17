@@ -1,0 +1,237 @@
+@page
+@model EasyStock.Admin.Pages.Configuracoes.ConfiguracaoFiscal.IndexModel
+@{
+    ViewData["Title"] = "Configuracao Fiscal";
+    var sucesso = TempData["Sucesso"] as string;
+    var erro = TempData["Erro"] as string;
+
+    var passo1Ok = Model.TemCertificado;
+    var passo2Ok = Model.TemCsc;
+    var passo3Ok = Model.Configurado && !string.IsNullOrEmpty(Model.Ambiente);
+    var todosPassosOk = passo1Ok && passo2Ok && passo3Ok;
+}
+
+<div x-data="{ passo: @(passo1Ok ? (passo2Ok ? (passo3Ok ? 0 : 3) : 2) : 1) }" class="max-w-3xl mx-auto">
+
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/Tenants" class="text-es-ink-mute hover:text-es-ink text-sm">&larr; Tenants</a>
+        <span class="text-es-ink-mute">/</span>
+        <span class="text-es-ink font-medium">@Model.EmpresaNome</span>
+        <span class="text-es-ink-mute">/</span>
+        <span class="text-es-ink font-medium">Configuracao Fiscal</span>
+    </div>
+
+    @if (!string.IsNullOrEmpty(sucesso))
+    {
+        <div class="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm mb-4">
+            @sucesso
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(erro))
+    {
+        <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">
+            @erro
+        </div>
+    }
+
+    <!-- Status geral -->
+    <div class="card p-4 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-es-ink">Status da Emissao</h2>
+                <p class="text-sm text-es-ink-mute mt-1">
+                    @if (Model.Habilitada)
+                    {
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
+                            Habilitada
+                        </span>
+                        <span class="ml-2">Ambiente: @Model.Ambiente | Serie: @Model.SerieNfce | Proximo numero: @Model.ProximoNumeroNfce</span>
+                    }
+                    else if (Model.Configurado)
+                    {
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/15 text-yellow-400">
+                            Configurada (nao habilitada)
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400">
+                            Nao configurada
+                        </span>
+                    }
+                </p>
+            </div>
+            @if (Model.Habilitada)
+            {
+                <form method="post" asp-page-handler="Desabilitar">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
+                    <button type="submit" class="btn-secondary text-xs text-red-400 hover:text-red-300"
+                            onclick="return confirm('Desabilitar emissao fiscal? Notas ja emitidas permanecem validas.')">
+                        Desabilitar
+                    </button>
+                </form>
+            }
+        </div>
+    </div>
+
+    <!-- Passos -->
+    <div class="space-y-4">
+
+        <!-- Passo 1: Certificado A1 -->
+        <div class="card overflow-hidden">
+            <button type="button" @@click="passo = passo === 1 ? 0 : 1"
+                    class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold @(passo1Ok ? "bg-green-500/20 text-green-400" : "bg-es-ink-mute/20 text-es-ink-mute")">
+                        @(passo1Ok ? "✓" : "1")
+                    </span>
+                    <div>
+                        <span class="font-medium text-es-ink">Certificado Digital A1</span>
+                        @if (Model.TemCertificado)
+                        {
+                            <span class="ml-2 text-xs text-es-ink-mute">Valido ate @Model.CertificadoValidoAte
+                                @if (Model.CertificadoDiasParaExpirar.HasValue && Model.CertificadoDiasParaExpirar < 30)
+                                {
+                                    <span class="text-yellow-400">(@Model.CertificadoDiasParaExpirar dias)</span>
+                                }
+                            </span>
+                        }
+                    </div>
+                </div>
+                <span class="text-es-ink-mute" x-text="passo === 1 ? '▲' : '▼'"></span>
+            </button>
+            <div x-show="passo === 1" x-collapse class="border-t border-white/5 p-4">
+                <p class="text-sm text-es-ink-dim mb-4">
+                    Envie o certificado digital A1 (.pfx ou .p12) da empresa. A senha sera usada apenas para validar o arquivo.
+                </p>
+                <form method="post" asp-page-handler="Certificado" enctype="multipart/form-data" class="space-y-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
+                    <div>
+                        <label for="pfx" class="block text-sm text-es-ink-dim mb-1">Arquivo .pfx</label>
+                        <input type="file" id="pfx" name="pfx" accept=".pfx,.p12" required
+                               class="form-input w-full" />
+                    </div>
+                    <div>
+                        <label for="senha" class="block text-sm text-es-ink-dim mb-1">Senha do certificado</label>
+                        <input type="password" id="senha" name="senha" required
+                               class="form-input w-full" placeholder="Senha fornecida pela certificadora" />
+                    </div>
+                    <button type="submit" class="btn-primary">Enviar Certificado</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Passo 2: CSC -->
+        <div class="card overflow-hidden">
+            <button type="button" @@click="passo = passo === 2 ? 0 : 2"
+                    class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold @(passo2Ok ? "bg-green-500/20 text-green-400" : "bg-es-ink-mute/20 text-es-ink-mute")">
+                        @(passo2Ok ? "✓" : "2")
+                    </span>
+                    <div>
+                        <span class="font-medium text-es-ink">CSC (Codigo de Seguranca do Contribuinte)</span>
+                        @if (Model.TemCsc)
+                        {
+                            <span class="ml-2 text-xs text-green-400">ID: @Model.CscId</span>
+                        }
+                    </div>
+                </div>
+                <span class="text-es-ink-mute" x-text="passo === 2 ? '▲' : '▼'"></span>
+            </button>
+            <div x-show="passo === 2" x-collapse class="border-t border-white/5 p-4">
+                <p class="text-sm text-es-ink-dim mb-4">
+                    O CSC e fornecido pela SEFAZ do estado da empresa. E usado para autenticar a emissao de NFC-e. Nao compartilhe.
+                </p>
+                <form method="post" asp-page-handler="Csc" class="space-y-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
+                    <div>
+                        <label for="cscId" class="block text-sm text-es-ink-dim mb-1">CSC ID</label>
+                        <input type="text" id="cscId" name="cscId" required
+                               class="form-input w-full" placeholder="1" maxlength="10"
+                               value="@Model.CscId" />
+                    </div>
+                    <div>
+                        <label for="cscToken" class="block text-sm text-es-ink-dim mb-1">CSC Token</label>
+                        <input type="text" id="cscToken" name="cscToken" required
+                               class="form-input w-full" placeholder="Token alfanumerico fornecido pela SEFAZ" maxlength="100" />
+                    </div>
+                    <button type="submit" class="btn-primary">Salvar CSC</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Passo 3: Serie e Ambiente -->
+        <div class="card overflow-hidden">
+            <button type="button" @@click="passo = passo === 3 ? 0 : 3"
+                    class="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold @(passo3Ok ? "bg-green-500/20 text-green-400" : "bg-es-ink-mute/20 text-es-ink-mute")">
+                        @(passo3Ok ? "✓" : "3")
+                    </span>
+                    <div>
+                        <span class="font-medium text-es-ink">Serie e Ambiente</span>
+                        @if (passo3Ok)
+                        {
+                            <span class="ml-2 text-xs text-es-ink-mute">@Model.Ambiente | Serie @Model.SerieNfce</span>
+                        }
+                    </div>
+                </div>
+                <span class="text-es-ink-mute" x-text="passo === 3 ? '▲' : '▼'"></span>
+            </button>
+            <div x-show="passo === 3" x-collapse class="border-t border-white/5 p-4">
+                <p class="text-sm text-es-ink-dim mb-4">
+                    Defina o ambiente (homologacao para testes, producao para notas fiscais reais) e a serie da NFC-e.
+                </p>
+                <div class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 rounded-lg px-3 py-2 text-xs mb-4">
+                    Ambiente de homologacao nao gera nota fiscal valida. Use producao apenas apos validar com o contador.
+                </div>
+                <form method="post" asp-page-handler="SerieAmbiente" class="space-y-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
+                    <div>
+                        <label for="ambiente" class="block text-sm text-es-ink-dim mb-1">Ambiente</label>
+                        <select id="ambiente" name="ambiente" class="form-input w-full">
+                            <option value="Sandbox" selected="@(Model.Ambiente == "Sandbox")">Homologacao (sandbox)</option>
+                            <option value="Production" selected="@(Model.Ambiente == "Production")">Producao</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="serieNfce" class="block text-sm text-es-ink-dim mb-1">Serie NFC-e</label>
+                        <input type="number" id="serieNfce" name="serieNfce" required min="1" max="999"
+                               class="form-input w-full" value="@Model.SerieNfce" />
+                    </div>
+                    <button type="submit" class="btn-primary">Salvar Serie e Ambiente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botao Habilitar -->
+    @if (!Model.Habilitada && todosPassosOk)
+    {
+        <div class="card p-4 mt-6 text-center">
+            <p class="text-sm text-es-ink-dim mb-3">
+                Todos os passos concluidos. A empresa esta pronta para emitir NFC-e.
+            </p>
+            <form method="post" asp-page-handler="Habilitar">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
+                <button type="submit" class="btn-primary px-8 py-2">
+                    Habilitar Emissao NFC-e
+                </button>
+            </form>
+        </div>
+    }
+    else if (!Model.Habilitada && !todosPassosOk)
+    {
+        <div class="card p-4 mt-6 text-center">
+            <p class="text-sm text-es-ink-mute">
+                Complete os 3 passos acima para habilitar a emissao.
+            </p>
+        </div>
+    }
+</div>
