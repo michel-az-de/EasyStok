@@ -1,5 +1,6 @@
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+# Husky.Net usa "dotnet husky run" diretamente — sem necessidade do
+# boot script .sh da versao npm (que nao e gerado por "dotnet husky install").
 
 ## husky task runner examples -------------------
 ## Note : for local installation use 'dotnet' prefix. e.g. 'dotnet husky'
