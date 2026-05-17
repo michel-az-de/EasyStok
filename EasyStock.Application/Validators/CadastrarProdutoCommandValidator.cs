@@ -15,6 +15,7 @@ public class CadastrarProdutoCommandValidator : AbstractValidator<CadastrarProdu
 
         RuleFor(x => x.Nome)
             .NotEmpty().WithMessage("Nome é obrigatório.")
+            .MinimumLength(3).WithMessage("Nome deve ter pelo menos 3 caracteres.")
             .MaximumLength(200).WithMessage("Nome deve ter no máximo 200 caracteres.");
 
         RuleFor(x => x.Tipo)

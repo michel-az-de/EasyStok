@@ -15,6 +15,12 @@ public record ProdutoResumo
     [JsonConverter(typeof(EnumStringOrIntConverter))]
     public int Status { get; init; }
     public string? FotosJson { get; init; }
+    /// <summary>
+    /// C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Usado por Lotes
+    /// para validar peso obrigatorio no front (campo opcional do API/serializa
+    /// como string via HasConversion).
+    /// </summary>
+    public string? TipoEmbalagem { get; init; }
 
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 

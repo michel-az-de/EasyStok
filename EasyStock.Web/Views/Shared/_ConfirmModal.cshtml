@@ -10,9 +10,9 @@
      @@keydown.escape.window="fechar()">
 
     <template x-if="open">
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
              @@click.self="fechar()" x-transition.opacity>
-            <div class="bg-white rounded-xl p-6 w-96 shadow-xl" @@click.stop>
+            <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl" @@click.stop>
                 <div class="flex items-start gap-3 mb-4">
                     <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
                          :class="classBotao.includes('red') ? 'bg-red-100' : 'bg-indigo-100'">

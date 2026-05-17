@@ -89,6 +89,83 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
         return ms.ToArray();
     }
 
+    public async Task<Stream> OpenUploadStreamAsync(string storageKey, string contentType, CancellationToken ct = default)
+    {
+        // Para S3: usamos upload multipart via MemoryStream intermediário.
+        // Uma implementação completa usaria TransferUtility ou UploadPartAsync;
+        // para o MVP retornamos um stream que, ao ser Dispose'd, faz o upload.
+        var ms = new S3UploadStream(GetClient(), _options.S3.BucketName, storageKey, contentType);
+        return await Task.FromResult<Stream>(ms);
+    }
+
+    public async Task<Stream> DownloadStreamAsync(string storageKey, CancellationToken ct = default)
+    {
+        var client   = GetClient();
+        var response = await client.GetObjectAsync(new GetObjectRequest
+        {
+            BucketName = _options.S3.BucketName,
+            Key        = storageKey
+        }, ct);
+        return response.ResponseStream;
+    }
+
+    public Task<Uri> CreatePreSignedDownloadUrlAsync(string storageKey, TimeSpan ttl, string downloadFileName, CancellationToken ct = default)
+    {
+        var client  = GetClient();
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = _options.S3.BucketName,
+            Key        = storageKey,
+            Expires    = DateTime.UtcNow.Add(ttl),
+            Verb       = HttpVerb.GET,
+            ResponseHeaderOverrides =
+            {
+                ContentDisposition = $"attachment; filename=\"{Uri.EscapeDataString(downloadFileName)}\""
+            }
+        };
+        var url = client.GetPreSignedURL(request);
+        return Task.FromResult(new Uri(url));
+    }
+
+    public async Task<bool> ExistsAsync(string storageKey, CancellationToken ct = default)
+    {
+        var client = GetClient();
+        try
+        {
+            await client.GetObjectMetadataAsync(_options.S3.BucketName, storageKey, ct);
+            return true;
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+    }
+
+    // Stream helper: bufferiza em memória e faz PutObject ao fechar.
+    // Para relatórios grandes, uma implementação multipart seria mais robusta (L2).
+    private sealed class S3UploadStream(AmazonS3Client client, string bucket, string key, string contentType)
+        : MemoryStream
+    {
+        private bool _uploaded;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!_uploaded)
+            {
+                _uploaded = true;
+                Position  = 0;
+                client.PutObjectAsync(new PutObjectRequest
+                {
+                    BucketName  = bucket,
+                    Key         = key,
+                    InputStream = this,
+                    ContentType = contentType
+                }).GetAwaiter().GetResult();
+            }
+            base.Dispose(disposing);
+        }
+    }
+
     private AmazonS3Client GetClient()
     {
         if (_client is not null)

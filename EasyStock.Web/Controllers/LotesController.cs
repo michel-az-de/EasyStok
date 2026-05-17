@@ -12,7 +12,15 @@ public class CriarLoteWebRequest
     public List<CriarLoteItemInput>? Itens { get; set; }
 }
 
-public class LotesController(LotesService svc, SessionService session) : BaseController(session)
+public class AtualizarPesoWebRequest
+{
+    public int PesoG { get; set; }
+}
+
+public class LotesController(
+    LotesService svc,
+    SessionService session,
+    ILogger<LotesController> log) : BaseController(session)
 {
     [HttpGet("/lotes")]
     public async Task<IActionResult> Index(string? search = null, string? status = null)
@@ -21,8 +29,61 @@ public class LotesController(LotesService svc, SessionService session) : BaseCon
         ViewBag.ActiveMenuItem = "Lotes";
         var vm = new LotesListViewModel { Search = search, FiltroStatus = status };
 
-        var result = await svc.ListarAsync(status, search);
-        if (result.Success && result.Data is not null) vm.Items = result.Data;
+        // /lotes vinha quebrando em 500 esporadicamente. O ApiClient captura erros
+        // de rede/parse, mas qualquer outra exceção (NRE em DTO mal-formado, etc.)
+        // escapava direto para o ErrorController. Aqui mantemos a página viva com
+        // lista vazia + toast e logamos o stack pra triagem.
+        //
+        // BUG 9: o toast antes disparava em qualquer falha, mas a chamada principal
+        // (ListarAsync) podia ter sucedido e só a auxiliar (ListarPendentesPesoAsync)
+        // ter falhado — o usuário via toast vermelho com 50 lotes carregados. Agora
+        // só avisamos o usuário quando a lista principal não pôde ser carregada.
+        var listaPrincipalCarregou = status == "pendente_peso";
+
+        try
+        {
+            // C2 (R10): consulta pendentes em paralelo a list. Status "pendente_peso"
+            // e filtro client-side — chama endpoint dedicado.
+            var pendentesTask = svc.ListarPendentesPesoAsync();
+
+            if (status != "pendente_peso")
+            {
+                var result = await svc.ListarAsync(status, search);
+                if (result.Success && result.Data is not null)
+                {
+                    vm.Items = result.Data;
+                    listaPrincipalCarregou = true;
+                }
+                else
+                    log.LogWarning("Lotes.Listar falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
+                        result.ErrorCode, result.ErrorMessage, result.HttpStatus, result.CorrelationId);
+            }
+
+            var pendentes = await pendentesTask;
+            if (pendentes.Success && pendentes.Data is not null)
+            {
+                vm.PendentesPesoCount = pendentes.Data.Count;
+                if (status == "pendente_peso")
+                {
+                    vm.PendentesPeso = pendentes.Data;
+                    listaPrincipalCarregou = true;
+                }
+            }
+            else
+            {
+                log.LogWarning("Lotes.ListarPendentesPeso falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
+                    pendentes.ErrorCode, pendentes.ErrorMessage, pendentes.HttpStatus, pendentes.CorrelationId);
+                if (status == "pendente_peso") listaPrincipalCarregou = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha inesperada carregando /lotes (search={Search}, status={Status})", search, status);
+            listaPrincipalCarregou = false;
+        }
+
+        if (!listaPrincipalCarregou)
+            Toast("warning", "Não foi possível carregar a lista de lotes agora. Tente novamente em instantes.");
 
         return View(vm);
     }
@@ -84,7 +145,40 @@ public class LotesController(LotesService svc, SessionService session) : BaseCon
     {
         var result = await svc.FinalizarAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
-        Toast("success", $"Lote finalizado. {result.Data?.TotalUnidades} etiqueta(s) geradas.");
+        Toast("success", $"Lote finalizado. {result.Data?.TotalUnidades} etiqueta(s) prontas. <a href='/lotes/{id}/imprimir'>Imprimir agora →</a>");
         return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    /// <summary>
+    /// C2 backfill — PATCH peso de item. Bloqueado se lote ja finalizado (R3).
+    /// </summary>
+    [HttpPatch("/lotes/{loteId}/itens/{itemId}/peso")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtualizarPeso(string loteId, string itemId, [FromBody] AtualizarPesoWebRequest req)
+    {
+        if (req.PesoG <= 0)
+            return BadRequest(new { success = false, error = new { code = "INVALID_PESO", message = "Peso deve ser maior que zero." } });
+
+        var result = await svc.AtualizarPesoItemAsync(loteId, itemId, req.PesoG);
+        if (!result.Success)
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao atualizar peso."
+                }
+            });
+        return Ok(new { success = true });
+    }
+
+    [HttpGet("/lotes/{id}/imprimir")]
+    public async Task<IActionResult> Imprimir(string id)
+    {
+        ViewBag.Title     = "Imprimir etiquetas";
+        ViewBag.LoteId    = id;
+        ViewBag.EmpresaId = Session.GetEmpresaId();
+        return View();
     }
 }

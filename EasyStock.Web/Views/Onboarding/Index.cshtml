@@ -5,8 +5,12 @@
 
 <div class="max-w-2xl mx-auto py-8" x-data="{ step: 1 }">
     <header class="mb-6 text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-3 ring-1 bg-emerald-50 text-emerald-800 ring-emerald-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            14 dias de trial · sem cartão de crédito
+        </div>
         <h1 class="text-2xl font-bold mb-1">Configure sua conta</h1>
-        <p class="text-sm" style="color: var(--text-secondary);">Em 3 passos rapidos voce esta pronto pra usar.</p>
+        <p class="text-sm" style="color: var(--text-secondary);">Em 3 passos rápidos você está pronto para usar.</p>
         <ol class="flex justify-center gap-2 mt-4 text-xs">
             <li :class="step >= 1 ? 'font-bold' : ''">1. Empresa</li>
             <li>·</li>
@@ -24,12 +28,12 @@
             <div class="space-y-3">
                 <div>
                     <label asp-for="NomeFantasia" class="block text-sm mb-1"></label>
-                    <input asp-for="NomeFantasia" class="w-full px-3 py-2 border rounded" placeholder="Ex: Restaurante do Jose" />
+                    <input asp-for="NomeFantasia" class="w-full px-3 py-2 border rounded" placeholder="Ex: Restaurante do José" />
                 </div>
                 <div>
                     <label asp-for="Telefone" class="block text-sm mb-1"></label>
                     <input asp-for="Telefone" class="w-full px-3 py-2 border rounded" placeholder="(11) 99999-0000" />
-                    <p class="text-xs mt-1" style="color: var(--text-secondary);">Usado pra notificacoes WhatsApp/SMS quando ativadas.</p>
+                    <p class="text-xs mt-1" style="color: var(--text-secondary);">Usado para notificações por WhatsApp/SMS quando ativadas.</p>
                 </div>
                 <div>
                     <label asp-for="Segmento" class="block text-sm mb-1"></label>
@@ -42,7 +46,7 @@
                 </div>
             </div>
             <div class="mt-5 flex justify-end">
-                <button type="button" @@click="step = 2" class="px-4 py-2 rounded font-semibold" style="background: var(--accent-primary, #E85814); color: #fff;">Proximo</button>
+                <button type="button" @@click="step = 2" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">Próximo</button>
             </div>
         </div>
 
@@ -56,7 +60,7 @@
                 </div>
                 <div>
                     <label asp-for="LojaEndereco" class="block text-sm mb-1"></label>
-                    <input asp-for="LojaEndereco" class="w-full px-3 py-2 border rounded" placeholder="Rua, numero, bairro, cidade" />
+                    <input asp-for="LojaEndereco" class="w-full px-3 py-2 border rounded" placeholder="Rua, número, bairro, cidade" />
                 </div>
                 <div>
                     <label asp-for="LojaTelefone" class="block text-sm mb-1"></label>
@@ -64,23 +68,27 @@
                 </div>
             </div>
             <div class="mt-5 flex justify-between">
-                <button type="button" @@click="step = 1" class="px-4 py-2 rounded border">Voltar</button>
-                <button type="button" @@click="step = 3" class="px-4 py-2 rounded font-semibold" style="background: var(--accent-primary, #E85814); color: #fff;">Proximo</button>
+                <button type="button" @@click="step = 1" class="ui-secondary-btn px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">Voltar</button>
+                <button type="button" @@click="step = 3" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">Próximo</button>
             </div>
         </div>
 
         <div x-show="step === 3" x-transition>
-            <h2 class="font-semibold mb-3">Pronto pra comecar?</h2>
-            <p class="text-sm mb-4">Voce tem <strong>14 dias de trial</strong> com acesso a tudo. Sem cartao de credito.</p>
+            <h2 class="font-semibold mb-3">Pronto para começar?</h2>
+            <p class="text-sm mb-4">Você tem <strong>14 dias de trial</strong> com acesso a tudo. Sem cartão de crédito.</p>
             <ul class="text-sm list-disc pl-5 space-y-1 mb-5" style="color: var(--text-secondary);">
-                <li>Catalogo, estoque e movimentacao multi-loja.</li>
+                <li>Catálogo, estoque e movimentação multi-loja.</li>
                 <li>Pedidos, vendas e caixa integrados.</li>
-                <li>Relatorios em tempo real.</li>
+                <li>Relatórios em tempo real.</li>
             </ul>
             <div class="flex justify-between">
-                <button type="button" @@click="step = 2" class="px-4 py-2 rounded border">Voltar</button>
-                <button type="submit" class="px-4 py-2 rounded font-semibold" style="background: var(--accent-primary, #E85814); color: #fff;">Concluir e entrar</button>
+                <button type="button" @@click="step = 2" class="ui-secondary-btn px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">Voltar</button>
+                <button type="submit" class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">Concluir e entrar</button>
             </div>
         </div>
     </form>
+
+    <p class="text-center text-xs text-slate-500 mt-4">
+        Já configurou antes? <a href="/dashboard" class="text-indigo-600 hover:underline">Ir para o painel</a>
+    </p>
 </div>

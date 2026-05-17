@@ -18,6 +18,12 @@ public class NfeItemConfiguration : IEntityTypeConfiguration<NfeItem>
         builder.Property(i => i.Unidade).IsRequired().HasMaxLength(6);
         builder.Property(i => i.CstOuCsosn).HasMaxLength(4);
 
+        // Tributos por linha — nullable (NULL = NFC-e legada anterior ao PR-D)
+        builder.Property(i => i.BaseIcms).HasColumnType("numeric(14,2)");
+        builder.Property(i => i.ValorIcms).HasColumnType("numeric(14,2)");
+        builder.Property(i => i.Pis).HasColumnType("numeric(14,2)");
+        builder.Property(i => i.Cofins).HasColumnType("numeric(14,2)");
+
         builder.Property(i => i.Quantidade).HasColumnType("numeric(14,3)");
 
         builder.Property(i => i.PrecoUnitario)

@@ -18,18 +18,35 @@
             <div class="flex flex-wrap items-center gap-3">
                 <h1 class="text-2xl font-bold text-slate-900">@c.Nome</h1>
                 <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
-                            @(c.Ativo ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                            @(c.Ativo ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
                     <span class="w-1.5 h-1.5 rounded-full @(c.Ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
                     @(c.Ativo ? "Ativo" : "Inativo")
                 </span>
             </div>
+            @{
+                // CriadoEm vem do banco do cliente; LastOrderAt e do pedido. Quando o cliente
+                // foi promovido a partir de pedido ad-hoc / sync mobile, LastOrderAt pode ser
+                // anterior a CriadoEm — antes a header dizia "cadastrado em 13/05/2026" com
+                // pedido em 28/04/2026 e parecia integridade violada. Aqui explicamos.
+                // Tambem padroniza formato de data (era "dd/MM/yy" + "dd/MM/yyyy" misturados).
+                var lastOrderLocal = c.LastOrderAt?.ToLocalTime();
+                var criadoLocal = c.CriadoEm.ToLocalTime();
+                var pedidoAntesDoCadastro = lastOrderLocal.HasValue && lastOrderLocal.Value < criadoLocal;
+            }
             <p class="text-sm text-slate-500 mt-1">
                 @c.OrderCount @(c.OrderCount == 1 ? "pedido" : "pedidos")
-                @if (c.LastOrderAt.HasValue)
+                @if (lastOrderLocal.HasValue)
                 {
-                    <text> · último em @c.LastOrderAt.Value.ToLocalTime().ToString("dd/MM/yy")</text>
+                    <text> · último em @lastOrderLocal.Value.AsDate()</text>
                 }
-                · cadastrado em @c.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy")
+                @if (pedidoAntesDoCadastro)
+                {
+                    <text> · ficha cadastral criada em @criadoLocal.AsDate() (a partir de pedido anterior)</text>
+                }
+                else
+                {
+                    <text> · cadastrado em @criadoLocal.AsDate()</text>
+                }
             </p>
         </div>
         <div class="flex gap-2 shrink-0">
@@ -51,7 +68,7 @@
             {
                 <form asp-action="Reativar" asp-controller="Clientes" asp-route-id="@c.Id" method="post">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="px-3.5 py-2 bg-white border border-emerald-300 text-emerald-700 text-sm font-semibold rounded-lg hover:bg-emerald-50 transition-colors">
+                    <button type="submit" class="px-3.5 py-2 bg-white border border-emerald-300 text-emerald-800 text-sm font-semibold rounded-lg hover:bg-emerald-50 transition-colors">
                         Reativar
                     </button>
                 </form>
@@ -90,13 +107,13 @@
             <form asp-action="Editar" asp-controller="Clientes" asp-route-id="@c.Id" method="post" x-show="editando" x-cloak>
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
-                    <div><label class="block text-xs text-slate-500 mb-1">Nome *</label><input type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Unidade</label><input type="text" name="apt" value="@c.Apt" placeholder="Ex: 304B, Bloco 2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Endereço</label><input type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Telefone</label><input type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">E-mail</label><input type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
-                    <div><label class="block text-xs text-slate-500 mb-1">Observações</label><textarea name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
+                    <div><label for="cli-edit-nome" class="block text-xs text-slate-500 mb-1">Nome *</label><input id="cli-edit-nome" type="text" name="nome" value="@c.Nome" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-apt" class="block text-xs text-slate-500 mb-1">Unidade</label><input id="cli-edit-apt" type="text" name="apt" value="@c.Apt" placeholder="Ex: 304B, Bloco 2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-endereco" class="block text-xs text-slate-500 mb-1">Endereço</label><input id="cli-edit-endereco" type="text" name="endereco" value="@c.Endereco" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-telefone" class="block text-xs text-slate-500 mb-1">Telefone</label><input id="cli-edit-telefone" type="text" name="telefone" value="@c.Telefone" data-mask="phone" inputmode="numeric" autocomplete="tel" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-email" class="block text-xs text-slate-500 mb-1">E-mail</label><input id="cli-edit-email" type="email" name="email" value="@c.Email" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-documento" class="block text-xs text-slate-500 mb-1">CPF/CNPJ</label><input id="cli-edit-documento" type="text" name="documento" value="@c.Documento" data-mask="doc" inputmode="numeric" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
+                    <div><label for="cli-edit-observacoes" class="block text-xs text-slate-500 mb-1">Observações</label><textarea id="cli-edit-observacoes" name="observacoes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@c.Observacoes</textarea></div>
                     <button type="submit" class="w-full app-primary-btn px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Salvar alterações</button>
                 </div>
             </form>
@@ -111,15 +128,18 @@
                     ("enderecos", "Endereços",   Model.Detalhe.Enderecos.Count),
                     ("telefones", "Telefones",   Model.Detalhe.Telefones.Count),
                     ("documentos","Documentos",  Model.Detalhe.Documentos.Count),
-                    ("alteracoes","Atividade",   Model.Detalhe.Alteracoes.Count)
+                    ("alteracoes","Atividade",   Model.Detalhe.Alteracoes.Count),
+                    ("timeline",  "Timeline",    -1)
                 })
                 {
                     <button type="button" @@click="tab = '@key'"
                             :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
                             class="px-3 py-2 text-sm font-medium border-b-2 inline-flex items-center gap-2">
                         @label
+                        @if (count >= 0) {
                         <span class="text-[11px] px-1.5 py-0.5 rounded-full"
                               :class="tab === '@key' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'">@count</span>
+                        }
                     </button>
                 }
             </div>
@@ -275,7 +295,7 @@
 
                 <form asp-action="AddDocumento" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
-                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask); else $refs.docValor.value = $refs.docValor.value.replace(/\D/g,'')">
+                    <select name="tipo" required class="ui-select text-sm" x-data x-ref="docTipo" @@change="$refs.docValor.dataset.mask = ($event.target.value === 'cpf' ? 'cpf' : ($event.target.value === 'cnpj' ? 'cnpj' : '')); if (window.EasyMasks && $refs.docValor.dataset.mask) window.EasyMasks.apply($refs.docValor, $refs.docValor.dataset.mask)">
                         <option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="rg">RG</option>
                         <option value="cnh">CNH</option><option value="passaporte">Passaporte</option><option value="outro">Outro</option>
                     </select>
@@ -293,7 +313,9 @@
                 @if (Model.Detalhe.Alteracoes.Any())
                 {
                     <ul class="divide-y divide-slate-100">
-                    @foreach (var a in Model.Detalhe.Alteracoes)
+                    @foreach (var a in Model.Detalhe.Alteracoes.Where(a =>
+                        string.IsNullOrEmpty(a.Origem) ||
+                        !a.Origem.Contains("sync", StringComparison.OrdinalIgnoreCase)))
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
@@ -323,6 +345,61 @@
                     })
                 }
             </div>
+
+            <!-- F10-D: Timeline cross-entidade (entity_alteracoes via AJAX) -->
+            <div x-show="tab === 'timeline'" x-cloak class="p-4"
+                 x-init="$watch('tab', v => { if (v === 'timeline') loadTimeline(); })">
+                <div id="timeline-content">
+                    <p class="text-sm text-slate-500">Carregando timeline...</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function loadTimeline() {
+    var el = document.getElementById('timeline-content');
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = '1';
+    fetch('/api/audit/client-timeline/@c.Id')
+        .then(r => r.json())
+        .then(res => {
+            var items = (res.data && res.data.items) || [];
+            if (items.length === 0) {
+                el.innerHTML = '<p class="text-sm text-slate-500">Nenhuma atividade cross-entidade registrada.</p>';
+                return;
+            }
+            var html = '<ul class="divide-y divide-slate-100">';
+            items.forEach(function(a) {
+                var dt = new Date(a.alteradoEm);
+                var fmt = dt.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'}) + ' ' +
+                          dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+                var icon = a.tipoEntidade === 'Pedido' ? '📋' : a.tipoEntidade === 'PedidoPagamento' ? '💳' : '👤';
+                html += '<li class="py-2 text-sm">';
+                html += '<div class="flex items-center gap-2 flex-wrap">';
+                html += '<span class="text-xs text-slate-400 font-mono">' + fmt + '</span>';
+                html += '<span>' + icon + '</span>';
+                html += '<span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">' + escHtml(a.tipoEntidade) + '</span>';
+                html += '<span class="font-medium text-slate-900">' + escHtml(a.acao) + '</span>';
+                if (a.campo) html += '<span class="text-xs text-slate-600">' + escHtml(a.campo) + '</span>';
+                if (a.valorAntigo != null || a.valorNovo != null) {
+                    html += '<span class="text-xs text-slate-500">';
+                    if (a.valorAntigo != null) html += '<del class="text-red-400">' + escHtml(trunc(a.valorAntigo, 40)) + '</del> ';
+                    if (a.valorNovo != null) html += '<ins class="text-green-600 no-underline">' + escHtml(trunc(a.valorNovo, 40)) + '</ins>';
+                    html += '</span>';
+                }
+                if (a.origem) html += '<span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">' + escHtml(a.origem) + '</span>';
+                html += '</div>';
+                if (a.alteradoPorNome) html += '<div class="text-xs text-slate-400 ml-2">por ' + escHtml(a.alteradoPorNome) + '</div>';
+                html += '</li>';
+            });
+            html += '</ul>';
+            if (res.data.total > 50) html += '<p class="text-xs text-slate-400 mt-2">Mostrando 50 de ' + res.data.total + '.</p>';
+            el.innerHTML = html;
+        })
+        .catch(function() { el.innerHTML = '<p class="text-sm text-red-500">Erro ao carregar timeline.</p>'; });
+}
+function escHtml(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '...' : s; }
+</script>

@@ -5,14 +5,14 @@
 }
 
 <div class="flex items-center gap-3 mb-6">
-    <a asp-action="Index" asp-controller="Fornecedores" class="text-slate-400 hover:text-slate-600">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <a asp-action="Index" asp-controller="Fornecedores" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para fornecedores">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-slate-900">@Model.Fornecedor.Nome</h1>
     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
-                @(Model.Fornecedor.Ativo ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                @(Model.Fornecedor.Ativo ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
         <span class="w-1.5 h-1.5 rounded-full @(Model.Fornecedor.Ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
         @Model.Fornecedor.Status
     </span>
@@ -77,35 +77,35 @@
                 @Html.AntiForgeryToken()
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Nome *</label>
-                        <input type="text" name="nome" value="@Model.Fornecedor.Nome" required aria-required="true"
+                        <label for="forn-edit-nome" class="block text-xs text-slate-500 mb-1">Nome *</label>
+                        <input id="forn-edit-nome" type="text" name="nome" value="@Model.Fornecedor.Nome" required aria-required="true"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">CNPJ/CPF</label>
-                        <input type="text" name="documento" value="@Model.Fornecedor.Documento"
+                        <label for="forn-edit-documento" class="block text-xs text-slate-500 mb-1">CNPJ/CPF</label>
+                        <input id="forn-edit-documento" type="text" name="documento" value="@Model.Fornecedor.Documento"
                                data-mask="doc" inputmode="numeric"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Responsável</label>
-                        <input type="text" name="contato" value="@Model.Fornecedor.Contato"
+                        <label for="forn-edit-contato" class="block text-xs text-slate-500 mb-1">Responsável</label>
+                        <input id="forn-edit-contato" type="text" name="contato" value="@Model.Fornecedor.Contato"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Email</label>
-                        <input type="email" name="email" value="@Model.Fornecedor.Email"
+                        <label for="forn-edit-email" class="block text-xs text-slate-500 mb-1">Email</label>
+                        <input id="forn-edit-email" type="email" name="email" value="@Model.Fornecedor.Email"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Telefone</label>
-                        <input type="text" name="telefone" value="@Model.Fornecedor.Telefone"
+                        <label for="forn-edit-telefone" class="block text-xs text-slate-500 mb-1">Telefone</label>
+                        <input id="forn-edit-telefone" type="text" name="telefone" value="@Model.Fornecedor.Telefone"
                                data-mask="phone" inputmode="numeric" autocomplete="tel"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Tipo</label>
-                        <select name="tipo" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
+                        <label for="forn-edit-tipo" class="block text-xs text-slate-500 mb-1">Tipo</label>
+                        <select id="forn-edit-tipo" name="tipo" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
                             <option value="" selected="@(string.IsNullOrEmpty(Model.Fornecedor.Tipo))">Selecione...</option>
                             @{
                                 var tipoOpts = new[] { "nacional", "importado", "dropshipping" };
@@ -117,33 +117,33 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Lead Time (dias)</label>
-                        <input type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias"
+                        <label for="forn-edit-lead" class="block text-xs text-slate-500 mb-1">Lead Time (dias)</label>
+                        <input id="forn-edit-lead" type="number" name="leadTimeEstimadoDias" value="@Model.Fornecedor.LeadTimeEstimadoDias"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Categorias</label>
-                        <input type="text" name="categoria" value="@Model.Fornecedor.Categoria"
+                        <label for="forn-edit-categoria" class="block text-xs text-slate-500 mb-1">Categorias</label>
+                        <input id="forn-edit-categoria" type="text" name="categoria" value="@Model.Fornecedor.Categoria"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Site</label>
-                        <input type="url" name="siteUrl" value="@Model.Fornecedor.SiteUrl" placeholder="https://"
+                        <label for="forn-edit-site" class="block text-xs text-slate-500 mb-1">Site</label>
+                        <input id="forn-edit-site" type="url" name="siteUrl" value="@Model.Fornecedor.SiteUrl" placeholder="https://"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Pedido Mínimo</label>
-                        <input type="text" name="pedidoMinimo" value="@Model.Fornecedor.PedidoMinimo"
+                        <label for="forn-edit-pedido-minimo" class="block text-xs text-slate-500 mb-1">Pedido Mínimo</label>
+                        <input id="forn-edit-pedido-minimo" type="text" name="pedidoMinimo" value="@Model.Fornecedor.PedidoMinimo"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Frete Padrão</label>
-                        <input type="text" name="fretePadrao" value="@Model.Fornecedor.FretePadrao"
+                        <label for="forn-edit-frete" class="block text-xs text-slate-500 mb-1">Frete Padrão</label>
+                        <input id="forn-edit-frete" type="text" name="fretePadrao" value="@Model.Fornecedor.FretePadrao"
                                class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">Observações</label>
-                        <textarea name="observacoes" rows="2"
+                        <label for="forn-edit-observacoes" class="block text-xs text-slate-500 mb-1">Observações</label>
+                        <textarea id="forn-edit-observacoes" name="observacoes" rows="2"
                                   class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">@Model.Fornecedor.Observacoes</textarea>
                     </div>
                     <button type="submit" x-data="{ loading: false }" @@click="loading = true"
@@ -272,14 +272,10 @@
             else
             {
                 <ul class="divide-y divide-slate-100">
-                @{
-                    var visiveis = Model.Alteracoes;
-                }
-                @for (int idx = 0; idx < visiveis.Count; idx++)
+                @for (int idx = 0; idx < Model.Alteracoes.Count; idx++)
                 {
-                    var a = visiveis[idx];
-                    var classeOculta = idx >= 10 ? "alt-extra" : "";
-                    <li class="py-2 text-sm @classeOculta" @(idx >= 10 ? "x-show=\"expanded\" x-cloak" : "")>
+                    var a = Model.Alteracoes[idx];
+                    <li class="py-2 text-sm" @(idx >= 10 ? "x-show=\"expanded\" x-cloak" : "")>
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
                             <span class="font-medium text-slate-900">@a.Campo</span>

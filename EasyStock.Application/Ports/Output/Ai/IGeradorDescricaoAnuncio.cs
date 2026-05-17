@@ -1,10 +1,8 @@
-using System.Threading.Tasks;
 using EasyStock.Domain.Entities;
 
-namespace EasyStock.Application.Ports.Output.Ai
+namespace EasyStock.Application.Ports.Output.Ai;
+
+public interface IGeradorDescricaoAnuncio
 {
-    public interface IGeradorDescricaoAnuncio
-    {
-        Task<string> GerarAsync(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoesComplementares = null);
-    }
+    Task<string> GerarAsync(Produto produto, ProdutoVariacao? variacao, ItemEstoque? itemEstoque, string? instrucoesComplementares = null);
 }

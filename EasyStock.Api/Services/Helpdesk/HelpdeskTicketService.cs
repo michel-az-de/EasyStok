@@ -15,13 +15,16 @@ namespace EasyStock.Api.Services.Helpdesk;
 /// Cada operacao registra entrada em ticket_historico e (quando aplicavel)
 /// dispara evento via outbox de notificacoes.
 /// </summary>
-public sealed class HelpdeskTicketService(
+public class HelpdeskTicketService(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
     ISlaResolver slaResolver,
     INotificadorService notificador)
 {
-    public async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
+    // virtual para permitir Substitute.For em testes (AutoTicketFalhaPagamentoTests).
+    // Sem essa marcacao a classe seria mockada apenas via interface — overhead nao
+    // justificado para um servico interno da camada Api.
+    public virtual async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
     {
         var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Id == cmd.EmpresaId, ct)
             ?? throw new KeyNotFoundException("Empresa nao encontrada.");
@@ -33,6 +36,15 @@ public sealed class HelpdeskTicketService(
             fatura = await db.Faturas
                 .FirstOrDefaultAsync(f => f.Id == cmd.FaturaId.Value && f.EmpresaId == cmd.EmpresaId, ct)
                 ?? throw new KeyNotFoundException("Fatura nao encontrada para esta empresa.");
+        }
+
+        // Onda 1.1 — valida pedido pertence a empresa quando informado (espelha guard de Fatura).
+        Domain.Entities.Pedido? pedido = null;
+        if (cmd.PedidoId.HasValue && cmd.PedidoId.Value != Guid.Empty)
+        {
+            pedido = await db.Pedidos
+                .FirstOrDefaultAsync(p => p.Id == cmd.PedidoId.Value && p.EmpresaId == cmd.EmpresaId, ct)
+                ?? throw new KeyNotFoundException("Pedido nao encontrado para esta empresa.");
         }
 
         var sla = await slaResolver.ResolverAsync(cmd.EmpresaId, cmd.Prioridade, ct: ct);
@@ -52,11 +64,12 @@ public sealed class HelpdeskTicketService(
             prazoResolucao: sla.PrazoResolucao,
             criadoPorId: autorId);
         ticket.FaturaId = fatura?.Id;
+        ticket.PedidoId = pedido?.Id;
 
         db.AdminTickets.Add(ticket);
         db.TicketHistoricos.Add(TicketHistorico.Criar(
             ticket.Id, autorId, TicketAcaoHistorico.Criado,
-            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id })));
+            metadadosJson: JsonSerializer.Serialize(new { ticket.Prioridade, ticket.Nivel, ticket.Categoria, faturaId = fatura?.Id, pedidoId = pedido?.Id })));
 
         // Vinculacao reversa: Fatura.TicketRelacionadoId aponta para o
         // primeiro ticket sobre ela (idempotente — se ja vinculada, mantem).
@@ -172,6 +185,24 @@ public sealed class HelpdeskTicketService(
             ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.StatusAlterado,
             valorAntes: statusAntes.ToString(),
             valorDepois: cmd.NovoStatus.ToString()));
+
+        // Onda 1.1 — trilha cruzada Pedido <-> Ticket. Quando ticket vinculado a
+        // pedido eh resolvido, registra PedidoEvento "ticket_resolvido". Apenas
+        // registro; nao altera estado do pedido (operador faz mutacao explicita
+        // se a resolucao envolver reembolso/cancelamento).
+        if (cmd.NovoStatus == TicketStatus.Resolvido && ticket.PedidoId.HasValue)
+        {
+            db.Set<Domain.Entities.PedidoEvento>().Add(new Domain.Entities.PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = ticket.PedidoId.Value,
+                Tipo = "ticket_resolvido",
+                Detalhes = JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo }),
+                UsuarioId = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                Origem = "api",
+                OcorridoEm = DateTime.UtcNow
+            });
+        }
 
         await db.CommitAsync();
 

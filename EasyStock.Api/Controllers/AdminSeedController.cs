@@ -26,8 +26,28 @@ public class AdminSeedController(
     AdminAuditService audit,
     SeedProgressService seedProgress,
     IConfiguration config,
+    IHostEnvironment env,
     ILogger<AdminSeedController> logger) : EasyStockControllerBase
 {
+    /// <summary>
+    /// R6: registro de auditoria forte sempre que algum endpoint de seed e chamado em Production.
+    /// Persiste no SystemErrorLog via interceptor de logging e dispara LogCritical (Sentry/alerting).
+    /// </summary>
+    private void AuditarChamadaEmProducao(string endpoint, object? payload = null)
+    {
+        if (!env.IsProduction()) return;
+
+        var callerEmail = User.FindFirstValue(ClaimTypes.Email)
+                       ?? User.FindFirstValue("email")
+                       ?? "(sem email no JWT)";
+        var callerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "(sem sub)";
+        var sourceIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "(sem ip)";
+
+        logger.LogCritical(
+            "[Seed][PROD] Endpoint {Endpoint} chamado em Production — caller={CallerEmail} (UserId={CallerUserId}, ip={SourceIp}), payload={@Payload}, ts={Ts}",
+            endpoint, callerEmail, callerUserId, sourceIp, payload, DateTime.UtcNow);
+    }
+
     [HttpGet("status")]
     public async Task<IActionResult> Status()
     {
@@ -69,8 +89,9 @@ public class AdminSeedController(
     [HttpPost("demo")]
     public async Task<IActionResult> ExecutarDemo([FromQuery] string? volume = null)
     {
+        AuditarChamadaEmProducao("POST /api/admin/seed/demo", new { volume });
         if (!SeedApiEnabled())
-            return DataBadRequest("Seed via API não está habilitado neste ambiente. Defina SEED_API_ENABLED=true ou execute via reinicialização da API.");
+            return DataBadRequest(SeedDisabledMessage());
 
         // Backup do volume original pra restaurar depois (não vazar configuração entre chamadas).
         var originalVolume = Environment.GetEnvironmentVariable("SEED_DEMO_VOLUME");
@@ -128,13 +149,13 @@ public class AdminSeedController(
         var sw = System.Diagnostics.Stopwatch.StartNew();
         logger.LogInformation("[Seed] admin-test-scenarios — iniciando…");
 
+        AuditarChamadaEmProducao("POST /api/admin/seed/admin-test-scenarios");
         if (!SeedApiEnabled())
         {
             var (envSet, cfgSet) = SeedApiEnabledSources();
             logger.LogWarning("[Seed] admin-test-scenarios BLOQUEADO — flag desabilitada (envSet={EnvSet}, configSet={CfgSet})", envSet, cfgSet);
             return DataBadRequest(
-                "Seed via API está desabilitado. Defina SEED_API_ENABLED=true (env var) ou \"Seed:ApiEnabled\": true em appsettings, e reinicie a API. " +
-                $"Estado atual: env={envSet}, config={cfgSet}.");
+                SeedDisabledMessage() + $" Estado atual: env={envSet}, config={cfgSet}.");
         }
 
         try
@@ -198,8 +219,9 @@ public class AdminSeedController(
     [HttpPost("minimal")]
     public async Task<IActionResult> ExecutarMinimal()
     {
+        AuditarChamadaEmProducao("POST /api/admin/seed/minimal");
         if (!SeedApiEnabled())
-            return DataBadRequest("Seed via API não está habilitado. Defina SEED_API_ENABLED=true.");
+            return DataBadRequest(SeedDisabledMessage());
 
         try
         {
@@ -226,12 +248,12 @@ public class AdminSeedController(
     [HttpPost("run-async")]
     public IActionResult RunAsync([FromQuery] string tipo = "adminTestScenarios", [FromQuery] string? volume = null)
     {
+        AuditarChamadaEmProducao("POST /api/admin/seed/run-async", new { tipo, volume });
         if (!SeedApiEnabled())
         {
             var (envSet, cfgSet) = SeedApiEnabledSources();
             return DataBadRequest(
-                $"Seed via API está desabilitado (env={envSet}, config={cfgSet}). " +
-                "Defina SEED_API_ENABLED=true e reinicie a API.");
+                SeedDisabledMessage() + $" (env={envSet}, config={cfgSet})");
         }
 
         var adminEmail = User.FindFirstValue(ClaimTypes.Email)
@@ -458,10 +480,40 @@ public class AdminSeedController(
     {
         // Aceita config (appsettings) OU env var. Default: false em prod, true em dev.
         var fromEnv = Environment.GetEnvironmentVariable("SEED_API_ENABLED");
-        if (!string.IsNullOrWhiteSpace(fromEnv))
-            return string.Equals(fromEnv, "true", StringComparison.OrdinalIgnoreCase);
-        var fromConfig = config.GetValue<bool?>("Seed:ApiEnabled");
-        return fromConfig ?? false;
+        var enabled = !string.IsNullOrWhiteSpace(fromEnv)
+            ? string.Equals(fromEnv, "true", StringComparison.OrdinalIgnoreCase)
+            : (config.GetValue<bool?>("Seed:ApiEnabled") ?? false);
+
+        if (!enabled) return false;
+
+        // R6: em Production exige DUPLA confirmacao — SEED_API_ENABLED + SEED_API_ALLOW_PROD.
+        // Two-keys break-glass: cobrir engano humano de virar a flag normal por curiosidade.
+        if (env.IsProduction())
+        {
+            var allowProd = Environment.GetEnvironmentVariable("SEED_API_ALLOW_PROD");
+            if (!string.Equals(allowProd, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogCritical(
+                    "[Seed][PROD] Tentativa de uso do endpoint de seed sem SEED_API_ALLOW_PROD=true. SEED_API_ENABLED={Env}",
+                    fromEnv ?? "(via config)");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Mensagem padrao quando SeedApiEnabled() retorna false — explica os 2 niveis de opt-in.
+    /// </summary>
+    private string SeedDisabledMessage()
+    {
+        if (env.IsProduction())
+        {
+            return "Seed via API em Production exige SEED_API_ENABLED=true E SEED_API_ALLOW_PROD=true (defesa em duas chaves). " +
+                   "Em incidente, ajustar ambas no Azure App Service Settings e reiniciar.";
+        }
+        return "Seed via API esta desabilitado. Defina SEED_API_ENABLED=true (env var) ou \"Seed:ApiEnabled\": true em appsettings, e reinicie a API.";
     }
 
     /// <summary>

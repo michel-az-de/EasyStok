@@ -15,22 +15,22 @@
     </div>
 
     <form method="get" class="flex gap-3 flex-wrap">
-        <select name="status" class="input-dark text-sm">
+        <select name="status" class="form-input text-sm">
             <option value="">Todos os status</option>
-            <option value="Pendente" selected="@(Model.Status == "Pendente")">Pendente</option>
-            <option value="Enviado" selected="@(Model.Status == "Enviado")">Enviado</option>
-            <option value="Falhado" selected="@(Model.Status == "Falhado")">Falhado</option>
-            <option value="Suprimido" selected="@(Model.Status == "Suprimido")">Suprimido</option>
+            <option value="Pendente" selected="@(Model.Status == "Pendente" ? "selected" : null)">Pendente</option>
+            <option value="Enviado" selected="@(Model.Status == "Enviado" ? "selected" : null)">Enviado</option>
+            <option value="Falhado" selected="@(Model.Status == "Falhado" ? "selected" : null)">Falhado</option>
+            <option value="Suprimido" selected="@(Model.Status == "Suprimido" ? "selected" : null)">Suprimido</option>
         </select>
-        <select name="canal" class="input-dark text-sm">
+        <select name="canal" class="form-input text-sm">
             <option value="">Todos os canais</option>
-            <option value="Email" selected="@(Model.Canal == "Email")">Email</option>
-            <option value="Sms" selected="@(Model.Canal == "Sms")">SMS</option>
-            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp")">WhatsApp</option>
-            <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
+            <option value="Email" selected="@(Model.Canal == "Email" ? "selected" : null)">Email</option>
+            <option value="Sms" selected="@(Model.Canal == "Sms" ? "selected" : null)">SMS</option>
+            <option value="WhatsApp" selected="@(Model.Canal == "WhatsApp" ? "selected" : null)">WhatsApp</option>
+            <option value="InApp" selected="@(Model.Canal == "InApp" ? "selected" : null)">In-App</option>
         </select>
-        <input type="date" name="de" value="@Model.De" class="input-dark text-sm" />
-        <input type="date" name="ate" value="@Model.Ate" class="input-dark text-sm" />
+        <input type="date" name="de" value="@Model.De" class="form-input text-sm" />
+        <input type="date" name="ate" value="@Model.Ate" class="form-input text-sm" />
         <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
     </form>
 
@@ -68,8 +68,8 @@
                         var outboxId = log.TryGetProperty("outboxMensagemId", out var oid) ? oid.GetString() : "";
                         var erro = log.TryGetProperty("erroDetalhado", out var er) && er.ValueKind != System.Text.Json.JsonValueKind.Null ? er.GetString() : null;
 
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40" title="@erro">
-                            <td class="px-4 py-3 font-mono text-slate-500 text-xs">@(outboxId?.Substring(0, 8))…</td>
+                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+                            <td class="px-4 py-3 font-mono text-slate-500 text-xs" title="@outboxId">@(outboxId is { Length: >= 8 } ? outboxId[..8] + "…" : outboxId)</td>
                             <td class="px-4 py-3 text-slate-300">@canal</td>
                             <td class="px-4 py-3 text-slate-400">@tentativa</td>
                             <td class="px-4 py-3 text-slate-400 font-mono text-xs">@provider</td>

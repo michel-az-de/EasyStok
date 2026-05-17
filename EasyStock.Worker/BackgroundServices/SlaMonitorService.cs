@@ -26,9 +26,6 @@ public sealed class SlaMonitorService(
     private static readonly Counter<long> SlaResolutionBreached = HelpdeskMeter.CreateCounter<long>("tickets.sla_resolution_breached", "tickets");
     private static readonly Counter<long> SlaProximoCounter = HelpdeskMeter.CreateCounter<long>("tickets.sla_proximo_alerta", "tickets");
 
-    // 0x534C4148 = "SLAH" (SLA Helpdesk) - lock unico para single-instance
-    private const long LockId = 0x534C_4148_0000_0001L;
-
     private static readonly TicketStatus[] StatusAtivos = [TicketStatus.Aberto, TicketStatus.EmAtendimento, TicketStatus.AguardandoCliente];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -59,7 +56,7 @@ public sealed class SlaMonitorService(
         var sp = scope.ServiceProvider;
         var advisoryLock = sp.GetRequiredService<PostgresAdvisoryLock>();
 
-        await advisoryLock.TentarExecutarAsync(LockId, async token =>
+        await advisoryLock.TentarExecutarAsync(LockKeys.SlaMonitor, async token =>
         {
             ct = token;
             var db = sp.GetRequiredService<EasyStockDbContext>();
@@ -127,10 +124,16 @@ public sealed class SlaMonitorService(
         if (agora >= prazo)
         {
             // Estourou — marcar violado + notificar
-            var sql = tipo == "Resposta"
-                ? "UPDATE admin_tickets SET \"SlaRespostaViolado\" = true, \"AlteradoEm\" = {0} WHERE \"Id\" = {1}"
-                : "UPDATE admin_tickets SET \"SlaResolucaoViolado\" = true, \"AlteradoEm\" = {0} WHERE \"Id\" = {1}";
-            await db.Database.ExecuteSqlRawAsync(sql, [agora, snap.Id], ct);
+            if (tipo == "Resposta")
+                await db.AdminTickets.Where(t => t.Id == snap.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(t => t.SlaRespostaViolado, true)
+                        .SetProperty(t => t.AlteradoEm, agora), ct);
+            else
+                await db.AdminTickets.Where(t => t.Id == snap.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(t => t.SlaResolucaoViolado, true)
+                        .SetProperty(t => t.AlteradoEm, agora), ct);
 
             db.TicketHistoricos.Add(EasyStock.Domain.Entities.TicketHistorico.Criar(
                 snap.Id, autorId: null, EasyStock.Domain.Enums.TicketAcaoHistorico.SlaViolado,
@@ -167,16 +170,14 @@ public sealed class SlaMonitorService(
         if (pctDecorrido >= 0.80 && snap.UltimoAlerta80PctEm is null)
         {
             await DispararAlertaProximoAsync(snap, tipo, 80, minutosRestantes, agora, db, notificador, ct);
-            await db.Database.ExecuteSqlRawAsync(
-                "UPDATE admin_tickets SET \"UltimoAlerta80PctEm\" = {0} WHERE \"Id\" = {1}",
-                [agora, snap.Id], ct);
+            await db.AdminTickets.Where(t => t.Id == snap.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.UltimoAlerta80PctEm, agora), ct);
         }
         else if (pctDecorrido >= 0.50 && snap.UltimoAlerta50PctEm is null)
         {
             await DispararAlertaProximoAsync(snap, tipo, 50, minutosRestantes, agora, db, notificador, ct);
-            await db.Database.ExecuteSqlRawAsync(
-                "UPDATE admin_tickets SET \"UltimoAlerta50PctEm\" = {0} WHERE \"Id\" = {1}",
-                [agora, snap.Id], ct);
+            await db.AdminTickets.Where(t => t.Id == snap.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.UltimoAlerta50PctEm, agora), ct);
         }
     }
 

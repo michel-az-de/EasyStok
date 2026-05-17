@@ -15,27 +15,10 @@
     <div class="pg-hd">
         <h1 class="flex items-center gap-3">
             Caixa do dia
-            @if (statusCaixa == "aberto")
-            {
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Aberto
-                </span>
-            }
-            else if (statusCaixa == "fechado")
-            {
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-slate-50 text-slate-600 ring-slate-200">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                    Fechado
-                </span>
-            }
-            else if (statusCaixa == "fechado-pendente")
-            {
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Aguardando abertura
-                </span>
-            }
+            @{ var caixaStatus = StatusHelper.Resolve(statusCaixa); }
+            <span class="badge @caixaStatus.BadgeClass">
+                <span class="dot"></span> @caixaStatus.Label
+            </span>
         </h1>
         <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
@@ -137,6 +120,9 @@
                 <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
                     Ver histórico de fechamentos
                 </a>
+                <a href="/configuracoes#suporte" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                    Falar com suporte
+                </a>
             }
         </div>
     </div>
@@ -146,20 +132,20 @@ else
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Saldo esperado</h3>
-            <div class="text-2xl font-bold text-slate-900">@d.SaldoEsperado.ToString("C")</div>
+            <div class="text-2xl font-bold text-slate-900 tabular-nums">@d.SaldoEsperado.AsMoney()</div>
             <div class="text-xs text-slate-500 mt-1">
                 @(d.Fechado ? "Caixa fechado" : (d.Aberto ? "Caixa aberto" : "Caixa não aberto"))
             </div>
         </div>
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Vendas + pagamentos</h3>
-            <div class="text-2xl font-bold text-green-600">@((d.TotalVendas + d.TotalPagamentosPedidos).ToString("C"))</div>
-            <div class="text-xs text-slate-500 mt-1">Vendas: @d.TotalVendas.ToString("C") · Pagamentos: @d.TotalPagamentosPedidos.ToString("C")</div>
+            <div class="text-2xl font-bold text-green-600 tabular-nums">@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</div>
+            <div class="text-xs text-slate-500 mt-1 tabular-nums">Vendas: @d.TotalVendas.AsMoney() · Pagamentos: @d.TotalPagamentosPedidos.AsMoney()</div>
         </div>
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Entradas/saídas extras</h3>
-            <div class="text-2xl font-bold text-slate-900">@((d.TotalEntradasExtras - d.TotalSaidasExtras).ToString("C"))</div>
-            <div class="text-xs text-slate-500 mt-1">Entradas: +@d.TotalEntradasExtras.ToString("C") · Saídas: -@d.TotalSaidasExtras.ToString("C")</div>
+            <div class="text-2xl font-bold text-slate-900 tabular-nums">@((d.TotalEntradasExtras - d.TotalSaidasExtras).AsMoney())</div>
+            <div class="text-xs text-slate-500 mt-1 tabular-nums">Entradas: +@d.TotalEntradasExtras.AsMoney() · Saídas: −@d.TotalSaidasExtras.AsMoney()</div>
         </div>
     </div>
 
@@ -181,16 +167,16 @@ else
                     + Lançar entrada/saída
                 </button>
                 <button type="button" x-data @@click="$dispatch('open-modal', 'fechar-caixa')"
-                        class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50">
+                        class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-800 text-sm font-medium rounded-lg hover:bg-amber-50">
                     🔒 Fechar caixa
                 </button>
             }
             @if (d.Fechado && d.Fechamento != null)
             {
                 <span class="text-sm text-slate-600">
-                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime().ToString("dd/MM HH:mm")
+                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime().AsDateTime()
                     @if (!string.IsNullOrEmpty(d.Fechamento.FechadoPorNome)) { <span class="text-slate-400">por @d.Fechamento.FechadoPorNome</span> }
-                    · Saldo final: <strong>@d.Fechamento.SaldoFinal.ToString("C")</strong>
+                    · Saldo final: <strong class="tabular-nums">@d.Fechamento.SaldoFinal.AsMoney()</strong>
                 </span>
             }
         </div>
@@ -223,7 +209,7 @@ else
                         <td class="text-xs text-slate-500">@m.DataMovimento.ToLocalTime().ToString("HH:mm")</td>
                         <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @tipoBadge">@m.Tipo</span></td>
                         <td class="font-medium @(m.Tipo == "saida" ? "text-red-700" : "text-slate-900")">
-                            @(m.Tipo == "saida" ? "-" : "+")@m.Valor.ToString("C")
+                            @(m.Tipo == "saida" ? "−" : "+")@m.Valor.AsMoney()
                         </td>
                         <td class="text-sm text-slate-600">@(m.Descricao ?? "—")</td>
                         <td class="text-xs text-slate-500">@(m.Categoria ?? "—")</td>
@@ -232,7 +218,7 @@ else
                             @if (m.Tipo != "abertura" && m.Tipo != "fechamento" && !d.Fechado)
                             {
                                 <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post"
-                                      x-data @@submit.prevent="if (confirm('Estornar @m.Tipo de @m.Valor.ToString("C")? Esta ação registra o estorno no histórico.')) $el.submit()">
+                                      x-data @@submit.prevent="if (confirm('Estornar @m.Tipo de @m.Valor.AsMoney()? Esta ação registra o estorno no histórico.')) $el.submit()">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar movimento">Estornar</button>
                                 </form>
@@ -440,20 +426,20 @@ else
                 <div class="caixa-fechar-resumo">
                     <div class="caixa-fechar-resumo__item">
                         <span class="text-xs text-slate-500 uppercase tracking-wider">Saldo final esperado</span>
-                        <span class="caixa-fechar-resumo__valor">@d.SaldoEsperado.ToString("C")</span>
+                        <span class="caixa-fechar-resumo__valor tabular-nums">@d.SaldoEsperado.AsMoney()</span>
                     </div>
                     <div class="caixa-fechar-resumo__split">
                         <div>
                             <span class="text-xs text-slate-500">Vendas + pagamentos</span>
-                            <strong class="text-green-700 block">+@((d.TotalVendas + d.TotalPagamentosPedidos).ToString("C"))</strong>
+                            <strong class="text-green-700 block tabular-nums">+@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</strong>
                         </div>
                         <div>
                             <span class="text-xs text-slate-500">Entradas extras</span>
-                            <strong class="text-green-700 block">+@d.TotalEntradasExtras.ToString("C")</strong>
+                            <strong class="text-green-700 block tabular-nums">+@d.TotalEntradasExtras.AsMoney()</strong>
                         </div>
                         <div>
                             <span class="text-xs text-slate-500">Saídas extras</span>
-                            <strong class="text-red-700 block">−@d.TotalSaidasExtras.ToString("C")</strong>
+                            <strong class="text-red-700 block tabular-nums">−@d.TotalSaidasExtras.AsMoney()</strong>
                         </div>
                     </div>
                 </div>

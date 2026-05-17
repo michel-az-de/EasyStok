@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Notifications.Email;
 using EasyStock.Infra.Notifications.InApp;
 using EasyStock.Infra.Notifications.Options;
+using EasyStock.Infra.Notifications.Push;
 using EasyStock.Infra.Notifications.Sms;
 using EasyStock.Infra.Notifications.Templating;
 using EasyStock.Infra.Notifications.WhatsApp;
@@ -28,6 +29,9 @@ public static class NotificationsInfraServiceCollectionExtensions
         services.AddScoped<ICanalNotificacao, SmsCanal>();
         services.AddScoped<ICanalNotificacao, WhatsAppCanal>();
         services.AddScoped<ICanalNotificacao, InAppCanal>();
+        // Onda 2.2 — Web Push via VAPID (PWA).
+        services.Configure<WebPushOptions>(configuration.GetSection("WebPush"));
+        services.AddScoped<ICanalNotificacao, WebPushCanal>();
 
         // SMS providers (todos registrados, selecionado por chave "sms:active")
         services.Configure<TwilioSmsOptions>(configuration.GetSection("Notifications:Sms:Twilio"));
@@ -48,7 +52,10 @@ public static class NotificationsInfraServiceCollectionExtensions
 
         services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:stub");
         services.AddKeyedScoped<IProvedorWhatsApp, TwilioWhatsAppProvider>("whatsapp:twilio");
-        services.AddKeyedScoped<IProvedorWhatsApp, MetaCloudWhatsAppProvider>("whatsapp:meta");
+        // Onda 2.1 — Meta concrete tambem registrado direto pra acesso ao EnviarTemplateAsync
+        // (templates aprovados Meta tem sintaxe propria, fora da interface IProvedorWhatsApp).
+        services.AddScoped<MetaCloudWhatsAppProvider>();
+        services.AddKeyedScoped<IProvedorWhatsApp>("whatsapp:meta", (sp, _) => sp.GetRequiredService<MetaCloudWhatsAppProvider>());
 
         var waProvider = configuration["Notifications:WhatsApp:Provider"] ?? "stub";
         services.AddKeyedScoped<IProvedorWhatsApp>(

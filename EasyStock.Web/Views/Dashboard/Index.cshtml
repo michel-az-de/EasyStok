@@ -1,9 +1,7 @@
-@model DashboardViewModel
+﻿@model DashboardViewModel
 @using System.Globalization
+@using System.Text.Json
 @{
-    var ptBR = new CultureInfo("pt-BR");
-    var hora = DateTime.Now.Hour;
-    var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
     var dataHoje = DateTime.Now.ToString("dd 'de' MMMM", ptBR);
 
@@ -406,5 +404,4 @@ else if (Model.ResumoApiFalhou)
             });
         })();
     </script>
-    }
 }

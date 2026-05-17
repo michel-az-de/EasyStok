@@ -114,6 +114,164 @@ public class AdminTenantsController(
         return DataOk(detalhe);
     }
 
+    /// <summary>
+    /// F4 — Health check da sincronizacao mobile pra esse tenant. Retorna
+    /// contagens de mobile_* sem o respectivo erp_*_id, mostrando o gap de
+    /// sync. Operador SuperAdmin usa pra detectar pedidos travados/perda
+    /// de dados antes do cliente reclamar.
+    ///
+    /// Todos os contadores em 0 = sincronia 100%.
+    /// </summary>
+    [HttpGet("{id:guid}/mobile-sync-health")]
+    public async Task<IActionResult> GetMobileSyncHealth(Guid id)
+    {
+        // Usa SQL raw pra evitar carregar entidades — leitura de contagens
+        // em tabelas mobile_*. IgnoreQueryFilters: SuperAdmin policy.
+        var pendingOrders = await db.Set<Domain.Entities.Mobile.Order>().IgnoreQueryFilters()
+            .CountAsync(o => o.EmpresaId == id && o.ErpPedidoId == null);
+        var entregueSemVenda = await db.Set<Domain.Entities.Mobile.Order>().IgnoreQueryFilters()
+            .CountAsync(o => o.EmpresaId == id && o.Status == "entregue" && o.ErpVendaId == null);
+        var pendingClients = await db.Set<Domain.Entities.Mobile.Client>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id && c.ErpClienteId == null);
+        var pendingProducts = await db.Set<Domain.Entities.Mobile.Product>().IgnoreQueryFilters()
+            .CountAsync(p => p.EmpresaId == id && p.ErpProductId == null);
+        var pendingBatches = await db.Set<Domain.Entities.Mobile.Batch>().IgnoreQueryFilters()
+            .CountAsync(b => b.EmpresaId == id && b.ErpLoteId == null);
+        var pendingCash = await db.Set<Domain.Entities.Mobile.CashEntry>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id && c.ErpMovimentoCaixaId == null);
+
+        var totalOrders = await db.Set<Domain.Entities.Mobile.Order>().IgnoreQueryFilters()
+            .CountAsync(o => o.EmpresaId == id);
+        var totalClients = await db.Set<Domain.Entities.Mobile.Client>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id);
+        var totalProducts = await db.Set<Domain.Entities.Mobile.Product>().IgnoreQueryFilters()
+            .CountAsync(p => p.EmpresaId == id);
+        var totalBatches = await db.Set<Domain.Entities.Mobile.Batch>().IgnoreQueryFilters()
+            .CountAsync(b => b.EmpresaId == id);
+        var totalCash = await db.Set<Domain.Entities.Mobile.CashEntry>().IgnoreQueryFilters()
+            .CountAsync(c => c.EmpresaId == id);
+        var devices = await db.Set<Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
+            .CountAsync(d => d.EmpresaId == id && !d.Revoked);
+        var lastSync = await db.Set<Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
+            .Where(d => d.EmpresaId == id)
+            .MaxAsync(d => (DateTime?)d.LastSeenAt);
+
+        var totalPending = pendingOrders + entregueSemVenda + pendingClients
+                         + pendingProducts + pendingBatches + pendingCash;
+        var healthy = totalPending == 0;
+
+        // F10-D: dados expandidos — processed mutations last 24h, audit entries
+        var last24h = DateTime.UtcNow.AddHours(-24);
+        var processedMutationsLast24h = await db.MobileProcessedMutations
+            .AsNoTracking().IgnoreQueryFilters()
+            .CountAsync(m => m.EmpresaId == id && m.CriadoEm >= last24h);
+        var auditEntriesTotal = await db.EntityAlteracoes
+            .AsNoTracking().IgnoreQueryFilters()
+            .CountAsync(a => a.EmpresaId == id);
+
+        return DataOk(new
+        {
+            healthy,
+            totalPending,
+            lastSyncAt = lastSync,
+            devices,
+            processedMutationsLast24h,
+            auditEntriesTotal,
+            orders   = new { total = totalOrders,   pending = pendingOrders,   entregueSemVenda },
+            clients  = new { total = totalClients,  pending = pendingClients },
+            products = new { total = totalProducts, pending = pendingProducts },
+            batches  = new { total = totalBatches,  pending = pendingBatches },
+            cash     = new { total = totalCash,     pending = pendingCash }
+        });
+    }
+
+    /// <summary>
+    /// F10-D — Saúde mobile global: semáforo por tenant.
+    /// Verde = 0 pending. Amarelo = 1-10 pending. Vermelho = >10 pending ou lastSync >24h.
+    /// </summary>
+    [HttpGet("mobile-sync-health-global")]
+    public async Task<IActionResult> GetMobileSyncHealthGlobal()
+    {
+        // Empresas com pelo menos 1 device ativo
+        var empresaIds = await db.Set<Domain.Entities.Mobile.MobileDevice>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(d => !d.Revoked)
+            .Select(d => d.EmpresaId)
+            .Distinct()
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+
+        // Batch queries — avoid N+1 per empresa
+        var empresas = await db.Empresas.AsNoTracking().IgnoreQueryFilters()
+            .Where(e => empresaIds.Contains(e.Id))
+            .Select(e => new { e.Id, e.Nome })
+            .ToDictionaryAsync(e => e.Id);
+
+        var pendingOrdersByEmp = await db.Set<Domain.Entities.Mobile.Order>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(o => o.EmpresaId.HasValue && empresaIds.Contains(o.EmpresaId.Value) && o.ErpPedidoId == null)
+            .GroupBy(o => o.EmpresaId!.Value)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EmpresaId, x => x.Count);
+
+        var pendingBatchesByEmp = await db.Set<Domain.Entities.Mobile.Batch>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(b => b.EmpresaId.HasValue && empresaIds.Contains(b.EmpresaId.Value) && b.ErpLoteId == null)
+            .GroupBy(b => b.EmpresaId!.Value)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EmpresaId, x => x.Count);
+
+        var pendingCashByEmp = await db.Set<Domain.Entities.Mobile.CashEntry>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(c => c.EmpresaId.HasValue && empresaIds.Contains(c.EmpresaId.Value) && c.ErpMovimentoCaixaId == null)
+            .GroupBy(c => c.EmpresaId!.Value)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.EmpresaId, x => x.Count);
+
+        var deviceInfoByEmp = await db.Set<Domain.Entities.Mobile.MobileDevice>()
+            .AsNoTracking().IgnoreQueryFilters()
+            .Where(d => empresaIds.Contains(d.EmpresaId) && !d.Revoked)
+            .GroupBy(d => d.EmpresaId)
+            .Select(g => new { EmpresaId = g.Key, Count = g.Count(), LastSeen = g.Max(d => (DateTime?)d.LastSeenAt) })
+            .ToDictionaryAsync(x => x.EmpresaId);
+
+        var results = new List<object>();
+        foreach (var empId in empresaIds)
+        {
+            if (!empresas.TryGetValue(empId, out var empresa)) continue;
+
+            var pendingOrders = pendingOrdersByEmp.GetValueOrDefault(empId);
+            var pendingBatches = pendingBatchesByEmp.GetValueOrDefault(empId);
+            var pendingCash = pendingCashByEmp.GetValueOrDefault(empId);
+            var totalPending = pendingOrders + pendingBatches + pendingCash;
+
+            deviceInfoByEmp.TryGetValue(empId, out var devInfo);
+            var lastSync = devInfo?.LastSeen;
+            var deviceCount = devInfo?.Count ?? 0;
+
+            var staleSync = lastSync.HasValue && (now - lastSync.Value).TotalHours > 24;
+            var status = totalPending == 0 && !staleSync ? "green"
+                       : totalPending <= 10 && !staleSync ? "yellow"
+                       : "red";
+
+            results.Add(new
+            {
+                empresaId = empresa.Id,
+                empresaNome = empresa.Nome,
+                status,
+                totalPending,
+                pendingOrders,
+                pendingBatches,
+                pendingCash,
+                lastSyncAt = lastSync,
+                deviceCount
+            });
+        }
+
+        return DataOk(results.OrderByDescending(r => ((dynamic)r).totalPending));
+    }
+
     // TODO B4 follow-up: extrair os endpoints de mutação para UseCases dedicados.
     // Hoje: PatchStatus, PatchPlano, GrantTrial, AplicarCupom já usam ports (IAssinatura/
     // IPlano/ICupom/IAuditLog Repository). Restam Impersonate e GetAudit que ainda

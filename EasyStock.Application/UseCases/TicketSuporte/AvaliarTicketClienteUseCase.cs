@@ -54,7 +54,7 @@ namespace EasyStock.Application.UseCases.TicketSuporte
             await ticketRepo.AddHistoricoAsync(TicketHistorico.Criar(
                 ticketId: ticket.Id,
                 autorId: currentUser.UsuarioId,
-                acao: TicketAcaoHistorico.Comentario,
+                acao: TicketAcaoHistorico.AvaliacaoCsat,
                 valorAntes: notaAnterior?.ToString(),
                 valorDepois: cmd.Nota.ToString(),
                 metadadosJson: JsonSerializer.Serialize(new { csat = true })));

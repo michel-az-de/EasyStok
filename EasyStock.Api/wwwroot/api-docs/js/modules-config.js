@@ -3,28 +3,12 @@
 
 export const MODULES = [
     {
-        id: 'vendas',
-        name: 'Vendas',
-        icon: 'sword',
-        accent: 'accent',
-        tags: ['Venda', 'Vendas', 'Pedido', 'Pedidos', 'WebhookPix'],
-        desc: 'Pedidos, vendas e cobrança Pix.'
-    },
-    {
-        id: 'estoque',
-        name: 'Estoque',
-        icon: 'package',
-        accent: 'basil',
-        tags: ['Produto', 'Produtos', 'ItemEstoque', 'ItensEstoque', 'Movimentacao', 'Movimentacoes', 'Categoria', 'Categorias', 'Lote', 'Lotes'],
-        desc: 'Catálogo, itens, movimentações e lotes.'
-    },
-    {
-        id: 'caixa',
-        name: 'Caixa',
-        icon: 'card',
+        id: 'auth',
+        name: 'Auth',
+        icon: 'lock',
         accent: 'gold',
-        tags: ['Caixa'],
-        desc: 'Movimentações de caixa, abertura e fechamento.'
+        tags: ['Auth'],
+        desc: 'Login, refresh e perfil do usuário.'
     },
     {
         id: 'pessoas',
@@ -35,20 +19,36 @@ export const MODULES = [
         desc: 'Usuários, empresas, clientes e fornecedores.'
     },
     {
+        id: 'estoque',
+        name: 'Estoque',
+        icon: 'package',
+        accent: 'basil',
+        tags: ['Produto', 'Produtos', 'ItemEstoque', 'ItensEstoque', 'Movimentacao', 'Movimentacoes', 'Categoria', 'Categorias', 'Lote', 'Lotes'],
+        desc: 'Catálogo, itens, movimentações e lotes.'
+    },
+    {
+        id: 'vendas',
+        name: 'Vendas',
+        icon: 'sword',
+        accent: 'accent',
+        tags: ['Venda', 'Vendas', 'Pedido', 'Pedidos', 'WebhookPix'],
+        desc: 'Pedidos, vendas e cobrança Pix.'
+    },
+    {
+        id: 'caixa',
+        name: 'Caixa',
+        icon: 'card',
+        accent: 'gold',
+        tags: ['Caixa'],
+        desc: 'Movimentações de caixa, abertura e fechamento.'
+    },
+    {
         id: 'inteligencia',
         name: 'Inteligência',
         icon: 'brain',
         accent: 'magenta',
         tags: ['Analytics', 'Inteligencia', 'InteligenciaLojas', 'IaAnuncio', 'ListasCompras'],
         desc: 'Dashboard, projeções, IA e listas de compras.'
-    },
-    {
-        id: 'auth',
-        name: 'Auth',
-        icon: 'lock',
-        accent: 'gold',
-        tags: ['Auth'],
-        desc: 'Login, refresh e perfil do usuário.'
     },
     {
         id: 'admin',

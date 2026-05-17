@@ -200,6 +200,20 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.Produtos.AsNoTracking()
                 .CountAsync(p => p.EmpresaId == empresaId);
 
+        /// <inheritdoc/>
+        public async Task<IReadOnlyDictionary<Guid, TipoEmbalagem>> GetTipoEmbalagemMapAsync(
+            Guid empresaId, IEnumerable<Guid> produtoIds)
+        {
+            var ids = produtoIds?.Distinct().ToList() ?? new List<Guid>();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, TipoEmbalagem>();
+
+            return await dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && ids.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.TipoEmbalagem);
+        }
+
         public async Task UpdateAsync(Produto produto)
         {
             dbContext.Produtos.Update(produto);

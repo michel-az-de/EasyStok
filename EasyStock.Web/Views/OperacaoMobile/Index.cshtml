@@ -100,7 +100,7 @@
                 };
                 var fg = a.Color switch
                 {
-                    "amber" => "text-amber-700",
+                    "amber" => "text-amber-800",
                     "red" => "text-red-700",
                     "indigo" => "text-indigo-700",
                     _ => "text-slate-700"
@@ -193,7 +193,7 @@
                             <form method="post" action="/operacao/devices/@d.Id/comando" class="inline">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="commandType" value="reload" />
-                                <button type="submit" class="text-xs text-slate-600 hover:text-amber-700 font-medium" title="Reinicia o app no celular">
+                                <button type="submit" class="text-xs text-slate-600 hover:text-amber-800 font-medium" title="Reinicia o app no celular">
                                     Recarregar
                                 </button>
                             </form>

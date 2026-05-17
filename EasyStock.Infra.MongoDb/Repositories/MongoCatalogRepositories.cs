@@ -270,6 +270,23 @@ public sealed class ProdutoRepository(MongoEasyStockContext context, MongoUnitOf
         var filter = MongoDB.Driver.Builders<Produto>.Filter.Eq(p => p.EmpresaId, empresaId);
         return (int)await Collection.CountDocumentsAsync(filter);
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyDictionary<Guid, EasyStock.Domain.Enums.TipoEmbalagem>> GetTipoEmbalagemMapAsync(
+        Guid empresaId, IEnumerable<Guid> produtoIds)
+    {
+        var ids = produtoIds?.Distinct().ToList() ?? new List<Guid>();
+        if (ids.Count == 0)
+            return new Dictionary<Guid, EasyStock.Domain.Enums.TipoEmbalagem>();
+
+        var filter = MongoDB.Driver.Builders<Produto>.Filter.And(
+            MongoDB.Driver.Builders<Produto>.Filter.Eq(p => p.EmpresaId, empresaId),
+            MongoDB.Driver.Builders<Produto>.Filter.In(p => p.Id, ids));
+        var produtos = await Collection.Find(filter)
+            .Project(p => new { p.Id, p.TipoEmbalagem })
+            .ToListAsync();
+        return produtos.ToDictionary(x => x.Id, x => x.TipoEmbalagem);
+    }
 }
 
 public sealed class ProdutoVariacaoRepository(MongoEasyStockContext context, MongoUnitOfWork unitOfWork)

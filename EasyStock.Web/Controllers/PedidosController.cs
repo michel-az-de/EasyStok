@@ -12,14 +12,19 @@ public class CriarPedidoWebRequest
     public string? TelefoneAdHoc { get; set; }
     public string? Observacoes { get; set; }
     public List<CriarItemInput>? Itens { get; set; }
+    public DateTime? AgendadoParaEm { get; set; }
 }
 
 public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
     ProdutosService produtosSvc,
+    TicketsApiService ticketsSvc,
     SessionService session) : BaseController(session)
 {
+    [HttpGet("/pedidos/novo")]
+    public IActionResult Novo() => RedirectToAction(nameof(Index));
+
     [HttpGet("/pedidos")]
     public async Task<IActionResult> Index(string? search = null, string? status = null)
     {
@@ -41,7 +46,7 @@ public class PedidosController(
         return View(vm);
     }
 
-    [HttpGet("/pedidos/{id}")]
+    [HttpGet("/pedidos/{id:guid}")]
     public async Task<IActionResult> Detail(string id)
     {
         ViewBag.Title = "Pedido";
@@ -79,7 +84,7 @@ public class PedidosController(
             });
 
         var result = await svc.CriarAsync(req.ClienteId, req.NomeAdHoc, req.AptAdHoc, req.TelefoneAdHoc,
-            req.Observacoes, req.Itens);
+            req.Observacoes, req.Itens, req.AgendadoParaEm);
         if (!result.Success)
             return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
             {
@@ -105,6 +110,20 @@ public class PedidosController(
         return RedirectToAction(nameof(Detail), new { id });
     }
 
+    [HttpPost("/pedidos/{id}/agendar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Agendar(string id, DateTime? agendadoParaEm)
+    {
+        var result = await svc.AlterarAgendamentoAsync(id, agendadoParaEm);
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
+        var msg = agendadoParaEm.HasValue
+            ? $"Pedido agendado para {agendadoParaEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}."
+            : "Agendamento removido.";
+        Toast("success", msg);
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
     [HttpPost("/pedidos/{id}/cancelar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancelar(string id, string? motivo)
@@ -114,6 +133,36 @@ public class PedidosController(
 
         Toast("success", "Pedido cancelado.");
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Onda 1.1 — abre ticket SaaS pra EasyStok reportando problema sobre
+    /// um pedido especifico. Vincula via PedidoId (cross-tenant validado no
+    /// use case). Cliente nao escolhe prioridade; categoria default Solicitacao.
+    /// </summary>
+    [HttpPost("/pedidos/{id:guid}/reportar-problema")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReportarProblema(Guid id, string motivo, string? descricao, string? categoria)
+    {
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            Toast("error", "Informe o motivo da reclamacao.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var titulo = $"Pedido {id.ToString().Substring(0, 8)} — {motivo}";
+        var desc = string.IsNullOrWhiteSpace(descricao) ? motivo : descricao;
+        var cat = string.IsNullOrWhiteSpace(categoria) ? "Solicitacao" : categoria;
+
+        var result = await ticketsSvc.AbrirAsync(titulo, desc, cat, pedidoId: id);
+        if (HasError(result))
+        {
+            Toast("error", $"Falha ao abrir ticket: {result.ErrorMessage}");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        Toast("success", $"Ticket aberto. Acompanhe em Suporte.");
+        return RedirectToAction(nameof(Detail), new { id });
     }
 
     [HttpPost("/pedidos/{id}/itens")]

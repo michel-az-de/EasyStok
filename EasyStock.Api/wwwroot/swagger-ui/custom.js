@@ -90,7 +90,7 @@
         /* Botão Console — destacado, redireciona pra /api-docs/ */
         const consoleLink = document.createElement('a');
         consoleLink.id = 'es-console-link';
-        consoleLink.href = '/api-docs/';
+        consoleLink.href = '/api-docs/index.html';
         consoleLink.textContent = 'Console';
         consoleLink.title = 'Abrir EasyStock Console (dark sci-fi)';
         toolbar.appendChild(consoleLink);

@@ -149,6 +149,16 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         ViewBag.Title = "Histórico de Entradas";
         ViewBag.ActiveMenuItem = "Entradas";
 
+        // BUG 10: defaults usavam UTC e concatenavam ":T23:59:59" em periodoFim.
+        // Input <input type="date"> não aceita componente de hora — campo "até"
+        // ficava vazio na UI. Fuso BR + apenas data nua.
+        if (string.IsNullOrEmpty(periodoInicio) && string.IsNullOrEmpty(periodoFim))
+        {
+            var hojeBr = DateTime.UtcNow.AddHours(-3).Date;
+            periodoInicio = hojeBr.AddDays(-30).ToString("yyyy-MM-dd");
+            periodoFim = hojeBr.ToString("yyyy-MM-dd");
+        }
+
         var result = await svc.HistoricoAsync(page, tipo, periodoInicio, periodoFim);
         if (HasError(result)) return View(new EntradasHistoricoViewModel());
 

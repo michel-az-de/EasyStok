@@ -10,11 +10,13 @@ public class CategoriasService(ApiClient api, SessionService session)
     public Task<ApiResult<List<CategoriaApi>>> ListarAsync() =>
         api.GetAsync<List<CategoriaApi>>($"categorias?empresaId={GetEmpresaId()}");
 
-    public Task<ApiResult<object>> CriarAsync(string nome) =>
+    public Task<ApiResult<object>> CriarAsync(string nome, int? quantidadeMinima = null, int? quantidadeCritica = null) =>
         api.PostAsync<object>("categorias", new
         {
             empresaId = GetEmpresaId(),
             nome,
+            quantidadeMinima,
+            quantidadeCritica,
             descricao = (string?)null,
             categoriaPaiId = (Guid?)null
         });
