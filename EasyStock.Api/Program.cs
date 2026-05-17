@@ -308,6 +308,12 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
         using (var checkScope = app.Services.CreateScope())
         {
             var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            // RLS: queries em __EFMigrationsHistory não dependem da policy
+            // tenant_isolation (tabela não tem EmpresaId), mas a connection
+            // ainda assim entra com tenant=Guid.Empty. Bypass garante que
+            // nada residual de outra request afete a leitura — defesa em
+            // profundidade para o caminho de boot.
+            using var _ = checkDb.UseRowLevelSecurityBypass();
             appliedMigrations = (await checkDb.Database.GetAppliedMigrationsAsync()).ToList();
             pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
         }
@@ -335,6 +341,11 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
             {
                 using var migScope = app.Services.CreateScope();
                 var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                // RLS: migrations criam/alteram tabelas tenant-aware — precisam
+                // rodar com bypass, senão a própria migration AddRowLevelSecurity
+                // (e qualquer DML em seed_data interno) fica sob a policy que
+                // ela mesma criou.
+                using var _ = migDb.UseRowLevelSecurityBypass();
                 var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
                 await migrator.MigrateAsync(migrationId);
                 swMigration.Stop();
@@ -352,6 +363,7 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
                     migrationId, ex.SqlState);
                 using var regScope = app.Services.CreateScope();
                 var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var _ = regDb.UseRowLevelSecurityBypass();
                 const string productVersion = "9.0.0";
                 await regDb.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
@@ -403,6 +415,8 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     {
         using var bootstrapScope = app.Services.CreateScope();
         var bootstrapDb = bootstrapScope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+        // RLS: schema bootstrap mexe em tabelas tenant-aware sem JWT contextual.
+        using var _ = bootstrapDb.UseRowLevelSecurityBypass();
         await EasyStock.Api.Data.SeedSchemaBootstrap.EnsureAsync(bootstrapDb, app.Logger);
     }
     catch (Exception ex)
@@ -420,6 +434,8 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     {
         using var superSeedScope = app.Services.CreateScope();
         var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // RLS: SuperAdmin seed cria registros sem tenant fixo — bypass obrigatório.
+        using var _ = superSeedDb.UseRowLevelSecurityBypass();
         await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger, app.Environment.IsProduction());
     }
     catch (Exception ex) when (!app.Environment.IsProduction())
@@ -438,6 +454,10 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
         try
         {
             using var seedScope = app.Services.CreateScope();
+            // RLS: SeedData percorre todos os tenants demo — bypass no DbContext
+            // do scope para que use cases internos enxerguem o universo todo.
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var __ = seedDb.UseRowLevelSecurityBypass();
             await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
         }
         catch (Exception ex)
@@ -456,6 +476,9 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
     {
         using var notifSeedScope = app.Services.CreateScope();
         var notifDb = notifSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // RLS: catalogo de notificacoes globais (sem EmpresaId) + writes em
+        // tabelas tenant-aware — bypass cobre os dois.
+        using var _ = notifDb.UseRowLevelSecurityBypass();
         await NotificacoesGlobaisSeed.ExecutarAsync(notifDb, app.Logger);
     }
     catch (Exception ex)

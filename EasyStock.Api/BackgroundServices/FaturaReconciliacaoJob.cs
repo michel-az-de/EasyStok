@@ -116,6 +116,13 @@ public sealed class FaturaReconciliacaoJob(
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var router = scope.ServiceProvider.GetRequiredService<IPagamentoGatewayRouter>();
 
+        // Reconciliação varre faturas de TODOS os tenants — webhook caído num
+        // tenant qualquer cai aqui. RLS exige bypass explícito ou a policy
+        // tenant_isolation zeraria o batch (CurrentTenantId=Guid.Empty fora de
+        // request). IgnoreQueryFilters já desligava o filtro EF; bypass cobre
+        // a camada do banco.
+        using var _ = db.UseRowLevelSecurityBypass();
+
         var agora = DateTime.UtcNow;
         var idadeMinima = agora.AddHours(-1);
         var idadeMaxima = agora.AddDays(-30);

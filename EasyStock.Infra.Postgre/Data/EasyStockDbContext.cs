@@ -65,35 +65,62 @@ namespace EasyStock.Infra.Postgre.Data
         public bool IsSuperAdmin => _currentUser is { IsAuthenticated: true, Nivel: NivelAcesso.SuperAdmin };
 
         /// <summary>
-        /// Bypass explicito do RLS no banco. Usado pelo
-        /// <c>SetTenantOnConnectionInterceptor</c> para emitir
-        /// <c>SET app.bypass_rls = 'on'</c> em cenarios cross-tenant
-        /// conhecidos (seeds, jobs, migrations). NAO usar em request-path.
+        /// Quando <c>true</c>, o <c>SetTenantOnConnectionInterceptor</c> emite
+        /// <c>SET app.bypass_rls = 'true'</c> na próxima abertura de conexão,
+        /// fazendo a policy <c>tenant_isolation</c> aceitar qualquer linha.
+        /// <para>
+        /// É usado por código cross-tenant deliberado: migrations, schema
+        /// bootstrap, SuperAdmin seed, jobs de reconciliação, login pré-auth
+        /// (sem <c>CurrentTenantId</c>). Nunca expor a flag a controllers/handlers
+        /// — eles devem confiar em <see cref="IsSuperAdmin"/>, que vem do JWT.
+        /// </para>
+        /// <para>
+        /// Use <see cref="UseRowLevelSecurityBypass"/> para escopo curto via
+        /// <c>using</c> — defesa em profundidade real, já que
+        /// <c>IgnoreQueryFilters</c> sozinho não basta: ele desliga o filtro
+        /// EF, mas a policy do Postgres ainda zera as linhas.
+        /// </para>
         /// </summary>
-        public bool BypassRowLevelSecurity { get; set; }
+        public bool BypassRowLevelSecurity { get; private set; }
 
         /// <summary>
-        /// Habilita <see cref="BypassRowLevelSecurity"/> apenas dentro do escopo
-        /// <c>using</c> e restaura o valor anterior no <c>Dispose</c>. Preferir
-        /// este metodo em vez de setar a propriedade diretamente em codigo de
-        /// request — garante que o bypass nao vaze apos o bloco.
+        /// Liga <see cref="BypassRowLevelSecurity"/> e devolve um
+        /// <see cref="IDisposable"/> que desliga ao sair do escopo. Cobre os
+        /// casos onde precisamos ler/escrever cross-tenant: jobs noturnos,
+        /// reconciliação de pagamento, login pré-JWT, seed de SuperAdmin.
+        /// <para>
+        /// O interceptor reaplica o setting na próxima abertura de conexão.
+        /// Se a sua operação roda dentro de uma única conexão já aberta, force
+        /// reabertura ou execute <c>SET app.bypass_rls</c> manualmente — mas o
+        /// caso normal (cada use case abre conexão nova via repository) já
+        /// funciona transparente.
+        /// </para>
         /// </summary>
         public IDisposable UseRowLevelSecurityBypass()
         {
             var previous = BypassRowLevelSecurity;
             BypassRowLevelSecurity = true;
-            return new RowLevelSecurityBypassScope(this, previous);
+            return new RlsBypassScope(this, previous);
         }
 
-        private sealed class RowLevelSecurityBypassScope(EasyStockDbContext context, bool previous) : IDisposable
+        private sealed class RlsBypassScope : IDisposable
         {
+            private readonly EasyStockDbContext _ctx;
+            private readonly bool _previous;
             private bool _disposed;
+
+            public RlsBypassScope(EasyStockDbContext ctx, bool previous)
+            {
+                _ctx = ctx;
+                _previous = previous;
+            }
+
 
             public void Dispose()
             {
                 if (_disposed) return;
                 _disposed = true;
-                context.BypassRowLevelSecurity = previous;
+                _ctx.BypassRowLevelSecurity = _previous;
             }
         }
 
