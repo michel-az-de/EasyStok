@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.Json;
 using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -128,12 +129,12 @@ app.MapGet("/api-proxy/dashboard-badges", async (
         return Results.Unauthorized();
     try
     {
-        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/admin/dashboard");
+        var data = await api.GetAsync<JsonElement>("api/admin/dashboard");
         int G(string k) => data.TryGetProperty(k, out var v)
-            && v.ValueKind == System.Text.Json.JsonValueKind.Number
+            && v.ValueKind == JsonValueKind.Number
             && v.TryGetInt32(out var n) ? n : 0;
         decimal GD(string k) => data.TryGetProperty(k, out var v)
-            && v.ValueKind == System.Text.Json.JsonValueKind.Number
+            && v.ValueKind == JsonValueKind.Number
             && v.TryGetDecimal(out var d) ? d : 0m;
         return Results.Ok(new
         {
@@ -173,7 +174,7 @@ app.MapGet("/api-proxy/status", async (
         return Results.Unauthorized();
     try
     {
-        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/admin/status");
+        var data = await api.GetAsync<JsonElement>("api/admin/status");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException)
@@ -228,7 +229,7 @@ app.MapGet("/api-proxy/buscar-global", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/admin/buscar-global?{qs}");
+        var data = await api.GetAsync<JsonElement>($"api/admin/buscar-global?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException)
@@ -265,8 +266,8 @@ app.MapPost("/api-proxy/admin-empresas-revelar", async (
     string? motivo = null;
     try
     {
-        using var doc = await System.Text.Json.JsonDocument.ParseAsync(ctx.Request.Body);
-        if (doc.RootElement.TryGetProperty("motivo", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.String)
+        using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
+        if (doc.RootElement.TryGetProperty("motivo", out var m) && m.ValueKind == JsonValueKind.String)
             motivo = m.GetString();
     }
     catch { /* corpo invalido — vai cair na validacao do backend */ }
@@ -276,7 +277,7 @@ app.MapPost("/api-proxy/admin-empresas-revelar", async (
 
     try
     {
-        var data = await api.PostAsync<System.Text.Json.JsonElement>(
+        var data = await api.PostAsync<JsonElement>(
             $"api/admin/empresas/{empresaId}/preview/revelar",
             new { motivo, ticketIdContexto = ticketId });
         return Results.Ok(new { data });
@@ -309,7 +310,7 @@ app.MapGet("/api-proxy/diag/summary", async (
     try
     {
         var hours = ctx.Request.Query["hours"].FirstOrDefault() ?? "24";
-        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/logs/enhanced?hours={Uri.EscapeDataString(hours)}");
+        var data = await api.GetAsync<JsonElement>($"api/diagnostico/logs/enhanced?hours={Uri.EscapeDataString(hours)}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -332,7 +333,7 @@ app.MapGet("/api-proxy/diag/search", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/logs/search?{qs}");
+        var data = await api.GetAsync<JsonElement>($"api/diagnostico/logs/search?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -357,7 +358,7 @@ app.MapPost("/api-proxy/seed/run-async", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.PostAsync<System.Text.Json.JsonElement>($"api/admin/seed/run-async?{qs}", new { });
+        var data = await api.PostAsync<JsonElement>($"api/admin/seed/run-async?{qs}", new { });
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -379,7 +380,7 @@ app.MapGet("/api-proxy/seed/run/{runId:guid}", async (
         return Results.Unauthorized();
     try
     {
-        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/admin/seed/run/{runId}");
+        var data = await api.GetAsync<JsonElement>($"api/admin/seed/run/{runId}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -402,7 +403,7 @@ app.MapGet("/api-proxy/seed/runs", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/admin/seed/runs?{qs}");
+        var data = await api.GetAsync<JsonElement>($"api/admin/seed/runs?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -451,9 +452,9 @@ app.MapPost("/api-proxy/diag/frontend-error", async (
 {
     try
     {
-        using var reader = new System.IO.StreamReader(req.Body);
+        using var reader = new StreamReader(req.Body);
         var body = await reader.ReadToEndAsync();
-        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+        var payload = JsonSerializer.Deserialize<JsonElement>(body);
         await api.PostRawAsync("api/diagnostico/frontend-error", payload);
         return Results.Ok(new { ok = true });
     }
@@ -476,7 +477,7 @@ app.MapGet("/api-proxy/diag/system-errors", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetAsync<System.Text.Json.JsonElement>($"api/diagnostico/system-errors?{qs}");
+        var data = await api.GetAsync<JsonElement>($"api/diagnostico/system-errors?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -499,7 +500,7 @@ app.MapPost("/api-proxy/diag/system-errors/expurgar", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.PostAsync<System.Text.Json.JsonElement>($"api/diagnostico/system-errors/expurgar?{qs}", new { });
+        var data = await api.PostAsync<JsonElement>($"api/diagnostico/system-errors/expurgar?{qs}", new { });
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -520,7 +521,7 @@ app.MapGet("/api-proxy/diag/logging-mode", async (
         return Results.Unauthorized();
     try
     {
-        var data = await api.GetAsync<System.Text.Json.JsonElement>("api/diagnostico/logging-mode");
+        var data = await api.GetAsync<JsonElement>("api/diagnostico/logging-mode");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -542,10 +543,10 @@ app.MapPost("/api-proxy/diag/logging-mode", async (
         return Results.Unauthorized();
     try
     {
-        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        using var reader = new StreamReader(ctx.Request.Body);
         var body = await reader.ReadToEndAsync();
-        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
-        var data = await api.PostAsync<System.Text.Json.JsonElement>("api/diagnostico/logging-mode", payload);
+        var payload = JsonSerializer.Deserialize<JsonElement>(body);
+        var data = await api.PostAsync<JsonElement>("api/diagnostico/logging-mode", payload);
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -660,7 +661,7 @@ app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/mobile/operation/dashboard?{qs}");
+        var data = await api.GetJsonAsync<JsonElement>($"api/mobile/operation/dashboard?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -750,7 +751,7 @@ app.MapGet("/api-proxy/mobile/operacao/devices-health", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/mobile/operation/devices-health?{qs}");
+        var data = await api.GetJsonAsync<JsonElement>($"api/mobile/operation/devices-health?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -772,7 +773,7 @@ app.MapGet("/api-proxy/mobile/devices", async (
     try
     {
         var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
-        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>($"api/mobile/devices?{qs}");
+        var data = await api.GetJsonAsync<JsonElement>($"api/mobile/devices?{qs}");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -793,10 +794,10 @@ app.MapPost("/api-proxy/mobile/devices/pair-codes", async (
     if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
     try
     {
-        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        using var reader = new StreamReader(ctx.Request.Body);
         var body = await reader.ReadToEndAsync();
-        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
-        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/mobile/devices/pair-codes", payload);
+        var payload = JsonSerializer.Deserialize<JsonElement>(body);
+        var data = await api.PostJsonAsync<JsonElement>("api/mobile/devices/pair-codes", payload);
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
@@ -819,10 +820,10 @@ app.MapPost("/api-proxy/mobile/devices/{id}/commands", async (
     if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
     try
     {
-        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        using var reader = new StreamReader(ctx.Request.Body);
         var body = await reader.ReadToEndAsync();
-        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
-        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>(
+        var payload = JsonSerializer.Deserialize<JsonElement>(body);
+        var data = await api.PostJsonAsync<JsonElement>(
             $"api/mobile/devices/{Uri.EscapeDataString(id)}/commands", payload);
         return Results.Ok(data);
     }
@@ -846,10 +847,10 @@ app.MapPost("/api-proxy/mobile/devices/broadcast", async (
     if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
     try
     {
-        using var reader = new System.IO.StreamReader(ctx.Request.Body);
+        using var reader = new StreamReader(ctx.Request.Body);
         var body = await reader.ReadToEndAsync();
-        var payload = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
-        var data = await api.PostJsonAsync<System.Text.Json.JsonElement>(
+        var payload = JsonSerializer.Deserialize<JsonElement>(body);
+        var data = await api.PostJsonAsync<JsonElement>(
             "api/mobile/devices/broadcast", payload);
         return Results.Ok(data);
     }
@@ -892,7 +893,7 @@ app.MapGet("/api-proxy/mobile/version", async (
     if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
     try
     {
-        var data = await api.GetJsonAsync<System.Text.Json.JsonElement>("api/mobile/version");
+        var data = await api.GetJsonAsync<JsonElement>("api/mobile/version");
         return Results.Ok(data);
     }
     catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
