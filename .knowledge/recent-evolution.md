@@ -4,14 +4,37 @@
 
 ## Snapshot 2026-05-07
 
-### Onda billing F10–F14 (em andamento)
-- **F10 — Dashboard financeiro** (`74a2b08`): MetricasFinanceirasUseCase com MRR, ARR, churn (Ativas/Suspensas/Canceladas), receita/atraso médio, top inadimplentes. Endpoint `GET /api/admin/faturas/metricas`.
-- **F11 — Pix Efi consulta + estorno** (`9d64666`): destrava reconciliação real (substitui stubs).
-- **F12 — Adapters stub Stripe + MercadoPago** (`e5a4180`): signature validators preparados, integração real pendente.
-- **F13 — Cache TTL 5min em métricas** (`99acab7`): IMemoryCache no MetricasFinanceirasUseCase, chave `metricas:{empresaId|all}:{dias}`. ForcarRefresh adicionado ao Command (auditoria 2026-05-07 wireou no controller — antes era inalcançável).
-- **F13 fix — Multi-tenant leak em assinaturas** (`191f685`): SomarPrecoMensalAtivasAsync/ContarPorStatusAsync agora aceitam empresaId opcional. Sem isso, admin operacional via dashboard veria MRR/contagens GLOBAIS.
-- **F14 — Auto-ticket após N falhas Pix** (`e29cc61`): IFalhaPagamentoNotifier port + AutoTicketFalhaPagamento adapter. Threshold 3 falhas/7 dias → ticket Financeiro/Alta vinculado à fatura. Idempotente.
-- **F14 fix — webhook anônimo violava FK em CriadoPorId** (`b11d165`, [PR #70](https://github.com/michel-az-de/EasyStok/pull/70) aberto): coage `currentUser.UsuarioId == Guid.Empty → null` em HelpdeskTicketService.AbrirAsync. Sem isso F14 quebrava silenciosamente em prod (exceção engolida pelo try/catch do AutoTicketFalhaPagamento). Lição 14 em do-not-do.md.
+### Onda Billing/Faturas F1–F14 (1 dia)
+Sessão massiva reativando e ampliando o módulo financeiro:
+
+- **F1+F2**: reativação completa do módulo Faturas (DbSets + FaturaNumeradorService).
+- **F3**: abstração multi-gateway (`IPagamentoGateway`, `PagamentoGatewayRouter`) + webhook genérico idempotente.
+- **F4**: geração de PDF de fatura via QuestPDF.
+- **F5**: convivência Fatura ↔ CobrancaAssinatura SaaS.
+- **F6**: reconciliação automática + notificações de vencimento (`FaturaReconciliacaoJob`).
+- **F7**: UI Admin de Faturas (listagem, detalhe, emissão avulsa).
+- **F8**: portal cliente standalone para faturas.
+- **F9**: integração Tickets ↔ Faturas + Export CSV.
+- **F10**: dashboard financeiro com MRR, ARR, churn, top inadimplentes. (`74a2b08`: MetricasFinanceirasUseCase, endpoint `GET /api/admin/faturas/metricas`).
+- **F11**: consulta + estorno Pix Efí (`ConsultarCobrancaAsync`, `EstornarAsync`) destrava reconciliação real (`9d64666`).
+- **F12**: adapters stub Stripe + MercadoPago + signature validators (HMAC-SHA256 com header próprio de cada provider) (`e5a4180`).
+- **F13**: cache de métricas financeiras com TTL 5min (`99acab7`: IMemoryCache, chave `metricas:{empresaId|all}:{dias}`, ForcarRefresh wireado no controller).
+- **F13 fix**: Multi-tenant leak em assinaturas (`191f685`): SomarPrecoMensalAtivasAsync/ContarPorStatusAsync agora aceitam empresaId opcional.
+- **F14**: trigger automático de ticket Financeiro após N falhas de pagamento (`e29cc61`: IFalhaPagamentoNotifier + AutoTicketFalhaPagamento, threshold 3 falhas/7 dias).
+- **F14 fix**: webhook anônimo violava FK em CriadoPorId (`b11d165`, [PR #70](https://github.com/michel-az-de/EasyStok/pull/70)): coage `currentUser.UsuarioId == Guid.Empty → null` em HelpdeskTicketService.AbrirAsync. Lição 14 em do-not-do.md.
+- **Hardening webhook Pix**: 5 correções (race em duplo-fire com `FOR UPDATE` em txid, validação de valor pago etc).
+- **Multi-tenant em métricas**: dashboard não vaza MRR/contagens globais a admin operacional.
+- **Cleanup billing**: dois passes (4f9c259 e fb4f08e) removendo código morto, padronizando usings, corrigindo comentários stale (FornecedorRepository Mongo Audit P4 não era stub).
+
+### Lições registradas
+- **Lição 12**: multi-tenant em agregação (`SomarPrecoMensalAtivasAsync(empresaId?)` com filtro opcional).
+- **Lição 13**: XML doc em `record` types (props públicas precisam de `<param>` no construtor primário).
+
+### Outras ondas concluídas hoje
+- **Landing pages**: site público (index/preços/app/contato/sucesso) + LeadPublico anônimo + rate limit + anti-spam.
+- **Integrations Fase 2/3/4**: `EasyStock.Contracts` + `EasyStock.Infra.Integrations` + `IntegrationCredentialResolver` AES-256-GCM + outbox transacional + `IntegrationEventDispatcher` Worker.
+- **API docs**: Swagger UI navy + laranja, console futurista, JWT try-it.
+- **Seed**: SuperAdmin global idempotente no startup + bootstrap em 4 camadas.
 
 ## Snapshot 2026-05-06
 
