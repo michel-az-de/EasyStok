@@ -73,32 +73,10 @@
 
         <div style="display:flex; gap:8px;">
             <es-button type="submit" variant="primary" icon="check">Salvar</es-button>
-            @if (Model.Id.HasValue)
-            {
-                <es-button type="submit" variant="secondary" icon="eye" formaction="?handler=Preview">Preview</es-button>
-            }
             <es-button variant="ghost" href="/Notificacoes/Templates">Cancelar</es-button>
         </div>
     </form>
 
-    @if (Model.PreviewResult.HasValue)
-    {
-        <div style="display:flex; flex-direction:column; gap:16px;">
-            <es-card title="Preview" description="Renderização com dados de exemplo">
-                <div style="font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.10em; color:var(--text-muted); margin-bottom:6px;">ASSUNTO</div>
-                <p style="color:var(--text-primary); font-weight:500; margin:0 0 14px;">
-                    @(Model.PreviewResult.Value.TryGetProperty("assuntoRenderizado", out var a) ? a.GetString() : "")
-                </p>
-                <div style="font:600 10px/1 var(--font-mono); text-transform:uppercase; letter-spacing:0.10em; color:var(--text-muted); margin-bottom:6px;">CORPO</div>
-                @* sandbox sem flags bloqueia scripts dentro do iframe *@
-                <iframe style="width:100%; height:320px; background:white; border-radius:var(--r-md); border:1px solid var(--border-soft);"
-                        sandbox=""
-                        title="Preview do corpo do template"
-                        srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
-                </iframe>
-            </es-card>
-        </div>
-    }
 </div>
 
 @section Scripts {
