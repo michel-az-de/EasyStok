@@ -12,7 +12,8 @@ namespace EasyStock.Api.Mobile.Controllers;
 
 /// <summary>
 /// Calculadora de Producao do PWA Casa da Baba:
-/// - POST /calcular: simula consumo de insumos read-only (batch query 1 round trip)
+/// - POST /calcular: simula consumo de insumos read-only (1 produto, batch query 1 round trip)
+/// - POST /calcular-cesta: Onda 1 in-context — simula varios produtos do mesmo pedido. Tolerante por item (sem receita / erro).
 /// - POST /preview-compra: agrupa insumos faltantes por fornecedor (sem criar PFs)
 /// - POST /criar-compra: cria N PFs all-or-nothing + outbox por PF. Idempotency-Key obrigatorio (validado UUID),
 ///   middleware IdempotencyMiddleware faz cache 24h via /api/mobile/calculadora/criar-compra whitelist
@@ -24,6 +25,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Authorize]
 public class MobileCalculadoraController(
     CalcularProducaoUseCase calcularUseCase,
+    CalcularCestaProducaoUseCase calcularCestaUseCase,
     PreviewSugestaoCompraUseCase previewUseCase,
     CriarSugestaoCompraUseCase criarUseCase,
     IProdutoComposicaoRepository composicaoRepository,
@@ -42,6 +44,30 @@ public class MobileCalculadoraController(
         var result = await calcularUseCase.ExecuteAsync(
             new CalcularProducaoCommand(emp, body.ProdutoFinalId, body.QuantidadeDesejada, unidadeDesejada, body.LojaId),
             ct);
+
+        return Ok(new { data = result });
+    }
+
+    [HttpPost("calcular-cesta")]
+    public async Task<IActionResult> CalcularCesta(
+        [FromBody] CalcularCestaRequest body,
+        CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(body.EmpresaId, out var emp, out var err)) return err!;
+
+        if (body.Itens == null || body.Itens.Count == 0)
+            throw new UseCaseValidationException("EMPTY_CESTA", "Cesta deve ter pelo menos 1 item.");
+
+        var itens = new List<ItemCestaInput>(body.Itens.Count);
+        foreach (var i in body.Itens)
+        {
+            if (!Enum.TryParse<UnidadeMedida>(i.Unidade, true, out var u))
+                throw new UseCaseValidationException("UNIT_INCOMPATIBLE", $"Unidade invalida no item: {i.Unidade}.");
+            itens.Add(new ItemCestaInput(i.ProdutoFinalId, i.Quantidade, u));
+        }
+
+        var result = await calcularCestaUseCase.ExecuteAsync(
+            new CalcularCestaProducaoCommand(emp, body.LojaId, itens), ct);
 
         return Ok(new { data = result });
     }
@@ -129,6 +155,16 @@ public sealed record CalcularRequest(
     decimal QuantidadeDesejada,
     string UnidadeDesejada,
     Guid? LojaId);
+
+public sealed record CalcularCestaRequest(
+    Guid EmpresaId,
+    Guid? LojaId,
+    List<CalcularCestaItemRequest> Itens);
+
+public sealed record CalcularCestaItemRequest(
+    Guid ProdutoFinalId,
+    decimal Quantidade,
+    string Unidade);
 
 public sealed record PreviewCompraRequest(
     Guid EmpresaId,
