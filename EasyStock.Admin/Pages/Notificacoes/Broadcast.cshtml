@@ -16,23 +16,23 @@
 
     <form method="post" class="card p-6 space-y-5">
         <div>
-            <label class="label-dark">EmpresaId</label>
-            <input asp-for="EmpresaId" class="input-dark w-full font-mono" placeholder="00000000-0000-0000-0000-000000000000" />
+            <label class="form-label">EmpresaId</label>
+            <input asp-for="EmpresaId" class="form-input w-full font-mono" placeholder="00000000-0000-0000-0000-000000000000" />
         </div>
 
         <div>
-            <label class="label-dark">UsuarioIds (um por linha, ou separados por vírgula)</label>
-            <textarea asp-for="UsuariosIds" class="input-dark w-full font-mono text-xs" rows="6"
+            <label class="form-label">UsuarioIds (um por linha, ou separados por vírgula)</label>
+            <textarea asp-for="UsuariosIds" class="form-input w-full font-mono text-xs" rows="6"
                       placeholder="00000000-0000-0000-0000-000000000001&#10;00000000-0000-0000-0000-000000000002"></textarea>
         </div>
 
         <div>
-            <label class="label-dark">Título</label>
-            <input asp-for="Titulo" class="input-dark w-full" placeholder="Comunicado importante" />
+            <label class="form-label">Título</label>
+            <input asp-for="Titulo" class="form-input w-full" placeholder="Comunicado importante" />
         </div>
         <div>
-            <label class="label-dark">Mensagem</label>
-            <textarea asp-for="Mensagem" class="input-dark w-full" rows="4"
+            <label class="form-label">Mensagem</label>
+            <textarea asp-for="Mensagem" class="form-input w-full" rows="4"
                       placeholder="Detalhes do comunicado..."></textarea>
         </div>
 

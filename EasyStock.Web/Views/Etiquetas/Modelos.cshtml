@@ -1,0 +1,188 @@
+@{
+    Layout    = "_Layout";
+    var empresaId = ViewBag.EmpresaId as string ?? "";
+}
+
+<div class="page-header">
+    <h1 class="etq-page-title">Modelos de etiqueta</h1>
+    <p class="etq-body">Layouts reutilizáveis para imprimir etiquetas de lotes.</p>
+</div>
+
+<!-- Abas -->
+<div style="display:flex;border-bottom:1px solid var(--border-soft,#D8DCE3);margin-bottom:16px">
+    <button id="tab-sistema" onclick="abaModelos('sistema')"
+            style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--navy-700,#1A2E5A);font-weight:600;font-size:13px;cursor:pointer">
+        Prontos do EasyStok
+    </button>
+    <button id="tab-empresa" onclick="abaModelos('empresa')"
+            style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid transparent;font-size:13px;cursor:pointer">
+        Personalizados (<span id="tab-empresa-count">0</span>)
+    </button>
+</div>
+
+<div id="modelos-lista" style="display:flex;flex-direction:column;gap:12px"></div>
+
+<div style="margin-top:16px">
+    <button class="etq-btn-primary" onclick="criarModelo()">+ Novo modelo personalizado</button>
+</div>
+
+<!-- Modal de confirmação -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:24px 20px;width:90%;max-width:400px">
+        <h4 id="confirm-title" style="font-size:15px;font-weight:700;margin:0 0 8px"></h4>
+        <p  id="confirm-body"  style="font-size:13px;color:#4D5665;margin:0 0 16px"></p>
+        <div id="confirm-btns" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="/etiqueta/etiqueta.css" />
+
+<script type="module">
+import { renderEtiqueta } from '/etiqueta/render.js';
+import { renderCodes }   from '/etiqueta/codes.js';
+
+const EMPRESA_ID = @Html.Raw(Json.Serialize(empresaId));
+let _templates   = [];
+let _aba         = 'sistema';
+
+function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function init() {
+    const res = await apiFetch(`/api/etiquetas/templates?empresaId=${EMPRESA_ID}`);
+    _templates = res.data ?? [];
+    const empresa = _templates.filter(t => t.Origem === 'Empresa');
+    document.getElementById('tab-empresa-count').textContent = empresa.length;
+    renderLista('sistema');
+}
+
+window.abaModelos = function(aba) {
+    _aba = aba;
+    document.getElementById('tab-sistema').style.borderBottomColor = aba === 'sistema' ? 'var(--navy-700,#1A2E5A)' : 'transparent';
+    document.getElementById('tab-empresa').style.borderBottomColor = aba === 'empresa' ? 'var(--navy-700,#1A2E5A)' : 'transparent';
+    renderLista(aba);
+};
+
+function renderLista(aba) {
+    const lista  = document.getElementById('modelos-lista');
+    const items  = _templates.filter(t => (aba === 'sistema' ? t.Origem === 'Sistema' : t.Origem === 'Empresa'));
+    if (!items.length) {
+        lista.innerHTML = `<div class="etq-caption">${aba === 'empresa'
+            ? 'Você ainda não tem modelos personalizados. Duplique um modelo pronto para começar.'
+            : 'Nenhum modelo do sistema.'}</div>`;
+        return;
+    }
+
+    lista.innerHTML = items.map(t => {
+        const eId = _esc(t.Id), eNome = _esc(t.Nome), eOrigem = _esc(t.Origem);
+        const eDesc = t.Descricao ? _esc(t.Descricao) : '';
+        return `
+        <div class="etq-tpl-card" style="padding:14px;display:flex;gap:12px;align-items:flex-start">
+            <div class="etq-tpl-card-thumb" id="thumb-${eId}" style="flex-shrink:0">
+                <span class="etq-tpl-card-thumb-placeholder etq-caption">⊞</span>
+            </div>
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <span class="etq-section-lbl">${eNome}</span>
+                    ${t.IsDefault ? '<span class="etq-status etq-status--impressa" title="Usado por padrão ao imprimir.">Padrão</span>' : ''}
+                </div>
+                ${eDesc ? `<div class="etq-caption" style="margin-top:2px">${eDesc}</div>` : ''}
+                ${t.Nome === 'Com tabela nutricional' ? '<div class="etq-disclaimer" style="margin-top:6px">ℹ️ Confira a RDC 727 antes de usar em embalagem de venda. O EasyStok não valida conformidade nutricional.</div>' : ''}
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                    ${aba === 'sistema' ? `
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="definirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="duplicar('${eId}','${eNome}')">Duplicar para personalizar</button>
+                    ` : `
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="window.location='/etiquetas/editor/${eId}'">Editar</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="definirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px;color:var(--crit-600,#DC2626)" onclick="excluir('${eId}','${eNome}')">Excluir</button>
+                    `}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    items.forEach(t => renderThumb(t));
+}
+
+async function renderThumb(t) {
+    const wrap = document.getElementById(`thumb-${t.Id}`);
+    if (!wrap) return;
+    try {
+        const layout = JSON.parse(t.LayoutJson);
+        const scale  = 160 / ((layout.size?.w_mm ?? 80) * 3.7795);
+        const dados  = { produto: { Nome: 'Nome do Produto', Marca: 'Marca', FichaAlergenos: [] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date().toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'EasyStok', LogoUrl: null } };
+        const el     = renderEtiqueta(layout, dados);
+        el.style.transform       = `scale(${scale})`;
+        el.style.transformOrigin = 'top left';
+        wrap.innerHTML = '';
+        wrap.appendChild(el);
+        await renderCodes(wrap);
+    } catch { /* keep placeholder */ }
+}
+
+window.definirPadrao = async function(origem, id) {
+    await apiFetch(`/api/etiquetas/templates/${origem}/${id}/set-default?empresaId=${EMPRESA_ID}`, 'POST');
+    toast('Modelo definido como padrão.');
+    await init();
+};
+
+window.duplicar = async function(id, nome) {
+    const t = _templates.find(x => x.Id === id);
+    if (!t) return;
+    await apiFetch(`/api/etiquetas/templates?empresaId=${EMPRESA_ID}`, 'POST', { empresaId: EMPRESA_ID, nome: `${nome} (cópia)`, layoutJson: t.LayoutJson, baseSistemaId: t.Id });
+    toast(`Modelo duplicado: '${nome} (cópia)'.`);
+    await init();
+    abaModelos('empresa');
+};
+
+window.excluir = function(id, nome) {
+    confirm2({ title: `Excluir o modelo '${nome}'?`, body: 'Esta ação não pode ser desfeita.',
+        btns: [
+            { label: 'Excluir', primary: true, danger: true, action: async () => {
+                await apiFetch(`/api/etiquetas/templates/${id}?empresaId=${EMPRESA_ID}`, 'DELETE');
+                toast('Modelo excluído.'); await init();
+            }},
+            { label: 'Cancelar', action: null },
+        ]
+    });
+};
+
+window.criarModelo = function() { alert('Editor disponível em breve.'); };
+
+function confirm2({ title, body, btns }) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent  = body;
+    const btnsEl = document.getElementById('confirm-btns');
+    btnsEl.innerHTML = '';
+    const modal = document.getElementById('confirm-modal');
+    modal.style.display = 'flex';
+    for (const btn of btns) {
+        const b = document.createElement('button');
+        b.textContent = btn.label;
+        b.className   = btn.primary ? 'etq-btn-primary' : 'etq-btn-secondary';
+        if (btn.danger) b.style.background = '#DC2626';
+        b.onclick = async () => { modal.style.display = 'none'; if (btn.action) await btn.action(); };
+        btnsEl.appendChild(b);
+    }
+}
+
+function toast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1A2E5A;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
+async function apiFetch(url, method = 'GET', body = null) {
+    const res = await fetch(url, {
+        method, credentials: 'include',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : null,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.ok && method !== 'DELETE' ? res.json() : {};
+}
+
+init();
+</script>

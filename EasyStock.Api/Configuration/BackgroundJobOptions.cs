@@ -28,8 +28,8 @@ public sealed class BackgroundJobOptions
     /// <summary>
     /// Quando <c>true</c>, registra o <c>FaturaReconciliacaoJob</c> (F6) que
     /// roda hora em hora consultando o gateway para fechar gaps de webhooks
-    /// perdidos. Default false — habilitar quando IEfiPixService.GetCobrancaAsync
-    /// estiver implementado (atualmente o adapter retorna Desconhecido, NO-OP).
+    /// perdidos. F11 implementou <c>IEfiPixService.ConsultarCobrancaAsync</c>
+    /// e o job agora funciona ponta-a-ponta para Pix.
     /// </summary>
     public bool EnableFaturaReconciliacaoJob { get; set; }
 

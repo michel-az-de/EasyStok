@@ -44,10 +44,12 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostRemoverKillSwitchAsync(Guid id)
+    public async Task<IActionResult> OnPostRemoverKillSwitchAsync(Guid id, string? motivo = null)
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(motivo))
+                logger.LogInformation("Removendo kill-switch {Id}. Motivo: {Motivo}", id, motivo);
             await api.DeleteAsync($"api/admin/notificacoes/canais/kill-switch/{id}");
             SetSucesso("Kill-switch removido.");
         }

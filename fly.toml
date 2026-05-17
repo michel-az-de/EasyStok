@@ -1,0 +1,37 @@
+# Fly.io config para o serviço API EasyStok.
+# Substituto do Render `easystok` enquanto o billing nao reseta.
+# Gerado em 2026-05-12. Postgres continua no Render (External URL).
+#
+# Como deployar (uma vez instalado o fly CLI + autenticado):
+#   cd C:\rep\EasyStok
+#   fly secrets set ... (env vars sensiveis)
+#   fly deploy
+#
+# Secrets sao setadas com `fly secrets set` — nao colocar valores aqui
+# (este arquivo vai pro git).
+
+app = "easystok"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"     # nao deixar dormir (free tier permite 24/7 com 3 vms)
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = "512mb"  # 512mb cobre uma API .NET 9 razoavelmente, ainda no free tier
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.health]
+    type = "http"
+    path = "/health/live"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"

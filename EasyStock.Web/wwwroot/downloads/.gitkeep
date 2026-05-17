@@ -1,0 +1,3 @@
+# Diretório alvo do APK release publicado pelo CI.
+# Os arquivos easystok-<sha>.apk, easystok-latest.apk e apk-version.json são
+# gerados pelo workflow .github/workflows/deploy-render.yml (job build-apk).

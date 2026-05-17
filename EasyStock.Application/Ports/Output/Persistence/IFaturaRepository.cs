@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 
@@ -9,7 +5,7 @@ namespace EasyStock.Application.Ports.Output.Persistence;
 
 /// <summary>
 /// Repositorio do agregado <see cref="Fatura"/>. Todas as queries respeitam
-/// multi-tenancy via <see cref="EmpresaId"/> obrigatorio (exceto admin global).
+/// multi-tenancy via <c>EmpresaId</c> obrigatorio (exceto admin global).
 /// </summary>
 public interface IFaturaRepository
 {
@@ -48,4 +44,33 @@ public interface IFaturaRepository
 
     /// <summary>Busca por origem (ex: encontrar fatura existente para uma assinatura).</summary>
     Task<Fatura?> GetByOrigemAsync(Guid empresaId, OrigemFatura origem, Guid origemRefId, CancellationToken ct = default);
+
+    // ─── F10 — Metricas agregadas ──────────────────────────────────────
+
+    /// <summary>Conta faturas por status no periodo informado (filtro DataEmissao).</summary>
+    Task<IReadOnlyDictionary<StatusFatura, int>> ContarPorStatusAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>Soma <c>Total</c> de faturas por status no periodo informado.</summary>
+    Task<IReadOnlyDictionary<StatusFatura, decimal>> SomarTotalPorStatusAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Media de dias de atraso para faturas <c>Vencida</c> ainda em aberto
+    /// (DataPagamentoTotal == null). Retorna 0 se nao ha vencidas.
+    /// </summary>
+    Task<double> MediaDiasAtrasoVencidasAsync(Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Top inadimplentes — empresas com mais faturas <c>Vencida</c>. Retorna
+    /// tuplas <c>(EmpresaId, EmpresaNome, QtdVencidas, ValorTotalVencido)</c>.
+    /// </summary>
+    Task<IReadOnlyList<TopInadimplenteResult>> TopInadimplentesAsync(
+        int limit = 5, CancellationToken ct = default);
 }
+
+public sealed record TopInadimplenteResult(
+    Guid EmpresaId,
+    string? EmpresaNome,
+    int QuantidadeVencidas,
+    decimal ValorTotalVencido);

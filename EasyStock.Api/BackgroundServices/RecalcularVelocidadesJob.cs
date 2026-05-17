@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
+using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.BackgroundServices;
 
@@ -39,11 +40,12 @@ public sealed class RecalcularVelocidadesJob(
         var itemEstoqueRepo = scope.ServiceProvider.GetRequiredService<IItemEstoqueRepository>();
         var movimentacaoRepo = scope.ServiceProvider.GetRequiredService<IMovimentacaoEstoqueRepository>();
         var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
 
         var empresas = await empresaRepo.GetAllAsync();
         foreach (var empresa in empresas)
         {
-            await ProcessarEmpresaAsync(empresa, itemEstoqueRepo, movimentacaoRepo, cancellationToken);
+            await ProcessarEmpresaAsync(empresa, itemEstoqueRepo, movimentacaoRepo, dbContext, cancellationToken);
         }
     }
 
@@ -51,6 +53,7 @@ public sealed class RecalcularVelocidadesJob(
         Empresa empresa,
         IItemEstoqueRepository itemEstoqueRepo,
         IMovimentacaoEstoqueRepository movimentacaoRepo,
+        EasyStockDbContext dbContext,
         CancellationToken cancellationToken)
     {
         var de = DateTime.UtcNow.AddDays(-30);
@@ -89,6 +92,8 @@ public sealed class RecalcularVelocidadesJob(
                     logger.LogError(ex, "Erro ao recalcular velocidade para item {ItemId}", item.Id);
                 }
             }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             totalProcessados += itensList.Count;
             page++;

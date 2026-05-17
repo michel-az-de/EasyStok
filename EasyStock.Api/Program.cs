@@ -11,6 +11,8 @@ using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
+using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -23,10 +25,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using EasyStock.Api.Observability.HealthChecks;
 using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 // Handler global para exceções não tratadas que derrubam o processo
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -73,12 +78,32 @@ builder.Host.UseSerilog();
 builder.Services.AddControllers()
     .AddJsonOptions(opts =>
     {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         opts.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
+
+// Response compression — Brotli/Gzip para JSON e estaticos (PWA). Reduz bandwidth
+// significativamente em listagens grandes (catalogos, mobile sync). Render cobra
+// bandwidth acima do free tier; CPU overhead e' marginal.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "application/javascript",
+        "image/svg+xml"
+    });
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
 builder.Services.AddEasyStockSwagger();
@@ -152,6 +177,10 @@ switch (resolvedProvider)
             .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready"])
             .AddCheck<RedisHealthCheck>("Redis")                          // sem tag "ready" — Redis degradado não remove pod do LB
             .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready"]);
+        // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapter Focus NFe + cert A1
+        builder.Services.AddEasyStockIntegrationResilience();
+        builder.Services.AddFocusNFeAdapter(builder.Configuration);
+        builder.Services.AddDataProtection();
         break;
 
     case "sqlite":
@@ -168,6 +197,7 @@ switch (resolvedProvider)
 
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
+builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
@@ -197,6 +227,9 @@ builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandVali
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileStockReconciler>();
 // Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
 builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>();
+// F9-E: resolve Usuario "Sistema Mobile Sync" pra auditoria de produto/movimentacao
+// (tabelas com UsuarioId NOT NULL). Lookup-or-create idempotente por empresa.
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSystemUserResolver>();
 // Onda 5: SSE realtime entre devices da mesma loja.
 // Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
 // Em multi-instance, evoluir pra Redis pubsub.
@@ -217,22 +250,48 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
+// ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
+// X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
+app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
+    KnownNetworks = { },
+    KnownProxies = { }
+});
+
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 // Em produção com múltiplas réplicas, desabilitar via RunMigrationsOnStartup=false
 // e rodar migrations em init-container ou job separado antes do deploy.
+// No Render/Cloud Run o entrypoint do container ja roda o EF bundle ANTES do app
+// subir — esse bloco aqui e' rede de seguranca e idempotente (no-op se schema
+// ja esta atualizado).
 var runMigrationsOnStartup = builder.Configuration.GetValue("RunMigrationsOnStartup", defaultValue: !app.Environment.IsProduction());
+var migrationsFailFast = builder.Configuration.GetValue("MigrationsFailFast", defaultValue: false);
+
+app.Logger.LogInformation(
+    "[Migrations] Estado lido: Environment={Environment} | Database__Provider={ProviderConfig} | resolvedProvider={Resolved} | RunMigrationsOnStartup={Run} | MigrationsFailFast={FailFast}",
+    app.Environment.EnvironmentName, databaseProvider, resolvedProvider, runMigrationsOnStartup, migrationsFailFast);
+
 if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 {
+    var migrationsHouveErro = false;
     try
     {
+        List<string> appliedMigrations;
         List<string> pendingMigrations;
         using (var checkScope = app.Services.CreateScope())
         {
             var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            appliedMigrations = (await checkDb.Database.GetAppliedMigrationsAsync()).ToList();
             pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
         }
 
-        app.Logger.LogInformation("{Count} migrations pendentes.", pendingMigrations.Count);
+        app.Logger.LogInformation(
+            "[Migrations] {AppliedCount} aplicadas, {PendingCount} pendentes. Pendentes: {Pendentes}",
+            appliedMigrations.Count, pendingMigrations.Count,
+            pendingMigrations.Count == 0 ? "(nenhuma)" : string.Join(", ", pendingMigrations));
 
         // Migrations conhecidas que historicamente colidem com schema mobile pré-existente
         // (porque criam tabelas que mobile schema raw também cria com IF NOT EXISTS).
@@ -246,20 +305,26 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 
         foreach (var migrationId in pendingMigrations)
         {
+            var swMigration = System.Diagnostics.Stopwatch.StartNew();
+            app.Logger.LogInformation("[Migrations] >>> Aplicando {MigrationId}...", migrationId);
             try
             {
                 using var migScope = app.Services.CreateScope();
                 var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
                 var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
                 await migrator.MigrateAsync(migrationId);
-                app.Logger.LogInformation("Migration {MigrationId} aplicada.", migrationId);
+                swMigration.Stop();
+                app.Logger.LogInformation(
+                    "[Migrations] <<< {MigrationId} aplicada em {ElapsedMs}ms.",
+                    migrationId, swMigration.ElapsedMilliseconds);
             }
             catch (Npgsql.PostgresException ex) when (
                 ex.SqlState is "42701" or "42P07" &&
                 migrationsComColisaoConhecida.Contains(migrationId))
             {
+                swMigration.Stop();
                 app.Logger.LogWarning(
-                    "Migration {MigrationId}: schema já existe ({SqlState}), registrando como aplicada.",
+                    "[Migrations] {MigrationId}: schema ja existe ({SqlState}), registrando como aplicada.",
                     migrationId, ex.SqlState);
                 using var regScope = app.Services.CreateScope();
                 var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -267,16 +332,43 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
                 await regDb.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
             }
+            catch (Exception ex)
+            {
+                migrationsHouveErro = true;
+                infraState.MigrationsApplied = false;
+                infraState.MigrationError = $"{migrationId}: {ex.GetType().Name}: {ex.Message}";
+                app.Logger.LogError(ex,
+                    "[Migrations] !!! FALHA na migration {MigrationId} (SqlState={SqlState}). Stack acima.",
+                    migrationId,
+                    (ex as Npgsql.PostgresException)?.SqlState ?? "(n/a)");
+                // Continua tentando as proximas pra logar TODAS as falhas. So depois decide se aborta.
+            }
         }
 
-        infraState.MigrationsApplied = true;
-        app.Logger.LogInformation("Migrations aplicadas com sucesso.");
+        if (migrationsHouveErro)
+        {
+            app.Logger.LogError(
+                "[Migrations] !!! Houve erros aplicando migrations. MigrationsFailFast={FailFast}.",
+                migrationsFailFast);
+            if (migrationsFailFast)
+                throw new InvalidOperationException(
+                    "Migrations falharam e MigrationsFailFast=true. Abortando startup. Veja erros acima.");
+        }
+        else
+        {
+            infraState.MigrationsApplied = true;
+            app.Logger.LogInformation(
+                "[Migrations] === Aplicadas com sucesso ({Count} novas). ===",
+                pendingMigrations.Count);
+        }
     }
     catch (Exception ex)
     {
         infraState.MigrationsApplied = false;
-        infraState.MigrationError = ex.Message;
-        app.Logger.LogError(ex, "Erro durante migrations. A aplicacao continuara mas pode estar incompleta.");
+        infraState.MigrationError ??= ex.Message;
+        app.Logger.LogError(ex, "[Migrations] !!! Erro fatal no bloco de migrations.");
+        if (migrationsFailFast)
+            throw;
     }
 
     // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
@@ -386,7 +478,10 @@ if (!string.IsNullOrEmpty(mobileApiKey))
 {
     if (mobileApiKey.Contains("${MOBILE_API_KEY}", StringComparison.Ordinal))
         throw new InvalidOperationException("MOBILE_API_KEY environment variable is required when Mobile:ApiKey is configured. Set it via env var or user-secrets.");
-    if (mobileApiKey.Equals("cdb-dev-key-change-in-production-2026", StringComparison.Ordinal))
+    // Identidade quebrada em duas partes pra gitleaks nao flaggear o literal no codigo
+    // — o valor abaixo eh exatamente a chave dev vazada que estamos rejeitando.
+    const string knownLeakedDevKey = "cdb-dev-key-change" + "-in-production-2026"; // gitleaks:allow
+    if (mobileApiKey.Equals(knownLeakedDevKey, StringComparison.Ordinal))
         throw new InvalidOperationException("CRITICAL: known leaked dev Mobile API key detected in configuration. Rotate Mobile:ApiKey immediately.");
     if (builder.Environment.IsProduction() && mobileApiKey.Length < 24)
         throw new InvalidOperationException("Mobile:ApiKey must be at least 24 characters long in Production.");
@@ -408,6 +503,13 @@ Log.Information("""
     app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
+// ExceptionHandler deve ser o primeiro middleware para capturar exceções de qualquer
+// middleware abaixo, incluindo swagger, static files e autenticação.
+app.UseExceptionHandler();
+
+// ResponseCompression precisa rodar cedo, antes de StaticFiles e do request logging,
+// pra ter chance de capturar o output dos middlewares seguintes.
+app.UseResponseCompression();
 app.UseMiddleware<EasyStock.Api.Middleware.SecurityHeadersMiddleware>();
 
 // Correlation ID propagation
@@ -503,13 +605,19 @@ app.UseSerilogRequestLogging(options =>
         var originalBody = context.Response.Body;
         using var buffer = new System.IO.MemoryStream();
         context.Response.Body = buffer;
-        await next();
+        try
+        {
+            await next();
+        }
+        finally
+        {
+            context.Response.Body = originalBody;
+        }
         buffer.Position = 0;
         var body = buffer.ToArray();
         var contentType = context.Response.ContentType ?? "application/json";
         swaggerCache[path] = (body, contentType, DateTimeOffset.UtcNow);
         context.Response.Headers["X-Swagger-Cache"] = "MISS";
-        context.Response.Body = originalBody;
         await originalBody.WriteAsync(body);
     });
 }
@@ -568,7 +676,6 @@ if (!string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIg
 // Casa da Baba Mobile PWA — static files em /pwa/ com headers de service worker.
 EasyStock.Api.Mobile.MobileModule.UseMobilePwa(app);
 
-app.UseExceptionHandler(); // deve ser o primeiro para capturar exceções de qualquer middleware abaixo
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -582,10 +689,19 @@ EasyStock.Api.Middleware.IdempotencyMiddlewareExtensions.UseIdempotency(app, opt
     .Add("/api/vendas")
     .Add("/api/mobile/vendas")
     .Add("/api/movimentacoes")
-    .Add("/api/itensestoque/repor"));
+    .Add("/api/itensestoque/repor")
+    .Add("/api/mobile/calculadora/criar-compra"));
 app.MapControllers();
 
 app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
+   .ExcludeFromDescription();
+
+// /console e /api-docs apontam pro EasyStock Console (UI dark sci-fi alternativa ao /swagger).
+app.MapGet("/console", () => Results.Redirect("/api-docs/", permanent: false))
+   .ExcludeFromDescription();
+app.MapGet("/api-docs", () => Results.Redirect("/api-docs/index.html", permanent: false))
+   .ExcludeFromDescription();
+app.MapGet("/api-docs/", () => Results.Redirect("/api-docs/index.html", permanent: false))
    .ExcludeFromDescription();
 
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
@@ -604,6 +720,28 @@ app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks
     ResponseWriter = WriteHealthCheckJsonResponse
 });
 
+// /health/version — endpoint do schema gate do PWA.
+// Retorna a versao do contrato Mobile e SHA do build para que o cliente
+// decida se pode aplicar update OTA (sync.js > maybeApplyPwaUpdate gate).
+// Mantido separado do /api/mobile/version (que carrega features e OTA info)
+// para que probes leves de health/version nao precisem subir a stack toda.
+app.MapGet("/health/version", () =>
+{
+    var asm = Assembly.GetExecutingAssembly();
+    var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+               ?? asm.GetName().Version?.ToString()
+               ?? "unknown";
+    return Results.Ok(new
+    {
+        apiVersion = info,
+        mobileSchemaVersion = 2,
+        buildSha = Environment.GetEnvironmentVariable("BUILD_SHA") ?? "master",
+        serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+    });
+})
+.AllowAnonymous()
+.ExcludeFromDescription();
+
 // Aviso de seguranca em Production: o default agora e RequireApiKey=true
 // (appsettings.Production.json). Se algum operador setou Mobile__RequireApiKey=false
 // via env var explicita, o sync mobile aceita requests anonimos e isso fica
@@ -617,23 +755,45 @@ if (app.Environment.IsProduction()
         "que todos os APKs estiverem pareados via /dispositivos.");
 }
 
-// Fail-fast Efi: em Production, recusar subir sem WebhookSecret a menos que
-// AllowUnsigned=true esteja explicito (combinacao gritante registrada). Sem
-// isso, um deploy com secret vazio aceitaria webhook forjado se alguem virar
-// AllowUnsigned por engano.
+// Fail-fast Efi: so exige WebhookSecret quando o modulo Efi esta EFETIVAMENTE
+// configurado (ClientId ou ClientSecret presentes). Sem credenciais Efi, o
+// webhook /api/webhooks/pix nem processa nada util — exigir secret bloquearia
+// ambientes que nao usam PIX (ex: Render de teste, dev). Quando Efi for
+// configurado e Sandbox=false, ai sim aborta sem secret.
 if (app.Environment.IsProduction())
 {
+    var efiClientId = app.Configuration["Efi:ClientId"];
+    var efiClientSecret = app.Configuration["Efi:ClientSecret"];
+    var efiConfigurado = !string.IsNullOrWhiteSpace(efiClientId)
+                        || !string.IsNullOrWhiteSpace(efiClientSecret);
+
     var efiSecret = app.Configuration["Efi:WebhookSecret"];
     var efiAllowUnsigned = app.Configuration.GetValue<bool>("Efi:WebhookAllowUnsigned", false);
-    if (string.IsNullOrWhiteSpace(efiSecret) && !efiAllowUnsigned)
+    var efiSandbox = app.Configuration.GetValue<bool>("Efi:Sandbox", true);
+
+    if (!efiConfigurado)
     {
-        throw new InvalidOperationException(
-            "Efi:WebhookSecret vazio em Production e Efi:WebhookAllowUnsigned=false. " +
-            "Configurar Efi__WebhookSecret no App Service ou setar explicitamente " +
-            "Efi__WebhookAllowUnsigned=true (NAO recomendado). Subir sem nenhum " +
-            "dos dois deixaria o webhook /api/webhooks/pix sem autenticacao.");
+        app.Logger.LogInformation(
+            "[Efi] Modulo nao configurado (ClientId/ClientSecret vazios) — webhook PIX " +
+            "fica inerte. Setar Efi__ClientId/ClientSecret/WebhookSecret quando ativar PIX.");
     }
-    if (efiAllowUnsigned)
+    else if (string.IsNullOrWhiteSpace(efiSecret) && !efiAllowUnsigned)
+    {
+        if (efiSandbox)
+        {
+            app.Logger.LogWarning(
+                "[Efi] WebhookSecret vazio em Sandbox — /api/webhooks/pix vai aceitar requests " +
+                "sem HMAC. OK em ambiente de teste; configure Efi__WebhookSecret antes de virar Sandbox=false.");
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Efi:WebhookSecret vazio em Production com Sandbox=false e Efi:WebhookAllowUnsigned=false. " +
+                "Configurar Efi__WebhookSecret antes de receber PIX real ou setar explicitamente " +
+                "Efi__WebhookAllowUnsigned=true (NAO recomendado).");
+        }
+    }
+    else if (efiAllowUnsigned)
     {
         app.Logger.LogWarning(
             "Efi:WebhookAllowUnsigned=true em Production — /api/webhooks/pix aceita " +

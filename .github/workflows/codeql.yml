@@ -32,6 +32,12 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      # EasyStock.Mobile e um projeto MAUI Android que exige o workload
+      # maui-android. Sem isso, "dotnet build EasyStok.sln" falha com
+      # NETSDK1147 e o CodeQL nao analisa nada.
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:

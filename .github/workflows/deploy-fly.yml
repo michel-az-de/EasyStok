@@ -1,0 +1,117 @@
+name: Deploy to Fly.io (master)
+
+# Pipeline automatica de deploy para Fly.io.
+#
+# Trigger: push em master (apos squash-merge admin de PR — R1 CLAUDE.md).
+# Sequencia: API -> Web -> Admin (sequencial, espelha o protocolo manual).
+# Cada etapa faz smoke test antes de prosseguir, com retry para tolerar
+# cold start de container.
+#
+# Auth: FLY_API_TOKEN (deploy token gerado em 2026-05-17, expira em 1 ano).
+# Token criado via: fly tokens create deploy --expiry 8760h --name github-actions-deploy-easystok
+#
+# Render workflow (deploy-render.yml) continua valido em paralelo enquanto
+# Render nao for desativado. Atualmente Fly = prod primaria, Render = standby.
+#
+# --remote-only: imagem Docker e buildada na infra Fly (nao no runner Actions).
+# Mais rapido e nao gasta minutos do plano GitHub Actions building.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Nao cancelar deploy em andamento — interromper pode deixar app em
+  # estado inconsistente. Pushes consecutivos enfileiram.
+  group: deploy-fly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-api:
+    name: Deploy API (easystok)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy API
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --config fly.toml -a easystok --remote-only
+
+      - name: Smoke test /health/live
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://easystok.fly.dev/health/live || echo 000)
+            echo "attempt $i: $STATUS"
+            [ "$STATUS" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::API /health/live nao retornou 200 em ~3min"
+          exit 1
+
+  deploy-web:
+    name: Deploy Web (easystok-web)
+    runs-on: ubuntu-latest
+    needs: deploy-api
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Web
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --config fly.web.toml -a easystok-web --remote-only
+
+      - name: Smoke test /
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://easystok-web.fly.dev/ || echo 000)
+            echo "attempt $i: $STATUS"
+            [ "$STATUS" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::Web / nao retornou 200 em ~3min"
+          exit 1
+
+  deploy-admin:
+    name: Deploy Admin (easystok-admin)
+    runs-on: ubuntu-latest
+    needs: deploy-web
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Admin
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --config fly.admin.toml -a easystok-admin --remote-only
+
+      - name: Smoke test / -> 302 /Auth/Login -> 200
+        run: |
+          # / deve redirecionar (302) para tela de login
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://easystok-admin.fly.dev/ || echo 000)
+            echo "root attempt $i: $STATUS"
+            [ "$STATUS" = "302" ] && break
+            sleep 10
+          done
+          # /Auth/Login deve renderizar (200)
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://easystok-admin.fly.dev/Auth/Login || echo 000)
+            echo "login attempt $i: $STATUS"
+            [ "$STATUS" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "::error::Admin /Auth/Login nao retornou 200 em ~2min"
+          exit 1

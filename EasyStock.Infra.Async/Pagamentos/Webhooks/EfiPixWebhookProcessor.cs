@@ -31,6 +31,7 @@ public sealed class EfiPixWebhookProcessor(
     IAssinaturaEmpresaRepository assinaturaRepo,
     IUnitOfWork unitOfWork,
     RegistrarPagamentoFaturaUseCase registrarPagamentoFaturaUseCase,
+    IFalhaPagamentoNotifier falhaNotifier,
     ILogger<EfiPixWebhookProcessor> logger) : IGatewayWebhookProcessor
 {
     public string Provedor => "EfiPix";
@@ -42,7 +43,9 @@ public sealed class EfiPixWebhookProcessor(
         JsonElement payload;
         try
         {
-            payload = JsonDocument.Parse(rawBody).RootElement;
+            // Clone libera o JsonDocument (e o ArrayPool interno) mantendo o payload acessivel.
+            using var doc = JsonDocument.Parse(rawBody);
+            payload = doc.RootElement.Clone();
         }
         catch (JsonException jx)
         {
@@ -97,6 +100,9 @@ public sealed class EfiPixWebhookProcessor(
         if (valorPago is null)
         {
             logger.LogWarning("Webhook Pix: txid {Txid} sem campo valor — recusando.", txid);
+            await falhaNotifier.RegistrarFalhaAsync(
+                cobranca.EmpresaId, cobranca.FaturaId,
+                $"Webhook Pix txid={txid} chegou sem campo valor.", ct);
             return;
         }
 
@@ -105,6 +111,9 @@ public sealed class EfiPixWebhookProcessor(
             logger.LogWarning(
                 "Webhook Pix: valor pago ({Pago}) menor que esperado ({Esperado}) para txid {Txid}. Recusando.",
                 valorPago.Value, cobranca.Valor, txid);
+            await falhaNotifier.RegistrarFalhaAsync(
+                cobranca.EmpresaId, cobranca.FaturaId,
+                $"Subpagamento Pix: pago {valorPago.Value:F2} < esperado {cobranca.Valor:F2} (txid {txid}).", ct);
             return;
         }
 

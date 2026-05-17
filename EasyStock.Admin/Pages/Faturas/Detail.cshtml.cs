@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Faturas;
 
+/// <summary>
+/// Detalhe de uma fatura: dados, itens, pagamentos, eventos e ações (pagar,
+/// cancelar, abrir ticket, baixar PDF).
+/// </summary>
 public class DetailModel(AdminApiClient api, AdminSessionService session, ILogger<DetailModel> log) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public Guid Id { get; set; }

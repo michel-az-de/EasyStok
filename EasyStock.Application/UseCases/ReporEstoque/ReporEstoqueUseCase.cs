@@ -26,8 +26,8 @@ namespace EasyStock.Application.UseCases.ReporEstoque
     public sealed record ReporEstoqueResult(
         Guid ItemEstoqueId,
         Guid MovimentacaoId,
-        int QuantidadeAnterior,
-        int QuantidadeAtual);
+        decimal QuantidadeAnterior,
+        decimal QuantidadeAtual);
 
     public class ReporEstoqueUseCase(
         IProdutoRepository produtoRepository,

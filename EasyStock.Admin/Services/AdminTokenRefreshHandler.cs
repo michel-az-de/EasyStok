@@ -98,9 +98,9 @@ public class AdminTokenRefreshHandler(
                     SameSite = SameSiteMode.Strict
                 });
         }
-        catch
+        catch (Exception ex)
         {
-            // Falha ao escrever cookie nao bloqueia o fluxo.
+            log.LogDebug(ex, "Falha ao escrever cookie de sessao expirada");
         }
     }
 

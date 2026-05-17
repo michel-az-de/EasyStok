@@ -21,6 +21,8 @@ namespace EasyStock.Domain.Enums
         VisualizarFaturas,
         EmitirFatura,
         GerenciarFaturas,
-        CancelarFatura
+        CancelarFatura,
+        GerenciarFaq,
+        VisualizarMetricasHelpdesk
     }
 }

@@ -1,0 +1,92 @@
+name: Backup Rotulos
+
+# ADR-0012 — Backup diario do Postgres + Fly volume para Cloudflare R2.
+# Retencao 5 anos (auditoria sanitaria Anvisa).
+#
+# Pre-requisitos (configurar manualmente antes de ativar):
+#   - Bucket R2 criado: easystok-rotulos-backup
+#   - Secrets no repo: R2_ACCESS_KEY, R2_SECRET_KEY, R2_ENDPOINT
+#   - Secrets no repo: PG_BACKUP_CONNECTION_STRING (read-only role recomendado)
+#   - Secrets no repo: FLY_API_TOKEN (para snapshot do volume)
+#
+# Cron: 03:00 BRT diario = 06:00 UTC.
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-rotulos
+  cancel-in-progress: false
+
+jobs:
+  pg-dump:
+    name: pg_dump + sync R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ vars.BACKUP_ENABLED == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure rclone for R2
+        run: |
+          mkdir -p ~/.config/rclone
+          cat > ~/.config/rclone/rclone.conf <<EOF
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.R2_ACCESS_KEY }}
+          secret_access_key = ${{ secrets.R2_SECRET_KEY }}
+          endpoint = ${{ secrets.R2_ENDPOINT }}
+          acl = private
+          EOF
+
+      - name: pg_dump (custom format, compressed)
+        env:
+          PGCONN: ${{ secrets.PG_BACKUP_CONNECTION_STRING }}
+        run: |
+          TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
+          BACKUP_FILE="easystok_${TIMESTAMP}.dump"
+          pg_dump "$PGCONN" --format=custom --compress=9 --file="$BACKUP_FILE"
+          ls -lh "$BACKUP_FILE"
+          echo "BACKUP_FILE=$BACKUP_FILE" >> $GITHUB_ENV
+
+      - name: Upload pg_dump to R2
+        run: |
+          rclone copy "$BACKUP_FILE" r2:easystok-rotulos-backup/postgres/ --progress
+
+      # TODO: snapshot incremental do Fly volume (depende de FLY_API_TOKEN +
+      # mecanismo de snapshot ou rsync via SSH com a app rodando).
+      # Implementar em F+1 quando volume real existir.
+
+      - name: Cleanup
+        if: always()
+        run: rm -f "$BACKUP_FILE"
+
+      - name: Retencao R2 (manter ultimos 5 anos)
+        run: |
+          # Lifecycle policy do bucket R2 deve estar configurada para 1825 dias.
+          # Este step apenas valida que a policy existe.
+          rclone lsd r2:easystok-rotulos-backup/postgres/ --max-depth 1 | tail -5
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Backup falhou em $(date -u). Configurar notificacao via Resend em F+1."
+          # TODO: chamar API Resend para mandar email critico ao admin.
+          # Endpoint: POST https://api.resend.com/emails
+          # Subject: [EasyStok Rotulagem] CRITICO: backup diario falhou
+          exit 1

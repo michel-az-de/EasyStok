@@ -28,3 +28,12 @@ EasyStock.Infra.Sqlite/
 k8s/
 scripts/
 **/Properties/launchSettings.json
+.claude/
+builds/
+git_*.log
+git_*.err
+**/TestResults/
+EasyStok.Mobile/
+docker-compose*.yml
+azure-pipelines.yml*
+*.disabled

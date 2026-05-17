@@ -48,3 +48,25 @@
 ## 10. Não floreio em resposta
 - Português BR direto, sem "Claro!", sem "Vou agora...", sem travessões enfeitando, sem vírgula sobrando.
 - Resposta = ação + resultado.
+
+## 12. Não criar agregação cross-tenant sem parâmetro `Guid? empresaId`
+- **O que aconteceu:** dashboard F10 (commit 74a2b08) introduziu `SomarPrecoMensalAtivasAsync()` e `ContarPorStatusAsync()` (assinaturas) sem aceitar `empresaId`. `IgnoreQueryFilters()` somado à ausência de `.Where(EmpresaId == ...)` retornava agregados GLOBAIS. Operacional admin com `VisualizarFaturas` filtrando dashboard por sua empresa via MRR/ARR/contagens de assinaturas vazavam dados de TODOS os tenants. F13 (cache) propagou o bug porque a chave de cache incluía empresaId mas o valor cacheado era global. Fixado em 191f685.
+- **Como evitar:** todo método de agregação que use `IgnoreQueryFilters()` em entidade tenant-aware DEVE aceitar `Guid? empresaId = null` e aplicar `.Where(x => x.EmpresaId == empresaId.Value)` quando `empresaId.HasValue && != Guid.Empty`. Auditoria mental antes de commit: "este metodo tem `IgnoreQueryFilters()`? entao precisa de empresaId opcional". Cache key contendo empresaId NÃO substitui o filtro — só evita colisão entre buckets já errados.
+
+## 14. Não criar webhook signature validator sem paridade com os existentes
+- **O que aconteceu:** F12 (commit e5a4180) criou `MercadoPagoSignatureValidator` paralelo ao Stripe. Stripe tinha `±5min` de janela de replay; MP parseava `ts` mas só usava no corpo do HMAC, sem comparar com tempo atual. Webhook MP capturado podia ser replayado indefinidamente. Fix em auditoria 2026-05-07.
+- **Como evitar:** ao criar novo validator (Stripe/MP/Pix/qualquer), abrir os existentes lado-a-lado e conferir paridade: replay window, `CryptographicOperations.FixedTimeEquals`, allow-unsigned guard, secret obrigatorio quando nao ha allow-unsigned, headers obrigatorios. **Quebra de paridade entre validators = vulnerabilidade silenciosa.** Bonus: criar testes unitarios espelhando os do gateway anterior (sem header, hmac correto/incorreto, ts atual/fora-da-janela, allow-unsigned). MP usa `ts` em **milissegundos** (Stripe usa segundos) — cada gateway tem seu format, conferir doc antes.
+
+## 13. Não documentar parâmetros posicionais de record com `///` antes do parâmetro
+- **O que aconteceu:** F10/F13 usaram `public sealed record Foo(/// <summary>...</summary> int Bar)`. C#/Roslyn silently ignora — nenhum doc é gerado para o parâmetro. Compilador não emite warning quando `GenerateDocumentationFile` está off (Application layer não gera).
+- **Como evitar:** documentar com `<param name="Bar">desc</param>` no doc-comment do tipo:
+  ```csharp
+  /// <summary>...</summary>
+  /// <param name="Bar">desc</param>
+  public sealed record Foo(int Bar);
+  ```
+  Funciona pra positional records em C# 11+ e propaga pra IntelliSense + XML doc.
+
+## 14. Não passar `currentUser.UsuarioId` direto pra FK quando o caller pode ser anônimo
+- **O que aconteceu:** F14 (commit e29cc61) introduziu `AutoTicketFalhaPagamento` que abre ticket admin via `HelpdeskTicketService.AbrirAsync` em resposta a webhook Pix. Webhook é anônimo — `ICurrentUserAccessor.UsuarioId` retorna `Guid.Empty` (não `null`, porque o tipo é `Guid` não-nullable). Esse `Guid.Empty` ia direto pra `AdminTicket.CriadoPorId` (FK p/ `Usuarios` com `OnDelete: SetNull`) e `TicketHistorico.AutorId` (idem). Postgres rejeita o INSERT com FK violation, falhando o fluxo todo de auto-ticket. Bug latente — não disparava nos testes unitários (sem DB) nem no caminho admin (autenticado). Detectado em auditoria pós-merge e corrigido em [HelpdeskTicketService.cs](EasyStock.Api/Services/Helpdesk/HelpdeskTicketService.cs) normalizando `Guid.Empty -> null` antes de passar pra `criadoPorId/autorId`.
+- **Como evitar:** sempre que um service injetar `ICurrentUserAccessor` E for invocado em código de fundo (webhook, job, integration event handler), normalizar `currentUser.UsuarioId == Guid.Empty ? (Guid?)null : currentUser.UsuarioId` antes de gravar em FK. Padrão recomendado: criar variável `autorId` no início do método e usar ela em todas as escritas (ticket criador, historico autor, mensagem autor, evento UsuarioId etc). Cobertura: tests unitários do service não pegam — só integration tests com Postgres real. Adicionar smoke E2E quando o caminho for crítico.

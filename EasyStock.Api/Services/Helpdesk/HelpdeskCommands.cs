@@ -3,9 +3,9 @@ using EasyStock.Domain.Enums;
 namespace EasyStock.Api.Services.Helpdesk;
 
 /// <summary>
-/// Comando de abertura de ticket admin. <c>FaturaId</c> e opcional (F9):
-/// quando informado, vincula o ticket bidirecionalmente a uma Fatura
-/// existente da mesma empresa.
+/// Comando de abertura de ticket admin. <c>FaturaId</c> e opcional (F9) e
+/// <c>PedidoId</c> e opcional (Onda 1.1): quando informados, vinculam o
+/// ticket bidirecionalmente a uma Fatura ou Pedido existente da mesma empresa.
 /// </summary>
 public sealed record AbrirAdminTicketCommand(
     Guid EmpresaId,
@@ -14,8 +14,8 @@ public sealed record AbrirAdminTicketCommand(
     TicketCategoria Categoria,
     TicketPrioridade Prioridade,
     NivelAtendimento Nivel,
-    Guid? AnexoIds,
-    Guid? FaturaId = null);
+    Guid? FaturaId = null,
+    Guid? PedidoId = null);
 
 public sealed record ResponderAdminTicketCommand(
     Guid TicketId,

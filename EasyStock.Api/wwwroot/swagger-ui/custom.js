@@ -1,10 +1,10 @@
 /**
- * EasyStok API – Custom Swagger UI JavaScript
+ * EasyStock Swagger UI — toolbar customizada.
  * Features:
- *  - Botao "Site" linkando pra landing publica (easystok.com.br ou /home em dev)
- *  - Botao "Documentacao" linkando pra README/docs no repo
- *  - Seletor de idioma (EN / PT-BR)
- *  - Toggle de tema (light / dark)
+ *   • Botão Console → redireciona pra /api-docs/ (interface dark sci-fi alternativa)
+ *   • Language switcher EN / PT-BR (troca entre os 2 docs OpenAPI)
+ *   • Theme toggle Dark (default) / Light
+ * Persistência via localStorage.
  */
 (function () {
     'use strict';
@@ -17,63 +17,33 @@
     const LANGS = {
         en: {
             code:       'en',
-            label:      '🇺🇸 EN',
+            label:      'EN',
             docName:    'v1-en',
             docTitle:   'EasyStock API (English)',
         },
         ptbr: {
             code:       'ptbr',
-            label:      '🇧🇷 PT-BR',
+            label:      'PT-BR',
             docName:    'v1-ptbr',
             docTitle:   'EasyStock API (Português)',
         }
     };
 
-    /* ── External links ───────────────────────────────────────────────────── */
-    /**
-     * Resolve URL da landing publica baseado no host atual.
-     * Em prod (easystok.com.br ou app.easystok.com.br): aponta pro dominio publico.
-     * Em dev/staging: aponta pra propria origem na rota raiz "/".
-     */
-    function resolveSiteUrl() {
-        const host = window.location.hostname || '';
-        // Producao com dominios separados — landing fica no apex
-        if (host === 'app.easystok.com.br') return 'https://easystok.com.br/';
-        // Producao com dominio unico ou outros casos
-        if (host.endsWith('.easystok.com.br') || host === 'easystok.com.br') {
-            return 'https://easystok.com.br/';
-        }
-        // Dev/staging/azurewebsites — landing roda no proprio EasyStock.Web,
-        // mas a API e um host separado, entao aponta pro dominio publico oficial.
-        // Felipe pode trocar pra "/" se rodar API e Web no mesmo host.
-        return 'https://easystok.com.br/';
-    }
-
-    const EXTERNAL_LINKS = [
-        {
-            id:   'es-site-btn',
-            label:'🏠 Site',
-            title:'Abrir landing publica do EasyStok',
-            cta:  true,
-            href: resolveSiteUrl(),
-            target: '_blank'
-        },
-        {
-            id:   'es-repo-btn',
-            label:'📖 Repo',
-            title:'Repositorio publico no GitHub',
-            href: 'https://github.com/michel-az-de/EasyStok',
-            target: '_blank'
-        }
-    ];
-
     /* ── Helpers ──────────────────────────────────────────────────────────── */
     function getStoredLang()  { return localStorage.getItem(LANG_KEY)  || 'ptbr'; }
-    function getStoredTheme() { return localStorage.getItem(THEME_KEY) || 'light'; }
+    function getStoredTheme() { return localStorage.getItem(THEME_KEY) || 'dark'; }
 
     function applyTheme(theme) {
         document.body.classList.add('es-theme-transition');
-        document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+        // Meta theme-color pra browsers mobile
+        let meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'theme-color';
+            document.head.appendChild(meta);
+        }
+        meta.content = theme === 'light' ? '#f5f7fb' : '#0b0908';
         localStorage.setItem(THEME_KEY, theme);
         setTimeout(() => document.body.classList.remove('es-theme-transition'), 300);
     }
@@ -90,18 +60,18 @@
             url.searchParams.set('urls.primaryName', lang.docTitle);
             window.location.replace(url.toString());
         }
-        updateLangButtons(code);
+        updateButtons(code);
     }
 
-    function updateLangButtons(activeLang) {
-        document.querySelectorAll('#es-toolbar [data-lang]').forEach(btn => {
+    function updateButtons(activeLang) {
+        document.querySelectorAll('#es-lang-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.lang === activeLang);
         });
     }
 
     function updateThemeButton(theme) {
         const btn = document.getElementById('es-theme-btn');
-        if (btn) btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+        if (btn) btn.textContent = theme === 'dark' ? '☀ Light' : '🌙 Dark';
     }
 
     /* ── Toolbar injection ────────────────────────────────────────────────── */
@@ -117,34 +87,30 @@
         const toolbar = document.createElement('div');
         toolbar.id = 'es-toolbar';
 
-        // Botoes de links externos (Site, Repo) — destacam vinculo com landing
-        EXTERNAL_LINKS.forEach(link => {
-            const a = document.createElement('a');
-            a.id = link.id;
-            a.href = link.href;
-            a.textContent = link.label;
-            a.title = link.title;
-            a.target = link.target;
-            a.rel = 'noopener noreferrer';
-            if (link.cta) a.classList.add('es-cta');
-            toolbar.appendChild(a);
-        });
+        /* Botão Console — destacado, redireciona pra /api-docs/ */
+        const consoleLink = document.createElement('a');
+        consoleLink.id = 'es-console-link';
+        consoleLink.href = '/api-docs/index.html';
+        consoleLink.textContent = 'Console';
+        consoleLink.title = 'Abrir EasyStock Console (dark sci-fi)';
+        toolbar.appendChild(consoleLink);
 
-        // Separador antes dos toggles
-        const sepLinks = document.createElement('span');
-        sepLinks.id = 'es-lang-sep';
-        sepLinks.textContent = '|';
-        toolbar.appendChild(sepLinks);
+        /* Separador */
+        const sep0 = document.createElement('span');
+        sep0.id = 'es-lang-sep';
+        sep0.textContent = '·';
+        toolbar.appendChild(sep0);
 
-        // Botoes de idioma
+        /* Language buttons */
         Object.values(LANGS).forEach((lang, idx) => {
             if (idx > 0) {
                 const sep = document.createElement('span');
                 sep.id = 'es-lang-sep';
-                sep.textContent = '·';
+                sep.textContent = '|';
                 toolbar.appendChild(sep);
             }
             const btn = document.createElement('button');
+            btn.id        = 'es-lang-btn';
             btn.dataset.lang = lang.code;
             btn.textContent  = lang.label;
             btn.title        = `Switch to ${lang.docTitle}`;
@@ -153,16 +119,16 @@
             toolbar.appendChild(btn);
         });
 
-        // Separador antes do theme
-        const sepTheme = document.createElement('span');
-        sepTheme.id = 'es-lang-sep';
-        sepTheme.textContent = '|';
-        toolbar.appendChild(sepTheme);
+        /* Separador */
+        const sep2 = document.createElement('span');
+        sep2.id = 'es-lang-sep';
+        sep2.textContent = '·';
+        toolbar.appendChild(sep2);
 
-        // Toggle de tema
+        /* Theme toggle */
         const themeBtn = document.createElement('button');
         themeBtn.id = 'es-theme-btn';
-        themeBtn.textContent = currentTheme === 'dark' ? '☀️ Light' : '🌙 Dark';
+        themeBtn.textContent = currentTheme === 'dark' ? '☀ Light' : '🌙 Dark';
         themeBtn.title = 'Toggle dark/light theme';
         themeBtn.addEventListener('click', () => {
             const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -175,21 +141,31 @@
     }
 
     /* ── Initialize on DOM ready ──────────────────────────────────────────── */
+    function tryInject() {
+        const topbar = document.querySelector('.swagger-ui .topbar .topbar-wrapper');
+        if (!topbar) return false;
+        injectToolbar();
+        const currentLang = getStoredLang();
+        const lang = LANGS[currentLang];
+        if (lang && window.ui) {
+            const currentUrl = window.ui.getState()?.spec?.url || '';
+            if (currentUrl && !currentUrl.includes(lang.docName)) {
+                selectLang(currentLang);
+            }
+        }
+        return true;
+    }
+
     function init() {
         applyTheme(getStoredTheme());
 
+        // Tenta injetar imediato (caso DOM já esteja pronto)
+        if (tryInject()) return;
+
+        // Senão observa mutações (Swagger UI carrega via React após boot)
         const observer = new MutationObserver(() => {
-            const topbar = document.querySelector('.swagger-ui .topbar .topbar-wrapper');
-            if (topbar) {
-                injectToolbar();
-                const currentLang = getStoredLang();
-                const lang = LANGS[currentLang];
-                if (lang && window.ui) {
-                    const currentUrl = window.ui.getState()?.spec?.url || '';
-                    if (currentUrl && !currentUrl.includes(lang.docName)) {
-                        selectLang(currentLang);
-                    }
-                }
+            if (tryInject()) {
+                // Continua observando — Swagger UI re-renderiza às vezes e perde a toolbar
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });

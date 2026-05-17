@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Faturas;
 
+/// <summary>
+/// Emissão de fatura avulsa pelo admin. Aceita arrays paralelos de itens
+/// montados pelo form Alpine (itemDescricao[], itemQuantidade[], etc.).
+/// </summary>
 public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogger<EmitirModel> log) : AdminPageBase(session)
 {
     public string? Erro { get; private set; }
@@ -11,7 +15,7 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
     private static readonly HashSet<string> TiposItemValidos = new(StringComparer.OrdinalIgnoreCase)
         { "Produto", "Servico", "Recorrencia", "Desconto", "Taxa" };
 
-    public Task OnGetAsync() => Task.CompletedTask;
+    public void OnGet() { }
 
     /// <summary>
     /// Aceita arrays paralelos para itens (dinamicos no form via Alpine).

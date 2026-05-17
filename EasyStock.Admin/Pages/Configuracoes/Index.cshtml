@@ -28,11 +28,11 @@
 <div class="grid grid-cols-1 gap-6 max-w-3xl">
 
     <!-- Disponibilidade -->
-    <div class="card p-6">
+    <div class="card p-6" x-data="{ manutencaoAtiva: @(manutencaoAtiva.ToString().ToLower()), pendingManutencao: false }">
         <h2 class="text-base font-semibold text-es-ink mb-4 flex items-center gap-2">
             <span>🚦</span> Disponibilidade
         </h2>
-        <form method="post" asp-page-handler="Disponibilidade" class="space-y-5">
+        <form method="post" asp-page-handler="Disponibilidade" class="space-y-5" x-ref="formDisp">
             @Html.AntiForgeryToken()
 
             <div class="flex items-center justify-between">
@@ -41,13 +41,22 @@
                     <div class="text-xs text-es-ink-mute">Bloqueia login de todos os tenants</div>
                 </div>
                 @* Pattern checkbox+hidden: o hidden value="false" só é enviado quando o checkbox NÃO está marcado.
-                   O JS desabilita o hidden quando o checkbox vira true, garantindo apenas UM valor de manutencao_ativa
-                   no POST (caso contrário ASP.NET Core recebe array e o handler que espera string falha). *@
+                   Ao ativar, exibe modal de confirmação antes de submeter. *@
                 <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" name="manutencao_ativa" value="true" @(manutencaoAtiva ? "checked" : "")
+                    <input type="checkbox" name="manutencao_ativa" value="true"
+                           :checked="manutencaoAtiva"
                            class="sr-only peer"
-                           onchange="var h=this.form.querySelector('input[type=hidden][name=manutencao_ativa]'); if(h){ h.disabled = this.checked; }" />
-                    <input type="hidden" name="manutencao_ativa" value="false" @(manutencaoAtiva ? "disabled" : "") />
+                           @@change="
+                               if ($event.target.checked) {
+                                   $event.target.checked = false;
+                                   pendingManutencao = true;
+                               } else {
+                                   var h = $el.form.querySelector('input[type=hidden][name=manutencao_ativa]');
+                                   if (h) h.disabled = false;
+                                   manutencaoAtiva = false;
+                               }
+                           " />
+                    <input type="hidden" name="manutencao_ativa" value="false" :disabled="manutencaoAtiva" />
                     <div class="w-11 h-6 bg-es-surface-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-red-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                 </label>
             </div>
@@ -84,6 +93,32 @@
 
             <button type="submit" class="btn-primary">Salvar Disponibilidade</button>
         </form>
+
+        <!-- Modal confirmação Modo Manutenção -->
+        <div x-show="pendingManutencao" x-cloak class="modal-overlay" @@click.self="pendingManutencao = false">
+            <div class="modal-box max-w-md" @@click.stop>
+                <h3 class="text-es-ink font-semibold mb-3">⚠️ Ativar Modo Manutenção?</h3>
+                <p class="text-es-ink-dim text-sm mb-5">
+                    O login de <strong>todos os tenants ativos</strong> será bloqueado enquanto o modo estiver ativo.
+                    Use apenas para manutenções planejadas.
+                </p>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @@click="pendingManutencao = false" class="btn-secondary">Cancelar</button>
+                    <button type="button" class="btn-danger"
+                            @@click="
+                                var cb = $refs.formDisp.querySelector('input[type=checkbox][name=manutencao_ativa]');
+                                var h  = $refs.formDisp.querySelector('input[type=hidden][name=manutencao_ativa]');
+                                if (cb) cb.checked = true;
+                                if (h)  h.disabled  = true;
+                                manutencaoAtiva = true;
+                                pendingManutencao = false;
+                                $refs.formDisp.submit();
+                            ">
+                        Confirmar Manutenção
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Onboarding -->

@@ -31,13 +31,15 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         }
     }
 
-    public async Task<IActionResult> OnPostToggleAsync(Guid id, bool ativa)
+    public async Task<IActionResult> OnPostToggleAsync(Guid id, bool ativa, string? motivo = null)
     {
         try
         {
             var endpoint = ativa
                 ? $"api/admin/notificacoes/rotinas/{id}/desativar"
                 : $"api/admin/notificacoes/rotinas/{id}/ativar";
+            if (ativa && !string.IsNullOrWhiteSpace(motivo))
+                logger.LogInformation("Desativando rotina {Id}. Motivo: {Motivo}", id, motivo);
             await api.PatchRawAsync(endpoint, new { });
             SetSucesso(ativa ? "Rotina desativada." : "Rotina ativada.");
         }

@@ -1,9 +1,7 @@
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,10 +33,8 @@ namespace EasyStock.Api.BackgroundServices;
 /// </para>
 ///
 /// <para>
-/// Limitacao atual: o <c>EfiPixGatewayAdapter.ConsultarAsync</c> retorna
-/// sempre <see cref="StatusGateway.Desconhecido"/> ate o
-/// <see cref="IEfiPixService"/> ser estendido com <c>GetCobrancaAsync(txid)</c>
-/// (TODO em release futura). Por enquanto o job roda mas e NO-OP para Pix.
+/// F11 — <see cref="IEfiPixService.ConsultarCobrancaAsync"/> ja foi implementado
+/// (<c>GET /v2/cob/{txid}</c>); reconciliacao agora funciona ponta-a-ponta para Pix.
 /// </para>
 /// </summary>
 public sealed class FaturaReconciliacaoJob(
@@ -64,7 +60,7 @@ public sealed class FaturaReconciliacaoJob(
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                logger.LogError(ex, "FaturaReconciliacaoJob: erro fatal — aguardando 30min antes do proximo retry.");
+                logger.LogError(ex, "FaturaReconciliacaoJob: erro fatal — aguardando 1h antes do proximo retry.");
             }
 
             try { await Task.Delay(TimeSpan.FromHours(1), stoppingToken); }
@@ -120,7 +116,6 @@ public sealed class FaturaReconciliacaoJob(
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var router = scope.ServiceProvider.GetRequiredService<IPagamentoGatewayRouter>();
-        var registrar = scope.ServiceProvider.GetRequiredService<RegistrarPagamentoFaturaUseCase>();
 
         var agora = DateTime.UtcNow;
         var idadeMinima = agora.AddHours(-1);
@@ -180,23 +175,29 @@ public sealed class FaturaReconciliacaoJob(
 
                     if (status == StatusGateway.Confirmado)
                     {
-                        // Fecha o gap — registra um pagamento confirmado adicional
-                        // (idempotencia local: o RegistrarPagamentoFaturaUseCase chama
-                        //  Fatura.RegistrarPagamento que e atomico).
+                        // Fecha o gap CONFIRMANDO o pagamento Pendente original em vez de
+                        // criar um FaturaPagamento novo. Criar novo deixa o original
+                        // intocado (Pendente) — proxima rodada da janela 1h-30d ainda
+                        // pegaria a fatura (se Status=ParcialmentePaga apos confirmacao
+                        // parcial), e o gateway responderia Confirmado de novo, gerando
+                        // pagamento duplicado e TotalPago > Total. Confirmar in-place
+                        // mantem Pagamentos.Count estavel e idempotencia natural via
+                        // FaturaPagamento.Confirmar() (no-op se ja Confirmado).
                         try
                         {
-                            await registrar.ExecuteAsync(new RegistrarPagamentoFaturaCommand(
-                                EmpresaId: fatura.EmpresaId,
-                                FaturaId: fatura.Id,
-                                Metodo: pag.Metodo,
-                                Valor: pag.Valor,
-                                GatewayProvedor: pag.GatewayProvedor,
-                                GatewayTransactionId: pag.GatewayTransactionId,
-                                DadosGatewayJson: pag.DadosGatewayJson,
-                                StatusInicial: StatusFaturaPagamento.Confirmado,
-                                Observacao: $"Confirmado via reconciliacao (webhook perdido).",
-                                OrigemRegistro: "job-reconciliacao"
-                            ), ct);
+                            pag.Confirmar();
+                            pag.Observacao = string.IsNullOrWhiteSpace(pag.Observacao)
+                                ? "Confirmado via reconciliacao (webhook perdido)."
+                                : $"{pag.Observacao}\nConfirmado via reconciliacao (webhook perdido).";
+
+                            // Recalcula Status da fatura com o pagamento agora confirmado.
+                            fatura.AtualizarStatusPorPagamentos();
+
+                            db.FaturaEventos.Add(FaturaEvento.Criar(
+                                fatura.Id,
+                                TipoEventoFatura.PagamentoConfirmado,
+                                origem: "job-reconciliacao",
+                                valorDepois: $"+{pag.Valor:F2} {fatura.Moeda} via {pag.Metodo} ({pag.GatewayProvedor})"));
 
                             db.FaturaEventos.Add(FaturaEvento.Criar(
                                 fatura.Id,
@@ -209,10 +210,10 @@ public sealed class FaturaReconciliacaoJob(
                                 "FaturaReconciliacaoJob: gap fechado. FaturaId={FaturaId} Numero={Numero} txid={Txid}",
                                 fatura.Id, fatura.Numero, pag.GatewayTransactionId);
                         }
-                        catch (Exception regEx)
+                        catch (RegraDeDominioVioladaException regEx)
                         {
-                            logger.LogError(regEx,
-                                "FaturaReconciliacaoJob: falha ao registrar pagamento confirmado. FaturaId={FaturaId}",
+                            logger.LogWarning(regEx,
+                                "FaturaReconciliacaoJob: regra de dominio impediu fechar gap. FaturaId={FaturaId}",
                                 fatura.Id);
                         }
                     }
