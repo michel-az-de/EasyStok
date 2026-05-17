@@ -138,8 +138,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerenciarUploadsUseCase>();
         services.AddScoped<GerenciarCategoriaUseCase>();
 
-        // Calculadora de Producao (Ondas 1.3 + 1.4)
+        // Calculadora de Producao (Ondas 1.3 + 1.4 single; Onda 1 cesta in-context)
         services.AddScoped<CalcularProducaoUseCase>();
+        services.AddScoped<CalcularCestaProducaoUseCase>();
         services.AddScoped<PreviewSugestaoCompraUseCase>();
         services.AddScoped<CriarSugestaoCompraUseCase>();
         services.AddScoped<GerenciarComposicaoUseCase>();

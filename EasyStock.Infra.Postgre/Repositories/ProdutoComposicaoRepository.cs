@@ -34,6 +34,43 @@ public class ProdutoComposicaoRepository(EasyStockDbContext context) : IProdutoC
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ProdutoComposicao>>> GetByProdutosFinaisAsync(
+        Guid empresaId, IReadOnlyList<Guid> produtoFinaisIds, Guid? lojaId, CancellationToken ct = default)
+    {
+        if (produtoFinaisIds.Count == 0)
+            return new Dictionary<Guid, IReadOnlyCollection<ProdutoComposicao>>(0);
+
+        // 1 query: traz override + padrao no mesmo round trip. Resolucao override-vs-padrao
+        // por produto e feita em memoria (pequeno N, evita 2 round trips).
+        var todas = await context.ProdutosComposicao
+            .AsNoTracking()
+            .Include(c => c.ProdutoFinal)
+            .Include(c => c.Insumo)
+            .Where(c => c.EmpresaId == empresaId
+                     && produtoFinaisIds.Contains(c.ProdutoFinalId)
+                     && (c.LojaId == null || (lojaId.HasValue && c.LojaId == lojaId.Value)))
+            .OrderBy(c => c.OrdemExibicao)
+            .ToListAsync(ct);
+
+        var resultado = new Dictionary<Guid, IReadOnlyCollection<ProdutoComposicao>>(produtoFinaisIds.Count);
+        foreach (var grupo in todas.GroupBy(c => c.ProdutoFinalId))
+        {
+            if (lojaId.HasValue)
+            {
+                var override_ = grupo.Where(c => c.LojaId == lojaId.Value).ToList();
+                if (override_.Count > 0)
+                {
+                    resultado[grupo.Key] = override_;
+                    continue;
+                }
+            }
+            var padrao = grupo.Where(c => c.LojaId == null).ToList();
+            if (padrao.Count > 0)
+                resultado[grupo.Key] = padrao;
+        }
+        return resultado;
+    }
+
     public Task<IReadOnlyCollection<ProdutoComposicao>> GetOndeInsumoAsync(
         Guid empresaId, Guid insumoId, CancellationToken ct = default) =>
         context.ProdutosComposicao

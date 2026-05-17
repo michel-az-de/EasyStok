@@ -10,6 +10,14 @@ public interface IProdutoComposicaoRepository
     /// </summary>
     Task<IReadOnlyCollection<ProdutoComposicao>> GetByProdutoFinalAsync(Guid empresaId, Guid produtoFinalId, Guid? lojaId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Batch da Onda 1 (cesta in-context): traz receitas de varios produtos-finais numa unica query.
+    /// Mesma logica de override-vs-padrao do <see cref="GetByProdutoFinalAsync"/>, aplicada por produto.
+    /// Inclui Produto.RendimentoBase/RendimentoUnidade do produto-final (necessario pro calculo do fator) e Insumo (nome + UnidadeMedidaBase).
+    /// Produto-final sem receita simplesmente nao aparece no dicionario (consumer usa TryGetValue + marca como SemReceita).
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ProdutoComposicao>>> GetByProdutosFinaisAsync(Guid empresaId, IReadOnlyList<Guid> produtoFinaisIds, Guid? lojaId, CancellationToken ct = default);
+
     /// <summary>Receitas que usam este produto como insumo. Util pra alerta de impacto antes de editar.</summary>
     Task<IReadOnlyCollection<ProdutoComposicao>> GetOndeInsumoAsync(Guid empresaId, Guid insumoId, CancellationToken ct = default);
 
