@@ -4,40 +4,89 @@
     ViewData["Title"] = Model.Id.HasValue ? "Editar Template" : "Novo Template";
 }
 
-<div class="space-y-6 max-w-4xl">
-    <div class="flex items-center gap-3">
-        <a href="/Notificacoes/Templates" class="text-slate-400 hover:text-white">&larr;</a>
-        <h1 class="text-2xl font-bold text-white">@ViewData["Title"]</h1>
-        @if (Model.Id.HasValue)
-        {
-            <span class="badge-yellow text-xs">Nova versão será criada ao salvar</span>
-        }
+<div x-data="templateEditor()" x-init="init()" class="space-y-4">
+
+    <!-- Toolbar como card normal (segue DS) -->
+    <div class="card flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-3 min-w-0 flex-wrap">
+            <a href="/Notificacoes/Templates" class="text-es-ink-mute hover:text-es-ink shrink-0" title="Voltar para a lista">&larr;</a>
+            <div class="min-w-0">
+                <h1 class="text-es-ink text-lg font-bold leading-tight">@ViewData["Title"]</h1>
+                @if (Model.Id.HasValue && !string.IsNullOrEmpty(Model.Codigo))
+                {
+                    <code class="text-amber-400 font-mono text-xs">@Model.Codigo</code>
+                }
+            </div>
+            @if (Model.Id.HasValue)
+            {
+                <div class="flex items-center gap-2 ml-1">
+                    <span class="status-badge badge-expirada">v@(Model.Versao)</span>
+                    @if (Model.Aprovado)
+                    {
+                        <span class="status-badge badge-resolvido">Aprovado</span>
+                    }
+                    else
+                    {
+                        <span class="status-badge badge-ematendimento">Aguardando</span>
+                    }
+                    <span class="text-xs text-es-ink-mute">Salvar cria nova versão</span>
+                </div>
+            }
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <button type="submit" form="form-template" id="btn-salvar"
+                    class="btn-primary"
+                    title="Salvar (Ctrl+S)">Salvar</button>
+            @if (Model.Id.HasValue && !Model.Aprovado)
+            {
+                <button type="button"
+                        @@click="$dispatch('open-justificar', {
+                            endpoint: '?handler=Aprovar',
+                            acao: 'Aprovar template',
+                            resumo: 'O template @Model.Codigo v@(Model.Versao) ficará disponível para envio.',
+                            variant: 'primary',
+                            confirmLabel: 'Aprovar (auditado)',
+                            extraFields: ''
+                        })"
+                        class="btn-secondary">Aprovar</button>
+            }
+            <a href="/Notificacoes/Templates" class="btn-secondary">Cancelar</a>
+        </div>
     </div>
 
     @if (Model.Erro != null)
     {
-        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
+        <div class="bg-red-900/30 border border-red-500/40 text-red-200 rounded-md p-3 text-sm">@Model.Erro</div>
     }
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Split-pane -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+        <!-- ESQUERDA: formulário -->
         <div class="space-y-4">
-            <form method="post">
+            <form method="post" id="form-template" class="space-y-4">
+
                 @if (!Model.Id.HasValue)
                 {
-                    <div class="card p-4 space-y-4">
-                        <h2 class="text-white font-semibold">Identificação</h2>
-                        <div>
-                            <label class="label-dark">Código</label>
-                            <input asp-for="Codigo" class="input-dark w-full font-mono" placeholder="produto_vencendo_email_v1" />
+                    <div class="card space-y-4">
+                        <div class="flex items-center justify-between pb-3 border-b border-es-border">
+                            <h2 class="text-es-ink font-semibold">Identificação</h2>
+                            <span class="text-xs text-es-ink-mute">obrigatório para novo template</span>
                         </div>
                         <div>
-                            <label class="label-dark">Nome</label>
-                            <input asp-for="Nome" class="input-dark w-full" placeholder="Produto Vencendo — Email" />
+                            <label class="form-label">Código</label>
+                            <input asp-for="Codigo" class="form-input w-full font-mono"
+                                   placeholder="produto_vencendo_email_v1" />
+                        </div>
+                        <div>
+                            <label class="form-label">Nome</label>
+                            <input asp-for="Nome" class="form-input w-full"
+                                   placeholder="Produto Vencendo — Email" />
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="label-dark">Canal</label>
-                                <select asp-for="Canal" class="input-dark w-full">
+                                <label class="form-label">Canal</label>
+                                <select asp-for="Canal" class="form-input w-full">
                                     <option value="Email">Email</option>
                                     <option value="Sms">SMS</option>
                                     <option value="WhatsApp">WhatsApp</option>
@@ -45,8 +94,8 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="label-dark">Tipo de Evento</label>
-                                <select asp-for="TipoEvento" class="input-dark w-full">
+                                <label class="form-label">Tipo de Evento</label>
+                                <select asp-for="TipoEvento" class="form-input w-full">
                                     <option value="ProdutoVencendo">Produto Vencendo</option>
                                     <option value="ProdutoVencido">Produto Vencido</option>
                                     <option value="AssinaturaExpirando">Assinatura Expirando</option>
@@ -59,54 +108,360 @@
                     </div>
                 }
 
-                <div class="card p-4 space-y-4">
-                    <h2 class="text-white font-semibold">Conteúdo</h2>
-                    <div>
-                        <label class="label-dark">Assunto</label>
-                        <input asp-for="AssuntoTemplate" class="input-dark w-full"
-                               placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
-                        <p class="text-slate-500 text-xs mt-1">Use <code class="text-amber-400">{{ variavel }}</code> para variáveis Scriban</p>
+                <div class="card space-y-4">
+                    <div class="flex items-center justify-between pb-3 border-b border-es-border flex-wrap gap-2">
+                        <h2 class="text-es-ink font-semibold">Conteúdo do template</h2>
+                        @if (Model.Id.HasValue)
+                        {
+                            <div class="flex gap-4 text-xs text-es-ink-mute">
+                                <span>Canal: <span class="text-es-ink">@Model.Canal</span></span>
+                                <span>Evento: <span class="text-es-ink">@Model.TipoEvento</span></span>
+                                <span>Idioma: <span class="text-es-ink">@Model.Idioma</span></span>
+                            </div>
+                        }
                     </div>
-                    <div>
-                        <label class="label-dark">Corpo (HTML)</label>
-                        <textarea asp-for="CorpoTemplate" class="input-dark w-full font-mono text-xs"
-                                  rows="12" placeholder="<p>Olá! O produto <strong>{{ nomeProduto }}</strong> vence em {{ diasRestantes }} dias.</p>"></textarea>
-                    </div>
-                </div>
 
-                <div class="flex gap-3">
-                    <button type="submit" class="btn-primary px-6 py-2">Salvar</button>
-                    @if (Model.Id.HasValue)
+                    <div>
+                        <label class="form-label">Assunto</label>
+                        <input asp-for="AssuntoTemplate" id="campo-assunto" class="form-input w-full"
+                               x-model="assunto"
+                               placeholder="{{ nomeProduto }} vence em {{ diasRestantes }} dias" />
+                        <p class="text-es-ink-mute text-xs mt-1">
+                            Use <code class="text-amber-400">{{ "{{ variavel }}" }}</code> para placeholders Scriban
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Corpo (HTML)</label>
+                        <textarea asp-for="CorpoTemplate" id="campo-corpo"
+                                  class="form-input w-full font-mono text-xs"
+                                  x-model="corpo"
+                                  rows="16"
+                                  placeholder="&lt;p&gt;Olá! O produto &lt;strong&gt;{{ nomeProduto }}&lt;/strong&gt; vence em {{ diasRestantes }} dias.&lt;/p&gt;"></textarea>
+                    </div>
+
+                    @if (Model.VariaveisDisponiveis.Count > 0)
                     {
-                        <button type="submit" asp-page-handler="Preview" class="btn-secondary px-6 py-2">Preview</button>
+                        <div class="pt-2 border-t border-es-border">
+                            <label class="form-label">Variáveis catalogadas para @Model.TipoEvento</label>
+                            <p class="text-es-ink-mute text-xs mb-2">Clique para inserir no campo focado.</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach (var v in Model.VariaveisDisponiveis)
+                                {
+                                    <button type="button"
+                                            class="px-2 py-1 rounded bg-es-bg hover:bg-amber-900/30 border border-es-border hover:border-amber-500/60 text-amber-400 font-mono text-xs transition-colors"
+                                            title="@v.Tipo — @v.Descricao @(string.IsNullOrEmpty(v.Exemplo) ? "" : $"(ex: {v.Exemplo})")"
+                                            @@click="inserirVariavel('@v.Nome')">{{ @v.Nome }}</button>
+                                }
+                            </div>
+                        </div>
                     }
-                    <a href="/Notificacoes/Templates" class="btn-ghost px-6 py-2">Cancelar</a>
+                    else if (!string.IsNullOrEmpty(Model.TipoEvento))
+                    {
+                        <p class="text-es-ink-mute text-xs pt-2 border-t border-es-border">
+                            Nenhuma variável catalogada para <code class="text-amber-400">@Model.TipoEvento</code>.
+                            Você pode usar qualquer nome Scriban — defina valores no painel <strong>Variáveis</strong> ao lado para visualizar no preview.
+                        </p>
+                    }
                 </div>
             </form>
         </div>
 
-        @if (Model.PreviewResult.HasValue)
-        {
-            <div class="space-y-4">
-                <h2 class="text-white font-semibold">Preview</h2>
-                <div class="card p-4">
-                    <p class="text-slate-400 text-xs mb-1">ASSUNTO</p>
-                    <p class="text-white font-medium">
-                        @(Model.PreviewResult.Value.TryGetProperty("assuntoRenderizado", out var a) ? a.GetString() : "")
-                    </p>
+        <!-- DIREITA: preview ao vivo (sticky) -->
+        <div class="xl:sticky xl:top-4 xl:self-start">
+            <div class="card p-0 overflow-hidden">
+
+                <!-- Tabs -->
+                <div class="flex items-center gap-1 border-b border-es-border px-2">
+                    <template x-for="t in [['preview','Preview'],['html','HTML'],['vars','Variáveis']]" :key="t[0]">
+                        <button type="button" @@click="tab=t[0]"
+                                :class="tab===t[0]
+                                    ? 'text-es-accent border-es-accent'
+                                    : 'text-es-ink-mute border-transparent hover:text-es-ink'"
+                                class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors"
+                                x-text="t[1]"></button>
+                    </template>
+                    <div class="ml-auto py-2 text-xs flex items-center gap-2">
+                        <span x-show="loading" class="text-es-ink-mute">⏳ renderizando…</span>
+                        <span x-show="!loading && erro" class="text-red-400">⚠ erro</span>
+                        <span x-show="!loading && !erro && lastRender" class="text-es-ink-mute" x-text="statusLabel"></span>
+                    </div>
                 </div>
-                <div class="card p-4">
-                    <p class="text-slate-400 text-xs mb-2">CORPO</p>
-                    @* sandbox sem nenhuma flag bloqueia scripts/forms/popups dentro do iframe.
-                       Se um template HTML contiver <script>, ele será renderizado mas inerte —
-                       evita execução acidental de JS injetado em variáveis. *@
-                    <iframe class="w-full h-80 bg-white rounded"
-                            sandbox=""
-                            title="Preview do corpo do template"
-                            srcdoc="@(Model.PreviewResult.Value.TryGetProperty("corpoRenderizado", out var b) ? b.GetString() ?? "" : "")">
-                    </iframe>
+
+                <!-- Erro inline (visível em qualquer tab) -->
+                <div x-show="erro" x-cloak
+                     class="bg-red-900/30 border-b border-red-500/40 px-4 py-2 text-xs text-red-200 font-mono whitespace-pre-wrap"
+                     x-text="erro"></div>
+
+                <!-- TAB: Preview (estilo email client) -->
+                <div x-show="tab==='preview'" class="p-4 space-y-3">
+                    <div class="flex items-center justify-end gap-1">
+                        <button type="button" @@click="viewport='desktop'"
+                                :class="viewport==='desktop' ? 'bg-es-surface-2 text-es-ink' : 'bg-es-bg text-es-ink-mute hover:text-es-ink'"
+                                class="px-2 py-1 rounded text-xs transition-colors border border-es-border"
+                                title="Desktop">💻 Desktop</button>
+                        <button type="button" @@click="viewport='mobile'"
+                                :class="viewport==='mobile' ? 'bg-es-surface-2 text-es-ink' : 'bg-es-bg text-es-ink-mute hover:text-es-ink'"
+                                class="px-2 py-1 rounded text-xs transition-colors border border-es-border"
+                                title="Mobile (375px)">📱 Mobile</button>
+                    </div>
+
+                    <div class="rounded border border-es-border overflow-hidden bg-white/[.02]">
+                        <!-- Header fake estilo email -->
+                        <div class="px-4 py-2 text-xs space-y-1 bg-es-bg border-b border-es-border">
+                            <div><span class="text-es-ink-mute inline-block w-16">De:</span><span class="text-es-ink-dim">noreply@easystok.com.br</span></div>
+                            <div><span class="text-es-ink-mute inline-block w-16">Para:</span><span class="text-es-ink-dim" x-text="varsObj.email || 'usuario@exemplo.com'"></span></div>
+                            <div><span class="text-es-ink-mute inline-block w-16">Assunto:</span><span class="text-es-ink font-medium" x-text="previewAssunto || '—'"></span></div>
+                        </div>
+                        <!-- iframe sandbox -->
+                        <div class="bg-slate-950 p-3 flex justify-center">
+                            @* sandbox="" sem flags = scripts/forms/popups bloqueados *@
+                            <iframe sandbox=""
+                                    title="Preview do corpo do template"
+                                    class="bg-white rounded shadow-md transition-all"
+                                    :style="(viewport==='mobile' ? 'width: 375px;' : 'width: 100%;') + ' height: 560px;'"
+                                    :srcdoc="previewCorpo"></iframe>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- TAB: HTML -->
+                <div x-show="tab==='html'" class="p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <p class="form-label !mb-0">HTML renderizado</p>
+                        <button type="button" @@click="copiarHtml()"
+                                class="text-xs text-es-ink-mute hover:text-es-accent transition-colors"
+                                x-text="copiado ? '✓ Copiado' : 'Copiar'"></button>
+                    </div>
+                    <pre class="bg-es-bg border border-es-border rounded p-3 text-xs text-es-ink-dim overflow-auto max-h-[560px] whitespace-pre-wrap"
+                         x-text="previewCorpo || '(vazio)'"></pre>
+                </div>
+
+                <!-- TAB: Variáveis (form auto-detectado, toggle JSON avançado) -->
+                <div x-show="tab==='vars'" class="p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-es-ink-dim text-sm">
+                            <strong x-text="variaveisDetectadas.length"></strong>
+                            <span x-text="variaveisDetectadas.length === 1 ? 'variável' : 'variáveis'"></span>
+                            no template
+                        </p>
+                        <button type="button" @@click="modoVarsAvancado = !modoVarsAvancado"
+                                class="text-xs text-es-ink-mute hover:text-es-accent transition-colors">
+                            <span x-text="modoVarsAvancado ? '← Voltar ao modo simples' : 'Editar como JSON →'"></span>
+                        </button>
+                    </div>
+
+                    <!-- MODO FORM (default) -->
+                    <div x-show="!modoVarsAvancado" class="space-y-2">
+                        <template x-for="v in variaveisDetectadas" :key="v.nome">
+                            <div class="rounded border p-3 transition-colors"
+                                 :class="v.naoCatalogada
+                                     ? 'border-amber-500/30 bg-amber-500/[.04]'
+                                     : 'border-es-border bg-es-bg'">
+                                <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+                                    <code class="text-amber-400 font-mono text-xs"
+                                          x-text="'{{ ' + v.nome + ' }}'"></code>
+                                    <div class="flex items-center gap-1">
+                                        <span x-show="v.tipo"
+                                              class="text-es-ink-mute text-xs uppercase"
+                                              x-text="v.tipo"></span>
+                                        <span x-show="v.naoCatalogada"
+                                              class="status-badge badge-normal" style="font-size: 0.6rem;">não catalogada</span>
+                                    </div>
+                                </div>
+                                <input type="text"
+                                       :value="varsObj[v.nome] ?? ''"
+                                       @@input="setVar(v.nome, $event.target.value)"
+                                       class="form-input w-full text-sm"
+                                       :placeholder="v.exemplo || v.nome" />
+                                <p x-show="v.descricao"
+                                   class="text-es-ink-mute text-xs mt-1"
+                                   x-text="v.descricao"></p>
+                            </div>
+                        </template>
+                        <p x-show="variaveisDetectadas.length === 0"
+                           class="text-es-ink-mute text-xs italic text-center py-6">
+                            Nenhuma variável Scriban detectada.<br>
+                            Adicione <code class="text-amber-400">{{ "{{ nome }}" }}</code> no assunto ou no corpo.
+                        </p>
+                    </div>
+
+                    <!-- MODO JSON (avançado) -->
+                    <div x-show="modoVarsAvancado" x-cloak class="space-y-2">
+                        <textarea x-model="varsJson"
+                                  class="form-input w-full font-mono text-xs"
+                                  rows="18"
+                                  spellcheck="false"></textarea>
+                        <p class="text-es-ink-mute text-xs">
+                            Edição manual — necessária para arrays, objects ou tipos numéricos/booleanos.
+                        </p>
+                    </div>
+                </div>
+
             </div>
-        }
+        </div>
     </div>
 </div>
+
+@await Html.PartialAsync("_ModalJustificativa")
+
+@section Scripts {
+<script>
+function templateEditor() {
+    const initialVars = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.InitialVars));
+    const catalogo = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.VariaveisDisponiveis.ToDictionary(v => v.Nome, v => new {
+            descricao = v.Descricao, tipo = v.Tipo, exemplo = v.Exemplo
+        })));
+
+    return {
+        // estado dos campos
+        assunto: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AssuntoTemplate ?? "")),
+        corpo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CorpoTemplate ?? "")),
+        varsJson: JSON.stringify(initialVars, null, 2),
+
+        // estado do preview
+        previewAssunto: '',
+        previewCorpo: '',
+        erro: null,
+        loading: false,
+        lastRender: null,
+        copiado: false,
+
+        // ui
+        tab: 'preview',
+        viewport: 'desktop',
+        modoVarsAvancado: false,
+        campoFocado: null,
+        _debounce: null,
+        _statusTick: null,
+
+        init() {
+            this.render();
+            this.$watch('assunto', () => this.scheduleRender());
+            this.$watch('corpo', () => this.scheduleRender());
+            this.$watch('varsJson', () => this.scheduleRender());
+
+            window.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    document.getElementById('btn-salvar').click();
+                }
+            });
+
+            document.addEventListener('focusin', (e) => {
+                if (['campo-assunto', 'campo-corpo'].includes(e.target.id)) {
+                    this.campoFocado = e.target;
+                }
+            });
+
+            // ticker pro statusLabel atualizar visualmente
+            this._statusTick = setInterval(() => {
+                if (this.lastRender) this.lastRender = this.lastRender;
+            }, 5000);
+        },
+
+        scheduleRender() {
+            clearTimeout(this._debounce);
+            this._debounce = setTimeout(() => this.render(), 500);
+        },
+
+        async render() {
+            this.loading = true;
+            let varsParsed = {};
+            try {
+                varsParsed = JSON.parse(this.varsJson);
+            } catch {
+                this.erro = 'JSON de variáveis inválido';
+                this.loading = false;
+                return;
+            }
+            try {
+                const r = await fetch('/api-proxy/notificacoes/templates/preview-raw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        assuntoTemplate: this.assunto,
+                        corpoTemplate: this.corpo,
+                        variaveis: varsParsed
+                    })
+                });
+                if (!r.ok) { this.erro = 'Falha HTTP ' + r.status; return; }
+                const d = await r.json();
+                const data = (d.data && d.data.data) || d.data || d;
+                this.previewAssunto = data.assuntoRenderizado || '';
+                this.previewCorpo = data.corpoRenderizado || '';
+                this.erro = data.erro || null;
+                this.lastRender = Date.now();
+            } catch (e) {
+                this.erro = 'Falha de rede: ' + (e && e.message ? e.message : 'desconhecida');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        inserirVariavel(nome) {
+            const alvo = this.campoFocado || document.getElementById('campo-corpo');
+            if (!alvo) return;
+            const texto = '{{ ' + nome + ' }}';
+            const i = alvo.selectionStart ?? alvo.value.length;
+            const f = alvo.selectionEnd ?? alvo.value.length;
+            alvo.value = alvo.value.slice(0, i) + texto + alvo.value.slice(f);
+            alvo.focus();
+            alvo.setSelectionRange(i + texto.length, i + texto.length);
+            alvo.dispatchEvent(new Event('input', { bubbles: true }));
+            if (alvo.id === 'campo-assunto') this.assunto = alvo.value;
+            else this.corpo = alvo.value;
+        },
+
+        async copiarHtml() {
+            try {
+                await navigator.clipboard.writeText(this.previewCorpo || '');
+                this.copiado = true;
+                setTimeout(() => { this.copiado = false; }, 1500);
+            } catch { /* clipboard pode falhar sem HTTPS */ }
+        },
+
+        // ── Variáveis auto-detectadas ─────────────────────────────────────
+        get varsObj() {
+            try { return JSON.parse(this.varsJson); }
+            catch { return {}; }
+        },
+
+        get variaveisDetectadas() {
+            const regex = /\{\{\s*([a-zA-Z_][\w]*)\s*\}\}/g;
+            const texto = (this.assunto || '') + ' ' + (this.corpo || '');
+            const nomes = new Set();
+            let m;
+            while ((m = regex.exec(texto)) !== null) nomes.add(m[1]);
+            return Array.from(nomes).sort().map(nome => {
+                const cat = catalogo[nome];
+                return {
+                    nome,
+                    descricao: (cat && cat.descricao) || '',
+                    tipo: (cat && cat.tipo) || '',
+                    exemplo: (cat && cat.exemplo) || '',
+                    naoCatalogada: !cat
+                };
+            });
+        },
+
+        setVar(nome, valor) {
+            let obj = {};
+            try { obj = JSON.parse(this.varsJson); } catch { obj = {}; }
+            obj[nome] = valor;
+            this.varsJson = JSON.stringify(obj, null, 2);
+        },
+
+        get statusLabel() {
+            if (!this.lastRender) return '';
+            const s = Math.floor((Date.now() - this.lastRender) / 1000);
+            if (s < 5) return 'renderizado agora';
+            if (s < 60) return 'renderizado há ' + s + 's';
+            return 'renderizado há ' + Math.floor(s / 60) + ' min';
+        }
+    };
+}
+</script>
+}

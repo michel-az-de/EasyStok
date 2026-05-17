@@ -19,6 +19,7 @@ public class AnalyticsViewModel
     public decimal ProjUnidades7d { get; set; }
     public decimal ProjUnidades30d { get; set; }
     public decimal ProjReceita30d { get; set; }
+    public bool ReceitaProjetadaDisponivel { get; set; }
 
     // Gráfico de receita mensal
     public List<string> GraficoLabels { get; set; } = [];

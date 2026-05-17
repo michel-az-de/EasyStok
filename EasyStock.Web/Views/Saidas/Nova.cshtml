@@ -120,7 +120,7 @@
                                class="ui-field w-full text-sm" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Data da Venda *</label>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Data da saída *</label>
                         <input asp-for="DtVenda" type="date"
                                class="ui-field w-full text-sm" />
                         <span asp-validation-for="DtVenda" class="text-red-600 text-xs"></span>
@@ -142,7 +142,7 @@
                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
-                        Campos extras (NF, Canal, etc.)
+                        Informações adicionais
                     </button>
                     <div x-show="open" x-transition>
                         <div class="grid grid-cols-2 gap-4 mb-4">
@@ -150,7 +150,7 @@
                                 <label class="block text-sm font-medium text-slate-700 mb-1">Data da Saída</label>
                                 <input asp-for="DtSaida" type="date"
                                        class="ui-field w-full text-sm" />
-                                <p class="text-xs text-slate-400 mt-0.5">Se diferente da data de venda</p>
+                                <p class="text-xs text-slate-400 mt-0.5">Se diferente da data da saída</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-slate-700 mb-1">Data de Envio</label>
@@ -181,7 +181,7 @@
                 <div class="flex justify-end gap-3 pt-4 border-t">
                     <a asp-action="Historico" asp-controller="Saidas"
                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                        Cancelar
+                        Descartar
                     </a>
                     <button type="submit"
                             :disabled="loading || (produtoId && estoqueAtual === 0)"
@@ -267,7 +267,7 @@
                         <span class="text-slate-500" x-text="produtoCriadoPor"></span>
                     </div>
                     <div x-show="produtoAlteradoPor" class="flex justify-between text-xs">
-                        <span class="text-slate-400">Últ. alteração por</span>
+                        <span class="text-slate-400">Última alteração por</span>
                         <span class="text-slate-500" x-text="produtoAlteradoPor"></span>
                     </div>
                 </div>
@@ -369,7 +369,7 @@ function saidaForm() {
             if (this.variacoes.length > 0 && this.variacoes[0].quantidadeEmEstoque !== undefined) {
                 this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque;
             }
-            this.valorUnit = d.precoReferencia || 0;
+            this.valorUnit = d.precoReferencia || d.custoReferencia || 0;
             this.produtoFotoUrl = d.fotoUrl || '';
             this.produtoMarca = d.marca || '';
             this.produtoCodigoBarras = d.codigoBarras || '';
@@ -382,6 +382,10 @@ function saidaForm() {
 
         async submitSaida() {
             if (!this.produtoId) { window.showToast('Selecione um produto.', 'warning'); return; }
+            // type="number" min="1" no input nao impede digitar -5 em todos os browsers.
+            // Sem essa validacao explicita o form ia ao server e retornava 400 sem feedback claro.
+            if (!this.qty || this.qty < 1) { window.showToast('Quantidade deve ser maior que zero.', 'warning'); return; }
+            if (this.valorUnit < 0) { window.showToast('Valor unitário não pode ser negativo.', 'warning'); return; }
             if (this.estoqueAtual === 0) { window.showToast('Este produto não tem estoque disponível.', 'error'); return; }
             if (this.qty > this.estoqueAtual) { window.showToast('Quantidade excede o estoque disponível (' + this.estoqueAtual + ').', 'error'); return; }
             if (this.valorUnit === 0 && !confirm('Deseja registrar uma saída com valor R$ 0,00?')) return;

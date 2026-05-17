@@ -58,6 +58,7 @@ public sealed class GerenciarVariacaoProdutoUseCase(
 
         var produto = await ValidarProdutoAtivoAsync(command.EmpresaId, command.ProdutoId);
         await ValidarSkuAsync(command.EmpresaId, command.Sku, null);
+        ValidarCodigoBarras(command.CodigoBarras);
 
         var agora = DateTime.UtcNow;
         var variacao = new ProdutoVariacao
@@ -96,6 +97,7 @@ public sealed class GerenciarVariacaoProdutoUseCase(
             ?? throw new UseCaseValidationException("Variacao nao encontrada.");
 
         await ValidarSkuAsync(command.EmpresaId, command.Sku, command.VariacaoId);
+        ValidarCodigoBarras(command.CodigoBarras);
 
         variacao.Nome = command.Nome.Trim();
         variacao.Cor = Normalizar(command.Cor);
@@ -176,6 +178,15 @@ public sealed class GerenciarVariacaoProdutoUseCase(
         {
             throw new UseCaseValidationException("SKU duplicado para esta empresa.");
         }
+    }
+
+    private static void ValidarCodigoBarras(string? codigoBarras)
+    {
+        if (string.IsNullOrWhiteSpace(codigoBarras))
+            return;
+
+        try { _ = Gtin.Parse(codigoBarras.Trim()); }
+        catch (ArgumentException ex) { throw new UseCaseValidationException(ex.Message); }
     }
 
     private static VariacaoProdutoResult Map(ProdutoVariacao variacao) =>

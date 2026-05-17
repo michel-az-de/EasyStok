@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
+using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
 using EasyStock.Domain.Entities;
@@ -73,7 +74,12 @@ public class ProdutoControllerTests
             _lojaRepository,
             _unitOfWork);
 
-        _controller = new ProdutoController(_produtoRepository, _produtoAlteracaoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase, _currentUser);
+        var salvarFichaTecnicaUseCase = new SalvarFichaTecnicaUseCase(
+            _produtoRepository,
+            Substitute.For<IAuditLogRepository>(),
+            _unitOfWork);
+
+        _controller = new ProdutoController(_produtoRepository, _produtoAlteracaoRepository, _cadastrarProdutoUseCase, gerenciarProdutoUseCase, gerenciarVariacaoProdutoUseCase, gerenciarUploadsUseCase, salvarFichaTecnicaUseCase, _currentUser);
     }
 
     [Fact]
@@ -134,7 +140,7 @@ public class ProdutoControllerTests
         var empresaId = Guid.NewGuid();
         var termo = "teste";
         var produtos = new List<Produto> { new Produto { Id = Guid.NewGuid(), Nome = "Produto Teste" } };
-        _produtoRepository.SearchAsync(empresaId, termo).Returns(produtos);
+        _produtoRepository.SearchAsync(empresaId, termo, Arg.Any<int>()).Returns(produtos);
 
         var result = await _controller.Search(empresaId, termo);
 
@@ -168,7 +174,7 @@ public class ProdutoControllerTests
             null,
             null,
             null);
-        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
         {
             Id = categoriaId,
             EmpresaId = empresaId,

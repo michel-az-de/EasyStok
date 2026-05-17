@@ -1,0 +1,112 @@
+@model EasyStock.Web.Models.ViewModels.Faq.FaqIndexViewModel
+@{
+    Layout = "_LayoutSite";
+    ViewData["Title"] = "Central de Ajuda";
+    ViewData["Description"] = "Encontre respostas para as duvidas mais comuns sobre o EasyStok.";
+}
+
+<section class="bg-es-surface py-12">
+    <div class="container mx-auto px-4 max-w-5xl">
+        <h1 class="text-3xl md:text-4xl font-bold text-es-ink mb-4">Central de Ajuda</h1>
+        <p class="text-es-ink-2 mb-6">
+            Encontre respostas para as duvidas mais comuns. Nao achou o que procurava?
+            <a class="text-es-primary underline" asp-controller="Site" asp-action="Contato" asp-route-origem="faq">Fale com a gente</a>.
+        </p>
+
+        <form method="get" class="flex flex-col md:flex-row gap-3 mb-8">
+            <input type="text" name="termo" value="@Model.Termo" placeholder="O que voce procura?"
+                   class="form-input flex-1" maxlength="120" />
+            <select name="categoriaId" class="form-input md:max-w-xs">
+                <option value="">Todas categorias</option>
+                @foreach (var cat in Model.Categorias)
+                {
+                    <option value="@cat.Id" selected="@(Model.CategoriaId == cat.Id)">@cat.Nome</option>
+                }
+            </select>
+            <button type="submit" class="btn-primary">Buscar</button>
+        </form>
+
+        @if (Model.Categorias.Any())
+        {
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+                @foreach (var cat in Model.Categorias)
+                {
+                    <a asp-action="Index" asp-route-categoriaId="@cat.Id"
+                       class="block p-4 rounded border border-es-border bg-es-surface hover:border-es-primary transition">
+                        @if (!string.IsNullOrEmpty(cat.Icone))
+                        {
+                            <div class="text-2xl mb-1">@cat.Icone</div>
+                        }
+                        <div class="font-semibold text-es-ink">@cat.Nome</div>
+                        @if (!string.IsNullOrEmpty(cat.Descricao))
+                        {
+                            <div class="text-xs text-es-ink-2 mt-1 line-clamp-2">@cat.Descricao</div>
+                        }
+                    </a>
+                }
+            </div>
+        }
+
+        @if (Model.Resultado != null)
+        {
+            <h2 class="text-xl font-semibold mb-4 text-es-ink">
+                @if (!string.IsNullOrWhiteSpace(Model.Termo))
+                {
+                    <text>Resultados para "@Model.Termo"</text>
+                }
+                else
+                {
+                    <text>Artigos populares</text>
+                }
+                <span class="text-sm text-es-ink-2 ml-2">(@Model.Resultado.Total)</span>
+            </h2>
+
+            @if (!Model.Resultado.Itens.Any())
+            {
+                <div class="rounded border border-es-border bg-es-surface-2 p-8 text-center">
+                    <p class="text-es-ink-2 mb-3">Nenhum resultado encontrado.</p>
+                    <a class="btn-primary text-sm" asp-controller="Site" asp-action="Contato" asp-route-origem="faq-no-result">Abrir chamado</a>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-3">
+                    @foreach (var item in Model.Resultado.Itens)
+                    {
+                        <a asp-action="Detalhe" asp-route-categoriaSlug="@item.CategoriaSlug" asp-route-itemSlug="@item.Slug"
+                           class="block p-4 rounded border border-es-border bg-es-surface hover:border-es-primary transition">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <div class="text-xs text-es-ink-2 uppercase tracking-wide mb-1">@item.CategoriaNome</div>
+                                    <div class="text-base font-semibold text-es-ink">@item.Titulo</div>
+                                    @if (!string.IsNullOrEmpty(item.Resumo))
+                                    {
+                                        <div class="text-sm text-es-ink-2 mt-2 line-clamp-2">@item.Resumo</div>
+                                    }
+                                </div>
+                                <div class="text-xs text-es-ink-2 whitespace-nowrap">@item.Visualizacoes vis.</div>
+                            </div>
+                        </a>
+                    }
+                </div>
+
+                @if (Model.Resultado.Total > Model.Resultado.PageSize)
+                {
+                    var totalPages = (Model.Resultado.Total + Model.Resultado.PageSize - 1) / Model.Resultado.PageSize;
+                    <div class="mt-6 flex gap-2">
+                        @for (int p = 1; p <= Math.Min(totalPages, 10); p++)
+                        {
+                            <a asp-action="Index"
+                               asp-route-termo="@Model.Termo"
+                               asp-route-categoriaId="@Model.CategoriaId"
+                               asp-route-page="@p"
+                               class="@(p == Model.Resultado.Page ? "btn-primary" : "btn-secondary") text-xs">
+                                @p
+                            </a>
+                        }
+                    </div>
+                }
+            }
+        }
+    </div>
+</section>

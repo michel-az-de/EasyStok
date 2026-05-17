@@ -3,30 +3,77 @@
     ViewBag.Title = "Pedidos";
     Layout = "_Layout";
 
-    string statusBadgeClass(string? s) => s switch
+    string statusPillClasses(string? s) => s switch
     {
-        "aguardando" => "bg-amber-100 text-amber-700",
-        "preparando" => "bg-blue-100 text-blue-700",
-        "pronto"     => "bg-violet-100 text-violet-700",
-        "entregue"   => "bg-green-100 text-green-700",
-        "cancelado"  => "bg-slate-100 text-slate-500 line-through",
-        _            => "bg-slate-100 text-slate-600"
+        "aguardando" => "bg-amber-50 text-amber-800 ring-amber-200",
+        "preparando" => "bg-blue-50 text-blue-700 ring-blue-200",
+        "pronto"     => "bg-violet-50 text-violet-700 ring-violet-200",
+        "entregue"   => "bg-emerald-50 text-emerald-800 ring-emerald-200",
+        "cancelado"  => "bg-slate-50 text-slate-500 ring-slate-200 line-through",
+        _            => "bg-slate-50 text-slate-600 ring-slate-200"
     };
+    string statusDotColor(string? s) => s switch
+    {
+        "aguardando" => "bg-amber-500",
+        "preparando" => "bg-blue-500",
+        "pronto"     => "bg-violet-500",
+        "entregue"   => "bg-emerald-500",
+        "cancelado"  => "bg-slate-400",
+        _            => "bg-slate-400"
+    };
+
+    string tempoRelativo(DateTime utc)
+    {
+        var diff = DateTime.UtcNow - utc;
+        if (diff.TotalMinutes < 1) return "agora";
+        if (diff.TotalMinutes < 60) return $"há {(int)diff.TotalMinutes} min";
+        if (diff.TotalHours < 24)   return $"há {(int)diff.TotalHours}h";
+        return $"há {(int)diff.TotalDays}d";
+    }
+
+    string statusDisplayLabel(string? s) => s switch
+    {
+        "aguardando" => "Aguardando",
+        "preparando" => "Em preparo",
+        "pronto"     => "Pronto",
+        "entregue"   => "Entregue",
+        "cancelado"  => "Cancelado",
+        _            => s ?? ""
+    };
+
+    bool pedidoAtrasado(string? status, DateTime criadoUtc, DateTime? agendadoParaEm) =>
+        agendadoParaEm.HasValue
+            ? agendadoParaEm.Value < DateTime.UtcNow && status != "entregue" && status != "cancelado"
+            : status == "aguardando" && (DateTime.UtcNow - criadoUtc).TotalHours >= 2;
+
+    var totalAgendados = Model.Items.Count(p => p.IsScheduled);
+    var totalAtrasados = Model.Items.Count(p => p.IsAtrasado);
+    var filtroAgenda = Context.Request.Query["agenda"].ToString();
 }
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Pedidos</h1>
-        <p>Encomendas em curso — vinculadas a clientes do cadastro central</p>
+        <p>
+            @Model.Items.Count @(Model.Items.Count == 1 ? "pedido listado" : "pedidos listados") · Gerencie pedidos e pagamentos
+        </p>
     </div>
-    <div class="flex gap-3">
-        <a href="/pedidos-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
-            📱 Pedidos do app
+    <div class="flex gap-3 flex-wrap">
+        <a href="/pedidos-mobile"
+           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            App mobile
         </a>
         <button type="button" x-data
                 @@click="$dispatch('open-modal', 'novo-pedido')"
-                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-            + Novo Pedido
+                class="app-primary-btn inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Novo pedido
         </button>
     </div>
 </div>
@@ -34,15 +81,15 @@
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar pedidos">
         <div class="flex flex-1 min-w-48 gap-3">
-            <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, apt, telefone..."
+            <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, unidade ou número do pedido…"
                    aria-label="Buscar pedido"
                    class="ui-field flex-1 min-w-48" />
             <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
                 Buscar
             </button>
         </div>
-        <div class="flex gap-2">
-            @foreach (var (val, label) in new[] { ("", "Todos"), ("aguardando", "Aguardando"), ("preparando", "Preparando"), ("pronto", "Pronto"), ("entregue", "Entregue") })
+        <div class="flex gap-2 flex-wrap">
+            @foreach (var (val, label) in new[] { ("", "Todos"), ("aguardando", "Aguardando"), ("preparando", "Em preparo"), ("pronto", "Pronto"), ("entregue", "Entregue") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = val == "" ? null : val })"
@@ -50,18 +97,40 @@
                     @label
                 </a>
             }
+            @if (totalAgendados > 0)
+            {
+                var agActive = filtroAgenda == "agendados";
+                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = agActive ? null : "agendados" })"
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(agActive ? "bg-blue-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                    📅 Agendados (@totalAgendados)
+                </a>
+            }
+            @if (totalAtrasados > 0)
+            {
+                var atActive = filtroAgenda == "atrasados";
+                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = atActive ? null : "atrasados" })"
+                   class="px-3 py-2 rounded-lg text-sm font-medium @(atActive ? "bg-red-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                    ⚠ Atrasados (@totalAtrasados)
+                </a>
+            }
         </div>
     </form>
 </div>
 
 <div class="ws">
-    @if (!Model.Items.Any())
+    @{
+        var itemsFiltrados = Model.Items.AsEnumerable();
+        if (filtroAgenda == "agendados") itemsFiltrados = itemsFiltrados.Where(i => i.IsScheduled);
+        else if (filtroAgenda == "atrasados") itemsFiltrados = itemsFiltrados.Where(i => i.IsAtrasado);
+        var itemsFinais = itemsFiltrados.ToList();
+    }
+    @if (!itemsFinais.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "📋" },
-            { "EmptyTitle", "Nenhum pedido" },
-            { "EmptyDescription", "Crie seu primeiro pedido vinculando a um cliente cadastrado." },
-            { "EmptyCta", "+ Novo Pedido" },
+            { "EmptyIllustration", "inbox" },
+            { "EmptyTitle", "Nenhum pedido por aqui" },
+            { "EmptyDescription", "Crie o primeiro pedido para começar a registrar vendas, controlar pagamentos e acompanhar entregas." },
+            { "EmptyCta", "Criar primeiro pedido" },
             { "EmptyCtaModal", "novo-pedido" }
         })
     }
@@ -70,33 +139,120 @@
         <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
-                <tr><th>Cliente</th><th>Status</th><th>Itens</th><th>Total</th><th>Pago</th><th>Criado</th><th></th></tr>
+                <tr><th>Cliente</th><th>Status</th><th>Agendado</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>Data</th><th role="columnheader" aria-label="Ações"></th></tr>
             </thead>
             <tbody>
-                @foreach (var p in Model.Items)
+                @foreach (var p in itemsFinais)
                 {
-                    <tr>
+                    var atrasado = pedidoAtrasado(p.Status, p.CriadoEm, p.AgendadoParaEm);
+                    <tr class="cursor-pointer hover:bg-slate-50/60 transition-colors @(atrasado ? "bg-amber-50/40" : "")"
+                        onclick="window.location='/pedidos/@p.Id'">
                         <td>
                             <div class="font-medium text-slate-900">@(p.ClienteNome ?? "—")</div>
                             @if (!string.IsNullOrEmpty(p.ClienteApt) || !string.IsNullOrEmpty(p.ClienteTelefone))
                             {
-                                <div class="text-xs text-slate-500">@p.ClienteApt @(string.IsNullOrEmpty(p.ClienteApt) ? "" : "·") @p.ClienteTelefone</div>
+                                @* Antes "21 · +55 11 98140-5122" colava unidade + DDD sem rotulo
+                                   e induzia leitura tipo "21·11 misturado". Agora "Apto 21 · Tel ..." *@
+                                <div class="text-xs text-slate-500">
+                                    @if (!string.IsNullOrEmpty(p.ClienteApt)) { <span title="Apartamento / mesa">Apto @p.ClienteApt</span> }
+                                    @if (!string.IsNullOrEmpty(p.ClienteApt) && !string.IsNullOrEmpty(p.ClienteTelefone)) { <span class="text-slate-300 mx-1">·</span> }
+                                    @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <span title="Telefone">@p.ClienteTelefone</span> }
+                                </div>
                             }
                         </td>
                         <td>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @statusBadgeClass(p.Status)">@p.Status</span>
+                            <div class="flex flex-col gap-1">
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 w-fit @statusPillClasses(p.Status)">
+                                    <span class="w-1.5 h-1.5 rounded-full @statusDotColor(p.Status)"></span>
+                                    @statusDisplayLabel(p.Status)
+                                </span>
+                                @* BUG 5: o badge "Conferir cobrança" disparava em todo pedido entregue
+                                   com TotalPago==0 — incluindo casos em que o agregado da lista estava
+                                   apenas defasado. Resultado: muitos pedidos legítimos exibiam um chip
+                                   ambíguo que sugeria erro. Suprimimos o chip aqui; a coluna "Pagamento"
+                                   abaixo já comunica o estado (Quitado / Parcial / Pendente / sem chip
+                                   quando há suspeita de divergência). Quando o agregado de pagamento
+                                   for confiável o suficiente, reativamos. *@
+                                @if (atrasado)
+                                {
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-medium text-amber-800">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        @tempoRelativo(p.CriadoEm) sem atualização
+                                    </span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            @if (p.IsScheduled)
+                            {
+                                var classe = p.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
+                                var prefix = p.IsAtrasado ? "⚠" : "📅";
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @classe"
+                                      title="@p.AgendadoParaEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")">
+                                    @prefix @p.AgendadoParaEm?.ToLocalTime().ToString("dd/MM HH:mm")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-xs text-slate-400">—</span>
+                            }
                         </td>
                         <td class="text-slate-600 text-sm">@p.ItensCount</td>
-                        <td class="text-slate-600">@p.Total.ToString("C")</td>
+                        <td class="text-slate-600 col-num">@p.Total.AsMoney()</td>
                         <td>
-                            @if (p.Quitado)   { <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">quitado</span> }
-                            else if (p.TotalPago > 0) { <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded">@(p.TotalPago.ToString("C")) / @(p.Total.ToString("C"))</span> }
-                            else              { <span class="text-xs text-slate-400">—</span> }
+                            @if (p.Status == "cancelado")
+                            {
+                                @* Pedido cancelado nao tem cobranca em aberto — antes mostrava "Pendente". *@
+                                @if (p.TotalPago > 0)
+                                {
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-slate-50 text-slate-500 ring-slate-200 tabular-nums" title="Pedido cancelado com pagamento ja recebido">
+                                        Pago · @(p.TotalPago.ToString("C"))
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-slate-50 text-slate-400 ring-slate-200" title="Pedido cancelado nao gera cobranca">
+                                        Sem cobrança
+                                    </span>
+                                }
+                            }
+                            else if (p.Quitado)
+                            {
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-emerald-50 text-emerald-800 ring-emerald-200">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Quitado
+                                </span>
+                            }
+                            else if (p.TotalPago > 0)
+                            {
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-amber-50 text-amber-800 ring-amber-200 tabular-nums">
+                                    Parcial · @p.TotalPago.AsMoney()
+                                </span>
+                            }
+                            else if (p.Status == "entregue")
+                            {
+                                @* BUG 5: pedido entregue com agregado=0 — não afirmamos "Pendente?".
+                                   O agregado da lista diverge do detalhe em parte dos casos; exibir um
+                                   chip com interrogação fazia o usuário duvidar do sistema. Em vez disso,
+                                   sumimos com a célula — o operador clica no pedido pra ver o estado real
+                                   se quiser confirmar. *@
+                                <span class="text-slate-300 text-sm" aria-hidden="true">—</span>
+                            }
+                            else
+                            {
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-yellow-50 text-yellow-800 ring-yellow-200">
+                                    Pendente
+                                </span>
+                            }
                         </td>
-                        <td class="text-xs text-slate-500">@p.CriadoEm.ToLocalTime().ToString("dd/MM HH:mm")</td>
-                        <td>
+                        <td class="text-xs text-slate-500">
+                            <div>@p.CriadoEm.ToLocalTime().AsDateTime()</div>
+                            <div class="text-[10px] text-slate-400">@tempoRelativo(p.CriadoEm)</div>
+                        </td>
+                        <td class="text-right">
                             <a asp-action="Detail" asp-controller="Pedidos" asp-route-id="@p.Id"
-                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                               class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Abrir →</a>
                         </td>
                     </tr>
                 }
@@ -106,101 +262,1122 @@
     }
 </div>
 
-<!-- Modal novo pedido -->
-<div x-data="novoPedidoModal()" @@open-modal.window="if ($event.detail === 'novo-pedido') open = true"
+<!-- Modal: novo pedido -->
+<div x-data="novoPedidoModal()"
      x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-     @@click.self="open = false" @@keydown.escape.window="open = false">
-    <div class="ui-modal bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[92vh]">
-        <h2 class="text-lg font-semibold text-slate-900 mb-1">Novo Pedido</h2>
-        <p class="text-sm text-slate-500 mb-4">Vincule a um cliente cadastrado ou cadastre dados ad-hoc.</p>
+     x-transition:enter="transition duration-150 ease-out"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition duration-100 ease-in"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @@keydown.window="handleKeydown($event)"
+     @@click.self="close()"
+     class="fm-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="fm-pedido-title">
+    <form x-ref="panel" class="fm-panel" style="max-width: 820px"
+          autocomplete="off" novalidate
+          @@submit.prevent="submit()"
+          x-transition:enter="transition duration-150 ease-out"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100">
 
-        <div x-show="erroMsg" x-cloak class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
+        <!-- ============== FASE: PROCESSANDO ============== -->
+        <div x-show="fase === 'processando'" x-cloak class="ped-flow ped-fase">
+            <header class="fm-header">
+                <div>
+                    <h2 class="fm-header__title">Processando seu pedido…</h2>
+                    <p class="fm-header__subtitle">Não feche esta janela.</p>
+                </div>
+            </header>
+            <div class="fm-body">
+                <ul class="ped-flow__steps">
+                    <template x-for="etapa in etapas" :key="etapa.id">
+                        <li class="ped-flow__step" :class="'ped-flow__step--' + etapa.status">
+                            <span class="ped-flow__icon" aria-hidden="true">
+                                <svg x-show="etapa.status === 'pending'" x-cloak viewBox="0 0 24 24" width="20" height="20">
+                                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 4"/>
+                                </svg>
+                                <svg x-show="etapa.status === 'running'" x-cloak class="ped-flow__spin" viewBox="0 0 24 24" width="20" height="20">
+                                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="20 40"/>
+                                </svg>
+                                <svg x-show="etapa.status === 'done'" x-cloak viewBox="0 0 24 24" width="20" height="20">
+                                    <path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <svg x-show="etapa.status === 'error'" x-cloak viewBox="0 0 24 24" width="20" height="20">
+                                    <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span class="ped-flow__label">
+                                <span class="ped-flow__title" x-text="etapa.label"></span>
+                                <span class="ped-flow__detail" x-show="etapa.detalhe" x-cloak x-text="etapa.detalhe"></span>
+                            </span>
+                        </li>
+                    </template>
+                </ul>
 
-        @Html.AntiForgeryToken()
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
-                <select x-model="form.clienteId" class="ui-select w-full text-sm">
-                    <option value="">— ad-hoc (preencher abaixo) —</option>
-                    @foreach (var c in Model.Clientes)
-                    {
-                        <option value="@c.Id">@c.Nome @(string.IsNullOrEmpty(c.Apt) ? "" : "(" + c.Apt + ")")</option>
-                    }
-                </select>
+                <div x-show="erroMsg" x-cloak class="fm-error mt-4" x-text="erroMsg" role="alert"></div>
             </div>
-            <div class="grid grid-cols-3 gap-3" x-show="!form.clienteId">
-                <input type="text" x-model="form.nomeAdHoc"     placeholder="Nome (ad-hoc)" class="ui-field text-sm" />
-                <input type="text" x-model="form.aptAdHoc"      placeholder="Apt"          class="ui-field text-sm" />
-                <input type="text" x-model="form.telefoneAdHoc" placeholder="Telefone"     class="ui-field text-sm" />
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Itens</label>
-                <template x-for="(it, i) in form.itens" :key="i">
-                    <div class="grid grid-cols-12 gap-2 mb-2">
-                        <input type="text"   x-model="it.nome"          placeholder="Nome"  class="ui-field text-sm col-span-5" />
-                        <input type="number" x-model.number="it.quantidade" step="0.01" min="0.01" placeholder="Qtd" class="ui-field text-sm col-span-2" />
-                        <input type="number" x-model.number="it.precoUnitario" step="0.01" min="0" placeholder="Preço" class="ui-field text-sm col-span-3" />
-                        <button type="button" @@click="form.itens.splice(i, 1)" class="col-span-2 text-xs text-red-600 hover:text-red-700">Remover</button>
-                    </div>
-                </template>
-                <button type="button" @@click="form.itens.push({nome:'',quantidade:1,precoUnitario:0})"
-                        class="text-sm text-indigo-600 hover:text-indigo-700">+ Adicionar Item</button>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-                <textarea x-model="form.observacoes" rows="2" class="ui-textarea w-full text-sm"></textarea>
-            </div>
+            <footer class="fm-footer">
+                <button type="button" x-show="erroMsg" x-cloak @@click="voltarParaFormulario()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Voltar e ajustar
+                </button>
+            </footer>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 mt-4 border-t">
-            <button type="button" @@click="open = false"
+        <!-- ============== FASE: RECIBO (sucesso) ============== -->
+        <div x-show="fase === 'concluido'" x-cloak class="ped-recibo ped-fase">
+            <header class="fm-header ped-recibo__header">
+                <div>
+                    <div class="ped-recibo__check">
+                        <svg viewBox="0 0 24 24" width="36" height="36">
+                            <circle cx="12" cy="12" r="11" fill="#10b981" />
+                            <path d="M7 12.5l3.5 3.5L17 9" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h2 class="fm-header__title">Pedido criado</h2>
+                    <p class="fm-header__subtitle">
+                        Nº <span class="font-mono" x-text="reciboPedidoCurto"></span>
+                    </p>
+                </div>
+                <button type="button" class="fm-close" aria-label="Fechar" @@click="irParaPedido()">✕</button>
+            </header>
+            <div class="fm-body">
+                <!-- Avisos: falhas parciais que NAO bloquearam o pedido (cliente/produto que
+                     viraram avulso). Pedido ja esta criado — operador so precisa saber pra
+                     corrigir depois. -->
+                <div x-show="avisos.length > 0" x-cloak
+                     class="rounded-lg p-3 mb-3 text-sm border bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-200">
+                    <div class="font-medium mb-1 flex items-center gap-2">
+                        <span>⚠</span>
+                        <span>Pedido criado com <span x-text="avisos.length"></span>
+                              <span x-text="avisos.length === 1 ? 'aviso' : 'avisos'"></span></span>
+                    </div>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        <template x-for="(av, idx) in avisos" :key="idx">
+                            <li x-text="av"></li>
+                        </template>
+                    </ul>
+                </div>
+
+                <div class="ped-recibo__bloco">
+                    <span class="ped-recibo__label">Cliente</span>
+                    <span class="ped-recibo__valor" x-text="clienteResumo || '(venda avulsa)'"></span>
+                </div>
+                <div class="ped-recibo__itens">
+                    <span class="ped-recibo__label">Itens</span>
+                    <ul>
+                        <template x-for="it in form.itens" :key="it.uid">
+                            <li>
+                                <span class="ped-recibo__item-nome" x-text="it.nome"></span>
+                                <span class="ped-recibo__item-detalhe">
+                                    <span x-text="it.quantidade"></span>
+                                    × <span x-text="formatBRL(it.precoUnitario)"></span>
+                                </span>
+                                <span class="ped-recibo__item-sub" x-text="formatBRL((it.quantidade || 0) * (it.precoUnitario || 0))"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+                <div class="ped-recibo__total">
+                    <span>Total</span>
+                    <span x-text="formatBRL(totalPedido)"></span>
+                </div>
+                <div class="ped-recibo__obs" x-show="form.observacoes" x-cloak>
+                    <span class="ped-recibo__label">Observações</span>
+                    <p x-text="form.observacoes"></p>
+                </div>
+            </div>
+            <footer class="fm-footer">
+                <button type="button" @@click="abrirOutroPedido()"
+                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    Novo pedido
+                </button>
+                <button type="button" @@click="irParaPedido()"
+                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                    Ver na esteira →
+                </button>
+            </footer>
+        </div>
+
+        <!-- ============== FASE: EDITANDO (form padrão) ============== -->
+        <div x-show="fase === 'editando'" class="ped-fase">
+        <header class="fm-header">
+            <div>
+                <h2 id="fm-pedido-title" class="fm-header__title">Novo pedido</h2>
+                <p class="fm-header__subtitle">Cliente e itens são registrados na base. Você completa os dados depois.</p>
+            </div>
+            <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+        </header>
+
+        <div class="fm-body">
+            <div x-show="erroMsg" x-cloak class="fm-error" x-text="erroMsg" role="alert"></div>
+            @Html.AntiForgeryToken()
+
+            <!-- ── Cliente: combobox unificado com cadastro inline ─────────────── -->
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Cliente</legend>
+
+                <!-- Cliente já selecionado: chip resumo -->
+                <template x-if="form.clienteId || clienteNovo.ativo || form.modo === 'avulso'">
+                    <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                              :class="form.clienteId ? 'bg-emerald-100 text-emerald-800' : (clienteNovo.ativo ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-800')">
+                            <span x-show="form.clienteId" x-cloak>✓ cadastrado</span>
+                            <span x-show="clienteNovo.ativo" x-cloak>+ novo cadastro</span>
+                            <span x-show="form.modo === 'avulso'" x-cloak>⚡ venda avulsa</span>
+                        </span>
+                        <span class="text-sm text-slate-700 font-medium" x-text="clienteResumo"></span>
+                        <button type="button" class="ml-auto text-xs text-slate-500 hover:text-slate-700"
+                                @@click="limparCliente()">trocar</button>
+                    </div>
+                </template>
+
+                <!-- Chip "Repetir ultimo pedido": foodservice e altamente repetitivo, cliente
+                     recorrente quer "o de sempre". So aparece com cliente cadastrado selecionado
+                     e com a lista de itens vazia (evita clobbering acidental). -->
+                <template x-if="form.clienteId && ultimoPedido && form.itens.length === 0">
+                    <button type="button" @@click="repetirUltimoPedido()"
+                            class="mt-2 w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-sm transition-colors">
+                        <span class="text-base">🔁</span>
+                        <span class="flex-1 text-left">
+                            <span class="font-medium">Repetir último pedido</span>
+                            <span class="text-xs text-indigo-600/80 ml-1">
+                                · <span x-text="ultimoPedido.itensCount"></span>
+                                <span x-text="ultimoPedido.itensCount === 1 ? 'item' : 'itens'"></span>
+                                · <span x-text="formatBRL(ultimoPedido.total)"></span>
+                                · <span x-text="tempoRelativo(ultimoPedido.criadoEm)"></span>
+                            </span>
+                        </span>
+                        <span class="text-xs font-medium">clonar →</span>
+                    </button>
+                </template>
+                <p x-show="ultimoPedidoCarregando && form.clienteId && form.itens.length === 0" x-cloak
+                   class="mt-2 text-xs text-slate-400">
+                    buscando último pedido do cliente…
+                </p>
+
+                <!-- Combobox de busca (mostrado se nada selecionado/cadastrando) -->
+                <div x-show="!form.clienteId && !clienteNovo.ativo && form.modo !== 'avulso'"
+                     class="ped-combobox" @@click.outside="comboboxOpen = false">
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-cli-busca">Buscar cliente</label>
+                        <div class="ped-combobox__input-wrap">
+                            <input id="ped-cli-busca" type="text" autocomplete="off"
+                                   class="ui-field w-full text-sm"
+                                   placeholder="Nome, apartamento, telefone…"
+                                   x-model="clienteBusca"
+                                   @@focus="comboboxOpen = true"
+                                   @@input="comboboxOpen = true"
+                                   @@keydown.arrow-down.prevent="comboboxNavega(1)"
+                                   @@keydown.arrow-up.prevent="comboboxNavega(-1)"
+                                   @@keydown.enter.prevent="comboboxEnter()" />
+                        </div>
+                        <span class="fm-field__hint" x-show="clienteBusca.length === 0">
+                            @Model.Clientes.Count clientes cadastrados · digite para buscar ou cadastrar novo
+                        </span>
+                    </div>
+
+                    <!-- Lista de resultados -->
+                    <ul x-show="comboboxOpen && (clientesFiltrados.length > 0 || clienteBusca.trim().length > 0)" x-cloak
+                        class="ped-combobox__list" role="listbox">
+                        <template x-for="(cli, i) in clientesFiltrados" :key="cli.id">
+                            <li class="ped-combobox__option"
+                                :class="{ 'ped-combobox__option--active': i === comboboxIndex }"
+                                @@mouseenter="comboboxIndex = i"
+                                @@click="selecionaCliente(cli)" role="option">
+                                <div class="font-medium text-slate-900" x-text="cli.nome"></div>
+                                <div class="text-xs text-slate-500">
+                                    <span x-show="cli.apt" x-text="cli.apt"></span>
+                                    <span x-show="cli.apt && cli.telefone"> · </span>
+                                    <span x-show="cli.telefone" x-text="cli.telefone"></span>
+                                </div>
+                            </li>
+                        </template>
+                        <!-- Cadastrar novo: opção sempre presente quando há texto digitado -->
+                        <li x-show="clienteBusca.trim().length > 0"
+                            class="ped-combobox__option border-t border-slate-200"
+                            :class="{ 'ped-combobox__option--active': comboboxIndex === clientesFiltrados.length }"
+                            @@mouseenter="comboboxIndex = clientesFiltrados.length"
+                            @@click="abrirCadastroCliente()">
+                            <div class="text-indigo-600 font-medium">
+                                + Cadastrar "<span x-text="clienteBusca.trim()"></span>" como novo cliente
+                            </div>
+                            <div class="text-xs text-slate-500">Cadastro mínimo agora · você completa depois</div>
+                        </li>
+                    </ul>
+
+                    <button type="button" class="text-xs text-slate-500 hover:text-slate-700 mt-2 underline"
+                            @@click="form.modo = 'avulso'">
+                        Ou registrar sem cliente (venda avulsa)
+                    </button>
+                </div>
+
+                <!-- Cadastro inline de cliente novo -->
+                <div x-show="clienteNovo.ativo" x-cloak class="fm-grid mt-2">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="ped-novo-nome">Nome do cliente</label>
+                        <input id="ped-novo-nome" type="text" x-model="clienteNovo.nome"
+                               class="ui-field w-full text-sm" required />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-novo-tel">Telefone</label>
+                        <input id="ped-novo-tel" type="text" x-model="clienteNovo.telefone"
+                               x-mask:phone inputmode="numeric"
+                               placeholder="(11) 99999-9999" class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-novo-apt">Apt / Mesa</label>
+                        <input id="ped-novo-apt" type="text" x-model="clienteNovo.apt"
+                               placeholder="Ex: 304B" class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field fm-col-2 text-xs text-slate-500">
+                        Endereço, e-mail e mais detalhes você completa depois em Clientes.
+                    </div>
+                </div>
+
+                <!-- Campos de venda avulsa (modo opt-in explícito) -->
+                <div x-show="form.modo === 'avulso'" x-cloak class="fm-grid mt-2">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="ped-nome-adhoc">Identificação</label>
+                        <input id="ped-nome-adhoc" type="text" x-model="form.nomeAdHoc"
+                               placeholder="Ex: Cliente da mesa 4, ou Apt 302"
+                               class="ui-field w-full text-sm" />
+                        <span class="fm-field__hint">Nome livre — não cria cadastro permanente.</span>
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-apt-adhoc">Apt / Mesa</label>
+                        <input id="ped-apt-adhoc" type="text" x-model="form.aptAdHoc"
+                               placeholder="Ex: 304B" class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="ped-tel-adhoc">Telefone</label>
+                        <input id="ped-tel-adhoc" type="text" x-model="form.telefoneAdHoc"
+                               x-mask:phone inputmode="numeric"
+                               placeholder="(11) 99999-9999" class="ui-field w-full text-sm" />
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- ── Itens: combobox de produto com cadastro inline ─────────────── -->
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">
+                    <span>Itens</span>
+                    <span x-show="form.itens.length > 0" x-cloak class="ped-itens-count">
+                        <span x-text="form.itens.length"></span> <span x-text="form.itens.length === 1 ? 'item' : 'itens'"></span>
+                    </span>
+                </legend>
+
+                @if (Model.Categorias.Count == 0)
+                {
+                    <div class="rounded-lg p-3 mb-3 text-sm border bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-200">
+                        <strong>Atenção:</strong> nenhuma categoria cadastrada. Você só conseguirá adicionar produtos que já existem na base.
+                        <a href="/produtos" class="underline font-medium">Cadastre uma categoria em Produtos</a> pra liberar o cadastro inline de produto novo.
+                    </div>
+                }
+
+                <template x-if="form.itens.length === 0">
+                    <div class="ped-itens-empty">
+                        <div class="text-2xl mb-1">🛒</div>
+                        <p class="text-sm font-medium text-slate-600">Nenhum item adicionado</p>
+                        <p class="text-xs text-slate-500 mt-1">Adicione pelo menos 1 item para criar o pedido</p>
+                    </div>
+                </template>
+
+                <ul class="ped-itens-list" x-show="form.itens.length > 0" x-cloak>
+                    <template x-for="(it, i) in form.itens" :key="it.uid">
+                        <li class="ped-item-row">
+                            <!-- Linha do item: usa grid .ped-item original -->
+                            <div class="ped-item">
+                                <div class="ped-item__nome ped-prod-cell">
+                                    <!-- Busca de produto (quando ainda não vinculado) -->
+                                    <input type="text"
+                                           x-show="!it.produtoId && !it.novoCadastro"
+                                           x-model="it.busca"
+                                           @@input="buscarProdutos(it)"
+                                           @@focus="it.dropdownOpen = true"
+                                           @@blur="setTimeout(() => it.dropdownOpen = false, 150)"
+                                           placeholder="Buscar produto pelo nome…"
+                                           :class="(it.busca || '').trim().length > 0 ? 'ui-field text-sm w-full ped-prod-input--pendente' : 'ui-field text-sm w-full'" />
+                                    <!-- Aviso quando há texto mas item não foi consolidado -->
+                                    <div x-show="!it.produtoId && !it.novoCadastro && (it.busca || '').trim().length > 0 && !it.dropdownOpen"
+                                         x-cloak class="ped-prod-pendente-hint">
+                                        ↑ selecione um resultado ou clique em "+ Cadastrar como novo produto"
+                                    </div>
+                                    <!-- Nome consolidado (após selecionar/cadastrar) -->
+                                    <div x-show="it.produtoId || it.novoCadastro" x-cloak
+                                         class="ped-prod-consolidated">
+                                        <span x-text="it.nome"></span>
+                                        <span x-show="it.novoCadastro" x-cloak class="ped-prod-badge ped-prod-badge--new">novo</span>
+                                        <span x-show="it.produtoId && !it.novoCadastro" x-cloak class="ped-prod-badge ped-prod-badge--ok">cadastrado</span>
+                                    </div>
+                                    <!-- Dropdown de resultados -->
+                                    <ul x-show="it.dropdownOpen && !it.produtoId && !it.novoCadastro && (it.busca || '').trim().length > 0"
+                                        x-cloak
+                                        class="ped-combobox__list ped-prod-dropdown">
+                                        <template x-for="p in it.resultados" :key="p.id">
+                                            <li class="ped-combobox__option"
+                                                @@mousedown.prevent="selecionarProduto(it, p)">
+                                                <div class="font-medium" x-text="p.nome"></div>
+                                                <div class="text-xs text-slate-500">
+                                                    <span x-show="p.precoReferencia" x-text="formatBRL(p.precoReferencia)"></span>
+                                                    <span x-show="p.sku"> · <span x-text="p.sku"></span></span>
+                                                </div>
+                                            </li>
+                                        </template>
+                                        <li class="ped-combobox__option ped-prod-dropdown__create"
+                                            @@mousedown.prevent="abrirCadastroProduto(it)">
+                                            <div class="ped-prod-dropdown__create-title">
+                                                + Cadastrar "<span x-text="(it.busca || '').trim()"></span>" como novo produto
+                                            </div>
+                                            <div class="text-xs text-slate-500">Registrado na base com entrada de estoque.</div>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="ped-item__qtd">
+                                    <input type="number" x-model.number="it.quantidade"
+                                           step="0.01" min="0.01" placeholder="Qtd"
+                                           class="ui-field text-sm w-full text-right" required />
+                                </div>
+                                <div class="ped-item__preco">
+                                    <span class="ped-item__preco-prefix">R$</span>
+                                    <input type="number" x-model.number="it.precoUnitario"
+                                           step="0.01" min="0" placeholder="0,00"
+                                           class="ui-field text-sm w-full text-right" required />
+                                </div>
+                                <div class="ped-item__subtotal" x-text="formatBRL((it.quantidade || 0) * (it.precoUnitario || 0))"></div>
+                                <button type="button" class="ped-item__remove" aria-label="Remover item"
+                                        @@click="form.itens.splice(i, 1)">✕</button>
+                            </div>
+
+                            <!-- Bloco de cadastro inline (irmão da linha, fora do grid) -->
+                            <div x-show="it.novoCadastro" x-cloak class="ped-prod-cadastro">
+                                <div class="ped-prod-cadastro__title">
+                                    Cadastro mínimo · enriquece depois em Produtos
+                                </div>
+                                <div class="ped-prod-cadastro__grid">
+                                    <div class="ped-prod-cadastro__field">
+                                        <label>Categoria</label>
+                                        <select x-model="it.categoriaId" class="ui-field text-sm w-full" required>
+                                            <option value="">Selecione…</option>
+                                            @foreach (var c in Model.Categorias)
+                                            {
+                                                <option value="@c.Id">@c.Nome</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="ped-prod-cadastro__field">
+                                        <label>Custo (opcional)</label>
+                                        <input type="number" step="0.01" min="0" x-model.number="it.custoCadastro"
+                                               placeholder="R$" class="ui-field text-sm w-full" />
+                                    </div>
+                                </div>
+                                <p class="ped-prod-cadastro__hint">
+                                    Será criada uma entrada de estoque com a quantidade do pedido (a saída do pedido sai dela em seguida) para preservar a auditoria.
+                                </p>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+
+                <button type="button" class="ped-add-item"
+                        @@click="adicionarItem()">
+                    + Adicionar item
+                </button>
+            </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Observações</legend>
+                <div class="fm-field fm-col-2">
+                    <textarea x-model="form.observacoes" rows="2"
+                              placeholder="Endereço de entrega, preferências, instruções especiais..."
+                              class="ui-textarea w-full text-sm"></textarea>
+                </div>
+            </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Agendamento</legend>
+                <div class="fm-field fm-col-2">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <input type="checkbox" x-model="form.agendarAtivo"
+                               class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        📅 Agendar para depois
+                    </label>
+                    <div x-show="form.agendarAtivo" x-cloak class="mt-2">
+                        <input type="datetime-local" x-model="form.agendadoParaEm"
+                               :min="new Date(Date.now() + 60000).toISOString().slice(0, 16)"
+                               class="ui-field w-full text-sm" />
+                        <p class="text-xs text-slate-500 mt-1">
+                            O pedido ficará marcado com badge 📅 e lembretes automáticos serão enviados.
+                        </p>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+
+        <!-- Resumo de impacto: o que será criado ao confirmar -->
+        <div x-show="impactoResumo.length > 0" x-cloak
+             class="px-4 py-2 text-xs text-slate-600 border-t border-slate-200 bg-slate-50">
+            <div class="font-medium text-slate-700 mb-1">Ao criar este pedido:</div>
+            <template x-for="linha in impactoResumo" :key="linha">
+                <div>✓ <span x-text="linha"></span></div>
+            </template>
+        </div>
+
+        <footer class="fm-footer">
+            <div class="ped-total">
+                <span class="ped-total__label">Total</span>
+                <span class="ped-total__value" x-text="formatBRL(totalPedido)"></span>
+            </div>
+            <button type="button" @@click="close()"
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
             </button>
-            <button type="button" @@click="submitForm()" :disabled="loading"
+            <button type="button" @@click="submit()"
+                    :disabled="loading || !podeEnviar()"
+                    :class="{ 'opacity-50 cursor-not-allowed': loading || !podeEnviar() }"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Criar Pedido</span>
-                <span x-show="loading" x-cloak>Salvando...</span>
+                <span>Criar pedido</span>
             </button>
-        </div>
-    </div>
+        </footer>
+        </div><!-- /fase editando -->
+    </form>
 </div>
 
 @section Scripts {
 <script>
 function novoPedidoModal() {
+    const clientes = @Html.Raw(Json.Serialize(Model.Clientes.Select(c => new {
+        id = c.Id,
+        nome = c.Nome,
+        apt = c.Apt,
+        telefone = c.Telefone
+    })));
+    const categoriaPadrao = @Html.Raw(Json.Serialize(Model.Categorias.FirstOrDefault()?.Id.ToString() ?? ""));
+    const categoriasIds = @Html.Raw(Json.Serialize(Model.Categorias.Select(c => c.Id.ToString()).ToArray()));
+
+    let _itemUid = 0;
+    const novoItem = () => ({
+        uid: ++_itemUid,
+        // Identificação do produto
+        produtoId: null, novoCadastro: false, busca: '', nome: '',
+        // Cadastro inline (quando novoCadastro = true)
+        categoriaId: categoriaPadrao || '', custoCadastro: null,
+        // Quantidade e preço
+        quantidade: 1, precoUnitario: 0,
+        // Combobox
+        resultados: [], dropdownOpen: false,
+        _buscaTimer: null
+    });
+
     return {
-        open: false, loading: false, erroMsg: '',
-        form: { clienteId: '', nomeAdHoc:'', aptAdHoc:'', telefoneAdHoc:'',
-                observacoes: '', itens: [] },
-        async submitForm() {
-            if (!this.form.clienteId && !this.form.nomeAdHoc.trim()) {
-                this.erroMsg = 'Informe um cliente OU um nome ad-hoc.'; return;
-            }
-            this.loading = true; this.erroMsg = '';
+        open: false,
+        fase: 'editando',         // editando | processando | concluido
+        loading: false,
+        erroMsg: '',
+        clienteBusca: '',
+        comboboxOpen: false,
+        comboboxIndex: 0,
+        _previousFocus: null,
+        clienteNovo: { ativo: false, nome: '', telefone: '', apt: '' },
+        etapas: [],
+        avisos: [],               // strings — falhas parciais que NAO bloquearam o pedido
+        pedidoCriado: null,       // { id }
+        ultimoPedido: null,       // {found, pedidoId, criadoEm, total, itensCount, itens[]}
+        ultimoPedidoCarregando: false,
+        form: {
+            modo: 'auto',           // auto | avulso
+            clienteId: '',
+            nomeAdHoc: '', aptAdHoc: '', telefoneAdHoc: '',
+            observacoes: '', itens: [],
+            agendarAtivo: false, agendadoParaEm: ''
+        },
+
+        get reciboPedidoCurto() {
+            const id = this.pedidoCriado?.id || '';
+            return id ? id.toString().slice(0, 8).toUpperCase() : '—';
+        },
+
+        // Adiciona / atualiza etapas no painel de progresso
+        _etapaSet(id, label, status, detalhe) {
+            const idx = this.etapas.findIndex(e => e.id === id);
+            const dado = { id, label, status, detalhe: detalhe || '' };
+            if (idx >= 0) this.etapas.splice(idx, 1, dado);
+            else this.etapas.push(dado);
+        },
+        _etapaUpdate(id, status, detalhe) {
+            const e = this.etapas.find(x => x.id === id);
+            if (!e) return;
+            e.status = status;
+            if (detalhe !== undefined) e.detalhe = detalhe;
+        },
+        async _runEtapa(id, label, fn) {
+            this._etapaSet(id, label, 'running');
+            console.log('%c→ ' + label, 'color:#6366f1;font-weight:bold');
+            const t0 = performance.now();
             try {
-                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+                const result = await fn();
+                const dt = Math.round(performance.now() - t0);
+                this._etapaUpdate(id, 'done', dt + 'ms');
+                console.log('%c✓ ' + label + ' (' + dt + 'ms)', 'color:#10b981', result || '');
+                return result;
+            } catch (err) {
+                const dt = Math.round(performance.now() - t0);
+                // Detalhe inline mostra mensagem real (truncada) — usuário ve o erro ao lado da etapa.
+                const detalhe = (err?.message || 'falhou').slice(0, 140);
+                this._etapaUpdate(id, 'error', detalhe);
+                console.error('✗ ' + label + ' (' + dt + 'ms)', err);
+                if (!err.etapaLabel) err.etapaLabel = label;
+                throw err;
+            }
+        },
+
+        voltarParaFormulario() {
+            this.fase = 'editando';
+            this.erroMsg = '';
+            this.etapas = [];
+            this.avisos = [];
+        },
+        irParaPedido() {
+            if (this.pedidoCriado?.id) {
+                window.location.href = '/pedidos/' + this.pedidoCriado.id;
+            } else {
+                this.close();
+            }
+        },
+        abrirOutroPedido() {
+            // Reset completo do formulário, mantém modal aberto.
+            this.fase = 'editando';
+            this.etapas = [];
+            this.avisos = [];
+            this.pedidoCriado = null;
+            this.erroMsg = '';
+            this.limparCliente();
+            this.form.observacoes = '';
+            this.form.itens = [];
+            this.form.modo = 'auto';
+        },
+
+        init() {
+            window.addEventListener('open-modal', (e) => {
+                if (e.detail !== 'novo-pedido') return;
+                this._previousFocus = document.activeElement;
+                // Reset completo: estado das fases + form. Antes restavam cliente/itens
+                // da sessao anterior quando o operador fechava (X) e abria de novo.
+                this.fase = 'editando';
+                this.etapas = [];
+                this.avisos = [];
+                this.pedidoCriado = null;
+                this.erroMsg = '';
+                this.limparCliente();
+                this.form.observacoes = '';
+                this.form.itens = [];
+                this.form.modo = 'auto';
+                this.open = true;
+                this.$nextTick(() => {
+                    const el = this.$refs.panel.querySelector('input, select, textarea');
+                    if (el) el.focus();
+                });
+            });
+            this.$watch('open', (v) => {
+                document.body.style.overflow = v ? 'hidden' : '';
+                if (!v) {
+                    this.erroMsg = '';
+                    if (this._previousFocus) this._previousFocus.focus?.();
+                }
+            });
+        },
+
+        close() {
+            // Bloqueia fechar enquanto está processando (evita perder trilha de criação)
+            if (this.fase === 'processando' && this.loading) return;
+            // Se um pedido foi criado e o operador fechou o modal sem clicar
+            // "Ver na esteira", força reload da lista pra ela aparecer (a tabela
+            // foi server-rendered antes da criação, fica desatualizada senão).
+            if (this.fase === 'concluido' && this.pedidoCriado?.id) {
+                window.location.href = '/pedidos?novo=' + this.pedidoCriado.id;
+                return;
+            }
+            this.open = false;
+        },
+
+        handleKeydown(e) {
+            if (e.key === 'Escape') {
+                if (this.comboboxOpen) { this.comboboxOpen = false; return; }
+                this.close();
+            }
+        },
+
+        // ── Cliente: combobox + cadastro inline ───────────────────────────
+        get clientesFiltrados() {
+            const q = (this.clienteBusca || '').toLowerCase().trim();
+            if (!q) return clientes.slice(0, 6);
+            return clientes.filter(c =>
+                (c.nome || '').toLowerCase().includes(q) ||
+                (c.apt || '').toLowerCase().includes(q) ||
+                (c.telefone || '').includes(q)
+            ).slice(0, 6);
+        },
+        comboboxNavega(delta) {
+            this.comboboxOpen = true;
+            // max = índice da opção "Cadastrar novo" (= length, pois é a última da lista)
+            const max = this.clientesFiltrados.length;
+            this.comboboxIndex = Math.max(0, Math.min(max, this.comboboxIndex + delta));
+        },
+        comboboxEnter() {
+            const filtrados = this.clientesFiltrados;
+            if (this.comboboxIndex < filtrados.length) {
+                this.selecionaCliente(filtrados[this.comboboxIndex]);
+            } else if ((this.clienteBusca || '').trim().length > 0) {
+                this.abrirCadastroCliente();
+            }
+        },
+        selecionaCliente(cli) {
+            this.form.clienteId = cli.id;
+            this.clienteBusca = cli.nome;
+            this.comboboxOpen = false;
+            this._carregarUltimoPedido(cli.id);
+        },
+        abrirCadastroCliente() {
+            this.clienteNovo = {
+                ativo: true,
+                nome: (this.clienteBusca || '').trim(),
+                telefone: '',
+                apt: ''
+            };
+            this.comboboxOpen = false;
+            this.ultimoPedido = null; // cliente novo nao tem historico
+        },
+        limparCliente() {
+            this.form.clienteId = '';
+            this.form.modo = 'auto';
+            this.clienteBusca = '';
+            this.clienteNovo = { ativo: false, nome: '', telefone: '', apt: '' };
+            this.form.nomeAdHoc = ''; this.form.aptAdHoc = ''; this.form.telefoneAdHoc = '';
+            this.comboboxIndex = 0;
+            this.ultimoPedido = null;
+            this.ultimoPedidoCarregando = false;
+        },
+
+        // Busca o ultimo pedido NAO cancelado do cliente pra oferecer "Repetir".
+        // Foodservice e altamente repetitivo — cliente recorrente quer "o de sempre".
+        async _carregarUltimoPedido(clienteId) {
+            if (!clienteId) { this.ultimoPedido = null; return; }
+            this.ultimoPedido = null;
+            this.ultimoPedidoCarregando = true;
+            try {
+                const r = await fetch('/pedidos/cliente/' + encodeURIComponent(clienteId) + '/ultimo');
+                if (!r.ok) return;
+                const d = await r.json();
+                this.ultimoPedido = (d && d.found) ? d : null;
+            } catch (err) {
+                console.warn('[Pedidos] Falha ao buscar ultimo pedido do cliente:', err);
+            } finally {
+                this.ultimoPedidoCarregando = false;
+            }
+        },
+
+        // Clona itens do ultimo pedido pro formulario atual. Substitui itens
+        // existentes — chip so aparece quando lista de itens esta vazia.
+        repetirUltimoPedido() {
+            if (!this.ultimoPedido || !this.ultimoPedido.itens) return;
+            this.form.itens = this.ultimoPedido.itens.map(it => {
+                const item = novoItem();
+                item.produtoId = it.produtoId || null;
+                item.busca = it.nome || '';
+                item.nome = it.nome || '';
+                item.quantidade = Number(it.quantidade) || 1;
+                item.precoUnitario = Number(it.precoUnitario) || 0;
+                return item;
+            });
+            // Some o chip — operador ja repetiu.
+            this.ultimoPedido = null;
+        },
+
+        // Helper local de tempo relativo pro chip de "ultimo pedido".
+        tempoRelativo(iso) {
+            if (!iso) return '';
+            const dt = new Date(iso);
+            if (isNaN(dt.getTime())) return '';
+            const diff = (Date.now() - dt.getTime()) / 1000;
+            if (diff < 60) return 'agora';
+            if (diff < 3600) return 'há ' + Math.floor(diff / 60) + ' min';
+            if (diff < 86400) return 'há ' + Math.floor(diff / 3600) + 'h';
+            if (diff < 86400 * 7) return 'há ' + Math.floor(diff / 86400) + 'd';
+            return dt.toLocaleDateString('pt-BR');
+        },
+        get clienteResumo() {
+            if (this.form.clienteId) {
+                const c = clientes.find(x => x.id === this.form.clienteId);
+                return c ? (c.nome + (c.telefone ? ' · ' + c.telefone : '')) : '';
+            }
+            if (this.clienteNovo.ativo) {
+                return this.clienteNovo.nome + (this.clienteNovo.telefone ? ' · ' + this.clienteNovo.telefone : '');
+            }
+            if (this.form.modo === 'avulso') {
+                return this.form.nomeAdHoc || '(sem identificação)';
+            }
+            return '';
+        },
+
+        // ── Itens: busca de produto + cadastro inline ─────────────────────
+        adicionarItem() {
+            this.form.itens.push(novoItem());
+            this.$nextTick(() => {
+                const items = this.$refs.panel.querySelectorAll('.ped-item input[type=text]');
+                const last = items[items.length - 1];
+                if (last) last.focus();
+            });
+        },
+        buscarProdutos(it) {
+            clearTimeout(it._buscaTimer);
+            const q = (it.busca || '').trim();
+            it.dropdownOpen = q.length > 0;
+            if (q.length < 2) { it.resultados = []; return; }
+            it._buscaTimer = setTimeout(async () => {
+                try {
+                    const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(q) + '&limit=8');
+                    if (!r.ok) { it.resultados = []; return; }
+                    it.resultados = await r.json();
+                } catch { it.resultados = []; }
+            }, 200);
+        },
+        selecionarProduto(it, p) {
+            it.produtoId = p.id;
+            it.nome = p.nome;
+            it.novoCadastro = false;
+            it.dropdownOpen = false;
+            if ((!it.precoUnitario || it.precoUnitario === 0) && p.precoReferencia) {
+                it.precoUnitario = p.precoReferencia;
+            }
+        },
+        abrirCadastroProduto(it) {
+            const nome = (it.busca || '').trim();
+            if (!nome) return;
+            // Prevenção: API exige CategoriaId. Se a empresa não tem nenhuma cadastrada,
+            // bloqueia o caminho e orienta — em vez de deixar quebrar com 400 no submit.
+            if (categoriasIds.length === 0) {
+                this.erroMsg = 'Cadastre uma categoria em Produtos antes de criar produtos novos pelo modal.';
+                it.dropdownOpen = false;
+                return;
+            }
+            it.nome = nome;
+            it.novoCadastro = true;
+            it.produtoId = null;
+            it.dropdownOpen = false;
+            if (!it.categoriaId) it.categoriaId = categoriaPadrao || '';
+        },
+
+        // ── Totais e validação ────────────────────────────────────────────
+        get totalPedido() {
+            return this.form.itens.reduce((acc, it) =>
+                acc + (Number(it.quantidade) || 0) * (Number(it.precoUnitario) || 0), 0);
+        },
+        formatBRL(v) {
+            return (Number(v) || 0).toLocaleString('pt-BR', {
+                style: 'currency', currency: 'BRL'
+            });
+        },
+        get impactoResumo() {
+            const linhas = [];
+            if (this.clienteNovo.ativo && this.clienteNovo.nome.trim()) {
+                linhas.push('Cliente "' + this.clienteNovo.nome.trim() + '" será cadastrado');
+            }
+            const novos = this.form.itens.filter(i => i.novoCadastro && i.nome.trim()).length;
+            if (novos > 0) {
+                linhas.push(novos + ' produto' + (novos > 1 ? 's' : '')
+                    + ' novo' + (novos > 1 ? 's' : '')
+                    + ' será' + (novos > 1 ? 'ão' : '')
+                    + ' registrado' + (novos > 1 ? 's' : '') + ' com entrada de estoque');
+            }
+            return linhas;
+        },
+        clienteValido() {
+            if (this.form.clienteId) return true;
+            if (this.clienteNovo.ativo) return !!this.clienteNovo.nome.trim();
+            if (this.form.modo === 'avulso') return !!this.form.nomeAdHoc.trim();
+            return false;
+        },
+        itensValidos() {
+            if (this.form.itens.length === 0) return false;
+            return this.form.itens.every(it => this._itemValido(it) === true);
+        },
+        // Retorna true ou string com motivo do erro (pra _preflight()).
+        _itemValido(it) {
+            // Item precisa estar consolidado: ou tem produtoId (selecionado) ou está em modo novoCadastro.
+            if (!it.produtoId && !it.novoCadastro) return 'Selecione ou cadastre um produto para cada linha.';
+            if (!it.nome || !it.nome.trim()) return 'Item sem nome.';
+            if (it.novoCadastro) {
+                if (!it.categoriaId) return 'Selecione a categoria do produto novo "' + it.nome + '".';
+                if (!categoriasIds.includes(String(it.categoriaId))) return 'Categoria do produto "' + it.nome + '" não existe.';
+            }
+            const q = Number(it.quantidade);
+            if (!(q > 0)) return 'Quantidade do item "' + it.nome + '" precisa ser maior que zero.';
+            const p = Number(it.precoUnitario);
+            if (!(p >= 0)) return 'Preço do item "' + it.nome + '" inválido.';
+            return true;
+        },
+        podeEnviar() { return this.clienteValido() && this.itensValidos(); },
+
+        // Pré-flight rigoroso: roda todas as validações e retorna a primeira mensagem
+        // de erro acionável. Ponto único de prevenção antes de bater na API.
+        _preflight() {
+            // Cliente
+            if (!this.form.clienteId && !this.clienteNovo.ativo && this.form.modo !== 'avulso') {
+                return 'Selecione um cliente, cadastre um novo ou marque venda avulsa.';
+            }
+            if (this.clienteNovo.ativo) {
+                const nome = (this.clienteNovo.nome || '').trim();
+                if (!nome) return 'Informe o nome do cliente novo.';
+                if (nome.length > 150) return 'Nome do cliente excede 150 caracteres.';
+            }
+            if (this.form.modo === 'avulso' && !(this.form.nomeAdHoc || '').trim()) {
+                return 'Informe pelo menos uma identificação para a venda avulsa.';
+            }
+            // Itens
+            if (this.form.itens.length === 0) return 'Adicione pelo menos 1 item ao pedido.';
+            for (const it of this.form.itens) {
+                const v = this._itemValido(it);
+                if (v !== true) return v;
+            }
+            return null; // tudo OK
+        },
+
+        // ── Submit: orquestração com etapas animadas + console group ──────
+        async submit() {
+            console.log('%c[Pedidos] submit() chamado', 'color:#6366f1;font-weight:bold',
+                'fase=' + this.fase, 'loading=' + this.loading);
+            if (this.loading) return;
+            const motivo = this._preflight();
+            if (motivo) {
+                this.erroMsg = motivo;
+                console.warn('[Pedidos] Pré-flight bloqueou submit:', motivo);
+                return;
+            }
+
+            this.loading = true;
+            this.erroMsg = '';
+            this.etapas = [];
+            this.avisos = [];
+            this.fase = 'processando';
+            const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+            const novos = this.form.itens.filter(it => it.novoCadastro);
+
+            // Pré-popula etapas com status "pending" pra usuário ver o roteiro completo.
+            if (this.clienteNovo.ativo) {
+                this._etapaSet('cliente', 'Cadastrar cliente "' + this.clienteNovo.nome.trim() + '"', 'pending');
+            }
+            novos.forEach((it) => {
+                this._etapaSet('prod-' + it.uid,
+                    'Cadastrar produto "' + it.nome.trim() + '" + entrada de estoque',
+                    'pending');
+            });
+            this._etapaSet('pedido', 'Criar pedido e movimentar saída de estoque', 'pending');
+
+            console.group('%c[Pedidos] Criando pedido', 'color:#6366f1;font-weight:bold');
+            console.log('Cliente novo:', this.clienteNovo.ativo ? this.clienteNovo : (this.form.clienteId || '(avulso)'));
+            console.log('Itens:', this.form.itens.length, '| produtos novos:', novos.length);
+            if (this.form.itens.length) console.table(this.form.itens.map(i => ({
+                nome: i.nome, qtd: i.quantidade, preco: i.precoUnitario,
+                produtoId: i.produtoId || '(novo)', cadastrar: i.novoCadastro
+            })));
+
+            const t0 = performance.now();
+            try {
+                // 1) Cliente novo — falha NAO trava: cai pra venda avulsa com os dados digitados.
+                if (this.clienteNovo.ativo) {
+                    const nomeCli = this.clienteNovo.nome.trim();
+                    const aptCli = this.clienteNovo.apt || '';
+                    const telCli = this.clienteNovo.telefone || '';
+                    try {
+                        const r = await this._runEtapa('cliente',
+                            'Cadastrar cliente "' + nomeCli + '"',
+                            async () => {
+                                const res = await this._postJson('/clientes/json', {
+                                    nome: nomeCli,
+                                    telefone: telCli || null,
+                                    apt: aptCli || null
+                                }, token);
+                                if (!res.ok) throw new Error(res.err);
+                                return { id: res.data.id };
+                            });
+                        this.form.clienteId = r.id;
+                    } catch (err) {
+                        const aviso = 'Cliente "' + nomeCli + '" não cadastrado: ' + (err?.message || 'erro desconhecido') + '. Pedido segue como venda avulsa — registre o cliente depois em Clientes.';
+                        console.warn('[Pedidos]', aviso);
+                        this.avisos.push(aviso);
+                        this._etapaUpdate('cliente', 'done', '⚠ falhou — segue como venda avulsa');
+                        this.clienteNovo.ativo = false;
+                        this.form.clienteId = '';
+                        this.form.modo = 'avulso';
+                        this.form.nomeAdHoc = nomeCli;
+                        this.form.aptAdHoc = aptCli;
+                        this.form.telefoneAdHoc = telCli;
+                    }
+                }
+
+                // 2) Produtos novos — falha NAO trava: item entra no pedido como descricao livre.
+                for (const it of novos) {
+                    const nomeProd = it.nome.trim();
+                    try {
+                        const r = await this._runEtapa('prod-' + it.uid,
+                            'Cadastrar produto "' + nomeProd + '" + entrada de estoque',
+                            async () => {
+                                const res = await this._postJson('/produtos/quick.json', {
+                                    nome: nomeProd,
+                                    categoriaId: it.categoriaId,
+                                    precoReferencia: it.precoUnitario || null,
+                                    custoReferencia: it.custoCadastro || null,
+                                    qtdInicial: Math.max(1, Math.ceil(Number(it.quantidade) || 1))
+                                }, token);
+                                if (!res.ok) throw new Error(res.err);
+                                return { id: res.data.id, entradaOk: res.data.entradaOk };
+                            });
+                        it.produtoId = r.id;
+                        it.novoCadastro = false;
+                        if (r.entradaOk === false) {
+                            const aviso = 'Produto "' + nomeProd + '" criado mas entrada de estoque inicial falhou. Lance entrada manual em Estoque.';
+                            console.warn('[Pedidos]', aviso);
+                            this.avisos.push(aviso);
+                        }
+                    } catch (err) {
+                        const aviso = 'Produto "' + nomeProd + '" não cadastrado: ' + (err?.message || 'erro desconhecido') + '. Item entrou no pedido como descrição livre — registre o produto depois em Produtos.';
+                        console.warn('[Pedidos]', aviso);
+                        this.avisos.push(aviso);
+                        this._etapaUpdate('prod-' + it.uid, 'done', '⚠ falhou — item segue como avulso');
+                        it.produtoId = null;
+                        it.novoCadastro = false;
+                    }
+                }
+
+                // 3) Pedido — UNICA etapa fatal. Se falhar, abortamos.
+                const usaAvulso = this.form.modo === 'avulso' && !this.form.clienteId;
+                const agendadoUtc = this.form.agendarAtivo && this.form.agendadoParaEm
+                    ? new Date(this.form.agendadoParaEm).toISOString()
+                    : null;
                 const payload = {
                     clienteId: this.form.clienteId || null,
-                    nomeAdHoc: this.form.clienteId ? null : this.form.nomeAdHoc,
-                    aptAdHoc: this.form.clienteId ? null : this.form.aptAdHoc,
-                    telefoneAdHoc: this.form.clienteId ? null : this.form.telefoneAdHoc,
+                    nomeAdHoc: usaAvulso ? this.form.nomeAdHoc : null,
+                    aptAdHoc: usaAvulso ? this.form.aptAdHoc : null,
+                    telefoneAdHoc: usaAvulso ? this.form.telefoneAdHoc : null,
                     observacoes: this.form.observacoes,
-                    itens: this.form.itens.filter(i => i.nome && i.quantidade > 0)
+                    agendadoParaEm: agendadoUtc,
+                    itens: this.form.itens.map(it => ({
+                        nome: it.nome.trim(),
+                        quantidade: it.quantidade,
+                        precoUnitario: it.precoUnitario,
+                        produtoId: it.produtoId || null
+                    }))
                 };
-                const res = await fetch('/pedidos/json', {
+                const pedido = await this._runEtapa('pedido',
+                    'Criar pedido e movimentar saída de estoque',
+                    async () => {
+                        const res = await this._postJson('/pedidos/json', payload, token);
+                        if (!res.ok) throw new Error(res.err);
+                        // Defesa: API pode retornar success:true sem id valido (bug de
+                        // serializacao). Se isso acontecer, o pedido NAO foi criado de
+                        // forma rastreavel — falha alto, nao engole.
+                        const id = res.data?.id;
+                        if (!id || typeof id !== 'string' || id.length < 30) {
+                            console.error('Resposta inesperada do servidor — sem id valido:', res);
+                            throw new Error('Servidor retornou sucesso sem id do pedido. O pedido pode nao ter sido salvo. Recarregue a lista de pedidos pra confirmar.');
+                        }
+                        return { id };
+                    });
+
+                this.pedidoCriado = pedido;
+                const dt = Math.round(performance.now() - t0);
+                console.log('%c✓ Pedido criado em ' + dt + 'ms', 'color:#10b981;font-weight:bold', pedido);
+                if (this.avisos.length > 0) {
+                    console.warn('[Pedidos] Avisos parciais (' + this.avisos.length + '):', this.avisos);
+                }
+                console.groupEnd();
+
+                // Persiste avisos pra exibir no Detail (toasts) caso o operador navegue pra la.
+                if (this.avisos.length > 0 && pedido?.id) {
+                    try {
+                        sessionStorage.setItem('pedido-avisos-' + pedido.id, JSON.stringify(this.avisos));
+                    } catch { /* sessionStorage indisponivel em incognito */ }
+                }
+
+                // Pequeno delay pra animação dos checks ficar visível antes do recibo.
+                await new Promise(r => setTimeout(r, 350));
+                this.fase = 'concluido';
+            } catch (err) {
+                console.groupEnd();
+                this.erroMsg = this._formatarErro(err, err?.etapaLabel);
+                console.error('[Pedidos] Submit falhou:', err);
+            } finally {
+                this.loading = false;
+                // Defesa final: se chegamos no finally sem ir pra 'concluido' nem ter
+                // erroMsg, alguma coisa fugiu do controle. Loga e força um erro visível
+                // pro operador — nada de modal silenciosamente fechando.
+                if (this.fase === 'processando' && !this.pedidoCriado && !this.erroMsg) {
+                    this.erroMsg = 'Não conseguimos confirmar o pedido. Recarregue a página de Pedidos antes de tentar de novo (pra evitar pedido duplicado se já tiver entrado).';
+                    console.error('[Pedidos] Submit terminou em estado indefinido — sem pedido nem erro.');
+                }
+            }
+        },
+
+        // Sugestão acionável complementar — NUNCA substitui a mensagem do servidor.
+        _diagnosticoDica(err) {
+            const msg = err?.message || '';
+            if (/sess[aã]o|expir|401|403/i.test(msg)) return 'Recarregue a página e faça login de novo.';
+            if (/timeout|sem conex/i.test(msg)) return 'Verifique sua internet e tente de novo.';
+            if (/501|n[ãa]o suportada/i.test(msg)) return 'Avise o suporte com este texto e o que estava cadastrando.';
+            if (/categoria/i.test(msg)) return 'Cadastre uma categoria primeiro em Produtos antes de criar produtos novos pelo modal.';
+            if (/estoque insuficiente/i.test(msg)) return 'Reponha o estoque ou ajuste a quantidade do item.';
+            if (/cliente.*duplicado|cnpj.*duplicado|cpf.*duplicado/i.test(msg)) return 'Já existe um cadastro com esses dados — busque o cliente em vez de cadastrar.';
+            return null;
+        },
+        _formatarErro(err, etapaLabel) {
+            const baseMsg = err?.message || 'Falha desconhecida.';
+            const dica = this._diagnosticoDica(err);
+            const prefixo = etapaLabel ? '[' + etapaLabel + '] ' : '';
+            return dica ? (prefixo + baseMsg + ' — ' + dica) : (prefixo + baseMsg);
+        },
+
+        async _postJson(url, body, token) {
+            console.log('%cPOST ' + url, 'color:#64748b', body);
+            let res;
+            try {
+                res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify(body)
                 });
-                const data = await res.json();
-                if (res.ok && data.success) window.location.href = '/pedidos/' + data.id;
-                else this.erroMsg = data.errorMessage || 'Erro ao criar pedido.';
-            } catch { this.erroMsg = 'Não foi possível conectar ao servidor.'; }
-            finally { this.loading = false; }
+            } catch (netErr) {
+                console.error('Falha de rede em ' + url, netErr);
+                return { ok: false, err: 'Sem conexão com o servidor.', status: 0, raw: null };
+            }
+            const raw = await res.text();
+            let data = null;
+            try { data = raw ? JSON.parse(raw) : null; } catch { /* não-JSON */ }
+            if (res.ok && data && data.success) {
+                console.log('%c← ' + res.status + ' ' + url, 'color:#10b981', data);
+                return { ok: true, data, status: res.status };
+            }
+            // Coleta TODAS as fontes possíveis de mensagem antes de cair em fallback.
+            const serverMsg = (data && (
+                data.errorMessage ||
+                data.error?.detail ||
+                data.error?.message ||
+                data.message ||
+                data.title
+            )) || (raw && raw.length < 300 ? raw : null);
+
+            const err = serverMsg || ('HTTP ' + res.status + ' em ' + url + ' (sem mensagem do servidor)');
+            console.error('← ' + res.status + ' ' + url, {
+                status: res.status,
+                bodyParsed: data,
+                bodyRaw: raw,
+                requestPayload: body
+            });
+            return { ok: false, err, status: res.status, raw, data };
         }
     };
 }

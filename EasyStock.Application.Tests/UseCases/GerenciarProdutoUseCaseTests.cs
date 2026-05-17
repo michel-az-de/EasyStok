@@ -69,7 +69,7 @@ public class GerenciarProdutoUseCaseTests
             Nome = "Produto Original",
             Status = StatusProduto.Ativo
         });
-        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
         {
             Id = categoriaId,
             EmpresaId = empresaId,
@@ -162,7 +162,7 @@ public class GerenciarProdutoUseCaseTests
             Nome = "Produto",
             Status = StatusProduto.Ativo
         });
-        _categoriaRepository.GetByIdAsync(categoriaId).Returns(new Categoria
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
         {
             Id = categoriaId,
             EmpresaId = empresaId,
@@ -185,5 +185,45 @@ public class GerenciarProdutoUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*embalagem*padrao*");
+    }
+
+    [Fact]
+    public async Task Atualizar_preserva_AtributosJson_quando_command_omite_campo()
+    {
+        // Regressao: ProdutoFormViewModel nao carrega AtributosJson. Sem o guard em
+        // GerenciarProdutoUseCase, qualquer edicao via Form zerava a ficha tecnica
+        // cadastrada via PUT /api/produtos/{id}/ficha-tecnica.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        const string fichaJsonOriginal = """{"nutricional":{"kcal":250,"porcao_g":100}}""";
+
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Ravioli",
+            Status = StatusProduto.Ativo,
+            AtributosJson = fichaJsonOriginal
+        });
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Massas"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Ravioli atualizado",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, null, null, AtributosJson: null, StatusProduto.Ativo,
+            null, null, null);
+
+        await useCase.AtualizarAsync(command);
+
+        await _produtoRepository.Received(1).UpdateAsync(Arg.Is<Produto>(p =>
+            p.Id == produtoId && p.AtributosJson == fichaJsonOriginal));
     }
 }

@@ -1,0 +1,98 @@
+@page
+@model EasyStock.Admin.Pages.Diagnostico.EmailModel
+@{
+    ViewData["Title"] = "Diagnóstico — Email";
+}
+
+<div x-data="diagEmail()" class="space-y-4">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Diagnóstico · Email</h2>
+            <p class="text-es-ink-mute text-sm">Envia email de teste pelo provedor ativo (Smtp · SendGrid · Console).</p>
+        </div>
+        <a href="/Diagnostico" class="text-es-accent hover:underline text-sm">← Voltar pro Diagnóstico</a>
+    </div>
+
+    <form @@submit.prevent="enviar()" class="rounded-xl p-5 space-y-3" style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
+        <div>
+            <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Destino *</label>
+            <input type="email" x-model="destino" required placeholder="seu-email@exemplo.com"
+                   class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent" />
+        </div>
+
+        <div>
+            <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Assunto (opcional)</label>
+            <input type="text" x-model="assunto" placeholder="EasyStok — teste"
+                   class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent" />
+        </div>
+
+        <div>
+            <label class="text-es-ink text-xs uppercase tracking-widest font-semibold">Corpo HTML (opcional)</label>
+            <textarea x-model="corpo" rows="4" placeholder="<p>Mensagem de teste...</p>"
+                      class="w-full mt-1 px-3 py-2 bg-es-surface-2 border border-es-surface-2 rounded-lg text-es-ink text-sm focus:outline-none focus:border-es-accent font-mono"></textarea>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" :disabled="loading"
+                    class="btn-primary text-sm disabled:opacity-50"
+                    x-text="loading ? 'Enviando...' : '📧 Enviar teste'"></button>
+        </div>
+
+        <template x-if="resultado">
+            <div class="mt-3 p-3 rounded-lg text-sm"
+                 :class="resultado.sucesso ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'">
+                <div class="font-bold" x-text="resultado.sucesso ? '✓ Enviado' : '✗ Falha'"></div>
+                <div class="text-xs mt-1 opacity-80">
+                    Provedor: <span x-text="resultado.provedor" class="font-mono"></span>
+                </div>
+                <div x-show="resultado.erro" class="text-xs mt-1 opacity-80 font-mono break-all" x-text="resultado.erro"></div>
+            </div>
+        </template>
+    </form>
+
+    <div class="text-xs text-es-ink-mute mt-3">
+        <strong>Como funciona:</strong> usa <code class="bg-es-surface-2 px-1.5 py-0.5 rounded">IEmailService</code> ativo na DI.
+        Switch via <code class="bg-es-surface-2 px-1.5 py-0.5 rounded">Email:Provider</code> em
+        <code class="bg-es-surface-2 px-1.5 py-0.5 rounded">{smtp, sendgrid, console}</code>.
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function diagEmail() {
+    return {
+        destino: '',
+        assunto: '',
+        corpo: '',
+        loading: false,
+        resultado: null,
+
+        async enviar() {
+            this.loading = true;
+            this.resultado = null;
+            try {
+                const r = await fetch('/api-proxy/diag/email-teste', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ destino: this.destino, assunto: this.assunto, corpo: this.corpo })
+                });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const data = await r.json();
+                // backend retorna envelope { data: { sucesso, provedor, erro } } via EasyStockControllerBase
+                const inner = data.data ?? data;
+                this.resultado = {
+                    sucesso: inner.sucesso === true,
+                    provedor: inner.provedor || '?',
+                    erro: inner.erro || null
+                };
+            } catch (e) {
+                this.resultado = { sucesso: false, provedor: '?', erro: e.message || String(e) };
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+</script>
+}

@@ -4,16 +4,21 @@
     Layout = "_Layout";
 }
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Fornecedores</h1>
-        <p>Gerencie seus fornecedores e pedidos de compra</p>
+        <p>
+            @Model.Items.Count @(Model.Items.Count == 1 ? "fornecedor listado" : "fornecedores listados") · gerencie cadastros e pedidos de compra
+        </p>
     </div>
-    <div class="flex gap-3">
+    <div class="flex gap-3 flex-wrap">
         <button type="button" x-data
                 @@click="$dispatch('open-modal', 'novo-fornecedor')"
-                class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-            + Novo Fornecedor
+                class="app-primary-btn inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Novo fornecedor
         </button>
     </div>
 </div>
@@ -22,7 +27,7 @@
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar fornecedores">
         <div class="supplier-search-group flex flex-1 min-w-48 gap-3">
-        <input type="search" name="search" value="@Model.Search" placeholder="Buscar fornecedor..."
+        <input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome, e-mail, CNPJ/CPF ou categoria…"
                aria-label="Buscar fornecedor"
                class="ui-field flex-1 min-w-48" />
         <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
@@ -47,10 +52,10 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIcon", "🏭" },
-            { "EmptyTitle", "Nenhum fornecedor cadastrado" },
-            { "EmptyDescription", "Adicione seu primeiro fornecedor para organizar suas compras." },
-            { "EmptyCta", "+ Novo Fornecedor" },
+            { "EmptyIllustration", "inbox" },
+            { "EmptyTitle", "Nenhum fornecedor cadastrado ainda" },
+            { "EmptyDescription", "Cadastre o primeiro fornecedor para começar a registrar pedidos de compra e acompanhar prazos de entrega." },
+            { "EmptyCta", "Cadastrar primeiro fornecedor" },
             { "EmptyCtaModal", "novo-fornecedor" }
         })
     }
@@ -83,13 +88,16 @@
                         <td class="text-slate-600">@(f.LeadTimeEstimadoDias?.ToString() ?? "—")</td>
                         <td class="text-slate-500 text-sm">@f.Categoria</td>
                         <td>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium @(f.Status == "ativo" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")">
+                            @{ var ativo = f.Status == "ativo"; }
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ring-1
+                                        @(ativo ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-slate-200")">
+                                <span class="w-1.5 h-1.5 rounded-full @(ativo ? "bg-emerald-500" : "bg-slate-400")"></span>
                                 @(string.IsNullOrWhiteSpace(f.Status) ? "—" : char.ToUpperInvariant(f.Status[0]) + f.Status[1..].ToLowerInvariant())
                             </span>
                         </td>
-                        <td>
+                        <td class="text-right">
                             <a asp-action="Detail" asp-controller="Fornecedores" asp-route-id="@f.Id"
-                               class="text-sm text-indigo-600 hover:text-indigo-700">Ver</a>
+                               class="text-sm font-medium text-indigo-600 hover:text-indigo-700">Abrir →</a>
                         </td>
                     </tr>
                 }
@@ -99,142 +107,175 @@
     }
 </div>
 
-<!-- Modal novo fornecedor -->
-<div x-data="criarFornecedorModal()" @@open-modal.window="if ($event.detail === 'novo-fornecedor') open = true"
-     x-show="open" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-     @@click.self="open = false" @@keydown.escape.window="open = false">
-    <div class="ui-modal supplier-modal bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 overflow-y-auto max-h-[92vh]">
-        <div class="supplier-modal__header">
-            <h2 class="text-lg font-semibold text-slate-900">Novo Fornecedor</h2>
-            <p class="text-sm text-slate-500 mt-1">Cadastre um parceiro com dados essenciais, contato e condições comerciais em um único fluxo.</p>
-        </div>
-        <div x-show="erroMsg" x-cloak class="mx-6 mt-5 mb-0 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700" x-text="erroMsg"></div>
-        @Html.AntiForgeryToken()
-        <div class="supplier-form grid grid-cols-2 gap-3 mb-0">
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
-                <input type="text" x-model="form.nome" required @@input="erroMsg = ''"
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">CNPJ/CPF</label>
-                <input type="text" x-model="form.documento" x-mask:doc inputmode="numeric" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                <input type="text" x-model="form.contato" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                <input type="email" x-model="form.email" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                <input type="text" x-model="form.telefone" x-mask:phone inputmode="numeric" autocomplete="tel" class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
-                <select x-model="form.tipo" required class="ui-select w-full text-sm">
-                    <option value="nacional">Nacional</option>
-                    <option value="importado">Importado</option>
-                    <option value="dropshipping">Dropshipping</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Lead Time (dias)</label>
-                <input type="number" x-model.number="form.leadTimeEstimadoDias" min="0"
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Categorias</label>
-                <input type="text" x-model="form.categoria" placeholder="Ex: eletrônicos, roupas..."
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Site</label>
-                <input type="url" x-model="form.siteUrl" placeholder="https://..."
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Pedido Mínimo</label>
-                <input type="text" x-model="form.pedidoMinimo" placeholder="Ex: R$ 500 ou 10 un"
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Frete Padrão</label>
-                <input type="text" x-model="form.fretePadrao" placeholder="Ex: R$ 50 ou grátis acima de R$ 500"
-                       class="ui-field w-full text-sm" />
-            </div>
-            <div class="col-span-2">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-                <textarea x-model="form.observacoes" rows="2"
-                          class="ui-textarea w-full text-sm"></textarea>
-            </div>
-        </div>
-        <div class="supplier-modal__footer flex justify-end gap-3 pt-3 border-t">
-            <button type="button" @@click="open = false"
-                    class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                Cancelar
-            </button>
-            <button type="button" @@click="submitForm()" :disabled="loading || !form.nome.trim()"
-                    :class="{ 'opacity-50 cursor-not-allowed': loading || !form.nome.trim() }"
-                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span x-show="!loading">Criar Fornecedor</span>
-                <span x-show="loading" x-cloak class="flex items-center gap-2"><span class="spinner"></span> Salvando...</span>
-            </button>
-        </div>
-    </div>
-</div>
-
-@section Scripts {
-<script>
-function criarFornecedorModal() {
-    return {
-        open: false,
-        loading: false,
-        erroMsg: '',
-        form: {
+<!-- Modal: novo fornecedor -->
+<div x-data="formModal({
+        id: 'novo-fornecedor',
+        endpoint: '/fornecedores/json',
+        redirect: '/fornecedores/{id}',
+        requireField: 'nome',
+        requireMessage: 'Informe o nome do fornecedor.',
+        initialForm: {
             nome: '', documento: '', contato: '', email: '', telefone: '',
             tipo: 'nacional', leadTimeEstimadoDias: 7, categoria: '',
             siteUrl: '', pedidoMinimo: '', fretePadrao: '', observacoes: ''
-        },
-        async submitForm() {
-            if (!this.form.nome.trim()) { this.erroMsg = 'Nome é obrigatório.'; return; }
-            this.loading = true;
-            this.erroMsg = '';
-            try {
-                const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
-                const res = await fetch('/fornecedores/json', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
-                    body: JSON.stringify(this.form)
-                });
-                // Lê o corpo como texto pra tolerar respostas vazias ou HTML (ex: página
-                // de erro do StatusCodePages quando antiforgery/auth falha).
-                const raw = await res.text();
-                let data = null;
-                try { data = raw ? JSON.parse(raw) : null; } catch { /* ignora — resposta não-JSON */ }
-                if (res.ok && data && data.success) {
-                    window.location.href = '/fornecedores/' + data.id;
-                    return;
-                }
-                if (data && data.errorMessage) {
-                    this.erroMsg = data.errorMessage;
-                } else if (res.status === 400 || res.status === 403) {
-                    this.erroMsg = 'Sessão expirada ou token inválido. Recarregue a página e tente novamente.';
-                } else if (res.status === 401) {
-                    this.erroMsg = 'Sessão expirada. Faça login novamente.';
-                } else {
-                    this.erroMsg = `Erro ao criar fornecedor (HTTP ${res.status}). Tente novamente.`;
-                }
-            } catch {
-                this.erroMsg = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
-            } finally {
-                this.loading = false;
-            }
         }
-    };
-}
-</script>
-}
+     })"
+     x-show="open" x-cloak
+     x-transition:enter="transition duration-150 ease-out"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition duration-100 ease-in"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @@keydown.window="handleKeydown($event)"
+     @@click.self="close()"
+     class="fm-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="fm-fornecedor-title">
+    <form x-ref="panel" class="fm-panel"
+          @@submit.prevent="submit()"
+          x-transition:enter="transition duration-150 ease-out"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100">
+        <header class="fm-header">
+            <div>
+                <h2 id="fm-fornecedor-title" class="fm-header__title">Novo fornecedor</h2>
+                <p class="fm-header__subtitle">Comece com o essencial. Condições comerciais e categorias você completa depois.</p>
+            </div>
+            <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+        </header>
+
+        <div class="fm-body">
+            <div x-show="erroMsg" x-cloak class="fm-error" x-text="erroMsg" role="alert"></div>
+            @Html.AntiForgeryToken()
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Identificação</legend>
+                <div class="fm-grid">
+                    <div class="fm-field fm-col-2">
+                        <label class="fm-field__label" for="forn-nome">
+                            Nome do fornecedor<span class="fm-field__required" aria-hidden="true">*</span>
+                        </label>
+                        <input id="forn-nome" type="text" x-model="form.nome" required
+                               placeholder="Ex: Distribuidora Sul Ltda"
+                               @@input="erroMsg = ''"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="forn-doc">CNPJ ou CPF</label>
+                        <input id="forn-doc" type="text" x-model="form.documento" x-mask:doc
+                               inputmode="numeric" placeholder="00.000.000/0000-00"
+                               data-validate-doc
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="forn-tipo">
+                            Origem<span class="fm-field__required" aria-hidden="true">*</span>
+                        </label>
+                        <select id="forn-tipo" x-model="form.tipo" required class="ui-select w-full text-sm">
+                            <option value="nacional">Nacional</option>
+                            <option value="importado">Importado</option>
+                            <option value="dropshipping">Dropshipping</option>
+                        </select>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Contato</legend>
+                <div class="fm-grid">
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="forn-resp">Pessoa de contato</label>
+                        <input id="forn-resp" type="text" x-model="form.contato"
+                               placeholder="Ex: Marina Silva"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="forn-tel">Telefone / WhatsApp</label>
+                        <input id="forn-tel" type="text" x-model="form.telefone" x-mask:phone
+                               inputmode="numeric" autocomplete="tel" placeholder="(11) 99999-9999"
+                               data-validate-phone
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="forn-email">E-mail</label>
+                        <input id="forn-email" type="email" x-model="form.email"
+                               placeholder="contato@fornecedor.com.br"
+                               class="ui-field w-full text-sm" />
+                    </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="forn-site">Site</label>
+                        <input id="forn-site" type="url" x-model="form.siteUrl"
+                               placeholder="https://..."
+                               class="ui-field w-full text-sm" />
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="fm-advanced">
+                <button type="button" class="fm-advanced__toggle"
+                        :aria-expanded="advancedOpen ? 'true' : 'false'"
+                        aria-controls="forn-advanced"
+                        @@click="advancedOpen = !advancedOpen">
+                    <span class="fm-advanced__chevron" aria-hidden="true">›</span>
+                    <span x-text="advancedOpen ? 'Ocultar condições comerciais' : 'Adicionar condições comerciais'"></span>
+                </button>
+                <div id="forn-advanced" x-show="advancedOpen" x-cloak
+                     x-transition:enter="transition duration-100 ease-out"
+                     x-transition:enter-start="opacity-0 -translate-y-1"
+                     x-transition:enter-end="opacity-100 translate-y-0">
+                    <div class="fm-grid">
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="forn-lead">Prazo de entrega (dias)</label>
+                            <input id="forn-lead" type="number" x-model.number="form.leadTimeEstimadoDias" min="0"
+                                   class="ui-field w-full text-sm" />
+                            <span class="fm-field__hint">Tempo médio entre pedido e recebimento</span>
+                        </div>
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="forn-cat">Categorias</label>
+                            <input id="forn-cat" type="text" x-model="form.categoria"
+                                   placeholder="eletrônicos, roupas..."
+                                   class="ui-field w-full text-sm" />
+                            <span class="fm-field__hint">Separe por vírgula</span>
+                        </div>
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="forn-min">Pedido mínimo</label>
+                            <input id="forn-min" type="text" x-model="form.pedidoMinimo"
+                                   placeholder="R$ 500 ou 10 un"
+                                   class="ui-field w-full text-sm" />
+                        </div>
+                        <div class="fm-field">
+                            <label class="fm-field__label" for="forn-frete">Frete padrão</label>
+                            <input id="forn-frete" type="text" x-model="form.fretePadrao"
+                                   placeholder="R$ 50 ou grátis acima de R$ 500"
+                                   class="ui-field w-full text-sm" />
+                        </div>
+                        <div class="fm-field fm-col-2">
+                            <label class="fm-field__label" for="forn-obs">Observações</label>
+                            <textarea id="forn-obs" x-model="form.observacoes" rows="2"
+                                      placeholder="Forma de pagamento preferida, prazos especiais..."
+                                      class="ui-textarea w-full text-sm"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="fm-footer">
+            <span class="fm-footer__hint">
+                Pressione <kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono text-slate-600">Enter</kbd> para salvar
+            </span>
+            <button type="button" @@click="close()"
+                    class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                Cancelar
+            </button>
+            <button type="submit" :disabled="loading || isInvalid()"
+                    :class="{ 'opacity-50 cursor-not-allowed': loading || isInvalid() }"
+                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
+                <span x-show="!loading">Salvar fornecedor</span>
+                <span x-show="loading" x-cloak class="flex items-center gap-2">
+                    <span class="spinner"></span> Salvando…
+                </span>
+            </button>
+        </footer>
+    </form>
+</div>

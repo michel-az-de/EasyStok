@@ -16,7 +16,7 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
 
     [BindProperty]
     [Required(ErrorMessage = "Informe a senha.")]
-    [StringLength(200, MinimumLength = 6, ErrorMessage = "Senha deve ter pelo menos 6 caracteres.")]
+    [StringLength(200, MinimumLength = 8, ErrorMessage = "Senha deve ter pelo menos 8 caracteres.")]
     public string Senha { get; set; } = "";
 
     public string? Erro { get; set; }
@@ -50,13 +50,13 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
 
             if (raw.TryGetProperty("error", out _))
             {
-                Erro = "Credenciais inválidas.";
+                Erro = "E-mail ou senha incorretos. Verifique e tente novamente.";
                 return Page();
             }
 
             if (!raw.TryGetProperty("data", out var data))
             {
-                Erro = "Resposta inesperada da API.";
+                Erro = "Não foi possível concluir. Tente novamente em instantes.";
                 return Page();
             }
 
@@ -68,7 +68,7 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
 
             if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(refreshToken))
             {
-                Erro = "Token não recebido.";
+                Erro = "Não foi possível concluir. Tente novamente em instantes.";
                 return Page();
             }
 

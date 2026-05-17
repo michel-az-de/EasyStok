@@ -475,33 +475,38 @@
     <div class="auth-card">
         @if (Model.SessaoExpirada)
         {
-            <div class="alert alert-warn">
-                <div>Sua sessão expirou por inatividade. Faça login novamente para continuar.</div>
+            <div class="alert alert-warn" role="status" aria-live="polite">
+                <div>Sua sessão expirou por inatividade. Entre novamente para continuar.</div>
             </div>
         }
         @if (Model.Erro != null)
         {
-            <div class="alert alert-error">
+            <div class="alert alert-error" role="alert" aria-live="assertive">
                 <div>@Model.Erro</div>
             </div>
         }
 
-        <form method="post" id="loginForm" autocomplete="on">
+        <form method="post" id="loginForm" autocomplete="on" aria-busy="false">
             @Html.AntiForgeryToken()
 
             <div class="field-group">
                 <label for="Email">> E-mail</label>
                 <input asp-for="Email" id="Email" type="email" required autocomplete="username"
-                       autofocus
                        class="field-input"
                        placeholder="admin@easystock.com.br" />
             </div>
 
             <div class="field-group">
                 <label for="Senha">> Senha</label>
-                <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
-                       class="field-input"
-                       placeholder="••••••••••••" />
+                <div class="relative">
+                    <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
+                           class="field-input pr-10"
+                           placeholder="••••••••••••" />
+                    <button type="button" id="toggleSenha"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-es-ink-mute hover:text-es-ink text-base leading-none"
+                            aria-label="Mostrar/ocultar senha"
+                            onclick="const s=document.getElementById('Senha');s.type=s.type==='password'?'text':'password';this.textContent=s.type==='password'?'👁':'🙈';">👁</button>
+                </div>
             </div>
 
             <button type="submit" class="btn-launch" id="loginBtn">
@@ -516,10 +521,10 @@
 </div>
 
 <!-- ─── Loading overlay ─────────────────────────────────────────────────── -->
-<div class="loading-overlay" id="loadingOverlay">
+<div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite" aria-label="Verificando credenciais">
     <div style="text-align:center;">
-        <div class="loading-cube">
-            <svg width="80" height="80" viewBox="0 0 64 64" fill="none">
+        <div class="loading-cube" aria-hidden="true">
+            <svg width="80" height="80" viewBox="0 0 64 64" fill="none" aria-hidden="true">
                 <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
                 <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
                 <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
@@ -532,7 +537,7 @@
             <span class="step-line" data-step="3">PRONTO</span>
         </div>
     </div>
-    <div class="loading-progress"></div>
+    <div class="loading-progress" aria-hidden="true"></div>
 </div>
 
 <script>
@@ -560,6 +565,11 @@
         const btn = document.getElementById('loginBtn');
         if (!form || !overlay) return;
 
+        // Foco inteligente: se há erro de autenticação server-side foca senha,
+        // senão foca email (substitui o autofocus nativo removido).
+        const hasServerError = !!document.querySelector('.alert-error');
+        (hasServerError ? document.getElementById('Senha') : document.getElementById('Email'))?.focus();
+
         form.addEventListener('submit', function () {
             // Não previne o submit — só mostra o overlay enquanto o servidor processa
             // e redireciona. Em caso de erro de validação client-side (HTML5 required),
@@ -567,6 +577,7 @@
             if (!form.checkValidity()) return;
 
             btn.disabled = true;
+            form.setAttribute('aria-busy', 'true');
             overlay.classList.add('active');
 
             // Sequência de checks animada — tempos cosméticos, não bloqueantes.
@@ -579,9 +590,11 @@
                     // Marca a linha atual como ativa, anteriores como done.
                     lines.forEach((l, i) => {
                         l.classList.remove('active');
+                        l.removeAttribute('aria-current');
                         if (i < idx) l.classList.add('done');
                         else if (i === idx) {
                             l.classList.add('show', 'active');
+                            l.setAttribute('aria-current', 'step');
                         }
                     });
                 }, stepDelays[idx]);
@@ -589,7 +602,11 @@
             // Última linha vira "done" depois de mais um tempinho — caso o servidor
             // ainda não respondeu (rede lenta), mantém visual coerente.
             setTimeout(() => {
-                lines.forEach((l) => { l.classList.remove('active'); l.classList.add('done'); });
+                lines.forEach((l) => {
+                    l.classList.remove('active');
+                    l.removeAttribute('aria-current');
+                    l.classList.add('done');
+                });
             }, stepDelays[stepDelays.length - 1] + 400);
         });
 
@@ -597,6 +614,7 @@
         // garante que o overlay esteja invisível.
         window.addEventListener('pageshow', () => {
             overlay.classList.remove('active');
+            form.setAttribute('aria-busy', 'false');
             if (btn) btn.disabled = false;
         });
     })();
