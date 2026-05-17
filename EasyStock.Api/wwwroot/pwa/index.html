@@ -3153,9 +3153,9 @@ button:disabled {
   letter-spacing: 0.02em;
   color: var(--ink-mute);
 }
-.doc-hint.valid { color: var(--basil); }
-.doc-hint.invalid { color: var(--accent); }
-.doc-hint.partial { color: var(--ink-mute); }
+.doc-hint.valid { color: var(--basil); text-decoration: none; }
+.doc-hint.invalid { color: var(--accent); text-decoration: none; }
+.doc-hint.partial { color: var(--ink-mute); text-decoration: none; }
 [data-theme="light"] .doc-hint.valid { color: var(--basil); }
 [data-theme="light"] .doc-hint.invalid { color: var(--accent); }
 
@@ -4386,6 +4386,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 [data-screen="producao"] .product-grid {
   gap: 8px;
+  padding-bottom: 140px; /* folga pro footer cta-row fixo (BUG #3) */
 }
 [data-screen="producao"] .grid-section {
   margin-top: 14px;
@@ -5197,7 +5198,15 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column;
   background: var(--bg);
   overflow: hidden;
+  min-height: 0; /* permite filhos com overflow-y:auto scrollarem (BUG #18) */
 }
+/* BUG #18: garante que a sheet "tall" no overlay coluna nao estoure viewport
+   e que filhos flex consigam shrink/scroll corretamente. */
+.etq-sheet--tall {
+  max-height: 100vh;
+  min-height: 0;
+}
+.etq-sheet > .etq-head { flex-shrink: 0; }
 .etq-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 18px 16px 12px; gap: 12px;
@@ -10543,6 +10552,12 @@ function _attentionFmtElapsed(ms) {
   return h + 'h' + (r ? ' ' + r : '');
 }
 
+// BUG #14: fonte unica pra "estoque critico" — centro de atencao e card
+// da home liam o mesmo filtro inline, abrindo brecha pra desync futuro.
+function getCriticalProducts() {
+  return (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+}
+
 function _buildAttentionItemsImpl() {
   const items = [];
   try {
@@ -10570,7 +10585,7 @@ function _buildAttentionItemsImpl() {
     }
 
     // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
-    const lowStock = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+    const lowStock = getCriticalProducts();
     if (lowStock.length) {
       // Top 3 mais criticos (stock=0 primeiro)
       const sortedLow = lowStock.slice().sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
@@ -10930,20 +10945,25 @@ function runGlobalSearch(q) {
   if (!host) return;
   const groups = buildSearchGroups(q);
   const nq = _normalizeSearch(String(q || '').trim());
-  const isShort = nq.length < 2;
+  const isEmpty = nq.length === 0;
+  const isShort = !isEmpty && nq.length < 2;
   const totalReal = groups.pedidos.length + groups.finalizados.length + groups.clientes.length
                   + groups.produtos.length + groups.lotes.length + groups.lancamentos.length;
-  // Empty state: sem busca = atalhos. Com busca mas 0 matches reais e sem
-  // shortcut match = mensagem amigavel.
-  if (!isShort && totalReal === 0 && groups.acoes.length === 0) {
+  // BUG #19: separa empty state inicial (sem texto) de "sem resultado" (com texto).
+  // Antes, qualquer input <2 chars mostrava "O que voce quer encontrar?" junto
+  // dos atalhos, deixando o operador confuso ao digitar nome de cliente.
+  if (!isEmpty && !isShort && totalReal === 0 && groups.acoes.length === 0) {
     host.innerHTML = '<div class="gs-empty"><strong>Nenhum resultado pra "' + escapeHtml(q) + '"</strong>Tente outro termo ou um nome parcial.</div>';
     return;
   }
   let html = '';
-  if (isShort) {
+  if (isEmpty) {
     html += '<div class="gs-empty"><strong>O que voce quer encontrar?</strong>Comece a digitar pra buscar pedidos, clientes, produtos ou lotes.</div>';
+  } else if (isShort) {
+    html += '<div class="gs-empty"><strong>Digite ao menos 2 caracteres</strong>pra ver resultados.</div>';
   }
-  if (groups.acoes.length) {
+  // Atalhos so aparecem com input vazio (foco no termo digitado).
+  if (isEmpty && groups.acoes.length) {
     html += '<div><div class="gs-group-title">Atalhos rápidos</div>';
     html += groups.acoes.map((s, i) => _gsRenderShortcut(s, i)).join('');
     html += '</div>';
@@ -11140,16 +11160,38 @@ function renderHomeInsights() {
   const open = openOrders();
   const ready = open.filter(o => o.status === 'pronto').length;
   const preparing = open.filter(o => o.status === 'preparando').length;
-  const critical = products.filter(p => !p.archived && (Number(p.stock) || 0) <= 2).length;
+  // BUG #14: usa fonte unica de "estoque critico" (compartilhada com centro
+  // de atencao) pra evitar contagens divergentes entre views.
+  const critical = getCriticalProducts().length;
   const pendingConfer = typeof getConferStatus === 'function'
     ? open.filter(o => getConferStatus(o) === 'pendente').length
     : 0;
+  // BUG #16+#10: agrega etiquetas pendentes ao card de conferência, pra
+  // diferenciar "conferência de pedido" de "conferência de etiqueta de lote".
+  let totalEtiquetas = 0, etiquetasConferidas = 0;
+  if (typeof etiquetasFromBatch === 'function' && typeof getUnitStatus === 'function') {
+    (batches || []).filter(b => !b.deleted).forEach(b => {
+      const ets = etiquetasFromBatch(b);
+      totalEtiquetas += ets.length;
+      ets.forEach(et => {
+        const st = getUnitStatus(b, et.idxStr);
+        if (typeof CONFER_STATUS !== 'undefined' ? st === CONFER_STATUS.CONFERIDO : st === 'conferido') {
+          etiquetasConferidas++;
+        }
+      });
+    });
+  }
+  const etiquetasPendentes = Math.max(0, totalEtiquetas - etiquetasConferidas);
   const producedUnits = batches
     .filter(b => !b.deleted && (b.createdAt || 0) >= todayStart.getTime())
     .reduce((sum, b) => sum + (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0), 0);
   const soldToday = orders
     .filter(o => o.status === 'entregue' && isToday(o.updatedAt))
     .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+  const conferWarn = pendingConfer > 0 || etiquetasPendentes > 0;
+  const conferNote = `${ready} pronto · ${preparing} preparo` +
+    (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
 
   host.innerHTML = `
     <div class="home-insight${critical ? ' warn' : ''}">
@@ -11162,10 +11204,10 @@ function renderHomeInsights() {
       <div class="hi-value">${producedUnits}</div>
       <div class="hi-note">unidades registradas</div>
     </div>
-    <div class="home-insight${pendingConfer ? ' warn' : ''}">
-      <div class="hi-label">Conferência</div>
+    <div class="home-insight${conferWarn ? ' warn' : ''}">
+      <div class="hi-label">Conferência pendente</div>
       <div class="hi-value">${pendingConfer}</div>
-      <div class="hi-note">${ready} pronto · ${preparing} preparo</div>
+      <div class="hi-note">${conferNote}</div>
     </div>
     <div class="home-insight">
       <div class="hi-label">Vendido hoje</div>
@@ -13030,8 +13072,8 @@ function renderClientesScreen() {
         <div class="client-rank">#${idx + 1}</div>
       </div>
       <div class="client-stats">
-        <div class="client-stat"><span>Ticket</span><strong>${money(row.avg)}</strong></div>
-        <div class="client-stat"><span>Total</span><strong>${money(row.total)}</strong></div>
+        <div class="client-stat" title="Ticket medio dos pedidos ENTREGUES"><span>Ticket médio</span><strong>${money(row.avg)}</strong></div>
+        <div class="client-stat" title="Soma de TODOS os pedidos do cliente (qualquer status)"><span>Total acumulado</span><strong>${money(row.total)}</strong></div>
         <div class="client-stat"><span>Favorito</span><strong>${escapeHtml(row.favorite)}</strong></div>
       </div>
       <div class="client-card-foot">
@@ -15663,11 +15705,19 @@ function setRetroActive(active) {
   if (label) label.textContent = active ? RETRO_LABEL_ON : RETRO_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('retroDatetime');
-    if (dt && !dt.value) {
-      // default 1h atrás pra forçar o operador a confirmar data/hora
-      const now = new Date(Date.now() - 60*60*1000);
-      const off = now.getTimezoneOffset() * 60000;
-      dt.value = new Date(now - off).toISOString().slice(0,16);
+    if (dt) {
+      // BUG #20: limita range pra evitar "01/01/1900" e datas futuras.
+      // min: 365 dias atras  /  max: agora.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      const minDate = new Date(Date.now() - 365*24*60*60*1000);
+      const maxDate = new Date();
+      dt.min = new Date(minDate - tzOff).toISOString().slice(0,16);
+      dt.max = new Date(maxDate - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // default 1h atrás pra forçar o operador a confirmar data/hora
+        const now = new Date(Date.now() - 60*60*1000);
+        dt.value = new Date(now - tzOff).toISOString().slice(0,16);
+      }
     }
   } else {
     const dt = document.getElementById('retroDatetime');
@@ -16833,7 +16883,11 @@ async function calcBuscarProdutos() {
         });
       });
     } catch (e) {
-      showToast('Erro ao buscar produtos');
+      // Reseta sugestoes para nao deixar estado "preso" do termo anterior.
+      box.classList.remove('show');
+      box.innerHTML = '';
+      try { console.error('[calculadora]', e); } catch (_) {}
+      showToast('Erro ao buscar produtos. Verifique sua conexao.');
     }
   }, 300);
 }
@@ -17101,6 +17155,10 @@ function calcAbrirAjusteReceita() {
 }
 
 function calcLimpar() {
+  // Confirm so se ja ha resultado ou produto selecionado (evita ruido
+  // quando ainda nao calculou nada).
+  const temTrabalho = !!calcProdutoSelecionado || !!calcUltimoResultado;
+  if (temTrabalho && !confirm('Limpar o produto e o resultado atual?')) return;
   calcProdutoSelecionado = null;
   calcUltimoResultado = null;
   document.getElementById('calcProdSearch').value = '';
@@ -20385,6 +20443,13 @@ function saveOrder() {
     const t = new Date(dtRaw).getTime();
     if (!isFinite(t) || isNaN(t)) { showToast('Data retroativa inválida'); return; }
     if (t > Date.now()) { showToast('Data retroativa não pode ser no futuro'); return; }
+    // BUG #20: bloqueio hard pra data >1 ano atras (evita 01/01/1900 quebrando
+    // relatorios temporais). UI ja restringe via min/max, mas defesa em profundidade.
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+    if (Date.now() - t > oneYear) {
+      showToast('Data retroativa muito antiga (mais de 1 ano). Use o admin web.');
+      return;
+    }
     // Aviso se data for muito antiga (> 90 dias) — passa, mas sinaliza
     const ninetyDays = 90 * 24 * 60 * 60 * 1000;
     if (Date.now() - t > ninetyDays) {

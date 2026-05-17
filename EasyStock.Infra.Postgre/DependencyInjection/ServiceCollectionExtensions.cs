@@ -100,12 +100,19 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ILancamentoRepository, LancamentoRepository>();
             services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
 
+            // Onda P0 Payment Orchestration
+            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IPaymentAttemptRepository,
+                Repositories.Pagamentos.PaymentAttemptRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
+                Repositories.Pagamentos.GatewayRoutingRuleRepository>();
+
             // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
             services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
             services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
             services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
+
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
             services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
             services.AddScoped<IFaqRepository, FaqRepository>();

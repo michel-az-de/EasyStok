@@ -30,6 +30,16 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
             .Include(f => f.Eventos.OrderByDescending(e => e.OcorridoEm))
             .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Id == faturaId, ct);
 
+    public Task<FaturaPagamento?> ObterPagamentoPorClientIdempotencyKeyAsync(
+        Guid empresaId, string clientIdempotencyKey, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(clientIdempotencyKey)) return Task.FromResult<FaturaPagamento?>(null);
+        return db.FaturaPagamentos
+            .FirstOrDefaultAsync(p =>
+                p.EmpresaId == empresaId &&
+                p.ClientIdempotencyKey == clientIdempotencyKey, ct);
+    }
+
     // IgnoreQueryFilters honra a semantica documentada na interface ("sem filtro EmpresaId").
     // Sem isso, admin operacional caia silenciosamente no filter global e via comportamento
     // diferente de SuperAdmin (que tem bypass IsSuperAdmin). Caller (controller admin) ja faz

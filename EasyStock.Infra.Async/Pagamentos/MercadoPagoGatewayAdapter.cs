@@ -36,9 +36,14 @@ public sealed class MercadoPagoGatewayAdapter(
         string.Equals(metodo, "mercadopago", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(metodo, "mp", StringComparison.OrdinalIgnoreCase);
 
-    public Task<InstrucaoPagamento> CriarAsync(Fatura fatura, string metodo, CancellationToken ct = default)
+    public Task<InstrucaoPagamento> CriarAsync(
+        Fatura fatura,
+        string metodo,
+        string? idempotencyKey = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(fatura);
+        // P2: ao implementar, enviar header "X-Idempotency-Key: {idempotencyKey}".
         var token = configuration["MercadoPago:AccessToken"];
         if (string.IsNullOrWhiteSpace(token))
         {
