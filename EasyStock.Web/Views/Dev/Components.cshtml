@@ -7,7 +7,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>DS Components - EasyStock</title>
+<title>Design System — EasyStock</title>
 <script>(function(){var t=localStorage.getItem('easystock-theme');if(t==='dark'){document.documentElement.dataset.theme='dark';document.documentElement.classList.add('theme-dark');}})();</script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -34,19 +34,19 @@
 
 <div class="space-y-10 max-w-5xl mx-auto">
 <div class="toolbar">
-    <strong>EasyStock DS Components</strong>
-    <button class="btn btn-secondary btn-sm" onclick="(function(){var d=document.documentElement;var dark=d.dataset.theme==='dark';d.dataset.theme=dark?'light':'dark';d.classList.toggle('theme-dark',!dark);localStorage.setItem('easystock-theme',d.dataset.theme);})()">Toggle tema</button>
+    <strong>EasyStock · Design System</strong>
+    <button class="btn btn-secondary btn-sm" onclick="(function(){var d=document.documentElement;var dark=d.dataset.theme==='dark';d.dataset.theme=dark?'light':'dark';d.classList.toggle('theme-dark',!dark);localStorage.setItem('easystock-theme',d.dataset.theme);})()">Alternar tema</button>
 </div>
 
     <header class="anim-fadeInUp">
-        <h1 class="text-2xl font-bold mb-1">EasyStock - Design System</h1>
-        <p class="text-sm text-[color:var(--text-muted)]">Storybook interno. Cada bloco abaixo demonstra um componente do DS. Sessao "Fase 1" mostra primitivos via TagHelper (es-icon, es-button, es-badge, es-status-pill, es-kbd).</p>
+        <h1 class="text-2xl font-bold mb-1">Design System EasyStock</h1>
+        <p class="text-sm text-[color:var(--text-muted)]">Catálogo interno de componentes. Cada bloco demonstra um primitivo do DS — referência viva para devs e revisão visual entre os temas claro e escuro.</p>
     </header>
 
     <!-- Fase 1: Icones (Lucide via es-icon) -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-icon (Lucide)</h2>
-        <p class="text-sm mb-4" style="color: var(--text-muted);">SVG inline server-side a partir de <code>wwwroot/lib/lucide/icons/</code>. Tamanhos via classe <code>es-icon--sm/md/lg</code> ou utilities <code>w-* h-*</code>. Cor via <code>color: currentColor</code>.</p>
+        <h2 class="text-lg font-semibold mb-3">Ícones — es-icon (Lucide)</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">SVG inline renderizado no servidor a partir de <code>wwwroot/lib/lucide/icons/</code>. Defina o tamanho via <code>es-icon--sm/md/lg</code> ou utilities <code>w-*/h-*</code>. A cor segue <code>currentColor</code>.</p>
         <div class="icon-grid">
             @{
                 var iconNames = new[] {
@@ -71,20 +71,20 @@
             }
         </div>
         <div class="mt-4 flex items-center gap-3 flex-wrap">
-            <span class="text-xs" style="color: var(--text-muted); font-family: var(--font-mono);">tamanhos:</span>
+            <span class="text-xs" style="color: var(--text-muted); font-family: var(--font-mono);">Tamanhos:</span>
             <es-icon name="package" class="es-icon--xs"></es-icon>
             <es-icon name="package" class="es-icon--sm"></es-icon>
             <es-icon name="package"></es-icon>
             <es-icon name="package" class="es-icon--lg"></es-icon>
-            <span class="text-xs ml-4" style="color: var(--text-muted); font-family: var(--font-mono);">fallback (nome invalido):</span>
+            <span class="text-xs ml-4" style="color: var(--text-muted); font-family: var(--font-mono);">Fallback (nome inválido):</span>
             <es-icon name="nao-existe" class="es-icon--lg"></es-icon>
         </div>
     </section>
 
     <!-- Fase 1: Botoes (es-button) -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-button</h2>
-        <p class="text-sm mb-4" style="color: var(--text-muted);">Wrapper sobre <code>.btn</code>. Variantes: primary, navy, secondary, ghost, danger, success, dark. Tamanhos: sm, md, lg. Suporta <code>icon</code>, <code>icon-trailing</code>, <code>icon-only</code>, <code>loading</code>, <code>disabled</code>, <code>href</code> (renderiza &lt;a&gt;).</p>
+        <h2 class="text-lg font-semibold mb-3">Botões — es-button</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Wrapper sobre <code>.btn</code>. Variantes: primary, navy, secondary, ghost, danger, success, dark. Tamanhos: sm, md, lg. Suporta <code>icon</code>, <code>icon-trailing</code>, <code>icon-only</code>, <code>loading</code>, <code>disabled</code> e <code>href</code> (renderiza como &lt;a&gt;).</p>
         <div class="flex flex-wrap gap-2 mb-3">
             <es-button variant="primary" icon="plus">Novo produto</es-button>
             <es-button variant="navy" icon="save">Salvar</es-button>
@@ -92,34 +92,34 @@
             <es-button variant="ghost" icon="refresh-cw">Atualizar</es-button>
             <es-button variant="danger" icon="trash-2">Excluir</es-button>
             <es-button variant="success" icon="check">Confirmar</es-button>
-            <es-button variant="dark" icon="moon">Dark</es-button>
+            <es-button variant="dark" icon="moon">Modo escuro</es-button>
         </div>
         <div class="flex flex-wrap gap-2 mb-3 items-center">
-            <es-button variant="primary" size="sm" icon="plus">Small</es-button>
-            <es-button variant="primary" icon="plus">Default</es-button>
-            <es-button variant="primary" size="lg" icon="plus">Large</es-button>
-            <es-button variant="primary" disabled>Disabled</es-button>
+            <es-button variant="primary" size="sm" icon="plus">Pequeno</es-button>
+            <es-button variant="primary" icon="plus">Padrão</es-button>
+            <es-button variant="primary" size="lg" icon="plus">Grande</es-button>
+            <es-button variant="primary" disabled>Desativado</es-button>
             <es-button variant="primary" loading>Salvando</es-button>
         </div>
         <div class="flex flex-wrap gap-2 mb-3 items-center">
             <es-button variant="secondary" icon-only icon="pencil" aria-label="Editar"></es-button>
             <es-button variant="ghost" icon-only icon="trash-2" aria-label="Excluir"></es-button>
             <es-button variant="navy" icon-only icon="printer" aria-label="Imprimir"></es-button>
-            <es-button variant="primary" icon="external-link" icon-trailing="chevron-right" href="/dev/components">Como link</es-button>
+            <es-button variant="primary" icon="external-link" icon-trailing="chevron-right" href="/dev/components">Renderiza como link</es-button>
         </div>
     </section>
 
     <!-- Fase 1: Badges -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-badge</h2>
+        <h2 class="text-lg font-semibold mb-3">Badges — es-badge</h2>
         <p class="text-sm mb-4" style="color: var(--text-muted);">Variantes: default, primary, navy, ok, success, warn, crit, danger, info, accent, neutral, soft. Suporta <code>icon</code> e <code>dot</code>.</p>
         <div class="flex flex-wrap gap-2 items-center">
             <es-badge>Default</es-badge>
             <es-badge variant="primary">Primary</es-badge>
             <es-badge variant="navy">Navy</es-badge>
             <es-badge variant="success">OK</es-badge>
-            <es-badge variant="warn">Atencao</es-badge>
-            <es-badge variant="danger">Critico</es-badge>
+            <es-badge variant="warn">Atenção</es-badge>
+            <es-badge variant="danger">Crítico</es-badge>
             <es-badge variant="info">Info</es-badge>
             <es-badge variant="accent">Accent</es-badge>
             <es-badge variant="soft">Soft</es-badge>
@@ -130,14 +130,14 @@
 
     <!-- Fase 1: Status pills -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-status-pill</h2>
-        <p class="text-sm mb-4" style="color: var(--text-muted);">Status semantico genericoo (ok, warn, crit, info, accent, ink, neutral). Status especificos de pedidos seguem usando <code>.stp.aguardando/.preparando/.pronto/.entregue/.vencendo/.critico</code>.</p>
+        <h2 class="text-lg font-semibold mb-3">Status pills — es-status-pill</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Status semântico genérico (ok, warn, crit, info, accent, ink, neutral). Status específicos de pedidos continuam usando <code>.stp.aguardando/.preparando/.pronto/.entregue/.vencendo/.critico</code>.</p>
         <div class="flex flex-wrap gap-2 items-center">
             <es-status-pill status="ok">Em estoque</es-status-pill>
             <es-status-pill status="warn">Vencendo em 3 dias</es-status-pill>
             <es-status-pill status="crit">Sem estoque</es-status-pill>
-            <es-status-pill status="info">Em transferencia</es-status-pill>
-            <es-status-pill status="accent">Promocao ativa</es-status-pill>
+            <es-status-pill status="info">Em transferência</es-status-pill>
+            <es-status-pill status="accent">Promoção ativa</es-status-pill>
             <es-status-pill status="ink">Arquivado</es-status-pill>
             <es-status-pill status="neutral">Rascunho</es-status-pill>
         </div>
@@ -145,7 +145,7 @@
 
     <!-- Fase 1: es-kbd -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 1 - es-kbd (atalhos)</h2>
+        <h2 class="text-lg font-semibold mb-3">Atalhos — es-kbd</h2>
         <p class="text-sm mb-4" style="color: var(--text-muted);">Use <code>&lt;es-kbd&gt;</code> em cheatsheets, tooltips e command palette para teclas de atalho.</p>
         <div class="space-y-2">
             <div class="kbd-row">
@@ -161,11 +161,11 @@
                 <span class="kbd-keys"><es-kbd>Esc</es-kbd></span>
             </div>
             <div class="kbd-row">
-                <span class="kbd-label">Cheatsheet (Fase 5)</span>
+                <span class="kbd-label">Abrir cheatsheet</span>
                 <span class="kbd-keys"><es-kbd>Shift</es-kbd><es-kbd>?</es-kbd></span>
             </div>
             <div class="kbd-row">
-                <span class="kbd-label">Ir para Produtos (Fase 5)</span>
+                <span class="kbd-label">Ir para Produtos</span>
                 <span class="kbd-keys"><es-kbd>g</es-kbd><es-kbd>p</es-kbd></span>
             </div>
         </div>
@@ -173,12 +173,12 @@
 
     <!-- Fase 4 / 5: dispatchers -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 4/5 - Confirm, Cheatsheet, Scanner</h2>
-        <p class="text-sm mb-4" style="color: var(--text-muted);">Disparadores globais via <code>window.easyConfirm()</code>, <code>cheatsheet:toggle</code> e <code>barcode:open</code>.</p>
+        <h2 class="text-lg font-semibold mb-3">Diálogos globais — confirmação, atalhos, leitor</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Disparados via <code>window.easyConfirm()</code>, evento <code>cheatsheet:toggle</code> e <code>barcode:open</code>.</p>
         <div class="flex flex-wrap gap-2">
             <es-button variant="danger" icon="trash-2"
-                       onclick="window.easyConfirm({ titulo: 'Excluir item?', mensagem: 'Esta acao nao pode ser desfeita.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700' }, () => window.showToast('Item excluido (simulado)', 'success'))">
-                easyConfirm
+                       onclick="window.easyConfirm({ titulo: 'Excluir item?', mensagem: 'Esta ação não pode ser desfeita.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700' }, () => window.showToast('Item excluído (demonstração)', 'success'))">
+                Confirmação destrutiva
             </es-button>
             <es-button variant="ghost" icon="help-circle"
                        onclick="window.dispatchEvent(new CustomEvent('cheatsheet:toggle'))">
@@ -188,17 +188,17 @@
                        onclick="window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: (code) => window.showToast('Lido: ' + code, 'success') } }))">
                 Abrir scanner
             </es-button>
-            <form data-confirm='{"titulo":"Form com data-confirm?","mensagem":"Forms com atributo data-confirm sao interceptados automaticamente pelo confirm.js.","textoBotao":"OK","classBotao":"bg-indigo-600 hover:bg-indigo-700"}'
-                  onsubmit="event.preventDefault(); window.showToast('Form submetido (simulado)', 'success')">
-                <es-button variant="primary" type="submit" icon="check">Form data-confirm</es-button>
+            <form data-confirm='{"titulo":"Confirmar envio do formulário?","mensagem":"Formulários com o atributo data-confirm são interceptados automaticamente.","textoBotao":"Enviar","classBotao":"bg-indigo-600 hover:bg-indigo-700"}'
+                  onsubmit="event.preventDefault(); window.showToast('Formulário enviado (demonstração)', 'success')">
+                <es-button variant="primary" type="submit" icon="check">Confirmar envio</es-button>
             </form>
         </div>
     </section>
 
     <!-- Fase 1: Side-by-side light/dark de primitivos -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Fase 1 - Side-by-side (light + dark)</h2>
-        <p class="text-sm mb-4" style="color: var(--text-muted);">Verificacao visual de regressao em ambos os temas, ignorando tema atual da pagina.</p>
+        <h2 class="text-lg font-semibold mb-3">Comparativo claro × escuro</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Verificação visual de regressão nos dois temas, independente do tema ativo na página.</p>
         <div class="side-by-side">
             <div class="light-pane" data-theme="light">
                 <div class="pane-label">light</div>
@@ -279,12 +279,12 @@
             <div class="stat-card">
                 <span class="stat-label">Receita</span>
                 <span class="stat-value">R$ 12.480</span>
-                <span class="stat-delta up">▲ 8.2% vs. ontem</span>
+                <span class="stat-delta up">▲ 8,2% vs. ontem</span>
             </div>
             <div class="stat-card">
                 <span class="stat-label">Pedidos</span>
                 <span class="stat-value">142</span>
-                <span class="stat-delta down">▼ 3.1%</span>
+                <span class="stat-delta down">▼ 3,1% vs. ontem</span>
             </div>
             <div class="stat-card">
                 <span class="stat-label">Itens críticos</span>
@@ -318,8 +318,8 @@
     <section>
         <h2 class="text-lg font-semibold mb-3">Tooltip</h2>
         <div class="flex gap-4 items-center">
-            <span class="tip" data-tip="Estoque crítico (< 10 un.)"><button class="btn btn-secondary">Hover me</button></span>
-            <span class="tip" data-tip="Atalho: Ctrl + K"><button class="btn btn-ghost">Atalho</button></span>
+            <span class="tip" data-tip="Estoque crítico — menos de 10 un."><button class="btn btn-secondary">Passe o mouse</button></span>
+            <span class="tip" data-tip="Atalho: Ctrl + K"><button class="btn btn-ghost">Ver atalho</button></span>
         </div>
     </section>
 
@@ -337,7 +337,7 @@
                     new { value = 5, label = "Frios" }
                 },
                 Value = (object?)null,
-                Placeholder = "Selecionar categoria"
+                Placeholder = "Selecione uma categoria"
             }' />
         </div>
     </section>
@@ -357,9 +357,9 @@
         <partial name="_Tabs" model='new {
             Default = "g",
             Items = new System.Collections.Generic.List<System.ValueTuple<string,string,string>> {
-                ("g", "Geral", "<p class=\"text-sm\">Conteúdo da aba Geral.</p>"),
+                ("g", "Geral", "<p class=\"text-sm\">Informações cadastrais do produto.</p>"),
                 ("e", "Estoque", "<p class=\"text-sm\">Movimentações, lotes e validades.</p>"),
-                ("h", "Histórico", "<p class=\"text-sm\">Histórico de alterações.</p>")
+                ("h", "Histórico", "<p class=\"text-sm\">Linha do tempo de alterações.</p>")
             }
         }' />
     </section>
@@ -370,9 +370,9 @@
         <partial name="_Accordion" model='new {
             Multiple = false,
             Items = new System.Collections.Generic.List<System.ValueTuple<string,string>> {
-                ("Como cadastrar produto?", "<p class=\"text-sm\">Vá em Produtos → Novo.</p>"),
-                ("Como repor estoque?", "<p class=\"text-sm\">Use o atalho na topbar.</p>"),
-                ("Como gerar etiquetas?", "<p class=\"text-sm\">No detalhe do produto, botão Imprimir.</p>")
+                ("Como cadastrar produto?", "<p class=\"text-sm\">Acesse <strong>Produtos → Novo</strong> e preencha SKU e categoria.</p>"),
+                ("Como repor estoque?", "<p class=\"text-sm\">Use o botão <strong>Repor</strong> na barra superior ou o atalho <strong>Ctrl+R</strong>.</p>"),
+                ("Como gerar etiquetas?", "<p class=\"text-sm\">Abra o produto e clique em <strong>Imprimir etiqueta</strong>.</p>")
             }
         }' />
     </section>
@@ -416,10 +416,10 @@
              role="dialog" aria-modal="true">
             <div class="modal-panel modal-md">
                 <div class="modal-header">
-                    <h3 class="text-base font-semibold m-0">Confirmar ação</h3>
+                    <h3 class="text-base font-semibold m-0">Confirmar ação?</h3>
                     <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="modal = false"></es-button>
                 </div>
-                <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja prosseguir? Esta acao pode ser revertida em ate 5 segundos via toast.</p></div>
+                <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja continuar? Você ainda pode desfazer pelo toast nos próximos 5 segundos.</p></div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @@click="modal = false">Cancelar</button>
                     <button class="btn btn-primary" @@click="modal = false">Confirmar</button>
@@ -432,11 +432,11 @@
             <div class="drawer-backdrop" @@click="drawer = false"></div>
             <aside class="drawer-panel" role="dialog" aria-modal="true" @@keydown.escape.window="drawer = false">
                 <div class="drawer-header">
-                    <h3 class="text-base font-semibold m-0">Edicao rapida</h3>
+                    <h3 class="text-base font-semibold m-0">Edição rápida</h3>
                     <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="drawer = false"></es-button>
                 </div>
                 <div class="drawer-body">
-                    <p class="text-sm">Drawer slide-right para ações sem trocar de página.</p>
+                    <p class="text-sm">Drawer lateral para ações pontuais sem sair da página atual.</p>
                 </div>
                 <div class="drawer-footer">
                     <button class="btn btn-secondary" @@click="drawer = false">Cancelar</button>
@@ -478,15 +478,15 @@
         <div class="alert crit" role="alert" aria-live="polite">
             <div class="ic" aria-hidden="true">!</div>
             <div class="body">
-                <div class="ttl">Verifique os campos abaixo</div>
-                <div class="desc"><ul class="list-disc pl-5 m-0"><li>Nome é obrigatório</li><li>CPF inválido</li></ul></div>
+                <div class="ttl">Corrija os campos abaixo para continuar</div>
+                <div class="desc"><ul class="list-disc pl-5 m-0"><li>Informe o nome.</li><li>CPF inválido. Verifique os números digitados.</li></ul></div>
             </div>
         </div>
     </section>
 
     <!-- Polish 2026-05 primitivos -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Polish 2026-05 — tokens, FormField, Tooltip, atalhos</h2>
+        <h2 class="text-lg font-semibold mb-3">Refinamentos — tokens de movimento, FormField, Tooltip, atalhos</h2>
         <div class="grid md:grid-cols-2 gap-4">
 
             <div class="card">
@@ -514,15 +514,15 @@
                     Label = "E-mail",
                     For = "showcase-email",
                     Required = true,
-                    Helper = "Usamos para login e notificacoes",
-                    InputHtml = "<input class=\"ui-field\" id=\"showcase-email\" type=\"email\" placeholder=\"voce@exemplo.com\" />"
+                    Helper = "Usamos para login e notificações.",
+                    InputHtml = "<input class=\"ui-field\" id=\"showcase-email\" type=\"email\" placeholder=\"voce@empresa.com.br\" />"
                 })
                 <hr class="my-3" />
                 @await Html.PartialAsync("_FormField", new {
                     Label = "Senha",
                     For = "showcase-senha",
                     Required = true,
-                    Error = "Senha deve ter pelo menos 8 caracteres",
+                    Error = "Use ao menos 8 caracteres na senha.",
                     InputHtml = "<input class=\"ui-field\" id=\"showcase-senha\" type=\"password\" />"
                 })
             </div>
@@ -532,8 +532,8 @@
                 <p class="text-sm text-slate-600 mb-3">Adicione <code>data-tooltip="texto"</code> em qualquer elemento. Delay 400ms.</p>
                 <div class="flex items-center gap-3">
                     <button class="btn btn-secondary btn-sm" data-tooltip="Atalho: Ctrl+S">Salvar</button>
-                    @await Html.PartialAsync("_Tooltip", new { Text = "Validade nominal — sera estendida ate domingo" })
-                    <span class="text-sm text-slate-500">passe o mouse</span>
+                    @await Html.PartialAsync("_Tooltip", new { Text = "Validade nominal — será estendida até domingo" })
+                    <span class="text-sm text-slate-500">Passe o mouse</span>
                 </div>
             </div>
 
@@ -557,7 +557,7 @@
                         <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">Ctrl+K</kbd></dd>
                     </div>
                     <div class="flex items-center justify-between">
-                        <dt>Criar novo na pagina atual</dt>
+                        <dt>Criar novo na página atual</dt>
                         <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">N</kbd></dd>
                     </div>
                     <div class="flex items-center justify-between">
