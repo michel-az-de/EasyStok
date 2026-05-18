@@ -35,10 +35,7 @@
                 var isActive = string.Equals(Model.FiltroStatus, val, StringComparison.OrdinalIgnoreCase)
                     || (string.IsNullOrEmpty(val) && string.IsNullOrEmpty(Model.FiltroStatus));
                 <a href="/notas-fiscais?status=@val&desde=@Model.PeriodoInicio&ate=@Model.PeriodoFim&search=@Model.Busca"
-                   class="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
-                          @(isActive ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50")">
-                    @label
-                </a>
+                   class="filter-chip @(isActive ? "active" : "")">@label</a>
             }
         </div>
 

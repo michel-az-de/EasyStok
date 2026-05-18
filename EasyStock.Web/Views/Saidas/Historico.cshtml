@@ -63,9 +63,7 @@
             {
                 var isActive = Model.FiltroNatureza == val || (val == "" && Model.FiltroNatureza == null);
                 <a href="@Url.Action("Historico", "Saidas", new { natureza = val == "" ? null : val, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                   class="px-3 py-1.5 rounded-full text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                    @label
-                </a>
+                   class="filter-chip @(isActive ? "active" : "")">@label</a>
             }
         </div>
         @* BUG 10: input type="date" não aceita componente de hora, então o valor
@@ -249,8 +247,7 @@
                                                    minlength="3" maxlength="300"
                                                    class="w-full mb-3 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                                             <div class="flex justify-end gap-2">
-                                                <button type="button" @@click="open = false; motivo = ''"
-                                                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                                                <button type="button" @@click="open = false; motivo = ''" class="btn-outline-dark">
                                                     Cancelar
                                                 </button>
                                                 <button type="submit"

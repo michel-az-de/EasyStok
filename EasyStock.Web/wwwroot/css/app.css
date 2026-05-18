@@ -4976,3 +4976,82 @@ html.theme-dark .btn-ghost:hover {
     border-color: rgba(147,197,253,.25) !important;
     color: rgb(147,197,253) !important;
 }
+
+/* ── 13. ui-secondary-btn dark mode ── */
+html.theme-dark .ui-secondary-btn {
+    background: transparent !important;
+    border-color: rgba(255,255,255,.18) !important;
+    color: var(--ink-200, #DEE2EB) !important;
+}
+html.theme-dark .ui-secondary-btn:hover {
+    background: rgba(255,255,255,.06) !important;
+    border-color: rgba(255,255,255,.28) !important;
+}
+
+/* ── 14. btn-warn-dark: amber outline (fechar caixa, confirmações de aviso) ── */
+.btn-warn-dark {
+    background: transparent;
+    border: 0.8px solid rgba(217,119,6,.5);
+    color: rgb(217,119,6);
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background .15s, border-color .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.btn-warn-dark:hover {
+    background: rgba(217,119,6,.08);
+    border-color: rgba(217,119,6,.8);
+}
+html.theme-dark .btn-warn-dark {
+    border-color: rgba(251,191,36,.35);
+    color: rgb(251,191,36);
+}
+html.theme-dark .btn-warn-dark:hover {
+    background: rgba(251,191,36,.08);
+    border-color: rgba(251,191,36,.6);
+}
+
+/* ── 15. filter-chip: pill-style filter (usado em filtros com muitos itens) ── */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #fff;
+    border: 1px solid #CBD5E1;
+    color: #475569;
+    transition: all .15s;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.filter-chip:hover {
+    background: #F8FAFC;
+}
+.filter-chip.active {
+    background: #4F46E5;
+    border-color: #4F46E5;
+    color: #fff;
+}
+html.theme-dark .filter-chip {
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.14);
+    color: var(--ink-300, #B8C1D4);
+}
+html.theme-dark .filter-chip:hover {
+    background: rgba(255,255,255,.1);
+}
+html.theme-dark .filter-chip.active {
+    background: var(--navy-700, #0E2A6E);
+    border-color: transparent;
+    color: var(--ink-50, #F5F7FB);
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}

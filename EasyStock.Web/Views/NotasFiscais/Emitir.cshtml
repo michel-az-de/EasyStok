@@ -76,24 +76,24 @@ else
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="destinatarioCpf">CPF/CNPJ</label>
                 <input type="text" id="destinatarioCpf" name="destinatarioCpf" inputmode="numeric" maxlength="14"
                        placeholder="apenas numeros"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="destinatarioNome">Nome</label>
                 <input type="text" id="destinatarioNome" name="destinatarioNome" maxlength="120"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1" for="destinatarioEmail">Email</label>
                 <input type="email" id="destinatarioEmail" name="destinatarioEmail" maxlength="120"
                        placeholder="opcional"
-                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                       class="ui-field w-full text-sm" />
             </div>
         </div>
     </section>
 
     <section class="ws flex items-center justify-end gap-3">
-        <a href="/notas-fiscais" class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</a>
+        <a href="/notas-fiscais" class="btn-outline-dark">Cancelar</a>
         <button type="submit" class="px-6 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
             Emitir NFC-e
         </button>
