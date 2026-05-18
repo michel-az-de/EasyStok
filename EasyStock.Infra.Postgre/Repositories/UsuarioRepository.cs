@@ -68,7 +68,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task UpdateAsync(Usuario usuario)
         {
-            dbContext.Usuarios.Update(usuario);
+            // Entry().State = Modified marks only scalar properties on the root entity.
+            // Usuarios.Update() would recursively mark all navigation-property entities
+            // (UsuarioEmpresa, UsuarioPerfil) as Modified too — those tables have RLS,
+            // so their UPDATEs return 0 rows when called without the bypass scope,
+            // causing DbUpdateConcurrencyException on login and other pre-auth flows.
+            dbContext.Entry(usuario).State = EntityState.Modified;
             return Task.CompletedTask;
         }
 
