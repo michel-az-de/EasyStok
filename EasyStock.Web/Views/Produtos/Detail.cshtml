@@ -432,7 +432,7 @@
                             </div>
                             <form asp-action="RemoverVariacao" asp-controller="Produtos"
                                   asp-route-id="@p.ProdutoId" asp-route-vid="@v.VariacaoId" method="post"
-                                  data-confirm='@($"{{\"titulo\":\"Remover variacao?\",\"mensagem\":\"A variacao '{System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(v.Nome ?? "")}' sera removida do produto.\",\"textoBotao\":\"Remover\",\"classBotao\":\"bg-red-600 hover:bg-red-700\"}}")'>
+                                  data-confirm='@($"{{\"titulo\":\"Remover variação?\",\"mensagem\":\"A variação '{System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(v.Nome ?? "")}' será removida do produto.\",\"textoBotao\":\"Remover\",\"classBotao\":\"bg-red-600 hover:bg-red-700\"}}")'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit"
                                         class="text-xs text-slate-300 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors ml-2">x</button>
@@ -1191,7 +1191,7 @@
                     const self = this;
                     window.easyConfirm({
                         titulo: 'Remover foto?',
-                        mensagem: 'Esta acao nao pode ser desfeita.',
+                        mensagem: 'Esta ação não pode ser desfeita.',
                         textoBotao: 'Remover',
                         classBotao: 'bg-red-600 hover:bg-red-700'
                     }, () => self._doDeletePhoto(fotoId));

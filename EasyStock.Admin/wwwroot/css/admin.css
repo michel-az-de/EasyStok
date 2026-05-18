@@ -35,12 +35,6 @@
     --es-shadow:        var(--shadow-lg);
     --es-glow:          var(--shadow-md);
 
-    /* Radii */
-    --es-radius-sm:     var(--r-sm);
-    --es-radius-md:     var(--r-md);
-    --es-radius-lg:     var(--r-lg);
-    --es-radius-pill:   var(--r-pill);
-
     --es-transition:    .15s ease;
 }
 
@@ -53,7 +47,7 @@
 .card {
     background:    var(--es-card);
     border:        1px solid var(--es-border-strong);
-    border-radius: var(--es-radius-md);
+    border-radius: var(--r-md);
     padding:       1.5rem;
 }
 
@@ -80,7 +74,7 @@
     display:        inline-flex;
     align-items:    center;
     padding:        0.2rem 0.6rem;
-    border-radius:  var(--es-radius-pill);
+    border-radius:  var(--r-pill);
     font-size:      0.7rem;
     font-weight:    700;
     text-transform: uppercase;
@@ -90,15 +84,15 @@
 /* ── Buttons ───────────────────────────────────────────────── */
 
 .btn-primary {
-    background:    var(--es-accent);
-    color:         var(--es-ink);
+    background:    var(--orange-600);
+    color:         var(--white);
     padding:       0.5rem 1rem;
-    border-radius: var(--es-radius-sm);
+    border-radius: var(--r-sm);
     font-size:     0.875rem;
     font-weight:   700;
     transition:    background var(--es-transition), transform var(--es-transition);
 }
-.btn-primary:hover  { background: var(--es-accent-hover); }
+.btn-primary:hover  { background: var(--orange-700); }
 .btn-primary:active { transform: scale(0.97); }
 
 .btn-secondary {
@@ -106,7 +100,7 @@
     color:         var(--es-ink-dim);
     border:        1px solid var(--es-border-strong);
     padding:       0.5rem 1rem;
-    border-radius: var(--es-radius-sm);
+    border-radius: var(--r-sm);
     font-size:     0.875rem;
     font-weight:   600;
     transition:    background var(--es-transition), transform var(--es-transition);
@@ -119,7 +113,7 @@
     color:         #f87171;
     border:        1px solid rgba(239, 68, 68, .25);
     padding:       0.4rem 0.8rem;
-    border-radius: var(--es-radius-sm);
+    border-radius: var(--r-sm);
     font-size:     0.8rem;
     font-weight:   600;
     transition:    background var(--es-transition), transform var(--es-transition);
@@ -133,7 +127,7 @@
     color:         var(--es-gold);
     border:        1px solid rgba(240, 184, 74, .30);
     padding:       0.4rem 0.8rem;
-    border-radius: var(--es-radius-sm);
+    border-radius: var(--r-sm);
     font-size:     0.8rem;
     font-weight:   600;
     transition:    background var(--es-transition), transform var(--es-transition);
@@ -147,7 +141,7 @@
     color:         #fff;
     border:        1px solid #b91c1c;
     padding:       0.4rem 0.8rem;
-    border-radius: var(--es-radius-sm);
+    border-radius: var(--r-sm);
     font-size:     0.8rem;
     font-weight:   700;
     transition:    background var(--es-transition), transform var(--es-transition);
@@ -200,7 +194,7 @@
     width:         100%;
     background:    var(--es-bg);
     border:        1px solid var(--es-border-strong);
-    border-radius: var(--es-radius-sm);
+    border-radius: var(--r-sm);
     color:         var(--es-ink);
     padding:       0.5rem 0.75rem;
     font-size:     0.875rem;
@@ -246,7 +240,7 @@ select.form-input {
 .modal-box {
     background:   var(--es-card);
     border:       1px solid var(--es-border-strong);
-    border-radius: var(--es-radius-md);
+    border-radius: var(--r-md);
     padding:      1.5rem;
     width:        100%;
     max-width:    480px;

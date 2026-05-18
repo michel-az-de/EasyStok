@@ -13,27 +13,27 @@
     string statusTone;
     if (Model.EstoqueCritico > 0 && Model.ProximosVencimento > 0)
     {
-        statusMsg = $"Voce tem {Model.EstoqueCritico} item(ns) em estoque critico e {Model.ProximosVencimento} proximo(s) ao vencimento.";
+        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico e {Model.ProximosVencimento} próximo(s) ao vencimento.";
         statusTone = "critical";
     }
     else if (Model.EstoqueCritico > 0)
     {
-        statusMsg = $"Voce tem {Model.EstoqueCritico} item(ns) em estoque critico precisando de reposicao.";
+        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico precisando de reposição.";
         statusTone = "critical";
     }
     else if (Model.ProximosVencimento > 0)
     {
-        statusMsg = $"{Model.ProximosVencimento} item(ns) vencem em ate 7 dias. Vale girar antes que estraguem.";
+        statusMsg = $"{Model.ProximosVencimento} item(ns) vencem em até 7 dias. Vale girar antes que estraguem.";
         statusTone = "warning";
     }
     else if (Model.SugestoesReposicao > 0)
     {
-        statusMsg = $"Nada urgente hoje. {Model.SugestoesReposicao} sugestao(oes) de reposicao prontas para revisao.";
+        statusMsg = $"Nada urgente hoje. {Model.SugestoesReposicao} sugestão(ões) de reposição prontas para revisão.";
         statusTone = "info";
     }
     else if (Model.ReceitaMes > 0)
     {
-        statusMsg = $"Estoque saudavel. Vendas dos ultimos 30 dias: {Model.ReceitaMes.ToString("C", ptBR)}.";
+        statusMsg = $"Estoque saudável. Vendas dos últimos 30 dias: {Model.ReceitaMes.ToString("C", ptBR)}.";
         statusTone = "ok";
     }
     else

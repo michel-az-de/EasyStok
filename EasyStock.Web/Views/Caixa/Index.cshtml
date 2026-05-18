@@ -159,7 +159,7 @@ else
                     + Lançar entrada/saída
                 </button>
                 <form asp-action="Fechar" asp-controller="Caixa" method="post" class="flex gap-2 items-center"
-                      data-confirm='@($"{{\"titulo\":\"Fechar caixa do dia?\",\"mensagem\":\"Saldo final: {d.SaldoEsperado.ToString("C")}. Esta acao nao pode ser desfeita.\",\"textoBotao\":\"Fechar caixa\",\"classBotao\":\"bg-amber-600 hover:bg-amber-700\"}}")'>
+                      data-confirm='@($"{{\"titulo\":\"Fechar caixa do dia?\",\"mensagem\":\"Saldo final: {d.SaldoEsperado.ToString("C")}. Esta ação não pode ser desfeita.\",\"textoBotao\":\"Fechar caixa\",\"classBotao\":\"bg-amber-600 hover:bg-amber-700\"}}")'>
                     @Html.AntiForgeryToken()
                     <input type="text" name="observacoes" placeholder="Obs do fechamento (opcional)" aria-label="Observações do fechamento" class="ui-field text-sm" />
                     <button type="submit" class="ui-secondary-btn px-4 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 inline-flex items-center gap-2">
@@ -213,7 +213,7 @@ else
                         <td>
                             @if (m.Tipo != "abertura" && m.Tipo != "fechamento" && !d.Fechado)
                             {
-                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor sera revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor será revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar movimento">Estornar</button>
                                 </form>

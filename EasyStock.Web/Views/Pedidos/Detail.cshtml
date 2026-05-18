@@ -61,7 +61,7 @@
                 </form>
             }
             <form asp-action="Cancelar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
-                  data-confirm='{"titulo":"Cancelar pedido?","mensagem":"O pedido sera marcado como cancelado e nao pode ser revertido.","textoBotao":"Cancelar pedido","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                  data-confirm='{"titulo":"Cancelar pedido?","mensagem":"O pedido será marcado como cancelado e não pode ser revertido.","textoBotao":"Cancelar pedido","classBotao":"bg-red-600 hover:bg-red-700"}'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
                     Cancelar
@@ -315,7 +315,7 @@ else
                                 <td class="text-right">
                                     @if (p.Status != "entregue" && !isCancelado)
                                     {
-                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do pedido?","mensagem":"O item sera removido do pedido. Estoque sera ajustado.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do pedido?","mensagem":"O item será removido do pedido. O estoque será ajustado.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Remover @i.Nome">✕</button>
                                         </form>
@@ -372,7 +372,7 @@ else
                                 <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ToLocalTime().AsDateTime()@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
                                 @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
                             </div>
-                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" data-confirm='{"titulo":"Remover pagamento?","mensagem":"O pagamento sera estornado do pedido.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" data-confirm='{"titulo":"Remover pagamento?","mensagem":"O pagamento será estornado do pedido.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar pagamento">✕</button>
                             </form>
@@ -602,7 +602,7 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
                 <div>
                     <h2 id="fm-report-title" class="fm-header__title text-amber-700">Reportar problema deste pedido</h2>
                     <p class="fm-header__subtitle">
-                        Abre ticket pra EasyStok sobre este pedido. Voce pode acompanhar a resposta em Suporte.
+                        Abre ticket para EasyStok sobre este pedido. Você pode acompanhar a resposta em Suporte.
                     </p>
                 </div>
                 <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>

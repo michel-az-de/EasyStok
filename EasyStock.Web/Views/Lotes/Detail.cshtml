@@ -45,7 +45,7 @@
     <div class="ml-auto flex gap-2">
         @if (l.Status == "em_producao")
         {
-            <form asp-action="Finalizar" asp-controller="Lotes" asp-route-id="@l.Id" method="post" data-confirm='@($"{{\"titulo\":\"Finalizar lote?\",\"mensagem\":\"Sera gerado(s) {l.TotalUnidades} etiqueta(s) e o lote ficara congelado para alteracoes.\",\"textoBotao\":\"Finalizar lote\",\"classBotao\":\"bg-indigo-600 hover:bg-indigo-700\"}}")'>
+            <form asp-action="Finalizar" asp-controller="Lotes" asp-route-id="@l.Id" method="post" data-confirm='@($"{{\"titulo\":\"Finalizar lote?\",\"mensagem\":\"Será gerado(s) {l.TotalUnidades} etiqueta(s) e o lote ficará congelado para alterações.\",\"textoBotao\":\"Finalizar lote\",\"classBotao\":\"bg-indigo-600 hover:bg-indigo-700\"}}")'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">
                     🏁 Finalizar lote
@@ -149,7 +149,7 @@
                                 <td class="text-right">
                                     @if (l.Status == "em_producao")
                                     {
-                                        <form asp-action="RemoveItem" asp-controller="Lotes" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do lote?","mensagem":"Esta acao nao pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                        <form asp-action="RemoveItem" asp-controller="Lotes" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do lote?","mensagem":"Esta ação não pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="text-xs text-red-600 hover:text-red-700">Remover</button>
                                         </form>
