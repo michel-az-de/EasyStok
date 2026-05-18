@@ -1,0 +1,320 @@
+@model EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal.ConfiguracaoFiscalViewModel
+@{
+    ViewBag.Title = "Configuracao Fiscal";
+    Layout = "_Layout";
+
+    var habilitada = Model.Habilitada;
+    var podeHabilitar = Model.PodeHabilitar;
+    var statusBadge = habilitada ? "badge-ok" : (podeHabilitar ? "badge-warn" : "badge-neutral");
+    var statusTexto = habilitada ? "Emissao ativa" : (podeHabilitar ? "Configuracao pronta — habilite" : "Configure para comecar");
+
+    var provedorAtual = (Model.Provedor ?? "mock").ToLowerInvariant();
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Configuracao Fiscal</h1>
+        <p>Defina regime, emitente, provedor SEFAZ e habilite a emissao de NFC-e.</p>
+    </div>
+    <span class="badge @statusBadge text-sm">@statusTexto</span>
+</div>
+
+@if (Model.IsMock)
+{
+    <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+        <strong>Modo simulacao ativo.</strong> Provedor "mock" emite notas ficticias sem
+        chamar a SEFAZ. Use para validar fluxo end-to-end no admin sem certificado real.
+        Em producao, troque para "focus" e cadastre certificado A1.
+    </div>
+}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+<!-- Secao 1: Dados do emitente -->
+<section class="ws">
+    <h2 class="text-lg font-semibold mb-4">1. Dados do emitente</h2>
+    <form method="post" action="/configuracao-fiscal/dados-emitente">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-slate-700 mb-1" for="regimeTributario">Regime tributario</label>
+            <select id="regimeTributario" name="regimeTributario"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    @(Model.Configurado ? "disabled" : "")>
+                @{
+                    var regimes = new[] { "Simples", "MicroempreendedorIndividual", "LucroPresumido", "LucroReal" };
+                    var regimeAtual = Model.RegimeTributario ?? "Simples";
+                }
+                @foreach (var r in regimes)
+                {
+                    if (r == regimeAtual)
+                    {
+                        <option value="@r" selected>@r</option>
+                    }
+                    else
+                    {
+                        <option value="@r">@r</option>
+                    }
+                }
+            </select>
+            @if (Model.Configurado)
+            {
+                <input type="hidden" name="regimeTributario" value="@regimeAtual" />
+                <p class="text-xs text-slate-500 mt-1">Regime nao pode ser alterado apos criado (afeta CST/CSOSN de notas ja emitidas).</p>
+            }
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="inscricaoEstadual">Inscricao Estadual</label>
+                <input type="text" id="inscricaoEstadual" name="inscricaoEstadual" value="@Model.InscricaoEstadual"
+                       placeholder="ISENTO ou numero"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="inscricaoMunicipal">Inscricao Municipal</label>
+                <input type="text" id="inscricaoMunicipal" name="inscricaoMunicipal" value="@Model.InscricaoMunicipal"
+                       placeholder="opcional"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+        </div>
+
+        <fieldset class="border border-slate-200 rounded-lg p-3 mb-3">
+            <legend class="text-xs font-medium text-slate-600 px-2">Endereco do emitente</legend>
+            <div class="grid grid-cols-3 gap-2 mb-2">
+                <div class="col-span-2">
+                    <label class="block text-xs text-slate-600 mb-1" for="logradouro">Logradouro</label>
+                    <input type="text" id="logradouro" name="logradouro" value="@Model.Endereco?.Logradouro"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-600 mb-1" for="numero">Numero</label>
+                    <input type="text" id="numero" name="numero" value="@Model.Endereco?.Numero"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                    <label class="block text-xs text-slate-600 mb-1" for="complemento">Complemento</label>
+                    <input type="text" id="complemento" name="complemento" value="@Model.Endereco?.Complemento"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-600 mb-1" for="bairro">Bairro</label>
+                    <input type="text" id="bairro" name="bairro" value="@Model.Endereco?.Bairro"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+                </div>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+                <div class="col-span-2">
+                    <label class="block text-xs text-slate-600 mb-1" for="cidade">Cidade</label>
+                    <input type="text" id="cidade" name="cidade" value="@Model.Endereco?.Cidade"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-600 mb-1" for="uf">UF</label>
+                    <input type="text" id="uf" name="uf" value="@Model.Endereco?.Uf" maxlength="2"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm uppercase" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-600 mb-1" for="cep">CEP</label>
+                    <input type="text" id="cep" name="cep" value="@Model.Endereco?.Cep" maxlength="10"
+                           placeholder="00000-000"
+                           class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
+                </div>
+            </div>
+        </fieldset>
+
+        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            Salvar dados do emitente
+        </button>
+    </form>
+</section>
+
+<!-- Secao 2: Provedor SEFAZ -->
+<section class="ws">
+    <h2 class="text-lg font-semibold mb-4">2. Provedor SEFAZ</h2>
+    <form method="post" action="/configuracao-fiscal/provedor">
+        @Html.AntiForgeryToken()
+
+        <p class="text-xs text-slate-500 mb-3">
+            Em desenvolvimento, prefira "mock" — emite notas simuladas sem credenciais reais.
+            Em producao, use "focus" com token Focus NFe + certificado A1 cadastrados.
+        </p>
+
+        <div class="space-y-2 mb-4">
+            @{
+                var provedores = new[] {
+                    ("mock", "Mock (simulacao)", "Resposta sintetica, sem chamar SEFAZ. Apenas Sandbox."),
+                    ("focus", "Focus NFe", "Provedor real. Requer token Focus + certificado A1."),
+                    ("enotas", "eNotas", "Provedor real (em desenvolvimento — nao implementado).")
+                };
+            }
+            @foreach (var (id, nome, desc) in provedores)
+            {
+                var disabled = id == "enotas";
+                <label class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer @(provedorAtual == id ? "border-indigo-500 bg-indigo-50" : "border-slate-200 hover:bg-slate-50") @(disabled ? "opacity-50 cursor-not-allowed" : "")">
+                    <input type="radio" name="provedor" value="@id" class="mt-1" @(provedorAtual == id ? "checked" : "") @(disabled ? "disabled" : "") />
+                    <div>
+                        <div class="text-sm font-medium text-slate-900">@nome</div>
+                        <div class="text-xs text-slate-500">@desc</div>
+                    </div>
+                </label>
+            }
+        </div>
+
+        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            Salvar provedor
+        </button>
+    </form>
+</section>
+
+<!-- Secao 3: Serie + Ambiente -->
+<section class="ws">
+    <h2 class="text-lg font-semibold mb-4">3. Serie e Ambiente</h2>
+    <form method="post" action="/configuracao-fiscal/serie-ambiente">
+        @Html.AntiForgeryToken()
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="serieNfce">Serie NFC-e</label>
+                <input type="number" id="serieNfce" name="serieNfce" value="@Model.SerieNfce" min="1" max="999"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                <p class="text-xs text-slate-500 mt-1">Proximo numero: @Model.ProximoNumeroNfce</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="ambiente">Ambiente</label>
+                <select id="ambiente" name="ambiente" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    @{
+                        var ambienteAtual = Model.Ambiente ?? "Sandbox";
+                    }
+                    @if (ambienteAtual == "Sandbox") { <option value="Sandbox" selected>Sandbox / Homologacao</option> } else { <option value="Sandbox">Sandbox / Homologacao</option> }
+                    @if (ambienteAtual == "Production") { <option value="Production" selected>Producao (SEFAZ real)</option> } else { <option value="Production">Producao (SEFAZ real)</option> }
+                </select>
+            </div>
+        </div>
+
+        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            Salvar serie e ambiente
+        </button>
+    </form>
+</section>
+
+<!-- Secao 4: CSC (NFC-e) -->
+<section class="ws">
+    <h2 class="text-lg font-semibold mb-4">4. CSC (Codigo de Seguranca do Contribuinte)</h2>
+    <form method="post" action="/configuracao-fiscal/csc">
+        @Html.AntiForgeryToken()
+
+        <p class="text-xs text-slate-500 mb-3">
+            Usado na geracao do QR Code da NFC-e. Voce obtem CSC ID e Token no portal
+            da SEFAZ do seu estado. Em modo simulacao, use valores ficticios (ex: ID "000001").
+        </p>
+
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-slate-700 mb-1" for="cscId">CSC ID</label>
+            <input type="text" id="cscId" name="cscId" value="@Model.CscId" placeholder="000001"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-slate-700 mb-1" for="cscToken">CSC Token</label>
+            <input type="text" id="cscToken" name="cscToken"
+                   placeholder="@(Model.TemCsc ? "(token cadastrado — preencha para substituir)" : "token SEFAZ")"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" />
+            @if (Model.TemCsc)
+            {
+                <p class="text-xs text-emerald-600 mt-1">CSC ja cadastrado.</p>
+            }
+        </div>
+
+        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            Salvar CSC
+        </button>
+    </form>
+</section>
+
+<!-- Secao 5: Certificado A1 -->
+<section class="ws lg:col-span-2">
+    <h2 class="text-lg font-semibold mb-4">5. Certificado Digital A1</h2>
+
+    @if (Model.IsMock)
+    {
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700">
+            Provedor "mock" nao requer certificado A1. Em producao, troque o provedor
+            para "focus" e faca upload do .pfx via API
+            <code class="font-mono text-xs bg-white px-1.5 py-0.5 rounded">POST /api/configuracao-fiscal/certificado</code>
+            (suporte a upload via UI esta na proxima onda).
+        </div>
+    }
+    else if (Model.Certificado is not null)
+    {
+        var diasRest = Model.Certificado.DiasParaExpirar ?? 0;
+        var corBadge = diasRest < 7 ? "badge-crit" : (diasRest < 30 ? "badge-warn" : "badge-ok");
+        <div class="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
+            <div>
+                <p class="text-sm font-medium text-slate-900">Certificado cadastrado</p>
+                <p class="text-xs text-slate-500">
+                    Valido ate @Model.Certificado.ValidoAte?.ToString("dd/MM/yyyy")
+                    (@diasRest dias restantes)
+                </p>
+            </div>
+            <span class="badge @corBadge">@(diasRest < 7 ? "Expirando" : diasRest < 30 ? "Atencao" : "OK")</span>
+        </div>
+    }
+    else
+    {
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+            <strong>Certificado A1 nao cadastrado.</strong> Em producao com provedor real,
+            faca upload do arquivo .pfx via API. Suporte a upload via UI vem na proxima onda.
+        </div>
+    }
+</section>
+
+</div>
+
+<!-- Acao Final: Habilitar / Desabilitar -->
+<section class="ws mt-6">
+    <h2 class="text-lg font-semibold mb-2">6. Habilitar emissao</h2>
+    @if (habilitada)
+    {
+        <p class="text-sm text-slate-600 mb-4">
+            Emissao fiscal esta <strong class="text-emerald-700">ativa</strong>.
+            Notas podem ser emitidas pela tela <a href="/notas-fiscais" class="text-indigo-600 hover:underline">Notas Fiscais</a>.
+        </p>
+        <form method="post" action="/configuracao-fiscal/desabilitar" onsubmit="return confirm('Desabilitar a emissao? Nenhuma nota podera ser emitida ate reabilitar.');">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-700">
+                Desabilitar emissao
+            </button>
+        </form>
+    }
+    else if (podeHabilitar)
+    {
+        <p class="text-sm text-slate-600 mb-4">
+            Configuracao minima esta completa (IE + Endereco com CEP+UF).
+            Clique abaixo para liberar a emissao de NFC-e.
+        </p>
+        <form method="post" action="/configuracao-fiscal/habilitar">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
+                Habilitar emissao
+            </button>
+        </form>
+    }
+    else
+    {
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+            <strong>Configuracao incompleta.</strong> Preencha pelo menos:
+            <ul class="list-disc list-inside mt-2 space-y-1">
+                @if (string.IsNullOrWhiteSpace(Model.InscricaoEstadual))
+                {
+                    <li>Inscricao Estadual (use "ISENTO" se for o caso)</li>
+                }
+                @if (Model.Endereco is null || string.IsNullOrWhiteSpace(Model.Endereco.Cep) || string.IsNullOrWhiteSpace(Model.Endereco.Uf))
+                {
+                    <li>Endereco com CEP e UF</li>
+                }
+            </ul>
+        </div>
+    }
+</section>
