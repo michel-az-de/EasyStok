@@ -26,6 +26,9 @@ COPY EasyStock.Infra.Postgre/      EasyStock.Infra.Postgre/
 COPY EasyStock.Infra.MongoDb/      EasyStock.Infra.MongoDb/
 COPY EasyStock.Infra.Sqlite/       EasyStock.Infra.Sqlite/
 COPY EasyStock.Infra.Async/        EasyStock.Infra.Async/
+COPY EasyStock.Infra.Notifications/ EasyStock.Infra.Notifications/
+COPY EasyStock.Infra.Integrations/ EasyStock.Infra.Integrations/
+COPY EasyStock.Contracts/          EasyStock.Contracts/
 COPY EasyStock.Api/                EasyStock.Api/
 
 WORKDIR /src/EasyStock.Api
