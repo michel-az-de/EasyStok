@@ -4743,3 +4743,231 @@ html.theme-dark .ds-api-warning {
     background: rgba(146, 64, 14, .22);
     border-left-color: #FBBF24;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   DS CONSISTENCY LAYER — 12 itens de padronização dark mode
+   Adicionado após auditoria completa das views.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. form-input: border-width era 0 pelo reset do Tailwind ── */
+.form-input {
+    display: block;
+    width: 100%;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 8px;
+    transition: border-color .15s, box-shadow .15s;
+    line-height: 1.4;
+}
+textarea.form-input { height: auto; resize: vertical; }
+select.form-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394A3B8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 32px;
+    cursor: pointer;
+}
+html:not(.theme-dark) .form-input {
+    background: #ffffff;
+    border-color: #CBD5E1;
+    color: #334155;
+}
+html:not(.theme-dark) .form-input::placeholder { color: #94A3B8; }
+html:not(.theme-dark) .form-input:focus {
+    outline: none;
+    border-color: #E85814;
+    box-shadow: 0 0 0 3px rgba(232,88,20,.12);
+}
+html.theme-dark .form-input {
+    background: rgba(255,255,255,.04) !important;
+    border-color: rgba(255,255,255,.12) !important;
+    color: #E5EEF8 !important;
+}
+html.theme-dark .form-input:focus {
+    border-color: var(--orange-500, #F26B25) !important;
+    box-shadow: 0 0 0 3px rgba(242,107,37,.15) !important;
+    outline: none;
+}
+html.theme-dark .form-input::placeholder { color: #64748B !important; }
+
+/* ── 2. text-gray-* dark mode overrides (texto quase-preto → claro) ── */
+html.theme-dark .text-gray-900 { color: var(--ink-50,  #F5F7FB) !important; }
+html.theme-dark .text-gray-800 { color: var(--ink-100, #ECEFF5) !important; }
+html.theme-dark .text-gray-700 { color: var(--ink-200, #DEE2EB) !important; }
+html.theme-dark .text-gray-600 { color: var(--ink-300, #C2C8D6) !important; }
+html.theme-dark .text-gray-500 { color: var(--ink-400, #98A0B4) !important; }
+html.theme-dark .text-gray-400 { color: var(--ink-500, #707892) !important; }
+
+/* ── 3. text-blue/green/red/yellow/orange dark overrides ── */
+html.theme-dark .text-blue-700,
+html.theme-dark .text-blue-600 { color: #93C5FD !important; }
+html.theme-dark .text-green-700,
+html.theme-dark .text-green-600 { color: #6EE7B7 !important; }
+html.theme-dark .text-red-700,
+html.theme-dark .text-red-600   { color: #FCA5A5 !important; }
+html.theme-dark .text-yellow-700,
+html.theme-dark .text-yellow-600 { color: #FCD34D !important; }
+html.theme-dark .text-orange-700,
+html.theme-dark .text-orange-600 { color: #FDBA74 !important; }
+
+/* ── 4. divide-gray-* table separators ── */
+html.theme-dark .divide-gray-200 > * + * { border-color: rgba(71,85,105,.55) !important; }
+html.theme-dark .divide-gray-100 > * + * { border-color: rgba(71,85,105,.4)  !important; }
+
+/* ── 5. badge backgrounds: bg-*-100 são claros demais em dark mode ── */
+html.theme-dark .bg-gray-100   { background-color: rgba(255,255,255,.06) !important; }
+html.theme-dark .bg-blue-100   { background-color: rgba(59,130,246,.14)  !important; }
+html.theme-dark .bg-yellow-100 { background-color: rgba(234,179,8,.14)   !important; }
+html.theme-dark .bg-green-100  { background-color: rgba(16,185,129,.14)  !important; }
+html.theme-dark .bg-red-100    { background-color: rgba(239,68,68,.14)   !important; }
+html.theme-dark .bg-orange-100 { background-color: rgba(249,115,22,.14)  !important; }
+html.theme-dark .bg-orange-50  { background-color: rgba(249,115,22,.09)  !important; }
+html.theme-dark .bg-indigo-50  { background-color: rgba(10,31,82,.65)    !important; }
+html.theme-dark .bg-indigo-100 { background-color: rgba(10,31,82,.8)     !important; }
+
+/* ── 6. page-heading / page-subheading ── */
+.page-heading {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary, #F2F4F9);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+html.theme-dark .page-heading { color: var(--ink-50, #F5F7FB) !important; }
+.page-subheading {
+    font-size: 13px;
+    color: var(--ink-400, #98A0B4);
+    margin-top: 2px;
+    line-height: 1.5;
+}
+
+/* ── 7. filter-tab-group / filter-tab ── */
+.filter-tab-group {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(255,255,255,.04);
+    border-radius: 10px;
+    border: 0.8px solid rgba(255,255,255,.08);
+}
+.filter-tab {
+    padding: 5px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-400, #98A0B4);
+    background: transparent;
+    border: none;
+    transition: all .15s;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.filter-tab:hover { color: var(--ink-200, #DEE2EB); background: rgba(255,255,255,.05); }
+.filter-tab.active,
+.filter-tab[data-active="true"],
+.filter-tab[aria-selected="true"] {
+    background: var(--navy-700, #0E2A6E);
+    color: var(--ink-50, #F5F7FB);
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+
+/* ── 8. filter-bar ── */
+.filter-bar {
+    background: rgba(10,31,82,.7);
+    border: 0.8px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.filter-bar .form-input { flex: 1; min-width: 140px; }
+
+/* ── 9. empty-state (complementa _EmptyState.cshtml) ── */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 220px;
+    padding: 48px 24px;
+    text-align: center;
+}
+.empty-state-icon { width: 64px; height: 64px; opacity: .35; margin-bottom: 4px; }
+.empty-state-title { font-size: 15px; font-weight: 600; color: var(--ink-200, #DEE2EB); }
+.empty-state-description {
+    font-size: 13px;
+    color: var(--ink-500, #707892);
+    max-width: 320px;
+    line-height: 1.5;
+}
+.empty-state .btn { margin-top: 8px; }
+
+/* ── 10. btn-outline-dark ── */
+.btn-outline-dark {
+    background: transparent;
+    border: 0.8px solid rgba(255,255,255,.2);
+    color: var(--ink-200, #DEE2EB);
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background .15s, border-color .15s, color .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.btn-outline-dark:hover {
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.35);
+    color: var(--ink-50, #F5F7FB);
+}
+
+/* ── 11. .card .btn-ghost: borda sutil para não parecer link solto ── */
+.card .btn-ghost,
+html.theme-dark .btn-ghost {
+    border: 0.8px solid rgba(255,255,255,.1);
+    color: var(--navy-200, #BCC8E5);
+    border-radius: 8px;
+}
+.card .btn-ghost:hover,
+html.theme-dark .btn-ghost:hover {
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.2);
+    color: var(--ink-50, #F5F7FB);
+}
+
+/* ── 12. toast severity variants ── */
+.toast-error {
+    background: rgba(127,29,29,.9) !important;
+    border-color: rgba(248,113,113,.3) !important;
+    color: rgb(252,165,165) !important;
+}
+.toast-warning {
+    background: rgba(120,53,15,.9) !important;
+    border-color: rgba(251,191,36,.3) !important;
+    color: rgb(253,230,138) !important;
+}
+.toast-success {
+    background: rgba(5,46,22,.9) !important;
+    border-color: rgba(74,222,128,.3) !important;
+    color: rgb(134,239,172) !important;
+}
+.toast-info {
+    background: rgba(10,31,82,.94) !important;
+    border-color: rgba(147,197,253,.25) !important;
+    color: rgb(147,197,253) !important;
+}
