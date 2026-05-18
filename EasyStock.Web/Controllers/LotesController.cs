@@ -59,20 +59,30 @@ public class LotesController(
                         result.ErrorCode, result.ErrorMessage, result.HttpStatus, result.CorrelationId);
             }
 
-            var pendentes = await pendentesTask;
-            if (pendentes.Success && pendentes.Data is not null)
+            // Pendentes rodam em paralelo e sua falha NÃO deve sobrescrever o
+            // listaPrincipalCarregou da lista principal já carregada com sucesso.
+            try
             {
-                vm.PendentesPesoCount = pendentes.Data.Count;
-                if (status == "pendente_peso")
+                var pendentes = await pendentesTask;
+                if (pendentes.Success && pendentes.Data is not null)
                 {
-                    vm.PendentesPeso = pendentes.Data;
-                    listaPrincipalCarregou = true;
+                    vm.PendentesPesoCount = pendentes.Data.Count;
+                    if (status == "pendente_peso")
+                    {
+                        vm.PendentesPeso = pendentes.Data;
+                        listaPrincipalCarregou = true;
+                    }
+                }
+                else
+                {
+                    log.LogWarning("Lotes.ListarPendentesPeso falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
+                        pendentes.ErrorCode, pendentes.ErrorMessage, pendentes.HttpStatus, pendentes.CorrelationId);
+                    if (status == "pendente_peso") listaPrincipalCarregou = false;
                 }
             }
-            else
+            catch (Exception ex)
             {
-                log.LogWarning("Lotes.ListarPendentesPeso falhou: {Code} {Message} (HTTP {Http} CID {Cid})",
-                    pendentes.ErrorCode, pendentes.ErrorMessage, pendentes.HttpStatus, pendentes.CorrelationId);
+                log.LogWarning(ex, "Lotes.ListarPendentesPeso lançou exceção (search={Search}, status={Status})", search, status);
                 if (status == "pendente_peso") listaPrincipalCarregou = false;
             }
         }

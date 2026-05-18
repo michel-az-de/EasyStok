@@ -622,6 +622,45 @@
                     </table>
                 </div>
             }
+            else if (p.QuantidadeTotalEstoque > 0)
+            {
+                <div class="overflow-x-auto mb-4">
+                    <table class="tbl-full">
+                        <thead>
+                            <tr>
+                                <th>Variação</th>
+                                <th class="text-center">Qtd</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <div class="font-medium text-slate-800">Padrão</div>
+                                    <div class="text-xs text-slate-400">Produto sem variações</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="text-lg font-extrabold @(p.QuantidadeTotalEstoque < 5 ? "text-amber-600" : "text-slate-900")">
+                                        @p.QuantidadeTotalEstoque
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="/entradas/nova?produtoId=@p.ProdutoId"
+                                       class="text-xs font-semibold text-emerald-600 px-2.5 py-1 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors whitespace-nowrap">
+                                        + Entrada
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center text-slate-400">
+                    <button @@click="tab='variacoes'; showAddVariacao=true; $nextTick(()=>$refs.novaVarInput?.focus())"
+                            class="text-sm font-semibold text-indigo-600 hover:underline">
+                        Organizar por variações →
+                    </button>
+                </div>
+            }
             else
             {
                 <div class="text-center py-10 text-slate-400">

@@ -121,11 +121,15 @@
 <div class="ws">
     @if (Model.Produtos.Any())
     {
+        @{
+            var catLookup = Model.Categorias.ToDictionary(c => c.Id, c => c.Nome);
+        }
         <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
                 <tr>
                     <th>Produto</th>
+                    <th>Categoria</th>
                     <th class="text-right">Preço</th>
                     <th class="text-center">Status</th>
                     <th></th>
@@ -164,6 +168,9 @@
                                     <div class="text-xs text-slate-400 font-mono">@(p.SkuBase?.Value ?? string.Empty)</div>
                                 </div>
                             </div>
+                        </td>
+                        <td class="text-sm text-slate-500">
+                            @(catLookup.TryGetValue(p.CategoriaId, out var catNome) ? catNome : "—")
                         </td>
                         <td class="text-right font-semibold">
                             @if (p.PrecoReferencia?.Valor is > 0)
