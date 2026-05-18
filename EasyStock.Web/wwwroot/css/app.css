@@ -4379,7 +4379,7 @@ html.theme-dark .ped-quick-btn:hover {
     line-height: 1.45;
     padding: 8px 12px;
     border-radius: 8px;
-    display: inline-block;
+    display: block;
     max-width: 100%;
 }
 
