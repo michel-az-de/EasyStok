@@ -69,7 +69,12 @@
                                 <span class="badge-critical">Inativa</span>
                             }
                         </td>
-                        <td class="text-slate-400 text-xs font-mono">@l.Id.ToString()[..8]...</td>
+                        <td class="text-slate-400 text-xs font-mono">
+                            <button type="button"
+                                    title="Copiar ID completo"
+                                    onclick="navigator.clipboard.writeText('@l.Id').then(function(){ var b=this; b.textContent='✓'; setTimeout(function(){ b.textContent='@(l.Id.ToString()[..8])...'; }, 1500); }.bind(this))"
+                                    class="hover:text-indigo-600 transition-colors cursor-copy">@(l.Id.ToString()[..8])...</button>
+                        </td>
                         <td>
                             <div class="flex items-center gap-3">
                                 <a href="/inteligencia-lojas/@l.Id"
@@ -90,7 +95,7 @@
                                 @if (l.Ativa)
                                 {
                                     <button type="button"
-                                            @@click="$dispatch('confirm-action', { titulo: 'Desativar loja', mensagem: 'Desativar <strong>' + @Json.Serialize(l.Nome) + '</strong>? Itens de estoque nessa loja não aparecerão mais.', textoBotao: 'Desativar', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/lojas/@l.Id/excluir' })"
+                                            @@click="$dispatch('confirm-action', { titulo: 'Desativar loja', mensagem: 'Desativar <strong>@System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(l.Nome)</strong>? Itens de estoque nessa loja não aparecerão mais.', textoBotao: 'Desativar', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/lojas/@l.Id/excluir' })"
                                             class="grid-action-btn grid-action-btn--danger">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M6.343 6.343l11.314 11.314" />

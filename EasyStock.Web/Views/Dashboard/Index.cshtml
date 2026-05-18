@@ -102,6 +102,14 @@ else if (Model.ResumoApiFalhou)
         {
             <div class="ds-kpi-sub text-slate-400">últimos 30 dias</div>
         }
+        @if (Model.ReceitaMes == 0)
+        {
+            <a href="/produtos?semPreco=true"
+               class="text-xs text-amber-600 hover:text-amber-700 hover:underline mt-1 block"
+               title="Saídas registradas com produtos sem preço resultam em receita zero">
+                ⚠ Verifique produtos sem preço
+            </a>
+        }
     </div>
 
     <div class="ws ds-kpi" title="Valor de venda estimado de todo o estoque atual">
@@ -351,6 +359,17 @@ else if (Model.ResumoApiFalhou)
             const ink  = css.getPropertyValue('--text-muted').trim() || 'rgb(112, 120, 146)';
             const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels));
             const dados = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados));
+
+            if (!dados.some(function (v) { return v > 0; })) {
+                var wrap = ctx.closest('.dashboard-chart-wrap');
+                if (wrap) wrap.innerHTML =
+                    '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2 py-8">' +
+                    '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' +
+                    '<p>Nenhuma venda com valor registrada no período.</p>' +
+                    '<a href="/produtos?semPreco=true" class="text-indigo-600 text-xs hover:underline">Verificar produtos sem preço →</a>' +
+                    '</div>';
+                return;
+            }
 
             const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
             gradient.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
