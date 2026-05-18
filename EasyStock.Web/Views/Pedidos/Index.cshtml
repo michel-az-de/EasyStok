@@ -59,8 +59,7 @@
         </p>
     </div>
     <div class="flex gap-3 flex-wrap">
-        <a href="/pedidos-mobile"
-           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+        <a href="/pedidos-mobile" class="btn-outline-dark">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -84,24 +83,20 @@
             <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, unidade ou número do pedido…"
                    aria-label="Buscar pedido"
                    class="ui-field flex-1 min-w-48" />
-            <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
-                Buscar
-            </button>
+            <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
         </div>
-        <div class="flex gap-2 flex-wrap">
+        <div class="filter-tab-group flex-wrap">
             @foreach (var (val, label) in new[] { ("", "Todos"), ("aguardando", "Aguardando"), ("preparando", "Em preparo"), ("pronto", "Pronto"), ("entregue", "Entregue") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                    @label
-                </a>
+                   class="filter-tab @(isActive ? "active" : "")">@label</a>
             }
             @if (totalAgendados > 0)
             {
                 var agActive = filtroAgenda == "agendados";
                 <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = agActive ? null : "agendados" })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(agActive ? "bg-blue-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                   class="filter-tab @(agActive ? "active" : "")">
                     📅 Agendados (@totalAgendados)
                 </a>
             }
@@ -109,7 +104,7 @@
             {
                 var atActive = filtroAgenda == "atrasados";
                 <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = atActive ? null : "atrasados" })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(atActive ? "bg-red-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                   class="filter-tab @(atActive ? "active" : "") text-[var(--crit-400)]">
                     ⚠ Atrasados (@totalAtrasados)
                 </a>
             }
