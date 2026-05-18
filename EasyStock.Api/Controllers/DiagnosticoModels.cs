@@ -167,6 +167,7 @@ public sealed class EndpointsTestResponse
     public EndpointTestResult[] Resultados { get; set; } = [];
     public int Saudaveis { get; set; }
     public int Lentos { get; set; }
+    public int Degradados { get; set; }
     public int Falhas { get; set; }
     public DateTimeOffset TestadoEm { get; set; }
 }
