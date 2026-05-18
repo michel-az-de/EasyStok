@@ -45,6 +45,7 @@ public class CriarTenantPorAdminUseCase(
     IUsuarioEmpresaRepository usuarioEmpresaRepository,
     IUsuarioPerfilRepository usuarioPerfilRepository,
     IUnitOfWork unitOfWork,
+    IPasswordHasher passwordHasher,
     IEmailService? emailService,
     ILogger<CriarTenantPorAdminUseCase> logger)
 {
@@ -95,7 +96,7 @@ public class CriarTenantPorAdminUseCase(
         await assinaturaRepository.AddAsync(assinatura);
 
         var senhaTemp = GerarSenhaAleatoria(SenhaTempLength);
-        var senhaHash = BCrypt.Net.BCrypt.HashPassword(senhaTemp);
+        var senhaHash = passwordHasher.Hash(senhaTemp);
         var usuario = Usuario.Criar(command.NomeAdmin.Trim(), emailNorm, senhaHash);
         await usuarioRepository.AddAsync(usuario);
 
