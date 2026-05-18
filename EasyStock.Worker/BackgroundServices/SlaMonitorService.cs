@@ -64,7 +64,7 @@ public sealed class SlaMonitorService(
             // Cross-tenant: monitor SLA varre AdminTickets de TODAS as empresas. Sem
             // usuario autenticado, sem bypass o RLS (app.bypass_rls) bloqueia leitura
             // E o filtro EF zera o IQueryable. Defesa em profundidade exige os dois layers.
-            db.BypassRowLevelSecurity = true;
+            using var _rlsBypass = db.UseRowLevelSecurityBypass();
             var notificador = sp.GetRequiredService<INotificadorService>();
 
             var agora = DateTime.UtcNow;
