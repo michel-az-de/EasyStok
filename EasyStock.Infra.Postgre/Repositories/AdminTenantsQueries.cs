@@ -93,7 +93,7 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
             .Where(a => usuariosIds.Contains(a.UsuarioId))
             .OrderByDescending(a => a.DataHora)
             .Take(20)
-            .Select(a => new TenantAuditLogInfo(a.Id, a.Acao, a.Sucesso, a.Detalhes, a.Ip, a.DataHora))
+            .Select(a => new TenantAuditLogInfo(a.Id, a.UsuarioId, a.Acao, a.Sucesso, a.Detalhes, a.Ip, a.DataHora))
             .ToListAsync();
 
         TenantAssinaturaInfo? assinaturaInfo = assinatura is null ? null : new TenantAssinaturaInfo(
@@ -119,5 +119,28 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
             lojas,
             usuarios,
             auditLogs);
+    }
+
+    public async Task<(IReadOnlyList<TenantAuditLogInfo> Items, int Total)> GetAuditLogsPagedAsync(
+        Guid empresaId, int page, int pageSize)
+    {
+        var usuariosIds = await db.UsuariosEmpresas.AsNoTracking()
+            .Where(ue => ue.EmpresaId == empresaId)
+            .Select(ue => ue.UsuarioId)
+            .ToListAsync();
+
+        var query = db.AuditLogs.AsNoTracking()
+            .Where(a => usuariosIds.Contains(a.UsuarioId));
+
+        var total = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(a => a.DataHora)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new TenantAuditLogInfo(a.Id, a.UsuarioId, a.Acao, a.Sucesso, a.Detalhes, a.Ip, a.DataHora))
+            .ToListAsync();
+
+        return (items, total);
     }
 }

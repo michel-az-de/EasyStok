@@ -8,10 +8,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [Fact]
+    [SkippableFact]
     public async Task SearchAsync_deve_buscar_por_nome_sku_e_marca_respeitando_empresa()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();
@@ -65,10 +65,10 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
         porNome.Single().EmpresaId.Should().Be(empresaA.Id);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Deve_persistir_value_objects_do_produto()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var produtoId = Guid.NewGuid();
@@ -111,10 +111,10 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetProdutosPaginadosAsync_deve_respeitar_tenant_por_empresaId()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();

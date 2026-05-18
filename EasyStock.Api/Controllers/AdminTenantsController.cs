@@ -272,14 +272,11 @@ public class AdminTenantsController(
         return DataOk(results.OrderByDescending(r => ((dynamic)r).totalPending));
     }
 
-    // TODO B4 follow-up: extrair os endpoints de mutação para UseCases dedicados.
-    // Hoje: PatchStatus, PatchPlano, GrantTrial, AplicarCupom já usam ports (IAssinatura/
-    // IPlano/ICupom/IAuditLog Repository). Restam Impersonate e GetAudit que ainda
-    // tocam db.UsuariosEmpresas / db.UsuariosPerfis / db.AdminImpersonationLogs /
-    // db.AuditLogs direto — JWT generation + queries complexas, requer refactor maior
-    // (criar IAdminImpersonationLogRepository + IUsuarioPerfilRepository.GetByUsuarioE...).
-    // Acoplamento atual gated por SuperAdmin policy. Leituras complexas já foram
-    // migradas para IAdminTenantsQueries.
+    // TODO B4 follow-up: extrair Impersonate para UseCase dedicado.
+    // GetAudit já foi migrado para IAdminTenantsQueries.GetAuditLogsPagedAsync.
+    // Impersonate ainda usa db.* direto (UsuariosEmpresas, UsuariosPerfis, AdminImpersonationLogs)
+    // + gera JWT inline — requer IAdminImpersonationLogRepository + extração do JWT signing
+    // para um ITokenService antes de ser extraível sem aumentar complexidade.
 
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> PatchStatus(Guid id, [FromBody] PatchTenantStatusRequest req)
@@ -405,22 +402,7 @@ public class AdminTenantsController(
     public async Task<IActionResult> GetAudit(Guid id, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         (page, pageSize) = NormalisePage(page, pageSize);
-
-        var usuariosIds = await db.UsuariosEmpresas
-            .Where(ue => ue.EmpresaId == id)
-            .Select(ue => ue.UsuarioId)
-            .ToListAsync();
-
-        var query = db.AuditLogs.Where(a => usuariosIds.Contains(a.UsuarioId));
-        var total = await query.CountAsync();
-
-        var logs = await query
-            .OrderByDescending(a => a.DataHora)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(a => new { a.Id, a.UsuarioId, a.Acao, a.Sucesso, a.Detalhes, a.Ip, a.DataHora })
-            .ToListAsync();
-
+        var (logs, total) = await tenantsQueries.GetAuditLogsPagedAsync(id, page, pageSize);
         return DataPaged(logs, total, page, pageSize);
     }
 

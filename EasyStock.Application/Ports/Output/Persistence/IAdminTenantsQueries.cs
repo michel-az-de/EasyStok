@@ -13,6 +13,9 @@ public interface IAdminTenantsQueries
         int page, int pageSize, string? search, StatusAssinatura? status);
 
     Task<TenantDetail?> ObterDetalheAsync(Guid empresaId);
+
+    Task<(IReadOnlyList<TenantAuditLogInfo> Items, int Total)> GetAuditLogsPagedAsync(
+        Guid empresaId, int page, int pageSize);
 }
 
 public sealed record TenantListItem(
@@ -66,4 +69,4 @@ public sealed record TenantUsuarioInfo(
     DateTime? UltimoAcessoEm, NivelAcesso? NivelAcesso);
 
 public sealed record TenantAuditLogInfo(
-    Guid Id, string Acao, bool Sucesso, string? Detalhes, string? Ip, DateTime DataHora);
+    Guid Id, Guid UsuarioId, string Acao, bool Sucesso, string? Detalhes, string? Ip, DateTime DataHora);

@@ -21,10 +21,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Tenancy;
 public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [Fact]
+    [SkippableFact]
     public async Task Sem_set_de_tenant_query_retorna_zero_linhas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
         await using var ctx = fixture.CreateDbContext();
@@ -36,10 +36,10 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         count.Should().Be(0, "fail-closed quando contexto de tenant não foi setado");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Set_tenant_A_ve_so_dados_de_A()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
         await using var ctx = fixture.CreateDbContext();
@@ -50,10 +50,10 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         produtos[0].EmpresaId.Should().Be(a.Id);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Set_tenant_B_ve_so_dados_de_B()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
         await using var ctx = fixture.CreateDbContext();
@@ -64,10 +64,10 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         produtos[0].EmpresaId.Should().Be(b.Id);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Bypass_RLS_ve_dados_dos_dois_tenants()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
         await using var ctx = fixture.CreateDbContext();
@@ -78,10 +78,10 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         produtos.Select(p => p.EmpresaId).Should().Contain(new[] { a.Id, b.Id });
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Insert_cross_tenant_e_bloqueado_pelo_WITH_CHECK()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
         await using var ctx = fixture.CreateDbContext();
@@ -100,10 +100,10 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
                 "policy WITH CHECK deve recusar gravação cross-tenant");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Interceptor_emite_SET_e_RESET_corretamente()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, _) = await SeedDuasEmpresasComProdutosAsync();
 
         // Cria um DbContext NOVO com o interceptor registrado e um ICurrentUser

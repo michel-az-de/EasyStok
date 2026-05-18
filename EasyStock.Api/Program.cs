@@ -255,6 +255,10 @@ builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSystemUserResolve
 // Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
 // Em multi-instance, evoluir pra Redis pubsub.
 builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.MobileEventBroker>();
+// SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.SyncMutationDispatcher>();
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.SyncAutoLinker>();
+builder.Services.AddScoped<EasyStock.Api.Mobile.Services.SyncReversePullService>();
 // Onda 9: OTA do PWA — lê CACHE_VERSION do sw.js em runtime pra /version reportar
 // a versão real do bundle (sem depender de config drift-prone).
 builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.IPwaVersionProvider,

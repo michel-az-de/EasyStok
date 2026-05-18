@@ -32,10 +32,10 @@ public class MongoDbHealthCheckTests : IAsyncLifetime
             await _container.DisposeAsync();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Health_deve_subir_com_provider_mongo()
     {
-        if (!_isAvailable || _container is null) return;
+        Skip.If(!_isAvailable || _container is null, "Docker/MongoDB unavailable");
 
         var databaseName = $"easystock_api_tests_{Guid.NewGuid():N}";
 
