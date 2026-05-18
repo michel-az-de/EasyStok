@@ -141,8 +141,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
 
-            if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
-                query = query.Where(i => i.Status == statusEnum);
+            var statusEnum = NormalizarStatusFiltro(status);
+            if (statusEnum.HasValue)
+                query = query.Where(i => i.Status == statusEnum.Value);
 
             if (categoriaId.HasValue)
                 query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
@@ -165,8 +166,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
 
-            if (!string.IsNullOrEmpty(status) && Enum.TryParse<StatusItemEstoque>(status, ignoreCase: true, out var statusEnum))
-                query = query.Where(i => i.Status == statusEnum);
+            var statusEnum = NormalizarStatusFiltro(status);
+            if (statusEnum.HasValue)
+                query = query.Where(i => i.Status == statusEnum.Value);
 
             if (categoriaId.HasValue)
                 query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
@@ -296,6 +298,31 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             dbContext.ItensEstoque.UpdateRange(itensEstoque);
             return Task.CompletedTask;
+        }
+
+        // Mapeia o valor PT-BR do querystring (vindo do frontend / deep-links do
+        // Dashboard tipo /estoque?status=critico) para o enum em inglês. Antes,
+        // Enum.TryParse falhava silenciosamente porque "critico" ≠ "Critical" e o
+        // filtro era ignorado — a lista voltava completa, e a pill ativa parecia
+        // não responder. Aceita variantes com e sem acento. Retorna null se o
+        // valor é vazio ou não reconhecido (= "sem filtro de status").
+        private static StatusItemEstoque? NormalizarStatusFiltro(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+                return null;
+
+            return status.Trim().ToLowerInvariant() switch
+            {
+                "ok" => StatusItemEstoque.Ok,
+                "warn" or "atencao" or "atenção" => StatusItemEstoque.Warn,
+                "critical" or "critico" or "crítico" => StatusItemEstoque.Critical,
+                "esgotado" => StatusItemEstoque.Esgotado,
+                "slow" or "parado" => StatusItemEstoque.Slow,
+                "vencido" => StatusItemEstoque.Vencido,
+                "descartado" => StatusItemEstoque.Descartado,
+                "bloqueado" => StatusItemEstoque.Bloqueado,
+                _ => null
+            };
         }
     }
 }
