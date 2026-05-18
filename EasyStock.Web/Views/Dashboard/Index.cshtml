@@ -371,26 +371,31 @@ else if (Model.ResumoApiFalhou)
                 return;
             }
 
-            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
-            gradient.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
-            gradient.addColorStop(1, 'rgba(30, 72, 168, 0)');
             new Chart(ctx, {
-                type: 'line',
+                type: labels.length > 1 ? 'line' : 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
                         label: 'Vendas',
                         data: dados,
                         borderColor: navy,
-                        backgroundColor: gradient,
+                        backgroundColor: labels.length > 1
+                            ? (function() {
+                                var g = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
+                                g.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
+                                g.addColorStop(1, 'rgba(30, 72, 168, 0)');
+                                return g;
+                              })()
+                            : 'rgba(30, 72, 168, 0.7)',
                         borderWidth: 2.5,
-                        fill: true,
+                        fill: labels.length > 1,
                         tension: 0.35,
-                        pointRadius: 0,
+                        pointRadius: labels.length > 1 ? 0 : undefined,
                         pointHoverRadius: 5,
                         pointHoverBackgroundColor: '#1E48A8',
                         pointHoverBorderColor: '#FFFFFF',
-                        pointHoverBorderWidth: 2
+                        pointHoverBorderWidth: 2,
+                        borderRadius: labels.length > 1 ? undefined : 6
                     }]
                 },
                 options: {
@@ -417,6 +422,7 @@ else if (Model.ResumoApiFalhou)
                             grid: { display: false }
                         },
                         y: {
+                            beginAtZero: true,
                             ticks: {
                                 color: ink,
                                 callback: v => 'R$ ' + v.toLocaleString('pt-BR')

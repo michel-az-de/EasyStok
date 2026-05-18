@@ -92,6 +92,12 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             {
                 vm.ReceitaMesAtual = ordenado[0].ReceitaBruta;
             }
+
+            // ReceitaEstimadaPeriodo usa MovimentacoesEstoque.ValorTotal que fica zero
+            // quando produtos não têm preço cadastrado. Usa Vendas.ValorTotal (mesmo
+            // fonte do gráfico) que reflete o total real registrado na venda.
+            if (vm.ReceitaMes == 0 && vm.ReceitaMesAtual > 0)
+                vm.ReceitaMes = vm.ReceitaMesAtual;
         }
 
         if (iaUsoResult.Success && iaUsoResult.Data is { } ia)
