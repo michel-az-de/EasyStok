@@ -11,8 +11,11 @@ using EasyStock.Infra.MongoDb.DependencyInjection;
 using EasyStock.Infra.MongoDb.HealthChecks;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
+using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal;
 using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
+using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -178,9 +181,11 @@ switch (resolvedProvider)
             .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
             .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
             .AddNotificationsHosting();
-        // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapter Focus NFe + cert A1
+        // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapters Focus NFe + Mock + cert A1
         builder.Services.AddEasyStockIntegrationResilience();
         builder.Services.AddFocusNFeAdapter(builder.Configuration);
+        builder.Services.AddMockFiscalGateway();
+        builder.Services.AddSingleton<IGatewayFiscalFactory, GatewayFiscalFactory>();
         builder.Services.AddDataProtection();
         break;
 
