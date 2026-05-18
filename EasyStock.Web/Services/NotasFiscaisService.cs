@@ -27,4 +27,34 @@ public class NotasFiscaisService(ApiClient api, SessionService session)
     {
         return api.PostAsync<object>($"notas-fiscais/{id}/cancelar?empresaId={GetEmpresaId()}", new { motivo });
     }
+
+    public Task<ApiResult<List<PedidoElegivelItem>>> ListarPedidosElegiveisAsync(int limit = 50)
+    {
+        return api.GetAsync<List<PedidoElegivelItem>>(
+            $"notas-fiscais/pedidos-elegiveis?empresaId={GetEmpresaId()}&limit={limit}");
+    }
+
+    public Task<ApiResult<NfeListItem>> EmitirDePedidoAsync(
+        Guid pedidoId, string? destinatarioCpf, string? destinatarioNome, string? destinatarioEmail)
+    {
+        var body = new
+        {
+            pedidoId,
+            destinatarioCpf = string.IsNullOrWhiteSpace(destinatarioCpf) ? null : destinatarioCpf,
+            destinatarioNome = string.IsNullOrWhiteSpace(destinatarioNome) ? null : destinatarioNome,
+            destinatarioEmail = string.IsNullOrWhiteSpace(destinatarioEmail) ? null : destinatarioEmail,
+        };
+        return api.PostAsync<NfeListItem>(
+            $"notas-fiscais/emitir-de-pedido?empresaId={GetEmpresaId()}", body);
+    }
+}
+
+public class PedidoElegivelItem
+{
+    public Guid Id { get; set; }
+    public DateTime CriadoEm { get; set; }
+    public string ClienteNome { get; set; } = "Consumidor";
+    public decimal Total { get; set; }
+    public int QtdItens { get; set; }
+    public string? Status { get; set; }
 }

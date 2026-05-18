@@ -18,7 +18,7 @@ namespace EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
 /// </para>
 /// </summary>
 public class InutilizarNumeracaoUseCase(
-    IGatewayFiscal gateway,
+    IGatewayFiscalFactory gatewayFactory,
     IConfigFiscalResolver configResolver,
     ILogger<InutilizarNumeracaoUseCase> logger) : IUseCase<InutilizarNumeracaoCommand, InutilizarNumeracaoResult>
 {
@@ -35,6 +35,7 @@ public class InutilizarNumeracaoUseCase(
             throw new UseCaseValidationException("Justificativa exige minimo 15 caracteres (SEFAZ).");
 
         var config = await configResolver.ResolveAsync(cmd.EmpresaId);
+        var gateway = gatewayFactory.ObterPara(config.Provedor);
 
         var resultado = await gateway.InutilizarAsync(
             cmd.EmpresaId,

@@ -19,12 +19,16 @@ public class EmitirNfceUseCaseTests
     private readonly INumeracaoNfeService _numeracao = Substitute.For<INumeracaoNfeService>();
     private readonly IGeradorChaveAcesso _geradorChave = Substitute.For<IGeradorChaveAcesso>();
     private readonly IGatewayFiscal _gateway = Substitute.For<IGatewayFiscal>();
+    private readonly IGatewayFiscalFactory _gatewayFactory = Substitute.For<IGatewayFiscalFactory>();
     private readonly IConfigFiscalResolver _configResolver = Substitute.For<IConfigFiscalResolver>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ILogger<EmitirNfceUseCase> _logger = Substitute.For<ILogger<EmitirNfceUseCase>>();
 
-    private EmitirNfceUseCase NewUseCase() =>
-        new(_nfeRepo, _numeracao, _geradorChave, _gateway, _configResolver, _uow, _logger);
+    private EmitirNfceUseCase NewUseCase()
+    {
+        _gatewayFactory.ObterPara(Arg.Any<string>()).Returns(_gateway);
+        return new(_nfeRepo, _numeracao, _geradorChave, _gatewayFactory, _configResolver, _uow, _logger);
+    }
 
     [Fact]
     public async Task ExecuteAsync_ComEmpresaIdVazio_LancaUseCaseValidationException()

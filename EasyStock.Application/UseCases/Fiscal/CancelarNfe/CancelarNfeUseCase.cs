@@ -24,7 +24,7 @@ namespace EasyStock.Application.UseCases.Fiscal.CancelarNfe;
 /// </summary>
 public class CancelarNfeUseCase(
     INfeRepository nfeRepo,
-    IGatewayFiscal gateway,
+    IGatewayFiscalFactory gatewayFactory,
     IConfigFiscalResolver configResolver,
     IUnitOfWork uow,
     ILogger<CancelarNfeUseCase> logger) : IUseCase<CancelarNfeCommand, CancelarNfeResult>
@@ -50,6 +50,7 @@ public class CancelarNfeUseCase(
                 $"So NFC-e Autorizada pode ser cancelada. Status atual: {nfe.Status}.");
 
         var config = await configResolver.ResolveAsync(cmd.EmpresaId);
+        var gateway = gatewayFactory.ObterPara(config.Provedor);
 
         // === SEFAZ primeiro (anti-padrao "commit antes de SEFAZ" evitado — B-055) ===
         var resultado = await gateway.CancelarAsync(nfe, cmd.Motivo.Trim(), config);
