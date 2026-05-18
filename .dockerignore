@@ -22,11 +22,11 @@ EasyStok.Mobile/
 EasyStock.*.Tests/
 EasyStock.ArchitectureTests/
 EasyStock.Benchmarks/
-EasyStock.Infra.MongoDb/
 EasyStock.Infra.MongoDb.IntegrationTests/
-EasyStock.Infra.Sqlite/
 k8s/
 scripts/
+!scripts/docker/
+!scripts/docker/api-entrypoint.sh
 **/Properties/launchSettings.json
 .claude/
 builds/
