@@ -46,6 +46,7 @@ public class CriarTenantPorAdminUseCase(
     IUsuarioPerfilRepository usuarioPerfilRepository,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
+    IPasswordHasher passwordHasher,
     IEmailService? emailService,
     ILogger<CriarTenantPorAdminUseCase> logger)
 {

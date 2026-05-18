@@ -39,6 +39,7 @@ public sealed class CriarUsuarioTenantPorAdminUseCase(
     IUsuarioPerfilRepository usuarioPerfilRepository,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
+    IPasswordHasher passwordHasher,
     IEmailService? emailService,
     ILogger<CriarUsuarioTenantPorAdminUseCase> logger)
 {
