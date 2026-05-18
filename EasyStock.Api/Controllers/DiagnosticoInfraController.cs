@@ -30,8 +30,9 @@ public sealed class DiagnosticoInfraController(
     [HttpGet("endpoints")]
     public async Task<IActionResult> TestEndpoints(CancellationToken ct)
     {
-        // Cache de 60s — o próprio teste consome ~4s; rodar a cada request degradaria a API
-        const string cacheKey = "diag:endpoints:v1";
+        // Cache de 60s — o próprio teste consome ~4s; rodar a cada request degradaria a API.
+        // v2: respostas agora incluem campo `degradados` + status "degraded" para auth-protegidos.
+        const string cacheKey = "diag:endpoints:v2";
         try
         {
             var cached = await cache.GetStringAsync(cacheKey, ct);
@@ -86,13 +87,25 @@ public sealed class DiagnosticoInfraController(
                 result.StatusCode = (int)httpResp.StatusCode;
                 result.LatenciaMs = sw.ElapsedMilliseconds;
 
-                var isExpectedStatus = result.StatusCode == expectedStatus ||
-                                       (expectedStatus == 401 && result.StatusCode == 401);
-                var isHealthy = result.StatusCode < 500 && isExpectedStatus;
-
-                result.Status = isHealthy
-                    ? (result.LatenciaMs < 300 ? "ok" : result.LatenciaMs < 1000 ? "slow" : "very_slow")
-                    : "error";
+                // Endpoint com expectedStatus=401 só testa que a auth está protegida — o teste
+                // não envia credenciais, então não conseguimos afirmar saúde funcional. Marcamos
+                // como "degraded" (amarelo, auth-protegido) em vez de "ok" para não dar falsa
+                // impressão de que o endpoint serve dados corretamente.
+                if (expectedStatus == 401 && result.StatusCode == 401)
+                {
+                    result.Status = "degraded";
+                    result.Erro = "Auth-protegido — teste sem credenciais, comportamento funcional não verificado.";
+                }
+                else if (result.StatusCode == expectedStatus && result.StatusCode < 400)
+                {
+                    result.Status = result.LatenciaMs < 300 ? "ok"
+                        : result.LatenciaMs < 1000 ? "slow"
+                        : "very_slow";
+                }
+                else
+                {
+                    result.Status = "error";
+                }
             }
             catch (TaskCanceledException)
             {
@@ -112,6 +125,7 @@ public sealed class DiagnosticoInfraController(
 
         var healthy = results.Count(r => r.Status == "ok");
         var slow = results.Count(r => r.Status is "slow" or "very_slow");
+        var degraded = results.Count(r => r.Status == "degraded");
         var failed = results.Count(r => r.Status is "error" or "timeout");
 
         var response = new EndpointsTestResponse
@@ -119,6 +133,7 @@ public sealed class DiagnosticoInfraController(
             Resultados = results.ToArray(),
             Saudaveis = healthy,
             Lentos = slow,
+            Degradados = degraded,
             Falhas = failed,
             TestadoEm = DateTimeOffset.UtcNow
         };
