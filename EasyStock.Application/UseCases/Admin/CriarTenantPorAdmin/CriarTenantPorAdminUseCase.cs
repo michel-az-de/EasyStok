@@ -44,8 +44,8 @@ public class CriarTenantPorAdminUseCase(
     IEmpresaRepository empresaRepository,
     IUsuarioEmpresaRepository usuarioEmpresaRepository,
     IUsuarioPerfilRepository usuarioPerfilRepository,
-    IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
+    IUnitOfWork unitOfWork,
     IEmailService? emailService,
     ILogger<CriarTenantPorAdminUseCase> logger)
 {
