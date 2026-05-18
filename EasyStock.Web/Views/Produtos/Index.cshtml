@@ -119,11 +119,11 @@
 
 <!-- Tabela -->
 <div class="ws">
+    @{
+        var catLookup = Model.Categorias.ToDictionary(c => c.Id, c => c.Nome);
+    }
     @if (Model.Produtos.Any())
     {
-        @{
-            var catLookup = Model.Categorias.ToDictionary(c => c.Id, c => c.Nome);
-        }
         <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
