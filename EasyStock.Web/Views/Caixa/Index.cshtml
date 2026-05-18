@@ -23,10 +23,10 @@
         <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
     <div class="flex gap-3">
-        <a href="/caixa-mobile" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 inline-flex items-center gap-2">
+        <a href="/caixa-mobile" class="btn-outline-dark inline-flex items-center gap-2">
             <es-icon name="phone" class="es-icon--sm"></es-icon> Lançamentos do app
         </a>
-        <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 inline-flex items-center gap-2">
+        <a href="/caixa/historico" class="btn-outline-dark inline-flex items-center gap-2">
             <es-icon name="history" class="es-icon--sm"></es-icon> Histórico
         </a>
     </div>
@@ -97,22 +97,22 @@
             @if (canAutoRetry)
             {
                 <button type="button" x-show="enabled && !exhausted" @@click="cancel()"
-                        class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                        class="btn-outline-dark">
                     Cancelar tentativas automáticas
                 </button>
             }
             @if (isAuthIssue)
             {
-                <a href="/auth/login" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                <a href="/auth/login" class="btn-outline-dark">
                     Ir para login
                 </a>
             }
             else
             {
-                <a href="/caixa/historico" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                <a href="/caixa/historico" class="btn-outline-dark">
                     Ver histórico de fechamentos
                 </a>
-                <a href="/configuracoes#suporte" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+                <a href="/configuracoes#suporte" class="btn-outline-dark">
                     Falar com suporte
                 </a>
             }

@@ -44,7 +44,7 @@
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
     <span class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
     <div class="ml-auto flex gap-2">
-        <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
+        <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
             🖨 Recibo
         </a>
         @if (p.Status != "entregue" && !isCancelado)
@@ -75,7 +75,7 @@
                 {
                     <form asp-action="Agendar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="inline">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50"
+                        <button type="submit" class="btn-outline-dark"
                                 title="Pedido vira imediato (sem data agendada)">
                             Remover agendamento
                         </button>

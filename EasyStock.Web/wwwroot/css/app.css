@@ -4818,6 +4818,11 @@ html.theme-dark .text-orange-600 { color: #FDBA74 !important; }
 html.theme-dark .divide-gray-200 > * + * { border-color: rgba(71,85,105,.55) !important; }
 html.theme-dark .divide-gray-100 > * + * { border-color: rgba(71,85,105,.4)  !important; }
 
+/* ── 4b. bg-slate-100/200: não cobertos pelos overrides existentes ── */
+html.theme-dark .bg-slate-100  { background-color: rgba(30,41,59,.88)  !important; }
+html.theme-dark .bg-slate-200  { background-color: rgba(51,65,85,.9)   !important; }
+html.theme-dark .hover\:bg-slate-200:hover { background-color: rgba(51,65,85,.95) !important; }
+
 /* ── 5. badge backgrounds: bg-*-100 são claros demais em dark mode ── */
 html.theme-dark .bg-gray-100   { background-color: rgba(255,255,255,.06) !important; }
 html.theme-dark .bg-blue-100   { background-color: rgba(59,130,246,.14)  !important; }

@@ -9,7 +9,7 @@
         <h1>Pedidos do app</h1>
         <p>Revise pedidos criados no app pelo operador e linke ao fluxo de pedidos do ERP</p>
     </div>
-    <a href="/pedidos" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">
+    <a href="/pedidos" class="btn-outline-dark">
         ← Pedidos ERP
     </a>
 </div>
@@ -33,13 +33,12 @@
 
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 items-center flex-wrap">
+        <div class="filter-tab-group">
         @foreach (var (val, label) in new[] { ("false", "Todos"), ("true", "Pendentes (sem link)") })
         {
             var isActive = (val == "true") == Model.PendingOnly;
             <a href="@Url.Action("Index", "PedidosMobile", new { pendingOnly = val == "true" })"
-               class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                @label
-            </a>
+               class="filter-tab @(isActive ? "active" : "")">@label</a>
         }
         @* F5 — filtros de agendamento (chips secundários) *@
         @{
@@ -47,16 +46,17 @@
             var atrasadosActive = filtroAgenda == "atrasados";
         }
         <a href="@Url.Action("Index", "PedidosMobile", new { pendingOnly = Model.PendingOnly, agenda = "agendados" })"
-           class="px-3 py-2 rounded-lg text-sm font-medium @(agendaActive ? "bg-blue-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+           class="filter-tab @(agendaActive ? "active" : "")">
             📅 Agendados (@totalAgendados)
         </a>
         @if (totalAtrasados > 0)
         {
             <a href="@Url.Action("Index", "PedidosMobile", new { pendingOnly = Model.PendingOnly, agenda = "atrasados" })"
-               class="px-3 py-2 rounded-lg text-sm font-medium @(atrasadosActive ? "bg-red-600 text-white" : "ui-secondary-btn bg-white border border-red-300 text-red-700 hover:bg-red-50")">
+               class="filter-tab @(atrasadosActive ? "active" : "") text-[var(--crit-400)]">
                 ⚠ Atrasados (@totalAtrasados)
             </a>
         }
+        </div>
         <span class="text-sm text-slate-500 ml-auto">@visiveis.Count pedido(s)</span>
     </form>
 </div>
@@ -139,7 +139,7 @@
                                                     <option value="@ep.Id">@(ep.ClienteNome ?? "—") · @ep.Total.ToString("C") · @ep.CriadoEm.ToLocalTime():dd/MM</option>
                                                 }
                                             </select>
-                                            <button type="submit" class="w-full px-3 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded hover:bg-slate-50">
+                                            <button type="submit" class="btn-outline-dark w-full justify-center">
                                                 🔗 Linkar
                                             </button>
                                         </form>

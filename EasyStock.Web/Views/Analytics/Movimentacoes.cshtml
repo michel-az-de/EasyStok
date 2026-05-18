@@ -119,7 +119,7 @@
                 @for (int p = 1; p <= Model.Paginacao.Pages; p++)
                 {
                     <a href="@Url.Action("Movimentacoes", "Analytics", new { page = p, tipo = Model.FiltroTipo, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                       class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                       class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "btn-outline-dark")">
                         @p
                     </a>
                 }

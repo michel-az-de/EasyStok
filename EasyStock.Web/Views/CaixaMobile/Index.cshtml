@@ -9,19 +9,19 @@
         <h1>Lançamentos do app</h1>
         <p>Revise entradas/saídas registradas no app pelo operador e promova pro caixa do ERP</p>
     </div>
-    <a href="/caixa" class="ui-secondary-btn px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50">← Caixa</a>
+    <a href="/caixa" class="btn-outline-dark">← Caixa</a>
 </div>
 
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 items-center">
+        <div class="filter-tab-group">
         @foreach (var (val, label) in new[] { ("false", "Todos"), ("true", "Pendentes (sem link)") })
         {
             var isActive = (val == "true") == Model.PendingOnly;
             <a href="@Url.Action("Index", "CaixaMobile", new { pendingOnly = val == "true" })"
-               class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                @label
-            </a>
+               class="filter-tab @(isActive ? "active" : "")">@label</a>
         }
+        </div>
         <span class="text-sm text-slate-500 ml-auto">@Model.Items.Count lançamento(s)</span>
     </form>
 </div>
