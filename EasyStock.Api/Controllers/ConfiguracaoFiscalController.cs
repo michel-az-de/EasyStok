@@ -145,6 +145,91 @@ public class ConfiguracaoFiscalController(
         }
     }
 
+    [SwaggerOperation(Summary = "Atualiza regime tributario, IE, IM e endereco do emitente. Cria a configuracao se nao existir.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("dados-emitente")]
+    public async Task<IActionResult> AtualizarDadosEmitente(
+        [FromBody] AtualizarDadosEmitenteRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+
+        try
+        {
+            await uow.ExecuteInTransactionAsync(async txCt =>
+            {
+                var config = await db.EmpresaConfiguracoesFiscais
+                    .FirstOrDefaultAsync(c => c.EmpresaId == eid, txCt);
+
+                if (config is null)
+                {
+                    config = EmpresaConfiguracaoFiscal.Criar(eid, req.RegimeTributario);
+                    await db.EmpresaConfiguracoesFiscais.AddAsync(config, txCt);
+                }
+                else if (config.RegimeTributario != req.RegimeTributario)
+                {
+                    // Regime e read-only pos-criacao — bloqueia mudanca silenciosa que
+                    // afetaria CST/CSOSN de notas ja emitidas neste regime.
+                    throw new EasyStock.Domain.Exceptions.RegraDeDominioVioladaException(
+                        "Regime tributario nao pode ser alterado apos criado. Contate o suporte.");
+                }
+
+                var endereco = req.Endereco is null
+                    ? null
+                    : new EasyStock.Domain.ValueObjects.Endereco(
+                        Logradouro: req.Endereco.Logradouro,
+                        Numero: req.Endereco.Numero,
+                        Complemento: req.Endereco.Complemento,
+                        Bairro: req.Endereco.Bairro,
+                        Cidade: req.Endereco.Cidade,
+                        Uf: req.Endereco.Uf,
+                        Cep: req.Endereco.Cep,
+                        Pais: "BR");
+
+                config.AtualizarDadosEmitente(req.InscricaoEstadual, req.InscricaoMunicipal, endereco);
+                db.EmpresaConfiguracoesFiscais.Update(config);
+            });
+
+            logger.LogInformation("Dados emitente atualizados para empresa {Empresa}.", eid);
+            return DataOk(new { mensagem = "Dados do emitente atualizados." });
+        }
+        catch (EasyStock.Domain.Exceptions.RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
+        catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
+    }
+
+    [SwaggerOperation(Summary = "Escolhe o provedor SEFAZ do tenant (mock, focus, enotas).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("provedor")]
+    public async Task<IActionResult> EscolherProvedor(
+        [FromBody] EscolherProvedorRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+        if (string.IsNullOrWhiteSpace(req.Provedor)) return DataBadRequest("Provedor obrigatorio.");
+
+        try
+        {
+            await uow.ExecuteInTransactionAsync(async txCt =>
+            {
+                var config = await db.EmpresaConfiguracoesFiscais
+                    .FirstOrDefaultAsync(c => c.EmpresaId == eid, txCt)
+                    ?? throw new InvalidOperationException("Config fiscal nao encontrada. Salve os dados do emitente primeiro.");
+
+                config.EscolherProvedor(req.Provedor);
+                db.EmpresaConfiguracoesFiscais.Update(config);
+            });
+
+            return DataOk(new { mensagem = $"Provedor '{req.Provedor.ToLowerInvariant()}' configurado." });
+        }
+        catch (InvalidOperationException ex) { return DataBadRequest(ex.Message); }
+        catch (EasyStock.Domain.Exceptions.RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
+        catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
+    }
+
     [SwaggerOperation(Summary = "Configurar CSC (Codigo de Seguranca do Contribuinte) para NFC-e")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -259,8 +344,21 @@ public class ConfiguracaoFiscalController(
             habilitada = config.Habilitada,
             ambiente = config.Ambiente.ToString(),
             regimeTributario = config.RegimeTributario.ToString(),
+            provedor = config.ProvedorPreferido,
             serieNfce = config.SerieNfce,
             proximoNumeroNfce = config.ProximoNumeroNfce,
+            inscricaoEstadual = config.InscricaoEstadual,
+            inscricaoMunicipal = config.InscricaoMunicipal,
+            endereco = config.Endereco is null ? null : new
+            {
+                logradouro = config.Endereco.Logradouro,
+                numero = config.Endereco.Numero,
+                complemento = config.Endereco.Complemento,
+                bairro = config.Endereco.Bairro,
+                cidade = config.Endereco.Cidade,
+                uf = config.Endereco.Uf,
+                cep = config.Endereco.Cep,
+            },
             temCsc = !string.IsNullOrWhiteSpace(config.CscId),
             cscId = config.CscId,
             certificado = cert is null

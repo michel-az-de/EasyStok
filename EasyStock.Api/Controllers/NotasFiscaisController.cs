@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -33,7 +34,8 @@ public class NotasFiscaisController(
     InutilizarNumeracaoUseCase inutilizarUseCase,
     ConsultarNfeUseCase consultarUseCase,
     INfeRepository nfeRepo,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    EasyStock.Infra.Postgre.Data.EasyStockDbContext db) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Emite uma NFC-e em homologação ou produção conforme config do tenant")]
     [ProducesResponseType(typeof(NfeResponse), StatusCodes.Status200OK)]
@@ -89,6 +91,126 @@ public class NotasFiscaisController(
         }
         catch (GatewayFiscalCredencialException ex) { return MapearExcecaoFiscal(ex); }
         catch (GatewayFiscalDenegadaException ex) { return MapearExcecaoFiscal(ex); }
+    }
+
+    [SwaggerOperation(Summary = "Emite uma NFC-e a partir de um pedido existente — Web admin")]
+    [ProducesResponseType(typeof(NfeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("emitir-de-pedido")]
+    [EnableRateLimiting("nfe-emitir")]
+    public async Task<IActionResult> EmitirDePedido(
+        [FromBody] EmitirDePedidoRequest req,
+        [FromQuery] Guid? empresaId,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+        if (req.PedidoId == Guid.Empty) return DataBadRequest("PedidoId obrigatorio.");
+
+        var pedido = await db.Pedidos
+            .AsNoTracking()
+            .Include(p => p.Itens)
+            .FirstOrDefaultAsync(p => p.Id == req.PedidoId && p.EmpresaId == eid, ct);
+
+        if (pedido is null) return DataNotFound("Pedido nao encontrado.");
+        if (pedido.Itens.Count == 0) return DataBadRequest("Pedido sem itens.");
+
+        var jaEmitida = await db.NfeDocumentos
+            .AsNoTracking()
+            .AnyAsync(n => n.PedidoId == req.PedidoId && n.Status != StatusNfe.Rejeitada
+                                                       && n.Status != StatusNfe.Inutilizada, ct);
+        if (jaEmitida) return DataBadRequest("Pedido ja possui NFC-e emitida.");
+
+        var empresa = await db.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eid, ct);
+        if (empresa is null) return DataBadRequest("Empresa nao encontrada.");
+        if (string.IsNullOrWhiteSpace(empresa.Documento)) return DataBadRequest("Empresa sem CNPJ. Cadastre antes de emitir.");
+
+        var config = await db.EmpresaConfiguracoesFiscais.AsNoTracking().FirstOrDefaultAsync(c => c.EmpresaId == eid, ct);
+        if (config is null) return DataBadRequest("Configuracao fiscal ausente. Acesse /configuracao-fiscal.");
+
+        var idempotencyKey = string.IsNullOrWhiteSpace(req.IdempotencyKey)
+            ? $"web-emitir-{pedido.Id:N}-{DateTime.UtcNow:yyyyMMddHHmmss}"
+            : req.IdempotencyKey;
+
+        var cmd = new EmitirNfceCommand(
+            EmpresaId: eid,
+            PedidoId: pedido.Id,
+            IdempotencyKey: idempotencyKey,
+            TotalNota: pedido.Total.Valor,
+            Emitente: new DadosEmitenteInput(
+                Cnpj: SomenteDigitos(empresa.Documento),
+                RazaoSocial: empresa.Nome,
+                NomeFantasia: null,
+                InscricaoEstadual: config.InscricaoEstadual,
+                InscricaoMunicipal: config.InscricaoMunicipal),
+            Destinatario: string.IsNullOrWhiteSpace(req.DestinatarioCpf) && string.IsNullOrWhiteSpace(req.DestinatarioNome)
+                ? null
+                : new DadosDestinatarioInput(
+                    CpfCnpj: req.DestinatarioCpf,
+                    Nome: req.DestinatarioNome,
+                    Email: req.DestinatarioEmail),
+            Itens: pedido.Itens
+                .Select(i => new EmitirNfceItemInput(
+                    NomeSnapshot: i.Nome,
+                    Quantidade: i.Quantidade,
+                    PrecoUnitario: i.PrecoUnitario,
+                    Unidade: string.IsNullOrWhiteSpace(i.Unidade) ? "UN" : i.Unidade,
+                    Ncm: null,
+                    Cfop: "5102",
+                    ProdutoIdSnapshot: i.ProdutoId,
+                    OrigemMercadoria: 0,
+                    CstOuCsosn: config.RegimeTributario == RegimeTributario.Simples ? "102" : "00"))
+                .ToList(),
+            UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+            UsuarioNome: ResolverNomeUsuarioAtual(),
+            Origem: "web-admin");
+
+        try
+        {
+            var result = await emitirUseCase.ExecuteAsync(cmd);
+            var nfe = await nfeRepo.GetByIdAsync(eid, result.NfeId, ct);
+            return DataOk(MapToResponse(nfe!));
+        }
+        catch (GatewayFiscalCredencialException ex) { return MapearExcecaoFiscal(ex); }
+        catch (GatewayFiscalDenegadaException ex) { return MapearExcecaoFiscal(ex); }
+    }
+
+    [SwaggerOperation(Summary = "Lista pedidos elegiveis para emissao de NFC-e — Web admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet("pedidos-elegiveis")]
+    public async Task<IActionResult> ListarPedidosElegiveis(
+        [FromQuery] Guid? empresaId,
+        [FromQuery] int limit = 50,
+        CancellationToken ct = default)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+        if (limit is < 1 or > 200) limit = 50;
+
+        var nfePedidoIds = await db.NfeDocumentos
+            .AsNoTracking()
+            .Where(n => n.Status != StatusNfe.Rejeitada && n.Status != StatusNfe.Inutilizada)
+            .Select(n => n.PedidoId)
+            .ToListAsync(ct);
+
+        var pedidos = await db.Pedidos
+            .AsNoTracking()
+            .Where(p => p.EmpresaId == eid
+                && (p.Status == "entregue" || p.Status == "pronto")
+                && !nfePedidoIds.Contains(p.Id))
+            .OrderByDescending(p => p.CriadoEm)
+            .Take(limit)
+            .Select(p => new
+            {
+                id = p.Id,
+                criadoEm = p.CriadoEm,
+                clienteNome = p.ClienteNome ?? "Consumidor",
+                total = p.Total.Valor,
+                qtdItens = p.Itens.Count,
+                status = p.Status,
+            })
+            .ToListAsync(ct);
+
+        return DataOk(pedidos);
     }
 
     [SwaggerOperation(Summary = "Cancela uma NFC-e autorizada (prazo SEFAZ 24h)")]
@@ -311,4 +433,7 @@ public class NotasFiscaisController(
             ? null
             : (claimNome.Length > 120 ? claimNome[..120] : claimNome);
     }
+
+    private static string SomenteDigitos(string input) =>
+        new(input.Where(char.IsDigit).ToArray());
 }

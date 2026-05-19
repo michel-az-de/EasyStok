@@ -128,6 +128,14 @@ public class TokenRefreshHandler(
             if (!string.IsNullOrEmpty(newAccess))
             {
                 session.SetTokens(newAccess, newRefresh ?? refreshToken);
+
+                // Sincroniza empresa_atual_id com o novo JWT para que GetEmpresaId()
+                // nas services continue correto mesmo se o token anterior estava
+                // expirado e o novo token carrega um empresaId diferente/novo.
+                var newEmpresaId = ExtractClaim(newAccess, "empresaId");
+                if (!string.IsNullOrEmpty(newEmpresaId))
+                    session.SetEmpresaId(newEmpresaId);
+
                 return newAccess;
             }
 
@@ -136,6 +144,39 @@ public class TokenRefreshHandler(
         catch (Exception ex)
         {
             log.LogError(ex, "Exception during token refresh");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extrai uma claim do payload JWT sem validar assinatura.
+    /// Usado apenas para leitura de campos nao-sensiveis (ex: empresaId) apos
+    /// confirmar que o servidor aceitou o token — a validacao real e feita pelo servidor.
+    /// </summary>
+    private static string? ExtractClaim(string token, string claimType)
+    {
+        var parts = token.Split('.');
+        if (parts.Length < 2) return null;
+
+        var payload = parts[1];
+        switch (payload.Length % 4)
+        {
+            case 2: payload += "=="; break;
+            case 3: payload += "="; break;
+        }
+        payload = payload.Replace('-', '+').Replace('_', '/');
+
+        try
+        {
+            var bytes = Convert.FromBase64String(payload);
+            using var doc = JsonDocument.Parse(bytes);
+            return doc.RootElement.TryGetProperty(claimType, out var value)
+                && value.ValueKind == JsonValueKind.String
+                    ? value.GetString()
+                    : null;
+        }
+        catch
+        {
             return null;
         }
     }

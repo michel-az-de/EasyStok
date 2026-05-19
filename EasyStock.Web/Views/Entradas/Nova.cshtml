@@ -80,7 +80,7 @@
                     </template>
                 </div>
 
-                <div x-show="buscaTerm.length > 1 && !buscando && resultados.length === 0" class="text-center py-6">
+                <div x-show="buscaTerm.length > 1 && jaFezBusca && !buscando && resultados.length === 0" class="text-center py-6">
                     <p class="text-slate-400 text-sm mb-2">Nenhum produto encontrado</p>
                     <p class="text-slate-400 text-xs mb-3">Verifique o termo de busca ou cadastre um novo produto.</p>
                     <a href="/produtos/novo" class="inline-block px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors">
@@ -312,6 +312,7 @@
                 step: 1,
                 buscaTerm: '',
                 buscando: false,
+                jaFezBusca: false,
                 resultados: [],
                 _searchAbort: null,
                 produtoId: '',
@@ -384,9 +385,10 @@
                 },
 
                 async buscarProduto() {
-                    if (this.buscaTerm.length < 2) { this.resultados = []; return; }
+                    if (this.buscaTerm.length < 2) { this.resultados = []; this.jaFezBusca = false; return; }
                     if (this._searchAbort) this._searchAbort.abort();
                     this._searchAbort = new AbortController();
+                    this.jaFezBusca = false;
                     this.buscando = true;
                     try {
                         const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm), { signal: this._searchAbort.signal });
@@ -402,6 +404,7 @@
                         window.showToast('Não foi possível conectar ao servidor.', 'error');
                     } finally {
                         this.buscando = false;
+                        this.jaFezBusca = true;
                     }
                 },
 

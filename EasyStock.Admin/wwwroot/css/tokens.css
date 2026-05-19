@@ -109,9 +109,6 @@
   --shadow-lg: 0 16px 40px rgba(10, 21, 48, 0.14), 0 4px 12px rgba(10, 21, 48, 0.06);
 
   /* ----- Motion (duration + easing) ----- */
-  --motion-fast: 120ms;          /* micro: hover, tap feedback */
-  --motion-base: 200ms;          /* default: modal open, toast slide */
-  --motion-slow: 320ms;          /* large: drawer slide, page transition */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
@@ -196,11 +193,6 @@
   --es-ink-dim:   var(--text-secondary);
   --es-ink-mute:  var(--text-muted);
 
-  /* Radii alias (legado) */
-  --es-radius-sm: var(--r-sm);
-  --es-radius-md: var(--r-md);
-  --es-radius-lg: var(--r-lg);
-  --es-radius-xl: var(--r-xl);
 }
 
 /* ----- Dark theme ----- */
@@ -399,7 +391,7 @@ html, body {
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: btn-spin var(--motion-slow) linear infinite;
+  animation: btn-spin var(--duration-slow) linear infinite;
   flex: none;
 }
 @keyframes btn-spin {

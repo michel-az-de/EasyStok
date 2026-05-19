@@ -51,7 +51,7 @@
             @if (!string.IsNullOrEmpty(Model.Nfe.DanfeUrl))
             {
                 <a href="@Model.Nfe.DanfeUrl" target="_blank" rel="noopener"
-                   class="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">
+                   class="btn-outline-dark inline-flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
@@ -83,7 +83,7 @@
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" x-data="{ motivo: '' }">
             <h3 class="text-lg font-semibold text-slate-900 mb-3">Cancelar nota fiscal</h3>
             <p class="text-sm text-slate-600 mb-4">
-                O cancelamento sera enviado a SEFAZ. Notas canceladas nao podem ser reativadas.
+                O cancelamento será enviado à SEFAZ. Notas canceladas não podem ser reativadas.
                 Informe o motivo (min. 15 caracteres).
             </p>
             <form method="post" action="/notas-fiscais/@Model.Nfe.Id/cancelar">
@@ -91,11 +91,10 @@
                 <label for="motivo" class="block text-sm font-medium text-slate-700 mb-1">Motivo *</label>
                 <textarea id="motivo" name="motivo" x-model="motivo"
                           rows="3" minlength="15" maxlength="255" required
-                          class="w-full mb-3 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                          class="ui-textarea w-full mb-3 text-sm"
                           placeholder="Descreva o motivo do cancelamento (min. 15 caracteres)"></textarea>
                 <div class="flex justify-end gap-2">
-                    <button type="button" @@click="cancelarOpen = false; motivo = ''"
-                            class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    <button type="button" @@click="cancelarOpen = false; motivo = ''" class="btn-outline-dark">
                         Voltar
                     </button>
                     <button type="submit"

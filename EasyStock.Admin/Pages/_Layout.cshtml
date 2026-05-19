@@ -18,9 +18,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script defer src="https://cdn.jsdelivr.net/npm/@@alpinejs/persist@@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/@@alpinejs/focus@@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@@alpinejs/persist@@3.14.9/dist/cdn.min.js" integrity="sha384-wZWe4VTq4LQ7GEl+bEYDXoqiNGJbs5PATmO48iyamKMB+u04AL0sHBjz3iPd0ATF" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@@alpinejs/focus@@3.14.9/dist/cdn.min.js" integrity="sha384-MwJMkSQqmpfOqfh4FK4B2v23V2VwIq14tNBh40UqE8U/5P7IvOji2CWpNV3aaN3A" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@@3.14.9/dist/cdn.min.js" integrity="sha384-45lAbSLNMkm7YNnbIXf3RX9VoYH1vIRbKYqKaExWOqWB0/qBH48xdWMvJ/hy4MX" crossorigin="anonymous"></script>
     <script defer src="~/js/masks.js" asp-append-version="true"></script>
     <script defer src="~/js/admin-components.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
@@ -28,7 +28,6 @@
     <link rel="stylesheet" href="~/css/app-shell.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/notificacoes.css" asp-append-version="true" />
     <style>
         [x-cloak] { display: none !important; }
     </style>
@@ -160,9 +159,9 @@
                 <es-icon name="settings" size="18" />
                 <span class="text-sm font-medium sidebar-label">Configurações</span>
             </a>
-            <a href="/Configuracoes/ConfiguracaoFiscal" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.Contains("ConfiguracaoFiscal") == true ? "active" : "")">
-                <span class="text-base">🧾</span>
-                <span class="text-sm font-medium">Config. Fiscal</span>
+            <a href="/Configuracoes/ConfiguracaoFiscal" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.Contains("ConfiguracaoFiscal") == true ? "is-active" : "")">
+                <es-icon name="file-text" size="18" />
+                <span class="text-sm font-medium sidebar-label">Config. Fiscal</span>
             </a>
 
             <div class="pt-4 mt-4 space-y-1" style="border-top:1px solid rgba(247,242,232,0.08)">
@@ -307,32 +306,6 @@
     </div>
 </div>
 
-<!-- Toast global client-side — dispare com: $dispatch('toast', { message: '...', type: 'success'|'error'|'warning' }) -->
-<div x-data="toastManager()"
-     x-on:toast.window="adicionar($event.detail)"
-     class="fixed top-4 right-4 z-[300] space-y-2 pointer-events-none">
-    <template x-for="t in lista" :key="t.id">
-        <div x-show="t.show"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 translate-x-4"
-             x-transition:enter-end="opacity-100 translate-x-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium min-w-[260px] max-w-xs"
-             :class="{
-               'bg-es-surface text-es-ink border border-[rgba(79,191,159,.35)]': t.type === 'success',
-               'bg-es-surface text-es-ink border border-[rgba(248,113,113,.35)]': t.type === 'error',
-               'bg-es-surface text-es-ink border border-[rgba(251,191,36,.35)]': t.type === 'warning'
-             }">
-            <span x-text="t.type === 'success' ? '✓' : t.type === 'error' ? '✗' : '⚠'"
-                  :class="{ 'text-es-basil': t.type === 'success', 'text-red-400': t.type === 'error', 'text-yellow-400': t.type === 'warning' }"></span>
-            <span x-text="t.message" class="flex-1"></span>
-            <button @@click="remover(t.id)" class="text-es-ink-mute hover:text-es-ink leading-none ml-1">✕</button>
-        </div>
-    </template>
-</div>
-
 <script>
     // ── Captura global de erros JS (preservado de versão anterior). ──
     (function () {
@@ -451,27 +424,14 @@
             // ── Dashboard polling (idêntico ao comportamento anterior) ──
             async fetchDashBadges() {
                 try {
-                    // Fetch paralelo: dashboard-badges (badges existentes) + criticos-resumo (Onda 1.4 — SLA violado + prioridade Alta/Critica cross-tenant)
-                    const [rBadges, rCrit] = await Promise.all([
-                        fetch('/api-proxy/dashboard-badges', { credentials: 'same-origin' }),
-                        fetch('/api-proxy/admin/tickets/criticos-resumo?limit=1', { credentials: 'same-origin' })
-                    ]);
-                    if (!rBadges.ok) {
-                        console.warn('[admin] dashboard-badges retornou', rBadges.status);
+                    const r = await fetch('/api-proxy/dashboard-badges', { credentials: 'same-origin' });
+                    if (!r.ok) {
+                        console.warn('[admin] dashboard-badges retornou', r.status);
                         return;
                     }
-                    const d = await rBadges.json();
+                    const d = await r.json();
                     Object.assign(this.dash, d);
-                    // Onda 1.4 — usa "total criticos" (SLA violado OU prioridade Alta/Critica) em vez do count antigo.
-                    // Falha do endpoint novo nao quebra badge — degrada para o calculo antigo.
-                    let criticos = d.ticketsCriticos ?? 0;
-                    if (rCrit.ok) {
-                        try {
-                            const c = await rCrit.json();
-                            if (typeof c.total === 'number') criticos = c.total;
-                        } catch { /* mantém fallback */ }
-                    }
-                    this.dash.ticketsBadge = (d.ticketsComNovaMensagem ?? 0) + criticos;
+                    this.dash.ticketsBadge = (d.ticketsComNovaMensagem ?? 0) + (d.ticketsCriticos ?? 0);
                     this._lastFetch = Date.now();
                     this.dashSecsAgo = 0;
                 } catch (e) {
@@ -493,10 +453,6 @@
                 list = list.slice(0, 5);
                 this.recentTenants = list;
                 try { localStorage.setItem(RECENT_TENANTS_KEY, JSON.stringify(list)); } catch {}
-            },
-            clearRecent() {
-                this.recentTenants = [];
-                try { localStorage.removeItem(RECENT_TENANTS_KEY); } catch {}
             },
             trackTenantViewed() {
                 const m = window.location.pathname.match(/^\/Tenants\/Detail\/([0-9a-f-]{36})/i);

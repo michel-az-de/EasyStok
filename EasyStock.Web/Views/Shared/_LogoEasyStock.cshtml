@@ -25,18 +25,21 @@
         };
     }
 
-    var modelDyn = (dynamic?)Model;
-    object? sizeObj = modelDyn?.Size;
+    var modelObj = Model as object;
+    var modelType = modelObj?.GetType();
+    object? Prop(string n) => modelType?.GetProperty(n)?.GetValue(modelObj);
+
+    object? sizeObj = Prop("Size");
     string size = sizeObj switch
     {
         string s => s,
         int i => i.ToString(),
         _ => "md"
     };
-    string variant = (modelDyn?.Variant as string) ?? "default";
-    bool showMark = (modelDyn?.ShowMark as bool?) ?? true;
-    bool showText = (modelDyn?.ShowText as bool?) ?? true;
-    string ariaLabel = (modelDyn?.AriaLabel as string) ?? "EasyStock";
+    string variant = Prop("Variant") as string ?? "default";
+    bool showMark = Prop("ShowMark") as bool? ?? true;
+    bool showText = Prop("ShowText") as bool? ?? true;
+    string ariaLabel = Prop("AriaLabel") as string ?? "EasyStock";
 
     int markPx = Resolve(size, 28);
     string textClass = variant switch

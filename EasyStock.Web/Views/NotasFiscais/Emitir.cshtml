@@ -1,0 +1,102 @@
+@model EasyStock.Web.Models.ViewModels.NotasFiscais.EmitirNfceViewModel
+@{
+    ViewBag.Title = "Emitir NFC-e";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-between mb-6">
+    <div class="pg-hd">
+        <h1>Emitir NFC-e</h1>
+        <p>Escolha um pedido elegivel e emita a nota.</p>
+    </div>
+    <a href="/notas-fiscais" class="text-sm text-slate-500 hover:text-slate-700">← Voltar</a>
+</div>
+
+@if (Model.PedidosElegiveis.Count == 0)
+{
+    <div class="ws text-center py-12">
+        <svg class="w-12 h-12 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <p class="text-slate-500 text-sm">Nenhum pedido elegível para emissão no momento.</p>
+        <p class="text-slate-400 text-xs mt-1">Pedidos elegíveis têm status <code>entregue</code> ou <code>pronto</code> e ainda não têm NFC-e.</p>
+        <a href="/pedidos" class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            Ver pedidos
+        </a>
+    </div>
+}
+else
+{
+<form method="post" action="/notas-fiscais/emitir" class="space-y-6">
+    @Html.AntiForgeryToken()
+
+    <section class="ws">
+        <h2 class="text-lg font-semibold mb-4">1. Pedido</h2>
+        <p class="text-xs text-slate-500 mb-3">@Model.PedidosElegiveis.Count pedidos elegiveis (status entregue/pronto sem NFC-e).</p>
+
+        <div class="overflow-x-auto -mx-2">
+            <table class="tbl-full">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width:40px"></th>
+                        <th scope="col">Data</th>
+                        <th scope="col">Cliente</th>
+                        <th scope="col" class="text-right">Itens</th>
+                        <th scope="col" class="text-right">Total</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.PedidosElegiveis)
+                    {
+                        <tr class="cursor-pointer hover:bg-slate-50" onclick="document.getElementById('p_@p.Id').click()">
+                            <td>
+                                <input type="radio" id="p_@p.Id" name="pedidoId" value="@p.Id" required />
+                            </td>
+                            <td class="text-slate-600">@p.CriadoEm.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="text-slate-900">@p.ClienteNome</td>
+                            <td class="text-right">@p.QtdItens</td>
+                            <td class="text-right font-medium">R$ @p.Total.ToString("N2")</td>
+                            <td>
+                                <span class="badge badge-neutral">@p.Status</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="ws">
+        <h2 class="text-lg font-semibold mb-2">2. Destinatario (opcional)</h2>
+        <p class="text-xs text-slate-500 mb-4">Sem CPF/Nome, a NFC-e e emitida como "Consumidor Final".</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="destinatarioCpf">CPF/CNPJ</label>
+                <input type="text" id="destinatarioCpf" name="destinatarioCpf" inputmode="numeric" maxlength="14"
+                       placeholder="apenas numeros"
+                       class="ui-field w-full text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="destinatarioNome">Nome</label>
+                <input type="text" id="destinatarioNome" name="destinatarioNome" maxlength="120"
+                       class="ui-field w-full text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="destinatarioEmail">Email</label>
+                <input type="email" id="destinatarioEmail" name="destinatarioEmail" maxlength="120"
+                       placeholder="opcional"
+                       class="ui-field w-full text-sm" />
+            </div>
+        </div>
+    </section>
+
+    <section class="ws flex items-center justify-end gap-3">
+        <a href="/notas-fiscais" class="btn-outline-dark">Cancelar</a>
+        <button type="submit" class="px-6 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
+            Emitir NFC-e
+        </button>
+    </section>
+</form>
+}

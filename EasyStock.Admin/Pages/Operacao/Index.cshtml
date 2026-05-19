@@ -135,18 +135,14 @@ function operacaoPage() {
         empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
         lojaId: '@(Model.LojaId?.ToString() ?? "")',
         d: {},
-        tk: { total: 0, slaViolados: 0, altaOuCritica: 0, top: [] },
         erro: '',
         ultimaAtualizacao: 0,
         _timer: null,
-        _tkTimer: null,
 
         async init() {
             if (!this.empresaId) return;
-            await Promise.all([this.fetchDashboard(), this.fetchTicketsCriticos()]);
+            await this.fetchDashboard();
             this._timer = setInterval(() => this.fetchDashboard(), 15000);
-            // Onda 1.4 — tickets criticos atualizam a cada 60s (mais lento, menor frequencia de mudanca)
-            this._tkTimer = setInterval(() => this.fetchTicketsCriticos(), 60000);
         },
 
         async fetchDashboard() {
@@ -163,21 +159,6 @@ function operacaoPage() {
             } catch (e) {
                 this.erro = 'Falha ao carregar dashboard: ' + (e.message || e);
             }
-        },
-
-        async fetchTicketsCriticos() {
-            try {
-                const url = '/api-proxy/admin/tickets/criticos-resumo?empresaId=' + this.empresaId + '&limit=5';
-                const r = await fetch(url, { credentials: 'same-origin' });
-                if (!r.ok) return; // silencioso — widget se esconde se total=0
-                const data = await r.json();
-                this.tk = {
-                    total: data.total || 0,
-                    slaViolados: data.slaViolados || 0,
-                    altaOuCritica: data.altaOuCritica || 0,
-                    top: Array.isArray(data.top) ? data.top : []
-                };
-            } catch { /* falha silenciosa — não quebra o resto do dashboard */ }
         },
 
         brl(v) {

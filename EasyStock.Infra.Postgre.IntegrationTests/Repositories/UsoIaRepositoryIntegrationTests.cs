@@ -10,11 +10,11 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 [Collection("PostgreSqlTestCollection")]
 public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public async Task GetAsync_DeveRetornarUsoCorreto()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
@@ -42,11 +42,11 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
         result!.TotalTokens.Should().Be(1000);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task AddAsync_DeveAdicionarUso()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
@@ -74,11 +74,11 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
         saved!.TotalTokens.Should().Be(500);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateAsync_DeveAtualizarUso()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 

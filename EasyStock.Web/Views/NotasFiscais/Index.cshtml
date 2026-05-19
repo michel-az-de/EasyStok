@@ -9,6 +9,14 @@
         <h1>Notas Fiscais</h1>
         <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "nota emitida" : "notas emitidas")</p>
     </div>
+    <div class="flex items-center gap-2">
+        <a href="/configuracao-fiscal" class="btn-outline-dark">
+            Configuração Fiscal
+        </a>
+        <a href="/notas-fiscais/emitir" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">
+            + Nova NFC-e
+        </a>
+    </div>
 </div>
 
 <!-- Filtros -->
@@ -27,10 +35,7 @@
                 var isActive = string.Equals(Model.FiltroStatus, val, StringComparison.OrdinalIgnoreCase)
                     || (string.IsNullOrEmpty(val) && string.IsNullOrEmpty(Model.FiltroStatus));
                 <a href="/notas-fiscais?status=@val&desde=@Model.PeriodoInicio&ate=@Model.PeriodoFim&search=@Model.Busca"
-                   class="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
-                          @(isActive ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50")">
-                    @label
-                </a>
+                   class="filter-chip @(isActive ? "active" : "")">@label</a>
             }
         </div>
 
@@ -60,7 +65,11 @@
         @if (string.IsNullOrEmpty(Model.FiltroStatus) && string.IsNullOrEmpty(Model.Busca))
         {
             <p class="text-slate-500 text-sm">Nenhuma nota fiscal emitida ainda.</p>
-            <p class="text-slate-400 text-xs mt-1">As emissoes aparecem aqui automaticamente apos confirmacao pelo SEFAZ.</p>
+            <p class="text-slate-400 text-xs mt-1">Emita a primeira NFC-e pelo botão acima ou verifique a configuração fiscal.</p>
+            <div class="mt-5 flex justify-center gap-3">
+                <a href="/notas-fiscais/emitir" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">+ Emitir primeira NFC-e</a>
+                <a href="/configuracao-fiscal" class="btn-outline-dark">Configurar emissão</a>
+            </div>
         }
         else
         {
@@ -143,7 +152,7 @@ else
             @for (int p = 1; p <= Model.Paginacao.Pages; p++)
             {
                 <a href="/notas-fiscais?page=@p&status=@Model.FiltroStatus&desde=@Model.PeriodoInicio&ate=@Model.PeriodoFim&search=@Model.Busca"
-                   class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                   class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "btn-outline-dark")">
                     @p
                 </a>
             }

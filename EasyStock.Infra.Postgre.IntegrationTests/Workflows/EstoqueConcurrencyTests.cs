@@ -16,10 +16,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 /// </summary>
 public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [Fact]
+    [SkippableFact]
     public async Task RegistrarSaidaEstoque_ComDoisThreadsVendendoMesmoLote_MantemEstoquePositivo()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         // ARRANGE: Setup com lote de 10 unidades

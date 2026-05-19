@@ -73,4 +73,43 @@ public class NotasFiscaisController(NotasFiscaisService svc, SessionService sess
         Toast("success", "Nota cancelada com sucesso. O protocolo de cancelamento foi registrado.");
         return RedirectToAction(nameof(Detalhes), new { id });
     }
+
+    [HttpGet("/notas-fiscais/emitir")]
+    public async Task<IActionResult> Emitir()
+    {
+        ViewBag.ActiveMenuItem = "NotasFiscais";
+        ViewBag.Title = "Emitir NFC-e";
+
+        var pedidosResult = await svc.ListarPedidosElegiveisAsync(50);
+        var vm = new EmitirNfceViewModel
+        {
+            PedidosElegiveis = pedidosResult.Data ?? new List<PedidoElegivelItem>(),
+        };
+        return View(vm);
+    }
+
+    [HttpPost("/notas-fiscais/emitir")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Emitir(
+        Guid pedidoId,
+        string? destinatarioCpf,
+        string? destinatarioNome,
+        string? destinatarioEmail)
+    {
+        if (pedidoId == Guid.Empty)
+        {
+            Toast("error", "Selecione um pedido.");
+            return RedirectToAction(nameof(Emitir));
+        }
+
+        var result = await svc.EmitirDePedidoAsync(pedidoId, destinatarioCpf, destinatarioNome, destinatarioEmail);
+        if (HasErrorVerbose(result, "Emissao NFC-e"))
+            return RedirectToAction(nameof(Emitir));
+
+        var nfeId = result.Data?.Id;
+        Toast("success", "NFC-e emitida com sucesso.");
+        return nfeId is null || nfeId == Guid.Empty
+            ? RedirectToAction(nameof(Index))
+            : RedirectToAction(nameof(Detalhes), new { id = nfeId.Value });
+    }
 }

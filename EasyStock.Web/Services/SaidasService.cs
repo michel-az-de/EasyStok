@@ -55,7 +55,9 @@ public class SaidasService(ApiClient api, SessionService session)
                     produtoId = Guid.TryParse(vm.ProdutoId, out var pid) ? pid : Guid.Empty,
                     produtoVariacaoId = Guid.TryParse(vm.VarId, out var vid) ? vid : (Guid?)null,
                     quantidade = vm.Qty,
-                    valorVendaUnitario = vm.Valor ?? 0m,
+                    // Null quando não informado: permite que a API use o preço
+                    // cadastrado do produto em vez de registrar ValorTotal = 0.
+                    valorVendaUnitario = vm.Valor,
                     descricao = vm.Descricao
                 }
             },

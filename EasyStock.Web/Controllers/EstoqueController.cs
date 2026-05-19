@@ -37,7 +37,18 @@ public class EstoqueController(
         var result = await listarTask;
         var contadoresResp = contadoresTask is null ? null : await contadoresTask;
 
-        if (HasError(result)) return View(new EstoqueListViewModel());
+        // Em erro (incluindo 401 silencioso), preserva filtros do querystring no VM
+        // pra que a pill ativa, search e categoria não sumam ao primeiro problema de
+        // API — caso contrário deep-links tipo /estoque?status=critico parecem quebrados
+        // (caem em VM vazio com StatusFiltro=null, ativa "Todos" e o operador acha que
+        // o filtro não aplicou). É consequência prática do bug #2A.
+        if (HasError(result))
+            return View(new EstoqueListViewModel
+            {
+                Search = search,
+                StatusFiltro = status,
+                Categoria = categoria
+            });
 
         var paged = result.Data!;
         var contadores = contadoresResp is { Success: true, Data: { } d } ? d : null;

@@ -255,10 +255,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                 table: "fatura_pagamentos",
                 columns: new[] { "EmpresaId", "Status" });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_fatura_pagamentos_RegistradoPorUserId",
-                table: "fatura_pagamentos",
-                column: "RegistradoPorUserId");
+            // Idempotente: AddIntegrationCore (20260507225911) já criou este índice.
+            // IF NOT EXISTS garante que re-runs ou ambientes com schema legado não falhem.
+            migrationBuilder.Sql(@"CREATE INDEX IF NOT EXISTS ""IX_fatura_pagamentos_RegistradoPorUserId"" ON fatura_pagamentos (""RegistradoPorUserId"");");
 
             migrationBuilder.CreateIndex(
                 name: "ux_fatura_pagamentos_empresa_client_idempotency",
@@ -348,13 +347,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                 unique: true,
                 filter: "\"Status\" = 'Sucesso'");
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_fatura_pagamentos_usuarios_RegistradoPorUserId",
-                table: "fatura_pagamentos",
-                column: "RegistradoPorUserId",
-                principalTable: "usuarios",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+            // Idempotente: AddIntegrationCore (20260507225911) já criou esta FK.
+            migrationBuilder.Sql(@"
+                DO $$ BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_fatura_pagamentos_usuarios_RegistradoPorUserId') THEN
+                    ALTER TABLE fatura_pagamentos ADD CONSTRAINT ""FK_fatura_pagamentos_usuarios_RegistradoPorUserId""
+                      FOREIGN KEY (""RegistradoPorUserId"") REFERENCES usuarios (""Id"") ON DELETE SET NULL;
+                  END IF;
+                END; $$;");
 
             // ─── Seed regras globais Onda P0 ────────────────────────────────────
             // Preserva comportamento atual: EfiPix prio=1 pra "pix"; Manual

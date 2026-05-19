@@ -58,7 +58,7 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IConfiguracaoLojaRepository? configuracaoLojaRepository = null,
         EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null)
     {
-        public async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
+        public virtual async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
         {
             logger.LogInformation("Registrando entrada de estoque. ProdutoId: {ProdutoId}, Quantidade: {Quantidade}", command.ProdutoId, command.Quantidade);
 

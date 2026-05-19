@@ -1,56 +1,7 @@
 @page
-@using EasyStock.Admin.Pages.Notificacoes
 @model EasyStock.Admin.Pages.Notificacoes.Templates.IndexModel
 @{
-    ViewData["Title"] = "Templates de Notificacao";
-
-    var eventosPorCategoria = new Dictionary<string, (string emoji, string desc, string[] eventos)>
-    {
-        ["Transacional"] = ("💳", "Transacoes financeiras + autenticacao", new[]
-        {
-            "AssinaturaExpirando", "AssinaturaExpirada",
-            "FaturaCriada", "FaturaVencendo", "FaturaPaga", "FaturaVencida",
-            "PagamentoConfirmado", "PagamentoFalhou",
-            "ResetSenha", "ConfirmacaoEmail"
-        }),
-        ["Helpdesk"] = ("🎫", "Tickets, SLA e ciclo de suporte", new[]
-        {
-            "TicketCriado", "TicketRespondidoCliente", "TicketRespondidoAdmin",
-            "TicketStatusAlterado", "TicketAtribuido", "TicketEncaminhadoNivel",
-            "SlaProximoVencer", "SlaViolado", "BugFixCriado", "ConviteCsat"
-        }),
-        ["Operacional"] = ("📦", "Estoque e alertas de operacao", new[]
-        {
-            "ProdutoVencendo", "ProdutoVencido", "AlertaEstoqueCritico", "TarefaPendente"
-        }),
-        ["Comunicacao"] = ("📢", "Broadcasts e comunicados gerais", new[]
-        {
-            "BroadcastSuperAdmin"
-        }),
-    };
-
-    var nomesCanais = new[] { ("Email", "📧"), ("InApp", "🔔"), ("Sms", "📱"), ("WhatsApp", "💬") };
-
-    var indexEventoCanal = new Dictionary<(string evento, string canal), List<System.Text.Json.JsonElement>>();
-    if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
-    {
-        foreach (var t in Model.Data.EnumerateArray())
-        {
-            var ev = t.TryGetProperty("tipoEvento", out var e) ? e.GetString() ?? "" : "";
-            var ca = t.TryGetProperty("canal", out var c) ? c.GetString() ?? "" : "";
-            if (string.IsNullOrWhiteSpace(ev) || string.IsNullOrWhiteSpace(ca)) continue;
-            var key = (ev, ca);
-            if (!indexEventoCanal.TryGetValue(key, out var lista))
-            {
-                lista = new List<System.Text.Json.JsonElement>();
-                indexEventoCanal[key] = lista;
-            }
-            lista.Add(t);
-        }
-    }
-
-    int TotalEventos() => eventosPorCategoria.Values.Sum(x => x.eventos.Length);
-    int EventosCobertos() => eventosPorCategoria.Values.Sum(x => x.eventos.Count(e => Model.CoberturaPorEvento.ContainsKey(e)));
+    ViewData["Title"] = "Templates de Notificação";
 }
 
 <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">

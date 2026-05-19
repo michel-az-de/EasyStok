@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Concurrency;
@@ -60,6 +61,10 @@ public sealed class SlaMonitorService(
         {
             ct = token;
             var db = sp.GetRequiredService<EasyStockDbContext>();
+            // Cross-tenant: monitor SLA varre AdminTickets de TODAS as empresas. Sem
+            // usuario autenticado, sem bypass o RLS (app.bypass_rls) bloqueia leitura
+            // E o filtro EF zera o IQueryable. Defesa em profundidade exige os dois layers.
+            using var _rlsBypass = db.UseRowLevelSecurityBypass();
             var notificador = sp.GetRequiredService<INotificadorService>();
 
             var agora = DateTime.UtcNow;
@@ -67,6 +72,7 @@ public sealed class SlaMonitorService(
             // Carregar candidatos: tickets ativos com prazo de resposta OU resolucao definido
             // e que ainda nao tem todas as flags de violado true.
             var candidatos = await db.AdminTickets
+                .IgnoreQueryFilters() // cross-tenant: monitor SLA de todas as empresas
                 .AsNoTracking()
                 .Where(t => StatusAtivos.Contains(t.Status))
                 .Where(t => t.PrazoResposta != null || t.PrazoResolucao != null)
@@ -135,8 +141,8 @@ public sealed class SlaMonitorService(
                         .SetProperty(t => t.SlaResolucaoViolado, true)
                         .SetProperty(t => t.AlteradoEm, agora), ct);
 
-            db.TicketHistoricos.Add(EasyStock.Domain.Entities.TicketHistorico.Criar(
-                snap.Id, autorId: null, EasyStock.Domain.Enums.TicketAcaoHistorico.SlaViolado,
+            db.TicketHistoricos.Add(TicketHistorico.Criar(
+                snap.Id, autorId: null, TicketAcaoHistorico.SlaViolado,
                 valorDepois: tipo));
 
             if (tipo == "Resposta") SlaResponseBreached.Add(1, new KeyValuePair<string, object?>("prioridade", snap.Prioridade.ToString()));
@@ -189,8 +195,8 @@ public sealed class SlaMonitorService(
             new KeyValuePair<string, object?>("prioridade", snap.Prioridade.ToString()),
             new KeyValuePair<string, object?>("percentual", percentual));
 
-        db.TicketHistoricos.Add(EasyStock.Domain.Entities.TicketHistorico.Criar(
-            snap.Id, autorId: null, EasyStock.Domain.Enums.TicketAcaoHistorico.SlaProximoVencer,
+        db.TicketHistoricos.Add(TicketHistorico.Criar(
+            snap.Id, autorId: null, TicketAcaoHistorico.SlaProximoVencer,
             valorDepois: $"{tipo}:{percentual}%"));
 
         await notificador.PublicarEventoAsync(

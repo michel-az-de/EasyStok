@@ -14,12 +14,12 @@
 </div>
 
 <div class="ws mb-6">
-    <div class="flex gap-2">
+    <div class="filter-tab-group">
         @foreach (var (val, label) in new[] { ("", "Todas"), ("aberta", "Abertas"), ("arquivada", "Arquivadas") })
         {
             var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
             <a href="@Url.Action("Index", "ListasCompras", new { status = val == "" ? null : val })"
-               class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">@label</a>
+               class="filter-tab @(isActive ? "active" : "")">@label</a>
         }
     </div>
 </div>

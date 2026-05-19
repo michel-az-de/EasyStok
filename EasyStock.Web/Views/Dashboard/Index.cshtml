@@ -13,27 +13,27 @@
     string statusTone;
     if (Model.EstoqueCritico > 0 && Model.ProximosVencimento > 0)
     {
-        statusMsg = $"Voce tem {Model.EstoqueCritico} item(ns) em estoque critico e {Model.ProximosVencimento} proximo(s) ao vencimento.";
+        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico e {Model.ProximosVencimento} próximo(s) ao vencimento.";
         statusTone = "critical";
     }
     else if (Model.EstoqueCritico > 0)
     {
-        statusMsg = $"Voce tem {Model.EstoqueCritico} item(ns) em estoque critico precisando de reposicao.";
+        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico precisando de reposição.";
         statusTone = "critical";
     }
     else if (Model.ProximosVencimento > 0)
     {
-        statusMsg = $"{Model.ProximosVencimento} item(ns) vencem em ate 7 dias. Vale girar antes que estraguem.";
+        statusMsg = $"{Model.ProximosVencimento} item(ns) vencem em até 7 dias. Vale girar antes que estraguem.";
         statusTone = "warning";
     }
     else if (Model.SugestoesReposicao > 0)
     {
-        statusMsg = $"Nada urgente hoje. {Model.SugestoesReposicao} sugestao(oes) de reposicao prontas para revisao.";
+        statusMsg = $"Nada urgente hoje. {Model.SugestoesReposicao} sugestão(ões) de reposição prontas para revisão.";
         statusTone = "info";
     }
     else if (Model.ReceitaMes > 0)
     {
-        statusMsg = $"Estoque saudavel. Vendas dos ultimos 30 dias: {Model.ReceitaMes.ToString("C", ptBR)}.";
+        statusMsg = $"Estoque saudável. Vendas dos últimos 30 dias: {Model.ReceitaMes.ToString("C", ptBR)}.";
         statusTone = "ok";
     }
     else
@@ -101,6 +101,14 @@ else if (Model.ResumoApiFalhou)
         else
         {
             <div class="ds-kpi-sub text-slate-400">últimos 30 dias</div>
+        }
+        @if (Model.ReceitaMes == 0)
+        {
+            <a href="/produtos?semPreco=true"
+               class="text-xs text-amber-600 hover:text-amber-700 hover:underline mt-1 block"
+               title="Saídas registradas com produtos sem preço resultam em receita zero">
+                ⚠ Verifique produtos sem preço
+            </a>
         }
     </div>
 
@@ -352,26 +360,43 @@ else if (Model.ResumoApiFalhou)
             const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels));
             const dados = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados));
 
-            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
-            gradient.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
-            gradient.addColorStop(1, 'rgba(30, 72, 168, 0)');
+            if (!dados.some(function (v) { return v > 0; })) {
+                var wrap = ctx.closest('.dashboard-chart-wrap');
+                if (wrap) wrap.innerHTML =
+                    '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2 py-8">' +
+                    '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' +
+                    '<p>Nenhuma venda com valor registrada no período.</p>' +
+                    '<a href="/produtos?semPreco=true" class="text-indigo-600 text-xs hover:underline">Verificar produtos sem preço →</a>' +
+                    '</div>';
+                return;
+            }
+
             new Chart(ctx, {
-                type: 'line',
+                type: labels.length > 1 ? 'line' : 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
                         label: 'Vendas',
                         data: dados,
                         borderColor: navy,
-                        backgroundColor: gradient,
+                        backgroundColor: labels.length > 1
+                            ? (function() {
+                                var g = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
+                                g.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
+                                g.addColorStop(1, 'rgba(30, 72, 168, 0)');
+                                return g;
+                              })()
+                            : 'rgba(30, 72, 168, 0.7)',
                         borderWidth: 2.5,
-                        fill: true,
+                        fill: labels.length > 1,
                         tension: 0.35,
-                        pointRadius: 0,
+                        pointRadius: labels.length > 1 ? 0 : undefined,
                         pointHoverRadius: 5,
                         pointHoverBackgroundColor: '#1E48A8',
                         pointHoverBorderColor: '#FFFFFF',
-                        pointHoverBorderWidth: 2
+                        pointHoverBorderWidth: 2,
+                        borderRadius: labels.length > 1 ? undefined : 6,
+                        maxBarThickness: 80
                     }]
                 },
                 options: {
@@ -398,6 +423,7 @@ else if (Model.ResumoApiFalhou)
                             grid: { display: false }
                         },
                         y: {
+                            beginAtZero: true,
                             ticks: {
                                 color: ink,
                                 callback: v => 'R$ ' + v.toLocaleString('pt-BR')

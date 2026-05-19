@@ -12,8 +12,7 @@
         </p>
     </div>
     <div class="flex gap-3 flex-wrap">
-        <a href="/lotes-mobile"
-           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+        <a href="/lotes-mobile" class="btn-outline-dark">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
@@ -32,13 +31,13 @@
 <div class="ws mb-6">
     <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar lotes">
         <input type="search" name="search" value="@Model.Search" placeholder="Buscar por código, operador, obs..." aria-label="Buscar lote" class="ui-field flex-1 min-w-48" />
-        <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">Buscar</button>
-        <div class="flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
+        <div class="filter-tab-group flex-wrap">
             @foreach (var (val, label) in new[] { ("", "Todos"), ("em_producao", "Em produção"), ("finalizado", "Finalizados") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Lotes", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="inline-flex items-center whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")"
+                   class="filter-tab @(isActive ? "active" : "")"
                    title="@label" aria-label="@label">@label</a>
             }
             @* C2 (R10): chip "Pendentes de peso" so aparece quando ha lotes embalados sem peso. *@
@@ -46,7 +45,7 @@
             {
                 var pendActive = Model.FiltroStatus == "pendente_peso";
                 <a href="@Url.Action("Index", "Lotes", new { search = Model.Search, status = "pendente_peso" })"
-                   class="inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 px-3 py-2 rounded-lg text-sm font-medium @(pendActive ? "bg-amber-600 text-white" : "bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100")"
+                   class="filter-tab @(pendActive ? "active" : "") text-[var(--warn-600)]"
                    title="@Model.PendentesPesoCount lote(s) com item embalado sem peso (RDC 727)"
                    aria-label="Pendentes de peso (@Model.PendentesPesoCount)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

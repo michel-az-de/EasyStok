@@ -1504,7 +1504,7 @@
                                     const self = this;
                                     window.easyConfirm({
                                         titulo: 'Restaurar rascunho?',
-                                        mensagem: 'Existe um rascunho salvo de um produto que voce nao concluiu. Deseja restaurar os dados?',
+                                        mensagem: 'Existe um rascunho salvo de um produto que você não concluiu. Deseja restaurar os dados?',
                                         textoBotao: 'Restaurar',
                                         classBotao: 'bg-indigo-600 hover:bg-indigo-700'
                                     }, () => self._applyDraft(d));
@@ -1651,7 +1651,7 @@
                         const self = this;
                         window.easyConfirm({
                             titulo: 'Preencher automaticamente?',
-                            mensagem: 'O SKU sera gerado e a descricao sera reescrita com IA. Campos ja preenchidos podem ser alterados. Deseja continuar?',
+                            mensagem: 'O SKU será gerado e a descrição será reescrita com IA. Campos já preenchidos podem ser alterados. Deseja continuar?',
                             textoBotao: 'Preencher',
                             classBotao: 'bg-indigo-600 hover:bg-indigo-700'
                         }, () => self.autoFill());
@@ -1871,7 +1871,7 @@ async deleteExistingPhoto(fotoId) {
     const self = this;
     window.easyConfirm({
         titulo: 'Remover foto do produto?',
-        mensagem: 'Esta acao nao pode ser desfeita.',
+        mensagem: 'Esta ação não pode ser desfeita.',
         textoBotao: 'Remover',
         classBotao: 'bg-red-600 hover:bg-red-700'
     }, () => self._doDeletePhoto(fotoId));
