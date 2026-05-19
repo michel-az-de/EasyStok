@@ -66,7 +66,7 @@ public sealed class MapMensalHandler(
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Passo 1: Carregar todos os documentos do período (max ~31 dias × 500 NFC-e/dia = ~15k rows).
-        var docs = await tenantQuery.Query<NfeDocumento>(db)
+        var docs = await tenantQuery.Query<NfeDocumento>()
             .Where(n => (n.Status == StatusNfe.Autorizada || n.Status == StatusNfe.Cancelada)
                         && n.DataAutorizacao >= de && n.DataAutorizacao <= ate)
             .AsNoTracking()

@@ -66,7 +66,7 @@ public sealed class VendasPorPeriodoHandler(
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // ADR-R07: query explícita com WHERE EmpresaId; IgnoreQueryFilters() via tenantQuery.Query<T>()
-        var query = tenantQuery.Query<EasyStock.Domain.Entities.Venda>(db)
+        var query = tenantQuery.Query<EasyStock.Domain.Entities.Venda>()
             .Where(v => v.DataVenda >= de && v.DataVenda <= ate);
 
         if (parametros.LojaId.HasValue)

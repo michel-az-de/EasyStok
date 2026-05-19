@@ -56,7 +56,7 @@ public sealed class XmlBulkDownloadHandler(
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Apenas NFC-e autorizadas com XML disponível no storage.
-        var documentos = tenantQuery.Query<NfeDocumento>(db)
+        var documentos = tenantQuery.Query<NfeDocumento>()
             .Where(n => n.Status == StatusNfe.Autorizada
                         && n.DataAutorizacao >= de && n.DataAutorizacao <= ate
                         && n.XmlAssinadoStorageKey != null)

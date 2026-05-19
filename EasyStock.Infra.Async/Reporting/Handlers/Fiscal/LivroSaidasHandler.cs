@@ -72,7 +72,7 @@ public sealed class LivroSaidasHandler(
         var statusAutorizada = StatusNfe.Autorizada.ToString();
         var statusCancelada  = StatusNfe.Cancelada.ToString();
 
-        var documentos = tenantQuery.Query<NfeDocumento>(db)
+        var documentos = tenantQuery.Query<NfeDocumento>()
             .Where(n => (n.Status == StatusNfe.Autorizada || n.Status == StatusNfe.Cancelada)
                         && n.DataAutorizacao >= de && n.DataAutorizacao <= ate)
             .OrderBy(n => n.DataAutorizacao)
