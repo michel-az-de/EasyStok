@@ -20,8 +20,8 @@
         </ol>
     </header>
 
-    <form asp-controller="Onboarding" asp-action="Index" method="post" class="space-y-4 p-6 rounded-lg border" style="background: var(--surface-1, #fff); border-color: var(--border-soft, #e7e5e4);">
-        <div asp-validation-summary="All" class="text-sm" style="color: var(--text-danger, #b91c1c);"></div>
+    <form asp-controller="Onboarding" asp-action="Index" method="post" class="space-y-4 p-6 rounded-lg border" style="background: var(--surface-1, var(--white)); border-color: var(--border-soft);">
+        <div asp-validation-summary="All" class="text-sm" style="color: var(--text-danger, var(--crit-600));"></div>
 
         <div x-show="step === 1" x-transition>
             <h2 class="font-semibold mb-3">Sobre a empresa</h2>
