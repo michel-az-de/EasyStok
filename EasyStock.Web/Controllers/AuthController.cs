@@ -494,9 +494,7 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
                 ? value.GetString()
                 : null;
         }
-        catch
-        {
-            return null;
-        }
+        catch (FormatException) { return null; }  // base64 malformado — token de versão antiga
+        catch (JsonException)   { return null; }  // payload inválido — degradação esperada
     }
 }

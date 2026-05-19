@@ -9,40 +9,13 @@
     // aspas escapadas. Permite passar com seguranca via atributo x-data sem quebrar
     // o HTML parser. JS recebe string e parsea internamente em fichaTecnicaForm._hidratar.
     var atributosJsonRaw = JsonSerializer.Serialize(p.AtributosJson);
-    var temFicha = !string.IsNullOrWhiteSpace(p.AtributosJson) && p.AtributosJson.Trim() != "{}";
-    // Tab so aparece pra produto Alimento ou pra qualquer produto que ja tenha ficha
-    // (preserva visibilidade caso operador tenha cadastrado em produto Fisico antes).
-    var mostrarFichaNutricional = p.Tipo == 1 || temFicha;
-
-    // ── Integrity score ──
-    var iFieldsBase = new (bool ok, string label, int pts)[]
-    {
-        (p.Fotos.Any(),                               "Foto",        20),
-        (!string.IsNullOrWhiteSpace(p.DescricaoBase), "Descrição",   15),
-        (p.CustoReferencia is > 0,                    "Custo",       15),
-        (p.PrecoReferencia is > 0,                    "Preço",       15),
-        (!string.IsNullOrWhiteSpace(p.CodigoBarras),  "Cód.Barras",  10),
-        (p.Variacoes.Any(),                           "Variações",   10),
-        (!string.IsNullOrWhiteSpace(p.Marca),         "Marca",        5),
-        (p.Dimensoes != null,                         "Dimensões",    5),
-        (true,                                        "Nome",         3),
-        (true,                                        "Categoria",    2),
-    };
-    var iFields = mostrarFichaNutricional
-        ? iFieldsBase.Concat(new (bool ok, string label, int pts)[] { (temFicha, "Nutricional", 10) }).ToArray()
-        : iFieldsBase;
-    var score = iFields.Where(f => f.ok).Sum(f => f.pts);
-    var missing = iFields.Where(f => !f.ok).Select(f => f.label).ToList();
-    // Map missing labels to edit form step
-    var missingStepMap = new System.Collections.Generic.Dictionary<string, int>
-    {
-        ["Foto"] = 2, ["Preço"] = 2, ["Custo"] = 2,
-        ["Variações"] = 3, ["Dimensões"] = 3,
-        ["Descrição"] = 1, ["Cód.Barras"] = 1, ["Marca"] = 1, ["Nome"] = 1, ["Categoria"] = 1,
-        ["Nutricional"] = 0, // tab dedicada no detalhe, nao etapa do form
-    };
-    var barCss = score >= 80 ? "bg-emerald-500" : score >= 50 ? "bg-amber-400" : "bg-red-500";
-    var scoreCss = score >= 80 ? "text-emerald-600" : score >= 50 ? "text-amber-600" : "text-red-600";
+    var temFicha = Model.TemFicha;
+    var mostrarFichaNutricional = Model.MostrarFichaNutricional;
+    var score = Model.IntegrityScore;
+    var missing = Model.IntegrityMissing;
+    var missingStepMap = ProdutoDetailViewModel.IntegrityMissingStepMap;
+    var barCss = Model.IntegrityBarCss;
+    var scoreCss = Model.IntegrityScoreCss;
 
     var statusBadge = p.StatusNome.ToLower() == "ativo" ? "badge-ok" : "badge-warn";
     var tipoBadge = p.Tipo switch { 1 => "Alimento", 2 => "Servico", _ => "Fisico" };

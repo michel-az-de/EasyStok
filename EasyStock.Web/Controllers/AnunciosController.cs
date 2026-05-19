@@ -45,9 +45,7 @@ public class AnunciosController(
         string produtoId, string? variacaoId, string titulo, string conteudo, string? instrucoes)
     {
         var result = await anunciosSvc.SalvarAnuncioAsync(produtoId, variacaoId, titulo, conteudo, instrucoes);
-        if (!result.Success)
-            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao salvar." });
-        return Json(new { ok = true });
+        return result.Success ? JsonOk() : JsonFail(result.ErrorMessage ?? "Erro ao salvar.");
     }
 
     [HttpPost("/anuncios/{id}/deletar")]
@@ -55,9 +53,7 @@ public class AnunciosController(
     public async Task<IActionResult> Deletar(string id)
     {
         var result = await anunciosSvc.DeletarAnuncioAsync(id);
-        if (!result.Success)
-            return Json(new { ok = false, erro = result.ErrorMessage ?? "Erro ao deletar." });
-        return Json(new { ok = true });
+        return result.Success ? JsonOk() : JsonFail(result.ErrorMessage ?? "Erro ao deletar.");
     }
 
     // GET is intentional — SSE streams never need anti-forgery

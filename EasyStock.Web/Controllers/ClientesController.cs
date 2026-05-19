@@ -17,6 +17,7 @@ public class CriarClienteWebRequest
 
 public class ClientesController(ClientesService svc, SessionService session) : BaseController(session)
 {
+    private const int SearchResultLimit = 5;
     [HttpGet("/clientes")]
     public async Task<IActionResult> Index(string? search = null, string? status = null)
     {
@@ -58,7 +59,7 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     }
 
     [HttpGet("/clientes/buscar-json")]
-    public async Task<IActionResult> BuscarJson(string? q = null, int limit = 5)
+    public async Task<IActionResult> BuscarJson(string? q = null, int limit = SearchResultLimit)
     {
         if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
         var result = await svc.ListarAsync(null, q);
