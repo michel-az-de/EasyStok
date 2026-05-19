@@ -7,16 +7,19 @@ namespace EasyStock.Web.Controllers;
 
 public class AnalyticsController(AnalyticsService svc, SessionService session) : BaseController(session)
 {
+    private static readonly int[] PeriodsAllowed = [3, 6, 12];
+    private const int DefaultPeriodMonths = 6;
+
     // /analises = alias PT-BR. O link no menu mostra "Análises", então usuários
     // digitam /analises na URL e batem em 404. Mantemos /analytics por compatibilidade
     // com bookmarks e command palette.
     [HttpGet("/analytics")]
     [HttpGet("/analises")]
-    public async Task<IActionResult> Index(int meses = 6)
+    public async Task<IActionResult> Index(int meses = DefaultPeriodMonths)
     {
         ViewBag.Title = "Analytics";
         ViewBag.ActiveMenuItem = "Analytics";
-        if (meses is not (3 or 6 or 12)) meses = 6;
+        if (!PeriodsAllowed.Contains(meses)) meses = DefaultPeriodMonths;
         ViewBag.MesesGrafico = meses;
 
         var vm = new AnalyticsViewModel();

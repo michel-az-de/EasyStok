@@ -88,7 +88,7 @@
                     <span x-show="nome && nome.trim().length > 0 && nome.trim().length < 3" x-cloak
                           class="text-red-500 text-xs mt-1 block">O nome deve ter pelo menos 3 caracteres.</span>
                     <span x-show="step1AttemptedAdvance && !nome" x-cloak
-                          class="text-red-500 text-xs mt-1 block">Informe o nome do produto para avançar.</span>
+                          class="text-red-500 text-xs mt-1 block">Nome é obrigatório.</span>
                     <span asp-validation-for="Nome" class="text-red-500 text-xs mt-1 block"></span>
                 </div>
 

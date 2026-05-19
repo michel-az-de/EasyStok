@@ -357,8 +357,8 @@ else if (Model.ResumoApiFalhou)
             const css = getComputedStyle(document.documentElement);
             const navy = css.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
             const ink  = css.getPropertyValue('--text-muted').trim() || 'rgb(112, 120, 146)';
-            const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels));
-            const dados = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados));
+            const labels = @Json.Serialize(Model.GraficoLabels);
+            const dados = @Json.Serialize(Model.GraficoDados);
 
             if (!dados.some(function (v) { return v > 0; })) {
                 var wrap = ctx.closest('.dashboard-chart-wrap');

@@ -147,13 +147,16 @@
     {
         <div class="card border-red-200 bg-red-50">
             <h3 class="font-medium text-red-900 mb-2">Cancelar conta</h3>
-            <form method="post" action="/contas-a-receber/@c.Id/cancelar" class="flex gap-2 items-end">
+            <form method="post" action="/contas-a-receber/@c.Id/cancelar"
+                  x-data="{}"
+                  class="flex gap-2 items-end"
+                  @@submit.prevent="() => { const f = $el, id = '_cr' + Date.now(); (window.__easyConfirmCallbacks ??= {})[id] = () => f.submit(); $dispatch('confirm-action', { titulo: 'Cancelar lançamento', mensagem: 'Esta ação não pode ser desfeita. O lançamento será marcado como <strong>cancelado</strong>.', textoBotao: 'Sim, cancelar lançamento', classBotao: 'bg-red-600 hover:bg-red-700', callbackId: id }); }">
                 @Html.AntiForgeryToken()
                 <div class="flex-1">
                     <label class="form-label text-xs">Motivo *</label>
                     <input type="text" name="motivo" required maxlength="500" class="form-input" placeholder="Ex: Cliente desistiu" />
                 </div>
-                <button type="submit" class="btn btn-danger" onclick="return confirm('Cancelar esta conta?')">Cancelar conta</button>
+                <button type="submit" class="btn btn-danger">Cancelar conta</button>
             </form>
         </div>
     }

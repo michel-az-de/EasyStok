@@ -79,6 +79,33 @@ public abstract class BaseController(SessionService session) : Controller
         return true;
     }
 
+    /// <summary>
+    /// Retorna um redirect para <paramref name="action"/> (padrão: Index) caso o resultado
+    /// da API seja erro ou dado nulo. Retorna <c>null</c> se o resultado for bem-sucedido,
+    /// permitindo o pattern: <c>if (RedirectIfError(r) is { } red) return red;</c>
+    /// </summary>
+    protected IActionResult? RedirectIfError<T>(ApiResult<T> result, string? action = null)
+        where T : class
+    {
+        if (!HasError(result) && result.Data is not null) return null;
+        return RedirectToAction(action ?? nameof(Index));
+    }
+
+    /// <summary>
+    /// Resposta JSON de sucesso para endpoints AJAX. Formato: <c>{ ok: true }</c>.
+    /// Use <c>JsonOk(new { id })</c> para incluir dados adicionais.
+    /// </summary>
+    protected JsonResult JsonOk(object? extra = null) =>
+        Json(extra is not null
+            ? new { ok = true, data = extra }
+            : (object)new { ok = true });
+
+    /// <summary>
+    /// Resposta JSON de erro para endpoints AJAX. Formato: <c>{ ok: false, erro: "..." }</c>.
+    /// </summary>
+    protected JsonResult JsonFail(string message) =>
+        Json(new { ok = false, erro = message });
+
     protected IActionResult? RedirectIfLimitReached<T>(ApiResult<T> result)
     {
         if (result.Success) return null;

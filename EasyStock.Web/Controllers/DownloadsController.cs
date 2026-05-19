@@ -15,9 +15,10 @@ namespace EasyStock.Web.Controllers;
 /// </summary>
 [AllowAnonymous]
 [Route("downloads")]
-public sealed class DownloadsController(IWebHostEnvironment env) : Controller
+public sealed class DownloadsController(IWebHostEnvironment env, ILogger<DownloadsController> logger) : Controller
 {
     private readonly IWebHostEnvironment _env = env;
+    private readonly ILogger<DownloadsController> _logger = logger;
 
     [HttpGet("")]
     public IActionResult Index()
@@ -100,8 +101,9 @@ public sealed class DownloadsController(IWebHostEnvironment env) : Controller
                        ?? throw new InvalidOperationException("apk-version.json inválido");
             return info with { Available = true };
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Falha ao ler apk-version.json em {Path}", path);
             return new ApkVersionInfo("error", "0.0.0", DateTimeOffset.UtcNow, 0, "", "", false);
         }
     }
