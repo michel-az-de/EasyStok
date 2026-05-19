@@ -118,10 +118,20 @@ public class SyncController(
             catch (ConflictException cex)
             {
                 rejected.Add(new SyncConflict(m.Id, "conflict: " + cex.Message, cex.WinningPayload));
+                _log.LogInformation(
+                    "SyncMutation REJECTED conflict deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: {Mensagem}",
+                    req.DeviceId, empresaId, m.Type, m.Id, cex.Message);
             }
             catch (Exception ex)
             {
                 rejected.Add(new SyncConflict(m.Id, ex.Message));
+                // Antes: silencioso (so adicionava em rejected). Agora: log explicito
+                // pra diagnose. Exception aqui = mutation invalida (tenant guard,
+                // validacao de payload, FK quebrada). PWA mostra como rejected mas
+                // sem este log o operador/admin nao tem como descobrir o motivo.
+                _log.LogError(ex,
+                    "SyncMutation REJECTED error deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId} exType={ExType}: {Mensagem}",
+                    req.DeviceId, empresaId, m.Type, m.Id, ex.GetType().Name, ex.Message);
             }
         }
 
@@ -172,7 +182,16 @@ public class SyncController(
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "Falha auto-link mobile→ERP apos sync");
+                // Outer catch: alguma exception ESCAPOU dos try/catch internos do SyncAutoLinker
+                // (cada TryAutoLink* tem catch por entity). Indica falha catastrofica
+                // como SaveChangesAsync abortando a transacao toda. LogError com
+                // contadores pra diagnose: ver quantos ficaram orfaos por tipo.
+                _log.LogError(ex,
+                    "AutoLink batch FALHOU empresaId={EmpresaId} deviceId={DeviceId} prods={P} clients={C} orders={O} batches={B} cash={CE} exType={ExType}: {Mensagem}",
+                    empresaId, req.DeviceId,
+                    autoLinkProductIds.Count, autoLinkClientIds.Count,
+                    autoLinkOrderIds.Count, autoLinkBatchIds.Count, autoLinkCashIds.Count,
+                    ex.GetType().Name, ex.Message);
             }
         }
 
