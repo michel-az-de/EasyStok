@@ -103,16 +103,32 @@ public class SyncAutoLinker(
 
     private async Task TryAutoLinkProductsAsync(IEnumerable<string> mobileProductIds, Guid? empresaId)
     {
-        if (!empresaId.HasValue) return;
+        var idsList = mobileProductIds as ICollection<string> ?? mobileProductIds.ToList();
+        if (!empresaId.HasValue)
+        {
+            // Bug silencioso historico: device nao pareado → produtos do PWA ficavam
+            // orfaos em mobile_products SEM qualquer indicacao no log. Telas /produtos
+            // do web vinham vazias e ninguem sabia onde olhar. Este warning torna
+            // o estado explicito; rodar `POST /api/mobile/sync/backfill-erp-link`
+            // de um device pareado da empresa resolve.
+            _log.LogWarning(
+                "AutoLink Produto SKIPPED: device nao pareado (empresaId=null), {Count} produtos ficam orfaos em mobile_products",
+                idsList.Count);
+            return;
+        }
         Guid? cachedCategoriaId = null;
         Guid? cachedSysUserId = null;
-        foreach (var pid in mobileProductIds)
+        var matched = 0;
+        var created = 0;
+        var idempotentSkip = 0;
+        var errorSkip = 0;
+        foreach (var pid in idsList)
         {
             try
             {
                 var mobileP = await _db.Set<Product>()
                     .FirstOrDefaultAsync(p => p.Id == pid && p.EmpresaId == empresaId);
-                if (mobileP == null || mobileP.ErpProductId.HasValue) continue;
+                if (mobileP == null || mobileP.ErpProductId.HasValue) { idempotentSkip++; continue; }
 
                 var webP = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
                     .FirstOrDefaultAsync(p =>
@@ -123,7 +139,8 @@ public class SyncAutoLinker(
                 if (webP != null)
                 {
                     mobileP.ErpProductId = webP.Id;
-                    _log.LogInformation("AutoLink Produto: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
+                    matched++;
+                    _log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
                     cachedSysUserId ??= await _systemUserResolver.GetOrCreateAsync(empresaId.Value);
                     _db.Add(new ProdutoAlteracao
                     {
@@ -171,26 +188,47 @@ public class SyncAutoLinker(
                     Observacao = $"Criado via mobile_product {pid}; Nome={novoProd.Nome}; Preco={novoProd.PrecoReferencia?.Valor}",
                     AlteradoEm = DateTime.UtcNow
                 });
+                created++;
                 _log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
                     pid, novoProd.Id, mobileP.Name);
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "AutoLink Produto falhou pra mobile={MobileId}", pid);
+                errorSkip++;
+                // Antes: LogWarning sem tipo. Agora exType e Mensagem em props
+                // estruturadas (Serilog/OTel) permitem filtrar por classe de erro
+                // sem precisar baixar e parsear stack trace.
+                _log.LogError(ex,
+                    "AutoLink Produto FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
+                    pid, empresaId, ex.GetType().Name, ex.Message);
             }
         }
+        _log.LogInformation(
+            "AutoLink Produto summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
+            empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
     }
 
     private async Task TryAutoLinkClientsAsync(IEnumerable<string> mobileClientIds, Guid? empresaId)
     {
-        if (!empresaId.HasValue) return;
-        foreach (var cid in mobileClientIds)
+        var idsList = mobileClientIds as ICollection<string> ?? mobileClientIds.ToList();
+        if (!empresaId.HasValue)
+        {
+            _log.LogWarning(
+                "AutoLink Cliente SKIPPED: device nao pareado (empresaId=null), {Count} clientes ficam orfaos em mobile_clients",
+                idsList.Count);
+            return;
+        }
+        var matched = 0;
+        var created = 0;
+        var idempotentSkip = 0;
+        var errorSkip = 0;
+        foreach (var cid in idsList)
         {
             try
             {
                 var mobileC = await _db.Set<Client>()
                     .FirstOrDefaultAsync(c => c.Id == cid && c.EmpresaId == empresaId);
-                if (mobileC == null || mobileC.ErpClienteId.HasValue) continue;
+                if (mobileC == null || mobileC.ErpClienteId.HasValue) { idempotentSkip++; continue; }
 
                 var baseQuery = _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
                     .Where(c => c.EmpresaId == empresaId && c.Ativo);
@@ -207,7 +245,8 @@ public class SyncAutoLinker(
                 if (match != null)
                 {
                     mobileC.ErpClienteId = match.Id;
-                    _log.LogInformation("AutoLink Cliente: mobile={MobileId} → erp={ErpId}", cid, match.Id);
+                    matched++;
+                    _log.LogInformation("AutoLink Cliente matched: mobile={MobileId} → erp={ErpId}", cid, match.Id);
                     _db.Add(new ClienteAlteracao
                     {
                         Id = Guid.NewGuid(),
@@ -241,21 +280,37 @@ public class SyncAutoLinker(
                     AlteradoEm = DateTime.UtcNow,
                     Origem = "mobile"
                 });
+                created++;
                 _log.LogInformation("AutoLink Cliente CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
                     cid, novoC.Id, mobileC.Name);
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "AutoLink Cliente falhou pra mobile={MobileId}", cid);
+                errorSkip++;
+                _log.LogError(ex,
+                    "AutoLink Cliente FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
+                    cid, empresaId, ex.GetType().Name, ex.Message);
             }
         }
+        _log.LogInformation(
+            "AutoLink Cliente summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
+            empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
     }
 
     // F1 — promove mobile_order → Pedido web. Idempotente via FindByMobileOrderIdAsync.
     private async Task TryAutoLinkOrdersAsync(IEnumerable<string> mobileOrderIds, Guid? empresaId)
     {
-        if (!empresaId.HasValue) return;
-        foreach (var oid in mobileOrderIds)
+        var idsList = mobileOrderIds as ICollection<string> ?? mobileOrderIds.ToList();
+        if (!empresaId.HasValue)
+        {
+            _log.LogWarning(
+                "AutoLink Pedido SKIPPED: device nao pareado (empresaId=null), {Count} pedidos ficam orfaos em mobile_orders",
+                idsList.Count);
+            return;
+        }
+        var processed = 0;
+        var errorSkip = 0;
+        foreach (var oid in idsList)
         {
             try
             {
@@ -263,6 +318,7 @@ public class SyncAutoLinker(
                     .Include(o => o.Items)
                     .FirstOrDefaultAsync(o => o.Id == oid && o.EmpresaId == empresaId);
                 if (mobileO == null) continue;
+                processed++;
 
                 Guid? pedidoIdResolvido = null;
 
@@ -408,9 +464,15 @@ public class SyncAutoLinker(
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "AutoLink Pedido falhou pra mobile={MobileId}", oid);
+                errorSkip++;
+                _log.LogError(ex,
+                    "AutoLink Pedido FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
+                    oid, empresaId, ex.GetType().Name, ex.Message);
             }
         }
+        _log.LogInformation(
+            "AutoLink Pedido summary empresaId={EmpresaId} total={Total} processed={Processed} errors={Errors}",
+            empresaId, idsList.Count, processed, errorSkip);
     }
 
     /// <summary>
@@ -609,21 +671,32 @@ public class SyncAutoLinker(
     // F2 — promove mobile_batch → Lote web. Idempotente via FindByMobileBatchIdAsync.
     private async Task TryAutoLinkBatchesAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
     {
-        if (!empresaId.HasValue) return;
-        foreach (var bid in mobileBatchIds)
+        var idsList = mobileBatchIds as ICollection<string> ?? mobileBatchIds.ToList();
+        if (!empresaId.HasValue)
+        {
+            _log.LogWarning(
+                "AutoLink Lote SKIPPED: device nao pareado (empresaId=null), {Count} lotes ficam orfaos em mobile_batches",
+                idsList.Count);
+            return;
+        }
+        var created = 0;
+        var idempotentSkip = 0;
+        var errorSkip = 0;
+        foreach (var bid in idsList)
         {
             try
             {
                 var mobileB = await _db.Set<Batch>().IgnoreQueryFilters()
                     .Include(b => b.Items)
                     .FirstOrDefaultAsync(b => b.Id == bid && b.EmpresaId == empresaId);
-                if (mobileB == null) continue;
-                if (mobileB.ErpLoteId.HasValue && mobileB.ErpLoteId.Value != Guid.Empty) continue;
+                if (mobileB == null) { idempotentSkip++; continue; }
+                if (mobileB.ErpLoteId.HasValue && mobileB.ErpLoteId.Value != Guid.Empty) { idempotentSkip++; continue; }
 
                 var jaPromovido = await _loteRepo.FindByMobileBatchIdAsync(empresaId.Value, mobileB.Id);
                 if (jaPromovido != null)
                 {
                     mobileB.ErpLoteId = jaPromovido.Id;
+                    idempotentSkip++;
                     _log.LogInformation("AutoLink Lote (idempotente): mobile={MobileId} → erp={ErpId}", bid, jaPromovido.Id);
                     continue;
                 }
@@ -673,6 +746,7 @@ public class SyncAutoLinker(
                 await _loteRepo.AddAsync(lote);
                 mobileB.ErpLoteId = lote.Id;
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                created++;
                 _log.LogInformation("F2 Lote CRIADO: mobile={MobileId} → erp={ErpId} itens={N}",
                     bid, lote.Id, lote.Itens.Count);
 
@@ -680,11 +754,15 @@ public class SyncAutoLinker(
             }
             catch (Exception ex)
             {
+                errorSkip++;
                 _log.LogError(ex,
-                    "F2 AutoLink Lote FALHOU mobile={MobileId}: {Tipo}: {Mensagem}",
-                    bid, ex.GetType().Name, ex.Message);
+                    "F2 AutoLink Lote FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
+                    bid, empresaId, ex.GetType().Name, ex.Message);
             }
         }
+        _log.LogInformation(
+            "AutoLink Lote summary empresaId={EmpresaId} total={Total} created={Created} idempotent={Idempotent} errors={Errors}",
+            empresaId, idsList.Count, created, idempotentSkip, errorSkip);
     }
 
     /// <summary>
@@ -776,15 +854,25 @@ public class SyncAutoLinker(
     // F3 — promove mobile_cash_entry → MovimentoCaixa web. Idempotente via Referencia="mobile:<id>".
     private async Task TryAutoLinkCashEntriesAsync(IEnumerable<string> mobileCashIds, Guid? empresaId)
     {
-        if (!empresaId.HasValue) return;
-        foreach (var ceid in mobileCashIds)
+        var idsList = mobileCashIds as ICollection<string> ?? mobileCashIds.ToList();
+        if (!empresaId.HasValue)
+        {
+            _log.LogWarning(
+                "AutoLink MovimentoCaixa SKIPPED: device nao pareado (empresaId=null), {Count} entradas ficam orfas em mobile_cash_entries",
+                idsList.Count);
+            return;
+        }
+        var created = 0;
+        var idempotentSkip = 0;
+        var errorSkip = 0;
+        foreach (var ceid in idsList)
         {
             try
             {
                 var mobileCE = await _db.Set<CashEntry>().IgnoreQueryFilters()
                     .FirstOrDefaultAsync(c => c.Id == ceid && c.EmpresaId == empresaId);
-                if (mobileCE == null) continue;
-                if (mobileCE.ErpMovimentoCaixaId.HasValue && mobileCE.ErpMovimentoCaixaId.Value != Guid.Empty) continue;
+                if (mobileCE == null) { idempotentSkip++; continue; }
+                if (mobileCE.ErpMovimentoCaixaId.HasValue && mobileCE.ErpMovimentoCaixaId.Value != Guid.Empty) { idempotentSkip++; continue; }
 
                 var referencia = $"mobile:{mobileCE.Id}";
                 var jaPromovido = await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
@@ -792,6 +880,7 @@ public class SyncAutoLinker(
                 if (jaPromovido != null)
                 {
                     mobileCE.ErpMovimentoCaixaId = jaPromovido.Id;
+                    idempotentSkip++;
                     _log.LogInformation("AutoLink MovimentoCaixa (idempotente): mobile={MobileId} → erp={ErpId}", ceid, jaPromovido.Id);
                     continue;
                 }
@@ -807,14 +896,21 @@ public class SyncAutoLinker(
                 _db.Add(mov);
                 mobileCE.ErpMovimentoCaixaId = mov.Id;
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
+                created++;
                 _log.LogInformation("AutoLink MovimentoCaixa CRIADO: mobile={MobileId} → erp={ErpId} tipo={Tipo} valor={Valor}",
                     ceid, mov.Id, tipo, mov.Valor);
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "AutoLink MovimentoCaixa falhou pra mobile={MobileId}", ceid);
+                errorSkip++;
+                _log.LogError(ex,
+                    "AutoLink MovimentoCaixa FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
+                    ceid, empresaId, ex.GetType().Name, ex.Message);
             }
         }
+        _log.LogInformation(
+            "AutoLink MovimentoCaixa summary empresaId={EmpresaId} total={Total} created={Created} idempotent={Idempotent} errors={Errors}",
+            empresaId, idsList.Count, created, idempotentSkip, errorSkip);
     }
 
     private async Task<Guid> GetOrCreateDefaultCategoriaAsync(Guid empresaId)

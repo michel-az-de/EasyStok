@@ -7,13 +7,35 @@ namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class UsuarioRepository(EasyStockDbContext dbContext) : IUsuarioRepository
     {
-        public Task<Usuario?> GetByIdAsync(Guid id) =>
-            dbContext.Usuarios
-                .AsNoTracking()
-                .Include(u => u.Empresas)
-                .Include(u => u.Perfis!)
-                .ThenInclude(up => up.Perfil)
-                .FirstOrDefaultAsync(u => u.Id == id);
+        public async Task<Usuario?> GetByIdAsync(Guid id)
+        {
+            // Pre-auth bypass: este metodo e chamado pelo RefreshTokenUseCase
+            // onde o JWT do request pode estar expirado (CurrentTenantId = Guid.Empty)
+            // OU pelo token middleware antes do contexto de tenant existir.
+            //
+            // Dois filtros precisam ser bypassados:
+            //   1. EF global query filter (Onda 1.2) — elimina linhas de
+            //      UsuarioEmpresa/UsuarioPerfil com EmpresaId != Guid.Empty.
+            //   2. RLS Postgres (2026-05-11) — policy tenant_isolation zera
+            //      as linhas mesmo com IgnoreQueryFilters.
+            //
+            // Sem o bypass, navegacoes Empresas/Perfis voltam vazias,
+            // ResolveEmpresaIdPadrao retorna null, JWT renovado fica sem
+            // a claim "empresaId" e o filtro global zera todas as consultas
+            // subsequentes (bug silencioso — telas vem vazias sem erro).
+            //
+            // Mesmo padrao ja aplicado em GetByEmailAsync (login).
+            using (dbContext.UseRowLevelSecurityBypass())
+            {
+                return await dbContext.Usuarios
+                    .AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .Include(u => u.Empresas)
+                    .Include(u => u.Perfis!)
+                    .ThenInclude(up => up.Perfil)
+                    .FirstOrDefaultAsync(u => u.Id == id);
+            }
+        }
 
         public async Task<Usuario?> GetByEmailAsync(string email)
         {
