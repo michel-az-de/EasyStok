@@ -1,4 +1,4 @@
-using EasyStock.Domain.Reporting.Exceptions;
+using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Domain.Reporting;
 

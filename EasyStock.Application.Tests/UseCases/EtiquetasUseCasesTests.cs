@@ -214,7 +214,7 @@ public class EtiquetasUseCasesTests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task AtualizarTemplate_ConflitoConcorrencia_LancaConcurrencyException()
+    public async Task AtualizarTemplate_ConflitoConcorrencia_PropagaExcecaoDeInfra()
     {
         var tpl = new EasyStock.Domain.Entities.EtiquetaTemplate
         {
@@ -225,14 +225,14 @@ public class EtiquetasUseCasesTests
         var uow   = Substitute.For<IUnitOfWork>();
 
         repo.GetEmpresaByIdAsync(EmpId, TplId).Returns(tpl);
-        // Simula conflito de concorrência no commit
-        repo.UpdateEmpresaAsync(Arg.Any<EasyStock.Domain.Entities.EtiquetaTemplate>())
-            .ThrowsAsync(new DbUpdateConcurrencyException("conflito"));
+        // Simula conflito de concorrência no commit (EF Core lança via uow.CommitAsync em produção;
+        // GlobalExceptionHandler mapeia DbUpdateConcurrencyException → 409 Conflict).
+        uow.CommitAsync().ThrowsAsync(new DbUpdateConcurrencyException("conflito"));
 
         var uc  = new AtualizarTemplateUseCase(repo, audit, uow);
         var cmd = new AtualizarTemplateCommand(EmpId, TplId, "Novo Nome", Layout, OperId, null, null);
 
-        await Assert.ThrowsAsync<UseCaseConcurrencyException>(() => uc.ExecuteAsync(cmd));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => uc.ExecuteAsync(cmd));
     }
 
     [Fact]

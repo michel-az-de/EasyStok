@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using EasyStock.Application.Reporting;
+using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Postgre.Reporting;
@@ -10,8 +11,12 @@ namespace EasyStock.Infra.Postgre.Reporting;
 /// Defesa em profundidade (ADR-R07): toda query de relatório passa por aqui.
 /// Aplica WHERE EmpresaId = @scope explicitamente, mesmo com Query Filter ativo.
 /// Cache de expressões compiladas por tipo para evitar overhead de reflection repetitivo.
+/// Recebe EasyStockDbContext via DI (não via parâmetro de método) para manter a
+/// interface ITenantScopedQueryBuilder livre de dependências de infraestrutura.
 /// </summary>
-public sealed class TenantScopedQueryBuilder(IReportExecutionScope scope) : ITenantScopedQueryBuilder
+public sealed class TenantScopedQueryBuilder(
+    EasyStockDbContext db,
+    IReportExecutionScope scope) : ITenantScopedQueryBuilder
 {
     // Cache thread-safe de expressões: TEntity → Expression<Func<TEntity, bool>> (stored as object)
     private static readonly ConcurrentDictionary<Type, object> _filterCache = new();
@@ -20,7 +25,7 @@ public sealed class TenantScopedQueryBuilder(IReportExecutionScope scope) : ITen
     /// Query com isolamento por tenant (contexto Tenant).
     /// Aplica WHERE EmpresaId = @scope.EmpresaId explicitamente.
     /// </summary>
-    public IQueryable<T> Query<T>(DbContext db) where T : class
+    public IQueryable<T> Query<T>() where T : class
     {
         EnsureSet();
         var empresaId = scope.EmpresaId;
@@ -42,7 +47,7 @@ public sealed class TenantScopedQueryBuilder(IReportExecutionScope scope) : ITen
     /// Query para Admin SaaS — cross-tenant explícito.
     /// Sem WHERE EmpresaId (intencional e auditável — apenas Admin chama isto).
     /// </summary>
-    public IQueryable<T> AdminQuery<T>(DbContext db) where T : class
+    public IQueryable<T> AdminQuery<T>() where T : class
     {
         EnsureSet();
 

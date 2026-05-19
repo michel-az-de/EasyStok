@@ -327,8 +327,8 @@
                 <div>
                     <div class="ped-recibo__check">
                         <svg viewBox="0 0 24 24" width="36" height="36">
-                            <circle cx="12" cy="12" r="11" fill="#10b981" />
-                            <path d="M7 12.5l3.5 3.5L17 9" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="12" r="11" fill="rgb(16,185,129)" />
+                            <path d="M7 12.5l3.5 3.5L17 9" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
                     <h2 class="fm-header__title">Pedido criado</h2>
@@ -809,13 +809,13 @@ function novoPedidoModal() {
         },
         async _runEtapa(id, label, fn) {
             this._etapaSet(id, label, 'running');
-            console.log('%c→ ' + label, 'color:#6366f1;font-weight:bold');
+            console.log('%c→ ' + label, 'font-weight:bold');
             const t0 = performance.now();
             try {
                 const result = await fn();
                 const dt = Math.round(performance.now() - t0);
                 this._etapaUpdate(id, 'done', dt + 'ms');
-                console.log('%c✓ ' + label + ' (' + dt + 'ms)', 'color:#10b981', result || '');
+                console.log('%c✓ ' + label + ' (' + dt + 'ms)', '', result || '');
                 return result;
             } catch (err) {
                 const dt = Math.round(performance.now() - t0);
@@ -1141,7 +1141,7 @@ function novoPedidoModal() {
 
         // ── Submit: orquestração com etapas animadas + console group ──────
         async submit() {
-            console.log('%c[Pedidos] submit() chamado', 'color:#6366f1;font-weight:bold',
+            console.log('%c[Pedidos] submit() chamado', 'font-weight:bold',
                 'fase=' + this.fase, 'loading=' + this.loading);
             if (this.loading) return;
             const motivo = this._preflight();
@@ -1170,7 +1170,7 @@ function novoPedidoModal() {
             });
             this._etapaSet('pedido', 'Criar pedido e movimentar saída de estoque', 'pending');
 
-            console.group('%c[Pedidos] Criando pedido', 'color:#6366f1;font-weight:bold');
+            console.group('%c[Pedidos] Criando pedido', 'font-weight:bold');
             console.log('Cliente novo:', this.clienteNovo.ativo ? this.clienteNovo : (this.form.clienteId || '(avulso)'));
             console.log('Itens:', this.form.itens.length, '| produtos novos:', novos.length);
             if (this.form.itens.length) console.table(this.form.itens.map(i => ({
@@ -1283,7 +1283,7 @@ function novoPedidoModal() {
 
                 this.pedidoCriado = pedido;
                 const dt = Math.round(performance.now() - t0);
-                console.log('%c✓ Pedido criado em ' + dt + 'ms', 'color:#10b981;font-weight:bold', pedido);
+                console.log('%c✓ Pedido criado em ' + dt + 'ms', 'font-weight:bold', pedido);
                 if (this.avisos.length > 0) {
                     console.warn('[Pedidos] Avisos parciais (' + this.avisos.length + '):', this.avisos);
                 }
@@ -1334,7 +1334,7 @@ function novoPedidoModal() {
         },
 
         async _postJson(url, body, token) {
-            console.log('%cPOST ' + url, 'color:#64748b', body);
+            console.log('%cPOST ' + url, '', body);
             let res;
             try {
                 res = await fetch(url, {
@@ -1353,7 +1353,7 @@ function novoPedidoModal() {
             let data = null;
             try { data = raw ? JSON.parse(raw) : null; } catch { /* não-JSON */ }
             if (res.ok && data && data.success) {
-                console.log('%c← ' + res.status + ' ' + url, 'color:#10b981', data);
+                console.log('%c← ' + res.status + ' ' + url, '', data);
                 return { ok: true, data, status: res.status };
             }
             // Coleta TODAS as fontes possíveis de mensagem antes de cair em fallback.

@@ -8,6 +8,7 @@ let _loteId     = null;
 let _empresaId  = null;
 let _selectedTemplate = null;  // { origem, id, nome, layoutJson }
 let _offlineMode = false;
+let _abortCtrl  = null;   // aborts in-flight loads when overlay closes
 
 const _FALLBACK_TEMPLATES = [
   { Id:'sys-identificacao', Origem:'Sistema', Nome:'Identificação', Descricao:'Compacta. Logo + nome + lote + QR.', IsDefault:true, LayoutJson:JSON.stringify({v:1,size:{preset:"80x40mm",w_mm:80,h_mm:40,orientation:"horizontal"},elements:[{id:"logo",type:"image",asset:"system:lockup-easystok",x_mm:2,y_mm:2,w_mm:10,h_mm:5,locked:false},{id:"nome",type:"text",content:"{produto.nome}",x_mm:14,y_mm:2,w_mm:44,h_mm:8,font:"sans",size_pt:14,weight:700,align:"left",overflow:"shrink-then-ellipsis"},{id:"marca",type:"text",content:"{produto.marca}",x_mm:14,y_mm:11,w_mm:44,h_mm:5,font:"sans",size_pt:9,weight:400,align:"left",overflow:"shrink-then-ellipsis"},{id:"lote",type:"text",content:"LOT {lote.codigo}",x_mm:2,y_mm:26,w_mm:56,h_mm:4,font:"mono",size_pt:9,weight:700,align:"left",overflow:"clip"},{id:"val",type:"text",content:"VAL {lote.validadeEm:dd/MM/yyyy}",x_mm:2,y_mm:31,w_mm:56,h_mm:5,font:"mono",size_pt:9,weight:400,align:"left",overflow:"clip"},{id:"qr",type:"code",format:"qr",content:"{etiqueta.codigo}",x_mm:60,y_mm:4,w_mm:18,h_mm:18,quiet_zone_mm:1},{id:"seq",type:"text",content:"{etiqueta.sequencial}",x_mm:60,y_mm:22,w_mm:18,h_mm:5,font:"mono",size_pt:8,weight:400,align:"center",overflow:"clip"},{id:"footer",type:"text",content:"@easystok",x_mm:62,y_mm:35,w_mm:16,h_mm:3,font:"sans",size_pt:6,weight:400,align:"center",color:"ink-500",locked:false}]}) },
@@ -18,6 +19,8 @@ const _FALLBACK_TEMPLATES = [
 // ── Public API (called from index.html inline handlers + lote card) ──────────
 
 window.etqAbrirImprimir = async function(loteId, empresaId) {
+  if (_abortCtrl) _abortCtrl.abort();
+  _abortCtrl = new AbortController();
   _loteId    = loteId;
   _empresaId = empresaId;
   _payload   = null;
@@ -27,17 +30,18 @@ window.etqAbrirImprimir = async function(loteId, empresaId) {
 
   _setStatus('Carregando…');
   try {
-    await Promise.all([_loadTemplates(), _loadPayload()]);
+    await Promise.all([_loadTemplates(_abortCtrl.signal), _loadPayload(_abortCtrl.signal)]);
     _populateTemplateSel();
     _updateCounts();
     await _atualizarPreview();
     _setStatus('');
   } catch (err) {
-    _setStatus('Erro ao carregar: ' + err.message);
+    if (err.name !== 'AbortError') _setStatus('Erro ao carregar: ' + err.message);
   }
 };
 
 window.etqImpFechar = function() {
+  if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
   document.getElementById('etq-imprimir-overlay').style.display = 'none';
   _payload = null;
 };
@@ -147,22 +151,23 @@ window.etqModelosCriar = function() {
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
-async function _loadTemplates() {
+async function _loadTemplates(signal) {
   try {
-    const res = await _apiFetch(`/api/etiquetas/templates?empresaId=${_empresaId}`);
+    const res = await _apiFetch(`/api/etiquetas/templates?empresaId=${_empresaId}`, signal);
     _templates = res.data ?? [];
     _offlineMode = false;
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     _templates = _FALLBACK_TEMPLATES;
     _offlineMode = true;
   }
 }
 
-async function _loadPayload() {
+async function _loadPayload(signal) {
   const t = _selectedTemplate;
   let url = `/api/lotes/${_loteId}/etiquetas/render?empresaId=${_empresaId}`;
   if (t) url += `&templateOrigem=${t.origem}&templateId=${t.id}`;
-  const res = await _apiFetch(url);
+  const res = await _apiFetch(url, signal);
   _payload = res.data;
 }
 
@@ -187,8 +192,9 @@ function _syncSelectedTemplate() {
 
 function _updateCounts() {
   if (!_payload) return;
-  const todas     = _payload.Etiquetas.length;
-  const pendentes = _payload.Etiquetas.filter(e => e.Status === 'pendente').length;
+  const etiquetas = _payload.Etiquetas ?? [];
+  const todas     = etiquetas.length;
+  const pendentes = etiquetas.filter(e => e.Status === 'pendente').length;
   document.getElementById('etq-imp-count-todas').textContent    = todas;
   document.getElementById('etq-imp-count-pendentes').textContent = pendentes;
 
@@ -204,14 +210,15 @@ function _updateCounts() {
 
 function _getSelectedIds() {
   if (!_payload) return [];
+  const etiquetas = _payload.Etiquetas ?? [];
   const range = document.querySelector('input[name="etq-range"]:checked')?.value ?? 'todas';
-  if (range === 'pendentes') return _payload.Etiquetas.filter(e => e.Status === 'pendente').map(e => e.Id);
+  if (range === 'pendentes') return etiquetas.filter(e => e.Status === 'pendente').map(e => e.Id);
   if (range === 'intervalo') {
     const from = parseInt(document.getElementById('etq-imp-from').value) || 1;
-    const to   = parseInt(document.getElementById('etq-imp-to').value)   || _payload.Etiquetas.length;
-    return _payload.Etiquetas.filter(e => e.Sequencial >= from && e.Sequencial <= to).map(e => e.Id);
+    const to   = parseInt(document.getElementById('etq-imp-to').value)   || etiquetas.length;
+    return etiquetas.filter(e => e.Sequencial >= from && e.Sequencial <= to).map(e => e.Id);
   }
-  return _payload.Etiquetas.map(e => e.Id);
+  return etiquetas.map(e => e.Id);
 }
 
 async function _atualizarPreview() {
@@ -324,7 +331,7 @@ ${labelHtmls}
 <script src="/etiqueta/vendor/jsbarcode.min.js"><\/script>
 <script type="module">
   import { renderCodes } from '/etiqueta/codes.js';
-  document.querySelectorAll('.etq-label').forEach(async root => { await renderCodes(root); });
+  (async () => { for (const r of document.querySelectorAll('.etq-label')) { try { await renderCodes(r); } catch(e) { console.warn('[etq] renderCodes:', e); } } })();
   window.addEventListener('load', () => setTimeout(() => window.print(), 500));
 <\/script>
 </body></html>`;
@@ -669,8 +676,8 @@ function _showToastEtq(msg) {
   else console.log('[etq]', msg);
 }
 
-async function _apiFetch(url) {
-  const res = await fetch(url, { credentials: 'include' });
+async function _apiFetch(url, signal) {
+  const res = await fetch(url, { credentials: 'include', signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

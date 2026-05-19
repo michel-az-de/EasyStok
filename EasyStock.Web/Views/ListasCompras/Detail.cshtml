@@ -50,7 +50,7 @@
         <span class="text-sm font-semibold text-slate-900">@pct%</span>
     </div>
     <div class="ped-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">
-        <div class="ped-progress__bar @(pct == 100 ? "ped-progress__bar--done" : "")" style="width: @(pct)%; background: @(pct == 100 ? null : "linear-gradient(90deg, #1E48A8 0%, #3B5BB8 100%)")"></div>
+        <div class="ped-progress__bar @(pct == 100 ? "ped-progress__bar--done" : "")" style="width: @(pct)%; background: @(pct == 100 ? null : "linear-gradient(90deg, var(--navy-500) 0%, var(--navy-600) 100%)")"></div>
     </div>
     @if (l.Status == "aberta")
     {

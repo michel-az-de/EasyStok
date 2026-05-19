@@ -66,7 +66,7 @@ public sealed class TotalizadoresFiscaisHandler(
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Passo 1: IDs das NFC-e autorizadas no período (escopo de tenant garantido).
-        var docIds = await tenantQuery.Query<NfeDocumento>(db)
+        var docIds = await tenantQuery.Query<NfeDocumento>()
             .AsNoTracking()
             .Where(n => n.Status == StatusNfe.Autorizada
                         && n.DataAutorizacao >= de && n.DataAutorizacao <= ate)

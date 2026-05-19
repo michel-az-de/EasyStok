@@ -8,22 +8,23 @@
     <meta charset="utf-8" />
     <title>Imprimir etiquetas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="/etiqueta/etiqueta.css" />
     <style>
         :root { color-scheme: light; }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: #ECEFF5; }
-        .toolbar { background: #fff; border-bottom: 1px solid #D8DCE3; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
-        .toolbar a { color: #1A2E5A; font-size: 13px; text-decoration: none; }
+        body { margin: 0; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: var(--ink-100); }
+        .toolbar { background: var(--white); border-bottom: 1px solid var(--border-soft); padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+        .toolbar a { color: var(--navy-700); font-size: 13px; text-decoration: none; }
         .toolbar a:hover { text-decoration: underline; }
         main { max-width: 700px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
-        select, input[type=number] { border: 1px solid #D8DCE3; border-radius: 6px; padding: 7px 10px; font-size: 13px; }
-        label { font-size: 14px; font-weight: 600; color: #3A4350; display: block; margin-bottom: 4px; }
-        .helper { font-size: 12px; color: #6B7480; margin-bottom: 6px; }
-        .card { background: #fff; border: 1px solid #D8DCE3; border-radius: 8px; padding: 16px; }
+        select, input[type=number] { border: 1px solid var(--border-soft); border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+        label { font-size: 14px; font-weight: 600; color: var(--ink-600); display: block; margin-bottom: 4px; }
+        .helper { font-size: 12px; color: var(--ink-500); margin-bottom: 6px; }
+        .card { background: var(--white); border: 1px solid var(--border-soft); border-radius: 8px; padding: 16px; }
         .radio-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; }
         .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-        #status-msg { font-size: 12px; color: #4D5665; min-height: 18px; }
+        #status-msg { font-size: 12px; color: var(--ink-600); min-height: 18px; }
         #sem-ficha-warn { display: none; }
     </style>
 </head>

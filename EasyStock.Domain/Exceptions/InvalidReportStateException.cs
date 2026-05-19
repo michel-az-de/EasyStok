@@ -1,6 +1,6 @@
-using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Reporting;
 
-namespace EasyStock.Domain.Reporting.Exceptions;
+namespace EasyStock.Domain.Exceptions;
 
 /// <summary>
 /// Lançada quando uma transição de estado inválida é tentada em um <see cref="ReportRun"/>.

@@ -9,9 +9,9 @@
 </div>
 
 <!-- Abas -->
-<div style="display:flex;border-bottom:1px solid var(--border-soft,#D8DCE3);margin-bottom:16px">
+<div style="display:flex;border-bottom:1px solid var(--border-soft);margin-bottom:16px">
     <button id="tab-sistema" onclick="abaModelos('sistema')"
-            style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--navy-700,#1A2E5A);font-weight:600;font-size:13px;cursor:pointer">
+            style="flex:1;padding:10px;background:none;border:none;border-bottom:2px solid var(--navy-700);font-weight:600;font-size:13px;cursor:pointer">
         Prontos do EasyStok
     </button>
     <button id="tab-empresa" onclick="abaModelos('empresa')"
@@ -28,9 +28,9 @@
 
 <!-- Modal de confirmação -->
 <div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:12px;padding:24px 20px;width:90%;max-width:400px">
+    <div style="background:var(--white);border-radius:12px;padding:24px 20px;width:90%;max-width:400px">
         <h4 id="confirm-title" style="font-size:15px;font-weight:700;margin:0 0 8px"></h4>
-        <p  id="confirm-body"  style="font-size:13px;color:#4D5665;margin:0 0 16px"></p>
+        <p  id="confirm-body"  style="font-size:13px;color:var(--ink-600);margin:0 0 16px"></p>
         <div id="confirm-btns" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
 </div>
@@ -57,8 +57,8 @@ async function init() {
 
 window.abaModelos = function(aba) {
     _aba = aba;
-    document.getElementById('tab-sistema').style.borderBottomColor = aba === 'sistema' ? 'var(--navy-700,#1A2E5A)' : 'transparent';
-    document.getElementById('tab-empresa').style.borderBottomColor = aba === 'empresa' ? 'var(--navy-700,#1A2E5A)' : 'transparent';
+    document.getElementById('tab-sistema').style.borderBottomColor = aba === 'sistema' ? 'var(--navy-700)' : 'transparent';
+    document.getElementById('tab-empresa').style.borderBottomColor = aba === 'empresa' ? 'var(--navy-700)' : 'transparent';
     renderLista(aba);
 };
 
@@ -94,7 +94,7 @@ function renderLista(aba) {
                     ` : `
                         <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="window.location='/etiquetas/editor/${eId}'">Editar</button>
                         <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="definirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
-                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px;color:var(--crit-600,#DC2626)" onclick="excluir('${eId}','${eNome}')">Excluir</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px;color:var(--crit-600)" onclick="excluir('${eId}','${eNome}')">Excluir</button>
                     `}
                 </div>
             </div>
@@ -160,7 +160,7 @@ function confirm2({ title, body, btns }) {
         const b = document.createElement('button');
         b.textContent = btn.label;
         b.className   = btn.primary ? 'etq-btn-primary' : 'etq-btn-secondary';
-        if (btn.danger) b.style.background = '#DC2626';
+        if (btn.danger) b.style.background = 'var(--crit-600)';
         b.onclick = async () => { modal.style.display = 'none'; if (btn.action) await btn.action(); };
         btnsEl.appendChild(b);
     }
@@ -169,7 +169,7 @@ function confirm2({ title, body, btns }) {
 function toast(msg) {
     const t = document.createElement('div');
     t.textContent = msg;
-    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1A2E5A;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy-700);color:var(--white);padding:10px 16px;border-radius:8px;font-size:13px;z-index:99999';
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3000);
 }

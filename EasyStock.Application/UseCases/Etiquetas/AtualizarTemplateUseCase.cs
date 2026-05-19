@@ -1,7 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Validators;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 
@@ -39,23 +38,17 @@ public class AtualizarTemplateUseCase(
         template.LayoutJson = cmd.LayoutJson;
         template.AlteradoEm = DateTime.UtcNow;
 
-        try
-        {
-            await repo.UpdateEmpresaAsync(template);
+        await repo.UpdateEmpresaAsync(template);
 
-            if (cmd.OperadorId.HasValue)
-            {
-                await auditRepo.AddAsync(AuditLogEntity.Criar(
-                    cmd.OperadorId.Value, "etiqueta-template.editado", true,
-                    $"Id: {template.Id}, Nome: {template.Nome}", cmd.Ip, cmd.UserAgent));
-            }
-
-            await uow.CommitAsync();
-        }
-        catch (DbUpdateConcurrencyException)
+        if (cmd.OperadorId.HasValue)
         {
-            throw new UseCaseConcurrencyException("Outro usuário modificou este modelo. Recarregue e tente novamente.");
+            await auditRepo.AddAsync(AuditLogEntity.Criar(
+                cmd.OperadorId.Value, "etiqueta-template.editado", true,
+                $"Id: {template.Id}, Nome: {template.Nome}", cmd.Ip, cmd.UserAgent));
         }
+
+        // DbUpdateConcurrencyException propagates to GlobalExceptionHandler → 409 Conflict.
+        await uow.CommitAsync();
 
         return CriarTemplateUseCase.Map(template);
     }

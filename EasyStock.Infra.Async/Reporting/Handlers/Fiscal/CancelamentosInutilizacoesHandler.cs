@@ -70,7 +70,7 @@ public sealed class CancelamentosInutilizacoesHandler(
         // JOIN com NfeDocumento garante escopo de tenant (NfeEvento não tem EmpresaId diretamente).
         var eventos = (
             from evt in db.NfeEventos
-            join doc in tenantQuery.Query<NfeDocumento>(db)
+            join doc in tenantQuery.Query<NfeDocumento>()
                 on evt.NfeDocumentoId equals doc.Id
             where _tiposRelevantes.Contains(evt.Tipo)
                   && evt.OcorridoEm >= de && evt.OcorridoEm <= ate

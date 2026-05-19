@@ -50,7 +50,7 @@ public sealed class EstoquePosicaoAtualHandler(
         [EnumeratorCancellation] CancellationToken ct)
     {
         // ADR-R07: query explícita com WHERE EmpresaId via ITenantScopedQueryBuilder
-        var query = tenantQuery.Query<EasyStock.Domain.Entities.ItemEstoque>(db)
+        var query = tenantQuery.Query<EasyStock.Domain.Entities.ItemEstoque>()
             .AsNoTracking();
 
         if (!parametros.IncluirSemEstoque)

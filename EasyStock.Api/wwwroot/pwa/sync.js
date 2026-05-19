@@ -624,7 +624,13 @@
         return 'retry';
       }
 
-      const result = await resp.json().catch(() => ({}));
+      let result;
+      try {
+        result = await resp.json();
+      } catch (e) {
+        _trace('flush', 'JSON parse fail — resp: ' + resp.status, false);
+        result = {};
+      }
       let acceptedCount = 0;
       if (result.acceptedIds && Array.isArray(result.acceptedIds)) {
         const accepted = new Set(result.acceptedIds);
