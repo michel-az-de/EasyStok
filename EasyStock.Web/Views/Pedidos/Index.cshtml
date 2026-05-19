@@ -227,12 +227,12 @@
                             }
                             else if (p.Status == "entregue")
                             {
-                                @* BUG 5: pedido entregue com agregado=0 — não afirmamos "Pendente?".
-                                   O agregado da lista diverge do detalhe em parte dos casos; exibir um
-                                   chip com interrogação fazia o usuário duvidar do sistema. Em vez disso,
-                                   sumimos com a célula — o operador clica no pedido pra ver o estado real
-                                   se quiser confirmar. *@
-                                <span class="text-slate-300 text-sm" aria-hidden="true">—</span>
+                                <a href="@Url.Action("Detail", "Pedidos", new { id = p.Id })"
+                                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ring-1 bg-slate-50 text-slate-600 ring-slate-300 hover:bg-slate-100"
+                                   title="Valor agregado diverge do detalhe — clique para ver o estado real do pagamento">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Verificar
+                                </a>
                             }
                             else
                             {

@@ -53,6 +53,14 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
             vm.UnidadesVendidasMes = ultimo.TotalItensVendidos;
             vm.ReceitaMes = ultimo.ReceitaBruta;
 
+            var receitaReal = receita.Sum(r => r.ReceitaBruta);
+            if (receitaReal > 0)
+            {
+                vm.ReceitaEstimadaPeriodo = receitaReal;
+                vm.ProjReceita30d = receitaReal / receita.Count;
+                vm.ReceitaProjetadaDisponivel = true;
+            }
+
             var ordenado = receita.OrderBy(r => r.Ano).ThenBy(r => r.Mes).ToList();
             vm.GraficoLabels = ordenado.Select(r => $"{r.Mes:D2}/{r.Ano}").ToList();
             vm.GraficoDados = ordenado.Select(r => r.ReceitaBruta).ToList();
