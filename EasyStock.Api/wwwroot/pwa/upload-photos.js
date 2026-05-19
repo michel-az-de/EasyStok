@@ -41,11 +41,14 @@
       form.append('photo', blob, 'photo.jpg');
 
       var url = apiBase + '/api/mobile/batches/' + encodeURIComponent(entry.batchId) + '/photos';
-      var resp = await fetch(url, {
-        method: 'POST',
-        headers: headers,
-        body: form
-      });
+      var ctrl = new AbortController();
+      var tId = setTimeout(function() { ctrl.abort(); }, RETRY_DELAY);
+      var resp;
+      try {
+        resp = await fetch(url, { method: 'POST', headers: headers, body: form, signal: ctrl.signal });
+      } finally {
+        clearTimeout(tId);
+      }
 
       if (resp.ok || resp.status === 409) {
         // 200 = uploaded, 409 = already exists (idempotente)
@@ -90,8 +93,9 @@
     var headers = {};
     try {
       // Tenta pegar apiBase e apiKey do sync state
-      var apiKey = localStorage.getItem('cdb-api-key') || '';
-      var deviceId = localStorage.getItem('cdb-device-id') || '';
+      var pairing = JSON.parse(localStorage.getItem('cdb-pairing') || '{}');
+      var apiKey = pairing.apiKey || '';
+      var deviceId = pairing.deviceId || localStorage.getItem('cdb-device-id') || '';
       if (!apiKey) return; // sem apiKey, nao pode fazer upload
       headers = {
         'X-Mobile-Api-Key': apiKey,

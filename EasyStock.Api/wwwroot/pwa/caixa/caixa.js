@@ -32,13 +32,16 @@
 
     function showStatus(msg, classe) {
         const el = $("statusMsg");
+        if (!el) return;
         el.className = "status-msg " + (classe || "status-info");
         el.textContent = msg;
     }
 
     function hideStatus() {
-        $("statusMsg").className = "status-msg";
-        $("statusMsg").textContent = "";
+        const el = $("statusMsg");
+        if (!el) return;
+        el.className = "status-msg";
+        el.textContent = "";
     }
 
     // ── Carregar emitente ────────────────────────────────────────────────────
@@ -140,8 +143,10 @@
             ul.appendChild(li);
         });
 
-        $("totalNota").textContent = fmtBRL(total);
-        $("btnEmitir").disabled = state.itens.length === 0;
+        const elTotal = $("totalNota");
+        if (elTotal) elTotal.textContent = fmtBRL(total);
+        const elEmitir = $("btnEmitir");
+        if (elEmitir) elEmitir.disabled = state.itens.length === 0;
     }
 
     function escapeHtml(s) {
@@ -244,6 +249,7 @@
 
     function setBtnEmitirLoading(on) {
         const btn = $("btnEmitir");
+        if (!btn) return;
         const label = btn.querySelector(".btn__label");
         if (on) {
             btn.dataset.originalLabel = label ? label.textContent : btn.textContent;

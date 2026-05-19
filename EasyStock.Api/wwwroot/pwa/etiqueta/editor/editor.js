@@ -90,6 +90,7 @@ let _empresaId    = '';
 // ── DOM refs (populated in init) ──────────────────────────────────────────
 let _overlay, _canvas, _canvasWrap, _propsPanel, _liveRegion,
     _firstRunEl, _confirmEl, _acEl, _valOverlay;
+let _keyboardBound = false;
 
 // ── Public API ─────────────────────────────────────────────────────────────
 export function etqEditorAbrir(templateId, layoutJson, empresaId) {
@@ -955,6 +956,8 @@ function _applyCompletion(ta, match, variable) {
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────────
 function _bindKeyboard() {
+    if (_keyboardBound) return;
+    _keyboardBound = true;
     document.addEventListener('keydown', e => {
         if (!_overlay?.classList.contains('open')) return;
         const tag = document.activeElement?.tagName;
