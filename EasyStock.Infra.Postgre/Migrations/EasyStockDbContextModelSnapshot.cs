@@ -4466,6 +4466,302 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("notif_web_push_subscriptions", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.GatewayHealthSnapshot", b =>
+                {
+                    b.Property<string>("Provedor")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte>("Estado")
+                        .HasColumnType("smallint");
+
+                    b.Property<int>("FailureCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("JanelaFimEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("JanelaInicioEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LatenciaP50Ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatenciaP95Ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RateLimitCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SuccessCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SuspensoAte")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TimeoutCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UltimoCanaryEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UltimoErro")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("UltimoErroEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UltimoSucessoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Provedor");
+
+                    b.ToTable("gateway_health_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.GatewayRoutingRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Metodo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Moeda")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("BRL");
+
+                    b.Property<string>("Pais")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasDefaultValue("BR");
+
+                    b.Property<int>("Prioridade")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Provedor")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("RegrasJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<long?>("ValorMaximoCentavos")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ValorMinimoCentavos")
+                        .HasColumnType("bigint");
+
+                    b.Property<uint>("Versao")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Metodo", "Ativo", "Prioridade")
+                        .HasDatabaseName("ix_gateway_routing_rules_empresa_metodo_ativo_prioridade");
+
+                    b.HasIndex("EmpresaId", "Metodo", "Provedor", "Moeda", "Pais")
+                        .IsUnique()
+                        .HasDatabaseName("ux_gateway_routing_rules_empresa_metodo_provedor_moeda_pais");
+
+                    b.ToTable("gateway_routing_rules", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.PaymentAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClientIdempotencyKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("CobrancaAssinaturaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte?>("ErrorCategory")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("FaturaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FaturaPagamentoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("FinalizadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GatewayTransactionId")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("IniciadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("LatenciaMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Metodo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Provedor")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("ProximaConsultaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RoutingMotivo")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("Tentativa")
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("Versao")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FaturaPagamentoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pagamento_attempts_pagamento_sucesso")
+                        .HasFilter("\"Status\" = 'Sucesso'");
+
+                    b.HasIndex("EmpresaId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pagamento_attempts_empresa_idempotency");
+
+                    b.HasIndex("Provedor", "GatewayTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pagamento_attempts_gateway_tx")
+                        .HasFilter("\"GatewayTransactionId\" IS NOT NULL");
+
+                    b.HasIndex("Status", "ProximaConsultaEm")
+                        .HasDatabaseName("ix_pagamento_attempts_status_proxima_consulta");
+
+                    b.HasIndex("EmpresaId", "FaturaPagamentoId", "Tentativa")
+                        .HasDatabaseName("ix_pagamento_attempts_empresa_pagamento_tentativa");
+
+                    b.HasIndex("EmpresaId", "Provedor", "IniciadoEm")
+                        .HasDatabaseName("ix_pagamento_attempts_empresa_provedor_inicio")
+                        .HasFilter("\"Status\" <> 'Sucesso'");
+
+                    b.ToTable("pagamento_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.PaymentAttemptEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("GatewayResponseJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("OcorridoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PaymentAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentAttemptId", "OcorridoEm")
+                        .HasDatabaseName("ix_pagamento_attempt_events_attempt_ocorrido");
+
+                    b.ToTable("pagamento_attempt_events", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Pedido", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6190,6 +6486,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CscId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CscToken")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
@@ -7688,6 +7992,28 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Empresa");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.PaymentAttempt", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.FaturaPagamento", "FaturaPagamento")
+                        .WithMany()
+                        .HasForeignKey("FaturaPagamentoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FaturaPagamento");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.PaymentAttemptEvent", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Pagamentos.PaymentAttempt", "PaymentAttempt")
+                        .WithMany()
+                        .HasForeignKey("PaymentAttemptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PaymentAttempt");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Pedido", b =>

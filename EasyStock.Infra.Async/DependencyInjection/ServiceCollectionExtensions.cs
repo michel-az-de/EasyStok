@@ -17,7 +17,14 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Cache Service
+        // Password Hasher (BCrypt). Stateless, singleton.
+        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+
+        // Cache Service. <see cref="RedisCacheService"/> envelopa
+        // <see cref="IDistributedCache"/> — quem registra o backend (Redis real
+        // em prod ou MemoryDistributedCache em dev) e o host (ApiServiceCollectionExtensions
+        // .AddEasyStockCache). <see cref="InMemoryCacheService"/> existe como
+        // alternativa explicita pra fluxos in-process sem serializacao JSON.
         services.AddSingleton<ICacheService, RedisCacheService>();
 
         // Queue Service
@@ -67,10 +74,24 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFaturaPdfRenderer, FaturaPdfRenderer>();
 
         // Modulo Financeiro F3 — abstracao multi-gateway de pagamento.
-        // Os adapters precisam ser Scoped (consomem repos scoped via DI).
-        services.AddScoped<IPagamentoGateway, EfiPixGatewayAdapter>();
-        services.AddScoped<IPagamentoGateway, ManualGatewayAdapter>();
+        // Adapters base sao Scoped (consomem repos scoped via DI). Cada IPagamentoGateway
+        // resolvido pelo router e envolvido por MeasuredPagamentoGatewayDecorator que mede
+        // latencia, classifica excecoes e alimenta IGatewayHealthStore.
+
+        // Concretes (registrados por tipo, sem expor como IPagamentoGateway)
+        services.AddScoped<EfiPixGatewayAdapter>();
+        services.AddScoped<ManualGatewayAdapter>();
+
+        // IPagamentoGateway = decorator(adapter). Adicionamos um por adapter ativo.
+        services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<EfiPixGatewayAdapter>()));
+        services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<ManualGatewayAdapter>()));
+
         services.AddScoped<IPagamentoGatewayRouter, PagamentoGatewayRouter>();
+
+        // Onda P0 Payment Orchestration
+        services.AddSingleton<IGatewayHealthStore, NoopGatewayHealthStore>();
+        services.AddSingleton<IGatewayErrorClassifier, GatewayErrorClassifier>();
+        services.AddScoped<IPagamentoOrchestrator, PagamentoOrchestrator>();
 
         // Webhook processors (scoped — consomem RegistrarPagamentoFaturaUseCase + repos)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
@@ -124,22 +145,31 @@ public static class ServiceCollectionExtensions
         // F12 — Adapters de gateways internacionais (stubs).
         // Registrados apenas quando ha credenciais OU quando AllowUnsigned=true
         // (DEV/sandbox). Em prod sem credenciais, permanecem fora do router para
-        // nao oferecer metodos que vao falhar.
+        // nao oferecer metodos que vao falhar. Tambem envolvidos pelo decorator.
         if (!string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"])
             || string.Equals(configuration["Stripe:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddScoped<IPagamentoGateway, StripeGatewayAdapter>();
+            services.AddScoped<StripeGatewayAdapter>();
+            services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<StripeGatewayAdapter>()));
             services.AddSingleton<IWebhookSignatureValidator, StripeSignatureValidator>();
         }
         if (!string.IsNullOrWhiteSpace(configuration["MercadoPago:AccessToken"])
             || string.Equals(configuration["MercadoPago:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddScoped<IPagamentoGateway, MercadoPagoGatewayAdapter>();
+            services.AddScoped<MercadoPagoGatewayAdapter>();
+            services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
             services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
         }
 
         return services;
     }
+
+    private static MeasuredPagamentoGatewayDecorator DecorateGateway(IServiceProvider sp, IPagamentoGateway inner)
+        => new(
+            inner,
+            sp.GetRequiredService<IGatewayHealthStore>(),
+            sp.GetRequiredService<IGatewayErrorClassifier>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MeasuredPagamentoGatewayDecorator>>());
 }
 
 /// <summary>

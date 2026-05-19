@@ -5,7 +5,7 @@ namespace EasyStock.Application.Ports.Output.Persistence;
 
 /// <summary>
 /// Repositorio do agregado <see cref="Fatura"/>. Todas as queries respeitam
-/// multi-tenancy via <see cref="EmpresaId"/> obrigatorio (exceto admin global).
+/// multi-tenancy via <c>EmpresaId</c> obrigatorio (exceto admin global).
 /// </summary>
 public interface IFaturaRepository
 {
@@ -45,6 +45,14 @@ public interface IFaturaRepository
     /// <summary>Busca por origem (ex: encontrar fatura existente para uma assinatura).</summary>
     Task<Fatura?> GetByOrigemAsync(Guid empresaId, OrigemFatura origem, Guid origemRefId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Replay de Idempotency-Key recebido do cliente. Se um <see cref="FaturaPagamento"/>
+    /// ja foi criado com esse <c>ClientIdempotencyKey</c> para o mesmo tenant,
+    /// retorna ele — orchestrator devolve sem chamar gateway novamente.
+    /// </summary>
+    Task<FaturaPagamento?> ObterPagamentoPorClientIdempotencyKeyAsync(
+        Guid empresaId, string clientIdempotencyKey, CancellationToken ct = default);
+
     // ─── F10 — Metricas agregadas ──────────────────────────────────────
 
     /// <summary>Conta faturas por status no periodo informado (filtro DataEmissao).</summary>
@@ -64,9 +72,17 @@ public interface IFaturaRepository
     /// <summary>
     /// Top inadimplentes — empresas com mais faturas <c>Vencida</c>. Retorna
     /// tuplas <c>(EmpresaId, EmpresaNome, QtdVencidas, ValorTotalVencido)</c>.
+    /// <para>
+    /// Quando <paramref name="empresaId"/> e informado e nao-vazio, restringe
+    /// a query aquela empresa — defesa em camadas conforme licao 12 do
+    /// <c>do-not-do.md</c>: agregacao com <c>IgnoreQueryFilters()</c> em
+    /// entidade tenant-aware DEVE aceitar filtro opcional. Hoje so o caminho
+    /// SuperAdmin invoca isso (controller forca empresaId pra admin operacional),
+    /// mas o repositorio nao deve assumir essa garantia.
+    /// </para>
     /// </summary>
     Task<IReadOnlyList<TopInadimplenteResult>> TopInadimplentesAsync(
-        int limit = 5, CancellationToken ct = default);
+        int limit = 5, Guid? empresaId = null, CancellationToken ct = default);
 }
 
 public sealed record TopInadimplenteResult(

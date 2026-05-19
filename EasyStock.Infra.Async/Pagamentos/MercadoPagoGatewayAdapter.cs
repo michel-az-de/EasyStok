@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using Microsoft.Extensions.Configuration;
@@ -35,9 +36,14 @@ public sealed class MercadoPagoGatewayAdapter(
         string.Equals(metodo, "mercadopago", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(metodo, "mp", StringComparison.OrdinalIgnoreCase);
 
-    public Task<InstrucaoPagamento> CriarAsync(Fatura fatura, string metodo, CancellationToken ct = default)
+    public Task<InstrucaoPagamento> CriarAsync(
+        Fatura fatura,
+        string metodo,
+        string? idempotencyKey = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(fatura);
+        // P2: ao implementar, enviar header "X-Idempotency-Key: {idempotencyKey}".
         var token = configuration["MercadoPago:AccessToken"];
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -46,7 +52,7 @@ public sealed class MercadoPagoGatewayAdapter(
             return Task.FromResult(new InstrucaoPagamento(
                 Provedor: Provedor,
                 TransactionId: "unconfigured",
-                DadosGatewayJson: System.Text.Json.JsonSerializer.Serialize(new { erro = "MP nao configurado." })
+                DadosGatewayJson: JsonSerializer.Serialize(new { erro = "MP nao configurado." })
             ));
         }
 

@@ -1,0 +1,65 @@
+@*
+    Logo unificado EasyStock. Cores via CSS vars (var(--orange-600), var(--navy-700), var(--navy-900))
+    para responder a tokens, tema e tema escuro corretamente.
+
+    Modelo dinamico aceita as propriedades opcionais:
+        Size = "sm" | "md" | "lg" | int (px)        (default "md" -> 28px)
+        Variant = "default" | "inverted" | "auth"   (default: "default")
+                  - default:  Easy=navy-700, Stok=orange-600 (uso geral em superficies claras)
+                  - inverted: Easy=branco,    Stok=orange-500 (uso em sidebar/superficies escuras)
+                  - auth:     Easy=navy-900,  Stok=orange-600 (header de Auth com fundo claro)
+        ShowMark = true|false                       (default true)
+        ShowText = true|false                       (default true)
+        AriaLabel = string                          (default "EasyStock")
+*@
+@{
+    int Resolve(string? sz, int dflt)
+    {
+        if (string.IsNullOrWhiteSpace(sz)) return dflt;
+        return sz switch
+        {
+            "sm" => 22,
+            "md" => 28,
+            "lg" => 40,
+            _ => int.TryParse(sz, out var px) ? px : dflt
+        };
+    }
+
+    var modelObj = Model as object;
+    var modelType = modelObj?.GetType();
+    object? Prop(string n) => modelType?.GetProperty(n)?.GetValue(modelObj);
+
+    object? sizeObj = Prop("Size");
+    string size = sizeObj switch
+    {
+        string s => s,
+        int i => i.ToString(),
+        _ => "md"
+    };
+    string variant = Prop("Variant") as string ?? "default";
+    bool showMark = Prop("ShowMark") as bool? ?? true;
+    bool showText = Prop("ShowText") as bool? ?? true;
+    string ariaLabel = Prop("AriaLabel") as string ?? "EasyStock";
+
+    int markPx = Resolve(size, 28);
+    string textClass = variant switch
+    {
+        "inverted" => "es-logo-word es-logo-word--inverted",
+        "auth" => "es-logo-word es-logo-word--auth",
+        _ => "es-logo-word"
+    };
+}
+<span class="es-logo es-logo--@(variant)" aria-label="@ariaLabel">
+    @if (showMark)
+    {
+        <svg class="es-logo-mark" width="@markPx" height="@markPx" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="var(--orange-600)" />
+            <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="var(--navy-700)" />
+            <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="var(--navy-900)" />
+        </svg>
+    }
+    @if (showText)
+    {
+        <span class="@textClass"><span class="es-logo-easy">Easy</span><span class="es-logo-stok">Stok</span></span>
+    }
+</span>

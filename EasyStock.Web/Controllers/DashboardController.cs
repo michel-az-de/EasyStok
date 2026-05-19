@@ -16,8 +16,90 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var lojas = await api.GetAsync<List<LojaApi>>("lojas");
         ViewBag.Lojas = lojas.Success && lojas.Data is not null ? lojas.Data : new List<LojaApi>();
 
-        var iaUsoResult = await api.GetAsync<IaUsoApi>("ia/uso");
         var vm = new DashboardViewModel();
+
+        var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
+        var diaTask = api.GetAsync<ResumoDiaApi>("analytics/dia");
+        var reposTask = api.GetAsync<List<ReposicaoSugerida>>("analytics/reposicao");
+        var movsTask = api.GetAsync<List<MovimentacaoResumo>>("analytics/movimentacoes?diasPadrao=30");
+        var receitaTask = api.GetAsync<List<ReceitaPorPeriodoApi>>("analytics/receita?meses=6");
+        var iaUsoTask = api.GetAsync<IaUsoApi>("ia/uso");
+
+        var dashResult = await dashTask;
+        var diaResult = await diaTask;
+        var reposResult = await reposTask;
+        var movsResult = await movsTask;
+        var receitaResult = await receitaTask;
+        var iaUsoResult = await iaUsoTask;
+
+        if (dashResult.Success && dashResult.Data is { } d)
+        {
+            vm.TotalProdutos = d.TotalSkus;
+            vm.QuantidadeTotalEmEstoque = d.QuantidadeTotalEmEstoque;
+            vm.ValorEstoque = d.ValorTotalEstoque;
+            vm.ReceitaMes = d.ReceitaEstimadaPeriodo;
+            vm.MediaVendasDiaria = d.MediaVendasDiaria;
+            vm.EstoqueCritico = d.AlertasEstoqueBaixo;
+            vm.ProximosVencimento = d.AlertasVencimento;
+            vm.ProdutosParados = d.AlertasItensParados;
+        }
+
+        if (diaResult.Success && diaResult.Data is { } dia)
+        {
+            vm.PedidosEntreguesHoje = dia.PedidosEntreguesHoje;
+            vm.FaturamentoHoje = dia.FaturamentoHoje;
+            vm.TicketMedioHoje = dia.TicketMedioHoje;
+            vm.PedidosPendentes = dia.PedidosPendentes;
+            vm.ValorPedidosPendentes = dia.ValorPedidosPendentes;
+            vm.CaixaAbertaHoje = dia.CaixaAbertaHoje;
+            vm.CaixaFechadaHoje = dia.CaixaFechadaHoje;
+            vm.SaldoCaixaAtual = dia.SaldoCaixaAtual;
+            vm.PixRecebidosHoje = dia.PixRecebidosHoje;
+            vm.ValorPixHoje = dia.ValorPixHoje;
+            vm.OnboardingCompleto = dia.OnboardingCompleto;
+        }
+
+        if (reposResult.Success && reposResult.Data is { } repos)
+            vm.SugestoesReposicao = repos.Count;
+
+        if (movsResult.Success && movsResult.Data is { } movs)
+        {
+            foreach (var m in movs.OrderByDescending(x => x.Ano).ThenByDescending(x => x.Mes).ThenByDescending(x => x.Dia).Take(10))
+            {
+                vm.MovimentacoesRecentes.Add(new MovimentacaoRecente
+                {
+                    Tipo = m.Tipo,
+                    TotalMovimentacoes = m.TotalMovimentacoes,
+                    Qty = m.QuantidadeTotal,
+                    Valor = m.ValorTotal > 0 ? m.ValorTotal : null,
+                    Data = new DateOnly(m.Ano, m.Mes, m.Dia)
+                });
+            }
+        }
+
+        if (receitaResult.Success && receitaResult.Data is { } receita)
+        {
+            var ordenado = receita.OrderBy(r => r.Ano).ThenBy(r => r.Mes).ToList();
+            vm.GraficoLabels = ordenado.Select(r => $"{r.Mes:D2}/{r.Ano}").ToList();
+            vm.GraficoDados = ordenado.Select(r => r.ReceitaBruta).ToList();
+
+            if (ordenado.Count >= 2)
+            {
+                vm.ReceitaMesAtual = ordenado[^1].ReceitaBruta;
+                vm.ReceitaMesAnterior = ordenado[^2].ReceitaBruta;
+            }
+            else if (ordenado.Count == 1)
+            {
+                vm.ReceitaMesAtual = ordenado[0].ReceitaBruta;
+            }
+
+            // ReceitaEstimadaPeriodo usa MovimentacoesEstoque.ValorTotal que fica zero
+            // quando produtos não têm preço cadastrado. Usa Vendas.ValorTotal (mesmo
+            // fonte do gráfico) que reflete o total real registrado na venda.
+            if (vm.ReceitaMes == 0 && vm.ReceitaMesAtual > 0)
+                vm.ReceitaMes = vm.ReceitaMesAtual;
+        }
+
         if (iaUsoResult.Success && iaUsoResult.Data is { } ia)
         {
             vm.IaConfigurada = true;
@@ -25,6 +107,12 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             vm.GeracoesIaUsadas = ia.TotalGeracoes;
             vm.GeracoesIaLimite = ia.LimiteMensal ?? 0;
         }
+
+        vm.ResumoApiFalhou = !dashResult.Success;
+        vm.TodasApisFalharam = !dashResult.Success
+            && !reposResult.Success
+            && !movsResult.Success
+            && !receitaResult.Success;
 
         return View(vm);
     }

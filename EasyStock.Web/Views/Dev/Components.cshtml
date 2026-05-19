@@ -7,7 +7,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>DS Components — EasyStock</title>
+<title>Design System — EasyStock</title>
 <script>(function(){var t=localStorage.getItem('easystock-theme');if(t==='dark'){document.documentElement.dataset.theme='dark';document.documentElement.classList.add('theme-dark');}})();</script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" integrity="sha384-l8f0VcPi/M1iHPv8egOnY/15TDwqgbOR1anMIJWvU6nLRgZVLTLSaNqi/TOoT5Fh" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,7 +15,18 @@
 <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
-<style>body{background:var(--bg-app,#fff);color:var(--text-primary);font-family:Inter,system-ui;padding:24px}section{padding:18px 0;border-bottom:1px solid var(--border-soft,#e5e7eb)} .toolbar{position:sticky;top:0;background:var(--bg-surface,#fff);padding:8px 0;margin-bottom:12px;display:flex;gap:8px;align-items:center;z-index:10}</style>
+<style>
+  body { background: var(--bg-app); color: var(--text-primary); font-family: Inter, system-ui; padding: 24px; }
+  section { padding: 18px 0; border-bottom: 1px solid var(--border-soft); }
+  .toolbar { position: sticky; top: 0; background: var(--bg-surface); padding: 8px 0; margin-bottom: 12px; display: flex; gap: 8px; align-items: center; z-index: var(--z-sticky); }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .icon-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-surface); font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); text-align: center; }
+  .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .side-by-side > div { padding: 16px; border-radius: 12px; border: 1px solid var(--border-soft); }
+  .side-by-side .light-pane { background: #F8FAFD; color: #0A1530; }
+  .side-by-side .dark-pane  { background: #06143A; color: #F2F4F9; }
+  .side-by-side .pane-label { font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin-bottom: 8px; }
+</style>
 </head>
 <body>
 <script src="~/js/masks.js" asp-append-version="true"></script>
@@ -23,16 +34,196 @@
 
 <div class="space-y-10 max-w-5xl mx-auto">
 <div class="toolbar">
-    <strong>EasyStock DS Components</strong>
-    <button class="btn btn-secondary btn-sm" onclick="(function(){var d=document.documentElement;var dark=d.dataset.theme==='dark';d.dataset.theme=dark?'light':'dark';d.classList.toggle('theme-dark',!dark);localStorage.setItem('easystock-theme',d.dataset.theme);})()">Toggle tema</button>
+    <strong>EasyStock · Design System</strong>
+    <button class="btn btn-secondary btn-sm" onclick="(function(){var d=document.documentElement;var dark=d.dataset.theme==='dark';d.dataset.theme=dark?'light':'dark';d.classList.toggle('theme-dark',!dark);localStorage.setItem('easystock-theme',d.dataset.theme);})()">Alternar tema</button>
 </div>
 
     <header class="anim-fadeInUp">
-        <h1 class="text-2xl font-bold mb-1">EasyStock — Design System</h1>
-        <p class="text-sm text-[color:var(--text-muted)]">Storybook interno. Cada bloco abaixo demonstra um componente do DS.</p>
+        <h1 class="text-2xl font-bold mb-1">Design System EasyStock</h1>
+        <p class="text-sm text-[color:var(--text-muted)]">Catálogo interno de componentes. Cada bloco demonstra um primitivo do DS — referência viva para devs e revisão visual entre os temas claro e escuro.</p>
     </header>
 
-    <!-- Buttons -->
+    <!-- Fase 1: Icones (Lucide via es-icon) -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Ícones — es-icon (Lucide)</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">SVG inline renderizado no servidor a partir de <code>wwwroot/lib/lucide/icons/</code>. Defina o tamanho via <code>es-icon--sm/md/lg</code> ou utilities <code>w-*/h-*</code>. A cor segue <code>currentColor</code>.</p>
+        <div class="icon-grid">
+            @{
+                var iconNames = new[] {
+                    "package", "box", "store", "warehouse",
+                    "layout-dashboard", "shopping-cart", "wallet", "users",
+                    "truck", "tag", "barcode", "scan-line",
+                    "alert-circle", "check-circle-2", "info", "x",
+                    "search", "filter", "plus", "minus",
+                    "pencil", "trash-2", "eye", "eye-off",
+                    "moon", "sun", "settings", "log-out",
+                    "chevron-down", "chevron-up", "chevron-left", "chevron-right",
+                    "arrow-up-down", "arrow-down-to-line", "arrow-up-from-line", "refresh-cw",
+                    "loader-2", "menu", "bell", "printer"
+                };
+            }
+            @foreach (var name in iconNames)
+            {
+                <div class="icon-cell">
+                    <es-icon name="@name" class="es-icon--lg" stroke-width="2"></es-icon>
+                    <span>@name</span>
+                </div>
+            }
+        </div>
+        <div class="mt-4 flex items-center gap-3 flex-wrap">
+            <span class="text-xs" style="color: var(--text-muted); font-family: var(--font-mono);">Tamanhos:</span>
+            <es-icon name="package" class="es-icon--xs"></es-icon>
+            <es-icon name="package" class="es-icon--sm"></es-icon>
+            <es-icon name="package"></es-icon>
+            <es-icon name="package" class="es-icon--lg"></es-icon>
+            <span class="text-xs ml-4" style="color: var(--text-muted); font-family: var(--font-mono);">Fallback (nome inválido):</span>
+            <es-icon name="nao-existe" class="es-icon--lg"></es-icon>
+        </div>
+    </section>
+
+    <!-- Fase 1: Botoes (es-button) -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Botões — es-button</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Wrapper sobre <code>.btn</code>. Variantes: primary, navy, secondary, ghost, danger, success, dark. Tamanhos: sm, md, lg. Suporta <code>icon</code>, <code>icon-trailing</code>, <code>icon-only</code>, <code>loading</code>, <code>disabled</code> e <code>href</code> (renderiza como &lt;a&gt;).</p>
+        <div class="flex flex-wrap gap-2 mb-3">
+            <es-button variant="primary" icon="plus">Novo produto</es-button>
+            <es-button variant="navy" icon="save">Salvar</es-button>
+            <es-button variant="secondary" icon="filter">Filtrar</es-button>
+            <es-button variant="ghost" icon="refresh-cw">Atualizar</es-button>
+            <es-button variant="danger" icon="trash-2">Excluir</es-button>
+            <es-button variant="success" icon="check">Confirmar</es-button>
+            <es-button variant="dark" icon="moon">Modo escuro</es-button>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3 items-center">
+            <es-button variant="primary" size="sm" icon="plus">Pequeno</es-button>
+            <es-button variant="primary" icon="plus">Padrão</es-button>
+            <es-button variant="primary" size="lg" icon="plus">Grande</es-button>
+            <es-button variant="primary" disabled>Desativado</es-button>
+            <es-button variant="primary" loading>Salvando</es-button>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3 items-center">
+            <es-button variant="secondary" icon-only icon="pencil" aria-label="Editar"></es-button>
+            <es-button variant="ghost" icon-only icon="trash-2" aria-label="Excluir"></es-button>
+            <es-button variant="navy" icon-only icon="printer" aria-label="Imprimir"></es-button>
+            <es-button variant="primary" icon="external-link" icon-trailing="chevron-right" href="/dev/components">Renderiza como link</es-button>
+        </div>
+    </section>
+
+    <!-- Fase 1: Badges -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Badges — es-badge</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Variantes: default, primary, navy, ok, success, warn, crit, danger, info, accent, neutral, soft. Suporta <code>icon</code> e <code>dot</code>.</p>
+        <div class="flex flex-wrap gap-2 items-center">
+            <es-badge>Default</es-badge>
+            <es-badge variant="primary">Primary</es-badge>
+            <es-badge variant="navy">Navy</es-badge>
+            <es-badge variant="success">OK</es-badge>
+            <es-badge variant="warn">Atenção</es-badge>
+            <es-badge variant="danger">Crítico</es-badge>
+            <es-badge variant="info">Info</es-badge>
+            <es-badge variant="accent">Accent</es-badge>
+            <es-badge variant="soft">Soft</es-badge>
+            <es-badge variant="success" dot>Online</es-badge>
+            <es-badge variant="danger" dot>Offline</es-badge>
+        </div>
+    </section>
+
+    <!-- Fase 1: Status pills -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Status pills — es-status-pill</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Status semântico genérico (ok, warn, crit, info, accent, ink, neutral). Status específicos de pedidos continuam usando <code>.stp.aguardando/.preparando/.pronto/.entregue/.vencendo/.critico</code>.</p>
+        <div class="flex flex-wrap gap-2 items-center">
+            <es-status-pill status="ok">Em estoque</es-status-pill>
+            <es-status-pill status="warn">Vencendo em 3 dias</es-status-pill>
+            <es-status-pill status="crit">Sem estoque</es-status-pill>
+            <es-status-pill status="info">Em transferência</es-status-pill>
+            <es-status-pill status="accent">Promoção ativa</es-status-pill>
+            <es-status-pill status="ink">Arquivado</es-status-pill>
+            <es-status-pill status="neutral">Rascunho</es-status-pill>
+        </div>
+    </section>
+
+    <!-- Fase 1: es-kbd -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Atalhos — es-kbd</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Use <code>&lt;es-kbd&gt;</code> em cheatsheets, tooltips e command palette para teclas de atalho.</p>
+        <div class="space-y-2">
+            <div class="kbd-row">
+                <span class="kbd-label">Abrir busca unificada</span>
+                <span class="kbd-keys"><es-kbd>Ctrl</es-kbd><es-kbd>K</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Focar busca</span>
+                <span class="kbd-keys"><es-kbd>/</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Fechar modal</span>
+                <span class="kbd-keys"><es-kbd>Esc</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Abrir cheatsheet</span>
+                <span class="kbd-keys"><es-kbd>Shift</es-kbd><es-kbd>?</es-kbd></span>
+            </div>
+            <div class="kbd-row">
+                <span class="kbd-label">Ir para Produtos</span>
+                <span class="kbd-keys"><es-kbd>g</es-kbd><es-kbd>p</es-kbd></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Fase 4 / 5: dispatchers -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Diálogos globais — confirmação, atalhos, leitor</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Disparados via <code>window.easyConfirm()</code>, evento <code>cheatsheet:toggle</code> e <code>barcode:open</code>.</p>
+        <div class="flex flex-wrap gap-2">
+            <es-button variant="danger" icon="trash-2"
+                       onclick="window.easyConfirm({ titulo: 'Excluir item?', mensagem: 'Esta ação não pode ser desfeita.', textoBotao: 'Excluir', classBotao: 'bg-red-600 hover:bg-red-700' }, () => window.showToast('Item excluído (demonstração)', 'success'))">
+                Confirmação destrutiva
+            </es-button>
+            <es-button variant="ghost" icon="help-circle"
+                       onclick="window.dispatchEvent(new CustomEvent('cheatsheet:toggle'))">
+                Abrir cheatsheet
+            </es-button>
+            <es-button variant="navy" icon="scan-line"
+                       onclick="window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: (code) => window.showToast('Lido: ' + code, 'success') } }))">
+                Abrir scanner
+            </es-button>
+            <form data-confirm='{"titulo":"Confirmar envio do formulário?","mensagem":"Formulários com o atributo data-confirm são interceptados automaticamente.","textoBotao":"Enviar","classBotao":"bg-indigo-600 hover:bg-indigo-700"}'
+                  onsubmit="event.preventDefault(); window.showToast('Formulário enviado (demonstração)', 'success')">
+                <es-button variant="primary" type="submit" icon="check">Confirmar envio</es-button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Fase 1: Side-by-side light/dark de primitivos -->
+    <section>
+        <h2 class="text-lg font-semibold mb-3">Comparativo claro × escuro</h2>
+        <p class="text-sm mb-4" style="color: var(--text-muted);">Verificação visual de regressão nos dois temas, independente do tema ativo na página.</p>
+        <div class="side-by-side">
+            <div class="light-pane" data-theme="light">
+                <div class="pane-label">light</div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <es-button variant="primary" icon="plus">Novo</es-button>
+                    <es-button variant="secondary" icon="filter">Filtrar</es-button>
+                    <es-badge variant="success">OK</es-badge>
+                    <es-status-pill status="warn">Vencendo</es-status-pill>
+                    <es-icon name="package" class="es-icon--lg"></es-icon>
+                </div>
+            </div>
+            <div class="dark-pane" data-theme="dark">
+                <div class="pane-label">dark</div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <es-button variant="primary" icon="plus">Novo</es-button>
+                    <es-button variant="secondary" icon="filter">Filtrar</es-button>
+                    <es-badge variant="success">OK</es-badge>
+                    <es-status-pill status="warn">Vencendo</es-status-pill>
+                    <es-icon name="package" class="es-icon--lg"></es-icon>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Buttons (legado .btn diretamente) -->
     <section>
         <h2 class="text-lg font-semibold mb-3">Botões</h2>
         <div class="flex flex-wrap gap-2 mb-3">
@@ -88,12 +279,12 @@
             <div class="stat-card">
                 <span class="stat-label">Receita</span>
                 <span class="stat-value">R$ 12.480</span>
-                <span class="stat-delta up">▲ 8.2% vs. ontem</span>
+                <span class="stat-delta up">▲ 8,2% vs. ontem</span>
             </div>
             <div class="stat-card">
                 <span class="stat-label">Pedidos</span>
                 <span class="stat-value">142</span>
-                <span class="stat-delta down">▼ 3.1%</span>
+                <span class="stat-delta down">▼ 3,1% vs. ontem</span>
             </div>
             <div class="stat-card">
                 <span class="stat-label">Itens críticos</span>
@@ -127,8 +318,8 @@
     <section>
         <h2 class="text-lg font-semibold mb-3">Tooltip</h2>
         <div class="flex gap-4 items-center">
-            <span class="tip" data-tip="Estoque crítico (< 10 un.)"><button class="btn btn-secondary">Hover me</button></span>
-            <span class="tip" data-tip="Atalho: Ctrl + K"><button class="btn btn-ghost">Atalho</button></span>
+            <span class="tip" data-tip="Estoque crítico — menos de 10 un."><button class="btn btn-secondary">Passe o mouse</button></span>
+            <span class="tip" data-tip="Atalho: Ctrl + K"><button class="btn btn-ghost">Ver atalho</button></span>
         </div>
     </section>
 
@@ -146,7 +337,7 @@
                     new { value = 5, label = "Frios" }
                 },
                 Value = (object?)null,
-                Placeholder = "Selecionar categoria"
+                Placeholder = "Selecione uma categoria"
             }' />
         </div>
     </section>
@@ -166,9 +357,9 @@
         <partial name="_Tabs" model='new {
             Default = "g",
             Items = new System.Collections.Generic.List<System.ValueTuple<string,string,string>> {
-                ("g", "Geral", "<p class=\"text-sm\">Conteúdo da aba Geral.</p>"),
+                ("g", "Geral", "<p class=\"text-sm\">Informações cadastrais do produto.</p>"),
                 ("e", "Estoque", "<p class=\"text-sm\">Movimentações, lotes e validades.</p>"),
-                ("h", "Histórico", "<p class=\"text-sm\">Histórico de alterações.</p>")
+                ("h", "Histórico", "<p class=\"text-sm\">Linha do tempo de alterações.</p>")
             }
         }' />
     </section>
@@ -179,9 +370,9 @@
         <partial name="_Accordion" model='new {
             Multiple = false,
             Items = new System.Collections.Generic.List<System.ValueTuple<string,string>> {
-                ("Como cadastrar produto?", "<p class=\"text-sm\">Vá em Produtos → Novo.</p>"),
-                ("Como repor estoque?", "<p class=\"text-sm\">Use o atalho na topbar.</p>"),
-                ("Como gerar etiquetas?", "<p class=\"text-sm\">No detalhe do produto, botão Imprimir.</p>")
+                ("Como cadastrar produto?", "<p class=\"text-sm\">Acesse <strong>Produtos → Novo</strong> e preencha SKU e categoria.</p>"),
+                ("Como repor estoque?", "<p class=\"text-sm\">Use o botão <strong>Repor</strong> na barra superior ou o atalho <strong>Ctrl+R</strong>.</p>"),
+                ("Como gerar etiquetas?", "<p class=\"text-sm\">Abra o produto e clique em <strong>Imprimir etiqueta</strong>.</p>")
             }
         }' />
     </section>
@@ -210,10 +401,10 @@
             <div class="relative">
                 <button class="btn btn-ghost" @@click="pop = !pop">Ações ▾</button>
                 <div class="popover-panel" x-show="pop" x-cloak @@click.outside="pop = false" style="right:0;top:calc(100% + 4px)" role="menu">
-                    <button class="popover-item" role="menuitem"><span aria-hidden="true">✏️</span><span>Editar</span></button>
-                    <button class="popover-item" role="menuitem"><span aria-hidden="true">📄</span><span>Duplicar</span></button>
+                    <button class="popover-item" role="menuitem"><es-icon name="pencil" class="es-icon--sm"></es-icon><span>Editar</span></button>
+                    <button class="popover-item" role="menuitem"><es-icon name="copy" class="es-icon--sm"></es-icon><span>Duplicar</span></button>
                     <div class="popover-divider"></div>
-                    <button class="popover-item danger" role="menuitem"><span aria-hidden="true">🗑️</span><span>Excluir</span></button>
+                    <button class="popover-item danger" role="menuitem"><es-icon name="trash-2" class="es-icon--sm"></es-icon><span>Excluir</span></button>
                 </div>
             </div>
         </div>
@@ -225,10 +416,10 @@
              role="dialog" aria-modal="true">
             <div class="modal-panel modal-md">
                 <div class="modal-header">
-                    <h3 class="text-base font-semibold m-0">Confirmar ação</h3>
-                    <button class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="modal = false">✕</button>
+                    <h3 class="text-base font-semibold m-0">Confirmar ação?</h3>
+                    <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="modal = false"></es-button>
                 </div>
-                <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja prosseguir? Esta ação pode ser revertida em até 5 segundos via toast.</p></div>
+                <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja continuar? Você ainda pode desfazer pelo toast nos próximos 5 segundos.</p></div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @@click="modal = false">Cancelar</button>
                     <button class="btn btn-primary" @@click="modal = false">Confirmar</button>
@@ -242,10 +433,10 @@
             <aside class="drawer-panel" role="dialog" aria-modal="true" @@keydown.escape.window="drawer = false">
                 <div class="drawer-header">
                     <h3 class="text-base font-semibold m-0">Edição rápida</h3>
-                    <button class="btn btn-ghost btn-sm" aria-label="Fechar" @@click="drawer = false">✕</button>
+                    <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="drawer = false"></es-button>
                 </div>
                 <div class="drawer-body">
-                    <p class="text-sm">Drawer slide-right para ações sem trocar de página.</p>
+                    <p class="text-sm">Drawer lateral para ações pontuais sem sair da página atual.</p>
                 </div>
                 <div class="drawer-footer">
                     <button class="btn btn-secondary" @@click="drawer = false">Cancelar</button>
@@ -287,15 +478,15 @@
         <div class="alert crit" role="alert" aria-live="polite">
             <div class="ic" aria-hidden="true">!</div>
             <div class="body">
-                <div class="ttl">Verifique os campos abaixo</div>
-                <div class="desc"><ul class="list-disc pl-5 m-0"><li>Nome é obrigatório</li><li>CPF inválido</li></ul></div>
+                <div class="ttl">Corrija os campos abaixo para continuar</div>
+                <div class="desc"><ul class="list-disc pl-5 m-0"><li>Informe o nome.</li><li>CPF inválido. Verifique os números digitados.</li></ul></div>
             </div>
         </div>
     </section>
 
     <!-- Polish 2026-05 primitivos -->
     <section>
-        <h2 class="text-lg font-semibold mb-3">Polish 2026-05 — tokens, FormField, Tooltip, atalhos</h2>
+        <h2 class="text-lg font-semibold mb-3">Refinamentos — tokens de movimento, FormField, Tooltip, atalhos</h2>
         <div class="grid md:grid-cols-2 gap-4">
 
             <div class="card">
@@ -323,15 +514,15 @@
                     Label = "E-mail",
                     For = "showcase-email",
                     Required = true,
-                    Helper = "Usamos para login e notificacoes",
-                    InputHtml = "<input class=\"ui-field\" id=\"showcase-email\" type=\"email\" placeholder=\"voce@exemplo.com\" />"
+                    Helper = "Usamos para login e notificações.",
+                    InputHtml = "<input class=\"ui-field\" id=\"showcase-email\" type=\"email\" placeholder=\"voce@empresa.com.br\" />"
                 })
                 <hr class="my-3" />
                 @await Html.PartialAsync("_FormField", new {
                     Label = "Senha",
                     For = "showcase-senha",
                     Required = true,
-                    Error = "Senha deve ter pelo menos 8 caracteres",
+                    Error = "Use ao menos 8 caracteres na senha.",
                     InputHtml = "<input class=\"ui-field\" id=\"showcase-senha\" type=\"password\" />"
                 })
             </div>
@@ -341,8 +532,8 @@
                 <p class="text-sm text-slate-600 mb-3">Adicione <code>data-tooltip="texto"</code> em qualquer elemento. Delay 400ms.</p>
                 <div class="flex items-center gap-3">
                     <button class="btn btn-secondary btn-sm" data-tooltip="Atalho: Ctrl+S">Salvar</button>
-                    @await Html.PartialAsync("_Tooltip", new { Text = "Validade nominal — sera estendida ate domingo" })
-                    <span class="text-sm text-slate-500">passe o mouse</span>
+                    @await Html.PartialAsync("_Tooltip", new { Text = "Validade nominal — será estendida até domingo" })
+                    <span class="text-sm text-slate-500">Passe o mouse</span>
                 </div>
             </div>
 
@@ -366,7 +557,7 @@
                         <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">Ctrl+K</kbd></dd>
                     </div>
                     <div class="flex items-center justify-between">
-                        <dt>Criar novo na pagina atual</dt>
+                        <dt>Criar novo na página atual</dt>
                         <dd><kbd class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-[11px] font-mono">N</kbd></dd>
                     </div>
                     <div class="flex items-center justify-between">

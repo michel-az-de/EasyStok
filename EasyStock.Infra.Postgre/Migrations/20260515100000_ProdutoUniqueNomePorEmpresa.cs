@@ -10,28 +10,32 @@ namespace EasyStock.Infra.Postgre.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Renomeia duplicatas exatas antes de criar o índice único.
-            // Mantém o registro com Id mais baixo como canônico; os outros recebem sufixo " (dup-N)".
+            // RLS está ativa em "produtos" desde AddRowLevelSecurity.
+            // O CTE de dedup e o CREATE UNIQUE INDEX precisam ver TODAS as linhas —
+            // desabilitar RLS na tabela (o owner pode fazer isso sem BYPASSRLS),
+            // operar, e reabilitar logo depois, ainda dentro da mesma transação.
             migrationBuilder.Sql("""
+                ALTER TABLE "produtos" DISABLE ROW LEVEL SECURITY;
+
                 WITH ranked AS (
                     SELECT "Id",
                            "EmpresaId",
                            "Nome",
                            ROW_NUMBER() OVER (PARTITION BY "EmpresaId", "Nome" ORDER BY "Id") AS rn
-                    FROM "Produtos"
+                    FROM "produtos"
                 )
-                UPDATE "Produtos" p
+                UPDATE "produtos" p
                 SET "Nome" = p."Nome" || ' (dup-' || (ranked.rn - 1)::text || ')'
                 FROM ranked
                 WHERE ranked."Id" = p."Id"
                   AND ranked.rn > 1;
-                """);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Produtos_EmpresaId_Nome",
-                table: "Produtos",
-                columns: new[] { "EmpresaId", "Nome" },
-                unique: true);
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_Produtos_EmpresaId_Nome"
+                    ON "produtos" ("EmpresaId", "Nome");
+
+                ALTER TABLE "produtos" ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE "produtos" FORCE ROW LEVEL SECURITY;
+                """);
         }
 
         /// <inheritdoc />
@@ -39,7 +43,7 @@ namespace EasyStock.Infra.Postgre.Migrations
         {
             migrationBuilder.DropIndex(
                 name: "IX_Produtos_EmpresaId_Nome",
-                table: "Produtos");
+                table: "produtos");
         }
     }
 }

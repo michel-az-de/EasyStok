@@ -12,10 +12,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 [Collection("PostgreSqlTestCollection")]
 public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public async Task GetDashboardResumoAsync_DeveRetornarResumoCorreto()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -107,10 +107,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         result.QuantidadeTotalEmEstoque.Should().Be(10);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMargemPorProdutoAsync_DeveRetornarMargensCorretas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -179,10 +179,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         margem.NomeProduto.Should().Be("Produto Teste");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetReceitaPorPeriodoAsync_DeveRetornarReceitasCorretas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -256,10 +256,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         result.Should().HaveCountGreaterThan(0);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMovimentacoesResumoAsync_DeveRetornarMovimentacoesCorretas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -325,10 +325,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         result.Should().HaveCountGreaterThan(0);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetAlertasValidadeAsync_DeveRetornarAlertasCorretos()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -379,10 +379,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         totalCount.Should().Be(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetItensParadosDetalhadosAsync_DeveRetornarItensParadosCorretos()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -433,10 +433,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         totalCount.Should().Be(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetSugestaoReposicaoDetalhadaAsync_DeveRetornarSugestoesCorretas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -487,10 +487,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         totalCount.Should().Be(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetProjecaoRupturaAsync_DeveRetornarProjecoesCorretas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 
@@ -540,10 +540,10 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         totalCount.Should().Be(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetVendasPorCanalAsync_DeveRetornarVendasPorCanalCorretas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
 

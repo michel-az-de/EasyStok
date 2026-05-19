@@ -16,12 +16,16 @@ public class CancelarNfeUseCaseTests
 {
     private readonly INfeRepository _nfeRepo = Substitute.For<INfeRepository>();
     private readonly IGatewayFiscal _gateway = Substitute.For<IGatewayFiscal>();
+    private readonly IGatewayFiscalFactory _gatewayFactory = Substitute.For<IGatewayFiscalFactory>();
     private readonly IConfigFiscalResolver _configResolver = Substitute.For<IConfigFiscalResolver>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ILogger<CancelarNfeUseCase> _logger = Substitute.For<ILogger<CancelarNfeUseCase>>();
 
-    private CancelarNfeUseCase NewUseCase() =>
-        new(_nfeRepo, _gateway, _configResolver, _uow, _logger);
+    private CancelarNfeUseCase NewUseCase()
+    {
+        _gatewayFactory.ObterPara(Arg.Any<string>()).Returns(_gateway);
+        return new(_nfeRepo, _gatewayFactory, _configResolver, _uow, _logger);
+    }
 
     [Fact]
     public async Task ExecuteAsync_ComMotivoMenor15Chars_LancaUseCaseValidationException()
@@ -64,6 +68,8 @@ public class CancelarNfeUseCaseTests
         var empresaId = Guid.NewGuid();
         var nfe = CriarNfeAutorizada(empresaId);
         _nfeRepo.GetByIdAsync(empresaId, nfe.Id, Arg.Any<CancellationToken>()).Returns(nfe);
+        _configResolver.ResolveAsync(empresaId, Arg.Any<CancellationToken>())
+            .Returns(NovaConfigMock(empresaId));
         _gateway.CancelarAsync(Arg.Any<NfeDocumento>(), Arg.Any<string>(), Arg.Any<ConfigFiscalDto>(), Arg.Any<CancellationToken>())
             .Returns<Task<ResultadoCancelamentoNfce>>(_ => throw new GatewayFiscalRejeitadaException("Prazo expirado", "218"));
 
@@ -79,6 +85,22 @@ public class CancelarNfeUseCaseTests
         await _uow.DidNotReceive().ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>());
         nfe.Status.Should().Be(StatusNfe.Autorizada);
     }
+
+    private static ConfigFiscalDto NovaConfigMock(Guid empresaId) => new(
+        EmpresaId: empresaId,
+        Provedor: "mock",
+        Ambiente: EasyStock.Domain.Integration.AmbienteIntegracao.Sandbox,
+        RegimeTributario: EasyStock.Domain.Fiscal.RegimeTributario.Simples,
+        Cnpj: "11444777000161",
+        InscricaoEstadual: "ISENTO",
+        InscricaoMunicipal: null,
+        Endereco: null,
+        SerieNfce: 1,
+        CredencialToken: null,
+        CertificadoA1Bytes: null,
+        CertificadoA1Senha: null,
+        CscId: null,
+        CscToken: null);
 
     private static NfeDocumento CriarNfeAutorizada(Guid empresaId)
     {

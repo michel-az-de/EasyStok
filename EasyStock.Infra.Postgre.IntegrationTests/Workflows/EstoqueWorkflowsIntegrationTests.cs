@@ -16,10 +16,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 
 public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [Fact]
+    [SkippableFact]
     public async Task RegistrarEntrada_deve_persistir_item_e_movimentacao()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -88,10 +88,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ReporEstoque_deve_atualizar_quantidade_e_gerar_movimentacao()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -156,10 +156,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RegistrarSaida_deve_persistir_venda_itens_venda_movimentacoes_e_baixar_estoque()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -247,10 +247,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RegistrarSaida_deve_consumir_lotes_em_fifo_automaticamente_no_postgre()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -347,10 +347,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RegistrarSaida_nao_deve_persistir_movimentacoes_quando_item_esta_bloqueado()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -417,10 +417,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RegistrarSaida_nao_deve_persistir_quando_item_esta_vencido()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -485,10 +485,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ReporEstoque_nao_deve_persistir_quando_item_pertence_a_outra_empresa()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -553,10 +553,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Atualizacoes_concorrentes_no_mesmo_item_devem_gerar_conflito()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -599,10 +599,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await act.Should().ThrowAsync<DbUpdateConcurrencyException>();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Queries_de_inteligencia_devem_respeitar_paginacao_e_filtros()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -745,10 +745,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             Task.FromResult(descricao);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Concorrencia_em_registrar_saida_deve_manter_saldo_consistente()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -845,10 +845,10 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
     /// Fluxo ponta a ponta: Entrada aumenta estoque → Saída baixa estoque →
     /// Analytics reflete quantidade, movimentações e receita corretamente.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task FluxoPontaAPonta_Entrada_Saida_Estoque_Analytics_devem_ser_coerentes()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();

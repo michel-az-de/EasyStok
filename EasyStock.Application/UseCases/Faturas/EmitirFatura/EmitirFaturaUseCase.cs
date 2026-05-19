@@ -13,6 +13,7 @@ namespace EasyStock.Application.UseCases.Faturas.EmitirFatura;
 /// Comando de emissao de fatura — usado por todas as origens
 /// (Assinatura via Job, Pedido via service interno, Avulsa via admin).
 /// </summary>
+/// <param name="IdempotentePorOrigem">Idempotencia: se ja existe fatura ATIVA com este (Origem, OrigemRefId), retorna a existente.</param>
 public sealed record EmitirFaturaCommand(
     Guid EmpresaId,
     DadosFaturado DadosFaturado,
@@ -26,7 +27,6 @@ public sealed record EmitirFaturaCommand(
     string Moeda = "BRL",
     DadosFiscais? DadosFiscais = null,
     DateTime? DataEmissao = null,
-    /// <summary>Idempotencia: se ja existe fatura ATIVA com este (Origem, OrigemRefId), retorna a existente.</summary>
     bool IdempotentePorOrigem = true,
     Guid? UsuarioId = null,
     string? UsuarioNome = null,

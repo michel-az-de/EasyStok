@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Domain.Entities;
 using FluentAssertions;
@@ -27,7 +28,7 @@ public class EsqueciSenhaUseCaseTests
             Id = Guid.NewGuid(),
             Nome = "Teste Usuario",
             Email = email,
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("Senha@123"),
+            SenhaHash = FakePasswordHasher.MakeHash("Senha@123"),
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow

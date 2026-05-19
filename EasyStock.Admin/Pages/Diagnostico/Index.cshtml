@@ -16,9 +16,19 @@
       quando ativadas (evita 3 chamadas pesadas no GET).
 *@
 
+<div style="margin-bottom:12px;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item>Diagnóstico</es-breadcrumb-item>
+    </es-breadcrumb>
+</div>
+
 @if (Model.Erro != null)
 {
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+    <div style="background:rgba(192,59,42,.10); border:1px solid rgba(192,59,42,.35); border-left:3px solid var(--crit-600); border-radius:var(--r-md); padding:12px 16px; font-size:13px; color:var(--crit-700); margin-bottom:14px; display:flex; align-items:center; gap:10px;">
+        <es-icon name="alert-triangle" size="16" />
+        <span>@Model.Erro</span>
+    </div>
 }
 
 <div x-data="diagnosticoPage()" x-init="init()">
@@ -939,6 +949,7 @@
             <div class="flex gap-4 px-4 py-2.5 text-xs text-es-ink-mute" style="background:rgba(247,242,232,.03);border-bottom:1px solid rgba(247,242,232,.06)">
                 <span>✅ Saudáveis: <b class="text-es-basil" x-text="perf.endpoints?.saudaveis ?? 0"></b></span>
                 <span>🐢 Lentos: <b class="text-amber-300" x-text="perf.endpoints?.lentos ?? 0"></b></span>
+                <span title="Endpoints autenticados — testados sem credenciais, só verificamos que a auth está protegida.">🔒 Auth-protegidos: <b class="text-amber-300" x-text="perf.endpoints?.degradados ?? 0"></b></span>
                 <span>❌ Falhas: <b class="text-red-400" x-text="perf.endpoints?.falhas ?? 0"></b></span>
                 <span class="ml-auto font-mono text-[10px]" x-show="perf.endpoints?.testadoEm" x-text="new Date(perf.endpoints.testadoEm).toLocaleTimeString('pt-BR')"></span>
             </div>
@@ -961,9 +972,9 @@
                             <td class="px-3 py-2 text-right font-mono" :class="(ep.latenciaMs ?? 0) > 1000 ? 'text-amber-400' : 'text-es-ink-mute'" x-text="ep.latenciaMs != null ? Math.round(ep.latenciaMs) : '—'"></td>
                             <td class="px-3 py-2">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                                      :class="ep.status === 'ok' ? 'bg-es-basil/20 text-es-basil' : ep.status === 'slow' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-400'"
-                                      x-text="ep.status ?? '—'"></span>
-                                <span x-show="ep.erro" class="ml-1 text-red-400 text-[10px]" x-text="ep.erro"></span>
+                                      :class="ep.status === 'ok' ? 'bg-es-basil/20 text-es-basil' : (ep.status === 'slow' || ep.status === 'degraded') ? 'bg-amber-500/20 text-amber-300' : ep.status === 'very_slow' ? 'bg-orange-500/20 text-orange-300' : 'bg-red-500/20 text-red-400'"
+                                      x-text="ep.status === 'degraded' ? 'auth-protegido' : (ep.status ?? '—')"></span>
+                                <span x-show="ep.erro" class="ml-1 text-amber-300 text-[10px]" :class="ep.status === 'degraded' ? 'text-amber-300' : 'text-red-400'" x-text="ep.erro"></span>
                             </td>
                         </tr>
                     </template>

@@ -2,7 +2,8 @@
 @{
     var activeItem = ViewBag.ActiveMenuItem as string ?? "";
     var lojaNome = ViewBag.LojaAtualNome as string ?? "Selecionar loja";
-    var lojaEmoji = ViewBag.LojaAtualEmoji as string ?? "🏪";
+    var lojaEmoji = ViewBag.LojaAtualEmoji as string;
+    var hasLojaEmoji = !string.IsNullOrWhiteSpace(lojaEmoji);
     var apiBase = (Configuration["ApiSettings:BaseUrl"] ?? "").TrimEnd('/');
     var kdsUrl = string.IsNullOrEmpty(apiBase) ? "/pwa/#kds" : $"{apiBase}/pwa/#kds";
 }
@@ -15,45 +16,42 @@
 
     <!-- Logo -->
     <div class="px-5 py-4 flex items-center gap-2.5 border-b border-white/5 justify-between">
-        <div class="flex items-center gap-2.5">
-            <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EasyStock" class="flex-shrink-0">
-                <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
-                <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
-                <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A"/>
-            </svg>
-            <span class="brand-name font-bold text-base tracking-tight" style="font-family:'Fraunces',serif;letter-spacing:-0.02em;">
-                <span style="color:#FFFFFF">Easy</span><span style="color:#F26B25">Stock</span>
-            </span>
-        </div>
+        <partial name="_LogoEasyStock" model='new { Size = 28, Variant = "inverted" }' />
         <!-- Close button (mobile only) -->
         <button @@click="sidebarOpen = false"
                 aria-label="Fechar menu"
                 class="lg:hidden p-2 text-slate-400 hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-navy-500">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <es-icon name="x" class="w-5 h-5"></es-icon>
         </button>
     </div>
 
     <!-- Seletor de Loja -->
-    <div class="px-3 py-2.5 border-b border-white/5" x-data="{ open: false }">
+    <div class="px-3 py-2.5 border-b border-white/5"
+         x-data="{ open: false, lojaSwitchClick($event) { if (window.EasyFormGuard && window.EasyFormGuard.hasDirtyForm && window.EasyFormGuard.hasDirtyForm()) { $event.preventDefault(); var href = $event.currentTarget.getAttribute('href'); window.easyConfirm({ titulo: 'Trocar de loja?', mensagem: 'Voce tem alteracoes nao salvas no formulario atual. Trocar de loja vai descartar essas alteracoes.', textoBotao: 'Trocar mesmo assim', classBotao: 'bg-amber-600 hover:bg-amber-700' }, function () { window.location.href = href; }); } } }">
         <button @@click="open = !open"
                 class="app-store-trigger w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-navy-500">
-            <span class="text-lg leading-none">@lojaEmoji</span>
+            @if (hasLojaEmoji)
+            {
+                <span class="text-lg leading-none" aria-hidden="true">@lojaEmoji</span>
+            }
+            else
+            {
+                <es-icon name="store" class="es-icon--sm" style="color: var(--text-muted);"></es-icon>
+            }
             <div class="flex-1 min-w-0">
                 <div class="text-white font-semibold truncate" style="font-size: 0.875rem;">@lojaNome</div>
                 @* Antes var(--text-muted) ficava quase invisivel em fundo navy escuro
                    (contraste < 3:1, falhava WCAG AA). text-slate-400 da ~7:1 — passa AA. *@
                 <div class="text-slate-400" style="font-size: 0.6875rem;">Loja selecionada</div>
             </div>
-            <svg class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+            <es-icon name="chevron-down" class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--text-muted);"></es-icon>
         </button>
         <div x-show="open" x-cloak @@click.outside="open = false"
              class="app-sidebar-menu mt-1 bg-slate-800 rounded-lg border border-white/10 overflow-hidden shadow-xl">
-            <a href="/auth/selecionar-loja" class="flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/5 transition-colors">
-                <span>🔄</span> Trocar loja
+            <a href="/auth/selecionar-loja" @@click="lojaSwitchClick($event)"
+               class="flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-white/5 transition-colors">
+                <es-icon name="refresh-cw" class="es-icon--sm"></es-icon>
+                <span>Trocar loja</span>
             </a>
         </div>
     </div>
@@ -65,81 +63,98 @@
         <div class="nav-sep"><span>Gestão</span></div>
 
         <a href="/dashboard" class="ni @(activeItem == "Dashboard" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+            <es-icon name="layout-dashboard" class="w-4 h-4 flex-shrink-0"></es-icon>
             Dashboard
         </a>
 
+        <div class="nav-section">Cadastros</div>
+
         <a href="/produtos" class="ni @(activeItem == "Produtos" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
+            <es-icon name="package" class="w-4 h-4 flex-shrink-0"></es-icon>
             Produtos
         </a>
         <a href="/estoque" class="ni @(activeItem == "Estoque" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+            <es-icon name="clipboard-list" class="w-4 h-4 flex-shrink-0"></es-icon>
             Estoque
         </a>
         <a href="/fornecedores" class="ni @(activeItem is "Fornecedores" or "PedidosAbertos" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <es-icon name="truck" class="w-4 h-4 flex-shrink-0"></es-icon>
             Fornecedores
         </a>
         <a href="/clientes" class="ni @(activeItem is "Clientes" or "ClientesMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+            <es-icon name="users" class="w-4 h-4 flex-shrink-0"></es-icon>
             Clientes
         </a>
-        <a href="/categorias" class="ni @(activeItem == "Categorias" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            Categorias
-        </a>
-        <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-            </svg>
-            Lotes
-        </a>
-        <a href="/listas-compras" class="ni @(activeItem == "ListasCompras" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Lista de compras
-        </a>
-
-        <div class="nav-sep"><span>Vendas</span></div>
-
         <a href="/pedidos" class="ni @(activeItem is "Pedidos" or "PedidosMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
+            <es-icon name="shopping-cart" class="w-4 h-4 flex-shrink-0"></es-icon>
             Pedidos
         </a>
         <a href="/caixa" class="ni @(activeItem is "Caixa" or "CaixaMobile" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h.01M11 15h2M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
+            <es-icon name="wallet" class="w-4 h-4 flex-shrink-0"></es-icon>
             Caixa
         </a>
+        <a href="/financeiro" class="ni @(activeItem == "Financeiro" ? "active" : "")">
+            <es-icon name="bar-chart-3" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Financeiro
+        </a>
+        <a href="/contas-a-receber" class="ni @(activeItem == "ContasAReceber" ? "active" : "")">
+            <es-icon name="banknote" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Contas a Receber
+        </a>
+        <a href="/contas-a-pagar" class="ni @(activeItem == "ContasAPagar" ? "active" : "")">
+            <es-icon name="credit-card" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Contas a Pagar
+        </a>
+        <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
+            <es-icon name="layers" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Lotes
+        </a>
+        <a href="/listas-compras" class="ni @(activeItem == "ListasCompras" ? "active" : "")">
+            <es-icon name="list-checks" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Compras
+        </a>
+        <a href="/categorias" class="ni @(activeItem == "Categorias" ? "active" : "")">
+            <es-icon name="tag" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Categorias
+        </a>
+
+        <div class="nav-section">Operação</div>
+
         <a href="/entradas/historico" class="ni @(activeItem is "Entradas" or "EntradasNova" or "EntradasHistorico" or "EntradasReposicao" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
+            <es-icon name="arrow-down-to-line" class="w-4 h-4 flex-shrink-0"></es-icon>
             Entradas
         </a>
         <a href="/saidas/historico" class="ni @(activeItem is "Saidas" or "SaidasNova" or "SaidasHistorico" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20H4m16-8H4m8-8H4" />
-            </svg>
+            <es-icon name="arrow-up-from-line" class="w-4 h-4 flex-shrink-0"></es-icon>
             Saídas
         </a>
+        <a href="/notas-fiscais" class="ni @(activeItem == "NotasFiscais" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Notas Fiscais
+        </a>
+        <a href="/configuracao-fiscal" class="ni @(activeItem == "ConfiguracaoFiscal" ? "active" : "")">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Configuração Fiscal
+        </a>
+
+        <div class="nav-sep"></div>
+
+        <a href="/analytics" class="ni @(activeItem is "Analytics" or "Movimentacoes" or "Inteligencia" or "InteligenciaLojas" ? "active" : "")">
+            <es-icon name="bar-chart-3" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Análises &amp; IA
+        </a>
+        <a href="/anuncios" class="ni @(activeItem == "Anuncios" ? "active" : "")">
+            <es-icon name="sparkles" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Anúncios com IA
+        </a>
+
+        <div class="nav-section">Atendimento</div>
+
         <a href="/kds" class="ni @(activeItem == "Kds" ? "active" : "")"
            title="Gerenciar configurações e filas do KDS">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,8 +162,12 @@
             </svg>
             KDS Operação
         </a>
+        <a href="/dispositivos" class="ni @(activeItem is "Dispositivos" or "ProdutosMobile" or "Operacao" ? "active" : "")">
+            <es-icon name="monitor" class="w-4 h-4 flex-shrink-0"></es-icon>
+            Dispositivos
+        </a>
 
-        <div class="nav-sep"><span>Inteligência</span></div>
+        <div class="nav-section">Inteligência</div>
 
         <a href="/analytics" class="ni @(activeItem is "Analytics" or "Movimentacoes" or "Inteligencia" or "InteligenciaLojas" ? "active" : "")">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,11 +188,8 @@
             Anúncios
         </a>
 
-        <div class="nav-sep"><span>Sistema</span></div>
+        <div class="nav-section">Configuração</div>
 
-        @* Pente-fino 2026-05-16: link /dispositivos removido porque DispositivosController nao existe (404).
-           Reintroduzir quando o modulo for implementado. ProdutosMobile/Operacao tinham seus proprios links
-           anteriormente; quando reintroduzir, restaurar este bloco. *@
         <a href="@kdsUrl" target="_blank" rel="noopener" class="ni"
            title="Abre o KDS num tablet/TV em nova aba. Precisa de device pareado nesse navegador.">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -182,17 +198,19 @@
             KDS Visor <span class="ml-auto text-[9px] uppercase tracking-wider text-orange-400 font-bold">alpha</span>
         </a>
         <a href="/usuarios" class="ni @(activeItem == "Usuarios" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
+            <es-icon name="user-cog" class="w-4 h-4 flex-shrink-0"></es-icon>
             Usuários
         </a>
         <a href="/configuracoes" class="ni @(activeItem is "Configuracoes" or "Lojas" or "Assinatura" or "Notificacoes" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <es-icon name="settings" class="w-4 h-4 flex-shrink-0"></es-icon>
             Configurações
+        </a>
+        <a href="/diagnostico" class="ni @(activeItem == "Diagnostico" ? "active" : "")"
+           title="Verificar saúde do sistema, integrações e logs">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Saúde do sistema
         </a>
 
     </nav>
@@ -203,14 +221,13 @@
     <div class="px-4 py-3 border-t border-white/5 flex items-center justify-between">
         <div>
             <div class="text-[11px] text-slate-600 font-semibold">EasyStock @(ViewBag.AppVersion as string ?? "v1.0")</div>
+            <div class="text-[10px] text-slate-700">Gestão inteligente de estoque</div>
         </div>
         @if (User.IsInRole("Admin") || User.IsInRole("SuperAdmin"))
         {
             <a href="/diagnostico" title="Diagnóstico"
                class="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-white/5 transition-colors @(activeItem == "Diagnostico" ? "text-orange-400" : "text-slate-500")">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
+                <es-icon name="shield-check" class="w-4 h-4"></es-icon>
                 <span class="text-[9px] leading-none">Diagnóstico</span>
             </a>
         }

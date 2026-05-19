@@ -33,7 +33,6 @@ public enum TipoEventoNotificacao
     ConviteCsat = 25,
 
     // Pedido agendado (mobile) — lembretes disparados pelo AgendamentoNotificacaoService.
-    // Idempotencia via colunas mobile_orders.agendamento_notificado_*_em.
     PedidoAgendadoHoje = 26,
     PedidoAgendadoEm1Hora = 27,
     PedidoAgendadoEm10Minutos = 28,
@@ -41,5 +40,12 @@ public enum TipoEventoNotificacao
     // Módulo de Relatórios (PR-C0)
     RelatorioPronto = 29,
     RelatorioFalhou = 30,
-    RelatorioExpirado = 31
+    RelatorioExpirado = 31,
+
+    // Contas a Pagar / Contas a Receber (CAP/CAR)
+    ContaPagarVencendo = 32,
+    ContaPagarVencida = 33,
+    ContaReceberVencendo = 34,
+    ContaReceberVencida = 35,
+    ParcelaRecebida = 36
 }

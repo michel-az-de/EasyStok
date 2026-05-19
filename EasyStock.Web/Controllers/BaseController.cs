@@ -47,11 +47,18 @@ public abstract class BaseController(SessionService session) : Controller
     protected void Toast(string type, string message, string? undoUrl = null) =>
         TempData["Toast"] = undoUrl is not null ? $"{type}|{message}|{undoUrl}" : $"{type}|{message}";
 
+    protected void ToastError(string message, string? correlationId = null) =>
+        TempData["Toast"] = correlationId is not null
+            ? $"error|{message}||{correlationId}"
+            : $"error|{message}";
+
     protected bool HasError<T>(ApiResult<T> result)
     {
         if (!result.Success)
         {
-            Toast("error", UserFacingErrors.Sanitize(result.ErrorCode, result.ErrorMessage, result.HttpStatus));
+            ToastError(
+                UserFacingErrors.Sanitize(result.ErrorCode, result.ErrorMessage, result.HttpStatus),
+                result.CorrelationId);
             return true;
         }
         return false;

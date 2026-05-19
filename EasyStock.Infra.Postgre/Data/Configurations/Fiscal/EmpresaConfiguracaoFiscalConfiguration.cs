@@ -30,6 +30,9 @@ public class EmpresaConfiguracaoFiscalConfiguration : IEntityTypeConfiguration<E
         builder.Property(c => c.ProximoNumeroNfce).HasDefaultValue(1L);
         builder.Property(c => c.Habilitada).HasDefaultValue(false);
 
+        builder.Property(c => c.CscId).HasMaxLength(10);
+        builder.Property(c => c.CscToken).HasMaxLength(100);
+
         // Endereco completo do emitente como jsonb (espelha padrao Fatura.DadosEmissor).
         builder.Property(c => c.Endereco)
             .HasColumnName("endereco")

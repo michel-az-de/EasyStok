@@ -2,6 +2,11 @@ using EasyStock.Domain.Enums;
 
 namespace EasyStock.Application.UseCases.TicketSuporte
 {
+    /// <summary>Request body de abertura de ticket pelo cliente.</summary>
+    /// <param name="Titulo">Titulo curto do ticket.</param>
+    /// <param name="Descricao">Descricao detalhada (vai como primeira mensagem).</param>
+    /// <param name="Categoria">Categoria do helpdesk.</param>
+    /// <param name="FaturaId">F9 — FK opcional a uma Fatura que motivou o ticket.</param>
     public sealed record AbrirTicketRequest(
         string Titulo,
         string Descricao,

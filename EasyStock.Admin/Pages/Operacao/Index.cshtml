@@ -4,149 +4,129 @@
     ViewData["Title"] = "Operação";
 }
 
-<div x-data="operacaoPage()" x-init="init()" class="space-y-6">
+<div x-data="operacaoPage()" x-init="init()" style="display:flex; flex-direction:column; gap:24px;">
 
-    <div class="flex items-center justify-between gap-4">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
         <div>
-            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Operação</h2>
-            <p class="text-es-ink-mute text-sm">KPIs do dia · atualiza a cada 15s</p>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item>Operação</es-breadcrumb-item>
+            </es-breadcrumb>
+            <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Operação</h2>
+            <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">KPIs do dia · atualiza a cada 15s</p>
         </div>
-        <div class="text-xs text-es-ink-mute" x-show="ultimaAtualizacao" x-cloak>
-            <span>atualizado <span x-text="formatLastUpdate()"></span></span>
+        <div x-show="ultimaAtualizacao" x-cloak style="display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:12px;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:999px; background:var(--ok-600); animation:pulse 2s infinite;"></span>
+            atualizado <span x-text="formatLastUpdate()"></span>
         </div>
     </div>
 
     <template x-if="!empresaId">
-        <div class="rounded-xl p-6"
-             style="background:var(--es-surface);border:1px dashed rgba(247,242,232,.18)">
-            <p class="text-es-ink-dim text-sm mb-3">Selecione um cliente para ver os dados de operação.</p>
-            <button type="button"
-                    class="btn-secondary text-sm flex items-center gap-2"
-                    @@click="$dispatch('open-cmdk', { onPick: id => window.location.href = '/Operacao?empresaId=' + id })">
-                🔍 Buscar cliente…
-                <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute font-mono">Ctrl K</kbd>
-            </button>
-            <p class="text-es-ink-mute text-xs mt-3">
-                ou informe na URL: <code class="text-xs bg-es-surface-2 px-2 py-1 rounded">?empresaId=&lt;guid&gt;</code>
-            </p>
-        </div>
+        <es-card>
+            <es-empty-state icon="building-2"
+                            title="Selecione uma empresa"
+                            description="Vá até /Tenants para escolher um cliente, ou informe ?empresaId=&lt;guid&gt; na URL.">
+                <es-button variant="primary" href="/Tenants" icon="building-2">Ir para clientes</es-button>
+            </es-empty-state>
+        </es-card>
     </template>
 
     <template x-if="empresaId">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;">
 
-            <!-- Vendas hoje -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Vendas hoje</div>
-                <div class="text-3xl font-bold text-es-ink mt-2" x-text="brl(d.vendasHojeValor)"></div>
-                <div class="text-xs text-es-ink-mute mt-1"><span x-text="d.vendasHojeCount || 0"></span> pedido(s) entregue(s)</div>
+            <div class="es-stat-card">
+                <div class="es-stat-label">Vendas hoje</div>
+                <div class="es-stat-value" x-text="brl(d.vendasHojeValor)"></div>
+                <div class="es-stat-meta">
+                    <span><strong style="color:var(--text-primary);" x-text="d.vendasHojeCount || 0"></strong> pedido(s) entregue(s)</span>
+                </div>
             </div>
 
-            <!-- Caixa -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Saldo do caixa</div>
-                <div class="text-3xl font-bold text-es-ink mt-2" x-text="brl(d.caixaSaldoHoje)"></div>
-                <div class="text-xs text-es-ink-mute mt-1">
+            <div class="es-stat-card">
+                <div class="es-stat-label">Saldo do caixa</div>
+                <div class="es-stat-value" x-text="brl(d.caixaSaldoHoje)"></div>
+                <div class="es-stat-meta" style="font-size:11px;">
                     +<span x-text="brl(d.caixaEntradasExtras)"></span> entradas ·
                     -<span x-text="brl(d.caixaSaidas)"></span> saídas
                 </div>
             </div>
 
-            <!-- Pedidos abertos -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Pedidos abertos</div>
-                <div class="text-3xl font-bold text-es-ink mt-2" x-text="d.pedidosAbertos || 0"></div>
-                <div class="text-xs text-es-ink-mute mt-1">
-                    <span x-text="d.pedidosPreparando || 0"></span> preparando ·
-                    <span x-text="d.pedidosProntos || 0"></span> prontos
+            <div class="es-stat-card">
+                <div class="es-stat-label">Pedidos abertos</div>
+                <div class="es-stat-value" x-text="d.pedidosAbertos || 0"></div>
+                <div class="es-stat-meta">
+                    <span><strong style="color:var(--text-primary);" x-text="d.pedidosPreparando || 0"></strong> preparando ·
+                    <strong style="color:var(--text-primary);" x-text="d.pedidosProntos || 0"></strong> prontos</span>
                 </div>
             </div>
 
-            <!-- Devices -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Dispositivos ativos</div>
-                <div class="text-3xl font-bold text-es-ink mt-2">
+            <a class="es-stat-card is-link card-interactive" :href="'/Dispositivos?empresaId=' + empresaId">
+                <div class="es-stat-label">Dispositivos ativos</div>
+                <div class="es-stat-value">
                     <span x-text="d.devicesAtivos || 0"></span>
-                    <span class="text-es-ink-mute text-base">/ <span x-text="d.devicesTotal || 0"></span></span>
+                    <span style="color:var(--text-muted); font-size:18px;"> / <span x-text="d.devicesTotal || 0"></span></span>
                 </div>
-                <div class="text-xs mt-1">
-                    <a :href="'/Dispositivos?empresaId=' + empresaId" class="text-es-accent hover:underline">gerenciar →</a>
+                <div class="es-stat-meta">
+                    <span style="color:var(--orange-500);">gerenciar →</span>
                 </div>
+            </a>
+
+            <div class="es-stat-card">
+                <div class="es-stat-label">Pedidos travados</div>
+                <div class="es-stat-value" :style="(d.pedidosTravados || 0) > 0 ? 'color: var(--warn-600);' : ''" x-text="d.pedidosTravados || 0"></div>
+                <div class="es-stat-meta"><span>preparando há +30 min</span></div>
             </div>
 
-            <!-- Pedidos travados -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Pedidos travados</div>
-                <div class="text-3xl font-bold mt-2"
-                     :class="(d.pedidosTravados || 0) > 0 ? 'text-yellow-300' : 'text-es-ink'"
-                     x-text="d.pedidosTravados || 0"></div>
-                <div class="text-xs text-es-ink-mute mt-1">preparando há +30 min</div>
+            <div class="es-stat-card">
+                <div class="es-stat-label">Conferência pendente</div>
+                <div class="es-stat-value" x-text="d.conferenciaPendente || 0"></div>
+                <div class="es-stat-meta"><span>prontos sem confirmar</span></div>
             </div>
 
-            <!-- Conferência pendente -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Conferência pendente</div>
-                <div class="text-3xl font-bold text-es-ink mt-2" x-text="d.conferenciaPendente || 0"></div>
-                <div class="text-xs text-es-ink-mute mt-1">prontos sem confirmar</div>
+            <div class="es-stat-card">
+                <div class="es-stat-label">Lotes hoje</div>
+                <div class="es-stat-value" x-text="d.lotesHoje || 0"></div>
             </div>
 
-            <!-- Lotes -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Lotes hoje</div>
-                <div class="text-3xl font-bold text-es-ink mt-2" x-text="d.lotesHoje || 0"></div>
-            </div>
-
-            <!-- Divergências de estoque -->
-            <div class="rounded-xl p-5"
-                 style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-                <div class="text-[10px] uppercase tracking-widest text-es-ink-mute font-semibold">Divergências estoque</div>
-                <div class="text-3xl font-bold mt-2"
-                     :class="(d.divergenciasEstoque || 0) > 0 ? 'text-yellow-300' : 'text-es-ink'"
-                     x-text="d.divergenciasEstoque || 0"></div>
-                <div class="text-xs text-es-ink-mute mt-1">PWA × ERP</div>
+            <div class="es-stat-card">
+                <div class="es-stat-label">Divergências estoque</div>
+                <div class="es-stat-value" :style="(d.divergenciasEstoque || 0) > 0 ? 'color: var(--warn-600);' : ''" x-text="d.divergenciasEstoque || 0"></div>
+                <div class="es-stat-meta"><span>PWA × ERP</span></div>
             </div>
         </div>
     </template>
 
-    <!-- Onda 1.4 — widget Tickets criticos do helpdesk SaaS -->
+    <!-- Onda 1.4 — widget Tickets críticos do helpdesk SaaS -->
     <template x-if="empresaId && tk.total > 0">
-        <div class="rounded-xl p-5"
-             style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
-            <div class="flex items-center justify-between mb-3">
+        <es-card padding="none">
+            <header class="es-card-header" style="display:flex; align-items:center; justify-content:space-between;">
                 <div>
-                    <h3 class="text-es-ink text-sm font-semibold uppercase tracking-widest">⚠ Tickets críticos</h3>
-                    <p class="text-xs text-es-ink-mute mt-0.5">SLA violado ou prioridade Alta/Crítica · atualiza a cada 60s</p>
+                    <h3 class="es-card-title">Tickets críticos</h3>
+                    <div class="es-card-desc">SLA violado ou prioridade Alta/Crítica · atualiza a cada 60s</div>
                 </div>
-                <div class="flex items-center gap-3 text-xs">
-                    <span class="text-red-400 font-bold"><span x-text="tk.slaViolados"></span> SLA</span>
-                    <span class="text-amber-300 font-bold"><span x-text="tk.altaOuCritica"></span> alta/crit</span>
-                    <a :href="'/Tickets?empresaId=' + empresaId + '&slaStatus=violado'" class="text-es-accent hover:underline">ver todos →</a>
+                <div style="display:flex; align-items:center; gap:12px; font-size:12px;">
+                    <span style="color:var(--crit-600); font-weight:700;"><span x-text="tk.slaViolados"></span> SLA</span>
+                    <span style="color:var(--warn-600); font-weight:700;"><span x-text="tk.altaOuCritica"></span> alta/crit</span>
+                    <a :href="'/Tickets?empresaId=' + empresaId + '&slaStatus=violado'" style="color:var(--orange-500); text-decoration:none;">ver todos →</a>
                 </div>
-            </div>
-            <ul class="divide-y divide-es-surface-2">
+            </header>
+            <div style="padding:0 0 8px;">
                 <template x-for="t in tk.top" :key="t.id">
-                    <li class="py-2 flex items-center gap-3 text-sm">
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-                              :class="t.prioridade === 'Critica' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'"
-                              x-text="t.prioridade"></span>
-                        <a :href="'/Tickets/Detail/' + t.id" class="text-es-ink hover:text-es-accent flex-1 truncate" x-text="t.titulo"></a>
-                        <span class="text-xs text-es-ink-mute" x-text="t.status"></span>
-                        <span x-show="t.slaRespostaViolado || t.slaResolucaoViolado" class="text-red-400 text-xs" title="SLA violado">⏱</span>
-                    </li>
+                    <div style="display:flex; align-items:center; gap:10px; padding:10px 20px; border-top:1px solid var(--border-soft); font-size:13px;">
+                        <es-badge :variant="t.prioridade === 'Critica' ? 'crit' : 'warn'" x-text="t.prioridade"></es-badge>
+                        <a :href="'/Tickets/Detail/' + t.id" style="color:var(--text-primary); font-weight:500; text-decoration:none; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="t.titulo"></a>
+                        <span style="color:var(--text-muted); font-size:12px;" x-text="t.status"></span>
+                        <es-icon x-show="t.slaRespostaViolado || t.slaResolucaoViolado" name="clock" size="14" style="color:var(--crit-600);" title="SLA violado"></es-icon>
+                    </div>
                 </template>
-            </ul>
-        </div>
+            </div>
+        </es-card>
     </template>
 
-    <p x-show="erro" x-cloak class="text-red-400 text-sm" x-text="erro"></p>
+    <p x-show="erro" x-cloak style="color:var(--crit-600); font-size:13px;" x-text="erro"></p>
 </div>
+
+<style>@@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }</style>
 
 @section Scripts {
 <script>
@@ -155,18 +135,14 @@ function operacaoPage() {
         empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
         lojaId: '@(Model.LojaId?.ToString() ?? "")',
         d: {},
-        tk: { total: 0, slaViolados: 0, altaOuCritica: 0, top: [] },
         erro: '',
         ultimaAtualizacao: 0,
         _timer: null,
-        _tkTimer: null,
 
         async init() {
             if (!this.empresaId) return;
-            await Promise.all([this.fetchDashboard(), this.fetchTicketsCriticos()]);
+            await this.fetchDashboard();
             this._timer = setInterval(() => this.fetchDashboard(), 15000);
-            // Onda 1.4 — tickets criticos atualizam a cada 60s (mais lento, menor frequencia de mudanca)
-            this._tkTimer = setInterval(() => this.fetchTicketsCriticos(), 60000);
         },
 
         async fetchDashboard() {
@@ -177,29 +153,12 @@ function operacaoPage() {
                 if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                // Normaliza camel-case do backend (data.vendasHojeValor) — JsonElement
-                // do proxy preserva como veio.
                 this.d = data || {};
                 this.ultimaAtualizacao = Date.now();
                 this.erro = '';
             } catch (e) {
                 this.erro = 'Falha ao carregar dashboard: ' + (e.message || e);
             }
-        },
-
-        async fetchTicketsCriticos() {
-            try {
-                const url = '/api-proxy/admin/tickets/criticos-resumo?empresaId=' + this.empresaId + '&limit=5';
-                const r = await fetch(url, { credentials: 'same-origin' });
-                if (!r.ok) return; // silencioso — widget se esconde se total=0
-                const data = await r.json();
-                this.tk = {
-                    total: data.total || 0,
-                    slaViolados: data.slaViolados || 0,
-                    altaOuCritica: data.altaOuCritica || 0,
-                    top: Array.isArray(data.top) ? data.top : []
-                };
-            } catch { /* falha silenciosa — não quebra o resto do dashboard */ }
         },
 
         brl(v) {

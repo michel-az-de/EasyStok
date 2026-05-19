@@ -9,15 +9,15 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20260514120000_EtiquetaTemplatesRedesign")]
-    partial class EtiquetaTemplatesRedesign
+    [Migration("20260502120000_AddPedidoFornecedorItemTable")]
+    partial class AddPedidoFornecedorItemTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
-            // Data-only migration — sem alteração de schema.
-            // BuildTargetModel deixado vazio intencionalmente;
-            // modelo idêntico à migration anterior EtiquetaTemplates.
+            // Designer gerado retroativamente — BuildTargetModel não reconstruído.
+            // Migration de criação da tabela pedidos_fornecedor_itens (já aplicada ao banco).
+            // Para regenerar corretamente: dotnet ef migrations add --no-build na raiz do Infra.Postgre.
         }
     }
 }

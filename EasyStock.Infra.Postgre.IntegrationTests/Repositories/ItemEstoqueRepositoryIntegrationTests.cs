@@ -8,10 +8,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [Fact]
+    [SkippableFact]
     public async Task SearchAsync_deve_buscar_item_por_codigo_chave_variacao_e_descricao()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();
@@ -63,10 +63,10 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         (await repository.SearchAsync(empresaId, "bluetooth")).Should().ContainSingle();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task SearchAsync_deve_retornar_ordem_deterministica_em_chamadas_consecutivas()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();
@@ -107,10 +107,10 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         primeira.Should().Equal(segunda, "chamadas consecutivas devem retornar a mesma ordem determinística");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Deve_persistir_value_objects_do_item_estoque()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         var empresaId = Guid.NewGuid();
@@ -169,10 +169,10 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetItensEstoquePaginadosAsync_deve_respeitar_tenant_por_empresaId()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();
@@ -245,10 +245,10 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         totalB.Should().Be(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetEstoqueBaixoAsync_deve_respeitar_tenant_e_filtros()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();

@@ -41,8 +41,14 @@
         _            => s ?? ""
     };
 
-    bool pedidoAtrasado(string? status, DateTime criadoUtc) =>
-        status == "aguardando" && (DateTime.UtcNow - criadoUtc).TotalHours >= 2;
+    bool pedidoAtrasado(string? status, DateTime criadoUtc, DateTime? agendadoParaEm) =>
+        agendadoParaEm.HasValue
+            ? agendadoParaEm.Value < DateTime.UtcNow && status != "entregue" && status != "cancelado"
+            : status == "aguardando" && (DateTime.UtcNow - criadoUtc).TotalHours >= 2;
+
+    var totalAgendados = Model.Items.Count(p => p.IsScheduled);
+    var totalAtrasados = Model.Items.Count(p => p.IsAtrasado);
+    var filtroAgenda = Context.Request.Query["agenda"].ToString();
 }
 
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -53,8 +59,7 @@
         </p>
     </div>
     <div class="flex gap-3 flex-wrap">
-        <a href="/pedidos-mobile"
-           class="ui-secondary-btn inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+        <a href="/pedidos-mobile" class="btn-outline-dark">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -78,17 +83,29 @@
             <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, unidade ou número do pedido…"
                    aria-label="Buscar pedido"
                    class="ui-field flex-1 min-w-48" />
-            <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
-                Buscar
-            </button>
+            <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
         </div>
-        <div class="flex gap-2">
+        <div class="filter-tab-group flex-wrap">
             @foreach (var (val, label) in new[] { ("", "Todos"), ("aguardando", "Aguardando"), ("preparando", "Em preparo"), ("pronto", "Pronto"), ("entregue", "Entregue") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                    @label
+                   class="filter-tab @(isActive ? "active" : "")">@label</a>
+            }
+            @if (totalAgendados > 0)
+            {
+                var agActive = filtroAgenda == "agendados";
+                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = agActive ? null : "agendados" })"
+                   class="filter-tab @(agActive ? "active" : "")">
+                    📅 Agendados (@totalAgendados)
+                </a>
+            }
+            @if (totalAtrasados > 0)
+            {
+                var atActive = filtroAgenda == "atrasados";
+                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = atActive ? null : "atrasados" })"
+                   class="filter-tab @(atActive ? "active" : "") text-[var(--crit-400)]">
+                    ⚠ Atrasados (@totalAtrasados)
                 </a>
             }
         </div>
@@ -96,7 +113,13 @@
 </div>
 
 <div class="ws">
-    @if (!Model.Items.Any())
+    @{
+        var itemsFiltrados = Model.Items.AsEnumerable();
+        if (filtroAgenda == "agendados") itemsFiltrados = itemsFiltrados.Where(i => i.IsScheduled);
+        else if (filtroAgenda == "atrasados") itemsFiltrados = itemsFiltrados.Where(i => i.IsAtrasado);
+        var itemsFinais = itemsFiltrados.ToList();
+    }
+    @if (!itemsFinais.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIllustration", "inbox" },
@@ -111,12 +134,12 @@
         <div class="overflow-x-auto">
         <table class="tbl-full">
             <thead>
-                <tr><th>Cliente</th><th>Status</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>Data</th><th role="columnheader" aria-label="Ações"></th></tr>
+                <tr><th>Cliente</th><th>Status</th><th>Agendado</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>Data</th><th role="columnheader" aria-label="Ações"></th></tr>
             </thead>
             <tbody>
-                @foreach (var p in Model.Items)
+                @foreach (var p in itemsFinais)
                 {
-                    var atrasado = pedidoAtrasado(p.Status, p.CriadoEm);
+                    var atrasado = pedidoAtrasado(p.Status, p.CriadoEm, p.AgendadoParaEm);
                     <tr class="cursor-pointer hover:bg-slate-50/60 transition-colors @(atrasado ? "bg-amber-50/40" : "")"
                         onclick="window.location='/pedidos/@p.Id'">
                         <td>
@@ -155,6 +178,21 @@
                                     </span>
                                 }
                             </div>
+                        </td>
+                        <td>
+                            @if (p.IsScheduled)
+                            {
+                                var classe = p.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
+                                var prefix = p.IsAtrasado ? "⚠" : "📅";
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @classe"
+                                      title="@p.AgendadoParaEm?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")">
+                                    @prefix @p.AgendadoParaEm?.ToLocalTime().ToString("dd/MM HH:mm")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-xs text-slate-400">—</span>
+                            }
                         </td>
                         <td class="text-slate-600 text-sm">@p.ItensCount</td>
                         <td class="text-slate-600 col-num">@p.Total.AsMoney()</td>
@@ -652,6 +690,25 @@
                               class="ui-textarea w-full text-sm"></textarea>
                 </div>
             </fieldset>
+
+            <fieldset class="fm-section">
+                <legend class="fm-section__legend">Agendamento</legend>
+                <div class="fm-field fm-col-2">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <input type="checkbox" x-model="form.agendarAtivo"
+                               class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        📅 Agendar para depois
+                    </label>
+                    <div x-show="form.agendarAtivo" x-cloak class="mt-2">
+                        <input type="datetime-local" x-model="form.agendadoParaEm"
+                               :min="new Date(Date.now() + 60000).toISOString().slice(0, 16)"
+                               class="ui-field w-full text-sm" />
+                        <p class="text-xs text-slate-500 mt-1">
+                            O pedido ficará marcado com badge 📅 e lembretes automáticos serão enviados.
+                        </p>
+                    </div>
+                </div>
+            </fieldset>
         </div>
 
         <!-- Resumo de impacto: o que será criado ao confirmar -->
@@ -728,7 +785,8 @@ function novoPedidoModal() {
             modo: 'auto',           // auto | avulso
             clienteId: '',
             nomeAdHoc: '', aptAdHoc: '', telefoneAdHoc: '',
-            observacoes: '', itens: []
+            observacoes: '', itens: [],
+            agendarAtivo: false, agendadoParaEm: ''
         },
 
         get reciboPedidoCurto() {
@@ -1190,12 +1248,16 @@ function novoPedidoModal() {
 
                 // 3) Pedido — UNICA etapa fatal. Se falhar, abortamos.
                 const usaAvulso = this.form.modo === 'avulso' && !this.form.clienteId;
+                const agendadoUtc = this.form.agendarAtivo && this.form.agendadoParaEm
+                    ? new Date(this.form.agendadoParaEm).toISOString()
+                    : null;
                 const payload = {
                     clienteId: this.form.clienteId || null,
                     nomeAdHoc: usaAvulso ? this.form.nomeAdHoc : null,
                     aptAdHoc: usaAvulso ? this.form.aptAdHoc : null,
                     telefoneAdHoc: usaAvulso ? this.form.telefoneAdHoc : null,
                     observacoes: this.form.observacoes,
+                    agendadoParaEm: agendadoUtc,
                     itens: this.form.itens.map(it => ({
                         nome: it.nome.trim(),
                         quantidade: it.quantidade,

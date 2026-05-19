@@ -4,43 +4,47 @@
     ViewData["Title"] = "Broadcast — Super Admin";
 }
 
-<div class="space-y-6 max-w-2xl">
-    <div>
-        <h1 class="text-2xl font-bold text-white">Broadcast</h1>
-        <p class="text-slate-400 text-sm mt-1">Envio ad-hoc de notificação para usuários selecionados</p>
+<div style="margin-bottom:20px; max-width:720px;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
+        <es-breadcrumb-item>Broadcast</es-breadcrumb-item>
+    </es-breadcrumb>
+    <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Broadcast</h2>
+    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Envio ad-hoc de notificação para usuários selecionados</p>
+</div>
+
+<div style="max-width:720px; display:flex; flex-direction:column; gap:16px;">
+
+    <div style="display:flex; align-items:flex-start; gap:12px; padding:14px 18px; background:rgba(240,184,74,.10); border:1px solid rgba(240,184,74,.30); border-left:3px solid var(--warn-600); border-radius:var(--r-md); color:var(--text-primary); font-size:13px;">
+        <es-icon name="alert-triangle" size="18" />
+        <div>
+            <strong>Atenção:</strong> esta ação envia notificações reais. Confirme os destinatários antes de enviar.
+        </div>
     </div>
 
-    <div class="bg-amber-900/30 border border-amber-500/40 rounded-lg p-4 text-sm text-amber-200">
-        ⚠️ Esta ação envia notificações reais. Confirme os destinatários antes de enviar.
-    </div>
+    <es-card title="Destinatários" description="Empresa e usuários que receberão a notificação">
+        <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+            <es-input asp-for="EmpresaId" label="EmpresaId" required="true"
+                      placeholder="00000000-0000-0000-0000-000000000000"
+                      input-class="font-mono"
+                      helper="GUID da empresa cliente." />
+            <es-textarea asp-for="UsuariosIds" label="UsuarioIds"
+                         rows="6"
+                         placeholder="00000000-0000-0000-0000-000000000001&#10;00000000-0000-0000-0000-000000000002"
+                         helper="Um GUID por linha ou separados por vírgula."
+                         input-class="font-mono" />
 
-    <form method="post" class="card p-6 space-y-5">
-        <div>
-            <label class="form-label">EmpresaId</label>
-            <input asp-for="EmpresaId" class="form-input w-full font-mono" placeholder="00000000-0000-0000-0000-000000000000" />
-        </div>
+            <hr style="border:0; border-top:1px solid var(--border-soft); margin:6px 0;" />
 
-        <div>
-            <label class="form-label">UsuarioIds (um por linha, ou separados por vírgula)</label>
-            <textarea asp-for="UsuariosIds" class="form-input w-full font-mono text-xs" rows="6"
-                      placeholder="00000000-0000-0000-0000-000000000001&#10;00000000-0000-0000-0000-000000000002"></textarea>
-        </div>
+            <es-input asp-for="Titulo" label="Título" required="true" placeholder="Comunicado importante" />
+            <es-textarea asp-for="Mensagem" label="Mensagem" required="true" rows="4"
+                         placeholder="Detalhes do comunicado..." />
 
-        <div>
-            <label class="form-label">Título</label>
-            <input asp-for="Titulo" class="form-input w-full" placeholder="Comunicado importante" />
-        </div>
-        <div>
-            <label class="form-label">Mensagem</label>
-            <textarea asp-for="Mensagem" class="form-input w-full" rows="4"
-                      placeholder="Detalhes do comunicado..."></textarea>
-        </div>
-
-        <div class="flex gap-3">
-            <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded font-medium transition-colors">
-                Enviar Broadcast
-            </button>
-            <a href="/Notificacoes/Templates" class="btn-ghost px-6 py-2">Cancelar</a>
-        </div>
-    </form>
+            <div style="display:flex; gap:8px; padding-top:6px;">
+                <es-button type="submit" variant="warn" icon="bell">Enviar broadcast</es-button>
+                <es-button variant="ghost" href="/Notificacoes/Templates">Cancelar</es-button>
+            </div>
+        </form>
+    </es-card>
 </div>

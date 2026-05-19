@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums;
@@ -23,6 +24,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
         ILogger<AutenticarUsuarioUseCase> logger)
     {
         public async Task<AutenticarUsuarioResult> ExecuteAsync(AutenticarUsuarioCommand command)
@@ -57,11 +59,11 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 usuario.ResetarTentativasFalha();
             }
 
-            // --- etapa 2: verificação bcrypt (CPU-bound ~200-800ms dependendo do work factor)
+            // --- etapa 2: verificação do hash (CPU-bound ~200-800ms dependendo do work factor)
             var swHash = Stopwatch.StartNew();
-            var senhaOk = BCrypt.Net.BCrypt.Verify(command.Senha, usuario.SenhaHash);
+            var senhaOk = passwordHasher.Verify(command.Senha, usuario.SenhaHash);
             swHash.Stop();
-            logger.LogDebug("Login etapa bcrypt verify: {ElapsedMs}ms", swHash.ElapsedMilliseconds);
+            logger.LogDebug("Login etapa hash verify: {ElapsedMs}ms", swHash.ElapsedMilliseconds);
 
             if (!senhaOk)
             {

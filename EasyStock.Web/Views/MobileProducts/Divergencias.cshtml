@@ -101,17 +101,13 @@
                             }
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <button type="button"
-                                    @@click="$dispatch('confirm-action', {
-                                        titulo: 'Reconciliar estoque de @d.ProductName?',
-                                        mensagem: 'Mobile (@d.MobileStock) vira ERP (@d.ErpStock). O valor do ERP prevalece e a próxima sync atualiza o app.',
-                                        textoBotao: 'Usar valor do ERP',
-                                        classBotao: 'bg-indigo-600 hover:bg-indigo-700',
-                                        formAction: '/produtos-mobile/@d.MobileProductId/reconciliar'
-                                    })"
-                                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                                Usar valor do ERP
-                            </button>
+                            <form method="post" action="/produtos-mobile/@d.MobileProductId/reconciliar" class="inline"
+                                  data-confirm='@($"{{\"titulo\":\"Reconciliar estoque?\",\"mensagem\":\"Mobile {d.MobileStock} será ajustado para ERP {d.ErpStock}. O valor do ERP prevalece.\",\"textoBotao\":\"Reconciliar\",\"classBotao\":\"bg-indigo-600 hover:bg-indigo-700\"}}")'>
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                    Usar valor do ERP
+                                </button>
+                            </form>
                         </td>
                     </tr>
                 }

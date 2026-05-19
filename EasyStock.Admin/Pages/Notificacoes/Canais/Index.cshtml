@@ -4,132 +4,95 @@
     ViewData["Title"] = "Canais de Notificação";
 }
 
-<div class="space-y-6">
-    <div>
-        <h1 class="text-2xl font-bold text-white">Canais</h1>
-        <p class="text-slate-400 text-sm mt-1">Configuração de provedores e kill-switches globais</p>
-    </div>
+<div style="margin-bottom:20px;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
+        <es-breadcrumb-item>Canais</es-breadcrumb-item>
+    </es-breadcrumb>
+    <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Canais</h2>
+    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Configuração de provedores e kill-switches globais</p>
+</div>
 
-    @if (Model.Erro != null)
-    {
-        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
-    }
-
-    @if (Model.Configs.HasValue && Model.Configs.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
-    {
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            @foreach (var cfg in Model.Configs.Value.EnumerateArray())
+@if (Model.Configs.HasValue && Model.Configs.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
+{
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-bottom:24px;">
+        @foreach (var cfg in Model.Configs.Value.EnumerateArray())
+        {
+            var canal = cfg.TryGetProperty("canal", out var c) ? c.GetString() : "";
+            var provider = cfg.TryGetProperty("providerAtivo", out var p) ? p.GetString() : "stub";
+            var ativo = cfg.TryGetProperty("ativoNoTenant", out var a) && a.GetBoolean();
+            var iconName = canal switch
             {
-                var canal = cfg.TryGetProperty("canal", out var c) ? c.GetString() : "";
-                var provider = cfg.TryGetProperty("providerAtivo", out var p) ? p.GetString() : "stub";
-                var ativo = cfg.TryGetProperty("ativoNoTenant", out var a) && a.GetBoolean();
+                "Email" => "bell",
+                "Sms" => "smartphone",
+                "WhatsApp" => "smartphone",
+                "InApp" => "bell",
+                _ => "bell"
+            };
 
-                <div class="card p-4 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-white font-semibold">@canal</h3>
-                        @if (ativo)
+            <es-card padding="md">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="display:inline-grid; place-items:center; width:36px; height:36px; border-radius:var(--r-md); background:var(--surface-sunken); color:var(--text-muted);">
+                            <es-icon name="@iconName" size="18" />
+                        </span>
+                        <h3 style="margin:0; font-size:15px; font-weight:600; color:var(--text-primary);">@canal</h3>
+                    </div>
+                    <es-badge variant="@(ativo ? "ok" : "neutral")" with-dot="true">@(ativo ? "ATIVO" : "INATIVO")</es-badge>
+                </div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft); font-size:12px; color:var(--text-muted);">
+                    Provider: <code style="font-family:var(--font-mono); color:var(--orange-500);">@provider</code>
+                </div>
+            </es-card>
+        }
+    </div>
+}
+
+<es-card title="Kill-switches" description="Bloqueia disparos no canal indicado até remoção manual ou expiração.">
+    @if (Model.Bloqueios.HasValue && Model.Bloqueios.Value.ValueKind == System.Text.Json.JsonValueKind.Array && Model.Bloqueios.Value.EnumerateArray().Any())
+    {
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+            @foreach (var b in Model.Bloqueios.Value.EnumerateArray())
+            {
+                var bId = b.TryGetProperty("id", out var bi) ? bi.GetString() : "";
+                var motivo = b.TryGetProperty("motivo", out var bm) ? bm.GetString() : "";
+                var canal = b.TryGetProperty("canal", out var bc) ? bc.GetString() : "Todos";
+                var expira = b.TryGetProperty("expiraEm", out var be) && be.ValueKind != System.Text.Json.JsonValueKind.Null ? be.GetString() : null;
+
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(192,59,42,.10); border:1px solid rgba(192,59,42,.30); border-left:3px solid var(--crit-600); border-radius:var(--r-md); gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <es-icon name="alert-triangle" size="16" />
+                        <es-badge variant="crit">@canal</es-badge>
+                        <span style="font-size:13px; color:var(--text-primary);">@motivo</span>
+                        @if (expira != null)
                         {
-                            <span class="badge-green text-xs">Ativo</span>
-                        }
-                        else
-                        {
-                            <span class="badge-gray text-xs">Inativo</span>
+                            <span style="font-size:11px; color:var(--text-muted);">expira: @expira</span>
                         }
                     </div>
-                    <p class="text-slate-400 text-sm">Provider: <span class="text-amber-400 font-mono">@provider</span></p>
+                    <form method="post" asp-page-handler="RemoverKillSwitch" style="display:inline;">
+                        <input type="hidden" name="id" value="@bId" />
+                        <es-button type="submit" variant="ghost" size="xs" icon="x">Remover</es-button>
+                    </form>
                 </div>
             }
         </div>
     }
+    else
+    {
+        <p style="color:var(--text-muted); font-size:13px; margin-bottom:18px;">Nenhum kill-switch ativo no momento.</p>
+    }
 
-    <div class="card p-6">
-        <h2 class="text-white font-semibold mb-4">Kill-switches ativos</h2>
-
-        @if (Model.Bloqueios.HasValue && Model.Bloqueios.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            <div class="space-y-2 mb-6">
-                @foreach (var b in Model.Bloqueios.Value.EnumerateArray())
-                {
-                    var bId = b.TryGetProperty("id", out var bi) ? bi.GetString() : "";
-                    var motivo = b.TryGetProperty("motivo", out var bm) ? bm.GetString() : "";
-                    var canal = b.TryGetProperty("canal", out var bc) ? bc.GetString() : "Todos";
-                    var expira = b.TryGetProperty("expiraEm", out var be) && be.ValueKind != System.Text.Json.JsonValueKind.Null
-                        ? be.GetString() : null;
-
-                    <div class="flex items-center justify-between bg-red-900/30 border border-red-500/30 rounded-lg p-3">
-                        <div>
-                            <span class="text-red-300 font-mono text-xs mr-2">Canal: @canal</span>
-                            <span class="text-white text-sm">@motivo</span>
-                            @if (expira != null)
-                            {
-                                <span class="text-xs ml-2" x-data="killSwitchCountdown('@expira')" x-init="start()" x-text="label" :class="expirado ? 'text-red-400 font-semibold' : 'text-slate-400'"></span>
-                            }
-                            else
-                            {
-                                <span class="text-slate-500 text-xs ml-2">Sem expiração definida</span>
-                            }
-                        </div>
-                        <button type="button"
-                                @@click="$dispatch('open-justificar', {
-                                    endpoint: '?handler=RemoverKillSwitch',
-                                    acao: 'Remover kill-switch',
-                                    resumo: 'O canal @canal voltará a enviar notificações imediatamente.',
-                                    variant: 'danger',
-                                    confirmLabel: 'Remover (auditado)',
-                                    extraFields: '<input type=&quot;hidden&quot; name=&quot;id&quot; value=&quot;@bId&quot; />'
-                                })"
-                                class="text-red-400 hover:text-red-300 text-xs">Remover</button>
-                    </div>
-                }
-            </div>
-        }
-        else
-        {
-            <p class="text-slate-500 text-sm mb-6">Nenhum kill-switch ativo.</p>
-        }
-
-        <h3 class="text-white font-medium mb-3">Ativar Kill-switch</h3>
-        <form method="post" asp-page-handler="KillSwitch" class="flex gap-3 flex-wrap">
-            <select name="canal" class="form-input text-sm">
-                <option value="">Todos os canais</option>
-                <option value="Email">Email</option>
-                <option value="Sms">SMS</option>
-                <option value="WhatsApp">WhatsApp</option>
-                <option value="InApp">In-App</option>
-            </select>
-            <input type="text" name="motivo" class="form-input text-sm flex-1" placeholder="Motivo (ex: Manutenção programada)" required />
-            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
-                Ativar Kill-switch
-            </button>
-        </form>
-    </div>
-</div>
-
-<script>
-function killSwitchCountdown(iso) {
-    return {
-        label: '',
-        expirado: false,
-        _timer: null,
-        compute() {
-            const target = new Date(iso).getTime();
-            const diff = target - Date.now();
-            if (diff <= 0) {
-                this.expirado = true;
-                this.label = 'Expirado';
-                if (this._timer) { clearInterval(this._timer); this._timer = null; }
-                return;
-            }
-            this.expirado = false;
-            const h = Math.floor(diff / 3600000);
-            const m = Math.floor((diff % 3600000) / 60000);
-            const s = Math.floor((diff % 60000) / 1000);
-            this.label = 'Expira em ' + (h > 0 ? h + 'h ' : '') + (h > 0 || m > 0 ? m + 'min' : s + 's');
-        },
-        start() {
-            this.compute();
-            this._timer = setInterval(() => this.compute(), 30000);
-        }
-    };
-}
-</script>
+    <h3 style="margin:0 0 12px; font-size:14px; font-weight:600; color:var(--text-primary);">Ativar novo kill-switch</h3>
+    <form method="post" asp-page-handler="KillSwitch" style="display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:end;">
+        <es-select name="canal" label="Canal">
+            <option value="">Todos os canais</option>
+            <option value="Email">Email</option>
+            <option value="Sms">SMS</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="InApp">In-App</option>
+        </es-select>
+        <es-input name="motivo" label="Motivo" required="true" placeholder="Ex.: manutenção programada" />
+        <es-button type="submit" variant="danger" icon="alert-triangle">Ativar</es-button>
+    </form>
+</es-card>

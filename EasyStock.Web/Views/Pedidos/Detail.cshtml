@@ -44,7 +44,7 @@
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
     <span class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
     <div class="ml-auto flex gap-2">
-        <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
+        <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
             🖨 Recibo
         </a>
         @if (p.Status != "entregue" && !isCancelado)
@@ -60,10 +60,44 @@
                     </button>
                 </form>
             }
-            <button type="button" x-data @@click="$dispatch('open-modal', 'cancelar-pedido')"
-                    class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
-                Cancelar pedido
-            </button>
+            <form asp-action="Cancelar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                  data-confirm='{"titulo":"Cancelar pedido?","mensagem":"O pedido será marcado como cancelado e não pode ser revertido.","textoBotao":"Cancelar pedido","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                @Html.AntiForgeryToken()
+                <button type="submit" class="px-3.5 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-50">
+                    Cancelar
+                </button>
+            </form>
+        }
+        @if (!isCancelado && p.Status != "entregue")
+        {
+            <div x-data="{ showAgendar: false }" class="relative">
+                @if (p.IsScheduled)
+                {
+                    <form asp-action="Agendar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn-outline-dark"
+                                title="Pedido vira imediato (sem data agendada)">
+                            Remover agendamento
+                        </button>
+                    </form>
+                }
+                <button type="button" @@click="showAgendar = !showAgendar"
+                        class="px-3.5 py-2 bg-white border border-blue-300 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-50">
+                    📅 @(p.IsScheduled ? "Reagendar" : "Agendar")
+                </button>
+                <div x-show="showAgendar" x-cloak @@click.outside="showAgendar = false"
+                     class="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg p-3 w-72">
+                    <form asp-action="Agendar" asp-controller="Pedidos" asp-route-id="@p.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <label class="block text-sm text-slate-700 mb-1">Data e hora</label>
+                        <input type="datetime-local" name="agendadoParaEm" required
+                               class="ui-field w-full text-sm mb-2" />
+                        <button type="submit" class="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+                            Confirmar
+                        </button>
+                    </form>
+                </div>
+            </div>
         }
         <button type="button" x-data @@click="$dispatch('open-modal', 'reportar-problema')"
                 class="px-3.5 py-2 bg-white border border-amber-300 text-amber-700 text-sm font-semibold rounded-lg hover:bg-amber-50"
@@ -203,6 +237,19 @@ else
                 @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <div><dt class="text-slate-500">Telefone</dt><dd>@p.ClienteTelefone</dd></div> }
                 <div class="pt-2 border-t"><dt class="text-slate-500">Origem</dt><dd>@(p.Origem ?? "—")</dd></div>
                 <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().AsDateTime()</dd></div>
+                @if (p.AgendadoParaEm.HasValue)
+                {
+                    var agBadge = p.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
+                    var agPrefix = p.IsAtrasado ? "⚠ Atrasado:" : "📅";
+                    <div>
+                        <dt class="text-slate-500">Agendado para</dt>
+                        <dd>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @agBadge">
+                                @agPrefix @p.AgendadoParaEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </span>
+                        </dd>
+                    </div>
+                }
                 @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().AsDateTime()</dd></div> }
                 @if (!string.IsNullOrEmpty(p.MobileOrderId))
                 {
@@ -268,8 +315,7 @@ else
                                 <td class="text-right">
                                     @if (p.Status != "entregue" && !isCancelado)
                                     {
-                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline"
-                                              x-data @@submit.prevent="if (confirm('Remover \x27@(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(i.Nome ?? ""))\x27 do pedido?')) $el.submit()">
+                                        <form asp-action="RemoveItem" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-itemId="@i.Id" method="post" class="inline" data-confirm='{"titulo":"Remover item do pedido?","mensagem":"O item será removido do pedido. O estoque será ajustado.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Remover @i.Nome">✕</button>
                                         </form>
@@ -326,8 +372,7 @@ else
                                 <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ToLocalTime().AsDateTime()@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
                                 @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
                             </div>
-                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post"
-                                  x-data @@submit.prevent="if (confirm('Estornar pagamento de @pg.Valor.AsMoney()?')) $el.submit()">
+                            <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" data-confirm='{"titulo":"Remover pagamento?","mensagem":"O pagamento será estornado do pedido.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar pagamento">✕</button>
                             </form>
@@ -557,7 +602,7 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
                 <div>
                     <h2 id="fm-report-title" class="fm-header__title text-amber-700">Reportar problema deste pedido</h2>
                     <p class="fm-header__subtitle">
-                        Abre ticket pra EasyStok sobre este pedido. Voce pode acompanhar a resposta em Suporte.
+                        Abre ticket para EasyStok sobre este pedido. Você pode acompanhar a resposta em Suporte.
                     </p>
                 </div>
                 <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>

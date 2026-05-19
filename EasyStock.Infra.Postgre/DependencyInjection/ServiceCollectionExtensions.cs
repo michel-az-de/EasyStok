@@ -1,7 +1,9 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
@@ -30,6 +32,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             connectionString = EnsurePoolLimits(connectionString, configuration);
 
             services.AddSingleton<AuditTimestampsInterceptor>();
+            services.AddSingleton<SetTenantOnConnectionInterceptor>();
+            services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
+            services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
             services.AddScoped<EntityChangeInterceptor>();
             services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
@@ -44,6 +49,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 })
                 .AddInterceptors(
                     sp.GetRequiredService<AuditTimestampsInterceptor>(),
+                    sp.GetRequiredService<SetTenantOnConnectionInterceptor>(),
+                    sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>(),
                     sp.GetRequiredService<EntityChangeInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
@@ -92,6 +99,20 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
             services.AddScoped<ILancamentoRepository, LancamentoRepository>();
             services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
+
+            // Onda P0 Payment Orchestration
+            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IPaymentAttemptRepository,
+                Repositories.Pagamentos.PaymentAttemptRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
+                Repositories.Pagamentos.GatewayRoutingRuleRepository>();
+
+            // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
+            services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
+            services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
+            services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
+            services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
+            services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
+
             services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
             services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
             services.AddScoped<IFaqRepository, FaqRepository>();

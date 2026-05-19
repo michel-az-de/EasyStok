@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
+using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,7 @@ public class WebhookPixController(
     IUnitOfWork unitOfWork,
     IConfiguration configuration,
     RegistrarPagamentoFaturaUseCase registrarPagamentoFaturaUseCase,
+    ReconciliarPixParcelaReceberUseCase reconciliarPixParcelaReceberUseCase,
     ILogger<WebhookPixController> logger) : ControllerBase
 {
     [HttpPost("pix")]
@@ -125,6 +127,22 @@ public class WebhookPixController(
 
     private async Task ProcessarPagamentoAsync(string txid, decimal? valorPago)
     {
+        // Roteamento por prefixo de txid:
+        // - "cr..." -> parcela ContaReceber (CAP/CAR module)
+        // - demais  -> CobrancaAssinatura (faturamento SaaS)
+        if (txid.StartsWith("cr", StringComparison.OrdinalIgnoreCase))
+        {
+            var r = await reconciliarPixParcelaReceberUseCase.ExecuteAsync(
+                new ReconciliarPixParcelaReceberCommand(txid, valorPago, DateTime.UtcNow));
+            if (r.Reconciliado)
+                logger.LogInformation("Webhook Pix: parcela CR reconciliada (txid={Txid} parcela={ParcelaId} conta={ContaId})",
+                    txid, r.ParcelaId, r.ContaId);
+            else
+                logger.LogWarning("Webhook Pix: parcela CR nao reconciliada (txid={Txid} motivo={Motivo})",
+                    txid, r.Motivo);
+            return;
+        }
+
         // Lock pessimista em "Txid" via SELECT FOR UPDATE serializa duplo-fire do
         // Efi (ate 5 retentativas em 5 min) — sem isso, dois webhooks simultaneos
         // passam o check Pendente e renovam a assinatura em duplicidade. O bloco

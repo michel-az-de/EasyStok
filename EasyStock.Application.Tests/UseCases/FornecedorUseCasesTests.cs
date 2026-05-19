@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AtualizarFornecedor;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarFornecedor;
@@ -56,7 +57,7 @@ public class FornecedorUseCasesTests
     {
         var fornecedorRepository = Substitute.For<IFornecedorRepository>();
         var pedidoRepository = Substitute.For<IPedidoFornecedorRepository>();
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
         var logger = Substitute.For<ILogger<DesativarFornecedorUseCase>>();
         var useCase = new DesativarFornecedorUseCase(fornecedorRepository, pedidoRepository, unitOfWork, logger);
 
@@ -75,7 +76,7 @@ public class FornecedorUseCasesTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*pedido aberto ou em transito*");
-        await unitOfWork.DidNotReceive().CommitAsync();
+        unitOfWork.CommitCount.Should().Be(0);
     }
 
     [Fact]

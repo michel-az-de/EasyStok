@@ -11,6 +11,7 @@ public sealed class AlterarSenhaUseCase(
     IUsuarioRepository usuarioRepository,
     ICurrentUserAccessor currentUserAccessor,
     IUnitOfWork unitOfWork,
+    IPasswordHasher passwordHasher,
     ILogger<AlterarSenhaUseCase> logger) : IUseCase<AlterarSenhaCommand, AlterarSenhaResult>
 {
     public async Task<AlterarSenhaResult> ExecuteAsync(AlterarSenhaCommand command)
@@ -29,12 +30,12 @@ public sealed class AlterarSenhaUseCase(
             throw new RegraDeDominioVioladaException("Usuario nao encontrado.");
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(command.SenhaAtual, usuario.SenhaHash))
+        if (!passwordHasher.Verify(command.SenhaAtual, usuario.SenhaHash))
         {
             throw new CredenciaisInvalidasException("Senha atual incorreta.");
         }
 
-        usuario.SenhaHash = BCrypt.Net.BCrypt.HashPassword(command.NovaSenha);
+        usuario.SenhaHash = passwordHasher.Hash(command.NovaSenha);
         usuario.AlteradoEm = DateTime.UtcNow;
 
         await usuarioRepository.UpdateAsync(usuario);

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
@@ -65,35 +66,61 @@ namespace EasyStock.Infra.Postgre.Data
         public bool IsSuperAdmin => _currentUser is { IsAuthenticated: true, Nivel: NivelAcesso.SuperAdmin };
 
         /// <summary>
-        /// Bypass explicito do RLS no banco. Usado pelo
-        /// <c>SetTenantOnConnectionInterceptor</c> para emitir
-        /// <c>SET app.bypass_rls = 'on'</c> em cenarios cross-tenant
-        /// conhecidos (seeds, jobs, migrations). NAO usar em request-path.
+        /// Quando <c>true</c>, o <c>SetTenantOnConnectionInterceptor</c> emite
+        /// <c>SET app.bypass_rls = 'true'</c> na próxima abertura de conexão,
+        /// fazendo a policy <c>tenant_isolation</c> aceitar qualquer linha.
+        /// <para>
+        /// É usado por código cross-tenant deliberado: migrations, schema
+        /// bootstrap, SuperAdmin seed, jobs de reconciliação, login pré-auth
+        /// (sem <c>CurrentTenantId</c>). Nunca expor a flag a controllers/handlers
+        /// — eles devem confiar em <see cref="IsSuperAdmin"/>, que vem do JWT.
+        /// </para>
+        /// <para>
+        /// Use <see cref="UseRowLevelSecurityBypass"/> para escopo curto via
+        /// <c>using</c> — defesa em profundidade real, já que
+        /// <c>IgnoreQueryFilters</c> sozinho não basta: ele desliga o filtro
+        /// EF, mas a policy do Postgres ainda zera as linhas.
+        /// </para>
         /// </summary>
-        public bool BypassRowLevelSecurity { get; set; }
+        public bool BypassRowLevelSecurity { get; private set; }
 
         /// <summary>
-        /// Habilita <see cref="BypassRowLevelSecurity"/> apenas dentro do escopo
-        /// <c>using</c> e restaura o valor anterior no <c>Dispose</c>. Preferir
-        /// este metodo em vez de setar a propriedade diretamente em codigo de
-        /// request — garante que o bypass nao vaze apos o bloco.
+        /// Liga <see cref="BypassRowLevelSecurity"/> e devolve um
+        /// <see cref="IDisposable"/> que desliga ao sair do escopo. Cobre os
+        /// casos onde precisamos ler/escrever cross-tenant: jobs noturnos,
+        /// reconciliação de pagamento, login pré-JWT, seed de SuperAdmin.
+        /// <para>
+        /// O interceptor reaplica o setting na próxima abertura de conexão.
+        /// Se a sua operação roda dentro de uma única conexão já aberta, force
+        /// reabertura ou execute <c>SET app.bypass_rls</c> manualmente — mas o
+        /// caso normal (cada use case abre conexão nova via repository) já
+        /// funciona transparente.
+        /// </para>
         /// </summary>
         public IDisposable UseRowLevelSecurityBypass()
         {
             var previous = BypassRowLevelSecurity;
             BypassRowLevelSecurity = true;
-            return new RowLevelSecurityBypassScope(this, previous);
+            return new RlsBypassScope(this, previous);
         }
 
-        private sealed class RowLevelSecurityBypassScope(EasyStockDbContext context, bool previous) : IDisposable
+        private sealed class RlsBypassScope : IDisposable
         {
+            private readonly EasyStockDbContext _ctx;
+            private readonly bool _previous;
             private bool _disposed;
+
+            public RlsBypassScope(EasyStockDbContext ctx, bool previous)
+            {
+                _ctx = ctx;
+                _previous = previous;
+            }
 
             public void Dispose()
             {
                 if (_disposed) return;
                 _disposed = true;
-                context.BypassRowLevelSecurity = previous;
+                _ctx.BypassRowLevelSecurity = _previous;
             }
         }
 
@@ -186,9 +213,27 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaturaContador> FaturaContadores { get; set; } = null!;
         public DbSet<WebhookRecebido> WebhookRecebidos { get; set; } = null!;
 
+        // Payment Orchestration (Onda P0)
+        public DbSet<PaymentAttempt> PaymentAttempts { get; set; } = null!;
+        public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;
+        public DbSet<GatewayRoutingRule> GatewayRoutingRules { get; set; } = null!;
+        public DbSet<GatewayHealthSnapshot> GatewayHealthSnapshots { get; set; } = null!;
+
         // Modulo Financeiro AR/AP — lancamentos previstos/realizados do tenant
         public DbSet<Lancamento> Lancamentos { get; set; } = null!;
         public DbSet<LancamentoBaixa> LancamentoBaixas { get; set; } = null!;
+
+        // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
+        public DbSet<EasyStock.Domain.Entities.Financeiro.CategoriaFinanceira> CategoriasFinanceiras { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.CentroCusto> CentrosCusto { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaPagar> ContasPagar { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaPagarAlteracao> ContaPagarAlteracoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaReceber> ContasReceber { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaReceberAlteracao> ContaReceberAlteracoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ParcelaPagar> ParcelasPagar { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ParcelaReceber> ParcelasReceber { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.PagamentoParcela> PagamentosParcela { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Financeiro.ContaFinanceiraEvento> ContasFinanceirasEventos { get; set; } = null!;
 
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
         public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
@@ -403,13 +448,15 @@ namespace EasyStock.Infra.Postgre.Data
             if (clrType == typeof(ReportRun)) return true;
 
             // Admin tooling — auditoria/feature flags cross-tenant.
+            // GatewayRoutingRule: EmpresaId nullable (NULL = regra global) e o repository
+            // filtra manualmente "EmpresaId == tenant OR EmpresaId IS NULL". Filtro
+            // automatico por igualdade eliminaria as regras globais.
             // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).
             // Acesso direto via SQL raw (INSERT...ON CONFLICT) ou lookup por PK no
-            // fallback; sem necessidade de filter — em background sem JWT o filter
-            // global zeraria a leitura no fallback nao-PG e o numerador retornaria
-            // contador zerado, gerando reset silencioso de numeracao por race.
+            // fallback; sem necessidade de filter.
             return clrType == typeof(AdminImpersonationLog)
                 || clrType == typeof(TenantFeatureFlag)
+                || clrType == typeof(GatewayRoutingRule)
                 || clrType == typeof(FaturaContador);
         }
     }

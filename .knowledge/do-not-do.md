@@ -67,6 +67,16 @@
   ```
   Funciona pra positional records em C# 11+ e propaga pra IntelliSense + XML doc.
 
-## 14. Não passar `currentUser.UsuarioId` direto pra FK quando o caller pode ser anônimo
+## 14. Não confiar em `MemberRenamer = _ => ""` como bloqueio em Scriban; `Template.RenderAsync` ignora `CancellationToken`-via-parametro
+- **O que aconteceu:** `ScribanSandbox` usava `MemberRenamer = _ => string.Empty` esperando bloquear acesso a `obj.GetType().Assembly...`. `MemberRenamer` é só pra **renomear** membros (snake_case ↔ CamelCase) — não filtra acesso. O bloqueio real aconteceu por acidente (membro renomeado pra "" virou inacessível por nome) e quebra com qualquer template que use propriedade .NET legitima. Ao mesmo tempo o `ScribanRenderer` aplicava `cts.CancelAfter(500ms)` esperando que `template.RenderAsync(context)` cancelasse — o método **não recebe CT como parâmetro**; o timeout era fake e loop infinito travava o worker até GC.
+- **Como evitar:**
+  - Bloqueio de membros perigosos: usar `TemplateContext.MemberFilter` (delegate `MemberInfo -> bool`). Falsa = bloqueia. Lista bloquear: `Type`, `Assembly`, `MemberInfo` e derivados, `Delegate`, `IServiceProvider`.
+  - Cancelamento de render: setar `context.CancellationToken = ct` e ler `ScriptAbortException` no catch. `RenderAsync(TemplateContext)` honra esse CT (testado: dispara `ScriptAbortException` em `<input>(linha,col) : error : The operation was cancelled`).
+  - Limites adicionais que custam pouco e poupam DoS: `LoopLimit` (já tinha 500), `RecursiveLimit`, `ObjectRecursionLimit`, `LimitToString`, `RegexTimeOut` (defesa ReDoS pra `regex.match`).
+  - `include`/`import` já são bloqueados por `TemplateLoader = null` (default). Não precisa remover dos builtins.
+  - Auto-escape HTML não existe nativo: aplicar `WebUtility.HtmlEncode` em strings antes de injetar quando canal renderiza HTML (Email, InApp). Numeros/booleanos passam direto.
+  - Cache de `Template` parseado por hash do source (singleton renderer + ConcurrentDictionary com cap). Reparse a cada render é O(template-size) caro.
+
+## 15. Não passar `currentUser.UsuarioId` direto pra FK quando o caller pode ser anônimo
 - **O que aconteceu:** F14 (commit e29cc61) introduziu `AutoTicketFalhaPagamento` que abre ticket admin via `HelpdeskTicketService.AbrirAsync` em resposta a webhook Pix. Webhook é anônimo — `ICurrentUserAccessor.UsuarioId` retorna `Guid.Empty` (não `null`, porque o tipo é `Guid` não-nullable). Esse `Guid.Empty` ia direto pra `AdminTicket.CriadoPorId` (FK p/ `Usuarios` com `OnDelete: SetNull`) e `TicketHistorico.AutorId` (idem). Postgres rejeita o INSERT com FK violation, falhando o fluxo todo de auto-ticket. Bug latente — não disparava nos testes unitários (sem DB) nem no caminho admin (autenticado). Detectado em auditoria pós-merge e corrigido em [HelpdeskTicketService.cs](EasyStock.Api/Services/Helpdesk/HelpdeskTicketService.cs) normalizando `Guid.Empty -> null` antes de passar pra `criadoPorId/autorId`.
 - **Como evitar:** sempre que um service injetar `ICurrentUserAccessor` E for invocado em código de fundo (webhook, job, integration event handler), normalizar `currentUser.UsuarioId == Guid.Empty ? (Guid?)null : currentUser.UsuarioId` antes de gravar em FK. Padrão recomendado: criar variável `autorId` no início do método e usar ela em todas as escritas (ticket criador, historico autor, mensagem autor, evento UsuarioId etc). Cobertura: tests unitários do service não pegam — só integration tests com Postgres real. Adicionar smoke E2E quando o caminho for crítico.

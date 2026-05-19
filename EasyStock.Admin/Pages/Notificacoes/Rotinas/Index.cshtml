@@ -4,132 +4,87 @@
     ViewData["Title"] = "Rotinas de Notificação";
 }
 
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-white">Rotinas</h1>
-            <p class="text-slate-400 text-sm mt-1">Configure triggers e canais de fallback para cada evento</p>
-        </div>
-        <a href="/Notificacoes/Rotinas/Edit" class="btn-primary px-4 py-2 text-sm">+ Nova Rotina</a>
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
+            <es-breadcrumb-item>Rotinas</es-breadcrumb-item>
+        </es-breadcrumb>
+        <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Rotinas</h2>
+        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Configure triggers e canais de fallback para cada evento</p>
     </div>
+    <es-button variant="primary" icon="plus" href="/Notificacoes/Rotinas/Edit">Nova rotina</es-button>
+</div>
 
-    <form method="get" class="flex gap-3">
-        <select name="ativa" class="form-input text-sm">
+<es-card padding="md" card-class="mb-4">
+    <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end;">
+        <es-select name="ativa" label="Status">
             <option value="">Todas</option>
             <option value="true">Ativas</option>
             <option value="false">Inativas</option>
-        </select>
-        <button type="submit" class="btn-secondary px-4 py-2 text-sm">Filtrar</button>
+        </es-select>
+        <es-button type="submit" variant="primary" icon="filter">Filtrar</es-button>
     </form>
+</es-card>
 
-    @if (Model.Erro != null)
+<es-data-table is-empty="@(Model.Data.ValueKind != System.Text.Json.JsonValueKind.Array || !Model.Data.EnumerateArray().Any())">
+    <es-data-table-column label="Código / Nome" />
+    <es-data-table-column label="Evento" />
+    <es-data-table-column label="Trigger" />
+    <es-data-table-column label="Template" />
+    <es-data-table-column label="Status" />
+    <es-data-table-column label="" actions="true" width="200px" />
+
+    @if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
     {
-        <div class="bg-red-900/50 border border-red-500 text-red-200 rounded-lg p-4 text-sm">@Model.Erro</div>
+        @foreach (var r in Model.Data.EnumerateArray())
+        {
+            var id = r.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
+            var codigo = r.TryGetProperty("codigo", out var c) ? c.GetString() : "";
+            var nome = r.TryGetProperty("nome", out var n) ? n.GetString() : "";
+            var evento = r.TryGetProperty("tipoEvento", out var ev) ? ev.GetString() : "";
+            var trigger = r.TryGetProperty("triggerTipo", out var tr) ? tr.GetString() : "";
+            var cron = r.TryGetProperty("cronExpression", out var ce) ? ce.GetString() : "";
+            var template = r.TryGetProperty("templateCodigo", out var tc) ? tc.GetString() : "";
+            var ativa = r.TryGetProperty("ativa", out var at) && at.GetBoolean();
+
+            <tr>
+                <td data-label="Código / Nome">
+                    <div style="font-family:var(--font-mono); color:var(--orange-500); font-size:11px;">@codigo</div>
+                    <div style="color:var(--text-primary); font-weight:500;">@nome</div>
+                </td>
+                <td data-label="Evento" style="color:var(--text-muted); font-size:12px;">@evento</td>
+                <td data-label="Trigger" style="color:var(--text-secondary); font-size:12px;">
+                    @trigger
+                    @if (!string.IsNullOrWhiteSpace(cron))
+                    {
+                        <br /><code style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">@cron</code>
+                    }
+                </td>
+                <td data-label="Template" style="font-family:var(--font-mono); font-size:12px; color:var(--text-muted);">@template</td>
+                <td data-label="Status">
+                    <es-badge variant="@(ativa ? "ok" : "neutral")" with-dot="true">@(ativa ? "ATIVA" : "INATIVA")</es-badge>
+                </td>
+                <td class="es-data-table-td-actions">
+                    <div class="es-row-actions">
+                        <es-button variant="ghost" size="xs" icon="edit-2" href="/Notificacoes/Rotinas/Edit?id=@id">Editar</es-button>
+                        <form method="post" asp-page-handler="Toggle" style="display:inline;">
+                            <input type="hidden" name="id" value="@id" />
+                            <input type="hidden" name="ativa" value="@ativa.ToString().ToLower()" />
+                            <es-button type="submit" variant="ghost" size="xs">@(ativa ? "Desativar" : "Ativar")</es-button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
     }
 
-    <div class="card overflow-hidden">
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase">
-                    <th class="px-4 py-3 text-left">Código / Nome</th>
-                    <th class="px-4 py-3 text-left">Evento</th>
-                    <th class="px-4 py-3 text-left">Trigger</th>
-                    <th class="px-4 py-3 text-left">Template</th>
-                    <th class="px-4 py-3 text-left">Status</th>
-                    <th class="px-4 py-3 text-left">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Model.Data.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    @foreach (var r in Model.Data.EnumerateArray())
-                    {
-                        var id = r.TryGetProperty("id", out var idEl) ? idEl.GetString() : "";
-                        var codigo = r.TryGetProperty("codigo", out var c) ? c.GetString() : "";
-                        var nome = r.TryGetProperty("nome", out var n) ? n.GetString() : "";
-                        var evento = r.TryGetProperty("tipoEvento", out var ev) ? ev.GetString() : "";
-                        var trigger = r.TryGetProperty("triggerTipo", out var tr) ? tr.GetString() : "";
-                        var cron = r.TryGetProperty("cronExpression", out var ce) ? ce.GetString() : "";
-                        var template = r.TryGetProperty("templateCodigo", out var tc) ? tc.GetString() : "";
-                        var ativa = r.TryGetProperty("ativa", out var at) && at.GetBoolean();
-                        var atualizadaEm = r.TryGetProperty("atualizadaEm", out var aem) ? aem.GetString() : null;
-                        var atualizadaPor = r.TryGetProperty("atualizadaPor", out var apr) ? apr.GetString() : null;
-
-                        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-                            <td class="px-4 py-3">
-                                <div class="font-mono text-amber-400 text-xs">@codigo</div>
-                                <div class="text-white">@nome</div>
-                            </td>
-                            <td class="px-4 py-3 text-slate-300 text-xs">@evento</td>
-                            <td class="px-4 py-3 text-slate-300 text-xs">
-                                @trigger
-                                @if (!string.IsNullOrWhiteSpace(cron))
-                                {
-                                    <br /><code class="text-slate-500" title="@cron">@cron</code>
-                                }
-                            </td>
-                            <td class="px-4 py-3 text-slate-400 font-mono text-xs">@template</td>
-                            <td class="px-4 py-3">
-                                @if (ativa)
-                                {
-                                    <span class="badge-green">Ativa</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-gray">Inativa</span>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(atualizadaEm))
-                                {
-                                    <div class="text-xs text-slate-500 mt-1" x-data x-init="$el.textContent = tempoRelativo('@atualizadaEm')" title="@atualizadaEm — @atualizadaPor"></div>
-                                }
-                            </td>
-                            <td class="px-4 py-3 flex gap-2 items-center">
-                                <a href="/Notificacoes/Rotinas/Edit?id=@id" class="text-blue-400 hover:text-blue-300 text-xs">Editar</a>
-                                @if (ativa)
-                                {
-                                    <button type="button"
-                                            @@click="$dispatch('open-justificar', {
-                                                endpoint: '?handler=Toggle',
-                                                acao: 'Desativar rotina',
-                                                resumo: 'A rotina @nome (@codigo) deixará de rodar até ser reativada.',
-                                                variant: 'danger',
-                                                confirmLabel: 'Desativar (auditado)',
-                                                extraFields: '<input type=&quot;hidden&quot; name=&quot;id&quot; value=&quot;@id&quot; /><input type=&quot;hidden&quot; name=&quot;ativa&quot; value=&quot;true&quot; />'
-                                            })"
-                                            class="text-xs text-red-400 hover:text-red-300">Desativar</button>
-                                }
-                                else
-                                {
-                                    <form method="post" asp-page-handler="Toggle" class="inline">
-                                        <input type="hidden" name="id" value="@id" />
-                                        <input type="hidden" name="ativa" value="false" />
-                                        <button type="submit" class="text-xs text-green-400 hover:text-green-300">Ativar</button>
-                                    </form>
-                                }
-                            </td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
-
-@await Html.PartialAsync("_ModalJustificativa")
-
-<script>
-function tempoRelativo(iso) {
-    if (!iso) return '';
-    const diff = Date.now() - new Date(iso).getTime();
-    if (isNaN(diff) || diff < 0) return '';
-    const s = Math.floor(diff / 1000);
-    if (s < 60) return 'atualizada há ' + s + 's';
-    const m = Math.floor(s / 60);
-    if (m < 60) return 'atualizada há ' + m + ' min';
-    const h = Math.floor(m / 60);
-    if (h < 24) return 'atualizada há ' + h + 'h';
-    const d = Math.floor(h / 24);
-    if (d < 30) return 'atualizada há ' + d + 'd';
-    return 'atualizada há ' + Math.floor(d / 30) + ' mês(es)';
-}
-</script>
+    <es-data-table-empty>
+        <es-empty-state icon="clock"
+                        title="Nenhuma rotina configurada"
+                        description="Crie rotinas para automatizar disparos por evento ou cron.">
+            <es-button variant="primary" icon="plus" href="/Notificacoes/Rotinas/Edit">Nova rotina</es-button>
+        </es-empty-state>
+    </es-data-table-empty>
+</es-data-table>

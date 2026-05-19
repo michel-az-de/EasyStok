@@ -179,7 +179,9 @@ else
                 }
             </div>
         </div>
-        <canvas id="grafico-receita-analytics" height="120"></canvas>
+        <div style="position:relative;height:220px">
+            <canvas id="grafico-receita-analytics"></canvas>
+        </div>
     </div>
 }
 
@@ -202,6 +204,7 @@ else
                     },
                     options: {
                         responsive: true,
+                        maintainAspectRatio: false,
                         interaction: { mode: 'index', intersect: false },
                         plugins: {
                             legend: { display: false },
@@ -213,6 +216,7 @@ else
                         },
                         scales: {
                             y: {
+                                beginAtZero: true,
                                 ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR') }
                             }
                         }

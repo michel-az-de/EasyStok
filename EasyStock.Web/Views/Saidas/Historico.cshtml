@@ -11,7 +11,7 @@
     </div>
     <div class="flex items-center gap-2">
         <a href="/saidas/exportar-csv?periodoInicio=@Model.PeriodoInicio&periodoFim=@Model.PeriodoFim"
-           class="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-300 hover:bg-slate-50 px-3 py-2 rounded-lg transition-colors">
+           class="btn-outline-dark inline-flex items-center gap-1.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
@@ -63,9 +63,7 @@
             {
                 var isActive = Model.FiltroNatureza == val || (val == "" && Model.FiltroNatureza == null);
                 <a href="@Url.Action("Historico", "Saidas", new { natureza = val == "" ? null : val, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                   class="px-3 py-1.5 rounded-full text-sm font-medium @(isActive ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                    @label
-                </a>
+                   class="filter-chip @(isActive ? "active" : "")">@label</a>
             }
         </div>
         @* BUG 10: input type="date" não aceita componente de hora, então o valor
@@ -218,7 +216,7 @@
                             {
                                 <form asp-action="Estornar" asp-route-id="@s.Id" method="post"
                                       x-data="{ open: false, motivo: '' }"
-                                      @@submit="if (!motivo || motivo.length < 3) { $event.preventDefault(); alert('Informe o motivo do estorno (mín. 3 caracteres).'); }">
+                                      @@submit="if (!motivo || motivo.length < 3) { $event.preventDefault(); window.showToast && window.showToast('Informe o motivo do estorno (mínimo 3 caracteres).', 'warning'); }">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="motivo" :value="motivo" />
                                     <button type="button" @@click="open = true; setTimeout(() => $refs.motivoInput?.focus(), 50)"
@@ -249,8 +247,7 @@
                                                    minlength="3" maxlength="300"
                                                    class="w-full mb-3 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                                             <div class="flex justify-end gap-2">
-                                                <button type="button" @@click="open = false; motivo = ''"
-                                                        class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                                                <button type="button" @@click="open = false; motivo = ''" class="btn-outline-dark">
                                                     Cancelar
                                                 </button>
                                                 <button type="submit"
@@ -282,7 +279,7 @@
                 @for (int p = 1; p <= Model.Paginacao.Pages; p++)
                 {
                     <a href="@Url.Action("Historico", "Saidas", new { page = p, natureza = Model.FiltroNatureza, de = Model.PeriodoInicio, ate = Model.PeriodoFim })"
-                       class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
+                       class="px-3 py-1.5 rounded text-sm @(p == Model.Paginacao.Page ? "bg-indigo-600 text-white" : "btn-outline-dark")">
                         @p
                     </a>
                 }

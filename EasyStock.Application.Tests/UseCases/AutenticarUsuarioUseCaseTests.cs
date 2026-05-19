@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -12,9 +13,10 @@ public class AutenticarUsuarioUseCaseTests
 {
     private static AutenticarUsuarioUseCase CriarUseCase(IUsuarioRepository usuarioRepository)
     {
-        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var unitOfWork = new FakeUnitOfWork();
+        var hasher = new FakePasswordHasher();
         var logger = Substitute.For<ILogger<AutenticarUsuarioUseCase>>();
-        return new AutenticarUsuarioUseCase(usuarioRepository, unitOfWork, logger);
+        return new AutenticarUsuarioUseCase(usuarioRepository, unitOfWork, hasher, logger);
     }
 
     [Fact]
@@ -22,7 +24,7 @@ public class AutenticarUsuarioUseCaseTests
     {
         var usuarioId = Guid.NewGuid();
         var empresaId = Guid.NewGuid();
-        var senhaHash = BCrypt.Net.BCrypt.HashPassword("senha123");
+        var senhaHash = FakePasswordHasher.MakeHash("senha123");
 
         var usuario = new Usuario
         {
@@ -63,7 +65,7 @@ public class AutenticarUsuarioUseCaseTests
             Id = usuarioId,
             Nome = "Admin",
             Email = "admin@empresa.com",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senha123"),
+            SenhaHash = FakePasswordHasher.MakeHash("senha123"),
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow,
@@ -126,7 +128,7 @@ public class AutenticarUsuarioUseCaseTests
             Id = Guid.NewGuid(),
             Nome = "Maria",
             Email = "maria@empresa.com",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senha123"),
+            SenhaHash = FakePasswordHasher.MakeHash("senha123"),
             Ativo = false,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
@@ -149,7 +151,7 @@ public class AutenticarUsuarioUseCaseTests
             Id = Guid.NewGuid(),
             Nome = "Carlos",
             Email = "carlos@empresa.com",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senhaCorreta"),
+            SenhaHash = FakePasswordHasher.MakeHash("senhaCorreta"),
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
@@ -179,7 +181,7 @@ public class AutenticarUsuarioUseCaseTests
             Id = usuarioId,
             Nome = "Super Admin",
             Email = "admin@easystok.com",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senha123"),
+            SenhaHash = FakePasswordHasher.MakeHash("senha123"),
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow,
@@ -228,7 +230,7 @@ public class AutenticarUsuarioUseCaseTests
             Id = usuarioId,
             Nome = "Ana",
             Email = "ana@empresa.com",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("senha123"),
+            SenhaHash = FakePasswordHasher.MakeHash("senha123"),
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow,

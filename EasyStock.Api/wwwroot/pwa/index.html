@@ -3153,9 +3153,9 @@ button:disabled {
   letter-spacing: 0.02em;
   color: var(--ink-mute);
 }
-.doc-hint.valid { color: var(--basil); }
-.doc-hint.invalid { color: var(--accent); }
-.doc-hint.partial { color: var(--ink-mute); }
+.doc-hint.valid { color: var(--basil); text-decoration: none; }
+.doc-hint.invalid { color: var(--accent); text-decoration: none; }
+.doc-hint.partial { color: var(--ink-mute); text-decoration: none; }
 [data-theme="light"] .doc-hint.valid { color: var(--basil); }
 [data-theme="light"] .doc-hint.invalid { color: var(--accent); }
 
@@ -4386,6 +4386,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 [data-screen="producao"] .product-grid {
   gap: 8px;
+  padding-bottom: 140px; /* folga pro footer cta-row fixo (BUG #3) */
 }
 [data-screen="producao"] .grid-section {
   margin-top: 14px;
@@ -5197,7 +5198,15 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column;
   background: var(--bg);
   overflow: hidden;
+  min-height: 0; /* permite filhos com overflow-y:auto scrollarem (BUG #18) */
 }
+/* BUG #18: garante que a sheet "tall" no overlay coluna nao estoure viewport
+   e que filhos flex consigam shrink/scroll corretamente. */
+.etq-sheet--tall {
+  max-height: 100vh;
+  min-height: 0;
+}
+.etq-sheet > .etq-head { flex-shrink: 0; }
 .etq-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 18px 16px 12px; gap: 12px;
@@ -8634,6 +8643,98 @@ function save(key, data) {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
 }
 
+// ================================================================
+// DOMAIN UTILS (Onda 4) — saneamento e validacao centralizada
+// Pequeno por design. Cada caminho de escrita/display que precisar
+// das mesmas regras deve usar essas funcoes para evitar duplicatas
+// e bugs sutis (espacos duplos, acentos, CPF vazado, peso absurdo).
+// ================================================================
+
+function normalizeName(s) {
+  // "  Maria  Jose  " -> "Maria Jose"
+  // Tambem normaliza NFC para evitar variantes Unicode (compostas vs
+  // decompostas) gerarem duplicatas no CRM ("José" U+00E9 vs "José").
+  return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').normalize('NFC');
+}
+
+function normalizeSearch(s) {
+  // toLowerCase + remove acentos (NFD + strip combining marks).
+  // Busca tolerante: "maria jose" -> match em "Maria Jose"/"María José".
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function maskCpf(cpf) {
+  // "111.444.777-35" ou "11144477735" -> "***.444.777-**"
+  // Preserva digitos do meio (suficiente para conferencia visual em
+  // contextos opt-in como picker), oculta inicio e final.
+  if (!cpf) return '';
+  const digits = String(cpf).replace(/\D/g, '');
+  if (digits.length !== 11) return cpf;
+  return '***.' + digits.slice(3, 6) + '.' + digits.slice(6, 9) + '-**';
+}
+
+function isCpfOrCnpjLike(s) {
+  // Detecta strings no formato CPF (xxx.xxx.xxx-xx) ou CNPJ
+  // (xx.xxx.xxx/xxxx-xx). Usado para sanear snapshots antigos
+  // que vazaram CPF no campo "ref" do pedido (pre-fix LGPD).
+  if (!s) return false;
+  const t = String(s).trim();
+  return /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(t) || /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(t);
+}
+
+function safeRefDisplay(ref) {
+  // Backward-compat: snapshots antigos podem ter CPF/CNPJ em ref
+  // porque clientReference() retornava document como fallback.
+  // Agora o display omite (string vazia) e os call sites decidem
+  // se mostram "sem referência" ou nada.
+  if (!ref) return '';
+  return isCpfOrCnpjLike(ref) ? '' : ref;
+}
+
+function parseProductWeightG(unit) {
+  // "300g" / "1.5 kg" / "500 ml" / "1L" -> gramas/ml.
+  // Retorna null se nao identificavel (ex: "unidade", "kit", "caixa").
+  if (!unit) return null;
+  const m = String(unit).match(/^\s*([\d.,]+)\s*(g|kg|ml|l)\s*$/i);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(',', '.'));
+  if (!isFinite(num) || num <= 0) return null;
+  const u = m[2].toLowerCase();
+  if (u === 'g' || u === 'ml') return num;
+  if (u === 'kg' || u === 'l')  return num * 1000;
+  return null;
+}
+
+function isProductWeightInsane(product, batchWeightG) {
+  // Cross-check produto.unit ("300g") vs lote.weightG (999999).
+  // Insano se ratio > 2x ou < 0.5x. Retorna { insane, declared, ratio }
+  // para o call site decidir UX (confirm dialog com numeros).
+  if (!product || !batchWeightG) return { insane: false, declared: null, ratio: null };
+  const declared = parseProductWeightG(product.unit);
+  if (!declared) return { insane: false, declared: null, ratio: null };
+  const ratio = batchWeightG / declared;
+  return { insane: ratio > 2 || ratio < 0.5, declared, ratio };
+}
+
+function shortenName(name) {
+  // "Maria Jose da Silva" -> "Maria Silva"
+  // Mantem primeiro + ultimo sobrenome quando >1 palavra; preserva
+  // identidade do cliente em cards apertados sem cortar para so o
+  // primeiro nome (varias "Marias" viram indistinguiveis).
+  if (!name) return '';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || '';
+  return parts[0] + ' ' + parts[parts.length - 1];
+}
+
+function clientOrderCount(clientId) {
+  // Conta pedidos nao-cancelados de um cliente diretamente do array
+  // de orders (fonte da verdade). Evita o bug do contador c.orderCount
+  // que crescia em saveOrder mas podia divergir do estado real.
+  if (!clientId) return 0;
+  return (orders || []).filter(o => o.clientId === clientId && o.status !== STATUS.CANCELADO).length;
+}
+
 function isCalmUx() {
   try { return (localStorage.getItem('cdb-ux-density') || 'calm') !== 'full'; }
   catch (e) { return true; }
@@ -10451,6 +10552,12 @@ function _attentionFmtElapsed(ms) {
   return h + 'h' + (r ? ' ' + r : '');
 }
 
+// BUG #14: fonte unica pra "estoque critico" — centro de atencao e card
+// da home liam o mesmo filtro inline, abrindo brecha pra desync futuro.
+function getCriticalProducts() {
+  return (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+}
+
 function _buildAttentionItemsImpl() {
   const items = [];
   try {
@@ -10478,7 +10585,7 @@ function _buildAttentionItemsImpl() {
     }
 
     // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
-    const lowStock = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+    const lowStock = getCriticalProducts();
     if (lowStock.length) {
       // Top 3 mais criticos (stock=0 primeiro)
       const sortedLow = lowStock.slice().sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
@@ -10838,20 +10945,25 @@ function runGlobalSearch(q) {
   if (!host) return;
   const groups = buildSearchGroups(q);
   const nq = _normalizeSearch(String(q || '').trim());
-  const isShort = nq.length < 2;
+  const isEmpty = nq.length === 0;
+  const isShort = !isEmpty && nq.length < 2;
   const totalReal = groups.pedidos.length + groups.finalizados.length + groups.clientes.length
                   + groups.produtos.length + groups.lotes.length + groups.lancamentos.length;
-  // Empty state: sem busca = atalhos. Com busca mas 0 matches reais e sem
-  // shortcut match = mensagem amigavel.
-  if (!isShort && totalReal === 0 && groups.acoes.length === 0) {
+  // BUG #19: separa empty state inicial (sem texto) de "sem resultado" (com texto).
+  // Antes, qualquer input <2 chars mostrava "O que voce quer encontrar?" junto
+  // dos atalhos, deixando o operador confuso ao digitar nome de cliente.
+  if (!isEmpty && !isShort && totalReal === 0 && groups.acoes.length === 0) {
     host.innerHTML = '<div class="gs-empty"><strong>Nenhum resultado pra "' + escapeHtml(q) + '"</strong>Tente outro termo ou um nome parcial.</div>';
     return;
   }
   let html = '';
-  if (isShort) {
+  if (isEmpty) {
     html += '<div class="gs-empty"><strong>O que voce quer encontrar?</strong>Comece a digitar pra buscar pedidos, clientes, produtos ou lotes.</div>';
+  } else if (isShort) {
+    html += '<div class="gs-empty"><strong>Digite ao menos 2 caracteres</strong>pra ver resultados.</div>';
   }
-  if (groups.acoes.length) {
+  // Atalhos so aparecem com input vazio (foco no termo digitado).
+  if (isEmpty && groups.acoes.length) {
     html += '<div><div class="gs-group-title">Atalhos rápidos</div>';
     html += groups.acoes.map((s, i) => _gsRenderShortcut(s, i)).join('');
     html += '</div>';
@@ -11048,16 +11160,38 @@ function renderHomeInsights() {
   const open = openOrders();
   const ready = open.filter(o => o.status === 'pronto').length;
   const preparing = open.filter(o => o.status === 'preparando').length;
-  const critical = products.filter(p => !p.archived && (Number(p.stock) || 0) <= 2).length;
+  // BUG #14: usa fonte unica de "estoque critico" (compartilhada com centro
+  // de atencao) pra evitar contagens divergentes entre views.
+  const critical = getCriticalProducts().length;
   const pendingConfer = typeof getConferStatus === 'function'
     ? open.filter(o => getConferStatus(o) === 'pendente').length
     : 0;
+  // BUG #16+#10: agrega etiquetas pendentes ao card de conferência, pra
+  // diferenciar "conferência de pedido" de "conferência de etiqueta de lote".
+  let totalEtiquetas = 0, etiquetasConferidas = 0;
+  if (typeof etiquetasFromBatch === 'function' && typeof getUnitStatus === 'function') {
+    (batches || []).filter(b => !b.deleted).forEach(b => {
+      const ets = etiquetasFromBatch(b);
+      totalEtiquetas += ets.length;
+      ets.forEach(et => {
+        const st = getUnitStatus(b, et.idxStr);
+        if (typeof CONFER_STATUS !== 'undefined' ? st === CONFER_STATUS.CONFERIDO : st === 'conferido') {
+          etiquetasConferidas++;
+        }
+      });
+    });
+  }
+  const etiquetasPendentes = Math.max(0, totalEtiquetas - etiquetasConferidas);
   const producedUnits = batches
     .filter(b => !b.deleted && (b.createdAt || 0) >= todayStart.getTime())
     .reduce((sum, b) => sum + (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0), 0);
   const soldToday = orders
     .filter(o => o.status === 'entregue' && isToday(o.updatedAt))
     .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+  const conferWarn = pendingConfer > 0 || etiquetasPendentes > 0;
+  const conferNote = `${ready} pronto · ${preparing} preparo` +
+    (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
 
   host.innerHTML = `
     <div class="home-insight${critical ? ' warn' : ''}">
@@ -11070,10 +11204,10 @@ function renderHomeInsights() {
       <div class="hi-value">${producedUnits}</div>
       <div class="hi-note">unidades registradas</div>
     </div>
-    <div class="home-insight${pendingConfer ? ' warn' : ''}">
-      <div class="hi-label">Conferência</div>
+    <div class="home-insight${conferWarn ? ' warn' : ''}">
+      <div class="hi-label">Conferência pendente</div>
       <div class="hi-value">${pendingConfer}</div>
-      <div class="hi-note">${ready} pronto · ${preparing} preparo</div>
+      <div class="hi-note">${conferNote}</div>
     </div>
     <div class="home-insight">
       <div class="hi-label">Vendido hoje</div>
@@ -11306,7 +11440,7 @@ function renderOpenOrders() {
         <div class="home-order-top">
           <div class="home-order-who">
             ${escapeHtml(o.clientSnapshot.name)}
-            <span class="ref">${escapeHtml(o.clientSnapshot.ref || timeOf(o.createdAt))}</span>
+            <span class="ref">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref) || timeOf(o.createdAt))}</span>
           </div>
           <div class="home-order-total">${money(o.total)}</div>
         </div>
@@ -12151,7 +12285,7 @@ function buildMovimentos() {
     events.push({
       type: 'exit',
       at: o.updatedAt || o.createdAt,
-      label: (o.clientSnapshot?.name || 'Pedido') + (o.clientSnapshot?.ref ? ' — ' + o.clientSnapshot.ref : ''),
+      label: (o.clientSnapshot?.name || 'Pedido') + (safeRefDisplay(o.clientSnapshot?.ref) ? ' — ' + safeRefDisplay(o.clientSnapshot.ref) : ''),
       ref: '#' + (o.id || '').slice(-6),
       items: (o.items || []).map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
       status: o.status,
@@ -12695,7 +12829,8 @@ function renderFinalizadosScreen() {
     const ts = new Date(o.updatedAt || o.createdAt);
     const dateStr = ts.toLocaleDateString('pt-BR') + ' ' + String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0');
     const cliente = o.clientSnapshot?.name || 'Sem cliente';
-    const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+    const refClean = safeRefDisplay(o.clientSnapshot?.ref);
+    const ref = refClean ? ' · ' + refClean : '';
     const orderRef = (o.id || '').slice(-8);
     const statusBadge = o.status === STATUS.ENTREGUE
       ? '<span class="fin-badge entregue">Entregue</span>'
@@ -12761,17 +12896,41 @@ function clientRecencyLabel(ts) {
 function buildClientInsights() {
   const byId = new Map();
   (clients || []).forEach(c => {
-    byId.set(c.id, { client: c, orders: 0, total: 0, lastAt: Number(c.lastOrder) || 0, products: new Map() });
+    byId.set(c.id, {
+      client: c, orders: 0, total: 0,
+      ordersDelivered: 0, totalDelivered: 0,
+      lastAt: Number(c.lastOrder) || 0,
+      products: new Map(),
+      distinctDays: new Set()
+    });
   });
   (orders || []).forEach(o => {
     if (o.status === STATUS.CANCELADO) return;
     const key = o.clientId || ('snapshot:' + (o.clientSnapshot?.name || 'sem cliente'));
     if (!byId.has(key)) {
-      byId.set(key, { client: { id: key, name: o.clientSnapshot?.name || 'Cliente sem cadastro', ref: o.clientSnapshot?.ref || '' }, orders: 0, total: 0, lastAt: 0, products: new Map() });
+      byId.set(key, {
+        client: { id: key, name: o.clientSnapshot?.name || 'Cliente sem cadastro', ref: o.clientSnapshot?.ref || '' },
+        orders: 0, total: 0, ordersDelivered: 0, totalDelivered: 0,
+        lastAt: 0, products: new Map(), distinctDays: new Set()
+      });
     }
     const row = byId.get(key);
     row.orders += 1;
     row.total += Number(o.total) || 0;
+    // Bug 7 (Onda 4): ticket medio so conta entregues. Pedidos em
+    // "Pronto/Divergencia" ou aguardando nao representam receita realizada.
+    if (o.status === STATUS.ENTREGUE) {
+      row.ordersDelivered += 1;
+      row.totalDelivered += Number(o.total) || 0;
+    }
+    // Bug 6 (Onda 4): coleta dias distintos para usar como sinal de
+    // recorrencia real. 2 pedidos no mesmo dia (ou mesmo minuto) NAO
+    // configuram cliente recorrente — recorrencia exige retorno.
+    const orderTime = Number(o.factAt || o.createdAt) || 0;
+    if (orderTime) {
+      const dayKey = new Date(orderTime).toISOString().slice(0, 10); // YYYY-MM-DD
+      row.distinctDays.add(dayKey);
+    }
     row.lastAt = Math.max(row.lastAt || 0, Number(o.factAt || o.updatedAt || o.createdAt) || 0);
     (o.items || []).forEach(it => {
       const name = it.name || 'Produto';
@@ -12780,12 +12939,17 @@ function buildClientInsights() {
   });
   return Array.from(byId.values()).map(row => {
     const favorite = Array.from(row.products.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'sem favorito';
-    const avg = row.orders ? row.total / row.orders : 0;
+    // Bug 7: avg = ticket medio s/ pedidos entregues. Fallback: se ainda
+    // nao ha entregue, usa media geral pra nao zerar o card no comeco.
+    const avg = row.ordersDelivered > 0
+      ? row.totalDelivered / row.ordersDelivered
+      : (row.orders ? row.total / row.orders : 0);
     const days = row.lastAt ? Math.floor((Date.now() - row.lastAt) / (24 * 60 * 60 * 1000)) : 9999;
-    const score = clientScore(row.orders, avg, days);
-    const category = clientCategory(row.orders, days);
-    return { ...row, favorite, avg, days, score, category };
-  }).sort((a, b) => (b.score - a.score) || (b.total - a.total) || (b.lastAt - a.lastAt));
+    const distinctDayCount = row.distinctDays.size;
+    const score = clientScore(row.ordersDelivered || row.orders, avg, days);
+    const category = clientCategory(row.orders, days, distinctDayCount);
+    return { ...row, favorite, avg, days, distinctDayCount, score, category };
+  }).sort((a, b) => (b.score - a.score) || (b.totalDelivered - a.totalDelivered) || (b.total - a.total) || (b.lastAt - a.lastAt));
 }
 
 function buildClientReturnMessage(row) {
@@ -12800,19 +12964,27 @@ function copyClientReturnMessage(clientId) {
   copyToClipboard(buildClientReturnMessage(row), 'Mensagem de retorno copiada');
 }
 
-// Categoria de cliente — matriz orders × days. Recencia > 30d sobrescreve
-// frequencia: ex-top sumido vira "risco"/"inativo" porque o que importa no
-// card e estado atual ("perdemos esse cliente, mande mensagem"), nao trofeu
-// historico. Janelas baseadas em ciclo semanal tipico de massas frescas;
-// calibrar com SQL apos 2 semanas de uso real.
-function clientCategory(orders, days) {
+// Categoria de cliente — matriz orders × days × distinctDays.
+// Recencia > 30d sobrescreve frequencia: ex-top sumido vira "risco"/"inativo"
+// porque o que importa no card e estado atual ("perdemos esse cliente,
+// mande mensagem"), nao trofeu historico.
+//
+// Bug 6 (Onda 4): "recorrente" e "top" agora exigem janela temporal real
+// (dias distintos), nao apenas contagem de pedidos. 2 pedidos no mesmo
+// minuto NAO configuram cliente recorrente — fidelizacao implica retorno
+// em datas separadas. distinctDays=0 ou ausente cai pra "novo".
+//
+// Janelas baseadas em ciclo semanal tipico de massas frescas; calibrar
+// com SQL apos 2 semanas de uso real.
+function clientCategory(orders, days, distinctDays) {
   const o = Number(orders) || 0;
   const d = days == null ? 9999 : Number(days);
+  const dd = Number(distinctDays) || 0;
   if (o === 0) return null;
   if (d > 60) return 'inativo';
   if (d > 30) return 'risco';
-  if (o >= 5) return 'top';
-  if (o >= 2) return 'recorrente';
+  if (o >= 5 && dd >= 3) return 'top';
+  if (o >= 2 && dd >= 2) return 'recorrente';
   return 'novo';
 }
 
@@ -12847,7 +13019,7 @@ function renderClientesScreen() {
   summary.innerHTML = `
     <div class="client-value-card"><span class="k">Clientes</span><span class="v">${clients.length}</span></div>
     <div class="client-value-card"><span class="k">Recorrentes</span><span class="v">${recurring.length}</span></div>
-    <div class="client-value-card"><span class="k">Top cliente</span><span class="v">${top ? escapeHtml(top.client.name).split(' ')[0] : '—'}</span></div>
+    <div class="client-value-card"><span class="k">Top cliente</span><span class="v">${top ? escapeHtml(shortenName(top.client.name)) : '—'}</span></div>
   `;
   let filtered = rows;
   if (clientFilter === 'recorrentes') filtered = rows.filter(r => r.orders >= 2);
@@ -12900,8 +13072,8 @@ function renderClientesScreen() {
         <div class="client-rank">#${idx + 1}</div>
       </div>
       <div class="client-stats">
-        <div class="client-stat"><span>Ticket</span><strong>${money(row.avg)}</strong></div>
-        <div class="client-stat"><span>Total</span><strong>${money(row.total)}</strong></div>
+        <div class="client-stat" title="Ticket medio dos pedidos ENTREGUES"><span>Ticket médio</span><strong>${money(row.avg)}</strong></div>
+        <div class="client-stat" title="Soma de TODOS os pedidos do cliente (qualquer status)"><span>Total acumulado</span><strong>${money(row.total)}</strong></div>
         <div class="client-stat"><span>Favorito</span><strong>${escapeHtml(row.favorite)}</strong></div>
       </div>
       <div class="client-card-foot">
@@ -13318,9 +13490,19 @@ function jumpKanban(status) {
 
 function renderKanbanCard(o, col) {
   const isHighlight = highlightOrderId === o.id;
-  const itemsLine = (o.items || []).map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
+  // Bug 5 (Onda 4): filtra items com qty=0 (resultado de ajuste). Sem isso,
+  // o card mostrava "0× Talharim Fresco" ate o pedido ser cancelado.
+  const visibleItems = (o.items || []).filter(i => (Number(i.qty) || 0) > 0);
+  const itemsLine = visibleItems.length
+    ? visibleItems.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ')
+    : '<em style="color:var(--ink-mute)">sem itens (ajustado para 0)</em>';
   const notes = o.notes ? `<div class="k-note">${escapeHtml(o.notes)}</div>` : '';
-  const itemCount = (o.items || []).reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
+  // Bug 1 (Onda 4): banner persistente quando o pedido foi marcado pronto
+  // com estoque negativo. Substitui o toast efemero que sumia em 3s.
+  const negStockBanner = o.negativeStockNote
+    ? `<div class="k-warning-banner" style="margin-top:6px;padding:6px 8px;background:rgba(231,104,69,0.12);border-left:3px solid var(--accent);border-radius:6px;font-size:12px;color:var(--ink-dim);line-height:1.4">⚠️ Estoque negativo: ${escapeHtml(o.negativeStockNote)}</div>`
+    : '';
+  const itemCount = visibleItems.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
   // Selo de status de conferência ao lado do status do kanban
   const cs = getConferStatus(o);
   const badgeLabel = cs === CONFER_STATUS.PENDENTE ? 'Conf. pendente' : conferStatusLabel(cs);
@@ -13335,7 +13517,9 @@ function renderKanbanCard(o, col) {
   const waBtn = waPhone
     ? `<button type="button" class="k-quick-wa" onclick="event.stopPropagation(); openWhatsAppCliente(${jsString(o.clientId)}); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(o.clientSnapshot?.name || 'cliente')}" title="WhatsApp"><span aria-hidden="true">💬</span></button>`
     : '';
-  const refForMap = o.clientSnapshot?.ref || '';
+  // Bug 11 (Onda 4): impede que CPF antigo (em snapshots pre-fix) vire
+  // query string do Google Maps. safeRefDisplay filtra documentos.
+  const refForMap = safeRefDisplay(o.clientSnapshot?.ref);
   const mapValid = refForMap.trim().length >= 5 && /\d/.test(refForMap);
   const mapBtn = mapValid
     ? `<button type="button" class="k-quick-map" onclick="event.stopPropagation(); openMapsPedidoRef(${jsString(refForMap)}); return false;" aria-label="Abrir endereço do pedido no Google Maps" title="Mapa"><span aria-hidden="true">📍</span></button>`
@@ -13349,7 +13533,7 @@ function renderKanbanCard(o, col) {
         <div class="k-time">${timeOf(o.createdAt)}</div>
       </div>
       <div class="k-head">
-        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(o.clientSnapshot?.ref || '')}</span></div>
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span></div>
         <span class="k-total">${money(o.total)}</span>
       </div>
       ${quickActions}
@@ -13359,13 +13543,14 @@ function renderKanbanCard(o, col) {
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>
       <div class="k-items">${itemsLine}</div>
+      ${negStockBanner}
       ${notes}
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
         <div class="k-actions">
           <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
           ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
-          <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
+          ${(Number(o.total) || 0) > 0 ? `<button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>` : ''}
           <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
           <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
         </div>
@@ -13571,7 +13756,12 @@ function getProductSku(product) {
 function buildCobrancaMessage(order, template) {
   template = template || currentCobrancaTemplate || 'cobranca';
   const nome = order.clientSnapshot?.name || 'Cliente';
-  const ref  = order.clientSnapshot?.ref ? ` (${order.clientSnapshot.ref})` : '';
+  // Bug 11 (Onda 4): mensagem WhatsApp NUNCA inclui CPF/CNPJ. Backward-compat
+  // sanea snapshots antigos (pre-fix) que tinham document em ref.
+  // Risco LGPD: o texto vai pro celular do cliente, backup da operadora,
+  // screenshots — manter document fora dele e mandatorio.
+  const refClean = safeRefDisplay(order.clientSnapshot?.ref);
+  const ref  = refClean ? ` (${refClean})` : '';
   const total = Number(order.total) || 0;
   const itensLinhas = (order.items || [])
     .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}`)
@@ -13623,7 +13813,10 @@ function buildCobrancaMessage(order, template) {
  */
 function buildEtiqueta(order) {
   const nome = order.clientSnapshot?.name || 'Cliente';
-  const ref  = order.clientSnapshot?.ref || '';
+  // Bug 11 (Onda 4): etiqueta impressa colada na embalagem nao deve ter
+  // CPF do cliente — sai do fluxo operacional e poderia ser fotografado
+  // por terceiros. Backward-compat com snapshots antigos.
+  const ref  = safeRefDisplay(order.clientSnapshot?.ref);
   const itensLinhas = (order.items || [])
     .map(i => `${i.qty}× ${i.name}`)
     .join('\n');
@@ -15512,11 +15705,19 @@ function setRetroActive(active) {
   if (label) label.textContent = active ? RETRO_LABEL_ON : RETRO_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('retroDatetime');
-    if (dt && !dt.value) {
-      // default 1h atrás pra forçar o operador a confirmar data/hora
-      const now = new Date(Date.now() - 60*60*1000);
-      const off = now.getTimezoneOffset() * 60000;
-      dt.value = new Date(now - off).toISOString().slice(0,16);
+    if (dt) {
+      // BUG #20: limita range pra evitar "01/01/1900" e datas futuras.
+      // min: 365 dias atras  /  max: agora.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      const minDate = new Date(Date.now() - 365*24*60*60*1000);
+      const maxDate = new Date();
+      dt.min = new Date(minDate - tzOff).toISOString().slice(0,16);
+      dt.max = new Date(maxDate - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // default 1h atrás pra forçar o operador a confirmar data/hora
+        const now = new Date(Date.now() - 60*60*1000);
+        dt.value = new Date(now - tzOff).toISOString().slice(0,16);
+      }
     }
   } else {
     const dt = document.getElementById('retroDatetime');
@@ -15599,7 +15800,10 @@ function openConfer(orderId) {
   pendingConferOrderId = orderId;
   const orderRef = (o.id || '').slice(-8);
   const cliente = o.clientSnapshot?.name || 'Sem cliente';
-  const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+  // Bug 10 (Onda 4): tela de conferencia nao mostra CPF — operadores de
+  // balcao nao tem motivo operacional pra ver documento do cliente.
+  const refConfer = safeRefDisplay(o.clientSnapshot?.ref);
+  const ref = refConfer ? ' · ' + refConfer : '';
   const data = new Date(o.factAt || o.createdAt).toLocaleString('pt-BR');
   // Bloco 1: identificação
   const status = getConferStatus(o);
@@ -15714,7 +15918,7 @@ function saveAjustar() {
     const corrected = Math.max(0, parseInt(inp.value || '0', 10) || 0);
     if (corrected !== original) {
       const it = o.items[idx];
-      adjustments.push({ name: it.name, productId: it.productId, originalQty: original, correctedQty: corrected });
+      adjustments.push({ idx, name: it.name, productId: it.productId, originalQty: original, correctedQty: corrected });
     }
   });
   const notes = (document.getElementById('ajustarNotes').value || '').trim() || null;
@@ -15724,8 +15928,17 @@ function saveAjustar() {
   }
   closeAjustar();
   closeConfer();
+  // Bug 5 (Onda 4): aplica de fato as quantidades ajustadas em o.items e
+  // recalcula o total. Sem isso, o card seguia mostrando qty/valor antigos
+  // e o botao "Cobrar" gerava mensagem WhatsApp com valor desatualizado.
+  // A divergencia ficava registrada em o.confirmation.adjustments mas
+  // invisivel ao operador, criando duvida operacional.
+  adjustments.forEach(adj => {
+    if (o.items[adj.idx]) o.items[adj.idx].qty = adj.correctedQty;
+  });
+  o.total = (o.items || []).reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
   applyConfirmation(id, 'adjust', { adjustments, notes });
-  showToast('✏️ Ajuste registrado');
+  showToast('✏️ Ajuste aplicado · novo total ' + money(o.total));
 }
 
 // ===== REPORTAR PROBLEMA =====
@@ -16670,7 +16883,11 @@ async function calcBuscarProdutos() {
         });
       });
     } catch (e) {
-      showToast('Erro ao buscar produtos');
+      // Reseta sugestoes para nao deixar estado "preso" do termo anterior.
+      box.classList.remove('show');
+      box.innerHTML = '';
+      try { console.error('[calculadora]', e); } catch (_) {}
+      showToast('Erro ao buscar produtos. Verifique sua conexao.');
     }
   }, 300);
 }
@@ -16938,6 +17155,10 @@ function calcAbrirAjusteReceita() {
 }
 
 function calcLimpar() {
+  // Confirm so se ja ha resultado ou produto selecionado (evita ruido
+  // quando ainda nao calculou nada).
+  const temTrabalho = !!calcProdutoSelecionado || !!calcUltimoResultado;
+  if (temTrabalho && !confirm('Limpar o produto e o resultado atual?')) return;
   calcProdutoSelecionado = null;
   calcUltimoResultado = null;
   document.getElementById('calcProdSearch').value = '';
@@ -17388,7 +17609,9 @@ function openBatchDetails(batchId) {
 function conferRowHtml(o) {
   const code = (o.id || '').slice(-8);
   const cliente = o.clientSnapshot?.name || 'Sem cliente';
-  const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+  // Bug 10 (Onda 4): lista de conferencia nao mostra CPF (LGPD).
+  const refConfer = safeRefDisplay(o.clientSnapshot?.ref);
+  const ref = refConfer ? ' · ' + refConfer : '';
   const status = getConferStatus(o);
   const qty = (o.items || []).reduce((acc, i) => acc + (Number(i.qty)||0), 0);
   const cls = status === CONFER_STATUS.CONFERIDO ? 'done'
@@ -17438,28 +17661,43 @@ function doConferScreenSearch() {
 function applyAdvanceTransition(id, nextStatus) {
   const o = getOrderById(id);
   if (!o) return;
-  // Se vai descontar estoque (transicao pra PRONTO), verifica ANTES se
-  // teria estoque negativo — e pede confirmacao explicita ao operador.
-  // (Felipe quer permitir negativo porque na pratica vai produzir, mas o
-  // alerta passivo era ignoravel demais e gerava saldos errados.)
+  // Bug 1 (Onda 4): se vai descontar estoque (transicao pra PRONTO) e o
+  // resultado seria negativo, abre dialog explicito de 3 opcoes ao inves
+  // de um confirm() simples que era ignoravel demais. Estoque negativo
+  // significa que vendemos o que nao produzimos — operador precisa
+  // decidir conscientemente entre Produzir / Ajustar pedido / Continuar.
   if (nextStatus === STATUS.PRONTO) {
-    const wouldGoNegative = [];
+    const missing = [];
     o.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
       if (p) {
-        const newStock = (p.stock || 0) - it.qty;
-        if (newStock < 0) wouldGoNegative.push(`${p.name}: ${p.stock || 0} - ${it.qty} = ${newStock}`);
+        const currentStock = p.stock || 0;
+        if (currentStock < it.qty) {
+          missing.push({
+            productId: it.productId,
+            name: p.name,
+            currentStock,
+            requestedQty: it.qty,
+            gap: it.qty - currentStock
+          });
+        }
       }
     });
-    if (wouldGoNegative.length > 0) {
-      const proceed = confirm(
-        '⚠️ ESTOQUE INSUFICIENTE\n\n' +
-        wouldGoNegative.join('\n') +
-        '\n\nMarcar como PRONTO mesmo assim? (estoque ficara negativo)'
-      );
-      if (!proceed) { showToast('Avanco cancelado'); return; }
+    if (missing.length > 0) {
+      showStockNegativeDialog(id, missing);
+      return;
     }
   }
+  _proceedAdvance(id, nextStatus);
+}
+
+// Aplica a transicao de status de fato (decrementa estoque, registra
+// banner persistente em caso de negativo, persiste, re-renderiza).
+// Separado de applyAdvanceTransition para permitir o dialog de bug 1
+// chamar diretamente quando o operador escolhe "continuar mesmo assim".
+function _proceedAdvance(id, nextStatus) {
+  const o = getOrderById(id);
+  if (!o) return;
   let negatives = [];
   if (nextStatus === STATUS.PRONTO) {
     o.items.forEach(it => {
@@ -17469,6 +17707,16 @@ function applyAdvanceTransition(id, nextStatus) {
         if (p.stock < 0) negatives.push(`${p.name} (${p.stock})`);
       }
     });
+    // Banner persistente no card: enquanto o pedido existir com estoque
+    // negativo registrado, o operador ve o alerta toda vez que olha o card,
+    // nao apenas no toast efemero que sumia em 3s.
+    if (negatives.length > 0) {
+      o.negativeStockNote = negatives.join(', ');
+    } else if (o.negativeStockNote) {
+      // Cobre regularizacao: se algum motivo apos producao o estoque
+      // voltou positivo, limpa o banner (improvavel mas defensivo).
+      delete o.negativeStockNote;
+    }
   }
   const prev = o.status;
   o.status = nextStatus;
@@ -17485,6 +17733,67 @@ function applyAdvanceTransition(id, nextStatus) {
   else if (nextStatus === STATUS.PRONTO && negatives.length > 0) showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
   else if (nextStatus === STATUS.PRONTO) showToast('Marcado como pronto');
   else if (nextStatus === STATUS.PREPARANDO) showToast('Preparo iniciado');
+}
+
+// Bug 1: dialog modal de 3 opcoes para conflito de estoque.
+// Construido dinamicamente para evitar poluir o HTML inicial com
+// outro modal estatico. Usa as classes ja existentes (.modal, .show)
+// e tokens de design do tema.
+function showStockNegativeDialog(orderId, missing) {
+  const id = 'stockNegativeModal';
+  let modal = document.getElementById(id);
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = id;
+  modal.className = 'modal show';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'stockNegativeTitle');
+  const itemsHtml = missing.map(m =>
+    `<li style="margin:4px 0"><strong>${escapeHtml(m.name)}</strong>: estoque ${m.currentStock}, pedido ${m.requestedQty} <span style="color:var(--accent);font-weight:700">(faltam ${m.gap})</span></li>`
+  ).join('');
+  modal.innerHTML =
+    '<div class="modal-content" style="max-width:440px">' +
+      '<h3 id="stockNegativeTitle" style="margin:0 0 12px;font-size:17px;color:var(--accent);display:flex;align-items:center;gap:8px">' +
+        '<span aria-hidden="true">⚠️</span> Estoque insuficiente' +
+      '</h3>' +
+      '<p style="margin:0 0 10px;font-size:14px;color:var(--ink-dim)">Para marcar como pronto, falta:</p>' +
+      '<ul style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.5">' + itemsHtml + '</ul>' +
+      '<p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-mute)">Estoque negativo significa que voce esta vendendo o que ainda nao produziu. Escolha como prosseguir:</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<button class="btn-primary" data-act="produzir" style="width:100%;padding:12px;border-radius:10px;background:var(--accent);color:white;border:0;font-weight:700;font-size:14px;cursor:pointer">Produzir agora</button>' +
+        '<button data-act="ajustar" style="width:100%;padding:12px;border-radius:10px;background:var(--bg-elev-2);color:var(--ink);border:1px solid var(--border-strong);font-weight:600;font-size:14px;cursor:pointer">Ajustar pedido</button>' +
+        '<button data-act="continuar" style="width:100%;padding:10px;border-radius:10px;background:transparent;color:var(--ink-dim);border:1px solid var(--border);font-weight:500;font-size:13px;cursor:pointer">Continuar mesmo assim (estoque ficara negativo)</button>' +
+        '<button data-act="cancel" style="width:100%;padding:8px;border-radius:10px;background:transparent;color:var(--ink-mute);border:0;font-weight:500;font-size:12px;cursor:pointer">Cancelar</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector('[data-act="produzir"]').onclick = () => {
+    // Pre-preenche a quantidade faltante em cada produto e leva o
+    // operador pra tela de Producao. Ele pode ajustar antes de
+    // confirmar o lote; pedido fica esperando ele voltar pra marcar pronto.
+    missing.forEach(m => {
+      const p = products.find(x => x.id === m.productId);
+      if (p) p.count = (p.count || 0) + m.gap;
+    });
+    close();
+    go('producao');
+    showToast('Quantidade pre-preenchida para completar o pedido');
+  };
+  modal.querySelector('[data-act="ajustar"]').onclick = () => {
+    close();
+    pendingConferOrderId = orderId;
+    openAjustar();
+  };
+  modal.querySelector('[data-act="continuar"]').onclick = () => {
+    close();
+    _proceedAdvance(orderId, STATUS.PRONTO);
+  };
+  modal.querySelector('[data-act="cancel"]').onclick = () => {
+    close();
+    showToast('Avanco cancelado');
+  };
 }
 
 // ================================================================
@@ -17669,7 +17978,9 @@ function escPosOrderLabel(o, nota) {
   b.line(divider());
   // Dados do cliente — truncados se passarem da largura
   b.line(asciiNorm('Cliente: ' + cliente).slice(0, PRINT_COLS));
-  if (o.clientSnapshot?.ref) b.line(asciiNorm(o.clientSnapshot.ref).slice(0, PRINT_COLS));
+  // Bug 11 (Onda 4): cupom impresso nao deve conter CPF (LGPD).
+  const refPrint = safeRefDisplay(o.clientSnapshot?.ref);
+  if (refPrint) b.line(asciiNorm(refPrint).slice(0, PRINT_COLS));
   b.line(data);
   b.line(divider());
   // Itens (qty x nome | preco) com truncamento via padLine
@@ -18393,11 +18704,13 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
   ctx.fillStyle = '#000';
   ctx.font = '900 18px Arial, sans-serif';
   ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 24), 30, y + 24);
-  if (o.clientSnapshot?.ref) {
+  // Bug 11 (Onda 4): canvas etiqueta (photo print) sem CPF.
+  const refCanvas1 = safeRefDisplay(o.clientSnapshot?.ref);
+  if (refCanvas1) {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#4b5563';
     ctx.font = '700 12px Arial, sans-serif';
-    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 18), W - 30, y + 10);
+    ctx.fillText(refCanvas1.slice(0, 18), W - 30, y + 10);
     ctx.fillStyle = '#000';
     ctx.textAlign = 'left';
   }
@@ -18541,7 +18854,9 @@ function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showB
   ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), lx, y); y += 16;
 
   // Cliente — box com 3 linhas; fillText usa baseline, logo +10/+24/+38 dentro de 52px
-  const clientH = o.clientSnapshot?.ref ? 58 : 44;
+  // Bug 11 (Onda 4): segunda variante de canvas etiqueta — sem CPF tambem.
+  const refCanvas2 = safeRefDisplay(o.clientSnapshot?.ref);
+  const clientH = refCanvas2 ? 58 : 44;
   ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
   ctx.strokeRect(lx, y, mainW, clientH);
   ctx.fillStyle = '#4b5563';
@@ -18550,10 +18865,10 @@ function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showB
   ctx.fillStyle = '#000';
   ctx.font = '800 14px Arial, sans-serif';
   ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 32), lx + 8, y + 26);
-  if (o.clientSnapshot?.ref) {
+  if (refCanvas2) {
     ctx.fillStyle = '#4b5563';
     ctx.font = '500 11px Arial, sans-serif';
-    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 36), lx + 8, y + 42);
+    ctx.fillText(refCanvas2.slice(0, 36), lx + 8, y + 42);
   }
   y += clientH + 12;
 
@@ -19149,7 +19464,7 @@ function orderLabelHtml(o, horizontal, nota) {
     <div class="pa-grid">
       <div class="pa-label">Cliente</div>
       <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
-      ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
+      ${(() => { const r = safeRefDisplay(o.clientSnapshot?.ref); return r ? `<div>${escapeHtml(r)}</div>` : ''; })()}
     </div>`;
 
   const notaRapidaBlock = nota
@@ -19479,6 +19794,28 @@ function confirmProduction() {
     if (!isFinite(q) || q <= 0) { showToast('Quantidade inválida em ' + p.name); return; }
     p.count = q;
   }
+  // Bug 2 (Onda 4): valida peso/unid do lote contra o peso declarado na
+  // unidade do produto (ex: produto.unit = "300g"). Evita typos
+  // catastroficos como digitar 999999g/unid em produto declarado 300g
+  // (gerou etiqueta com "PESO: 1000kg" para 11 unidades = 11 toneladas).
+  for (const p of itemsRaw) {
+    const d = detail.perProduct.get(p.id) || {};
+    if (!d.weightG) continue;
+    const check = isProductWeightInsane(p, d.weightG);
+    if (check.insane) {
+      const ratioTxt = check.ratio > 2
+        ? `${check.ratio.toFixed(1)}x maior`
+        : `${(1 / check.ratio).toFixed(1)}x menor`;
+      const proceed = confirm(
+        'Verificar peso de ' + p.name + '?\n\n' +
+        'Produto declarado: ' + p.unit + ' por unidade\n' +
+        'Lote registrado: ' + d.weightG + 'g por unidade\n' +
+        '(' + ratioTxt + ' que o declarado)\n\n' +
+        'Confirmar mesmo assim?'
+      );
+      if (!proceed) return;
+    }
+  }
   _isSavingProduction = true;
 
   const nowMs = Date.now();
@@ -19645,11 +19982,15 @@ function updateClientSaveState() {
 }
 
 function clientReference(c) {
+  // Bug 10/11 (Onda 4): CPF/CNPJ NAO e referencia operacional.
+  // Antes, document era fallback quando address/phone faltavam — isso
+  // vazava CPF em telas operacionais (conferencia, kanban) e ate em
+  // mensagens WhatsApp (cobranca). LGPD: document e dado fiscal,
+  // sai do fluxo operacional. Para forms de edicao, ler c.document direto.
   if (!c) return 'sem referência';
   if (c.address) return c.address;
   if (c.apt)     return 'apto ' + c.apt;        // legado pra clientes pré-migration
   if (c.phone)   return c.phone;
-  if (c.document) return c.document;
   return 'sem referência';
 }
 
@@ -19705,7 +20046,14 @@ function renderSelectedClient() {
         <div class="cp-avatar">${escapeHtml(c.name.charAt(0).toUpperCase())}</div>
         <div class="cp-info">
           <div class="cp-name">${escapeHtml(c.name)}</div>
-          <div class="cp-ref">${escapeHtml(clientReference(c))}${c.orderCount ? ' · ' + c.orderCount + ' ' + (c.orderCount === 1 ? 'pedido' : 'pedidos') : ''}</div>
+          <div class="cp-ref">${escapeHtml(clientReference(c))}${(() => {
+            // Bug 22 (Onda 4): conta pedidos a partir do array global orders[]
+            // em vez de usar c.orderCount mutavel. Antes, o contador podia
+            // divergir do estado real (incrementado antes do pedido salvar
+            // de fato, ou nao incrementado em fluxos retroativos).
+            const n = clientOrderCount(c.id);
+            return n ? ' · ' + n + ' ' + (n === 1 ? 'pedido' : 'pedidos') : '';
+          })()}</div>
         </div>
         <button class="cp-edit" onclick="openClientModal({editId: '${c.id}'})" title="Editar cliente" aria-label="Editar">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
@@ -19726,14 +20074,18 @@ function clearClient() {
 
 function searchClient() {
   const raw = document.getElementById('clientSearch').value;
-  const q = raw.trim().toLowerCase();
-  const qDigits = q.replace(/\D/g, '');
+  // Bug 8 (Onda 4): normaliza com NFD + remove acentos + lowercase pra
+  // que "maria jose" ache "Maria José". Antes, o picker era case-insensitive
+  // mas accent-sensitive, gerando duplicatas no CRM (clientes nao encontrados
+  // viravam cadastros novos).
+  const nq = normalizeSearch(raw);
+  const qDigits = nq.replace(/\D/g, '');
   const box = document.getElementById('clientSuggestions');
-  if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+  if (!nq) { box.classList.remove('show'); box.innerHTML = ''; return; }
   const matches = clients.filter(c =>
-    c.name.toLowerCase().includes(q) ||
-    (c.address && c.address.toLowerCase().includes(q)) ||
-    (c.apt && c.apt.toLowerCase().includes(q)) ||
+    normalizeSearch(c.name || '').includes(nq) ||
+    normalizeSearch(c.address || '').includes(nq) ||
+    normalizeSearch(c.apt || '').includes(nq) ||
     (qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits)) ||
     (qDigits && c.phone && c.phone.replace(/\D/g, '').includes(qDigits))
   ).slice(0, 5);
@@ -19741,11 +20093,20 @@ function searchClient() {
   matches.forEach(c => {
     const item = document.createElement('button');
     item.className = 'sug-item';
-    item.innerHTML = `<div class="sn">${escapeHtml(c.name)}</div><div class="sr">${escapeHtml(clientReference(c))}</div>`;
+    // Bug 10 (Onda 4): clientReference nao retorna mais CPF.
+    // Se o operador buscou por digitos e o match veio do document,
+    // mostra CPF MASCARADO no secundario pra ele confirmar visualmente
+    // que e o cliente certo. Em outros casos, document nao aparece.
+    const matchedByDoc = !!(qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits));
+    const ref = clientReference(c);
+    const secondary = matchedByDoc
+      ? ref + ' · CPF ' + maskCpf(c.document)
+      : ref;
+    item.innerHTML = `<div class="sn">${escapeHtml(c.name)}</div><div class="sr">${escapeHtml(secondary)}</div>`;
     item.onclick = () => selectClient(c);
     box.appendChild(item);
   });
-  const exactMatch = clients.some(c => c.name.toLowerCase() === q);
+  const exactMatch = clients.some(c => normalizeSearch(c.name || '') === nq);
   if (!exactMatch) {
     const create = document.createElement('button');
     create.className = 'sug-item create';
@@ -19805,7 +20166,11 @@ function closeClientModal() {
   document.getElementById('newClientModal').classList.remove('show');
 }
 function saveNewClient() {
-  const name = document.getElementById('newClientName').value.trim();
+  // Bug 9 (Onda 4): normalizeName em vez de so trim() — colapsa espacos
+  // duplos internos ("  Maria  José  " vira "Maria José") e aplica
+  // normalize NFC. Antes, o input cosmetico escondia espacos extras
+  // que vazavam pra WhatsApp ("Oi *Maria  José*"), tela de edicao e busca.
+  const name = normalizeName(document.getElementById('newClientName').value);
   if (!name) {
     showToast('Nome é obrigatório');
     document.getElementById('newClientName').focus();
@@ -20060,7 +20425,10 @@ function saveOrder() {
   } else {
     snapshot = { name: selectedClient.name, ref: clientReference(selectedClient) };
     selectedClient.lastOrder = Date.now();
-    selectedClient.orderCount = (selectedClient.orderCount || 0) + 1;
+    // Bug 22 (Onda 4): nao mantemos mais orderCount manualmente — o picker
+    // agora deriva o numero direto de orders[] via clientOrderCount.
+    // Mantemos o campo nos clientes antigos por compat, mas nao escrevemos
+    // mais nele para evitar divergencia com o estado real.
   }
 
   // Retroativo: data/hora passada → pedido entra como 'entregue', desconta
@@ -20075,6 +20443,13 @@ function saveOrder() {
     const t = new Date(dtRaw).getTime();
     if (!isFinite(t) || isNaN(t)) { showToast('Data retroativa inválida'); return; }
     if (t > Date.now()) { showToast('Data retroativa não pode ser no futuro'); return; }
+    // BUG #20: bloqueio hard pra data >1 ano atras (evita 01/01/1900 quebrando
+    // relatorios temporais). UI ja restringe via min/max, mas defesa em profundidade.
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+    if (Date.now() - t > oneYear) {
+      showToast('Data retroativa muito antiga (mais de 1 ano). Use o admin web.');
+      return;
+    }
     // Aviso se data for muito antiga (> 90 dias) — passa, mas sinaliza
     const ninetyDays = 90 * 24 * 60 * 60 * 1000;
     if (Date.now() - t > ninetyDays) {
@@ -20277,7 +20652,10 @@ function updateMarginPreview() {
   previewEl.style.display = '';
 }
 function saveNewProduct() {
-  const name = document.getElementById('newProdName').value.trim();
+  // Bug 9 (Onda 4): normalizeName em vez de so trim() — mesma motivacao
+  // do saveNewClient, evita "  Talharim  Fresco  " virar duplicata
+  // de "Talharim Fresco" no catalogo de produtos.
+  const name = normalizeName(document.getElementById('newProdName').value);
   if (!name) { showToast('Nome do produto é obrigatório'); document.getElementById('newProdName').focus(); return; }
   const unit = document.getElementById('newProdUnit').value.trim();
   const priceStr = document.getElementById('newProdPrice').value.trim();

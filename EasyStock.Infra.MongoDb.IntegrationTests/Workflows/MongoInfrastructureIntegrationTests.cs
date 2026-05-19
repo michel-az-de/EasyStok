@@ -377,7 +377,8 @@ public class MongoInfrastructureIntegrationTests(MongoDbFixture fixture) : IClas
             Id = usuarioId,
             Nome = "Usuario Mongo",
             Email = "mongo@easystock.com",
-            SenhaHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+            // Hash fixo placeholder — teste so persiste/le, nao valida senha.
+            SenhaHash = "$2a$11$placeholderhashforintegrationtestonlyxxxxxxxxxxxxxxxxxxxxxxxx",
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow

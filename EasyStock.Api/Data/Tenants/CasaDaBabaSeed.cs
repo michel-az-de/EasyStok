@@ -13,7 +13,9 @@ namespace EasyStock.Api.Data.Tenants;
 internal static partial class CasaDaBabaSeed
 {
     public const string EmpresaNome = "Casa da Baba";
-    public const string EmpresaDocumento = "48.735.219/0001-62";
+    // CNPJ ficticio com DV valido (algoritmo Receita Federal mod-11) — necessario para
+    // o fluxo fiscal (GeradorChaveAcesso valida DV antes de montar a chave de 44 digitos).
+    public const string EmpresaDocumento = "48.735.219/0001-65";
 
     public static async Task ExecutarAsync(EasyStockDbContext context, DateTime agora, ILogger logger)
     {
@@ -267,6 +269,10 @@ internal static partial class CasaDaBabaSeed
         await EnriquecerAsync(context, empresa, lojaCentro, lojaMercadao,
             usuarioAdmin, usuarioGerente, usuarioOperadorCentro, usuarioOperadorMercadao,
             produtos, itens, fornFarinha, fornCarnes, fornLaticinios, fornHortifruti, agora, logger);
+
+        // Configuracao fiscal mock para suportar fluxo de NFC-e end-to-end no admin demo —
+        // implementado em CasaDaBabaSeed.Fiscal.cs. Idempotente.
+        await EnsureFiscalAsync(context, empresa, logger);
 
         logger.LogInformation("Seed tenant '{Empresa}' concluído.", EmpresaNome);
     }

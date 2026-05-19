@@ -25,7 +25,7 @@ namespace EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 /// </summary>
 public class ReprocessarContingenciaUseCase(
     INfeRepository nfeRepo,
-    IGatewayFiscal gateway,
+    IGatewayFiscalFactory gatewayFactory,
     IConfigFiscalResolver configResolver,
     IRowLevelSecurityBypass rlsBypass,
     IUnitOfWork uow,
@@ -53,6 +53,7 @@ public class ReprocessarContingenciaUseCase(
             try
             {
                 var config = await configResolver.ResolveAsync(nfe.EmpresaId);
+                var gateway = gatewayFactory.ObterPara(config.Provedor);
 
                 // Recarrega com itens (gateway precisa)
                 var nfeComItens = await nfeRepo.GetByIdWithDetailsAsync(nfe.EmpresaId, nfe.Id);

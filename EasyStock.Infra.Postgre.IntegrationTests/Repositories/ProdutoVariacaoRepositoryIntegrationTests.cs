@@ -7,10 +7,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 public class ProdutoVariacaoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [Fact]
+    [SkippableFact]
     public async Task SearchAsync_deve_buscar_variacao_por_sku_cor_tamanho_e_descricao()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
         await using var context = fixture.CreateDbContext();

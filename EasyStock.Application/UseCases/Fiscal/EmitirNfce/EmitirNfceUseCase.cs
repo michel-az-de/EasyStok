@@ -35,7 +35,7 @@ public class EmitirNfceUseCase(
     INfeRepository nfeRepo,
     INumeracaoNfeService numeracao,
     IGeradorChaveAcesso geradorChave,
-    IGatewayFiscal gateway,
+    IGatewayFiscalFactory gatewayFactory,
     IConfigFiscalResolver configResolver,
     IUnitOfWork uow,
     ILogger<EmitirNfceUseCase> logger) : IUseCase<EmitirNfceCommand, EmitirNfceResult>
@@ -52,6 +52,7 @@ public class EmitirNfceUseCase(
             throw new UseCaseValidationException("Itens obrigatorios.");
 
         var config = await configResolver.ResolveAsync(cmd.EmpresaId);
+        var gateway = gatewayFactory.ObterPara(config.Provedor);
 
         // === Tx 1: reservar numero, criar NfeDocumento Rascunho->EnviadaAguardando ===
         var nfeId = await uow.ExecuteInTransactionAsync(async _ =>

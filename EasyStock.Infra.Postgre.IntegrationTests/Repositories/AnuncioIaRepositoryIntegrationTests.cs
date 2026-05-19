@@ -9,11 +9,11 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 [Collection("PostgreSqlTestCollection")]
 public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public async Task GetByIdAsync_DeveRetornarAnuncioCorreto()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -41,11 +41,11 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         result!.Conteudo.Should().Be("Descrição teste");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetByProdutoAsync_DeveRetornarAnunciosDoProduto()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -83,11 +83,11 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         result.First().Conteudo.Should().Be("Descrição 1");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task AddAsync_DeveAdicionarAnuncio()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -115,11 +115,11 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         saved!.Conteudo.Should().Be("Nova descrição");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateAsync_DeveAtualizarAnuncio()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 
@@ -149,11 +149,11 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         updated!.Conteudo.Should().Be("Descrição atualizada");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RemoveAsync_DeveRemoverAnuncio()
     {
         // Arrange
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
         var repo = new Infra.Postgre.Repositories.AnuncioIaRepository(dbContext);
 

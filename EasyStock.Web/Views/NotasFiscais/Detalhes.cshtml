@@ -1,0 +1,186 @@
+@model EasyStock.Web.Models.ViewModels.NotasFiscais.NotaFiscalDetalheViewModel
+@{
+    ViewBag.Title = $"NFC-e {Model.Nfe.Serie}-{Model.Nfe.Numero}";
+    Layout = "_Layout";
+}
+
+<div class="mb-6">
+    <a href="/notas-fiscais" class="text-sm text-slate-500 hover:text-slate-700">&larr; Voltar para listagem</a>
+</div>
+
+<!-- Header -->
+<div class="ws mb-6" x-data="{ cancelarOpen: false }">
+    <div class="flex items-start justify-between">
+        <div>
+            <div class="flex items-center gap-3 mb-2">
+                <h1 class="text-xl font-bold text-slate-900">NFC-e @Model.Nfe.Serie-@Model.Nfe.Numero</h1>
+                <span class="badge @Model.StatusCss" aria-label="Status: @Model.StatusLabel">@Model.StatusLabel</span>
+            </div>
+            <div class="text-sm text-slate-500 space-y-1">
+                @if (!string.IsNullOrEmpty(Model.Nfe.ChaveAcesso))
+                {
+                    <p>
+                        <span class="font-medium text-slate-600">Chave:</span>
+                        <span class="font-mono text-xs">@Model.Nfe.ChaveAcesso</span>
+                    </p>
+                }
+                @if (!string.IsNullOrEmpty(Model.Nfe.ProtocoloAutorizacao))
+                {
+                    <p>
+                        <span class="font-medium text-slate-600">Protocolo:</span>
+                        <span class="font-mono text-xs">@Model.Nfe.ProtocoloAutorizacao</span>
+                    </p>
+                }
+                <p>
+                    <span class="font-medium text-slate-600">Emitida em:</span>
+                    @(Model.Nfe.DataAutorizacao?.ToString("dd/MM/yyyy HH:mm") ?? Model.Nfe.CriadoEm.ToString("dd/MM/yyyy HH:mm"))
+                </p>
+                <p>
+                    <span class="font-medium text-slate-600">Valor total:</span>
+                    R$ @Model.Nfe.TotalNota.ToString("N2")
+                </p>
+                @if (!string.IsNullOrEmpty(Model.Nfe.MotivoRejeicao))
+                {
+                    <p class="text-red-600">
+                        <span class="font-medium">Motivo rejeicao:</span> @Model.Nfe.MotivoRejeicao
+                    </p>
+                }
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            @if (!string.IsNullOrEmpty(Model.Nfe.DanfeUrl))
+            {
+                <a href="@Model.Nfe.DanfeUrl" target="_blank" rel="noopener"
+                   class="btn-outline-dark inline-flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Baixar DANFE
+                </a>
+            }
+            @if (Model.PodeCancelar)
+            {
+                <button type="button" @@click="cancelarOpen = true"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                    Cancelar nota
+                </button>
+            }
+            else if (string.Equals(Model.Nfe.Status, "Autorizada", StringComparison.OrdinalIgnoreCase)
+                     && Model.Nfe.DataAutorizacao.HasValue
+                     && (DateTime.UtcNow - Model.Nfe.DataAutorizacao.Value).TotalHours >= 24)
+            {
+                <span class="text-xs text-slate-400" title="Prazo de cancelamento (24h) expirado. Consulte seu contador.">
+                    Prazo de cancelamento expirado
+                </span>
+            }
+        </div>
+    </div>
+
+    <!-- Modal cancelar -->
+    <div x-show="cancelarOpen" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+         @@click.self="cancelarOpen = false">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" x-data="{ motivo: '' }">
+            <h3 class="text-lg font-semibold text-slate-900 mb-3">Cancelar nota fiscal</h3>
+            <p class="text-sm text-slate-600 mb-4">
+                O cancelamento será enviado à SEFAZ. Notas canceladas não podem ser reativadas.
+                Informe o motivo (min. 15 caracteres).
+            </p>
+            <form method="post" action="/notas-fiscais/@Model.Nfe.Id/cancelar">
+                @Html.AntiForgeryToken()
+                <label for="motivo" class="block text-sm font-medium text-slate-700 mb-1">Motivo *</label>
+                <textarea id="motivo" name="motivo" x-model="motivo"
+                          rows="3" minlength="15" maxlength="255" required
+                          class="ui-textarea w-full mb-3 text-sm"
+                          placeholder="Descreva o motivo do cancelamento (min. 15 caracteres)"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @@click="cancelarOpen = false; motivo = ''" class="btn-outline-dark">
+                        Voltar
+                    </button>
+                    <button type="submit"
+                            :disabled="motivo.length < 15"
+                            :class="motivo.length < 15 ? 'opacity-50 cursor-not-allowed' : ''"
+                            class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+                        Confirmar cancelamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Itens -->
+<div class="ws mb-6">
+    <h2 class="text-base font-semibold text-slate-900 mb-3">Itens (@Model.Itens.Count)</h2>
+    @if (Model.Itens.Count == 0)
+    {
+        <p class="text-sm text-slate-400">Nenhum item registrado.</p>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="tbl-full">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Produto</th>
+                        <th scope="col">Qtd</th>
+                        <th scope="col">Preco unit.</th>
+                        <th scope="col">Total</th>
+                        <th scope="col">NCM</th>
+                        <th scope="col">CFOP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Itens.OrderBy(i => i.Ordem))
+                    {
+                        <tr>
+                            <td class="text-slate-400 text-xs">@item.Ordem</td>
+                            <td class="font-medium">@item.NomeSnapshot</td>
+                            <td>@item.Quantidade.ToString("N2") @item.Unidade</td>
+                            <td>R$ @item.PrecoUnitario.ToString("N2")</td>
+                            <td class="font-medium">R$ @((item.Quantidade * item.PrecoUnitario).ToString("N2"))</td>
+                            <td class="text-slate-500 text-xs font-mono">@(item.Ncm ?? "-")</td>
+                            <td class="text-slate-500 text-xs font-mono">@(item.Cfop ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Eventos -->
+<div class="ws">
+    <h2 class="text-base font-semibold text-slate-900 mb-3">Historico de eventos (@Model.Eventos.Count)</h2>
+    @if (Model.Eventos.Count == 0)
+    {
+        <p class="text-sm text-slate-400">Nenhum evento registrado.</p>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="tbl-full">
+                <thead>
+                    <tr>
+                        <th scope="col">Evento</th>
+                        <th scope="col">Data</th>
+                        <th scope="col">Usuario</th>
+                        <th scope="col">Origem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ev in Model.Eventos.OrderByDescending(e => e.OcorridoEm))
+                    {
+                        <tr>
+                            <td class="font-medium">@ev.Tipo</td>
+                            <td class="text-slate-600">@ev.OcorridoEm.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="text-slate-500">@(ev.UsuarioNome ?? "-")</td>
+                            <td class="text-slate-400 text-xs">@(ev.Origem ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

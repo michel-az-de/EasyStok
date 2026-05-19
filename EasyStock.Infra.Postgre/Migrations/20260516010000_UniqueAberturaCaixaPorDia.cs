@@ -10,13 +10,23 @@ namespace EasyStock.Infra.Postgre.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // extract(epoch from timestamptz) é STABLE no PostgreSQL (não IMMUTABLE),
+            // então não pode ser usado diretamente em expressão de índice.
+            // Criamos uma função wrapper marcada como IMMUTABLE — padrão aceito para
+            // timestamptz quando o valor retornado é determinístico (epoch UTC não
+            // depende de configuração de sessão).
+            migrationBuilder.Sql("""
+                CREATE OR REPLACE FUNCTION public.caixa_abertura_utc_day(ts timestamptz)
+                RETURNS bigint LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT
+                AS $$ SELECT date_part('epoch', $1)::bigint / 86400 $$;
+                """);
+
             // Sanity: estorna aberturas duplicadas pré-existentes mantendo a primeira de cada dia/empresa/loja.
-            // Sem isso, o UNIQUE INDEX abaixo não consegue ser criado em bases que já têm o problema.
             migrationBuilder.Sql("""
                 WITH ranked AS (
                     SELECT "Id",
                            ROW_NUMBER() OVER (
-                               PARTITION BY "EmpresaId", COALESCE("LojaId", '00000000-0000-0000-0000-000000000000'::uuid), DATE("DataMovimento")
+                               PARTITION BY "EmpresaId", COALESCE("LojaId", '00000000-0000-0000-0000-000000000000'::uuid), public.caixa_abertura_utc_day("DataMovimento")
                                ORDER BY "CriadoEm"
                            ) AS rn
                     FROM movimentos_caixa
@@ -36,7 +46,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                 ON movimentos_caixa(
                     "EmpresaId",
                     COALESCE("LojaId", '00000000-0000-0000-0000-000000000000'::uuid),
-                    DATE("DataMovimento")
+                    public.caixa_abertura_utc_day("DataMovimento")
                 )
                 WHERE "Tipo" = 'abertura' AND "EstornadoEm" IS NULL;
                 """);

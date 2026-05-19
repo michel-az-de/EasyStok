@@ -25,10 +25,10 @@
     <div class="ml-auto flex gap-2">
         @if (l.Status == "aberta")
         {
-            <button type="button" x-data @@click="$dispatch('open-modal', 'arquivar-lista')"
-                    class="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
-                📦 Arquivar lista
-            </button>
+            <form asp-action="Arquivar" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Arquivar lista?","mensagem":"A lista será movida para Arquivadas e não aparecerá no board ativo.","textoBotao":"Arquivar","classBotao":"bg-slate-600 hover:bg-slate-700"}'>
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-outline-dark">📦 Arquivar</button>
+            </form>
         }
         else
         {
@@ -127,8 +127,7 @@
                                 <div class="text-xs text-slate-400">comprado @it.DoneEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(it.DonePorNome) ? "" : "· " + it.DonePorNome)</div>
                             }
                         </div>
-                        <form asp-action="RemoveItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0"
-                              x-data @@submit.prevent="if (confirm('Remover \'@it.Texto\' da lista?')) $el.submit()">
+                        <form asp-action="RemoveItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0" data-confirm='{"titulo":"Remover item da lista?","mensagem":"Esta ação não pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
                             @Html.AntiForgeryToken()
                             <button type="submit" class="text-slate-300 hover:text-red-600 text-lg leading-none p-1" aria-label="Remover item">×</button>
                         </form>

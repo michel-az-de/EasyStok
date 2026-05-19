@@ -2,6 +2,8 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.Financeiro.ContasReceber;
+using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
@@ -20,9 +22,16 @@ public class AtualizarStatusPedidoUseCaseTests
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
         var movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
         var uow = Substitute.For<IUnitOfWork>();
+        var configRepo = Substitute.For<IConfiguracaoLojaRepository>();
+        var contaReceberRepo = Substitute.For<IContaReceberRepository>();
+        var categoriaRepo = Substitute.For<ICategoriaFinanceiraRepository>();
+        var criarContaReceber = new CriarContaReceberUseCase(contaReceberRepo, categoriaRepo,
+            Substitute.For<ICentroCustoRepository>(), uow, NullLogger<CriarContaReceberUseCase>.Instance);
+        var gerarCr = new GerarContaReceberDePedidoUseCase(contaReceberRepo, categoriaRepo, configRepo,
+            criarContaReceber, NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
         var opts = Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = permiteNegativo });
         var integ = new PedidoEstoqueIntegrationService(itemRepo, movRepo, opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
-        var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
+        var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
         return (uc, pedidoRepo, itemRepo, movRepo, uow);
     }
 

@@ -108,7 +108,7 @@
     @if (!Model.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "box" },
+            { "EmptyIconName", "tag" },
             { "EmptyTitle", "Nenhuma categoria cadastrada" },
             { "EmptyDescription", "Crie categorias para organizar seus produtos por tipo e facilitar o controle de estoque." },
             { "EmptyCta", "Criar primeira categoria" },

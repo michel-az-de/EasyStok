@@ -68,6 +68,16 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableFaturaVencimentoJob)
             services.AddHostedService<FaturaVencimentoJob>();
 
+        // ContaFinanceiraVencimentoJob (CAP/CAR) — diario 09:30 UTC, marca
+        // parcelas vencidas e atualiza status agregado das contas.
+        if (options.EnableContaFinanceiraVencimentoJob)
+            services.AddHostedService<ContaFinanceiraVencimentoJob>();
+
+        // ContaReceberPixReconciliacaoJob (CAP/CAR) — horario, consulta Efi
+        // pra fechar gaps de webhooks perdidos em parcelas CR com Pix ativo.
+        if (options.EnableContaReceberPixReconciliacaoJob)
+            services.AddHostedService<ContaReceberPixReconciliacaoJob>();
+
         return services;
     }
 }

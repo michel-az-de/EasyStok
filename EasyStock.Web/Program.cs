@@ -42,6 +42,9 @@ builder.Services.AddHttpContextAccessor();
 // 4. Register SessionService first (used by TokenRefreshHandler)
 builder.Services.AddScoped<SessionService>();
 
+// 4b. Design system: Lucide icon resolver (cache de SVGs em memoria, singleton)
+builder.Services.AddSingleton<LucideIconResolver>();
+
 // 5. HttpClient with TokenRefreshHandler
 builder.Services.AddScoped<TokenRefreshHandler>();
 builder.Services.AddHttpClient<ApiClient>(client =>
@@ -75,6 +78,7 @@ builder.Services.AddScoped<FornecedoresService>();
 builder.Services.AddScoped<ClientesService>();
 builder.Services.AddScoped<PedidosService>();
 builder.Services.AddScoped<CaixaService>();
+builder.Services.AddScoped<FinanceiroService>();
 builder.Services.AddScoped<LotesService>();
 builder.Services.AddScoped<EtiquetasService>();
 builder.Services.AddScoped<ListasComprasService>();
@@ -93,6 +97,8 @@ builder.Services.AddScoped<MobileDevicesService>();
 builder.Services.AddScoped<MobileProductsService>();
 builder.Services.AddScoped<OperacaoMobileService>();
 builder.Services.AddScoped<RelatoriosService>();
+builder.Services.AddScoped<NotasFiscaisService>();
+builder.Services.AddScoped<ConfiguracaoFiscalService>();
 
 // 6b. Marketing options + Leads API service (landing publica)
 builder.Services.Configure<MarketingOptions>(config.GetSection("Marketing"));

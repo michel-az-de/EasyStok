@@ -30,18 +30,14 @@
         <input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome, e-mail, CNPJ/CPF ou categoria…"
                aria-label="Buscar fornecedor"
                class="ui-field flex-1 min-w-48" />
-        <button type="submit" class="ui-secondary-btn px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-sm hover:bg-slate-200">
-            Buscar
-        </button>
+        <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
         </div>
-        <div class="flex gap-2">
+        <div class="filter-tab-group">
             @foreach (var (val, label) in new[] { ("", "Todos"), ("ativo", "Ativos"), ("inativo", "Inativos") })
             {
                 var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
                 <a href="@Url.Action("Index", "Fornecedores", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="px-3 py-2 rounded-lg text-sm font-medium @(isActive ? "app-primary-btn bg-indigo-600 text-white" : "ui-secondary-btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50")">
-                    @label
-                </a>
+                   class="filter-tab @(isActive ? "active" : "")">@label</a>
             }
         </div>
     </form>
@@ -52,10 +48,10 @@
     @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "inbox" },
-            { "EmptyTitle", "Nenhum fornecedor cadastrado ainda" },
-            { "EmptyDescription", "Cadastre o primeiro fornecedor para começar a registrar pedidos de compra e acompanhar prazos de entrega." },
-            { "EmptyCta", "Cadastrar primeiro fornecedor" },
+            { "EmptyIconName", "truck" },
+            { "EmptyTitle", "Nenhum fornecedor cadastrado" },
+            { "EmptyDescription", "Adicione seu primeiro fornecedor para organizar suas compras." },
+            { "EmptyCta", "+ Novo Fornecedor" },
             { "EmptyCtaModal", "novo-fornecedor" }
         })
     }

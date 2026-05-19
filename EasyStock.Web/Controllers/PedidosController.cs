@@ -12,6 +12,7 @@ public class CriarPedidoWebRequest
     public string? TelefoneAdHoc { get; set; }
     public string? Observacoes { get; set; }
     public List<CriarItemInput>? Itens { get; set; }
+    public DateTime? AgendadoParaEm { get; set; }
 }
 
 public class PedidosController(
@@ -83,7 +84,7 @@ public class PedidosController(
             });
 
         var result = await svc.CriarAsync(req.ClienteId, req.NomeAdHoc, req.AptAdHoc, req.TelefoneAdHoc,
-            req.Observacoes, req.Itens);
+            req.Observacoes, req.Itens, req.AgendadoParaEm);
         if (!result.Success)
             return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
             {
@@ -106,6 +107,20 @@ public class PedidosController(
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
         Toast("success", $"Pedido marcado como {status}.");
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    [HttpPost("/pedidos/{id}/agendar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Agendar(string id, DateTime? agendadoParaEm)
+    {
+        var result = await svc.AlterarAgendamentoAsync(id, agendadoParaEm);
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
+        var msg = agendadoParaEm.HasValue
+            ? $"Pedido agendado para {agendadoParaEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}."
+            : "Agendamento removido.";
+        Toast("success", msg);
         return RedirectToAction(nameof(Detail), new { id });
     }
 

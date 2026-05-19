@@ -179,8 +179,7 @@
                 </div>
 
                 <div class="flex justify-end gap-3 pt-4 border-t">
-                    <a asp-action="Historico" asp-controller="Saidas"
-                       class="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                    <a asp-action="Historico" asp-controller="Saidas" class="btn-outline-dark">
                         Descartar
                     </a>
                     <button type="submit"
@@ -388,8 +387,20 @@ function saidaForm() {
             if (this.valorUnit < 0) { window.showToast('Valor unitário não pode ser negativo.', 'warning'); return; }
             if (this.estoqueAtual === 0) { window.showToast('Este produto não tem estoque disponível.', 'error'); return; }
             if (this.qty > this.estoqueAtual) { window.showToast('Quantidade excede o estoque disponível (' + this.estoqueAtual + ').', 'error'); return; }
-            if (this.valorUnit === 0 && !confirm('Deseja registrar uma saída com valor R$ 0,00?')) return;
+            if (this.valorUnit === 0) {
+                const self = this;
+                window.easyConfirm({
+                    titulo: 'Saida com valor R$ 0,00?',
+                    mensagem: 'O preço unitário está zerado. Confirme se você realmente quer registrar essa saída sem valor.',
+                    textoBotao: 'Registrar saída',
+                    classBotao: 'bg-amber-600 hover:bg-amber-700'
+                }, () => self._executarSaida());
+                return;
+            }
+            await this._executarSaida();
+        },
 
+        async _executarSaida() {
             this.loading = true;
             const form = this.$el.closest('form');
             const fd = new FormData(form);

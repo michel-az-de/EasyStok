@@ -1,6 +1,6 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
 
@@ -55,7 +55,7 @@ public sealed record MetricasFinanceirasResult(
 /// no <see cref="IFaturaRepository"/> e <see cref="IAssinaturaEmpresaRepository"/>.
 ///
 /// <para>
-/// F13 — cache em <see cref="IMemoryCache"/> com TTL 5 minutos. Chave
+/// F13 — cache via <see cref="ICacheService"/> com TTL 5 minutos. Chave
 /// <c>metricas:{empresaId|null}:{dias}</c>. Sem cache, 6 queries SQL custavam
 /// ~200ms em Postgres com indices. Com cache, &lt; 1ms na hit. Invalidacao
 /// via <c>ForcarRefresh=true</c> (admin pode disparar pelo dashboard).
@@ -64,7 +64,7 @@ public sealed record MetricasFinanceirasResult(
 public class MetricasFinanceirasUseCase(
     IFaturaRepository faturaRepo,
     IAssinaturaEmpresaRepository assinaturaRepo,
-    IMemoryCache cache)
+    ICacheService cache)
 {
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
@@ -74,11 +74,14 @@ public class MetricasFinanceirasUseCase(
         var dias = Math.Clamp(cmd.DiasRetroativo, 1, 365);
         var cacheKey = $"metricas:{cmd.EmpresaId?.ToString("N") ?? "all"}:{dias}";
 
-        if (!cmd.ForcarRefresh && cache.TryGetValue(cacheKey, out MetricasFinanceirasResult? cached) && cached is not null)
-            return cached;
+        if (!cmd.ForcarRefresh)
+        {
+            var cached = await cache.GetAsync<MetricasFinanceirasResult>(cacheKey);
+            if (cached is not null) return cached;
+        }
 
         var result = await ComputarAsync(dias, cmd.EmpresaId, ct);
-        cache.Set(cacheKey, result, CacheTtl);
+        await cache.SetAsync(cacheKey, result, CacheTtl);
         return result;
     }
 
@@ -120,7 +123,7 @@ public class MetricasFinanceirasUseCase(
         var atrasoMedio = await faturaRepo.MediaDiasAtrasoVencidasAsync(empresaId, ct);
         var topInadimplentes = empresaId.HasValue
             ? Array.Empty<TopInadimplenteResult>() // filtro por 1 empresa elimina top-N
-            : await faturaRepo.TopInadimplentesAsync(limit: 5, ct);
+            : await faturaRepo.TopInadimplentesAsync(limit: 5, empresaId: null, ct: ct);
 
         return new MetricasFinanceirasResult(
             Mrr: mrr,

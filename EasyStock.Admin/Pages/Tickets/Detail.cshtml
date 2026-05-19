@@ -14,12 +14,17 @@
     };
 }
 
-<a href="/Tickets" class="text-es-ink-mute hover:text-es-ink text-sm mb-4 inline-flex items-center gap-1">← Voltar</a>
-
-@if (Model.Erro != null)
-{
-    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">@Model.Erro</div>
+@{
+    var tituloBreadcrumb = Model.Titulo != null && Model.Titulo.Length > 50 ? Model.Titulo.Substring(0, 50) + "…" : Model.Titulo;
 }
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item href="/Tickets">Tickets</es-breadcrumb-item>
+        <es-breadcrumb-item>@tituloBreadcrumb</es-breadcrumb-item>
+    </es-breadcrumb>
+    <es-button variant="ghost" size="sm" href="/Tickets" icon="arrow-left">Voltar</es-button>
+</div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6"
      x-data="{
