@@ -1,6 +1,6 @@
 @model EasyStock.Web.Models.ViewModels.Financeiro.CriarContaViewModel
 @{
-    var hoje = DateTime.Today.ToString("yyyy-MM-dd");
+    var hoje   = DateTime.Today.ToString("yyyy-MM-dd");
     var amanha = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
 }
 
@@ -10,16 +10,9 @@
         <a href="/contas-a-pagar" class="btn btn-ghost">Voltar</a>
     </div>
 
-    @if (Model.Categorias.Count == 0)
-    {
-        <div class="card bg-yellow-50 border-yellow-200 mb-4">
-            <p class="text-sm text-yellow-800">
-                Cadastre uma categoria de despesa antes de lancar contas a pagar.
-            </p>
-        </div>
-    }
-
-    <form method="post" action="/contas-a-pagar/criar" class="card space-y-4" x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal' }">
+    <form method="post" action="/contas-a-pagar/criar" class="card space-y-4"
+          x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal' }"
+          @@submit="if (!$el.querySelector('input[name=categoriaFinanceiraId]')?.value) { $event.preventDefault(); window.showToast?.('Selecione ou crie uma categoria.', 'error'); }">
         @Html.AntiForgeryToken()
 
         <div>
@@ -30,23 +23,24 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="form-label">Categoria *</label>
-                <select name="categoriaFinanceiraId" required class="form-input">
-                    <option value="">Selecione...</option>
-                    @foreach (var c in Model.Categorias.Where(c => c.Ativa))
-                    {
-                        <option value="@c.Id">@c.Nome</option>
-                    }
-                </select>
+                <partial name="_CreatableCombobox" model='new {
+                    Name         = "categoriaFinanceiraId",
+                    Items        = Model.Categorias.Where(c => c.Ativa).Select(c => new { value = c.Id.ToString(), label = c.Nome }),
+                    Placeholder  = "Buscar ou criar categoria...",
+                    Required     = true,
+                    CreateUrl    = "/financeiro/categorias/criar-rapido",
+                    CreatePayload= new { tipo = "Despesa" }
+                }' />
             </div>
             <div>
                 <label class="form-label">Centro de Custo</label>
-                <select name="centroCustoId" class="form-input">
-                    <option value="">— Nenhum —</option>
-                    @foreach (var c in Model.CentrosCusto.Where(c => c.Ativo))
-                    {
-                        <option value="@c.Id">@c.Codigo - @c.Nome</option>
-                    }
-                </select>
+                <partial name="_CreatableCombobox" model='new {
+                    Name        = "centroCustoId",
+                    Items       = Model.CentrosCusto.Where(c => c.Ativo).Select(c => new { value = c.Id.ToString(), label = c.Codigo + " - " + c.Nome }),
+                    Placeholder = "— Nenhum —",
+                    AllowClear  = true,
+                    CreateUrl   = "/financeiro/centros-custo/criar-rapido"
+                }' />
             </div>
         </div>
 

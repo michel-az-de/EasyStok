@@ -58,7 +58,7 @@ public class FinanceiroService(ApiClient api, SessionService session)
 
     // ── Contas a Pagar ────────────────────────────────────────────────────
 
-    public Task<ApiResult<ContasPagarPaginadas>> ListarContasPagarAsync(
+    public async Task<ApiResult<ContasPagarPaginadas>> ListarContasPagarAsync(
         string? status = null,
         DateTime? vencimentoDe = null,
         DateTime? vencimentoAte = null,
@@ -71,7 +71,16 @@ public class FinanceiroService(ApiClient api, SessionService session)
         if (vencimentoDe.HasValue) qs += $"&vencimentoDe={vencimentoDe.Value:yyyy-MM-dd}";
         if (vencimentoAte.HasValue) qs += $"&vencimentoAte={vencimentoAte.Value:yyyy-MM-dd}";
         if (!string.IsNullOrWhiteSpace(busca)) qs += $"&busca={Uri.EscapeDataString(busca)}";
-        return api.GetAsync<ContasPagarPaginadas>(qs);
+        var r = await api.GetAsync<PagedResult<ContaPagarApi>>(qs);
+        if (!r.Success || r.Data is null)
+            return ApiResult<ContasPagarPaginadas>.Fail(r.ErrorCode ?? "ERROR", r.ErrorMessage ?? "Erro.", r.HttpStatus, r.CorrelationId);
+        return ApiResult<ContasPagarPaginadas>.Ok(new ContasPagarPaginadas
+        {
+            Itens    = r.Data.Data,
+            Total    = r.Data.Meta.Total,
+            Page     = r.Data.Meta.Page,
+            PageSize = r.Data.Meta.Limit
+        });
     }
 
     public Task<ApiResult<ContaPagarApi>> ObterContaPagarAsync(Guid id) =>
@@ -112,7 +121,7 @@ public class FinanceiroService(ApiClient api, SessionService session)
 
     // ── Contas a Receber ──────────────────────────────────────────────────
 
-    public Task<ApiResult<ContasReceberPaginadas>> ListarContasReceberAsync(
+    public async Task<ApiResult<ContasReceberPaginadas>> ListarContasReceberAsync(
         string? status = null,
         DateTime? vencimentoDe = null,
         DateTime? vencimentoAte = null,
@@ -125,7 +134,16 @@ public class FinanceiroService(ApiClient api, SessionService session)
         if (vencimentoDe.HasValue) qs += $"&vencimentoDe={vencimentoDe.Value:yyyy-MM-dd}";
         if (vencimentoAte.HasValue) qs += $"&vencimentoAte={vencimentoAte.Value:yyyy-MM-dd}";
         if (!string.IsNullOrWhiteSpace(busca)) qs += $"&busca={Uri.EscapeDataString(busca)}";
-        return api.GetAsync<ContasReceberPaginadas>(qs);
+        var r = await api.GetAsync<PagedResult<ContaReceberApi>>(qs);
+        if (!r.Success || r.Data is null)
+            return ApiResult<ContasReceberPaginadas>.Fail(r.ErrorCode ?? "ERROR", r.ErrorMessage ?? "Erro.", r.HttpStatus, r.CorrelationId);
+        return ApiResult<ContasReceberPaginadas>.Ok(new ContasReceberPaginadas
+        {
+            Itens    = r.Data.Data,
+            Total    = r.Data.Meta.Total,
+            Page     = r.Data.Meta.Page,
+            PageSize = r.Data.Meta.Limit
+        });
     }
 
     public Task<ApiResult<ContaReceberApi>> ObterContaReceberAsync(Guid id) =>

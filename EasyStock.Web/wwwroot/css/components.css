@@ -585,6 +585,35 @@ button:focus-visible {
 .combobox-option[data-active="true"] { background: rgba(232,88,20,0.08); color: var(--orange-700); }
 .combobox-empty { padding: 12px; color: var(--text-muted); font-size: 13px; text-align: center; }
 
+/* --- Combobox: criação inline + limpar (extensão T2.1) --- */
+.combobox-create {
+  padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  font-size: 13.5px; color: var(--navy-700); font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+  border-top: 1px solid var(--border-soft); margin-top: 2px;
+}
+.combobox-create:hover,
+.combobox-create[data-active="true"] {
+  background: rgba(30, 72, 168, 0.07); color: var(--navy-700);
+}
+[data-theme="dark"] .combobox-create { color: var(--navy-200); }
+[data-theme="dark"] .combobox-create:hover,
+[data-theme="dark"] .combobox-create[data-active="true"] { background: rgba(30, 72, 168, 0.18); }
+
+.combobox-error {
+  padding: 6px 10px; font-size: 12.5px;
+  color: var(--crit-600); border-top: 1px solid var(--border-soft);
+}
+
+.combobox-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: 18px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 120ms, background-color 120ms;
+}
+.combobox-clear:hover { color: var(--text-primary); background: var(--bg-elev-1, var(--ink-100)); }
+
 /* ---------- Popover (T2.4) ---------- */
 .popover-panel {
   position: absolute; min-width: 180px;
