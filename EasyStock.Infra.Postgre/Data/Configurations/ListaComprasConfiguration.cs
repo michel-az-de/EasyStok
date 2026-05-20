@@ -35,6 +35,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
         {
             b.ToTable("itens_lista_compras");
             b.HasKey(x => x.Id);
+            b.Property(x => x.ProdutoId);
             b.Property(x => x.Texto).IsRequired().HasMaxLength(255);
             b.Property(x => x.Quantidade).HasColumnType("numeric(14,3)");
             b.Property(x => x.Unidade).HasMaxLength(32);

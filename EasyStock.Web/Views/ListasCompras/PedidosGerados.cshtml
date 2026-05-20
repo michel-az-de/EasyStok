@@ -1,0 +1,90 @@
+@model PedidosGeradosViewModel
+@using System.Globalization
+@using System.Linq
+@{
+    ViewBag.Title = "Pedidos gerados";
+    Layout = "_Layout";
+    var ptBR = new CultureInfo("pt-BR");
+    var r = Model.Resultado;
+    var empresa = ViewBag.LojaAtualNome as string ?? "";
+
+    string WaLink(string? tel, string texto)
+    {
+        var digits = new string((tel ?? "").Where(char.IsDigit).ToArray());
+        if (digits.Length == 10 || digits.Length == 11) digits = "55" + digits; // BR sem código do país
+        return $"https://wa.me/{digits}?text={Uri.EscapeDataString(texto)}";
+    }
+}
+
+<div class="flex items-center gap-3 mb-6 flex-wrap">
+    <a href="/listas-compras/@Model.ListaId" class="text-slate-400 hover:text-slate-600" aria-label="Voltar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <div class="pg-hd">
+        <h1>Pedidos gerados</h1>
+        <p>@r.Pedidos.Count @(r.Pedidos.Count == 1 ? "pedido criado" : "pedidos criados") · agrupados por fornecedor</p>
+    </div>
+</div>
+
+<div class="space-y-4">
+@foreach (var p in r.Pedidos)
+{
+    var sb = new System.Text.StringBuilder();
+    sb.Append("Olá! Pedido de compra");
+    if (!string.IsNullOrWhiteSpace(empresa)) { sb.Append(" — ").Append(empresa); }
+    sb.AppendLine(":");
+    foreach (var it in p.Itens)
+    {
+        sb.Append("• ").Append(it.Quantidade.ToString("0.##", ptBR)).Append(' ').AppendLine(it.Nome);
+    }
+    <div class="ws">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+                <h2 class="font-semibold text-slate-900">@p.FornecedorNome</h2>
+                <p class="text-xs text-slate-500">
+                    @p.Itens.Count @(p.Itens.Count == 1 ? "item" : "itens")@if (p.ValorEstimado.HasValue) { <text> · estimado R$ @p.ValorEstimado.Value.ToString("N2", ptBR)</text> }
+                </p>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(p.FornecedorTelefone))
+            {
+                <a href="@WaLink(p.FornecedorTelefone, sb.ToString())" target="_blank" rel="noopener"
+                   class="inline-flex items-center px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg flex-shrink-0">📲 Enviar no WhatsApp</a>
+            }
+            else
+            {
+                <span class="text-xs text-slate-400 flex-shrink-0">sem telefone cadastrado</span>
+            }
+        </div>
+        <ul class="divide-y divide-slate-100 mt-3">
+        @foreach (var it in p.Itens)
+        {
+            <li class="flex items-center justify-between py-1.5 text-sm">
+                <span class="text-slate-700">@it.Nome</span>
+                <span class="text-slate-400 text-xs">@it.Quantidade.ToString("0.##", ptBR) @it.Unidade</span>
+            </li>
+        }
+        </ul>
+    </div>
+}
+</div>
+
+@if (r.ItensSemFornecedor.Any() || r.ItensIgnorados > 0)
+{
+    <div class="ws mt-4 border border-amber-200 bg-amber-50">
+        <h3 class="font-semibold text-amber-800 text-sm mb-1">Nem tudo virou pedido</h3>
+        @if (r.ItensSemFornecedor.Any())
+        {
+            <p class="text-sm text-amber-700">Sem fornecedor conhecido — esses itens não viraram pedido (o fornecedor é aprendido das entradas de estoque): @string.Join(", ", r.ItensSemFornecedor)</p>
+        }
+        @if (r.ItensIgnorados > 0)
+        {
+            <p class="text-sm text-amber-700 mt-1">@r.ItensIgnorados @(r.ItensIgnorados == 1 ? "item foi ignorado" : "itens foram ignorados") (sem produto vinculado ou sem quantidade).</p>
+        }
+    </div>
+}
+
+<div class="mt-6">
+    <a href="/listas-compras/@Model.ListaId" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">← Voltar para a lista</a>
+</div>

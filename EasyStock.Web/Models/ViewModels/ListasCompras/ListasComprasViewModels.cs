@@ -31,5 +31,12 @@ public class GerarListaItemForm
 {
     public bool Incluir { get; set; }
     public string? Texto { get; set; }
+    public Guid? ProdutoId { get; set; }
     public decimal? Quantidade { get; set; }
+}
+
+public class PedidosGeradosViewModel
+{
+    public required string ListaId { get; set; }
+    public required GerarPedidosResultApi Resultado { get; set; }
 }

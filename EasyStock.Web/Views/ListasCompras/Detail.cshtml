@@ -51,6 +51,13 @@
             <a href="@waUrl" target="_blank" rel="noopener"
                class="inline-flex items-center px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg">📲 WhatsApp</a>
         }
+        @if (l.Status == "aberta" && Model.Detalhe.Itens.Any(i => i.ProdutoId.HasValue))
+        {
+            <form asp-action="GerarPedidos" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Gerar pedidos de fornecedor?","mensagem":"Os itens vinculados a produto serão agrupados pelo fornecedor preferido e viram pedidos de compra. Os fornecedores podem ser notificados por WhatsApp/e-mail.","textoBotao":"Gerar pedidos","classBotao":"bg-green-700 hover:bg-green-800"}'>
+                @Html.AntiForgeryToken()
+                <button type="submit" class="inline-flex items-center px-3.5 py-2 bg-green-700 hover:bg-green-800 text-white text-sm font-semibold rounded-lg">📦 Gerar pedidos</button>
+            </form>
+        }
         @if (l.Status == "aberta")
         {
             <form asp-action="Arquivar" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Arquivar lista?","mensagem":"A lista será movida para Arquivadas e não aparecerá no board ativo.","textoBotao":"Arquivar","classBotao":"bg-slate-600 hover:bg-slate-700"}'>

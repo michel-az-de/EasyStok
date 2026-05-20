@@ -63,6 +63,7 @@ else
                                x-on:change="recalc()" data-custo="@custoJs"
                                class="accent-indigo-600 w-4 h-4 flex-shrink-0 cursor-pointer" />
                         <input type="hidden" name="Itens[@i].Texto" value="@s.Nome" />
+                        <input type="hidden" name="Itens[@i].ProdutoId" value="@s.ProdutoId" />
                         <div class="flex-1 min-w-0">
                             <div class="text-sm font-medium text-slate-800 truncate">@s.Nome</div>
                             <div class="text-xs text-slate-400">

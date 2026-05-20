@@ -1,3 +1,4 @@
+using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.ListasCompras;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -62,6 +63,7 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
         var itens = selecionados.Select(i => (object)new
         {
             texto = i.Texto!.Trim(),
+            produtoId = i.ProdutoId,
             quantidade = i.Quantidade,
             unidade = (string?)null,
             categoria = "Reposição",
@@ -80,6 +82,39 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
         var result = await svc.ObterAsync(id);
         if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Index));
         return View(new ListaComprasDetailViewModel { Detalhe = result.Data });
+    }
+
+    [HttpPost("/listas-compras/{id}/gerar-pedidos")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GerarPedidos(string id)
+    {
+        var result = await svc.GerarPedidosAsync(id);
+        if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Detail), new { id });
+
+        if (result.Data.Pedidos.Count == 0)
+        {
+            Toast("warning", "Nenhum item da lista tem fornecedor conhecido para virar pedido.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        // PRG: guarda o resultado e redireciona, evitando reenvio (que notificaria fornecedores 2x).
+        TempData["PedidosGeradosJson"] = System.Text.Json.JsonSerializer.Serialize(result.Data);
+        return RedirectToAction(nameof(PedidosGerados), new { id });
+    }
+
+    [HttpGet("/listas-compras/{id}/pedidos-gerados")]
+    public IActionResult PedidosGerados(string id)
+    {
+        if (TempData["PedidosGeradosJson"] is not string json)
+            return RedirectToAction(nameof(Detail), new { id });
+
+        var data = System.Text.Json.JsonSerializer.Deserialize<GerarPedidosResultApi>(
+            json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (data is null) return RedirectToAction(nameof(Detail), new { id });
+
+        ViewBag.Title = "Pedidos gerados";
+        ViewBag.ActiveMenuItem = "ListasCompras";
+        return View(new PedidosGeradosViewModel { ListaId = id, Resultado = data });
     }
 
     [HttpPost("/listas-compras")]
