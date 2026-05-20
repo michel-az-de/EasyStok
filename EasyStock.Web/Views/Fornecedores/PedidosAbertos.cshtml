@@ -125,22 +125,18 @@
                                             <span class="pedido-action-modal__eyebrow">Recebimento</span>
                                             <h3 class="text-lg font-semibold text-slate-900">Confirmar recebimento</h3>
                                             <p class="text-sm text-slate-600">
-                                                Finalize a chegada do pedido de <strong>@ped.FornecedorNome</strong> e registre o rastreio, se existir.
+                                                Confirmar a chegada do pedido de <strong>@ped.FornecedorNome</strong>. Todos os itens entram no estoque automaticamente.
                                             </p>
                                         </div>
                                         <div class="pedido-action-modal__body">
-                                            <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Código de rastreio</label>
-                                            <input type="text" x-model="tracking" placeholder="Ex: BR123456789"
-                                                   class="ui-field mb-4" />
                                             <div class="pedido-action-modal__footer">
                                                 <button type="button" @@click="confirmReceber = false"
                                                         class="ui-secondary-btn">Voltar</button>
                                                 <form asp-action="ReceberPedido" asp-controller="Fornecedores"
                                                       asp-route-id="@ped.PedidoId" method="post">
                                                     @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="tracking" :value="tracking" />
                                                     <button type="submit" class="app-primary-btn app-primary-btn--success">
-                                                        Confirmar recebimento
+                                                        Confirmar e dar entrada
                                                     </button>
                                                 </form>
                                             </div>

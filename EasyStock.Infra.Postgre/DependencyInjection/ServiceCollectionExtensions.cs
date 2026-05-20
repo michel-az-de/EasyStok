@@ -75,6 +75,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IEtiquetaTemplateRepository, EtiquetaTemplateRepository>();
             services.AddScoped<IListaComprasRepository, ListaComprasRepository>();
             services.AddScoped<IPedidoFornecedorRepository, PedidoFornecedorRepository>();
+            services.AddScoped<IPedidoFornecedorItemRepository, PedidoFornecedorItemRepository>();
             services.AddScoped<IUsuarioRepository, UsuarioRepository>();
             services.AddScoped<IPerfilRepository, PerfilRepository>();
             services.AddScoped<IPlanoRepository, PlanoRepository>();

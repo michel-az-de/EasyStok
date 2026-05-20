@@ -35,6 +35,7 @@ public class FornecedorController(
     ReceberPedidoFornecedorUseCase receberPedidoUseCase,
     CancelarPedidoFornecedorUseCase cancelarPedidoUseCase,
     ProcessarRecebimentoPedidoFornecedorUseCase processarRecebimentoUseCase,
+    ReceberPedidoCompletoUseCase receberCompletoUseCase,
     ObterHistoricoAlteracoesFornecedorUseCase obterAlteracoesUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
@@ -127,6 +128,23 @@ public class FornecedorController(
             ItensRecebidos);
 
         var resultado = await processarRecebimentoUseCase.ExecuteAsync(comando, ct);
+        return DataOk(resultado);
+    }
+
+    [SwaggerOperation(Summary = "Receive a purchase order in full — marks all items received and posts stock entry (Gerente only)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("pedidos/{id}/receber-tudo")]
+    [Authorize(Policy = "Gerente")]
+    public async Task<IActionResult> ReceberPedidoTudo(
+        Guid id,
+        [FromBody] ReceberTudoBody body,
+        CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var empresaId, out var err)) return err!;
+        var resultado = await receberCompletoUseCase.ExecuteAsync(
+            new ReceberPedidoCompletoCommand(id, empresaId, body.DataRecebimento), ct);
         return DataOk(resultado);
     }
 
@@ -248,3 +266,4 @@ public sealed record ReceberPedidoBody(Guid? EmpresaId, DateTime? DataRecebiment
 public sealed record CancelarPedidoBody(Guid? EmpresaId);
 public sealed record ReceberPedidoComEstoqueBody(Guid? EmpresaId, DateTime? DataRecebimento, List<ItemRecebidoDto>? Itens);
 public sealed record ItemRecebidoDto(Guid ItemId, decimal QuantidadeRecebida);
+public sealed record ReceberTudoBody(Guid? EmpresaId, DateTime? DataRecebimento);
