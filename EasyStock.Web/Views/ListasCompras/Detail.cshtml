@@ -12,6 +12,27 @@
         .OrderBy(g => g.Key == "Outros") // "Outros" sempre por último
         .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
         .ToList();
+
+    // Texto da lista para compartilhar via WhatsApp (wa.me — abre o app, usuário escolhe o contato).
+    var lojaNomeWa = ViewBag.LojaAtualNome as string ?? "";
+    var waSb = new System.Text.StringBuilder();
+    waSb.Append("🛒 ").AppendLine(l.Nome);
+    if (!string.IsNullOrWhiteSpace(lojaNomeWa)) waSb.AppendLine(lojaNomeWa);
+    waSb.AppendLine(DateTime.Now.ToString("dd/MM/yyyy"));
+    foreach (var g in grupos)
+    {
+        waSb.AppendLine();
+        waSb.Append('*').Append(g.Key).AppendLine("*");
+        foreach (var it in g)
+        {
+            var marca = it.Done ? "✅" : "▢";
+            var qtd = it.Quantidade.HasValue
+                ? it.Quantidade.Value.ToString("0.##") + (string.IsNullOrWhiteSpace(it.Unidade) ? "" : " " + it.Unidade) + " "
+                : "";
+            waSb.Append(marca).Append(' ').Append(qtd).AppendLine(it.Texto);
+        }
+    }
+    var waUrl = "https://wa.me/?text=" + Uri.EscapeDataString(waSb.ToString());
 }
 
 <div class="flex items-center gap-3 mb-6 flex-wrap">
@@ -23,6 +44,13 @@
     <h1 class="text-2xl font-bold text-slate-900">@l.Nome</h1>
     <span class="px-2 py-0.5 rounded-full text-xs font-medium @(l.Status == "aberta" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")">@l.Status</span>
     <div class="ml-auto flex gap-2">
+        @if (l.TotalItens > 0)
+        {
+            <a href="/listas-compras/@l.Id/imprimir"
+               class="inline-flex items-center px-3.5 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">🖨️ Imprimir</a>
+            <a href="@waUrl" target="_blank" rel="noopener"
+               class="inline-flex items-center px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg">📲 WhatsApp</a>
+        }
         @if (l.Status == "aberta")
         {
             <form asp-action="Arquivar" asp-controller="ListasCompras" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Arquivar lista?","mensagem":"A lista será movida para Arquivadas e não aparecerá no board ativo.","textoBotao":"Arquivar","classBotao":"bg-slate-600 hover:bg-slate-700"}'>

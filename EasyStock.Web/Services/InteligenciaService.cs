@@ -22,6 +22,10 @@ public class InteligenciaService(ApiClient api, SessionService session)
     public Task<ApiResult<List<ItemEstoqueInteligenciaApi>>> SugestoesReposicaoAsync(int pageSize = 10) =>
         api.GetAsync<List<ItemEstoqueInteligenciaApi>>($"inteligencia/sugestao-reposicao?empresaId={GetEmpresaId()}&pageSize={pageSize}");
 
+    // Sugestão de reposição com nome do produto + quantidade sugerida (alimenta a geração de lista de compras).
+    public Task<ApiResult<List<SugestaoReposicaoApi>>> SugestaoReposicaoListaAsync(int pageSize = 50) =>
+        api.GetAsync<List<SugestaoReposicaoApi>>($"inteligencia/sugestao-reposicao?empresaId={GetEmpresaId()}&pageSize={pageSize}");
+
     public Task<ApiResult<List<ProjecaoRupturaInteligenciaApi>>> ProjecaoRupturaAsync(int pageSize = 5) =>
         api.GetAsync<List<ProjecaoRupturaInteligenciaApi>>($"inteligencia/projecao-ruptura?empresaId={GetEmpresaId()}&pageSize={pageSize}");
 }

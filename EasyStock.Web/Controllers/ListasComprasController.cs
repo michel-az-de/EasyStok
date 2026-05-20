@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class ListasComprasController(ListasComprasService svc, SessionService session) : BaseController(session)
+public class ListasComprasController(ListasComprasService svc, InteligenciaService inteligencia, SessionService session) : BaseController(session)
 {
     [HttpGet("/listas-compras")]
     public async Task<IActionResult> Index(string? status = null)
@@ -28,6 +28,57 @@ public class ListasComprasController(ListasComprasService svc, SessionService se
         var result = await svc.ObterAsync(id);
         if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Index));
 
+        return View(new ListaComprasDetailViewModel { Detalhe = result.Data });
+    }
+
+    [HttpGet("/listas-compras/gerar")]
+    public async Task<IActionResult> Gerar()
+    {
+        ViewBag.Title = "Gerar lista de compras";
+        ViewBag.ActiveMenuItem = "ListasCompras";
+
+        var vm = new GerarListaViewModel { NomeSugerido = $"Reposição {DateTime.Now:dd/MM}" };
+        var result = await inteligencia.SugestaoReposicaoListaAsync(50);
+        if (result.Success && result.Data is not null) vm.Sugestoes = result.Data;
+
+        return View(vm);
+    }
+
+    [HttpPost("/listas-compras/gerar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Gerar(GerarListaForm form)
+    {
+        var selecionados = form.Itens
+            .Where(i => i.Incluir && !string.IsNullOrWhiteSpace(i.Texto))
+            .ToList();
+
+        if (selecionados.Count == 0)
+        {
+            Toast("warning", "Selecione ao menos um item para gerar a lista.");
+            return RedirectToAction(nameof(Gerar));
+        }
+
+        var nome = string.IsNullOrWhiteSpace(form.Nome) ? $"Reposição {DateTime.Now:dd/MM}" : form.Nome.Trim();
+        var itens = selecionados.Select(i => (object)new
+        {
+            texto = i.Texto!.Trim(),
+            quantidade = i.Quantidade,
+            unidade = (string?)null,
+            categoria = "Reposição",
+            observacao = (string?)null
+        });
+
+        var result = await svc.GerarAsync(nome, form.Observacoes, itens);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+        Toast("success", $"Lista gerada com {selecionados.Count} {(selecionados.Count == 1 ? "item" : "itens")}.");
+        return RedirectToAction(nameof(Detail), new { id = result.Data?.Id });
+    }
+
+    [HttpGet("/listas-compras/{id}/imprimir")]
+    public async Task<IActionResult> Imprimir(string id)
+    {
+        var result = await svc.ObterAsync(id);
+        if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Index));
         return View(new ListaComprasDetailViewModel { Detalhe = result.Data });
     }
 
