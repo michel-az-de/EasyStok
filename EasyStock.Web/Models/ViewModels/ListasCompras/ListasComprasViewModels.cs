@@ -12,3 +12,24 @@ public class ListaComprasDetailViewModel
 {
     public required ListaComprasDetalhe Detalhe { get; set; }
 }
+
+public class GerarListaViewModel
+{
+    public List<SugestaoReposicaoApi> Sugestoes { get; set; } = [];
+    public string NomeSugerido { get; set; } = "";
+}
+
+// Form de POST da tela de geração (model binding por índice: Itens[i].*).
+public class GerarListaForm
+{
+    public string? Nome { get; set; }
+    public string? Observacoes { get; set; }
+    public List<GerarListaItemForm> Itens { get; set; } = [];
+}
+
+public class GerarListaItemForm
+{
+    public bool Incluir { get; set; }
+    public string? Texto { get; set; }
+    public decimal? Quantidade { get; set; }
+}

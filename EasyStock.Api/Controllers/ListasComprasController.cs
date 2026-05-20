@@ -22,6 +22,7 @@ public class ListasComprasController(
     AdicionarItemListaComprasUseCase addItemUseCase,
     ToggleItemListaComprasUseCase toggleItemUseCase,
     RemoverItemListaComprasUseCase removeItemUseCase,
+    GerarListaComprasUseCase gerarUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List shopping lists (paginated)")]
@@ -55,6 +56,21 @@ public class ListasComprasController(
     {
         if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
         var result = await criarUseCase.ExecuteAsync(command with
+        {
+            EmpresaId = emp,
+            CriadaPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            Origem = command.Origem ?? "web"
+        });
+        return DataCreated($"/api/listas-compras/{result.Id}", result);
+    }
+
+    [SwaggerOperation(Summary = "Create list pre-populated with items (e.g. from low-stock suggestion)")]
+    [HttpPost("gerar")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> Gerar([FromBody] GerarListaComprasCommand command)
+    {
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
+        var result = await gerarUseCase.ExecuteAsync(command with
         {
             EmpresaId = emp,
             CriadaPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,

@@ -30,6 +30,19 @@ public class ListasComprasService(ApiClient api, SessionService session)
         });
     }
 
+    public Task<ApiResult<ListaCompras>> GerarAsync(string nome, string? observacoes, IEnumerable<object> itens)
+    {
+        var emp = GetEmpresaId();
+        if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<ListaCompras>());
+        return api.PostAsync<ListaCompras>("listas-compras/gerar", new
+        {
+            empresaId = emp, nome, observacoes,
+            criadaPorNome = session.GetUsuarioNome(),
+            origem = "web",
+            itens
+        });
+    }
+
     public Task<ApiResult<ListaCompras>> ArquivarAsync(string id) =>
         api.PostAsync<ListaCompras>($"listas-compras/{id}/arquivar?empresaId={GetEmpresaId()}", new { });
 

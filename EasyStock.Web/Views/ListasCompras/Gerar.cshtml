@@ -1,0 +1,112 @@
+@model GerarListaViewModel
+@using System.Globalization
+@{
+    ViewBag.Title = "Gerar lista de compras";
+    Layout = "_Layout";
+    var ptBR = new CultureInfo("pt-BR");
+    var temSugestoes = Model.Sugestoes.Any();
+}
+
+<div class="flex items-center gap-3 mb-6 flex-wrap">
+    <a asp-action="Index" asp-controller="ListasCompras" class="text-slate-400 hover:text-slate-600" aria-label="Voltar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+    </a>
+    <div class="pg-hd">
+        <h1>Gerar lista do que está acabando</h1>
+        <p>Itens abaixo do mínimo, já com a quantidade sugerida de compra. Revise, ajuste e crie a lista.</p>
+    </div>
+</div>
+
+@if (!temSugestoes)
+{
+    <div class="ws">
+        <div class="text-center py-10">
+            <div class="text-4xl mb-2">✅</div>
+            <p class="text-base font-semibold text-slate-700">Tudo abastecido!</p>
+            <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">Nenhum item está abaixo do mínimo agora. Quando algum produto baixar, ele aparece aqui para você gerar a compra em um clique.</p>
+            <a href="/listas-compras" class="inline-block mt-4 text-sm text-indigo-600 hover:text-indigo-700 font-medium">← Voltar para as listas</a>
+        </div>
+    </div>
+}
+else
+{
+    <form asp-action="Gerar" asp-controller="ListasCompras" method="post" x-data="gerarListaForm()">
+        @Html.AntiForgeryToken()
+
+        <div class="ws mb-4">
+            <label class="fm-field__label" for="lista-nome">Nome da lista</label>
+            <input id="lista-nome" type="text" name="Nome" value="@Model.NomeSugerido" maxlength="80"
+                   class="ui-field w-full text-sm mt-1" />
+        </div>
+
+        <div class="ws">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-900">@Model.Sugestoes.Count @(Model.Sugestoes.Count == 1 ? "item sugerido" : "itens sugeridos")</h2>
+                <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                    <input type="checkbox" x-on:change="toggleTodos($event.target.checked)" checked
+                           class="accent-indigo-600 w-4 h-4 cursor-pointer" />
+                    Marcar todos
+                </label>
+            </div>
+
+            <ul class="divide-y divide-slate-100">
+                @for (int i = 0; i < Model.Sugestoes.Count; i++)
+                {
+                    var s = Model.Sugestoes[i];
+                    var atual = s.QuantidadeAtual.ToString("0.##", ptBR);
+                    var qtdValue = s.QuantidadeSugerida.ToString("0.##", CultureInfo.InvariantCulture);
+                    var custoJs = s.CustoEstimado.ToString("0.00", CultureInfo.InvariantCulture);
+                    <li class="flex items-center gap-3 py-2.5">
+                        <input type="checkbox" name="Itens[@i].Incluir" value="true" checked
+                               x-on:change="recalc()" data-custo="@custoJs"
+                               class="accent-indigo-600 w-4 h-4 flex-shrink-0 cursor-pointer" />
+                        <input type="hidden" name="Itens[@i].Texto" value="@s.Nome" />
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-slate-800 truncate">@s.Nome</div>
+                            <div class="text-xs text-slate-400">
+                                atual @atual · mín @s.LimiteMinimo@if (s.CustoEstimado > 0) { <text> · ~R$ @s.CustoEstimado.ToString("N2", ptBR)</text> }
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            <input type="number" name="Itens[@i].Quantidade" value="@qtdValue"
+                                   step="0.01" min="0" class="ui-field text-sm text-right w-20" aria-label="Quantidade a comprar" />
+                            <span class="text-xs text-slate-400">un</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div class="flex items-center justify-between mt-4 gap-3 flex-wrap">
+            <a href="/listas-compras" class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</a>
+            <button type="submit" class="app-primary-btn px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
+                Gerar lista (<span x-text="count"></span> <span x-text="count === 1 ? 'item' : 'itens'"></span><span x-show="total > 0"> · ~R$ <span x-text="totalFmt"></span></span>)
+            </button>
+        </div>
+    </form>
+}
+
+@section Scripts {
+<script>
+function gerarListaForm() {
+    return {
+        count: 0,
+        total: 0,
+        get totalFmt() { return this.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+        init() { this.recalc(); },
+        recalc() {
+            const checks = [...this.$root.querySelectorAll('input[type=checkbox][data-custo]')];
+            const sel = checks.filter(c => c.checked);
+            this.count = sel.length;
+            this.total = sel.reduce((a, c) => a + parseFloat(c.dataset.custo || '0'), 0);
+        },
+        toggleTodos(val) {
+            this.$root.querySelectorAll('input[type=checkbox][data-custo]').forEach(c => c.checked = val);
+            this.recalc();
+        }
+    };
+}
+</script>
+}

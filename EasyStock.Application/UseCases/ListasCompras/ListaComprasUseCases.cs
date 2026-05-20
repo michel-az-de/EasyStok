@@ -270,3 +270,69 @@ public class RemoverItemListaComprasUseCase(
         return true;
     }
 }
+
+// ── GerarLista (criar lista já populada com itens) ───────────────────
+public sealed record GerarItemListaComprasInput(
+    [property: Required][property: MaxLength(255)] string Texto,
+    decimal? Quantidade = null,
+    [property: MaxLength(32)] string? Unidade = null,
+    string? Observacao = null,
+    [property: MaxLength(60)] string? Categoria = null);
+
+public sealed record GerarListaComprasCommand(
+    [property: Required] Guid EmpresaId,
+    [property: Required][property: MaxLength(120)] string Nome,
+    IReadOnlyList<GerarItemListaComprasInput> Itens,
+    Guid? LojaId = null,
+    string? Observacoes = null,
+    Guid? CriadaPorUserId = null,
+    [property: MaxLength(120)] string? CriadaPorNome = null,
+    [property: MaxLength(20)] string? Origem = "web");
+
+public class GerarListaComprasUseCase(
+    IListaComprasRepository repo, IUnitOfWork uow, ILogger<GerarListaComprasUseCase> logger)
+{
+    public async Task<ListaComprasResult> ExecuteAsync(GerarListaComprasCommand cmd)
+    {
+        UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        if (string.IsNullOrWhiteSpace(cmd.Nome))
+            throw new UseCaseValidationException("Nome da lista é obrigatório.");
+
+        var itensValidos = (cmd.Itens ?? Array.Empty<GerarItemListaComprasInput>())
+            .Where(i => !string.IsNullOrWhiteSpace(i.Texto))
+            .ToList();
+        if (itensValidos.Count == 0)
+            throw new UseCaseValidationException("Selecione ao menos um item para gerar a lista.");
+
+        var agora = DateTime.UtcNow;
+        var lista = ListaComprasEntity.Criar(cmd.EmpresaId, cmd.Nome, cmd.LojaId, cmd.Origem);
+        lista.Observacoes = cmd.Observacoes;
+        lista.CriadaPorUserId = cmd.CriadaPorUserId;
+        lista.CriadaPorNome = cmd.CriadaPorNome;
+
+        foreach (var input in itensValidos)
+        {
+            lista.Itens.Add(new ItemListaCompras
+            {
+                Id = Guid.NewGuid(),
+                ListaComprasId = lista.Id,
+                Texto = input.Texto.Trim(),
+                Quantidade = input.Quantidade,
+                Unidade = input.Unidade,
+                Observacao = input.Observacao,
+                Categoria = input.Categoria,
+                Done = false,
+                CriadoEm = agora,
+                AlteradoEm = agora
+            });
+        }
+
+        // Itens vão na coleção de navegação: EF insere lista + itens em cascata num único commit.
+        await repo.AddAsync(lista);
+        await uow.CommitAsync();
+
+        logger.LogInformation("Lista de compras {Id} '{Nome}' gerada com {Count} itens.",
+            lista.Id, lista.Nome, itensValidos.Count);
+        return ListaComprasMapper.Map(lista);
+    }
+}
