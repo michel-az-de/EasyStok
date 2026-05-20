@@ -22,7 +22,7 @@ public sealed record ListaComprasDetalheResult(
 );
 
 public sealed record ItemListaComprasResult(
-    Guid Id, Guid ListaComprasId,
+    Guid Id, Guid ListaComprasId, Guid? ProdutoId,
     string Texto, decimal? Quantidade, string? Unidade,
     string? Observacao, string? Categoria,
     bool Done, DateTime? DoneEm, Guid? DonePorUserId, string? DonePorNome,
@@ -38,7 +38,7 @@ internal static class ListaComprasMapper
         l.CriadoEm, l.AlteradoEm, l.ArquivadoEm);
 
     public static ItemListaComprasResult Map(ItemListaCompras i) => new(
-        i.Id, i.ListaComprasId, i.Texto, i.Quantidade, i.Unidade,
+        i.Id, i.ListaComprasId, i.ProdutoId, i.Texto, i.Quantidade, i.Unidade,
         i.Observacao, i.Categoria,
         i.Done, i.DoneEm, i.DonePorUserId, i.DonePorNome,
         i.CriadoEm, i.AlteradoEm);
@@ -274,6 +274,7 @@ public class RemoverItemListaComprasUseCase(
 // ── GerarLista (criar lista já populada com itens) ───────────────────
 public sealed record GerarItemListaComprasInput(
     [property: Required][property: MaxLength(255)] string Texto,
+    Guid? ProdutoId = null,
     decimal? Quantidade = null,
     [property: MaxLength(32)] string? Unidade = null,
     string? Observacao = null,
@@ -316,6 +317,7 @@ public class GerarListaComprasUseCase(
             {
                 Id = Guid.NewGuid(),
                 ListaComprasId = lista.Id,
+                ProdutoId = input.ProdutoId,
                 Texto = input.Texto.Trim(),
                 Quantidade = input.Quantidade,
                 Unidade = input.Unidade,

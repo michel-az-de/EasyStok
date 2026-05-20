@@ -26,7 +26,7 @@ public record ListaComprasDetalhe
 }
 
 public record ItemListaComprasDto(
-    string Id, string ListaComprasId,
+    string Id, string ListaComprasId, Guid? ProdutoId,
     string Texto, decimal? Quantidade, string? Unidade,
     string? Observacao, string? Categoria,
     bool Done, DateTime? DoneEm, Guid? DonePorUserId, string? DonePorNome,

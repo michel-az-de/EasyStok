@@ -23,6 +23,7 @@ public class ListasComprasController(
     ToggleItemListaComprasUseCase toggleItemUseCase,
     RemoverItemListaComprasUseCase removeItemUseCase,
     GerarListaComprasUseCase gerarUseCase,
+    GerarPedidosDaListaUseCase gerarPedidosUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List shopping lists (paginated)")]
@@ -77,6 +78,23 @@ public class ListasComprasController(
             Origem = command.Origem ?? "web"
         });
         return DataCreated($"/api/listas-compras/{result.Id}", result);
+    }
+
+    [SwaggerOperation(Summary = "Generate supplier orders from a list (grouped by preferred supplier; notifies suppliers)")]
+    [HttpPost("{id}/gerar-pedidos")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> GerarPedidos(
+        Guid id,
+        [FromQuery] Guid? empresaId,
+        [FromQuery] Guid? lojaId,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var key = string.IsNullOrWhiteSpace(idempotencyKey) ? Guid.NewGuid().ToString() : idempotencyKey;
+        var result = await gerarPedidosUseCase.ExecuteAsync(
+            new GerarPedidosDaListaCommand(emp, id, lojaId, key), ct);
+        return DataOk(result);
     }
 
     [SwaggerOperation(Summary = "Archive list")]

@@ -134,6 +134,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ToggleItemListaComprasUseCase>();
         services.AddScoped<RemoverItemListaComprasUseCase>();
         services.AddScoped<GerarListaComprasUseCase>();
+        services.AddScoped<GerarPedidosDaListaUseCase>();
 
         // Produtos e Categorias
         services.AddScoped<CadastrarProdutoUseCase>();

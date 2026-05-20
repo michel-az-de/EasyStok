@@ -43,6 +43,16 @@ public class ListasComprasService(ApiClient api, SessionService session)
         });
     }
 
+    public Task<ApiResult<GerarPedidosResultApi>> GerarPedidosAsync(string id)
+    {
+        var emp = GetEmpresaId();
+        if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<GerarPedidosResultApi>());
+        var loja = session.GetLojaId();
+        var lojaParam = string.IsNullOrEmpty(loja) ? "" : $"&lojaId={loja}";
+        return api.PostAsync<GerarPedidosResultApi>(
+            $"listas-compras/{id}/gerar-pedidos?empresaId={emp}{lojaParam}", new { });
+    }
+
     public Task<ApiResult<ListaCompras>> ArquivarAsync(string id) =>
         api.PostAsync<ListaCompras>($"listas-compras/{id}/arquivar?empresaId={GetEmpresaId()}", new { });
 

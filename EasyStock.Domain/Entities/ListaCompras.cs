@@ -73,6 +73,8 @@ namespace EasyStock.Domain.Entities
     {
         public Guid Id { get; set; }
         public Guid ListaComprasId { get; set; }
+        /// <summary>Produto de origem quando o item veio da geração automática; null em itens manuais (texto livre).</summary>
+        public Guid? ProdutoId { get; set; }
 
         public string Texto { get; set; } = null!;
         public decimal? Quantidade { get; set; }
