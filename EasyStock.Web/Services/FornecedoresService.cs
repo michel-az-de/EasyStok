@@ -105,17 +105,17 @@ public class FornecedoresService(ApiClient api, SessionService session)
         });
     }
 
-    public Task<ApiResult<object>> ReceberPedidoAsync(string pedidoId, string? tracking)
+    public Task<ApiResult<object>> ReceberPedidoAsync(string pedidoId)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
             return Task.FromResult(ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente."));
 
-        return api.PatchAsync<object>($"fornecedores/pedidos/{pedidoId}/receber", new
+        // receber-tudo: marca todos os itens como recebidos e dá entrada no estoque (fecha o ciclo de compra).
+        return api.PostAsync<object>($"fornecedores/pedidos/{pedidoId}/receber-tudo", new
         {
             empresaId,
-            dataRecebimento = DateTime.UtcNow,
-            tracking
+            dataRecebimento = DateTime.UtcNow
         });
     }
 

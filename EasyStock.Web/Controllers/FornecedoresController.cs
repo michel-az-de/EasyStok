@@ -234,12 +234,12 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
 
     [HttpPost("/fornecedores/pedidos/{id}/receber")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ReceberPedido(string id, string? tracking)
+    public async Task<IActionResult> ReceberPedido(string id)
     {
-        var result = await svc.ReceberPedidoAsync(id, tracking);
+        var result = await svc.ReceberPedidoAsync(id);
         if (HasError(result)) return RedirectToAction(nameof(PedidosAbertos));
 
-        Toast("success", "Pedido marcado como recebido!");
+        Toast("success", "Pedido recebido — itens deram entrada no estoque!");
         return RedirectToAction(nameof(PedidosAbertos));
     }
 

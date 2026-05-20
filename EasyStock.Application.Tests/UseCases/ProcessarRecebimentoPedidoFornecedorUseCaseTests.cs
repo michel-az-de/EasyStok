@@ -31,7 +31,16 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
     {
         _pedidoRepository = Substitute.For<IPedidoFornecedorRepository>();
         _itemRepository = Substitute.For<IPedidoFornecedorItemRepository>();
-        _entradaUseCase = Substitute.For<RegistrarEntradaEstoqueUseCase>();
+        // RegistrarEntradaEstoqueUseCase é classe concreta com ExecuteAsync virtual: NSubstitute
+        // exige todos os args do ctor (6 obrigatórios + 5 opcionais) para criar o proxy.
+        _entradaUseCase = Substitute.For<RegistrarEntradaEstoqueUseCase>(
+            Substitute.For<IProdutoRepository>(),
+            Substitute.For<IProdutoVariacaoRepository>(),
+            Substitute.For<IItemEstoqueRepository>(),
+            Substitute.For<IMovimentacaoEstoqueRepository>(),
+            _unitOfWork,
+            Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(),
+            null, null, null, null, null);
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _logger = Substitute.For<ILogger<ProcessarRecebimentoPedidoFornecedorUseCase>>();
         _publicador = Substitute.For<IPublicadorEventos>();

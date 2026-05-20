@@ -40,6 +40,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarPedidosAbertosUseCase>();
         services.AddScoped<CriarPedidoFornecedorUseCase>();
         services.AddScoped<ReceberPedidoFornecedorUseCase>();
+        // Recebimento com entrada de estoque (era injetado no controller sem registro — corrige 500 em /api/fornecedores).
+        services.AddScoped<ProcessarRecebimentoPedidoFornecedorUseCase>();
+        services.AddScoped<ReceberPedidoCompletoUseCase>();
         services.AddScoped<CancelarPedidoFornecedorUseCase>();
 
         // Auditoria de alterações
