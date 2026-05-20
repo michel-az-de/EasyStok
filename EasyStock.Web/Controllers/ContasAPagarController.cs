@@ -66,6 +66,11 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
             Toast("error", "Descricao e obrigatoria.");
             return RedirectToAction(nameof(Criar));
         }
+        if (categoriaFinanceiraId == Guid.Empty)
+        {
+            Toast("error", "Selecione ou crie uma categoria.");
+            return RedirectToAction(nameof(Criar));
+        }
         if (numeroParcelas < 1 || numeroParcelas > 36)
         {
             Toast("error", "Numero de parcelas deve estar entre 1 e 36.");
