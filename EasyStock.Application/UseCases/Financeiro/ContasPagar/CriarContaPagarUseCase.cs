@@ -70,13 +70,13 @@ public class CriarContaPagarUseCase(
         {
             var conta = ContaPagar.Criar(
                 cmd.EmpresaId, cmd.FornecedorId, cmd.CategoriaFinanceiraId,
-                cmd.Descricao, cmd.DataEmissao,
+                cmd.Descricao, DataUtc.ParaUtc(cmd.DataEmissao),
                 cmd.CentroCustoId, cmd.LojaId,
                 cmd.Origem, cmd.OrigemRefId, cmd.DocumentoReferencia,
-                cmd.DataCompetencia, cmd.Observacoes);
+                DataUtc.ParaUtcOpcional(cmd.DataCompetencia), cmd.Observacoes);
 
             foreach (var p in cmd.Parcelas.OrderBy(x => x.Numero))
-                conta.AdicionarParcela(p.Numero, p.Valor, p.DataVencimento, p.MetodoPlanejado);
+                conta.AdicionarParcela(p.Numero, p.Valor, DataUtc.ParaUtc(p.DataVencimento), p.MetodoPlanejado);
 
             if (cmd.EmitirAposCriar) conta.Emitir();
 

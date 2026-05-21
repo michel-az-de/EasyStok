@@ -51,12 +51,35 @@ namespace EasyStock.Infra.Postgre.Data
         }
 
         /// <summary>
-        /// Tenant atual usado pelo <c>HasQueryFilter</c> global. Quando não há
-        /// usuário autenticado (jobs, seeds, migrations) retorna
-        /// <see cref="Guid.Empty"/> — o filtro elimina tudo, exigindo que o
-        /// chamador use <c>IgnoreQueryFilters()</c> explicitamente.
+        /// Override explícito de tenant para fluxos SEM principal JWT (módulo
+        /// Mobile, autenticado por <c>X-Mobile-Api-Key</c>). Setado via
+        /// <see cref="SetMobileTenantContext"/>; tem precedência sobre o claim.
         /// </summary>
-        public Guid CurrentTenantId => _currentUser is { IsAuthenticated: true } u ? u.EmpresaId : Guid.Empty;
+        private Guid? _tenantContextOverride;
+
+        /// <summary>
+        /// Tenant atual usado pelo <c>HasQueryFilter</c> global E pelo
+        /// <c>SetTenantOnConnectionInterceptor</c> (que emite <c>SET app.empresa_id</c>).
+        /// Ordem de resolução: override explícito (Mobile) → claim do JWT →
+        /// <see cref="Guid.Empty"/> (jobs/seeds/migrations, que devem usar
+        /// <c>IgnoreQueryFilters()</c> + bypass).
+        /// </summary>
+        public Guid CurrentTenantId =>
+            _tenantContextOverride
+            ?? (_currentUser is { IsAuthenticated: true } u ? u.EmpresaId : Guid.Empty);
+
+        /// <summary>
+        /// Define o tenant da conexão quando NÃO há principal JWT — o caso do
+        /// módulo Mobile (device via <c>X-Mobile-Api-Key</c>). Sem isto,
+        /// <see cref="CurrentTenantId"/> cairia em <see cref="Guid.Empty"/> e a
+        /// policy RLS <c>tenant_isolation</c> (fail-closed) zeraria as linhas ERP
+        /// no sync reverso (web→mobile) e bloquearia o auto-link mobile→ERP por
+        /// <c>WITH CHECK</c> — silenciosamente. Com o tenant do device setado, o
+        /// interceptor emite <c>SET app.empresa_id</c> correto e o RLS libera
+        /// EXATAMENTE aquele tenant (isolamento preservado). O DbContext é scoped
+        /// por request, então o valor não vaza entre requests.
+        /// </summary>
+        public void SetMobileTenantContext(Guid empresaId) => _tenantContextOverride = empresaId;
 
         /// <summary>
         /// Bypass do filtro multi-tenant para SuperAdmin (back-office cross-tenant).

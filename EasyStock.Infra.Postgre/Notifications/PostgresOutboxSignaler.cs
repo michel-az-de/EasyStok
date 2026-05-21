@@ -113,11 +113,16 @@ public sealed class PostgresOutboxSignaler : IOutboxSignaler, IHostedService, IA
 
     public async ValueTask DisposeAsync()
     {
-        // Marca disposed ANTES de cancelar/disposed objetos — Signal() vai virar no-op
+        // Idempotente: o host (e o WebApplicationFactory nos testes) pode chamar
+        // DisposeAsync mais de uma vez. Sem este guard, a 2ª chamada fazia
+        // _cts.Cancel() num CTS já disposed → ObjectDisposedException no shutdown.
+        if (_disposed) return;
+
+        // Marca disposed ANTES de cancelar/disposed objetos — Signal() vira no-op
         // mesmo se o callback do Npgsql disparar entre o cancel e o dispose do semáforo.
         _disposed = true;
 
-        if (_cts is not null) _cts.Cancel();
+        try { _cts?.Cancel(); } catch (ObjectDisposedException) { /* já cancelado/disposed */ }
         if (_listenLoop is not null)
         {
             try { await _listenLoop; } catch { /* shutdown */ }

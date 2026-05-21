@@ -113,4 +113,22 @@ public class AlterarAgendamentoPedidoUseCaseTests
         result.Should().BeNull();
         await _uow.DidNotReceive().CommitAsync();
     }
+
+    [Fact]
+    public async Task DeveNormalizarAgendamentoParaUtc_QuandoClienteEnviaSemFuso()
+    {
+        // Regressão: a data agendada chega do cliente com Kind=Unspecified e o Postgres
+        // timestamptz rejeita no save. O caminho de EDIÇÃO deve normalizar pra UTC
+        // (espelha o fix do CriarPedido — antes este path reintroduzia o bug).
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var futuroSemFuso = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Unspecified);
+        await Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(empresaId, pedido.Id, futuroSemFuso));
+
+        pedido.AgendadoParaEm.Should().NotBeNull();
+        pedido.AgendadoParaEm!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        await _uow.Received(1).CommitAsync();
+    }
 }

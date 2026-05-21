@@ -66,13 +66,19 @@ public class SyncController(
         var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
 
         // F10-C-3 — Idempotency: pre-check mutations já processadas.
+        // Dedup por MutationId GLOBAL (não por device). Os ids são UUID v4
+        // ('mut_' + crypto.randomUUID, ver pwa/sync.js) — globalmente únicos.
+        // Antes a checagem exigia DeviceId == req.DeviceId; após re-pareamento
+        // (novo deviceId, mesmos mutationIds) a dedup falhava e a mutation era
+        // reaplicada → Venda + baixa de estoque DUPLICADAS. Como o id é único,
+        // basta o MutationId; nunca descarta mutation legítima de outro device.
         var mutationIds = req.Mutations.Select(m => m.Id).Where(id => !string.IsNullOrEmpty(id)).ToList();
         var alreadyProcessed = new Dictionary<string, MobileProcessedMutation>(StringComparer.Ordinal);
-        if (mutationIds.Count > 0 && !string.IsNullOrEmpty(req.DeviceId))
+        if (mutationIds.Count > 0)
         {
             var existing = await _db.MobileProcessedMutations
                 .AsNoTracking()
-                .Where(p => mutationIds.Contains(p.MutationId) && p.DeviceId == req.DeviceId)
+                .Where(p => mutationIds.Contains(p.MutationId))
                 .ToListAsync();
             foreach (var e in existing)
                 alreadyProcessed[e.MutationId] = e;

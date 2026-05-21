@@ -95,7 +95,7 @@ public class ReconciliarPixParcelaReceberUseCase(
         {
             var pagamento = PagamentoParcela.CriarConfirmado(
                 conta.EmpresaId, TipoLadoFinanceiro.Receber,
-                aplicado, "pix", pagoEm,
+                aplicado, "pix", DataUtc.ParaUtc(pagoEm),
                 "EfiPix", cmd.Txid, "Reconciliado via Pix Efi");
             parcela.RegistrarPagamento(pagamento);
 

@@ -64,7 +64,7 @@ public sealed class BaixarLancamentoUseCase(
             {
                 baixa = lancamento.RegistrarBaixa(
                     valor: cmd.Valor,
-                    dataBaixa: cmd.DataBaixa == default ? DateTime.UtcNow : cmd.DataBaixa,
+                    dataBaixa: cmd.DataBaixa == default ? DateTime.UtcNow : DataUtc.ParaUtc(cmd.DataBaixa),
                     meioPagamento: cmd.MeioPagamento,
                     contaBancariaId: cmd.ContaBancariaId,
                     chaveExterna: cmd.ChaveExterna,

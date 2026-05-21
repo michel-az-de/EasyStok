@@ -185,7 +185,12 @@ switch (resolvedProvider)
         builder.Services.AddEasyStockIntegrationResilience();
         builder.Services.AddFocusNFeAdapter(builder.Configuration);
         builder.Services.AddMockFiscalGateway();
-        builder.Services.AddSingleton<IGatewayFiscalFactory, GatewayFiscalFactory>();
+        // Scoped (não Singleton): a factory consome IEnumerable<IGatewayFiscal>, e os
+        // adapters (Focus/Mock) são Scoped (dependem de serviços scoped como
+        // INfeCertificadoA1Service). Como Singleton, capturava gateways scoped
+        // (captive dependency / lifetime mismatch) — só não explodia em prod porque
+        // ValidateOnBuild fica off lá. Os consumidores (use cases fiscais) são Scoped.
+        builder.Services.AddScoped<IGatewayFiscalFactory, GatewayFiscalFactory>();
         builder.Services.AddDataProtection();
         break;
 

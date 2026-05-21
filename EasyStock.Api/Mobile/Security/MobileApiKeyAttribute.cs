@@ -96,6 +96,12 @@ internal sealed class MobileApiKeyFilter(
         // Disponibiliza o device pro controller via HttpContext.Items.
         http.Items[MobileAuth.HttpContextItemDevice] = device;
 
+        // Sem JWT, CurrentTenantId cairia em Guid.Empty e a policy RLS zeraria as
+        // linhas ERP no sync reverso (web→mobile) e bloquearia writes mobile→ERP.
+        // Seta o tenant do device no DbContext request-scoped → interceptor emite
+        // SET app.empresa_id correto. Isolamento preservado (vê só este tenant).
+        db.SetMobileTenantContext(device.EmpresaId);
+
         // Atualiza last_seen async (fire-and-forget) num scope DI proprio.
         // Antes usava o mesmo `db` do request — concorrente com operacoes
         // do controller causava "A second operation was started on this

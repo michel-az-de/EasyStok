@@ -64,7 +64,7 @@ public class EmitirFaturaUseCase(
             }
         }
 
-        var dataEmissao = cmd.DataEmissao ?? DateTime.UtcNow;
+        var dataEmissao = DataUtc.ParaUtcOpcional(cmd.DataEmissao) ?? DateTime.UtcNow;
         var numero = await numerador.GerarAsync(cmd.EmpresaId, dataEmissao, ct);
 
         var fatura = Fatura.Criar(
@@ -74,7 +74,7 @@ public class EmitirFaturaUseCase(
             dadosEmissor: cmd.DadosEmissor,
             origem: cmd.Origem,
             dataEmissao: dataEmissao,
-            dataVencimento: cmd.DataVencimento,
+            dataVencimento: DataUtc.ParaUtc(cmd.DataVencimento),
             clienteId: cmd.ClienteId,
             origemRefId: cmd.OrigemRefId,
             observacoes: cmd.Observacoes,

@@ -53,11 +53,15 @@ public class CriarPedidoUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
+        // Postgres 'timestamp with time zone' exige UTC; a data agendada vem do cliente
+        // com Kind=Unspecified e o Npgsql rejeita no save. Normaliza para UTC.
+        var agendadoParaEm = DataUtc.ParaUtcOpcional(cmd.AgendadoParaEm);
+
         // F5 — agendamento precisa ser no futuro. PWA valida client-side, mas
         // API publica e SyncController nao validam — espelha a checagem aqui
         // pra impedir pedido agendado pro passado (worker ignoraria silenciosamente
         // via filtro de status, mas dado corrompido fica registrado).
-        if (cmd.AgendadoParaEm.HasValue && cmd.AgendadoParaEm.Value <= DateTime.UtcNow)
+        if (agendadoParaEm.HasValue && agendadoParaEm.Value <= DateTime.UtcNow)
             throw new UseCaseValidationException("Data agendada precisa ser no futuro.");
 
         // Pedido sem itens é permitido (operador pode adicionar depois via
@@ -94,7 +98,7 @@ public class CriarPedidoUseCase(
         }
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
-        pedido.AgendadoParaEm = cmd.AgendadoParaEm;
+        pedido.AgendadoParaEm = agendadoParaEm;
 
         // Adiciona itens.
         if (cmd.Itens != null)

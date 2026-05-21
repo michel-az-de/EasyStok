@@ -26,7 +26,10 @@ public class AlterarAgendamentoPedidoUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
 
-        if (cmd.AgendadoParaEm.HasValue && cmd.AgendadoParaEm.Value <= DateTime.UtcNow)
+        // Normaliza pra UTC: a data vem do cliente com Kind=Unspecified e o Postgres
+        // timestamptz rejeita no save (mesma classe de bug já corrigida no CriarPedido).
+        var agendado = DataUtc.ParaUtcOpcional(cmd.AgendadoParaEm);
+        if (agendado.HasValue && agendado.Value <= DateTime.UtcNow)
             throw new UseCaseValidationException("Data agendada precisa ser no futuro.");
 
         var pedido = await pedidoRepo.GetByIdAsync(cmd.EmpresaId, cmd.PedidoId);
@@ -36,7 +39,7 @@ public class AlterarAgendamentoPedidoUseCase(
             throw new UseCaseValidationException("Não é possível alterar agendamento de pedido entregue ou cancelado.");
 
         var anterior = pedido.AgendadoParaEm;
-        pedido.AgendadoParaEm = cmd.AgendadoParaEm;
+        pedido.AgendadoParaEm = agendado;
         pedido.AlteradoEm = DateTime.UtcNow;
 
         var descricao = cmd.AgendadoParaEm.HasValue
