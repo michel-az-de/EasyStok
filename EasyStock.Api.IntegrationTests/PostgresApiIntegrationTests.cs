@@ -10,8 +10,16 @@ using Testcontainers.PostgreSql;
 namespace EasyStock.Api.IntegrationTests;
 
 /// <summary>
-/// Testes de integração da API com PostgreSQL real via Testcontainers.
-/// Cobrem: health check, autenticação (login), e endpoints protegidos.
+/// Testes de integração web→API com PostgreSQL real via Testcontainers. Sobem a
+/// API inteira (<see cref="WebApplicationFactory{Program}"/>) apontando para um
+/// Postgres efêmero, rodam migrations + seed no startup e batem HTTP nos mesmos
+/// endpoints que o EasyStock.Web consome.
+///
+/// <para>
+/// <b>Docker obrigatório.</b> Sem Docker o Testcontainers não sobe e os testes
+/// são PULADOS de forma visível (<c>Skip.IfNot</c>) — nunca passam vazios
+/// (falso-verde). Em CI/máquina com Docker eles exercem o caminho real.
+/// </para>
 /// </summary>
 public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 {
@@ -74,12 +82,28 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             });
     }
 
+    private async Task<HttpClient> ClienteAutenticadoAdminAsync(WebApplicationFactory<Program> factory)
+    {
+        var client = factory.CreateClient();
+        var loginResp = await client.PostAsJsonAsync("/api/auth/login",
+            new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" });
+
+        Skip.IfNot(loginResp.IsSuccessStatusCode,
+            "Login admin indisponível (seed não rodou) — fluxo autenticado web→API pulado.");
+
+        var body = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
+        var token = body.GetProperty("token").GetString();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
     // ─── Health Check ─────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task Health_deve_retornar_Healthy_com_PostgreSQL()
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -91,10 +115,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     // ─── Autenticação ─────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_com_credenciais_invalidas_deve_retornar_401()
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -105,10 +129,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_admin_deve_retornar_token_JWT()
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -123,10 +147,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         body.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_gerente_deve_retornar_token_JWT()
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -137,10 +161,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_operador_deve_retornar_token_JWT()
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -151,17 +175,20 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    // ─── Endpoints protegidos sem autenticação ────────────────────────────────
+    // ─── Endpoints protegidos sem autenticação (todos exigem token) ────────────
 
-    [Theory]
+    [SkippableTheory]
     [InlineData("/api/produtos")]
     [InlineData("/api/estoque")]
     [InlineData("/api/lojas")]
     [InlineData("/api/categorias")]
     [InlineData("/api/notificacoes")]
+    [InlineData("/api/contas-a-pagar")]
+    [InlineData("/api/contas-a-receber")]
+    [InlineData("/api/pedidos")]
     public async Task Endpoint_protegido_sem_token_deve_retornar_401(string path)
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -171,32 +198,27 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    // ─── Endpoints com autenticação Admin ─────────────────────────────────────
+    // ─── Endpoints com autenticação Admin (web→API ponta-a-ponta) ──────────────
+    // Inclui os módulos que quebravam em produção (contas a pagar/receber, pedidos):
+    // este teste prova que login + resolução de empresaId + query no Postgres real
+    // funcionam ponta-a-ponta, sem 500.
 
-    [Theory]
+    [SkippableTheory]
     [InlineData("/api/produtos")]
     [InlineData("/api/estoque")]
     [InlineData("/api/lojas")]
     [InlineData("/api/categorias")]
     [InlineData("/api/fornecedores")]
     [InlineData("/api/notificacoes")]
+    [InlineData("/api/contas-a-pagar")]
+    [InlineData("/api/contas-a-receber")]
+    [InlineData("/api/pedidos")]
     public async Task Endpoint_com_token_admin_deve_retornar_2xx(string path)
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         await using var factory = CriarFactory();
-        using var client = factory.CreateClient();
-
-        // Login como Admin
-        var loginResp = await client.PostAsJsonAsync("/api/auth/login",
-            new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" });
-
-        if (!loginResp.IsSuccessStatusCode) return; // Seed ainda nao rodou
-
-        var body = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
-        var token = body.GetProperty("token").GetString();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        using var client = await ClienteAutenticadoAdminAsync(factory);
 
         var response = await client.GetAsync(path);
 
@@ -209,10 +231,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     // ─── Migrations ───────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task Migrations_devem_rodar_sem_erros_no_startup()
     {
-        if (!_isAvailable) return;
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
 
         // Se a factory sobe sem exceção, as migrations rodaram
         await using var factory = CriarFactory();

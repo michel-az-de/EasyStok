@@ -128,4 +128,38 @@ public class FornecedorUseCasesTests
         result.Total.Should().Be(1);
         result.Fornecedores.Should().ContainSingle();
     }
+
+    // ── Guards (cenários absurdos) ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task Deve_lancar_validation_quando_empresaId_vazio()
+    {
+        var fornecedorRepository = Substitute.For<IFornecedorRepository>();
+        var assinaturaRepository = Substitute.For<IAssinaturaEmpresaRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = new CriarFornecedorUseCase(fornecedorRepository, assinaturaRepository, unitOfWork,
+            Substitute.For<ILogger<CriarFornecedorUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new CriarFornecedorCommand(
+            Guid.Empty, "Fornecedor A", null, null, null, null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Deve_lancar_validation_quando_email_invalido()
+    {
+        var fornecedorRepository = Substitute.For<IFornecedorRepository>();
+        var assinaturaRepository = Substitute.For<IAssinaturaEmpresaRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = new CriarFornecedorUseCase(fornecedorRepository, assinaturaRepository, unitOfWork,
+            Substitute.For<ILogger<CriarFornecedorUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new CriarFornecedorCommand(
+            Guid.NewGuid(), "Fornecedor A", null, "isto-nao-eh-email", null, null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
 }
