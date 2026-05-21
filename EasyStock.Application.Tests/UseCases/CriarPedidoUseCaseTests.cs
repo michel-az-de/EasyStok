@@ -60,4 +60,122 @@ public class CriarPedidoUseCaseTests
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*futuro*");
         await _uow.DidNotReceive().CommitAsync();
     }
+
+    // ── Itens: cenários absurdos (não podem virar 500) ─────────────────────────
+
+    [Fact]
+    public async Task DeveLancarValidation_QuandoItemComQuantidadeZeroOuNegativa()
+    {
+        var empresaId = Guid.NewGuid();
+        var cmd = new CriarPedidoCommand(empresaId, Itens: new[]
+        {
+            new CriarPedidoItemInput("Pão", Quantidade: 0m, PrecoUnitario: 5m),
+        });
+
+        var act = () => Sut().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveLancarValidation_QuandoItemComPrecoNegativo()
+    {
+        var empresaId = Guid.NewGuid();
+        var cmd = new CriarPedidoCommand(empresaId, Itens: new[]
+        {
+            new CriarPedidoItemInput("Pão", Quantidade: 1m, PrecoUnitario: -5m),
+        });
+
+        var act = () => Sut().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveLancarValidation_QuandoItemSemNome()
+    {
+        var empresaId = Guid.NewGuid();
+        var cmd = new CriarPedidoCommand(empresaId, Itens: new[]
+        {
+            new CriarPedidoItemInput("   ", Quantidade: 1m, PrecoUnitario: 5m),
+        });
+
+        var act = () => Sut().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveLancarValidation_QuandoProdutoDoItemNaoPertenceAEmpresa()
+    {
+        // Cross-tenant: item referencia ProdutoId que não existe nesta empresa.
+        var empresaId = Guid.NewGuid();
+        // _produtoRepo.GetByIdAsync(...) não configurado → null → deve barrar.
+        var cmd = new CriarPedidoCommand(empresaId, Itens: new[]
+        {
+            new CriarPedidoItemInput("Farinha", Quantidade: 1m, PrecoUnitario: 5m, ProdutoId: Guid.NewGuid()),
+        });
+
+        var act = () => Sut().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*empresa*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveLancarValidation_QuandoClienteInexistente()
+    {
+        var empresaId = Guid.NewGuid();
+        // _clienteRepo.GetByIdAsync(empresaId, id) não configurado → null.
+        var cmd = new CriarPedidoCommand(empresaId, ClienteId: Guid.NewGuid());
+
+        var act = () => Sut().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*liente*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveRecalcularTotal_ComMultiplosItens()
+    {
+        var empresaId = Guid.NewGuid();
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+
+        var cmd = new CriarPedidoCommand(empresaId, Itens: new[]
+        {
+            new CriarPedidoItemInput("Pão",   Quantidade: 2m, PrecoUnitario: 10m), // 20
+            new CriarPedidoItemInput("Leite", Quantidade: 3m, PrecoUnitario: 5m),  // 15
+        });
+
+        await Sut().ExecuteAsync(cmd);
+
+        salvo.Should().NotBeNull();
+        salvo!.Itens.Should().HaveCount(2);
+        ((decimal)salvo.Total).Should().Be(35m);
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveAplicarSnapshotAdHoc_QuandoSemCliente()
+    {
+        var empresaId = Guid.NewGuid();
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+
+        var cmd = new CriarPedidoCommand(empresaId,
+            ClienteNomeAdHoc: "Maria", ClienteAptAdHoc: "101", ClienteTelefoneAdHoc: "11999990000");
+
+        await Sut().ExecuteAsync(cmd);
+
+        salvo.Should().NotBeNull();
+        salvo!.ClienteId.Should().BeNull();
+        salvo.ClienteNome.Should().Be("Maria");
+        salvo.ClienteApt.Should().Be("101");
+        salvo.ClienteTelefone.Should().Be("11999990000");
+        await _uow.Received(1).CommitAsync();
+    }
 }
