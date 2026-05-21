@@ -75,8 +75,9 @@ public static class UserFacingErrors
     // JSON/ProblemDetails crus, traços ANSI de runtime .NET ou Java.
     private static readonly Regex TechnicalPattern = new(
         @"(?ix)
-            \bSystem\.[A-Z]\w+\.[A-Z]\w+   # System.Collections.Generic
+            \bSystem\.[A-Z]\w+              # System.Exception, System.Collections...
           | \bMicrosoft\.\w+\.\w+           # Microsoft.EntityFrameworkCore...
+          | \bNpgsql\b                      # Npgsql / Postgres driver leaks
           | \b\w+Exception\b                # NullReferenceException, SqlException
           | \bat\s+\w+\.\w+\.\w+            # at Foo.Bar.Baz (stack frame)
           | --->\s                          # ---> inner exception marker
