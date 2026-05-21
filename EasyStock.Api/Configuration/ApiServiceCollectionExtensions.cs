@@ -4,6 +4,7 @@ using EasyStock.Api.Observability;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -425,18 +426,9 @@ public static class ApiServiceCollectionExtensions
 
     public static IServiceCollection AddEasyStockFileStorage(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<FileStorageOptions>(configuration.GetSection(ConfigurationKeys.SectionFileStorage));
-
-        var fileStorageOptions = configuration
-            .GetSection(ConfigurationKeys.SectionFileStorage)
-            .Get<FileStorageOptions>() ?? new FileStorageOptions();
-
-        if (string.Equals(fileStorageOptions.Provider, "AzureFileShare", StringComparison.OrdinalIgnoreCase))
-            services.AddSingleton<IFileStorage, AzureFileShareStorage>();
-        else if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
-            services.AddSingleton<IFileStorage, S3CompatibleFileStorage>();
-        else
-            services.AddSingleton<IFileStorage, LocalFileStorage>();
+        // IFileStorage (provider switch Local/S3/AzureFileShare) vive em Infra.Async.Storage,
+        // compartilhado com o Worker — que também precisa dele para o motor de relatórios.
+        services.AddEasyStockFileStorageCore(configuration);
 
         services.AddSingleton<IImageProcessor, SkiaImageProcessor>();
 

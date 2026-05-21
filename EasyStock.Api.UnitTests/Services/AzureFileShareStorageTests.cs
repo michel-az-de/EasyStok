@@ -1,6 +1,5 @@
-using EasyStock.Api.Configuration;
-using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Infra.Async.Storage;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 
