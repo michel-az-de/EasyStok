@@ -14,6 +14,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
+    <!-- Pin explícito: uma dep transitiva trazia EntityFrameworkCore.Relational 9.0.1
+         enquanto EF Core/Npgsql são 9.0.4 — o Worker falhava no runtime ao carregar
+         Relational 9.0.4 (downgrade silencioso, warning MSB3277). Fixar 9.0.4 unifica
+         a versão em todos os dependentes e destrava o startup. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.4">
