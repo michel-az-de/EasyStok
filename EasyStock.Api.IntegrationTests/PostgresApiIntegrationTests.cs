@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using System.Net;
@@ -25,6 +26,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
+    private string? _connString;
 
     private const string JwtIssuer  = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -32,6 +34,28 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Prioridade 1: Postgres externo via env var EASYSTOCK_IT_PG (CI ou ambiente
+        // sem Docker — ex.: Postgres local/WSL). Permite rodar a integração web→API
+        // DE VERDADE onde o Testcontainers não consegue subir um container.
+        var externalPg = Environment.GetEnvironmentVariable("EASYSTOCK_IT_PG");
+        if (!string.IsNullOrWhiteSpace(externalPg))
+        {
+            _connString = externalPg;
+            // WebApplicationFactory + Minimal API top-level: o ConfigureAppConfiguration
+            // nem sempre sobrescreve o que o Program lê no startup (o GetConnectionString
+            // saía null → AddNpgSql quebrava / auto-detect caía p/ SQLite). Env vars são
+            // lidas pelo CreateBuilder de forma confiável (precedência alta, cedo).
+            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", externalPg);
+            Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
+            Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
+            Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
+            // Production exige a senha do bootstrap de SuperAdmin via env var.
+            Environment.SetEnvironmentVariable("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
+            _isAvailable = true;
+            return;
+        }
+
+        // Prioridade 2: Testcontainers (Docker disponível).
         try
         {
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
@@ -41,6 +65,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
                 .Build();
 
             await _pg.StartAsync();
+            _connString = _pg.GetConnectionString();
             _isAvailable = true;
         }
         catch (DockerUnavailableException)
@@ -57,17 +82,28 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     private WebApplicationFactory<Program> CriarFactory()
     {
-        if (_pg is null) throw new InvalidOperationException("Contêiner PostgreSQL não disponível.");
+        if (_connString is null) throw new InvalidOperationException("PostgreSQL de teste não disponível.");
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
+                // Development (padrão do WebApplicationFactory): roda migrations + seed
+                // demo (cria o admin de teste) no startup e liga ValidateOnBuild — que
+                // valida o container REAL de produção (branch postgresql). O auto-detect
+                // resolve PostgreSql porque a connection string vai via env var
+                // (ConnectionStrings__DefaultConnection, ver InitializeAsync) — antes saía
+                // null e caía no fallback SQLite.
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["Database:Provider"]                      = "PostgreSql",
-                        ["ConnectionStrings:DefaultConnection"]     = _pg.GetConnectionString(),
+                        ["ConnectionStrings:DefaultConnection"]     = _connString,
+                        // Production não roda migrations no startup por padrão; forçamos
+                        // p/ o banco de teste vazio receber o schema completo (inclui RLS).
+                        ["RunMigrationsOnStartup"]                  = "true",
+                        // Em Production a app exige Mobile:ApiKey com >= 24 chars.
+                        ["Mobile:ApiKey"]                           = "easystock-integration-test-mobile-key-0001",
                         ["ConnectionStrings:Redis"]                 = "localhost:6379",
                         ["Jwt:Issuer"]                             = JwtIssuer,
                         ["Jwt:Audience"]                           = JwtAudience,
