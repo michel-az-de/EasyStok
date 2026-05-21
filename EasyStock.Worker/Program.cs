@@ -113,7 +113,12 @@ builder.Services.AddReportingWorker();
 builder.Services.AddEasyStockIntegrationResilience();
 builder.Services.AddFocusNFeAdapter(builder.Configuration);
 builder.Services.AddMockFiscalGateway();
-builder.Services.AddSingleton<EasyStock.Application.Ports.Output.Fiscal.IGatewayFiscalFactory,
+// Scoped (não Singleton): a factory consome IGatewayFiscal Scoped — como Singleton
+// capturava gateways scoped (captive dependency / lifetime mismatch). Mesmo fix da
+// API (#193). Os jobs (hosted services) já resolvem os use cases fiscais via
+// IServiceScope (ex.: ReprocessarContingenciaBackgroundService.CreateScope()), então
+// a factory scoped resolve corretamente dentro do scope.
+builder.Services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGatewayFiscalFactory,
     EasyStock.Infra.Integrations.Fiscal.GatewayFiscalFactory>();
 builder.Services.AddDataProtection();
 builder.Services.AddHostedService<ReprocessarContingenciaBackgroundService>();
