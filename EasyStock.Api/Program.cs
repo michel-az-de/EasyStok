@@ -280,6 +280,24 @@ builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
+// ── Modo migrate-only (release_command do deploy) ─────────────────────────────
+// Aplica migrations pendentes e ENCERRA, sem subir o servidor. O deploy (Fly
+// release_command) roda este modo numa máquina temporária ANTES de promover a
+// versão nova; se a migration falhar (exit != 0), o deploy é abortado e a versão
+// antiga continua servindo — produção nunca fica com código novo + banco velho.
+if (args.Contains("--migrate-only"))
+{
+    using var migrateScope = app.Services.CreateScope();
+    var migrateDb = migrateScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+    using var _ = migrateDb.UseRowLevelSecurityBypass();
+    var pendentes = (await migrateDb.Database.GetPendingMigrationsAsync()).ToList();
+    app.Logger.LogInformation("[migrate-only] {Count} migration(s) pendente(s): {Lista}",
+        pendentes.Count, pendentes.Count == 0 ? "(nenhuma)" : string.Join(", ", pendentes));
+    await migrateDb.Database.MigrateAsync();
+    app.Logger.LogInformation("[migrate-only] Concluido. Encerrando sem subir o servidor.");
+    return;
+}
+
 // ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
 // X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
 app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions

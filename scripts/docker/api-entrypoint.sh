@@ -19,5 +19,12 @@ if [ -z "$ConnectionStrings__DefaultConnection" ]; then
   exit 1
 fi
 
+# Modo migrate-only (release_command do deploy): aplica migrations e encerra,
+# sem subir o servidor. Se falhar, o deploy e abortado (versao antiga continua).
+if [ "$1" = "--migrate-only" ]; then
+  echo "[entrypoint] >>> Modo migrate-only: aplicando migrations e encerrando..."
+  exec dotnet EasyStock.Api.dll --migrate-only
+fi
+
 echo "[entrypoint] >>> Iniciando API (migrations rodam no startup do app)..."
 exec dotnet EasyStock.Api.dll

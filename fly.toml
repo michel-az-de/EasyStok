@@ -16,6 +16,13 @@ primary_region = "iad"
 [build]
   dockerfile = "Dockerfile"
 
+# Antes de promover a versao nova, o Fly roda as migrations numa maquina
+# temporaria (entrypoint recebe --migrate-only → app migra e encerra). Se a
+# migration falhar, o deploy e abortado e a versao antiga continua servindo —
+# producao nunca fica com codigo novo + banco velho.
+[deploy]
+  release_command = "--migrate-only"
+
 [http_service]
   internal_port = 8080
   force_https = true
