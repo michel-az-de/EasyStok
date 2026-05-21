@@ -23,7 +23,7 @@ public class AdicionarParcelaContaReceberUseCase(IContaReceberRepository repo, I
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ContaReceberId, ct);
         if (c is null) return null;
 
-        try { c.AdicionarParcela(cmd.Numero, cmd.Valor, cmd.DataVencimento, cmd.MetodoPlanejado); }
+        try { c.AdicionarParcela(cmd.Numero, cmd.Valor, DataUtc.ParaUtc(cmd.DataVencimento), cmd.MetodoPlanejado); }
         catch (RegraDeDominioVioladaException ex) { throw new UseCaseValidationException(ex.Message); }
 
         await repo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(

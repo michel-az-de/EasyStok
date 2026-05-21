@@ -70,13 +70,13 @@ public class CriarContaPagarUseCase(
         {
             var conta = ContaPagar.Criar(
                 cmd.EmpresaId, cmd.FornecedorId, cmd.CategoriaFinanceiraId,
-                cmd.Descricao, ParaUtc(cmd.DataEmissao),
+                cmd.Descricao, DataUtc.ParaUtc(cmd.DataEmissao),
                 cmd.CentroCustoId, cmd.LojaId,
                 cmd.Origem, cmd.OrigemRefId, cmd.DocumentoReferencia,
-                ParaUtcOpcional(cmd.DataCompetencia), cmd.Observacoes);
+                DataUtc.ParaUtcOpcional(cmd.DataCompetencia), cmd.Observacoes);
 
             foreach (var p in cmd.Parcelas.OrderBy(x => x.Numero))
-                conta.AdicionarParcela(p.Numero, p.Valor, ParaUtc(p.DataVencimento), p.MetodoPlanejado);
+                conta.AdicionarParcela(p.Numero, p.Valor, DataUtc.ParaUtc(p.DataVencimento), p.MetodoPlanejado);
 
             if (cmd.EmitirAposCriar) conta.Emitir();
 
@@ -97,14 +97,4 @@ public class CriarContaPagarUseCase(
             throw new UseCaseValidationException(ex.Message);
         }
     }
-
-    // Postgres 'timestamp with time zone' exige UTC; datas vindas do cliente (vencimento,
-    // emissão) chegam com Kind=Unspecified e o Npgsql rejeita. Normaliza para UTC.
-    private static DateTime ParaUtc(DateTime d) => d.Kind switch
-    {
-        DateTimeKind.Utc => d,
-        DateTimeKind.Local => d.ToUniversalTime(),
-        _ => DateTime.SpecifyKind(d, DateTimeKind.Utc)
-    };
-    private static DateTime? ParaUtcOpcional(DateTime? d) => d.HasValue ? ParaUtc(d.Value) : null;
 }

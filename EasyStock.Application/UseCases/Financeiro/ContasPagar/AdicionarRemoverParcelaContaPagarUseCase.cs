@@ -27,7 +27,7 @@ public class AdicionarParcelaContaPagarUseCase(
 
         try
         {
-            c.AdicionarParcela(cmd.Numero, cmd.Valor, cmd.DataVencimento, cmd.MetodoPlanejado);
+            c.AdicionarParcela(cmd.Numero, cmd.Valor, DataUtc.ParaUtc(cmd.DataVencimento), cmd.MetodoPlanejado);
         }
         catch (RegraDeDominioVioladaException ex)
         {

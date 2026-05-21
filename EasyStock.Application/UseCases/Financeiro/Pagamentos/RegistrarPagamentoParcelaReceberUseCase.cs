@@ -51,7 +51,7 @@ public class RegistrarPagamentoParcelaReceberUseCase(
                     parcela.ValorPago, parcela.Saldo, existente.MovimentoCaixaId);
         }
 
-        var dataPagamento = cmd.DataPagamento ?? DateTime.UtcNow;
+        var dataPagamento = DataUtc.ParaUtcOpcional(cmd.DataPagamento) ?? DateTime.UtcNow;
         try
         {
             var pagamento = PagamentoParcela.CriarConfirmado(

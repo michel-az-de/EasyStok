@@ -16,8 +16,10 @@ public class InteligenciaService(ApiClient api, SessionService session)
     public Task<ApiResult<List<ItemEstoqueInteligenciaApi>>> ProximoVencimentoAsync(int dias = 30, int pageSize = 10) =>
         api.GetAsync<List<ItemEstoqueInteligenciaApi>>($"inteligencia/proximo-vencimento?empresaId={GetEmpresaId()}&dias={dias}&pageSize={pageSize}");
 
+    // O endpoint /parados liga o filtro em "diasSemMovimento" (não "dias"); enviar a
+    // chave errada fazia o filtro ser silenciosamente ignorado (divergência de contrato).
     public Task<ApiResult<List<ItemEstoqueInteligenciaApi>>> ItensParadosAsync(int dias = 60, int pageSize = 10) =>
-        api.GetAsync<List<ItemEstoqueInteligenciaApi>>($"inteligencia/parados?empresaId={GetEmpresaId()}&dias={dias}&pageSize={pageSize}");
+        api.GetAsync<List<ItemEstoqueInteligenciaApi>>($"inteligencia/parados?empresaId={GetEmpresaId()}&diasSemMovimento={dias}&pageSize={pageSize}");
 
     public Task<ApiResult<List<ItemEstoqueInteligenciaApi>>> SugestoesReposicaoAsync(int pageSize = 10) =>
         api.GetAsync<List<ItemEstoqueInteligenciaApi>>($"inteligencia/sugestao-reposicao?empresaId={GetEmpresaId()}&pageSize={pageSize}");

@@ -55,7 +55,7 @@ public class CriarPedidoUseCase(
 
         // Postgres 'timestamp with time zone' exige UTC; a data agendada vem do cliente
         // com Kind=Unspecified e o Npgsql rejeita no save. Normaliza para UTC.
-        var agendadoParaEm = ParaUtcOpcional(cmd.AgendadoParaEm);
+        var agendadoParaEm = DataUtc.ParaUtcOpcional(cmd.AgendadoParaEm);
 
         // F5 — agendamento precisa ser no futuro. PWA valida client-side, mas
         // API publica e SyncController nao validam — espelha a checagem aqui
@@ -178,16 +178,6 @@ public class CriarPedidoUseCase(
             pedido.Id, pedido.ClienteId, pedido.Total, pedido.Origem);
 
         return Map(pedido);
-    }
-
-    // Postgres timestamptz exige UTC; datas do cliente vêm Kind=Unspecified.
-    private static DateTime? ParaUtcOpcional(DateTime? d)
-    {
-        if (!d.HasValue) return null;
-        var v = d.Value;
-        return v.Kind == DateTimeKind.Utc ? v
-             : v.Kind == DateTimeKind.Local ? v.ToUniversalTime()
-             : DateTime.SpecifyKind(v, DateTimeKind.Utc);
     }
 
     internal static PedidoResult Map(PedidoEntity p) => new(

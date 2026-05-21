@@ -33,7 +33,7 @@ public class AtualizarContaReceberUseCase(
 
         if (!string.IsNullOrWhiteSpace(cmd.Descricao)) conta.Descricao = cmd.Descricao.Trim();
         if (cmd.Observacoes is not null) conta.Observacoes = string.IsNullOrWhiteSpace(cmd.Observacoes) ? null : cmd.Observacoes.Trim();
-        if (cmd.DataCompetencia.HasValue) conta.DataCompetencia = cmd.DataCompetencia;
+        if (cmd.DataCompetencia.HasValue) conta.DataCompetencia = DataUtc.ParaUtc(cmd.DataCompetencia.Value);
 
         if (cmd.CategoriaFinanceiraId.HasValue && cmd.CategoriaFinanceiraId.Value != conta.CategoriaFinanceiraId)
         {
