@@ -149,7 +149,7 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
 
     [HttpPost("/listas-compras/{id}/itens")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddItem(string id, string texto, decimal? quantidade, string? unidade, string? categoria)
+    public async Task<IActionResult> AddItem(string id, string texto, decimal? quantidade, string? unidade, string? categoria, string? produtoId)
     {
         // Auditoria 2026-04-30 (HIGH fix): validar texto não-vazio.
         if (string.IsNullOrWhiteSpace(texto))
@@ -158,7 +158,9 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
             return RedirectToAction(nameof(Detail), new { id });
         }
 
-        var result = await svc.AddItemAsync(id, texto, quantidade, unidade, categoria, null);
+        // produtoId vem do autocomplete (vazio = item de texto livre).
+        Guid? pid = Guid.TryParse(produtoId, out var g) ? g : null;
+        var result = await svc.AddItemAsync(id, texto, quantidade, unidade, categoria, null, pid);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -168,8 +170,12 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
     public async Task<IActionResult> ToggleItem(string id, string itemId, bool done)
     {
         var result = await svc.ToggleItemAsync(id, itemId, done);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
-        return RedirectToAction(nameof(Detail), new { id });
+        // AJAX (marcar comprado instantâneo): responde 204/500 sem redirect.
+        // Sem JS, mantém o fallback de full reload.
+        var ajax = Request.Headers["X-Requested-With"].ToString() == "fetch";
+        if (HasError(result))
+            return ajax ? StatusCode(500) : RedirectToAction(nameof(Detail), new { id });
+        return ajax ? NoContent() : RedirectToAction(nameof(Detail), new { id });
     }
 
     [HttpPost("/listas-compras/{id}/itens/{itemId}/excluir")]
