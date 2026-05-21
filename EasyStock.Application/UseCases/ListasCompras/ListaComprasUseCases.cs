@@ -166,7 +166,8 @@ public sealed record AdicionarItemListaComprasCommand(
     decimal? Quantidade = null,
     [property: MaxLength(32)] string? Unidade = null,
     string? Observacao = null,
-    [property: MaxLength(60)] string? Categoria = null);
+    [property: MaxLength(60)] string? Categoria = null,
+    Guid? ProdutoId = null);
 
 public class AdicionarItemListaComprasUseCase(
     IListaComprasRepository repo, IUnitOfWork uow, ILogger<AdicionarItemListaComprasUseCase> logger)
@@ -188,6 +189,7 @@ public class AdicionarItemListaComprasUseCase(
         {
             Id = Guid.NewGuid(),
             ListaComprasId = lista.Id,
+            ProdutoId = cmd.ProdutoId,
             Texto = cmd.Texto.Trim(),
             Quantidade = cmd.Quantidade,
             Unidade = cmd.Unidade,

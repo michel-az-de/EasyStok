@@ -60,14 +60,14 @@ public class ListasComprasService(ApiClient api, SessionService session)
         api.PostAsync<ListaCompras>($"listas-compras/{id}/reabrir?empresaId={GetEmpresaId()}", new { });
 
     public Task<ApiResult<object>> AddItemAsync(string id,
-        string texto, decimal? quantidade, string? unidade, string? categoria, string? observacao)
+        string texto, decimal? quantidade, string? unidade, string? categoria, string? observacao, Guid? produtoId = null)
     {
         var emp = GetEmpresaId();
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
         return api.PostAsync<object>($"listas-compras/{id}/itens", new
         {
             empresaId = emp, listaComprasId = Guid.Parse(id),
-            texto, quantidade, unidade, categoria, observacao
+            texto, quantidade, unidade, categoria, observacao, produtoId
         });
     }
 
