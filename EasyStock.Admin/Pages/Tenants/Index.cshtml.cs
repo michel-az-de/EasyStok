@@ -14,7 +14,9 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     public JsonElement Data { get; private set; }
     public int Total { get; private set; }
     public int TotalPages { get; private set; }
-    public string? Erro { get; private set; }
+
+    private const int PageSize = 20;
+    private const int MaxPage = 10000;
 
     private static readonly HashSet<string> StatusValidos = new(StringComparer.OrdinalIgnoreCase)
         { "Ativa", "Suspensa", "Cancelada" };
@@ -33,10 +35,10 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     public async Task OnGetAsync()
     {
         if (Page < 1) Page = 1;
-        if (Page > 10000) Page = 10000;
+        if (Page > MaxPage) Page = MaxPage;
         try
         {
-            var qs = $"api/admin/tenants?page={Page}&pageSize=20";
+            var qs = $"api/admin/tenants?page={Page}&pageSize={PageSize}";
             if (!string.IsNullOrWhiteSpace(Search)) qs += $"&search={Uri.EscapeDataString(Search)}";
             if (!string.IsNullOrWhiteSpace(Status) && StatusValidos.Contains(Status))
                 qs += $"&status={Uri.EscapeDataString(Status)}";
@@ -54,7 +56,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao listar tenants");
-            Erro = "Não foi possível carregar a lista de tenants. Tente recarregar a página.";
+            SetErro("Não foi possível carregar a lista de tenants. Tente recarregar a página.");
         }
     }
 
@@ -132,7 +134,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao cadastrar tenant manualmente");
-            SetErro($"Falha ao cadastrar cliente: {ex.Message}");
+            SetErroSeguro(ex, "Cadastrar cliente");
             return RedirectToPage(new { Page, Search, Status });
         }
     }
@@ -145,44 +147,50 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
             return RedirectToPage(new { Page, Search, Status });
         }
         var motivoT = (motivo ?? "").Trim();
-        if (motivoT.Length < 3)
+        if (motivoT.Length < 10)
         {
-            SetErro("Informe um motivo com pelo menos 3 caracteres.");
+            SetErro("Informe um motivo com pelo menos 10 caracteres — fica registrado no audit log.");
             return RedirectToPage(new { Page, Search, Status });
         }
         try
         {
             await api.PatchAsync<JsonElement>($"api/admin/tenants/{id}/status",
                 new { status = "Suspensa", motivo = motivoT });
-            SetSucesso("Tenant suspenso com sucesso.");
+            SetSucesso("Conta suspensa. O cliente não conseguirá acessar o sistema.");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao suspender tenant {TenantId}", id);
-            SetErro($"Falha ao suspender tenant: {ex.Message}");
+            SetErroSeguro(ex, "Suspender tenant");
         }
         return RedirectToPage(new { Page, Search, Status });
     }
 
-    public async Task<IActionResult> OnPostReativarAsync(Guid id)
+    public async Task<IActionResult> OnPostReativarAsync(Guid id, string motivo)
     {
         if (id == Guid.Empty)
         {
             SetErro("Tenant inválido.");
             return RedirectToPage(new { Page, Search, Status });
         }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10)
+        {
+            SetErro("Informe um motivo com pelo menos 10 caracteres — fica registrado no audit log.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
         try
         {
             await api.PatchAsync<JsonElement>($"api/admin/tenants/{id}/status",
-                new { status = "Ativa", motivo = "Reativado pelo admin" });
-            SetSucesso("Tenant reativado com sucesso.");
+                new { status = "Ativa", motivo = motivoT });
+            SetSucesso("Conta reativada. O cliente já pode acessar o sistema.");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao reativar tenant {TenantId}", id);
-            SetErro($"Falha ao reativar tenant: {ex.Message}");
+            SetErroSeguro(ex, "Reativar tenant");
         }
         return RedirectToPage(new { Page, Search, Status });
     }
@@ -218,7 +226,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao impersonar tenant {TenantId}", id);
-            SetErro($"Falha ao impersonar: {ex.Message}");
+            SetErroSeguro(ex, "Impersonar tenant");
             return RedirectToPage(new { Page, Search, Status });
         }
     }

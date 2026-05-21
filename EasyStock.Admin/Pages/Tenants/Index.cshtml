@@ -174,18 +174,24 @@
                 <strong x-text="confirmNome"></strong> voltará a ter acesso normal ao sistema.
             </p>
         </div>
-        <form method="post" x-bind:action="confirmAcao === 'suspender' ? '?handler=Suspender' : '?handler=Reativar'">
+        <form method="post" x-bind:action="confirmAcao === 'suspender' ? '?handler=Suspender' : '?handler=Reativar'"
+              x-data="{ loading: false }" x-on:submit="loading = true">
             @Html.AntiForgeryToken()
             <input type="hidden" name="id" x-bind:value="confirmId" />
-            <div x-show="confirmAcao === 'suspender'" style="margin-bottom:14px;">
-                <es-input name="motivo" label="Motivo da suspensão" placeholder="Ex.: inadimplência, fraude, solicitação..." required="true" />
+            <div style="margin-bottom:14px;">
+                <es-input name="motivo"
+                          :label="confirmAcao === 'suspender' ? 'Motivo da suspensão' : 'Motivo da reativação'"
+                          :placeholder="confirmAcao === 'suspender' ? 'Ex.: inadimplência, fraude, solicitação...' : 'Ex.: pagamento regularizado, solicitação do cliente...'"
+                          required="true" minlength="10" />
             </div>
             <es-modal-footer>
-                <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
+                <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
                 <button type="submit"
                         class="btn"
-                        :class="confirmAcao === 'suspender' ? 'btn-danger btn-md' : 'btn-primary btn-md'">
-                    <span x-text="confirmAcao === 'suspender' ? 'Suspender' : 'Reativar'"></span>
+                        :class="confirmAcao === 'suspender' ? 'btn-danger btn-md' : 'btn-primary btn-md'"
+                        :disabled="loading">
+                    <span x-show="!loading" x-text="confirmAcao === 'suspender' ? 'Suspender' : 'Reativar'"></span>
+                    <span x-show="loading" x-cloak>Salvando…</span>
                 </button>
             </es-modal-footer>
         </form>

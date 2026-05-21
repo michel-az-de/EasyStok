@@ -30,7 +30,7 @@
 }
 else
 {
-    <div style="display:grid; gap:12px;" x-data="{ editingId: '' }">
+    <div style="display:grid; gap:12px;" x-data="{ editingId: '', deletarId: '', deletarCodigo: '' }">
         @foreach (var c in Model.Cupons)
         {
             var cid = c.TryGetProperty("id", out var cidP) ? cidP.GetString() : "";
@@ -85,16 +85,14 @@ else
                         <form method="post" asp-page-handler="Toggle" style="display:inline;">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@cid" />
+                            <input type="hidden" name="codigo" value="@codigo" />
+                            <input type="hidden" name="atualmenteAtivo" value="@ativo.ToString().ToLower()" />
                             <es-button type="submit" variant="@(ativo ? "ghost" : "primary")" size="sm">@(ativo ? "Desativar" : "Ativar")</es-button>
                         </form>
-                        <form method="post" asp-page-handler="Deletar" style="display:inline;"
-                              onsubmit="return confirm('Excluir cupom @codigo?')">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@cid" />
-                            <es-button type="submit" variant="danger" size="sm" icon="trash-2"
-                                       icon-only="true" aria-label="Excluir cupom"
-                                       disabled="@(totalUsos > 0)" />
-                        </form>
+                        <es-button variant="danger" size="sm" icon="trash-2" icon-only="true"
+                                   aria-label="Excluir cupom @codigo"
+                                   disabled="@(totalUsos > 0)"
+                                   x-on:click="deletarId = '@cid'; deletarCodigo = '@codigo'; $dispatch('open-modal-deletar-cupom')" />
                     </div>
                 </div>
 
@@ -128,12 +126,33 @@ else
                 </div>
             </es-card>
         }
+
+        <!-- Modal Excluir Cupom -->
+        <es-modal id="deletar-cupom" title="Excluir cupom?" size="sm"
+                  description="Esta ação não pode ser desfeita.">
+            <form method="post" asp-page-handler="Deletar"
+                  x-data="{ loading: false }" x-on:submit="loading = true">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" x-bind:value="deletarId" />
+                <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+                    Deseja excluir permanentemente o cupom <strong><span x-text="deletarCodigo"></span></strong>?
+                </p>
+                <es-modal-footer>
+                    <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+                    <es-button type="submit" variant="danger" icon="trash-2" :disabled="loading">
+                        <span x-show="!loading">Excluir</span>
+                        <span x-show="loading" x-cloak>Excluindo…</span>
+                    </es-button>
+                </es-modal-footer>
+            </form>
+        </es-modal>
     </div>
 }
 
 <!-- Modal Novo Cupom -->
 <es-modal id="novo-cupom" title="Novo cupom" description="Configure os detalhes do desconto." size="md">
-    <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;">
+    <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;"
+          x-data="{ loading: false }" x-on:submit="loading = true">
         @Html.AntiForgeryToken()
         <es-input name="codigo" label="Código" placeholder="PROMO10" required="true"
                   helper="Geralmente em maiúsculas, sem espaços." input-class="uppercase" />
@@ -166,8 +185,11 @@ else
         </es-select>
 
         <es-modal-footer>
-            <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
-            <es-button type="submit" variant="primary" icon="check">Criar cupom</es-button>
+            <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+            <es-button type="submit" variant="primary" icon="check" :disabled="loading">
+                <span x-show="!loading">Criar cupom</span>
+                <span x-show="loading" x-cloak>Criando…</span>
+            </es-button>
         </es-modal-footer>
     </form>
 </es-modal>

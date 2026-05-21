@@ -8,8 +8,6 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 {
     public IEnumerable<JsonElement> Cupons { get; private set; } = Enumerable.Empty<JsonElement>();
     public IEnumerable<JsonElement> Planos { get; private set; } = Enumerable.Empty<JsonElement>();
-    public string? Erro { get; private set; }
-    public string? Mensagem { get; private set; }
 
     private static readonly HashSet<string> TiposValidos = new(StringComparer.OrdinalIgnoreCase)
         { "Percentual", "ValorFixo" };
@@ -24,7 +22,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao listar cupons");
-            Erro = "Não foi possível carregar a lista de cupons.";
+            SetErro("Não foi possível carregar a lista de cupons.");
         }
 
         try
@@ -58,7 +56,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao criar cupom {Codigo}", codigoT);
-            SetErro($"Falha ao criar cupom: {ex.Message}");
+            SetErroSeguro(ex, "Criar cupom");
         }
 
         return RedirectToPage();
@@ -90,13 +88,13 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao editar cupom {CupomId}", id);
-            SetErro($"Falha ao editar cupom: {ex.Message}");
+            SetErroSeguro(ex, "Editar cupom");
         }
 
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostToggleAsync(Guid id)
+    public async Task<IActionResult> OnPostToggleAsync(Guid id, string? codigo, bool atualmenteAtivo)
     {
         if (id == Guid.Empty)
         {
@@ -106,13 +104,16 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         try
         {
             await api.PatchAsync<JsonElement>($"api/admin/cupons/{id}/toggle", new { });
-            SetSucesso("Status do cupom alterado.");
+            var label = codigo is { Length: > 0 } ? $"\"{codigo}\"" : "Cupom";
+            SetSucesso(atualmenteAtivo
+                ? $"{label} desativado. Não será aceito em novas assinaturas."
+                : $"{label} ativado.");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao alternar cupom {CupomId}", id);
-            SetErro($"Falha ao alterar status: {ex.Message}");
+            SetErroSeguro(ex, "Alterar status do cupom");
         }
         return RedirectToPage();
     }
@@ -133,7 +134,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         catch (Exception ex)
         {
             log.LogError(ex, "Falha ao deletar cupom {CupomId}", id);
-            SetErro($"Falha ao remover cupom: {ex.Message}");
+            SetErroSeguro(ex, "Remover cupom");
         }
         return RedirectToPage();
     }

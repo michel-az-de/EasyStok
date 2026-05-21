@@ -24,7 +24,8 @@
     </div>
 
     <es-card title="Destinatários" description="Empresa e usuários que receberão a notificação">
-        <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+        <form method="post" style="display:flex; flex-direction:column; gap:14px;"
+              x-data="{ loading: false }" x-on:submit="loading = true">
             <es-input asp-for="EmpresaId" label="EmpresaId" required="true"
                       placeholder="00000000-0000-0000-0000-000000000000"
                       input-class="font-mono"
@@ -42,8 +43,11 @@
                          placeholder="Detalhes do comunicado..." />
 
             <div style="display:flex; gap:8px; padding-top:6px;">
-                <es-button type="submit" variant="warn" icon="bell">Enviar broadcast</es-button>
-                <es-button variant="ghost" href="/Notificacoes/Templates">Cancelar</es-button>
+                <es-button type="submit" variant="warn" icon="bell" :disabled="loading">
+                    <span x-show="!loading">Enviar broadcast</span>
+                    <span x-show="loading" x-cloak>Enviando…</span>
+                </es-button>
+                <es-button variant="ghost" href="/Notificacoes/Templates" :disabled="loading">Cancelar</es-button>
             </div>
         </form>
     </es-card>

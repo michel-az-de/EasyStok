@@ -14,6 +14,18 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
     protected void SetSucesso(string mensagem) => TempData["Sucesso"] = mensagem;
     protected void SetErro(string mensagem)    => TempData["Erro"] = mensagem;
 
+    /// <summary>
+    /// Exibe erro amigável: ApiException.Message já é seguro; outros erros
+    /// recebem mensagem genérica para não vazar detalhes técnicos ao operador.
+    /// </summary>
+    protected void SetErroSeguro(Exception ex, string contexto = "Operação")
+    {
+        if (ex is ApiException api)
+            SetErro(api.Message);
+        else
+            SetErro($"{contexto} falhou. Tente novamente — se persistir, contate o suporte.");
+    }
+
     public override async Task OnPageHandlerExecutionAsync(
         PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
     {
@@ -64,8 +76,10 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
             try { context.HttpContext.Items["__handler_error"] = ex.Message; } catch { }
             try
             {
-                ((Microsoft.AspNetCore.Mvc.RazorPages.PageModel)context.HandlerInstance).TempData["Erro"]
-                    = "Operação falhou: " + (ex.Message?.Length > 200 ? ex.Message.Substring(0, 200) + "…" : ex.Message);
+                var msg = ex is ApiException apiEx
+                    ? apiEx.Message
+                    : "Operação falhou. Tente novamente — se persistir, contate o suporte.";
+                ((Microsoft.AspNetCore.Mvc.RazorPages.PageModel)context.HandlerInstance).TempData["Erro"] = msg;
             }
             catch { /* TempData não disponível em contextos especiais — ignora */ }
             context.Result = new RedirectToPageResult(context.ActionDescriptor.ViewEnginePath);

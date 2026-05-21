@@ -125,7 +125,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
-            SetErro(ex.Message);
+            SetErroSeguro(ex, "Salvar template");
             await OnGetAsync();
             return Page();
         }
@@ -140,7 +140,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
             SetSucesso("Template aprovado e ativo.");
         }
         catch (SessionExpiredException) { throw; }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Aprovar template"); }
         return RedirectToPage("Index");
     }
 }

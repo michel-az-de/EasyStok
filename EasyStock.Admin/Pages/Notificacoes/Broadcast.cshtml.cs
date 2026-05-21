@@ -13,6 +13,13 @@ public class BroadcastModel(AdminApiClient api, AdminSessionService session)
 
     public async Task<IActionResult> OnPostAsync()
     {
+        var tituloT = Titulo.Trim();
+        var mensagemT = Mensagem.Trim();
+
+        if (EmpresaId == Guid.Empty) { SetErro("Selecione uma empresa."); return Page(); }
+        if (tituloT.Length is < 3 or > 200) { SetErro("Título deve ter entre 3 e 200 caracteres."); return Page(); }
+        if (mensagemT.Length is < 5 or > 2000) { SetErro("Mensagem deve ter entre 5 e 2000 caracteres."); return Page(); }
+
         try
         {
             var ids = UsuariosIds
@@ -32,8 +39,8 @@ public class BroadcastModel(AdminApiClient api, AdminSessionService session)
             {
                 empresaId = EmpresaId,
                 usuariosDestinoIds = ids,
-                titulo = Titulo,
-                mensagem = Mensagem
+                titulo = tituloT,
+                mensagem = mensagemT
             });
 
             SetSucesso($"Broadcast enviado para {ids.Count} destinatário(s).");
@@ -42,7 +49,7 @@ public class BroadcastModel(AdminApiClient api, AdminSessionService session)
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
-            SetErro(ex.Message);
+            SetErroSeguro(ex, "Enviar broadcast");
             return Page();
         }
     }

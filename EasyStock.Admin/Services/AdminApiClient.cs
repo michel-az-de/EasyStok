@@ -161,7 +161,8 @@ public class AdminApiClient(HttpClient httpClient)
         ThrowIfUnauthorized(response);
         await EnsureSuccessOrThrowAsync(response);
         var content = await response.Content.ReadAsStringAsync();
-        if (string.IsNullOrWhiteSpace(content)) return default!;
+        if (string.IsNullOrWhiteSpace(content))
+            throw new ApiException(0, "EMPTY_RESPONSE", "API devolveu resposta vazia inesperadamente.");
         return JsonSerializer.Deserialize<T>(content, JsonOptions)
             ?? throw new ApiException(0, "BAD_RESPONSE", "API devolveu corpo vazio.");
     }
@@ -173,7 +174,8 @@ public class AdminApiClient(HttpClient httpClient)
         ThrowIfUnauthorized(response);
         await EnsureSuccessOrThrowAsync(response);
         var content = await response.Content.ReadAsStringAsync();
-        if (string.IsNullOrWhiteSpace(content)) return default!;
+        if (string.IsNullOrWhiteSpace(content))
+            throw new ApiException(0, "EMPTY_RESPONSE", "API devolveu resposta vazia inesperadamente.");
         return JsonSerializer.Deserialize<T>(content, JsonOptions)
             ?? throw new ApiException(0, "BAD_RESPONSE", "API devolveu corpo vazio.");
     }
@@ -249,6 +251,11 @@ public class AdminApiClient(HttpClient httpClient)
         await EnsureSuccessOrThrowAsync(response);
     }
 
+    /// <summary>
+    /// PUT com corpo de resposta opcional. Retorna JsonElement vazio (default) quando
+    /// API responde 204 NoContent — isso é comportamento esperado, não erro silencioso.
+    /// Use <see cref="PutAsync"/> quando não há corpo de resposta e não precisa inspecionar.
+    /// </summary>
     public async Task<JsonElement> PutRawAsync(string path, object body)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Put, path, body));
@@ -256,7 +263,7 @@ public class AdminApiClient(HttpClient httpClient)
         await EnsureSuccessOrThrowAsync(response);
         var content = await response.Content.ReadAsStringAsync();
         if (string.IsNullOrWhiteSpace(content))
-            return default;
+            return default; // 204 NoContent é válido — caller não precisa de corpo
         using var json = JsonDocument.Parse(content);
         return json.RootElement.Clone();
     }
