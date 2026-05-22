@@ -18,6 +18,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
 
         context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa A", Documento = "555", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
@@ -73,6 +74,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
 
         context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Paginacao", Documento = "777", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Eletronicos", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
@@ -155,6 +157,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
 
         await using (var context = fixture.CreateDbContext())
         {
+            context.SetMobileTenantContext(empresaId);
             var repository = new ItemEstoqueRepository(context);
             var item = await repository.GetByIdAsync(itemId);
 
@@ -191,16 +194,20 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             AlteradoEm = DateTime.UtcNow
         };
 
+        var categoriaB = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaB.Id, Nome = "Audio B", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var produtoB = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaB.Id, CategoriaId = categoriaB.Id, Nome = "Produto B", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
         context.Empresas.AddRange(empresaA, empresaB);
-        context.Categorias.Add(categoriaA);
-        context.Produtos.Add(produtoA);
+        context.Categorias.AddRange(categoriaA, categoriaB);
+        context.Produtos.AddRange(produtoA, produtoB);
         context.ItensEstoque.AddRange(
             new ItemEstoque
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
+                QuantidadeInicial = Quantidade.From(10),
                 QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -211,7 +218,9 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
+                QuantidadeInicial = Quantidade.From(5),
                 QuantidadeAtual = Quantidade.From(5),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -221,8 +230,10 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaB.Id,
-                ProdutoId = Guid.NewGuid(), // Produto B, mas não importa
+                ProdutoId = produtoB.Id,
+                QuantidadeInicial = Quantidade.From(20),
                 QuantidadeAtual = Quantidade.From(20),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -233,7 +244,9 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
 
         var repository = new ItemEstoqueRepository(context);
 
+        context.SetMobileTenantContext(empresaA.Id);
         var (itensA, totalA) = await repository.GetItensEstoquePaginadosAsync(empresaA.Id, 1, 10);
+        context.SetMobileTenantContext(empresaB.Id);
         var (itensB, totalB) = await repository.GetItensEstoquePaginadosAsync(empresaB.Id, 1, 10);
 
         itensA.Should().HaveCount(2);
@@ -267,16 +280,20 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             AlteradoEm = DateTime.UtcNow
         };
 
+        var categoriaB = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaB.Id, Nome = "Audio B", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var produtoB = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaB.Id, CategoriaId = categoriaB.Id, Nome = "Produto B", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
         context.Empresas.AddRange(empresaA, empresaB);
-        context.Categorias.Add(categoriaA);
-        context.Produtos.Add(produtoA);
+        context.Categorias.AddRange(categoriaA, categoriaB);
+        context.Produtos.AddRange(produtoA, produtoB);
         context.ItensEstoque.AddRange(
             new ItemEstoque
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
+                QuantidadeInicial = Quantidade.From(3),
                 QuantidadeAtual = Quantidade.From(3), // Baixo
+                CustoUnitario = Dinheiro.FromDecimal(10m),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -287,7 +304,9 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaA.Id,
                 ProdutoId = produtoA.Id,
+                QuantidadeInicial = Quantidade.From(10),
                 QuantidadeAtual = Quantidade.From(10), // Normal
+                CustoUnitario = Dinheiro.FromDecimal(10m),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -297,8 +316,10 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaB.Id,
-                ProdutoId = Guid.NewGuid(),
+                ProdutoId = produtoB.Id,
+                QuantidadeInicial = Quantidade.From(2),
                 QuantidadeAtual = Quantidade.From(2), // Baixo, mas empresa B
+                CustoUnitario = Dinheiro.FromDecimal(10m),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -309,6 +330,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
 
         var repository = new ItemEstoqueRepository(context);
 
+        context.SetMobileTenantContext(empresaA.Id);
         var (itensBaixoA, totalA) = await repository.GetEstoqueBaixoAsync(empresaA.Id, 5, 1, 10);
 
         itensBaixoA.Should().ContainSingle();
