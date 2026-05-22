@@ -27,7 +27,10 @@ namespace EasyStock.Infra.Postgre.Repositories
         /// </summary>
         public async Task<ItemEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id)
         {
-            var sql = "SELECT * FROM itens_estoque WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
+            // SELECT *, xmin: itens_estoque mapeia xmin (system column) como token de
+            // concorrencia; FirstOrDefaultAsync compoe o FromSqlRaw em subquery e o
+            // SELECT * nao expoe xmin -> EF gera e.xmin e estoura 42703.
+            var sql = "SELECT *, xmin FROM itens_estoque WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
             return await dbContext.ItensEstoque
                 .FromSqlRaw(sql, empresaId, id)
                 .FirstOrDefaultAsync();
@@ -252,7 +255,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 : "\"EntradaEm\", \"CriadoEm\"";
 
             var sql = $@"
-                    SELECT * FROM itens_estoque
+                    SELECT *, xmin FROM itens_estoque
                     WHERE ""EmpresaId"" = {{0}}
                       AND ""ProdutoId"" = {{1}}
                       AND ""QuantidadeAtual"" > 0

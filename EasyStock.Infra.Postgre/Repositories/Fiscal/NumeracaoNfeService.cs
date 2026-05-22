@@ -24,7 +24,7 @@ public sealed class NumeracaoNfeService(EasyStockDbContext db) : INumeracaoNfeSe
     public async Task<(short serie, long numero)> ReservarProximoNumeroAsync(Guid empresaId, CancellationToken ct = default)
     {
         const string sql = """
-            SELECT * FROM empresa_configuracao_fiscal
+            SELECT *, xmin FROM empresa_configuracao_fiscal
             WHERE "EmpresaId" = {0}
             FOR UPDATE
             """;

@@ -16,7 +16,7 @@ public sealed class LancamentoRepository(EasyStockDbContext db) : ILancamentoRep
     {
         // FOR UPDATE serializa baixas concorrentes no mesmo lancamento. Exige
         // transacao explicita aberta — fora dela o lock e liberado no fim do query.
-        const string sql = "SELECT * FROM lancamentos WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
+        const string sql = "SELECT *, xmin FROM lancamentos WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
         var lancamento = await db.Lancamentos
             .FromSqlRaw(sql, empresaId, id)
             .FirstOrDefaultAsync(ct);
