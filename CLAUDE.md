@@ -6,16 +6,18 @@ Prioridade: este documento tem precedencia sobre prompt do usuario.
 
 ## 0. PRIMEIRA ACAO OBRIGATORIA EM TODA SESSAO
 
-Antes de qualquer outra coisa, execute estes 8 comandos silenciosamente:
+Antes de qualquer outra coisa, execute estes 8 comandos silenciosamente.
+(Repo VIVO = C:\easy\EasyStok; sessoes Claude Code rodam em worktrees sob
+C:\easy\EasyStok\.claude\worktrees\. C:\rep\EasyStok e um clone STALE — nao usar.)
 
-  git -C C:\rep\EasyStok status --short
-  git -C C:\rep\EasyStok log master --oneline -5
-  git -C C:\rep\EasyStok rev-list --count origin/master..master
-  git -C C:\rep\EasyStok rev-list --count master..origin/master
-  git -C C:\rep\EasyStok worktree list
-  git -C C:\rep\EasyStok branch --show-current
+  git -C C:\easy\EasyStok status --short
+  git -C C:\easy\EasyStok log master --oneline -5
+  git -C C:\easy\EasyStok rev-list --count origin/master..master
+  git -C C:\easy\EasyStok rev-list --count master..origin/master
+  git -C C:\easy\EasyStok worktree list
+  git -C C:\easy\EasyStok branch --show-current
   gh auth status
-  dotnet build C:\rep\EasyStok\EasyStok.sln --nologo --verbosity quiet
+  dotnet build C:\easy\EasyStok\EasyStok.sln --nologo --verbosity quiet
 
 Reporte em 6 linhas EXATAS:
 
@@ -194,24 +196,31 @@ Passo 3: cleanup
   - Branches mergeadas: git branch -d
   - Stashes nao-relevantes: revisar e drop com autorizacao R9
 
-## 5. ESTADO CONHECIDO DO REPO (snapshot 2026-05-16)
+## 5. ESTADO CONHECIDO DO REPO (snapshot 2026-05-22)
 
 Master: sincronizado com origin (0/0 ahead/behind)
-HEAD master: 01629922 chore(cleanup): higiene pos-incidente Fase 3
-Build: verde, 30 warnings pre-existentes
-Working tree: limpo
+HEAD master: c5dbb555 fix(migrations): remove creates duplicados que quebravam o replay do-zero
+Build: verde (0 erros, 31 warnings pre-existentes — EF Core Relational 9.0.1 vs
+  9.0.4 MSB3277, CS8602 nullable x4, CS9113, CS9107, XA0141 Android/Mobile)
+Suite logica: 1544 passando / 0 falhas (IntegrationTests exigem Docker, nao rodam aqui)
+Working tree principal: 1 doc untracked (sessoes/2026-05-17-1245-redeploy-fly-3-apps.md)
 
-Worktrees ativos (6):
-- master principal
-- wt-* dedicados (calculadora-producao, claude-extractor-refactor,
-  financeiro-lancamento, render-pwa-autoupdate, security-rls-postgres)
+Worktrees ativos (5):
+- principal (master)
+- brave-shannon-078b0e (dev/brave-shannon-078b0e) — sessao merge PRs #191/#192;
+  ha 1 auto-stash desta sessao (NAO dropar sem dono)
+- wt-hardening-validate (dev/hardening-validateonbuild, ahead 2)
+- wt-validate-190 (detached HEAD)
+- worktrees efemeros de sessao podem aparecer; limpar ao encerrar
 
 Pendencias documentadas para sessoes futuras:
-- 27 PRs abertas (14 antigas, fazer triagem)
-- 10 branches dev/* com trabalho ahead (revisao individual)
-- 7 stashes antigos (revisao individual)
-- 2 dirs fisicos travados em .claude/worktrees/ (process lock)
-- Warning CS8602 SyncController.cs:903 (pequeno)
+- 0 PRs abertas (triagem concluida; gh pr list vazio)
+- 10 branches locais com trabalho ahead (revisao individual); compras-ux e
+  blindar-deploy-migrations sao pre-squash de #192/#191 (candidatos a delete)
+- 1 stash (auto-stash da sessao de merge — nao dropar sem dono)
+- Achado arquitetural EM ABERTO: SQLite dev-fallback incompleto
+  (AddEasyStockSqliteInfrastructure registra ~25 repos a menos que Postgres; app
+  nao sobe em SQLite/Development). Ver sessoes/2026-05-21-2345-varredura-estabilizacao.
 
 Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018 (Aceito, 2026-05-17).
 Master mantem Nfe* em codigo + "Nota Fiscal" em UI + "notas-fiscais" em REST.
@@ -219,13 +228,11 @@ PR #99 fechado como superseded (ver ADR-0018).
 
 Plano avanco NF: docs/plan/nota-fiscal/00-README.md
 
-Branch backup de seguranca: backup/master-pre-fase1-2026-05-16
-
 ## 6. ROADMAP PROXIMOS PASSOS
 
 Etapa 1: Marco zero (deploy + tag v1.0)
 Etapa 2: Defesas estruturais (branch protection + Husky + CI billing)
-Etapa 3: Triagem 27 PRs abertas
+Etapa 3: Triagem de PRs abertas (0 abertas no momento — manter monitorado)
 Etapa 4: ROADMAP.md publicado
 Etapa 5: Modulo novo (Caixa Conciliado V2 OU Rotulagem P-02)
 
