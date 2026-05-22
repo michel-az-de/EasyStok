@@ -27,7 +27,8 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
-        await using var ctx = fixture.CreateDbContext();
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
 
         // Sem SET: current_setting('app.empresa_id', true) retorna '' →
         // NULLIF('','')::uuid vira NULL → comparação UNKNOWN/false → 0 linhas.
@@ -42,7 +43,8 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
-        await using var ctx = fixture.CreateDbContext();
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
         await SetTenantManualAsync(ctx, a.Id);
 
         var produtos = await SelecionarProdutosAsync(ctx);
@@ -56,7 +58,8 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
-        await using var ctx = fixture.CreateDbContext();
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
         await SetTenantManualAsync(ctx, b.Id);
 
         var produtos = await SelecionarProdutosAsync(ctx);
@@ -70,7 +73,8 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
-        await using var ctx = fixture.CreateDbContext();
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
         await ctx.Database.ExecuteSqlRawAsync("SET app.bypass_rls = 'true'");
 
         var produtos = await SelecionarProdutosAsync(ctx);
@@ -84,15 +88,20 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (a, b) = await SeedDuasEmpresasComProdutosAsync();
 
-        await using var ctx = fixture.CreateDbContext();
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
         await SetTenantManualAsync(ctx, a.Id);
 
         // Tenta inserir um produto pertencente ao tenant B enquanto a sessão
         // está autenticada como A — a policy WITH CHECK deve bloquear (42501
-        // insufficient_privilege / new row violates row-level security policy).
+        // new row violates row-level security policy).
+        // Colunas batem com o schema real (ModelSnapshot): Tipo/Status sao
+        // persistidos como string (HasConversion<string>), ControlaValidade e
+        // NOT NULL sem default. A WITH CHECK do RLS e avaliada antes do trigger
+        // AFTER da FK, entao o CategoriaId aleatorio nao dispara 23503 — o erro e 42501.
         var inserirNoTenantB = async () => await ctx.Database.ExecuteSqlInterpolatedAsync($@"
-            INSERT INTO produtos (""Id"", ""EmpresaId"", ""CategoriaId"", ""Nome"", ""Tipo"", ""SkuBase"", ""Status"", ""CriadoEm"", ""AlteradoEm"", ""IsDeletado"", ""IsSeedData"")
-            VALUES ({Guid.NewGuid()}, {b.Id}, {Guid.NewGuid()}, 'Hack', 1, 'HACK-SKU', 1, {DateTime.UtcNow}, {DateTime.UtcNow}, false, false)");
+            INSERT INTO produtos (""Id"", ""EmpresaId"", ""CategoriaId"", ""Nome"", ""Tipo"", ""Status"", ""ControlaValidade"", ""CriadoEm"", ""AlteradoEm"")
+            VALUES ({Guid.NewGuid()}, {b.Id}, {Guid.NewGuid()}, 'Hack', 'Fisico', 'Ativo', false, {DateTime.UtcNow}, {DateTime.UtcNow})");
 
         await inserirNoTenantB.Should()
             .ThrowAsync<Npgsql.PostgresException>()
@@ -140,7 +149,12 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
     {
         await fixture.ResetDatabaseAsync();
 
-        await using var seed = fixture.CreateDbContext();
+        await using var seed = fixture.CreateRlsClientDbContext();
+        // Conexao aberta explicitamente: SET (sem LOCAL) vive pela sessao Npgsql.
+        // Mante-la aberta garante que o INSERT do SaveChanges rode na MESMA conexao
+        // e enxergue o bypass; sem isso o EF abriria/fecharia a conexao por comando
+        // e o SET se perderia, fazendo a policy zerar o INSERT.
+        await seed.Database.OpenConnectionAsync();
         // Bypass via SET direto: fixture cria DbContext sem interceptor, então
         // a policy RLS bloquearia todo INSERT sem essa linha (current_setting
         // retorna '' e a policy USING/WITH CHECK falha).
@@ -235,12 +249,10 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
 
     private string GetTestConnectionString()
     {
-        // O fixture é interno do mesmo namespace de testes; expor via método
-        // público no fixture seria intrusivo. Truque: reabre o DbContext criado
-        // pelo fixture e lê a connection string dele.
-        using var probe = fixture.CreateDbContext();
-        return probe.Database.GetConnectionString()
-            ?? throw new InvalidOperationException("Connection string indisponível no fixture.");
+        // Conexao do role NOSUPERUSER (sujeito a RLS). O teste do interceptor monta
+        // seu proprio DbContext com o interceptor e precisa do mesmo login comum —
+        // como 'postgres' (superuser) a RLS seria ignorada e o COUNT viria 2.
+        return fixture.RlsClientConnectionString;
     }
 
     private sealed record ProdutoLinhaCrua(Guid Id, Guid EmpresaId, string Nome);
