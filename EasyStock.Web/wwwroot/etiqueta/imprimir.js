@@ -117,9 +117,10 @@ window.etqImpImprimir = async function() {
 
 window.etqImpBaixarPdf = function() {
   if (!_loteId || !_selectedTemplate) return;
-  const t = _selectedTemplate;
-  const url = `/api/lotes/${_loteId}/etiquetas/render.pdf?templateOrigem=${t.origem}&templateId=${t.id}`;
-  window.open(url, '_blank');
+  const ids = _getSelectedIds();
+  if (!ids.length) { _setStatus('Nenhuma etiqueta selecionada.'); return; }
+  // Sem render PDF no servidor: imprime via navegador (use "Salvar como PDF" no diálogo).
+  _executarImpressao(ids, _selectedTemplate);
 };
 
 window.etqAbrirModelos = async function() {

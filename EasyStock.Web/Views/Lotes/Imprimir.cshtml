@@ -167,12 +167,7 @@ function getSelectedIds() {
     return _payload.Etiquetas.map(e => e.Id);
 }
 
-window.imprimir = async function() {
-    const t = getSelectedTemplate(); if (!t) return;
-    const ids = getSelectedIds();   if (!ids.length) { setStatus('Nenhuma etiqueta selecionada.'); return; }
-    if (ids.length > 100 && !confirm(`Imprimir ${ids.length} etiquetas? O navegador pode travar. Clique OK para continuar ou Cancelar para baixar PDF.`)) {
-        baixarPdf(); return;
-    }
+function _imprimirEtiquetasCliente(ids, t) {
     setStatus('Abrindo janela de impressão…');
 
     // Mark as enviada_impressao
@@ -185,7 +180,6 @@ window.imprimir = async function() {
     const layout = JSON.parse(t.layoutJson);
     const w = layout.size?.w_mm ?? 80, h = layout.size?.h_mm ?? 40;
     const etiquetas = _payload.Etiquetas.filter(e => ids.includes(e.Id));
-    const MM = 3.7795;
     const labelsHtml = etiquetas.map((e, i) => {
         const dados = etqToDados(e);
         const el = renderEtiqueta(layout, dados, { forPrint: i === 0 });
@@ -206,6 +200,15 @@ window.imprimir = async function() {
 <\/script></body></html>`);
     win.document.close();
     setStatusHtml(`${_esc(String(ids.length))} etiquetas enviadas para impressão. <a href="#" onclick="marcarImpressas();return false">Marcar como impressas →</a>`);
+}
+
+window.imprimir = async function() {
+    const t = getSelectedTemplate(); if (!t) return;
+    const ids = getSelectedIds();   if (!ids.length) { setStatus('Nenhuma etiqueta selecionada.'); return; }
+    if (ids.length > 100 && !confirm(`Imprimir ${ids.length} etiquetas? O navegador pode travar. Clique OK para continuar ou Cancelar para baixar PDF.`)) {
+        baixarPdf(); return;
+    }
+    _imprimirEtiquetasCliente(ids, t);
 };
 
 window.marcarImpressas = async function() {
@@ -221,7 +224,9 @@ window.marcarImpressas = async function() {
 
 window.baixarPdf = function() {
     const t = getSelectedTemplate(); if (!t) return;
-    window.open(`/api/lotes/${LOTE_ID}/etiquetas/render.pdf?empresaId=${EMPRESA_ID}&templateOrigem=${t.origem}&templateId=${t.id}`, '_blank');
+    const ids = getSelectedIds(); if (!ids.length) { setStatus('Nenhuma etiqueta selecionada.'); return; }
+    // Sem render PDF no servidor: imprime via navegador (use "Salvar como PDF" no diálogo).
+    _imprimirEtiquetasCliente(ids, t);
 };
 
 function etqToDados(e) {
