@@ -21,8 +21,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -116,8 +117,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -188,8 +190,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -265,8 +268,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -334,8 +338,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -388,8 +393,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -442,8 +448,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -496,8 +503,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
@@ -549,8 +557,9 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
 
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N"), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
 
         var produto = new Produto
