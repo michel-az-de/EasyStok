@@ -334,6 +334,14 @@ public class ConfiguracaoFiscalController(
 
         if (config is null) return DataOk(new { configurado = false });
 
+        // Identidade do emitente (CNPJ/razão/fantasia) — usada pelo caixa NFC-e;
+        // vive na Empresa, não na config fiscal.
+        var empresa = await db.Empresas
+            .AsNoTracking()
+            .Where(e => e.Id == eid)
+            .Select(e => new { e.Documento, e.Nome, e.NomeFantasia })
+            .FirstOrDefaultAsync(ct);
+
         var cert = config.CertificadoCredencialId.HasValue
             ? await credencialRepo.GetByIdAsync(config.CertificadoCredencialId.Value, ct)
             : null;
@@ -342,6 +350,9 @@ public class ConfiguracaoFiscalController(
         {
             configurado = true,
             habilitada = config.Habilitada,
+            cnpj = empresa?.Documento,
+            razaoSocial = empresa?.Nome,
+            nomeFantasia = empresa?.NomeFantasia,
             ambiente = config.Ambiente.ToString(),
             regimeTributario = config.RegimeTributario.ToString(),
             provedor = config.ProvedorPreferido,

@@ -68,16 +68,11 @@
         const data = json.data ?? json;
         if (!data?.configurado) throw new Error("Tenant sem config fiscal habilitada.");
 
-        // Tenta buscar dados da empresa
-        const respEmp = await fetch("/api/empresa", {
-            headers: { "Authorization": "Bearer " + jwt },
-        });
-        const emp = respEmp.ok ? (await respEmp.json()).data ?? {} : {};
-
+        // Dados do emitente vêm do próprio /api/configuracao-fiscal (cnpj/razão/fantasia).
         state.emitente = {
-            cnpj: emp.documento || emp.cnpj || "",
-            razaoSocial: emp.razaoSocial || emp.nome || "(razao social)",
-            nomeFantasia: emp.nomeFantasia,
+            cnpj: data.cnpj || "",
+            razaoSocial: data.razaoSocial || "(razao social)",
+            nomeFantasia: data.nomeFantasia,
             inscricaoEstadual: data.inscricaoEstadual,
             ambiente: data.ambiente,
         };
