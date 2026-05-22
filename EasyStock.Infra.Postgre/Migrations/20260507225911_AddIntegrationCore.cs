@@ -77,11 +77,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         onDelete: ReferentialAction.Restrict);
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_fatura_pagamentos_RegistradoPorUserId",
-                table: "fatura_pagamentos",
-                column: "RegistradoPorUserId");
-
+            // NOTA: o indice IX_fatura_pagamentos_RegistradoPorUserId NAO e criado aqui —
+            // ja e criado pela migration anterior 20260507223432_Add_Financeiro_CapCar_Core.
+            // O CreateIndex duplicado (artefato de snapshot stale) quebrava o replay
+            // do-zero com 42P07 (relation already exists). A FK abaixo permanece.
             migrationBuilder.CreateIndex(
                 name: "ix_credencial_integracao_empresa_provider_ambiente_ativo",
                 table: "credencial_integracao",
@@ -111,31 +110,24 @@ namespace EasyStock.Infra.Postgre.Migrations
                 columns: new[] { "shard_key", "proxima_tentativa_em" },
                 filter: "status = 1");
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_fatura_pagamentos_usuarios_RegistradoPorUserId",
-                table: "fatura_pagamentos",
-                column: "RegistradoPorUserId",
-                principalTable: "usuarios",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+            // NOTA: a FK FK_fatura_pagamentos_usuarios_RegistradoPorUserId NAO e criada aqui —
+            // ja e criada por 20260507223432_Add_Financeiro_CapCar_Core. O AddForeignKey
+            // duplicado (artefato de snapshot stale) quebrava o replay do-zero com 42710.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_fatura_pagamentos_usuarios_RegistradoPorUserId",
-                table: "fatura_pagamentos");
-
+            // NOTA: DropForeignKey de FK_fatura_pagamentos_usuarios_RegistradoPorUserId
+            // removido — a FK pertence a 20260507223432_Add_Financeiro_CapCar_Core.
             migrationBuilder.DropTable(
                 name: "credencial_integracao");
 
             migrationBuilder.DropTable(
                 name: "outbox_evento_integracao");
 
-            migrationBuilder.DropIndex(
-                name: "IX_fatura_pagamentos_RegistradoPorUserId",
-                table: "fatura_pagamentos");
+            // DropIndex de IX_fatura_pagamentos_RegistradoPorUserId removido: o indice
+            // pertence a 20260507223432_Add_Financeiro_CapCar_Core (que o cria e o dropa).
         }
     }
 }

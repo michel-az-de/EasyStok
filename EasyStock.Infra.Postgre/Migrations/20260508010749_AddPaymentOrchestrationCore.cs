@@ -69,38 +69,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                 type: "smallint",
                 nullable: true);
 
-            migrationBuilder.CreateTable(
-                name: "credencial_integracao",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    empresa_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    categoria = table.Column<int>(type: "integer", nullable: false),
-                    provider_key = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
-                    ambiente = table.Column<int>(type: "integer", nullable: false),
-                    payload_cifrado = table.Column<byte[]>(type: "bytea", nullable: false),
-                    kek_id = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
-                    iv = table.Column<byte[]>(type: "bytea", nullable: false),
-                    tag = table.Column<byte[]>(type: "bytea", nullable: false),
-                    valido_de = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    valido_ate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ativo = table.Column<bool>(type: "boolean", nullable: false),
-                    ultimo_uso_em = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    criado_por_usuario_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    criado_em = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    alterado_em = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_credencial_integracao", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_credencial_integracao_empresas_empresa_id",
-                        column: x => x.empresa_id,
-                        principalTable: "empresas",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
+            // NOTA: credencial_integracao NAO e criada aqui — ja e criada por
+            // 20260507225911_AddIntegrationCore. CreateTable duplicado (snapshot stale)
+            // quebrava o replay do-zero (42P07 relation already exists).
             migrationBuilder.CreateTable(
                 name: "gateway_health_snapshots",
                 columns: table => new
@@ -152,40 +123,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                     table.PrimaryKey("PK_gateway_routing_rules", x => x.Id);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "outbox_evento_integracao",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    empresa_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    tipo_evento = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
-                    aggregate_type = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
-                    aggregate_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    payload_json = table.Column<string>(type: "jsonb", nullable: false),
-                    payload_schema_version = table.Column<int>(type: "integer", nullable: false),
-                    correlation_id = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
-                    causation_event_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    status = table.Column<int>(type: "integer", nullable: false),
-                    tentativas = table.Column<int>(type: "integer", nullable: false),
-                    max_tentativas = table.Column<int>(type: "integer", nullable: false),
-                    proxima_tentativa_em = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    processado_em = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    erro_ultima_tentativa = table.Column<string>(type: "text", nullable: true),
-                    idempotency_key = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    shard_key = table.Column<int>(type: "integer", nullable: false),
-                    criado_em = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_outbox_evento_integracao", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_outbox_evento_integracao_empresas_empresa_id",
-                        column: x => x.empresa_id,
-                        principalTable: "empresas",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
+            // NOTA: outbox_evento_integracao NAO e criada aqui — ja e criada por
+            // 20260507225911_AddIntegrationCore (CreateTable duplicado removido).
             migrationBuilder.CreateTable(
                 name: "pagamento_attempts",
                 columns: table => new
@@ -266,18 +205,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                 unique: true,
                 filter: "\"ClientIdempotencyKey\" IS NOT NULL");
 
-            migrationBuilder.CreateIndex(
-                name: "ix_credencial_integracao_empresa_provider_ambiente_ativo",
-                table: "credencial_integracao",
-                columns: new[] { "empresa_id", "provider_key", "ambiente" },
-                unique: true,
-                filter: "ativo = true");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_credencial_integracao_kek_id",
-                table: "credencial_integracao",
-                column: "kek_id");
-
+            // NOTA: indices de credencial_integracao NAO sao criados aqui — ver 20260507225911_AddIntegrationCore.
             migrationBuilder.CreateIndex(
                 name: "ix_gateway_routing_rules_empresa_metodo_ativo_prioridade",
                 table: "gateway_routing_rules",
@@ -289,23 +217,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                 columns: new[] { "EmpresaId", "Metodo", "Provedor", "Moeda", "Pais" },
                 unique: true);
 
-            migrationBuilder.CreateIndex(
-                name: "ix_outbox_evento_integracao_empresa_status",
-                table: "outbox_evento_integracao",
-                columns: new[] { "empresa_id", "status", "criado_em" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_outbox_evento_integracao_idempotency_key",
-                table: "outbox_evento_integracao",
-                column: "idempotency_key",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "ix_outbox_evento_integracao_pendentes",
-                table: "outbox_evento_integracao",
-                columns: new[] { "shard_key", "proxima_tentativa_em" },
-                filter: "status = 1");
-
+            // NOTA: indices de outbox_evento_integracao NAO sao criados aqui — ver 20260507225911_AddIntegrationCore.
             migrationBuilder.CreateIndex(
                 name: "ix_pagamento_attempt_events_attempt_ocorrido",
                 table: "pagamento_attempt_events",
@@ -386,17 +298,13 @@ namespace EasyStock.Infra.Postgre.Migrations
                 name: "FK_fatura_pagamentos_usuarios_RegistradoPorUserId",
                 table: "fatura_pagamentos");
 
-            migrationBuilder.DropTable(
-                name: "credencial_integracao");
-
+            // credencial_integracao + outbox_evento_integracao: DropTable removido —
+            // pertencem a 20260507225911_AddIntegrationCore.
             migrationBuilder.DropTable(
                 name: "gateway_health_snapshots");
 
             migrationBuilder.DropTable(
                 name: "gateway_routing_rules");
-
-            migrationBuilder.DropTable(
-                name: "outbox_evento_integracao");
 
             migrationBuilder.DropTable(
                 name: "pagamento_attempt_events");
