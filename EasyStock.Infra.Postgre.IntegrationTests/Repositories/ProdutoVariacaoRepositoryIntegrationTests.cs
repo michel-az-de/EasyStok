@@ -17,6 +17,7 @@ public class ProdutoVariacaoRepositoryIntegrationTests(PostgreSqlDatabaseFixture
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
 
         context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa A", Documento = "444", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
         context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Audio", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });

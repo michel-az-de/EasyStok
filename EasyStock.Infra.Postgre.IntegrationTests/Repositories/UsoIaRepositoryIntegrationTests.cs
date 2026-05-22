@@ -19,6 +19,7 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
         var ano = 2024;
         var mes = 4;
 
@@ -51,6 +52,7 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
         var ano = 2024;
         var mes = 5;
 
@@ -83,6 +85,7 @@ public sealed class UsoIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fi
         var repo = new Infra.Postgre.Repositories.UsoIaRepository(dbContext);
 
         var empresaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
         var ano = 2024;
         var mes = 6;
 

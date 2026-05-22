@@ -53,6 +53,7 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
 
         await context.SaveChangesAsync();
 
+        context.SetMobileTenantContext(empresaA.Id);
         var repository = new ProdutoRepository(context);
 
         var porNome = await repository.SearchAsync(empresaA.Id, "buds");
@@ -99,6 +100,7 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
 
         await using (var context = fixture.CreateDbContext())
         {
+            context.SetMobileTenantContext(empresaId);
             var repository = new ProdutoRepository(context);
             var produto = await repository.GetByIdAsync(produtoId);
 
@@ -164,7 +166,9 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
 
         var repository = new ProdutoRepository(context);
 
+        context.SetMobileTenantContext(empresaA.Id);
         var (produtosA, totalA) = await repository.GetProdutosPaginadosAsync(empresaA.Id, 1, 10);
+        context.SetMobileTenantContext(empresaB.Id);
         var (produtosB, totalB) = await repository.GetProdutosPaginadosAsync(empresaB.Id, 1, 10);
 
         produtosA.Should().HaveCount(2);
