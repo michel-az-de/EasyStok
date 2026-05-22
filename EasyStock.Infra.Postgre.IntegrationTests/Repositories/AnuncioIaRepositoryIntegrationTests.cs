@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.IntegrationTests;
 using FluentAssertions;
@@ -9,6 +10,18 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 [Collection("PostgreSqlTestCollection")]
 public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
 {
+    // Cria o tenant + Produto pai (FK anuncios_ia -> produtos) e seta o contexto de
+    // tenant para o filtro global de empresa nao zerar as queries do repo.
+    private static async Task SeedProdutoAsync(EasyStockDbContext db, Guid empresaId, Guid produtoId)
+    {
+        db.SetMobileTenantContext(empresaId);
+        db.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        var catId = Guid.NewGuid();
+        db.Categorias.Add(new Categoria { Id = catId, EmpresaId = empresaId, Nome = "Cat", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        db.Produtos.Add(new Produto { Id = produtoId, EmpresaId = empresaId, CategoriaId = catId, Nome = "Produto", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+    }
+
     [SkippableFact]
     public async Task GetByIdAsync_DeveRetornarAnuncioCorreto()
     {
@@ -19,6 +32,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        await SeedProdutoAsync(dbContext, empresaId, produtoId);
 
         var anuncio = new AnuncioIa
         {
@@ -51,6 +65,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        await SeedProdutoAsync(dbContext, empresaId, produtoId);
 
         var anuncio1 = new AnuncioIa
         {
@@ -93,6 +108,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        await SeedProdutoAsync(dbContext, empresaId, produtoId);
 
         var anuncio = new AnuncioIa
         {
@@ -125,6 +141,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        await SeedProdutoAsync(dbContext, empresaId, produtoId);
 
         var anuncio = new AnuncioIa
         {
@@ -159,6 +176,7 @@ public sealed class AnuncioIaRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
 
         var empresaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
+        await SeedProdutoAsync(dbContext, empresaId, produtoId);
 
         var anuncio = new AnuncioIa
         {
