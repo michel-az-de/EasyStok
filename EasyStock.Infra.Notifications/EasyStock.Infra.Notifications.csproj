@@ -23,8 +23,10 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.5" />
-    <!-- Onda 2.2: Web Push via VAPID (RFC 8030). Lib WebPush (curtisconnard) gera headers + encripta payload ECDH P-256. -->
-    <PackageReference Include="WebPush" Version="1.0.12" />
+    <!-- Onda 2.2: Web Push via VAPID (RFC 8030). Lib WebPush (curtisconnard) gera headers + encripta payload ECDH P-256.
+         1.0.13 (net9.0) elimina dependencia transitiva de Newtonsoft.Json 10.0.3 / System.Net.Http 4.3.0
+         / System.Text.RegularExpressions 4.3.0 (GHSA-5crp-9r3c-p9vr, GHSA-7jgj-8wvc-jh57, GHSA-cmhx-cq75-c4mj). -->
+    <PackageReference Include="WebPush" Version="1.0.13" />
   </ItemGroup>
 
   <ItemGroup>

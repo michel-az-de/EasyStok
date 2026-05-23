@@ -9,6 +9,11 @@
   <ItemGroup>
     <PackageReference Include="MongoDB.Driver" Version="2.19.0" />
     <PackageReference Include="MongoDB.Bson" Version="2.19.0" />
+    <!-- CVE sweep: overrides transitivas de MongoDB.Driver 2.x que ainda pinam versoes vulneraveis.
+         Snappier 1.0.0 -> 1.3.1 (GHSA-pggp-6c3x-2xmx, HIGH).
+         SharpCompress 0.30.1 -> 0.40.0 (GHSA-6c8g-7p36-r338, MODERATE). -->
+    <PackageReference Include="Snappier" Version="1.3.1" />
+    <PackageReference Include="SharpCompress" Version="0.40.0" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />

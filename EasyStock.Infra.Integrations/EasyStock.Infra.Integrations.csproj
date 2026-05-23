@@ -16,6 +16,10 @@
     <PackageReference Include="Microsoft.Extensions.Resilience" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="9.0.0" />
+    <!-- CVE sweep: DataProtection 9.0.0 traz Xml 9.0.0 transitiva (GHSA-37gx-xxp4-5rgx /
+         GHSA-w3x6-4m5h-cxqf, HIGH). Override top-level cobre Api/Worker/IntegrationTests
+         que tem este projeto na cadeia. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.16" />
     <PackageReference Include="Scrutor" Version="5.0.2" />
   </ItemGroup>
 
