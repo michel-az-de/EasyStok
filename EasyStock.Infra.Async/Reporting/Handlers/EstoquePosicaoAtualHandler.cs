@@ -70,9 +70,11 @@ public sealed class EstoquePosicaoAtualHandler(
                 UltimaMovimentacaoEm = i.UltimaMovimentacaoEm,
 
                 // Produto
+                // SkuBase eh CodigoSku? (nullable VO). Conditional p/ alinhar
+                // tipo do anonimo a string? — downstream (linha do "??") ja trata null.
                 ProdutoSkuBase    = db.Produtos
                     .Where(p => p.Id == i.ProdutoId)
-                    .Select(p => p.SkuBase.Value)
+                    .Select(p => p.SkuBase != null ? p.SkuBase.Value : null)
                     .FirstOrDefault(),
                 ProdutoNome       = db.Produtos
                     .Where(p => p.Id == i.ProdutoId)
@@ -87,7 +89,8 @@ public sealed class EstoquePosicaoAtualHandler(
                 VariacaoSku       = i.ProdutoVariacaoId == null ? null
                     : db.ProdutosVariacao
                         .Where(v => v.Id == i.ProdutoVariacaoId)
-                        .Select(v => v.Sku.Value)
+                        // Sku eh CodigoSku? — conditional preserva null (downstream "??")
+                        .Select(v => v.Sku != null ? v.Sku.Value : null)
                         .FirstOrDefault(),
                 VariacaoNome      = i.ProdutoVariacaoId == null ? null
                     : db.ProdutosVariacao
