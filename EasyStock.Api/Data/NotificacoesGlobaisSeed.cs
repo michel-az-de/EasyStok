@@ -25,7 +25,12 @@ public static class NotificacoesGlobaisSeed
 
     private static async Task<bool> SeedConfiguracoesCanal(EasyStockDbContext context, ILogger logger)
     {
+        // HasQueryFilter global (EmpresaId == CurrentTenantId || IsSuperAdmin) zera essa
+        // leitura durante o seed (CurrentTenantId=Guid.Empty e null != Guid.Empty), entao
+        // o seed enxergava lista vazia e duplicava as configs a cada startup. Idempotencia
+        // exige IgnoreQueryFilters para ler o que ja existe globalmente.
         var existentes = await context.NotifConfiguracoesCanal
+            .IgnoreQueryFilters()
             .Where(c => c.EmpresaId == null)
             .Select(c => c.Canal)
             .ToListAsync();
@@ -46,7 +51,10 @@ public static class NotificacoesGlobaisSeed
 
     private static async Task<bool> SeedTemplates(EasyStockDbContext context, ILogger logger)
     {
+        // Ver comentario em SeedConfiguracoesCanal — HasQueryFilter global zera a leitura
+        // de globais (EmpresaId IS NULL) durante seed; IgnoreQueryFilters restaura.
         var existentes = await context.NotifTemplates
+            .IgnoreQueryFilters()
             .Where(t => t.EmpresaId == null)
             .Select(t => t.Codigo)
             .ToListAsync();
@@ -69,7 +77,10 @@ public static class NotificacoesGlobaisSeed
 
     private static async Task<bool> SeedRotinas(EasyStockDbContext context, ILogger logger)
     {
+        // Ver comentario em SeedConfiguracoesCanal — HasQueryFilter global zera a leitura
+        // de globais (EmpresaId IS NULL) durante seed; IgnoreQueryFilters restaura.
         var existentes = await context.NotifRotinas
+            .IgnoreQueryFilters()
             .Where(r => r.EmpresaId == null)
             .Select(r => r.Codigo)
             .ToListAsync();

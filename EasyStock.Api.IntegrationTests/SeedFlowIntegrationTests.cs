@@ -35,7 +35,8 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_seedflow_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                // Program.cs:577 falha-rapido em creds default (Username=postgres + Password=postgres).
+                .WithPassword("EasyStock-IT-NonDefault-2026!")
                 .Build();
 
             await _pg.StartAsync();
@@ -60,6 +61,11 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("SEED_SUPERADMIN_EMAIL", SuperAdminEmail);
         Environment.SetEnvironmentVariable("SEED_SUPERADMIN_PASSWORD", SuperAdminPassword);
         Environment.SetEnvironmentVariable("SEED_DEMO_DATA", seedDemoData ? "true" : "false");
+        // ConfigureAppConfiguration nao chega em tempo p/ Program.cs ler ConnectionStrings
+        // antes do AddNpgSql (Program.cs:179) — sem essas env vars, NRE no startup.
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _pg.GetConnectionString());
+        Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
+        Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
@@ -92,13 +98,17 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
         await using var conn = new NpgsqlConnection(_pg.GetConnectionString());
         await conn.OpenAsync();
 
+        // Tabelas seguem snake_case (PerfilConfiguration.ToTable("perfis") etc.); colunas
+        // mantem PascalCase (EF default). Perfil.Nivel e NivelAcesso enum convertido p/
+        // string via HasConversion<string>() — o valor SuperAdmin (=0) e gravado como
+        // texto, nao integer; o filtro usa 'SuperAdmin', nao 0.
         var migrations = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM \"__EFMigrationsHistory\"");
-        var perfis = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM \"Perfis\" WHERE \"Nivel\" = 0");
+        var perfis = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM perfis WHERE \"Nivel\" = 'SuperAdmin'");
         var superAdminUsuarios = await ScalarIntAsync(conn,
-            "SELECT COUNT(*) FROM \"Usuarios\" WHERE LOWER(\"Email\") = LOWER(@email)",
+            "SELECT COUNT(*) FROM usuarios WHERE LOWER(\"Email\") = LOWER(@email)",
             ("email", SuperAdminEmail));
-        var empresas = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM \"Empresas\"");
-        var notifTemplates = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM \"NotifTemplates\"");
+        var empresas = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM empresas");
+        var notifTemplates = await ScalarIntAsync(conn, "SELECT COUNT(*) FROM notif_templates");
 
         return (migrations, perfis, superAdminUsuarios, empresas, notifTemplates);
     }
