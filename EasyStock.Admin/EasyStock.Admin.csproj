@@ -11,6 +11,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.9" />
+    <!-- CVE sweep: Cookies 2.3.9 -> AspNetCore.Authentication 2.3.0 -> DataProtection 2.3.0
+         -> Xml 8.0.2 transitiva (GHSA-37gx-xxp4-5rgx / GHSA-w3x6-4m5h-cxqf, HIGH).
+         Override top-level para versao patched 9.0.16. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.16" />
   </ItemGroup>
 
   <!-- Tailwind: gera wwwroot/css/tailwind.dist.css antes do build.
