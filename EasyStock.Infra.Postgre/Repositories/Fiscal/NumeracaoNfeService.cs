@@ -36,8 +36,14 @@ public sealed class NumeracaoNfeService(EasyStockDbContext db) : INumeracaoNfeSe
             throw new InvalidOperationException(
                 "ReservarProximoNumeroAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — sem transação ativa, o FOR UPDATE é descartado e ocorrem números duplicados.");
 
+        // .IgnoreQueryFilters(): impede que o filtro global de tenant envolva o raw
+        // numa subquery. O raw ja filtra por "EmpresaId" — isolamento preservado.
+        // Critico aqui: o wrap em subquery pode levar o Postgres a re-planejar o
+        // FOR UPDATE de forma indesejada e, sob carga paralela, abrir janela de
+        // duplicacao de numero fiscal. Tirar o filtro EF e defesa-em-profundidade.
         var config = await db.EmpresaConfiguracoesFiscais
             .FromSqlRaw(sql, empresaId)
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
 
         if (config is null)
