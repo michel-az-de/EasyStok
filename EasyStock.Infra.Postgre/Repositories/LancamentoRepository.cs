@@ -16,9 +16,15 @@ public sealed class LancamentoRepository(EasyStockDbContext db) : ILancamentoRep
     {
         // FOR UPDATE serializa baixas concorrentes no mesmo lancamento. Exige
         // transacao explicita aberta — fora dela o lock e liberado no fim do query.
+        // .IgnoreQueryFilters(): impede que o filtro global de tenant envolva o raw
+        // numa subquery (que em outros padroes — ex: ItemEstoqueRepository.GetLotes
+        // DisponiveisParaSaida — descarta semantica de ORDER BY/LIMIT). Aqui o raw
+        // ja filtra "EmpresaId" + "Id" — isolamento de tenant preservado. Defesa
+        // em profundidade contra wrap em subquery do EF.
         const string sql = "SELECT *, xmin FROM lancamentos WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
         var lancamento = await db.Lancamentos
             .FromSqlRaw(sql, empresaId, id)
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
 
         if (lancamento != null)

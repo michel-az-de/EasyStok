@@ -23,9 +23,15 @@ public sealed class CobrancaAssinaturaRepository(EasyStockDbContext dbContext) :
 
     public async Task<CobrancaAssinatura?> GetByTxidComLockAsync(string txid, CancellationToken ct = default)
     {
+        // Txid e UUID v4 unico globalmente (gerado pelo PSP no PIX, contrato Sicredi/EFI/etc).
+        // Webhook do PSP nao carrega contexto de tenant — busca apenas por Txid.
+        // .IgnoreQueryFilters(): sem isso o filtro global de tenant (CurrentTenantId)
+        // bloqueia o lookup quando o webhook roda fora de qualquer sessao de usuario
+        // (current_tenant = NULL nao casa com EmpresaId persistido).
         const string sql = "SELECT * FROM \"CobrancasAssinatura\" WHERE \"Txid\" = {0} FOR UPDATE";
         return await dbContext.CobrancasAssinatura
             .FromSqlRaw(sql, txid)
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
     }
 
