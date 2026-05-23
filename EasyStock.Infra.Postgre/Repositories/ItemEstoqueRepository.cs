@@ -247,22 +247,36 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true)
         {
-            // FOR UPDATE garante serialização: requests concorrentes aguardam o lock
-            // antes de ler a quantidade, evitando estoque negativo.
-            // Usa dois templates separados para deixar o filtro de variacao como
-            // literal fixo e evitar interpolação de valor no SQL (avisos EF1002).
+            // FOR UPDATE serializa concorrentes — lock adquirido no raw SQL DENTRO da
+            // transacao do caller (DbContext.Database.CurrentTransaction). Evita estoque
+            // negativo + perda de update sob carga.
+            //
+            // FEFO/FIFO determinismo: usamos SqlQueryRaw<Guid> pra extrair apenas o ID
+            // ordenado pelo raw (Postgres respeita ORDER BY quando a query retorna
+            // primitivos). Depois carregamos as entities tracked por ID e reordenamos
+            // in-memory na ordem dos IDs (que veio do raw, ja correto).
+            //
+            // Por que NAO usar dbContext.ItensEstoque.FromSqlRaw direto: EF compoe o raw
+            // como subquery ("SELECT * FROM (raw com ORDER BY...) sub") para alimentar
+            // o ChangeTracker, e o outer SELECT em Postgres NAO preserva o ORDER BY
+            // interno. .AsNoTracking() + .IgnoreQueryFilters() nao impediram o wrap em
+            // testes — provedor parece sempre envolver entity sets.
+            //
+            // FOR UPDATE no raw com SqlQueryRaw<Guid>: o lock e adquirido nas rows
+            // selecionadas (lock-level row, escopo da transacao). O reload subsequente
+            // via dbContext.ItensEstoque.Where(...) re-le as mesmas rows JA travadas —
+            // outros concorrentes esperam o commit. Semantica de serializacao preservada.
+
             var variacaoFilter = produtoVariacaoId.HasValue
                 ? "AND \"ProdutoVariacaoId\" = {2}"
                 : "AND \"ProdutoVariacaoId\" IS NULL";
 
-            // FEFO: lotes com validade mais próxima saem primeiro (NULLS LAST = sem validade saem por último).
-            // FIFO: lotes mais antigos (por data de entrada) saem primeiro.
             var orderBy = fefo
                 ? "\"ValidadeEm\" NULLS LAST, \"EntradaEm\", \"CriadoEm\""
                 : "\"EntradaEm\", \"CriadoEm\"";
 
-            var sql = $@"
-                    SELECT *, xmin FROM itens_estoque
+            var sqlIds = $@"
+                    SELECT ""Id"" AS ""Value"" FROM itens_estoque
                     WHERE ""EmpresaId"" = {{0}}
                       AND ""ProdutoId"" = {{1}}
                       AND ""QuantidadeAtual"" > 0
@@ -270,22 +284,24 @@ namespace EasyStock.Infra.Postgre.Repositories
                     ORDER BY {orderBy}
                     FOR UPDATE";
 
-            var query = produtoVariacaoId.HasValue
-                ? dbContext.ItensEstoque.FromSqlRaw(sql, empresaId, produtoId, produtoVariacaoId.Value)
-                : dbContext.ItensEstoque.FromSqlRaw(sql, empresaId, produtoId);
+            var idsQuery = produtoVariacaoId.HasValue
+                ? dbContext.Database.SqlQueryRaw<Guid>(sqlIds, empresaId, produtoId, produtoVariacaoId.Value)
+                : dbContext.Database.SqlQueryRaw<Guid>(sqlIds, empresaId, produtoId);
 
-            // IgnoreQueryFilters: critico para FEFO/FIFO. Sem isso, o global query
-            // filter do EF (EmpresaId == CurrentTenantId) envolve o raw em subselect
-            // ("SELECT * FROM (raw com ORDER BY) sub WHERE sub.EmpresaId = @tenant"),
-            // e o Postgres NAO garante que o outer SELECT preserve o ORDER BY interno
-            // sem um ORDER BY externo. Resultado em prod: ordem dos lotes vira nao-
-            // deterministica -> perecivel com validade longa sai antes do proximo a
-            // expirar (FEFO quebrado) / custo PEPS contabil quebra (FIFO quebrado).
-            // O raw JA filtra por "EmpresaId" = {0}, entao tenant continua isolado
-            // pelo WHERE literal; ignorar o global filter so remove o wrap em subquery.
-            return await query
+            var idsOrdenados = await idsQuery.ToListAsync();
+            if (idsOrdenados.Count == 0) return Array.Empty<ItemEstoque>();
+
+            // Carrega entities tracked (sem ordem garantida do banco — reorderamos abaixo).
+            // IgnoreQueryFilters: raw acima ja filtrou por EmpresaId, e RLS (ADR-0010)
+            // protege em camada 2. Cross-tenant impossivel.
+            var entities = await dbContext.ItensEstoque
                 .IgnoreQueryFilters()
+                .Where(i => idsOrdenados.Contains(i.Id))
                 .ToListAsync();
+
+            // Reordena pela lista de IDs (que veio do raw com ORDER BY correto).
+            var byId = entities.ToDictionary(i => i.Id);
+            return idsOrdenados.Select(id => byId[id]).ToList();
         }
 
         public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
