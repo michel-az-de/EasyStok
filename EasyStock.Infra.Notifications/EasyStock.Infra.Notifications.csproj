@@ -9,7 +9,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="Polly" Version="8.5.2" />
-    <PackageReference Include="Scriban" Version="7.1.0" />
+    <!--
+      7.2.0 (de 7.1.0): GHSA-24c8-4792-22hx — array.insert_at permite alocacao
+      ilimitada de memoria via parametro de indice, causando DoS por OOM.
+      Affected: <= 7.1.0, First Fixed: 7.2.0. Patch-level, sem breaking change.
+      Defesa em profundidade: templates de email no projeto NAO usam array.insert_at
+      hoje (grep zero matches), mas templates futuros / cliente custom poderiam.
+    -->
+    <PackageReference Include="Scriban" Version="7.2.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.5" />
