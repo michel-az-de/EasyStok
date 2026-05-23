@@ -266,8 +266,11 @@ public sealed class MovimentacaoEstoqueRepository(MongoEasyStockContext context,
     public async Task<MovimentacaoEstoque?> GetByIdAsync(Guid id) =>
         await Collection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
-    // MongoDB não suporta FOR UPDATE; lock implementado apenas em PostgreSQL
-    public Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid id) => GetByIdAsync(id);
+    // MongoDB não suporta FOR UPDATE; lock implementado apenas em PostgreSQL.
+    // empresaId/ct mantidos por consistência de assinatura — Mongo só tem GetByIdAsync(Guid id),
+    // o isolamento de tenant em Mongo é responsabilidade do MongoUnitOfWork (scoped filters).
+    public Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+        GetByIdAsync(id);
 
     public Task UpdateAsync(MovimentacaoEstoque movimentacao)
     {

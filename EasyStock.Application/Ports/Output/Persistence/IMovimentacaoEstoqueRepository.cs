@@ -10,8 +10,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task InsertAsync(MovimentacaoEstoque movimentacao);
         Task InsertRangeAsync(IEnumerable<MovimentacaoEstoque> movimentacoes);
         Task<MovimentacaoEstoque?> GetByIdAsync(Guid id);
-        /// <summary>Busca movimentação com lock pessimista (FOR UPDATE) para evitar duplo estorno.</summary>
-        Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid id);
+        /// <summary>
+        /// Busca movimentação com lock pessimista (FOR UPDATE) para evitar duplo estorno.
+        /// O filtro por <paramref name="empresaId"/> aplica defesa-em-profundidade no raw SQL —
+        /// não depende exclusivamente do global query filter do EF, que é descartável via
+        /// <c>IgnoreQueryFilters()</c>. Espelha a convenção de <c>ILancamentoRepository.GetWithLockAsync</c>.
+        /// </summary>
+        Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default);
         Task UpdateAsync(MovimentacaoEstoque movimentacao);
         Task<(IEnumerable<MovimentacaoEstoque> Items, int TotalCount)> GetByEmpresaAsync(
             Guid empresaId,
