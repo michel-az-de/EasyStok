@@ -82,27 +82,59 @@ internal static class MongoClassMapRegistrar
         return false;
     }
 
-    private sealed class CodigoSkuSerializer : SerializerBase<CodigoSku>
+    /// <summary>
+    /// Wrapper null-safe para serializers de Value Objects (sealed record). VOs em entities
+    /// podem ser nullable (ex: <c>Produto.SkuBase = CodigoSku?</c>); sem este guard, o MongoDB
+    /// driver chama Serialize com value=null e estoura NRE em prod. Em Deserialize, ReadNull
+    /// quando documento tem o campo como BsonNull.
+    /// </summary>
+    private abstract class VOSerializerBase<T> : SerializerBase<T> where T : class
     {
-        public override CodigoSku Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args) =>
+        public sealed override T Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+        {
+            if (context.Reader.GetCurrentBsonType() == BsonType.Null)
+            {
+                context.Reader.ReadNull();
+                return null!;
+            }
+            return DeserializeValue(context, args);
+        }
+
+        public sealed override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, T value)
+        {
+            if (value is null)
+            {
+                context.Writer.WriteNull();
+                return;
+            }
+            SerializeValue(context, args, value);
+        }
+
+        protected abstract T DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args);
+        protected abstract void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, T value);
+    }
+
+    private sealed class CodigoSkuSerializer : VOSerializerBase<CodigoSku>
+    {
+        protected override CodigoSku DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args) =>
             CodigoSku.From(context.Reader.ReadString());
 
-        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, CodigoSku value) =>
+        protected override void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, CodigoSku value) =>
             context.Writer.WriteString(value.Value);
     }
 
-    private sealed class CodigoLoteSerializer : SerializerBase<CodigoLote>
+    private sealed class CodigoLoteSerializer : VOSerializerBase<CodigoLote>
     {
-        public override CodigoLote Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args) =>
+        protected override CodigoLote DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args) =>
             CodigoLote.From(context.Reader.ReadString());
 
-        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, CodigoLote value) =>
+        protected override void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, CodigoLote value) =>
             context.Writer.WriteString(value.Value);
     }
 
-    private sealed class QuantidadeSerializer : SerializerBase<Quantidade>
+    private sealed class QuantidadeSerializer : VOSerializerBase<Quantidade>
     {
-        public override Quantidade Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+        protected override Quantidade DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args)
         {
             // Backward-compatible: existing documents stored as Int32; new writes use Decimal128.
             var bsonType = context.Reader.GetCurrentBsonType();
@@ -116,13 +148,13 @@ internal static class MongoClassMapRegistrar
             };
         }
 
-        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, Quantidade value) =>
+        protected override void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, Quantidade value) =>
             context.Writer.WriteDecimal128(new MongoDB.Bson.Decimal128(value.Value));
     }
 
-    private sealed class DinheiroSerializer : SerializerBase<Dinheiro>
+    private sealed class DinheiroSerializer : VOSerializerBase<Dinheiro>
     {
-        public override Dinheiro Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+        protected override Dinheiro DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args)
         {
             var bsonType = context.Reader.GetCurrentBsonType();
             var value = bsonType switch
@@ -137,22 +169,22 @@ internal static class MongoClassMapRegistrar
             return Dinheiro.FromDecimal(value);
         }
 
-        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, Dinheiro value) =>
+        protected override void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, Dinheiro value) =>
             context.Writer.WriteDecimal128(new Decimal128(value.Valor));
     }
 
-    private sealed class ValidadeSerializer : SerializerBase<Validade>
+    private sealed class ValidadeSerializer : VOSerializerBase<Validade>
     {
-        public override Validade Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args) =>
+        protected override Validade DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args) =>
             Validade.From(BsonUtils.ToDateTimeFromMillisecondsSinceEpoch(context.Reader.ReadDateTime()));
 
-        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, Validade value) =>
+        protected override void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, Validade value) =>
             context.Writer.WriteDateTime(BsonUtils.ToMillisecondsSinceEpoch(value.DataValidade));
     }
 
-    private sealed class DimensoesSerializer : SerializerBase<Dimensoes>
+    private sealed class DimensoesSerializer : VOSerializerBase<Dimensoes>
     {
-        public override Dimensoes Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+        protected override Dimensoes DeserializeValue(BsonDeserializationContext context, BsonDeserializationArgs args)
         {
             context.Reader.ReadStartDocument();
             decimal peso = 0m;
@@ -186,7 +218,7 @@ internal static class MongoClassMapRegistrar
             return Dimensoes.From(peso, largura, altura, comprimento);
         }
 
-        public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, Dimensoes value)
+        protected override void SerializeValue(BsonSerializationContext context, BsonSerializationArgs args, Dimensoes value)
         {
             context.Writer.WriteStartDocument();
             context.Writer.WriteName("peso");
