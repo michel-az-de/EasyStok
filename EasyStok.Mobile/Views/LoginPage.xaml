@@ -123,7 +123,7 @@
 
                         <!-- CTA principal -->
                         <Button Text="Entrar"
-                                Command="{Binding LoginCommand}"
+                                Command="{Binding EntrarCommand}"
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}" />
 
                         <ActivityIndicator IsRunning="{Binding IsBusy}"

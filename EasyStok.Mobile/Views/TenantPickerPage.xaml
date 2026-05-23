@@ -29,7 +29,7 @@
 
                 <Button Text="Sair e tentar com outra conta"
                         Style="{StaticResource ButtonGhost}"
-                        Command="{Binding LogoutCommand}" />
+                        Command="{Binding SairCommand}" />
 
             </VerticalStackLayout>
         </ScrollView>
