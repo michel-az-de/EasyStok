@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:EasyStok.Mobile.Controls"
              x:Class="EasyStok.Mobile.Controls.BrandHeader"
              x:Name="HeaderRoot">
     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="6" Padding="0,8,0,12">
@@ -18,7 +19,7 @@
 
         <!-- Nome empresa + MOBILE chip -->
         <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="2" VerticalOptions="Start">
-            <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=EmpresaNome}"
+            <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=EmpresaNome, x:DataType=controls:BrandHeader}"
                    FontFamily="Fraunces"
                    FontSize="22"
                    FontAttributes="Bold"
@@ -49,7 +50,7 @@
                 StrokeThickness="1"
                 Padding="10,5"
                 VerticalOptions="Start">
-            <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=LojaCodigo}"
+            <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=LojaCodigo, x:DataType=controls:BrandHeader}"
                    FontFamily="Inter"
                    FontSize="11"
                    FontAttributes="Bold"
@@ -59,7 +60,7 @@
         <!-- Saudação + nome operador editável (placeholder) + ações busca/ajustes -->
         <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
-                <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=Saudacao}"
+                <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=Saudacao, x:DataType=controls:BrandHeader}"
                        Style="{StaticResource LabelGreeting}"
                        VerticalOptions="Center" />
                 <Border BackgroundColor="{AppThemeBinding Dark={StaticResource Gold700}, Light={StaticResource Gold100}}"
@@ -72,7 +73,7 @@
                         <TapGestureRecognizer Tapped="OnEditarOperadorTapped" />
                     </Border.GestureRecognizers>
                     <HorizontalStackLayout Spacing="6">
-                        <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=OperadorNome}"
+                        <Label Text="{Binding Source={x:Reference HeaderRoot}, Path=OperadorNome, x:DataType=controls:BrandHeader}"
                                FontFamily="Inter" FontSize="13" FontAttributes="Bold"
                                TextColor="{AppThemeBinding Dark={StaticResource Gold200}, Light={StaticResource Gold700}}" />
                         <Label Text="✏️" FontSize="11" VerticalOptions="Center" />
