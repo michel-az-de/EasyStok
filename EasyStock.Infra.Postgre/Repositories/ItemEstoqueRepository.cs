@@ -31,8 +31,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             // concorrencia; FirstOrDefaultAsync compoe o FromSqlRaw em subquery e o
             // SELECT * nao expoe xmin -> EF gera e.xmin e estoura 42703.
             var sql = "SELECT *, xmin FROM itens_estoque WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
+            // IgnoreQueryFilters: a SQL raw JA filtra por "EmpresaId" = {0}, entao o
+            // isolamento de tenant esta preservado pelo proprio SQL. O global query
+            // filter do EF (EmpresaId == CurrentTenantId) so seria redundante aqui,
+            // mas envolve a query em subselect ("SELECT * FROM (raw) sub WHERE ...")
+            // — defesa-em-profundidade para nao perder ORDER BY/FOR UPDATE semantics
+            // se a query evoluir. Cross-tenant continua bloqueado pelo WHERE literal.
             return await dbContext.ItensEstoque
                 .FromSqlRaw(sql, empresaId, id)
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync();
         }
 
@@ -267,7 +274,17 @@ namespace EasyStock.Infra.Postgre.Repositories
                 ? dbContext.ItensEstoque.FromSqlRaw(sql, empresaId, produtoId, produtoVariacaoId.Value)
                 : dbContext.ItensEstoque.FromSqlRaw(sql, empresaId, produtoId);
 
+            // IgnoreQueryFilters: critico para FEFO/FIFO. Sem isso, o global query
+            // filter do EF (EmpresaId == CurrentTenantId) envolve o raw em subselect
+            // ("SELECT * FROM (raw com ORDER BY) sub WHERE sub.EmpresaId = @tenant"),
+            // e o Postgres NAO garante que o outer SELECT preserve o ORDER BY interno
+            // sem um ORDER BY externo. Resultado em prod: ordem dos lotes vira nao-
+            // deterministica -> perecivel com validade longa sai antes do proximo a
+            // expirar (FEFO quebrado) / custo PEPS contabil quebra (FIFO quebrado).
+            // O raw JA filtra por "EmpresaId" = {0}, entao tenant continua isolado
+            // pelo WHERE literal; ignorar o global filter so remove o wrap em subquery.
             return await query
+                .IgnoreQueryFilters()
                 .ToListAsync();
         }
 

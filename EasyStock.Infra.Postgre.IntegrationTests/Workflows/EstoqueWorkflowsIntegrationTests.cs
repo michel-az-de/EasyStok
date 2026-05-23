@@ -335,19 +335,14 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 CanalVenda.MercadoLivre,
                 "Saida FIFO"));
 
-            // TODO(produto): a ordem FEFO/FIFO ESPERADA seria {10, 2} (loteAntigo
-            // esgota primeiro, loteNovo absorve o resto). Hoje a ordem nao eh
-            // deterministica porque GetLotesDisponiveisParaSaidaAsync usa
-            // FromSqlRaw + FOR UPDATE, e quando o EF compoe o filtro global
-            // (EmpresaId == CurrentTenantId) sobre essa query o wrap externo
-            // descarta o ORDER BY interno (subquery em Postgres). Fix no produto
-            // (uma linha): adicionar .IgnoreQueryFilters() apos FromSqlRaw em
-            // ItemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync/GetByIdComLockAsync
-            // (a raw SQL ja filtra por EmpresaId, isolamento preservado).
-            // Enquanto isso, asserts ficam order-agnostic.
+            // Ordem FEFO deterministica garantida por .IgnoreQueryFilters() apos o
+            // FromSqlRaw em ItemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync
+            // (sem isso, o wrap em subquery do filtro global descartava o ORDER BY
+            // interno -> ordem nao-deterministica). loteAntigo (validade mais
+            // proxima) esgota primeiro (10 unidades), loteNovo absorve o resto (2).
             result.Itens.Should().HaveCount(2);
-            result.Itens.Sum(i => i.QuantidadeSaida).Should().Be(12);
-            result.Itens.Select(i => i.ItemEstoqueId).Should().BeEquivalentTo(new[] { loteAntigoId, loteNovoId });
+            result.Itens.Select(i => i.QuantidadeSaida).Should().Equal(10, 2);
+            result.Itens.Select(i => i.ItemEstoqueId).Should().Equal(loteAntigoId, loteNovoId);
         }
 
         await using (var assertContext = fixture.CreateDbContext())
@@ -361,18 +356,23 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 .OrderBy(m => m.DataMovimentacao)
                 .ToListAsync();
 
-            // Order-agnostic (ver TODO no bloco da use-case): um lote esgota
-            // (qty 0, Esgotado), o outro fica com saldo 3 (Warn). Indicadores
-            // FIFO atualizados em AMBOS. NAO checamos QUAL lote esgota.
+            // lotes ordenado por EntradaEm asc: [0]=loteAntigo (esgotado, qty 0),
+            // [1]=loteNovo (qty 3, Warn). Ordem FEFO deterministica garantida pelo
+            // fix em ItemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync.
             lotes.Should().HaveCount(2);
-            lotes.Should().ContainSingle(i => i.QuantidadeAtual.Value == 0 && i.Status == StatusItemEstoque.Esgotado);
-            lotes.Should().ContainSingle(i => i.QuantidadeAtual.Value == 3 && i.Status == StatusItemEstoque.Warn);
-            lotes.Select(i => i.Id).Should().BeEquivalentTo(new[] { loteAntigoId, loteNovoId });
+            lotes[0].Id.Should().Be(loteAntigoId);
+            lotes[0].QuantidadeAtual.Value.Should().Be(0);
+            lotes[0].Status.Should().Be(StatusItemEstoque.Esgotado);
+            lotes[1].Id.Should().Be(loteNovoId);
+            lotes[1].QuantidadeAtual.Value.Should().Be(3);
+            lotes[1].Status.Should().Be(StatusItemEstoque.Warn);
             lotes.Should().OnlyContain(i => i.VelocidadeSaidaDiaria > 0m);
             lotes.Should().OnlyContain(i => i.PrevisaoZeramentoDias.HasValue);
 
             venda.ItensVenda.Should().HaveCount(2);
             movimentacoes.Should().HaveCount(2);
+            // movimentacoes ordenadas por DataMovimentacao (mesmo timestamp p/ ambas)
+            // -> ordem instavel entre execucoes; usar BeEquivalentTo (set-equality).
             movimentacoes.Select(m => m.ItemEstoqueId).Should().BeEquivalentTo(new[] { loteAntigoId, loteNovoId });
             movimentacoes.Sum(m => m.Quantidade.Value).Should().Be(12);
         }
