@@ -56,7 +56,7 @@
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <Button Text="Sair" Style="{StaticResource ButtonGhost}" Command="{Binding LogoutCommand}" />
+            <Button Text="Sair" Style="{StaticResource ButtonGhost}" Command="{Binding SairCommand}" />
 
         </VerticalStackLayout>
     </Grid>
