@@ -345,6 +345,11 @@ public class SyncMutationDispatcher(
             EmpresaId = empresaId,
             LojaId = lojaId
         };
+        if (dto.Items is null)
+            throw new InvalidOperationException(
+                $"Batch {dto.Id} chegou sem coleção Items — payload mal-formado do PWA. " +
+                "Cliente deveria enviar Items=[] em vez de null; rejeita p/ nao corromper estoque.");
+
         foreach (var i in dto.Items)
         {
             batch.Items.Add(new BatchItem
