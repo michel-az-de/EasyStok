@@ -146,7 +146,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
                 QuantidadeAtual = Quantidade.From(7),
                 CustoUnitario = Dinheiro.FromDecimal(250m),
                 PrecoVendaSugerido = Dinheiro.FromDecimal(399.90m),
-                ValidadeEm = Validade.From(new DateTime(2026, 12, 31)),
+                ValidadeEm = Validade.From(new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc)),
                 Status = StatusItemEstoque.Ok,
                 EntradaEm = DateTime.UtcNow,
                 CriadoEm = DateTime.UtcNow,
@@ -168,7 +168,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
             item.QuantidadeAtual.Value.Should().Be(7);
             item.CustoUnitario.Valor.Should().Be(250m);
             item.PrecoVendaSugerido!.Valor.Should().Be(399.90m);
-            item.ValidadeEm!.DataValidade.Should().Be(new DateTime(2026, 12, 31));
+            item.ValidadeEm!.DataValidade.Should().Be(new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc));
         }
     }
 
