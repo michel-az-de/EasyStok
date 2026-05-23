@@ -16,7 +16,6 @@ namespace EasyStock.Infra.Async.Reporting.Handlers.Fiscal;
 /// sem carregar todos os XMLs em memória simultaneamente.
 /// </summary>
 public sealed class XmlBulkDownloadHandler(
-    EasyStockDbContext        db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<XmlBulkDownloadParams, XmlBulkDownloadRow>
 {
