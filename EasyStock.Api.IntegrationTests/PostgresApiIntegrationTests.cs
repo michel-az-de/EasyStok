@@ -32,6 +32,14 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     private const string JwtAudience = "EasyStock";
     private const string JwtSecret  = "EasyStock-Test-SuperSecretKey-Min32Chars!!";
 
+    // Cache classe-scoped: a checagem de "seed demo disponível" é determinística
+    // dentro do mesmo processo (mesma Program.cs, mesma config). Sem cache, cada
+    // um dos 12 testes que dependem do seed pagava ~30s subindo WebApplicationFactory
+    // só para descobrir que o login falhava — total ~6min queimados/run.
+    // Com cache: o primeiro paga o custo, os outros 11 leem a flag e pulam em ms.
+    private static bool? _seedDemoDisponivelCache;
+    private static readonly SemaphoreSlim _seedDemoCheckLock = new(1, 1);
+
     public async Task InitializeAsync()
     {
         // Prioridade 1: Postgres externo via env var EASYSTOCK_IT_PG (CI ou ambiente
@@ -134,6 +142,34 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         return client;
     }
 
+    // Helper: checa UMA VEZ por processo se o seed demo está disponível (login do
+    // admin funciona). Antes desta otimização, cada um dos 12 testes que depende
+    // do seed subia WebApplicationFactory (~30s) só pra descobrir que o Skip ia
+    // pular. Agora o primeiro paga, os outros 11 leem a flag e pulam cedo.
+    private async Task<bool> SeedDemoDisponivelAsync()
+    {
+        if (_seedDemoDisponivelCache.HasValue)
+            return _seedDemoDisponivelCache.Value;
+
+        await _seedDemoCheckLock.WaitAsync();
+        try
+        {
+            if (_seedDemoDisponivelCache.HasValue)
+                return _seedDemoDisponivelCache.Value;
+
+            await using var factory = CriarFactory();
+            using var client = factory.CreateClient();
+            var loginResp = await client.PostAsJsonAsync("/api/auth/login",
+                new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" });
+            _seedDemoDisponivelCache = loginResp.IsSuccessStatusCode;
+            return _seedDemoDisponivelCache.Value;
+        }
+        finally
+        {
+            _seedDemoCheckLock.Release();
+        }
+    }
+
     // ─── Health Check ─────────────────────────────────────────────────────────
 
     [SkippableFact]
@@ -169,6 +205,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     public async Task Login_admin_deve_retornar_token_JWT()
     {
         Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        Skip.IfNot(await SeedDemoDisponivelAsync(),
+            "Seed demo (felipe@easystock.com) indisponível neste ambiente.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -176,11 +214,6 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         // O seed roda no startup, portanto os usuarios ja existem
         var payload = new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" };
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
-
-        // O usuário demo depende do seed de tenants (credenciais variam por ambiente);
-        // sem ele alinhado o login é 401. Pula honesto em vez de falso-vermelho.
-        Skip.IfNot(response.StatusCode == HttpStatusCode.OK,
-            $"Seed demo (felipe@easystock.com) indisponível neste ambiente (login {response.StatusCode}).");
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
@@ -190,6 +223,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     public async Task Login_gerente_deve_retornar_token_JWT()
     {
         Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        Skip.IfNot(await SeedDemoDisponivelAsync(),
+            "Seed demo (gerente) indisponível neste ambiente.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -197,8 +232,6 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         var payload = new { Email = "thatiane@easystock.com", Senha = "Thati@2026!Gerente" };
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
 
-        Skip.IfNot(response.StatusCode == HttpStatusCode.OK,
-            $"Seed demo (gerente) indisponível neste ambiente (login {response.StatusCode}).");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -206,6 +239,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     public async Task Login_operador_deve_retornar_token_JWT()
     {
         Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        Skip.IfNot(await SeedDemoDisponivelAsync(),
+            "Seed demo (operador) indisponível neste ambiente.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -213,8 +248,6 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         var payload = new { Email = "operador.fone@easystock.com", Senha = "OpFone@2026!Access" };
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
 
-        Skip.IfNot(response.StatusCode == HttpStatusCode.OK,
-            $"Seed demo (operador) indisponível neste ambiente (login {response.StatusCode}).");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -259,6 +292,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     public async Task Endpoint_com_token_admin_deve_retornar_2xx(string path)
     {
         Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        Skip.IfNot(await SeedDemoDisponivelAsync(),
+            "Seed demo (admin) indisponível neste ambiente — fluxo autenticado web→API pulado.");
 
         await using var factory = CriarFactory();
         using var client = await ClienteAutenticadoAdminAsync(factory);
