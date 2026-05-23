@@ -11,7 +11,6 @@ public partial class LojaPickerPage : ContentPage
 	{
 		InitializeComponent();
 		BindingContext = _vm = vm;
-		LojaPickerRoot.BindingContext = vm;
 	}
 
 	protected override void OnAppearing()

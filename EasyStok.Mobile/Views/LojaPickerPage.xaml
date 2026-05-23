@@ -33,7 +33,11 @@
                     <DataTemplate x:DataType="models:Loja">
                         <Border Style="{StaticResource Card}" Margin="0,4">
                             <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Path=BindingContext.SelectCommand, Source={x:Reference LojaPickerRoot}}"
+                                <!-- RelativeSource AncestorType localiza o ContentPage cujo BindingContext é LojaPickerViewModel.
+                                     Padrão canônico MAUI para compiled bindings dentro de DataTemplate (substitui o hack
+                                     anterior com Source={x:Reference LojaPickerRoot} + LojaPickerRoot.BindingContext=vm).
+                                     Comportamento runtime equivalente: dispara SelectCommand do VM ao tapar item. -->
+                                <TapGestureRecognizer Command="{Binding Path=SelectCommand, Source={RelativeSource Mode=FindAncestorBindingContext, AncestorType={x:Type vm:LojaPickerViewModel}}, x:DataType=vm:LojaPickerViewModel}"
                                                       CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
@@ -55,8 +59,5 @@
             <Button Text="Sair" Style="{StaticResource ButtonGhost}" Command="{Binding LogoutCommand}" />
 
         </VerticalStackLayout>
-
-        <!-- Hack para resolver Source={x:Reference} no DataTemplate -->
-        <ContentView x:Name="LojaPickerRoot" IsVisible="False" />
     </Grid>
 </ContentPage>

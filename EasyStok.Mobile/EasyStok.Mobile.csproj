@@ -26,6 +26,11 @@
 
 		<SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
 
+		<!-- Compila bindings com Source={x:Reference} explícito (elimina XC0025).
+		     Cada Binding com Source explícita PRECISA de x:DataType correspondente
+		     (BrandHeader.xaml linhas 21/52/62/75, LojaPickerPage.xaml linha 36). -->
+		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+
 		<!-- Build com `dotnet publish -c Release` para gerar APK auto-suficiente
 		     (assemblies + Mono runtime nativo embarcados). `dotnet build` em
 		     Debug usa fast deployment que assume runtime compartilhado pre-
