@@ -30,11 +30,21 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
 
         await using (var setupContext = fixture.CreateDbContext())
         {
+            var empresa = new Empresa
+            {
+                Id = empresaId,
+                Nome = "Empresa Teste",
+                Documento = empresaId.ToString("N")[..14],
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            };
             var categoria = new Categoria
             {
                 Id = categoriaId,
                 EmpresaId = empresaId,
-                Nome = "Eletrônicos"
+                Nome = "Eletrônicos",
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
             };
             var produto = new Produto
             {
@@ -43,7 +53,10 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
                 CategoriaId = categoriaId,
                 Nome = "Produto Teste",
                 SkuBase = CodigoSku.From("SKU-TEST"),
-                Status = StatusProduto.Ativo
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
             };
             var item = new ItemEstoque
             {
@@ -55,11 +68,14 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
                 QuantidadeMinima = 1,
                 CustoUnitario = Dinheiro.FromDecimal(100m),
                 Status = StatusItemEstoque.Ok,
-                EntradaEm = DateTime.UtcNow
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
             };
 
             itemEstoqueId = item.Id;
 
+            await setupContext.Set<Empresa>().AddAsync(empresa);
             await setupContext.Set<Categoria>().AddAsync(categoria);
             await setupContext.Set<Produto>().AddAsync(produto);
             await setupContext.Set<ItemEstoque>().AddAsync(item);
@@ -70,6 +86,7 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
         var task1 = Task.Run(async () =>
         {
             await using var context = fixture.CreateDbContext();
+            context.SetMobileTenantContext(empresaId);
             var useCase = new RegistrarSaidaEstoqueUseCase(
                 new ProdutoRepository(context),
                 new ItemEstoqueRepository(context),
@@ -89,6 +106,7 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
         var task2 = Task.Run(async () =>
         {
             await using var context = fixture.CreateDbContext();
+            context.SetMobileTenantContext(empresaId);
             var useCase = new RegistrarSaidaEstoqueUseCase(
                 new ProdutoRepository(context),
                 new ItemEstoqueRepository(context),
@@ -121,6 +139,7 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
         // Verificar estado final: quantidade deve ser 0, nunca negativa
         await using (var assertContext = fixture.CreateDbContext())
         {
+            assertContext.SetMobileTenantContext(empresaId);
             var item = await assertContext.ItensEstoque
                 .Where(i => i.Id == itemEstoqueId)
                 .FirstAsync();
