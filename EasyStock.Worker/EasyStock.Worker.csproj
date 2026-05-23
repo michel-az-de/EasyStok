@@ -12,6 +12,16 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.5" />
     <PackageReference Include="Npgsql" Version="9.0.3" />
+    <!--
+      MSB3277: dependencias transitivas (alguma combinacao de Microsoft.Extensions.Hosting
+      9.0.0 + analyzers do dotnet 10 SDK) trazem Microsoft.EntityFrameworkCore.Relational
+      9.0.1 (net8.0). EasyStock.Infra.Postgre + Infra.Async usam 9.0.4 (net9.0).
+      Sem esta referencia top-level, NuGet escolhe 9.0.1 como "principal" e gera
+      assembly do Worker contra runtime mais antigo — risco de MissingMethodException
+      em APIs novas (ex: IgnoreQueryFilters wiring melhorado em 9.0.x patches).
+      PackageReference direta vence dependencia transitiva e alinha em 9.0.4.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />

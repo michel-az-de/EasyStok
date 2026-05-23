@@ -14,6 +14,12 @@
     <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!--
+      MSB3277: NetArchTest.Rules + Test.Sdk trazem EFCore.Relational 9.0.1 (net8.0)
+      via analyzers; Infra.Postgre (project-ref) usa 9.0.4 (net9.0). Top-level
+      Relational 9.0.4 vence transitivas. Espelha fix de Worker/Infra.Async.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup>
