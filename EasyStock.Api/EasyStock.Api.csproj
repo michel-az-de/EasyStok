@@ -9,7 +9,7 @@
          (GHSA-6c8g-7p36-r338, affected <= 0.47.4, First Fixed: None). Zero uso
          real no projeto (grep "SharpCompress" retorna 0). Re-avaliar quando patch
          sair. Ver docs/dev/incidentes/2026-05-23-sharpcompress-no-patch.md. -->
-    <NoWarn>$(NoWarn);1591;NU1903</NoWarn>
+    <NoWarn>$(NoWarn);1591;NU1903;NU1902</NoWarn>
     <Version>1.10.0</Version>
     <AssemblyVersion>1.10.0.0</AssemblyVersion>
     <FileVersion>1.10.0.0</FileVersion>

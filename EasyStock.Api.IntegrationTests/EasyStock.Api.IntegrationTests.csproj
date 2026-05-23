@@ -7,7 +7,7 @@
     <IsPackable>false</IsPackable>
     <!-- NU1903: SharpCompress transitiva via Api project-ref (MongoDB.Driver).
          Ver docs/dev/incidentes/2026-05-23-sharpcompress-no-patch.md. -->
-    <NoWarn>$(NoWarn);NU1903</NoWarn>
+    <NoWarn>$(NoWarn);NU1903;NU1902</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
