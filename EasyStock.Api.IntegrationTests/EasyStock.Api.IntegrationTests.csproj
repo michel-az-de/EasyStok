@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- NU1903: SharpCompress transitiva via Api project-ref (MongoDB.Driver).
+         Ver docs/dev/incidentes/2026-05-23-sharpcompress-no-patch.md. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

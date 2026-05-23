@@ -4,6 +4,10 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- NU1903: SharpCompress (top-level override do PR #210 — toda a faixa <= 0.47.4
+         vulneravel, sem patch upstream). Zero uso real no projeto.
+         Ver docs/dev/incidentes/2026-05-23-sharpcompress-no-patch.md. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
