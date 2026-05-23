@@ -41,8 +41,10 @@ namespace EasyStock.Application.UseCases.EstornarSaida
             // o lock pessimistico ate o commit final.
             return await unitOfWork.ExecuteInTransactionAsync(async ct =>
             {
-                // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock
-                var original = await movimentacaoRepository.GetByIdComLockAsync(command.MovimentacaoId)
+                // FOR UPDATE evita duplo estorno: requests concorrentes aguardam o lock.
+                // empresaId no raw SQL aplica defesa-em-profundidade (o repo filtra
+                // explicitamente — nao depende apenas do global query filter do EF).
+                var original = await movimentacaoRepository.GetByIdComLockAsync(command.EmpresaId, command.MovimentacaoId, ct)
                     ?? throw new UseCaseValidationException("Movimentacao nao encontrada.");
 
                 if (original.EmpresaId != command.EmpresaId)

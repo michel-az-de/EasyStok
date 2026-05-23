@@ -23,10 +23,21 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(m => m.ItemEstoque)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
-        public async Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid id) =>
-            await dbContext.MovimentacoesEstoque
-                .FromSqlRaw("SELECT * FROM movimentacoes_estoque WHERE \"Id\" = {0} FOR UPDATE", id)
-                .FirstOrDefaultAsync();
+        public async Task<MovimentacaoEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default)
+        {
+            // FOR UPDATE serializa estorno/baixa concorrentes; raw filtra por
+            // EmpresaId + Id como defesa-em-profundidade (nao depende apenas do
+            // global query filter do EF, que e descartavel via IgnoreQueryFilters).
+            // IgnoreQueryFilters() aqui evita o wrap em subquery que o filtro global
+            // imporia — preserva semantica do FOR UPDATE.
+            // Sem ", xmin" no SELECT porque MovimentacaoEstoque NAO configura xmin
+            // como concurrency token (ver MovimentacaoEstoqueConfiguration.cs).
+            const string sql = "SELECT * FROM movimentacoes_estoque WHERE \"EmpresaId\" = {0} AND \"Id\" = {1} FOR UPDATE";
+            return await dbContext.MovimentacoesEstoque
+                .FromSqlRaw(sql, empresaId, id)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(ct);
+        }
 
         public Task UpdateAsync(MovimentacaoEstoque movimentacao)
         {
