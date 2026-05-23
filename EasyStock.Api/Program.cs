@@ -22,6 +22,7 @@ using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Sqlite.DependencyInjection;
 using EasyStock.Infra.Sqlite.HealthChecks;
 using EasyStock.Infra.Async.DependencyInjection;
+using EasyStock.Infra.Async.Storage;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;

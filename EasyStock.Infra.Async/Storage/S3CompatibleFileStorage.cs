@@ -2,12 +2,11 @@ using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
-using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.Extensions.Options;
 
-namespace EasyStock.Api.Services;
+namespace EasyStock.Infra.Async.Storage;
 
 public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options) : IFileStorage
 {

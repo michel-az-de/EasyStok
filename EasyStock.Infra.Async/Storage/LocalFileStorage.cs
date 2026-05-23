@@ -1,11 +1,14 @@
-using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-namespace EasyStock.Api.Services;
+namespace EasyStock.Infra.Async.Storage;
 
-public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IWebHostEnvironment environment) : IFileStorage
+// IHostEnvironment (não IWebHostEnvironment): só usamos ContentRootPath, que existe no
+// contrato base do Generic Host. Isso permite resolver esta implementação tanto na API
+// (web host) quanto no Worker (generic host), fechando o gap do motor de relatórios.
+public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHostEnvironment environment) : IFileStorage
 {
     private readonly FileStorageOptions _options = options.Value;
 

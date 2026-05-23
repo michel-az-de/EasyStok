@@ -1,12 +1,11 @@
 using Azure.Storage;
 using Azure.Storage.Files.Shares;
 using Azure.Storage.Sas;
-using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.Extensions.Options;
 
-namespace EasyStock.Api.Services;
+namespace EasyStock.Infra.Async.Storage;
 
 public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) : IFileStorage
 {

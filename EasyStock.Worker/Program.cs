@@ -2,6 +2,7 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
+using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
@@ -104,10 +105,23 @@ builder.Services.AddHostedService<EndpointHealthMonitorService>();
 // Pode ser desligado via Integration:Outbox:Enabled=false (default true).
 builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
 
+// Storage de arquivos (IFileStorage): o motor de relatórios escreve/lê artefatos via
+// IFileStorage. As implementações vivem em Infra.Async.Storage (compartilhadas com a API).
+// Sem este registro o Worker não resolvia IFileStorage e o ReportRunner falhava em runtime
+// (gap fechado — provider lido de "FileStorage:Provider", default Local).
+builder.Services.AddEasyStockFileStorageCore(builder.Configuration);
+
 // Motor de relatórios assíncrono (PR-C0 — ADR-R02/R03/R04/R06/R07)
 // Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
 // WorkerCurrentUserAccessor (override ADR-R06) + ReportExecutionContext (AsyncLocal).
 builder.Services.AddReportingWorker();
+
+// IMemoryCache: o ConfigFiscalResolver (registrado em AddEasyStockPostgreInfrastructure)
+// faz cache de 60s da config fiscal por tenant. Sem este registro o
+// ReprocessarContingenciaBackgroundService quebrava em runtime ao resolver
+// ReprocessarContingenciaUseCase → IConfigFiscalResolver → IMemoryCache (só a API
+// registrava o cache, via AddEasyStockCache). Singleton consumido por Scoped: OK.
+builder.Services.AddMemoryCache();
 
 // Modulo Fiscal NFC-e (F4) — Polly pipelines + adapters Focus NFe + Mock + jobs background
 builder.Services.AddEasyStockIntegrationResilience();
@@ -126,6 +140,33 @@ builder.Services.AddHostedService<RenovacaoCertificadoA1BackgroundService>();
 
 // Health checks
 builder.Services.AddHealthChecks();
+
+// Validação de DI sob demanda (CI/diagnóstico): `dotnet run -- --validate-di` constrói
+// o grafo com ValidateOnBuild + ValidateScopes, pegando captive dependencies
+// (singleton↔scoped) e serviços não-resolvíveis. Foi assim que o lifetime mismatch da
+// factory fiscal (#194) passou silencioso no Generic Host (não valida por padrão).
+//
+// Esta ferramenta encontrou e fechamos 2 crashes latentes que dariam "erro genérico":
+//   • IFileStorage  — motor de relatórios (ReportRunner/Watchdog). Realocado p/ Infra.Async.
+//   • IMemoryCache  — cadeia fiscal (ReprocessarContingenciaUseCase → IConfigFiscalResolver).
+//
+// Mantido CONDICIONAL (não roda no startup normal): o grafo ainda não é 100% resolvível
+// porque o Worker reusa AddEasyStockApplication() — que registra TODOS os use cases da
+// API (auth, PIX, uploads, faturas, admin, inteligência, tickets). Esses use cases nunca
+// são resolvidos pelos jobs do Worker (registros mortos), mas o ValidateOnBuild os reporta.
+// Um gate incondicional verde exigiria fatiar AddEasyStockApplication para o Worker
+// registrar só o que executa — refatoração de registro compartilhado (follow-up).
+if (args.Contains("--validate-di"))
+{
+    using var validationProvider = builder.Services.BuildServiceProvider(new ServiceProviderOptions
+    {
+        ValidateOnBuild = true,
+        ValidateScopes = true
+    });
+    Log.Information("Worker: grafo de DI validado com sucesso.");
+    Log.CloseAndFlush();
+    return;
+}
 
 var host = builder.Build();
 host.Run();
