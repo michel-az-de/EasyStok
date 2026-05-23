@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- NU1903: SharpCompress (transitiva via MongoDB.Driver no Api ref) sem patch
+         upstream. Ver docs/dev/incidentes/2026-05-23-sharpcompress-no-patch.md. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
