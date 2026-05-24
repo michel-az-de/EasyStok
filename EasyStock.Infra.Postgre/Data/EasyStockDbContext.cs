@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -154,6 +154,7 @@ namespace EasyStock.Infra.Postgre.Data
         // Storefront aggregates (ver ADR-0002 multi-tenancy, ADR-0014 vaga lifecycle)
         public DbSet<EasyStock.Domain.Entities.Storefront.Storefront> Storefronts { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.CardapioItem> CardapioItens { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.FreteZona> FreteZonas { get; set; } = null!;
         public DbSet<Categoria> Categorias { get; set; } = null!;
         public DbSet<Produto> Produtos { get; set; } = null!;
         public DbSet<ProdutoVariacao> ProdutosVariacao { get; set; } = null!;
