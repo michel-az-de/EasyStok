@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Messaging;
+﻿namespace EasyStock.Application.Ports.Output.Messaging;
 
 /// <summary>
 /// Porta para envio de código OTP via WhatsApp/SMS. Implementação concreta vive em

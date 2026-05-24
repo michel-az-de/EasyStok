@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Messaging;
+﻿using EasyStock.Application.Ports.Output.Messaging;
 using EasyStock.Infra.Integrations.WhatsApp;
 using Microsoft.Extensions.DependencyInjection;
 

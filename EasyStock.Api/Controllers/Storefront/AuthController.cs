@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Storefront.Auth;
 using EasyStock.Domain.Exceptions.Storefront;

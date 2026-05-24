@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Messaging;
+﻿using EasyStock.Application.Ports.Output.Messaging;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

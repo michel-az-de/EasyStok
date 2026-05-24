@@ -1,4 +1,4 @@
-// Camada Storefront — use cases publicos consumidos pela storefront
+﻿// Camada Storefront — use cases publicos consumidos pela storefront
 // (Casa da Baba e tenants futuros). Inclui: autenticacao OTP, agendamento,
 // menu, frete, checkout, avaliacao.
 //
