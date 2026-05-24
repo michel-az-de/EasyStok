@@ -214,6 +214,16 @@ builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
+
+// ── Storefront — WhatsApp OTP provider (stub em Development, real em Prod) ────
+// TASK-EZ-AUTH-001: stub apenas em ambientes nao-Production. Provider real
+// (Meta WhatsApp Cloud API) entra em TASK-EZ-WA-001 apos Meta Business
+// Verification (TASK-HUM-001). Em Production sem provider real, AuthController
+// nao resolve — fail fast intencional.
+if (!builder.Environment.IsProduction())
+{
+    builder.Services.AddEasyStockWhatsAppStub();
+}
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
 
