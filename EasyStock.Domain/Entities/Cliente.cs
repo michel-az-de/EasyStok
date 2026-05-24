@@ -29,6 +29,25 @@ namespace EasyStock.Domain.Entities
         public string? Documento { get; set; }
         public string? Observacoes { get; set; }
 
+        // ── Aditivos storefront (TASK-EZ-005) ───────────────────────────
+        // Cliente storefront se cadastra com nome + telefone (OTP); demais campos
+        // são preenchidos no primeiro checkout. Cpf separado de Documento porque
+        // Documento é genérico no ERP; Cpf valida 11 chars no Config.
+        public string? Cep { get; set; }
+        public string? Complemento { get; set; }
+        public string? Bairro { get; set; }
+        public string? Cidade { get; set; }
+        public string? Cpf { get; set; }
+
+        /// <summary>Último acesso autenticado via storefront (cookie de sessão).</summary>
+        public DateTime? UltimoAcessoStorefrontEm { get; set; }
+
+        /// <summary>LGPD Art. 7º — opt-in explícito para marketing (SMS/email/WhatsApp promocional).</summary>
+        public bool ConsentiuMarketing { get; set; }
+
+        /// <summary>Carimbo do opt-in (LGPD: precisa registrar quando consentimento foi dado).</summary>
+        public DateTime? ConsentimentoEm { get; set; }
+
         // ── Métricas operacionais (mantidas pelo sync) ──────────────────
         public int OrderCount { get; set; }
         public DateTime? LastOrderAt { get; set; }
