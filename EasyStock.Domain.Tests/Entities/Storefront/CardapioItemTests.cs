@@ -125,8 +125,6 @@ public class CardapioItemTests
     {
         var produto = NovoProdutoValido(precoReferencia: 25m);
         var item = NovoItemValido(produto: produto);
-        // Nav prop precisa estar carregada pra fallback funcionar (in-memory test)
-        item.Produto = produto;
 
         item.PrecoEfetivo().Should().Be(25m);
     }
@@ -136,7 +134,6 @@ public class CardapioItemTests
     {
         var produto = NovoProdutoValido(precoReferencia: null);
         var item = NovoItemValido(produto: produto);
-        item.Produto = produto;
 
         item.PrecoEfetivo().Should().Be(0m, "produto sem preço base é caso de borda, mas não pode crashar");
     }
@@ -215,33 +212,42 @@ public class CardapioItemTests
     }
 
     [Theory]
-    [InlineData("destaque")]   // não está na lista
-    [InlineData("vegano")]     // typo proibido — só vegetariano
-    [InlineData("ASSINATURA")] // sem normalização → rejeita (ou normaliza? optei por rejeitar não-normalizado)
+    [InlineData("destaque")] // não está na lista
+    [InlineData("vegano")]   // typo proibido — só vegetariano
+    [InlineData("foo bar")]  // qualquer outro lixo
     public void AtualizarMetadata_rejeita_tag_fora_da_lista_permitida(string tag)
     {
         var item = NovoItemValido();
 
         var act = () => item.AtualizarMetadata(tag: tag);
 
-        // ASSINATURA pode passar se normalizar — vou normalizar para lowercase, então este Theory testa
-        // que "destaque" e "vegano" falham. Vou tratar ASSINATURA via normalização.
-        if (tag.Equals("ASSINATURA", StringComparison.Ordinal))
-            return; // ignora — entity normaliza pra lowercase
-
         act.Should().Throw<RegraDeDominioVioladaException>()
-            .WithMessage("*tag*");
+            .WithMessage("*Tag*");
     }
 
     [Fact]
-    public void AtualizarMetadata_aceita_tag_null_para_remover()
+    public void AtualizarMetadata_normaliza_tag_para_lowercase()
+    {
+        var item = NovoItemValido();
+
+        item.AtualizarMetadata(tag: "ASSINATURA");
+
+        item.Tag.Should().Be("assinatura", "entity normaliza tag para lowercase antes de validar");
+    }
+
+    [Fact]
+    public void LimparTag_remove_tag_e_atualiza_data()
     {
         var item = NovoItemValido();
         item.AtualizarMetadata(tag: "assinatura");
         item.Tag.Should().Be("assinatura");
+        var antes = item.AlteradoEm;
+        Thread.Sleep(10);
 
-        item.AtualizarMetadata(tag: null);
+        item.LimparTag();
+
         item.Tag.Should().BeNull();
+        item.AlteradoEm.Should().BeAfter(antes);
     }
 
     // ── FiltrosJson ───────────────────────────────────────────────────
