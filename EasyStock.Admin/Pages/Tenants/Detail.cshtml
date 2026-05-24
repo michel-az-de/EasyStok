@@ -438,8 +438,8 @@ function mobileSyncHealth(tenantId) {
                         // Escapa pra atributo JS — evita quebra se o nome tiver aspas/apóstrofo.
                         var unomeJs = System.Text.Json.JsonSerializer.Serialize(unome);
                         var uemailJs = System.Text.Json.JsonSerializer.Serialize(uemail);
-                        var unomeEscaped = unome.Replace("\\", "\\\\").Replace("'", "\\'");
-                        var uemailEscaped = uemail.Replace("\\", "\\\\").Replace("'", "\\'");
+                        var unomeEscaped = (unome ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
+                        var uemailEscaped = (uemail ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
                         <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', '@Html.Raw(uemailEscaped)'))">
                             <td class="text-es-ink font-medium whitespace-nowrap max-w-[220px] overflow-hidden text-ellipsis" title="@unome">@unome</td>
                             <td class="text-es-ink-dim font-mono text-xs">
@@ -971,7 +971,7 @@ function mobileSyncHealth(tenantId) {
                     var lnomeJs = System.Text.Json.JsonSerializer.Serialize(lnome);
                     // Versão safe pra uso em string JS com aspas simples / atributo HTML com aspas duplas.
                     var lojaJsonAttr = lojaJson.Replace("\"", "&quot;");
-                    var lnomeEscaped = lnome.Replace("\\", "\\\\").Replace("'", "\\'");
+                    var lnomeEscaped = (lnome ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
                     <div class="card flex flex-col">
                         <div class="flex items-start justify-between mb-2">
                             <h4 class="text-es-ink font-semibold flex-1 truncate" title="@lnome">@lnome</h4>
