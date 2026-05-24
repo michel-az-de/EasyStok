@@ -1,0 +1,8 @@
+task_id: ETK-0005
+agent: claude-opus-4.7
+session_id: sess_1779657597
+worktree_path: .claude/worktrees/wt-etk-0005
+branch: feat/etk-0005-decisao-modulo-novo
+claimed_at: 2026-05-24T21:20:09.627353+00:00
+expires_at: 2026-05-25T00:20:11.282056+00:00
+heartbeat_at: 2026-05-24T21:20:09.627353+00:00
