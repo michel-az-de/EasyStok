@@ -1,12 +1,14 @@
 id: ETK-0004
 title: "Publicar ROADMAP.md publico (nao-CLAUDE)"
-status: backlog
+status: in_progress
 priority: P1
 module: meta
 estimate_hours: 2
 methodology: incremental
 created_by: claude-opus-4.7
 created_at: "2026-05-24T20:30:00Z"
+claimed_at: "2026-05-24T22:26:20Z"
+claimed_by: claude-opus-4.7
 
 depends_on: []
 blocks: []
@@ -14,10 +16,55 @@ blocks: []
 context: |
   Hoje ROADMAP esta so no CLAUDE.md (privado pra agentes). Felipe quer ROADMAP.md publico na raiz mostrando proximas N entregas pra stakeholders externos.
 
+  ESCOPO EXPANDIDO (com aprovacao do Felipe nesta sessao 2026-05-24): entrega
+  combinada de 3 artefatos de visibilidade publica como umbrella desta task:
+  ROADMAP.md + docs/CHANGELOG.md + docs/FEATURES.md. Justificativa: coesos
+  (visao de futuro/presente/passado), doc-only, baixo risco, menos churn de PRs.
+
 acceptance_criteria:
-  - "ROADMAP.md na raiz do repo"
-  - "Lista proximas 3-5 entregas com estimativa"
-  - "Linka pros ADRs e planos"
+  - "ROADMAP.md na raiz do repo - FEITO"
+  - "Lista proximas 3-5 entregas com estimativa - FEITO (Etapas 1-5+)"
+  - "Linka pros ADRs e planos - FEITO"
+  - "docs/CHANGELOG.md com 158 PRs squashed agrupados por mes - FEITO (escopo expandido)"
+  - "docs/FEATURES.md com mapa por modulo de negocio - FEITO (escopo expandido, 22 modulos)"
+  - "Nao duplicar .knowledge/ - FEITO (FEATURES aponta pra current-state.md)"
+
 quality_gates:
   - cmd: "test -f ROADMAP.md"
+  - cmd: "test -f docs/CHANGELOG.md"
+  - cmd: "test -f docs/FEATURES.md"
+
 handoff_notes_required: true
+
+outcome: |
+  Entrega combinada de 3 artefatos de visibilidade publica:
+
+  1. ROADMAP.md (raiz, 154 linhas): visao publica do roadmap por etapa,
+     estabilizacao continua (stability-roadmap), marcos de longo prazo
+     (NF-e, marketplaces), como acompanhar, links pra 21 ADRs e planos.
+
+  2. docs/CHANGELOG.md (274 linhas): formato Keep a Changelog adaptado para
+     Conventional Commits squashed. 158 PRs agrupados por mes (2026-05
+     dominante: 153 PRs; 2026-04 minoritario) com highlights, listagem
+     feat/fix/perf/test/arch/refactor/chore/ci/docs por tipo, eventos de
+     infra/decisao (sem PR) em tabela cronologica.
+
+  3. docs/FEATURES.md (391 linhas): mapa publico por modulo de negocio
+     (22 modulos) com status (Pronto/Parcial/Planejado/Diferido). Aponta
+     pra .knowledge/current-state.md para detalhes tecnicos (single source
+     of truth interna). Cobre: Auth, Multi-tenant, Catalogo, Pedido,
+     Compras, Caixa (V1+V2 deferred), Financeiro, Billing, Pagamentos,
+     NF-e, Rotulagem (Etapa 5), Etiquetas, Notificacoes, Helpdesk, Mobile,
+     KDS, IA, Admin, Auditoria/LGPD, Onboarding, Webhooks, Infra.
+
+  Gap observado durante execucao: scripts/tasks/claim.sh depende de bash 5+
+  e python3 (UTC isoformat). Em Windows nativo nao roda direto — replicado
+  manualmente em PowerShell. Sugestao: portar pra script PowerShell paralelo
+  OU documentar dependencia (WSL ou Git Bash + Python).
+
+completed_by: claude-opus-4.7
+completed_at: "2026-05-24T22:55:00Z"
+branch: feat/etk-0004-roadmap-publicado
+commits:
+  - "6521d27a feat(ETK-0004): ROADMAP publico + CHANGELOG + FEATURES"
+handoff_file: docs/dev/sessoes/2026-05-24-2255-etk-0004-visibilidade-publica.md
