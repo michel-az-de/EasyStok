@@ -158,6 +158,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Storefront.JanelaEntrega> JanelasEntrega { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.BloqueioEntrega> BloqueiosEntrega { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.VagaOcupada> VagasOcupadas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.WebhookProcessado> WebhooksProcessados { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.CheckoutIdempotency> CheckoutsIdempotency { get; set; } = null!;
         public DbSet<Categoria> Categorias { get; set; } = null!;
         public DbSet<Produto> Produtos { get; set; } = null!;
         public DbSet<ProdutoVariacao> ProdutosVariacao { get; set; } = null!;
