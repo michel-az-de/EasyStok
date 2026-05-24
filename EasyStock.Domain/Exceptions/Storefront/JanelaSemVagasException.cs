@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions.Storefront;
+﻿namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
 /// Lançada quando o INSERT atômico de <see cref="EasyStock.Domain.Entities.Storefront.VagaOcupada"/>
