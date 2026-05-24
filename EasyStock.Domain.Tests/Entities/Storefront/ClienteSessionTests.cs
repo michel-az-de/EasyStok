@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Storefront;
+﻿using EasyStock.Domain.Entities.Storefront;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Entities.Storefront;

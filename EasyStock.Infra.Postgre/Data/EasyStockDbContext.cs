@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -288,6 +288,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<BloqueioNotificacao> NotifBloqueios { get; set; } = null!;
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
         public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
+
+        // Storefront — autenticação (TASK-EZ-005)
+        public DbSet<EasyStock.Domain.Entities.Storefront.ClienteOtp> ClienteOtps { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.ClienteSession> ClienteSessions { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {

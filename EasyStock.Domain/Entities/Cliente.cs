@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace EasyStock.Domain.Entities
@@ -107,8 +107,8 @@ namespace EasyStock.Domain.Entities
             AlteradoEm = DateTime.UtcNow;
         }
 
-        public void Desativar()  { Ativo = false; AlteradoEm = DateTime.UtcNow; }
-        public void Reativar()   { Ativo = true;  AlteradoEm = DateTime.UtcNow; }
+        public void Desativar() { Ativo = false; AlteradoEm = DateTime.UtcNow; }
+        public void Reativar() { Ativo = true; AlteradoEm = DateTime.UtcNow; }
     }
 
     /// <summary>

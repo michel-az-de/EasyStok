@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Tests.Entities.Storefront;
+﻿namespace EasyStock.Domain.Tests.Entities.Storefront;
 
 /// <summary>
 /// TimeProvider fake mínimo para testes determinísticos. Evita dep externa em

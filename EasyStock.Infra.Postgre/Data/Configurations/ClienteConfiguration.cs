@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,6 +17,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(c => c.Email).HasMaxLength(255);
             builder.Property(c => c.Documento).HasMaxLength(30);
             builder.Property(c => c.Observacoes).HasColumnType("text");
+
+            // ── Aditivos storefront (TASK-EZ-005) ──────────────────────
+            builder.Property(c => c.Cep).HasMaxLength(8);
+            builder.Property(c => c.Complemento).HasMaxLength(100);
+            builder.Property(c => c.Bairro).HasMaxLength(100);
+            builder.Property(c => c.Cidade).HasMaxLength(100);
+            builder.Property(c => c.Cpf).HasMaxLength(11);
+            builder.Property(c => c.ConsentiuMarketing).HasDefaultValue(false);
 
             builder.HasOne(c => c.Empresa)
                 .WithMany()
