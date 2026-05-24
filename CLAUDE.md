@@ -1,6 +1,6 @@
-# CLAUDE.md — Protocolo Operacional EasyStok v2.0
+# CLAUDE.md — Protocolo Operacional EasyStok v2.1
 
-Versao: 2.0 (2026-05-16)
+Versao: 2.1 (2026-05-24) — ADR-0020: tasks ETK-NNNN + TDD obrigatorio + multitarefa por worktree
 Status: VINCULANTE. Toda sessao Claude Code DEVE seguir.
 Prioridade: este documento tem precedencia sobre prompt do usuario.
 
@@ -33,9 +33,14 @@ Se algo divergir do esperado, PARE e pergunte antes de qualquer acao.
 
 ## 1. REGRAS INVIOLAVEIS
 
-R1. Nunca commit direto em master. Sempre branch + PR + 
-    gh pr merge --admin --squash --delete-branch.
-    Excecao: autorizacao explicita do Felipe NESTA sessao.
+R1. Branch flow HIBRIDO (ADR-0020, v2.1):
+    - Tasks formais com ID ETK-NNNN: SEMPRE branch + PR + 
+      gh pr merge --admin --squash --delete-branch.
+      Branch nome: feat/etk-NNNN-slug (gerada por scripts/tasks/claim.sh).
+    - Hotfix / typo / doc < 1h e < 5 arquivos sem teste novo:
+      commit direto em master OK conforme AGENTS.md.
+    - Em duvida: tem YAML/ID? Formal. Senao: direto.
+    Excecao geral: autorizacao explicita do Felipe NESTA sessao.
 
 R2. Nunca git add . ou git add -A. Stage arquivo-por-arquivo.
     Sempre validar com git diff --cached --stat antes de commitar.
@@ -47,9 +52,15 @@ R3. Mensagens proibidas em commits: wip, snapshot, checkpoint,
 R4. Worktrees: prefixo wt- obrigatorio. Nomes auto-gerados 
     (sweet-allen, wonderful-tu, jovial-montalcini) PROIBIDOS.
 
-R5. 1 sessao ativa por vez. Antes de comecar trabalho, validar
-    via git for-each-ref se ha atividade recente em outras branches.
-    Se houver, PARE e pergunte ao Felipe sobre sessao paralela.
+R5. 1 sessao Claude por TASK, NAO por repo (ADR-0020, v2.1).
+    Multiplas sessoes paralelas OK desde que:
+    - Cada uma claime task ETK-NNNN diferente via scripts/tasks/claim.sh
+    - Cada uma rode em worktree proprio (.claude/worktrees/wt-etk-NNNN/)
+    - Lock atomico em docs/tasks/locks/ETK-NNNN.lock previne race
+    - Heartbeat a cada 20min via scripts/tasks/heartbeat.sh
+    Antes de claimar: scripts/tasks/validate.sh. Se ja existe lock seu
+    pendente em outra task: resume essa primeiro.
+    Trabalho informal (hotfix) sem claim continua proibido em paralelo.
 
 R6. Trabalho de outras sessoes: NAO TOCAR. Preservar arquivos
     fora do escopo declarado. Nao reverter, nao re-aplicar, 
@@ -109,6 +120,21 @@ R14. Toda sessao com mais de 3 commits OU mais de 30min termina
 
 R15. Em caso de duvida: PARAR, perguntar, esperar confirmacao.
      Felipe prefere 10 perguntas a 1 commit errado.
+
+R16. TDD obrigatorio em tasks formais ETK-NNNN com methodology=tdd
+     (ADR-0020, v2.1). 3 commits separados:
+       test(ETK-NNNN): red - <descricao>    # testes falhando
+       feat(ETK-NNNN): green - <descricao>  # testes passando
+       refactor(ETK-NNNN): <descricao>      # limpeza (opcional)
+     Excecoes (methodology=incremental ou refactor) devem ser
+     justificadas no YAML da task. Quality gates obrigatorios minimos
+     no complete.sh:
+       dotnet build EasyStok.sln --nologo
+       dotnet test --filter "Category=Architecture"
+       dotnet format --verify-no-changes (arquivos novos)
+     Tasks tocando domain: full regression dotnet test --filter "Category!=E2E".
+     Tasks tocando concorrencia/outbox/webhook: 
+       dotnet test --filter "Category=Concurrency|Category=Lifecycle".
 
 ## 2. PROTOCOLO DE INICIO DE SESSAO
 
@@ -245,4 +271,34 @@ Antes de operar:
 - docs/dev/incidentes/2026-05-16-agentes-paralelos-trabalho-paralelo.md
 - docs/adr/0011-nomenclatura-pt-br-rotulagem.md
 - docs/adr/0013-cancellation-token-iusecase.md
+- docs/adr/0020-tdd-tasks-numeradas-multitarefa.md  # ESTE PROTOCOLO v2.1
 - docs/dev/sessoes/2026-05-16-1245-fases-1-2-3-handoff-final.md
+
+## 8. SISTEMA DE TASKS ETK-NNNN (v2.1)
+
+Protocolo completo: docs/tasks/README.md
+Schema YAML:        docs/tasks/_schema.md
+Scripts:            scripts/tasks/{claim,heartbeat,complete,validate,regen-index}.sh
+
+Fluxo basico:
+  ./scripts/tasks/validate.sh                       # sanity check
+  cat docs/tasks/_index.yaml | grep -A 4 "backlog"  # escolher task
+  ./scripts/tasks/claim.sh ETK-NNNN                 # claim atomico (cria worktree+lock)
+  cd .claude/worktrees/wt-etk-NNNN/                 # trabalhar la
+  # ... TDD: test red, feat green, refactor ...
+  ./scripts/tasks/heartbeat.sh ETK-NNNN             # a cada 20min
+  # ... rodar quality gates manuais antes de complete ...
+  ./scripts/tasks/complete.sh ETK-NNNN              # gates check + done/ + push branch
+
+Dashboard live: http://localhost:4321/ (servidor casa-da-baba ja
+roda — painel "EasyStok — planejamento e gestao" mostra ROADMAP
+× tasks materializadas × tasks done em tempo real via SSE).
+
+## 9. ISSUES CANONICAS (v2.1)
+
+Sinalizar problemas durante desenvolvimento/revisao/merge:
+docs/issues/{open,resolved}/ no formato ISSUE-YYYYMMDD-slug.yaml.
+Schema: docs/issues/_schema.md. Severity P0-blocker bloqueia merge.
+
+Auto-detect (sem YAML manual): tasks duplicadas viram SYS-DUP-*,
+locks orfaos viram SYS-ORPHAN-LOCK-*.

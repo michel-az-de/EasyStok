@@ -1,0 +1,24 @@
+id: ETK-0014
+title: "Use case EmitirNfe (modelo 55)"
+status: backlog
+priority: P1
+module: nota-fiscal
+estimate_hours: 3
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Use case que enfileira na outbox NfeEvent. Modelo 55 NFe (nao 65 NFCe).
+
+acceptance_criteria:
+  - "Use case implementado"
+  - "Validacao dados fiscais (CNPJ, NCM, CFOP)"
+  - "Outbox cria NfeEvent.Pendente"
+  - "10 cenarios teste"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~EmitirNfe'"
+handoff_notes_required: true

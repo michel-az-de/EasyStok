@@ -1,0 +1,23 @@
+id: ETK-0002
+title: "Defesas estruturais (branch protection + Husky + CI billing)"
+status: backlog
+priority: P0
+module: infra
+estimate_hours: 6
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Endurecer infraestrutura: branch protection no master, Husky pre-commit hook validando build local, desbloquear CI billing GitHub Actions.
+
+acceptance_criteria:
+  - "Branch protection master ativa (require PR, require status checks)"
+  - "Husky pre-commit roda dotnet build + format check"
+  - "GitHub Actions billing resolvido"
+quality_gates:
+  - cmd: "gh api repos/michel-az-de/EasyStok/branches/master/protection"
+handoff_notes_required: true

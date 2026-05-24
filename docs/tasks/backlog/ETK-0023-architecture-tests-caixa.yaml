@@ -1,0 +1,23 @@
+id: ETK-0023
+title: "Architecture tests modulo Caixa"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 1.5
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Apos ETK-0006..0012 implementarem Caixa, adicionar architecture tests blindando o modulo.
+
+acceptance_criteria:
+  - "CaixaArchitectureTests com 6+ cenarios"
+  - "Tests rodam em <2s"
+  - "100% pass"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~CaixaArchitecture|Category=Architecture'"
+handoff_notes_required: true

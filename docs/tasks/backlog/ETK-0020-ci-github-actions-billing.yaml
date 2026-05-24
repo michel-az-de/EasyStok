@@ -1,0 +1,23 @@
+id: ETK-0020
+title: "Desbloquear CI GitHub Actions (billing)"
+status: backlog
+priority: P0
+module: infra
+estimate_hours: 2
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  AGENTS.md cita 'bloqueado por billing GitHub Actions desde 2026-05-11'. Resolver com Felipe.
+
+acceptance_criteria:
+  - "GitHub Actions billing ativo"
+  - "Workflow build-casa-da-baba-apk.yml verde em main"
+  - "Outros workflows (test, lint) verdes"
+quality_gates:
+  - cmd: "gh workflow list"
+handoff_notes_required: true
