@@ -23,6 +23,17 @@ public sealed class ClienteOtpRepository(EasyStockDbContext db) : IClienteOtpRep
             .OrderByDescending(o => o.CriadoEm)
             .FirstOrDefaultAsync(ct);
 
+    public Task<int> ContarCriadosDesdeAsync(
+        Guid empresaId,
+        string telefoneHash,
+        DateTime desde,
+        CancellationToken ct = default) =>
+        db.ClienteOtps
+            .Where(o => o.EmpresaId == empresaId
+                && o.TelefoneHash == telefoneHash
+                && o.CriadoEm >= desde)
+            .CountAsync(ct);
+
     public Task AddAsync(ClienteOtp otp, CancellationToken ct = default)
     {
         db.ClienteOtps.Add(otp);
