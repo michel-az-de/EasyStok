@@ -255,7 +255,14 @@ public class FreteZonaTests
     [Fact]
     public void CriarPorBairros_rejeita_lista_null()
     {
-        var act = () => NovaZonaPorBairros(bairros: null!);
+        // Chamada direta na factory — o helper NovaZonaPorBairros tem fallback
+        // pra default que comeria o null, mascarando o cenário.
+        var act = () => FreteZona.CriarPorBairros(
+            storefrontId: Guid.NewGuid(),
+            label: "Qualquer",
+            bairros: null!,
+            valor: 10m,
+            tempoEstimadoMinutos: 30);
 
         act.Should().Throw<RegraDeDominioVioladaException>()
             .WithMessage("*bairro*");
