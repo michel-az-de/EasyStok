@@ -260,9 +260,12 @@ Etapa 1: Marco zero (deploy + tag v1.0)
 Etapa 2: Defesas estruturais (branch protection + Husky + CI billing)
 Etapa 3: Triagem de PRs abertas (0 abertas no momento — manter monitorado)
 Etapa 4: ROADMAP.md publicado
-Etapa 5: Modulo novo (Caixa Conciliado V2 OU Rotulagem P-02)
-
-Decisao Caixa vs Rotulagem: pendente, depende de validacao premissas.
+Etapa 5: Rotulagem P-02 (decidido em ADR-0021, 2026-05-24).
+         Plano: docs/plan/p-02-rotulagem-nutricional.md.
+         Entry tasks: ETK-0016 (Entity RotuloNutricional, P1) + ETK-0017
+         (UseCase GerarRotuloNutricional, P1).
+Etapa 6+: Caixa Conciliado V2 (diferido; retomar apos F2 da Etapa 5).
+         Plano: docs/plan/README.md. Backlog: ETK-0006..0012, 0023.
 
 ## 7. RECURSOS DE LEITURA
 
