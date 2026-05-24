@@ -150,6 +150,9 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Domain DbSets
         public DbSet<Empresa> Empresas { get; set; } = null!;
+
+        // Storefront aggregates (ver ADR-0002 multi-tenancy, ADR-0014 vaga lifecycle)
+        public DbSet<EasyStock.Domain.Entities.Storefront.Storefront> Storefronts { get; set; } = null!;
         public DbSet<Categoria> Categorias { get; set; } = null!;
         public DbSet<Produto> Produtos { get; set; } = null!;
         public DbSet<ProdutoVariacao> ProdutosVariacao { get; set; } = null!;
