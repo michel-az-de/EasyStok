@@ -1,8 +1,0 @@
-task_id: ETK-0004
-agent: claude-opus-4.7
-session_id: sess_2026-05-24T22-26-20Z
-worktree_path: .claude/worktrees/wt-etk-0004
-branch: feat/etk-0004-roadmap-publicado
-claimed_at: 2026-05-24T22:26:20.986873+00:00
-expires_at: 2026-05-25T01:26:20.986873+00:00
-heartbeat_at: 2026-05-24T22:26:20.986873+00:00
