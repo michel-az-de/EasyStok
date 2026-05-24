@@ -207,12 +207,11 @@ public class SolicitarOtpUseCaseTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("11997573992")]            // sem +55
     [InlineData("+1 555 123 4567")]        // não-BR
     [InlineData("+5511")]                  // muito curto
     [InlineData("+55119999999999999")]     // muito longo
     [InlineData("abcdef")]                 // não-numérico
-    [InlineData("+55-11-9999")]            // formato bruto demais
+    [InlineData("12345")]                  // sem prefixo e dígitos insuficientes
     public async Task ExecuteAsync_TelefoneInvalido_LancaTelefoneInvalido(string telefone)
     {
         var f = BuildFakes();
@@ -228,6 +227,7 @@ public class SolicitarOtpUseCaseTests
     [Theory]
     [InlineData("(11) 99757-3992")]
     [InlineData("11 99757-3992")]
+    [InlineData("11997573992")]                 // 11 dígitos sem prefixo (DDD + número)
     [InlineData("+55 (11) 99757-3992")]
     [InlineData("+55 11 9 9757 3992")]
     [InlineData(" +5511997573992 ")]
