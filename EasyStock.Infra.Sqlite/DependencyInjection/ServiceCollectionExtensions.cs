@@ -73,6 +73,34 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
+        // Paridade com Postgre (anteriormente faltava 22 repos -> 17 Api.IntegrationTests
+        // falhavam por ValidateOnBuild com Sqlite). Sqlite reusa as Repository classes do
+        // EasyStock.Infra.Postgre.Repositories porque ambos usam o MESMO EasyStockDbContext
+        // (apenas o provider EF muda — UseSqlite vs UseNpgsql). Repos que dependem de
+        // features Postgres-only (FOR UPDATE, ILIKE, xmin) podem nao funcionar em runtime
+        // sqlite, mas o ValidateOnBuild passa e o caminho dev/test fica consistente.
+        services.AddScoped<IEmailConfirmationTokenRepository, EmailConfirmationTokenRepository>();
+        services.AddScoped<IIdempotencyKeyRepository, IdempotencyKeyRepository>();
+        services.AddScoped<ILancamentoRepository, LancamentoRepository>();
+        services.AddScoped<IFaturaRepository, FaturaRepository>();
+        services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
+        services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
+        services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
+        services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
+        services.AddScoped<ICupomRepository, CupomRepository>();
+        services.AddScoped<IPedidoFornecedorItemRepository, PedidoFornecedorItemRepository>();
+        services.AddScoped<IEtiquetaTemplateRepository, EtiquetaTemplateRepository>();
+        services.AddScoped<IMovimentacaoEstoqueAlteracaoRepository, MovimentacaoEstoqueAlteracaoRepository>();
+        services.AddScoped<IProdutoComposicaoRepository, ProdutoComposicaoRepository>();
+        services.AddScoped<IProdutoComposicaoAlteracaoRepository, ProdutoComposicaoAlteracaoRepository>();
+        services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
+        services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
+        services.AddScoped<IFaqRepository, FaqRepository>();
+        services.AddScoped<IFaqAdminRepository, FaqAdminRepository>();
+        services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
+        services.AddScoped<ICredencialIntegracaoRepository, CredencialIntegracaoRepository>();
+        services.AddScoped<IOutboxEventoIntegracaoRepository, OutboxEventoIntegracaoRepository>();
+        services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
         services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
         // AI: usa implementacao real se Anthropic:Enabled = true, caso contrario usa stub
