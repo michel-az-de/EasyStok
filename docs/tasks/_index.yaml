@@ -1,13 +1,13 @@
 # _index.yaml — Tasks EasyStok (DERIVADO de tasks/*/*.yaml)
-# REGENERADO em 2026-05-24T21:55:45.105853+00:00. NÃO editar manualmente — re-rode regen-index.sh
+# REGENERADO em 2026-05-24T22:51:02.988177+00:00. NÃO editar manualmente — re-rode regen-index.sh
 
 schema_version: 1
-regenerated_at: 2026-05-24T21:55:45.105853+00:00
+regenerated_at: 2026-05-24T22:51:02.988177+00:00
 total_tasks: 25
 by_status:
-  backlog: 24
+  backlog: 23
   in_progress: 1
-  done: 0
+  done: 1
   blocked: 0
 
 tasks:
@@ -33,14 +33,6 @@ tasks:
     module: infra
     title: "Triagem das PRs abertas remanescentes"
     estimate_hours: 3
-    depends_on: []
-    blocks: []
-  - id: ETK-0004
-    status: backlog
-    priority: P1
-    module: meta
-    title: "Publicar ROADMAP.md publico (nao-CLAUDE)"
-    estimate_hours: 2
     depends_on: []
     blocks: []
   - id: ETK-0006
@@ -203,8 +195,16 @@ tasks:
     estimate_hours: 3
     depends_on: []
     blocks: []
-  - id: ETK-0005
+  - id: ETK-0004
     status: in_progress
+    priority: P1
+    module: meta
+    title: "Publicar ROADMAP.md publico (nao-CLAUDE)"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0005
+    status: done
     priority: P1
     module: meta
     title: "Decidir e iniciar proximo modulo (Caixa V2 vs Rotulagem P-02)"
