@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -184,6 +184,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EntityAlteracao> EntityAlteracoes { get; set; } = null!;
         public DbSet<MobileProcessedMutation> MobileProcessedMutations { get; set; } = null!;
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
+
+        // Storefront Module DbSets
+        public DbSet<EasyStock.Domain.Entities.Storefront.PedidoAvaliacao> PedidoAvaliacoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.StorefrontFaleConosco> StorefrontFaleConoscos { get; set; } = null!;
 
         // Admin Module DbSets
         public DbSet<SystemErrorLog> SystemErrorLogs { get; set; } = null!;
