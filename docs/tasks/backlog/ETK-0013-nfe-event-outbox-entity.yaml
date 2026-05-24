@@ -1,0 +1,23 @@
+id: ETK-0013
+title: "NfeEvent outbox entity + tests"
+status: backlog
+priority: P1
+module: nota-fiscal
+estimate_hours: 1.5
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Outbox pra eventos de emissao NFe. Pattern ja estabelecido.
+
+acceptance_criteria:
+  - "NfeEvent entity com Status (Pendente, Emitida, Falhou)"
+  - "Idempotency key"
+  - "Architecture test: outbox immutability"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~NfeEvent'"
+handoff_notes_required: true

@@ -1,0 +1,25 @@
+id: ETK-0006
+title: "Entity SessaoCaixa + tests + EF config"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 2
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Primeira entity do modulo Caixa Conciliado V2 (ADR-0015 ja estabeleceu como 'entidade explicita'). Ver docs/plan/01-dominio.md B.1.a.
+
+acceptance_criteria:
+  - "Entity SessaoCaixa com factory Abrir + estados Aberta/EmConferencia/Fechada"
+  - "Metodos IniciarConferencia + Fechar"
+  - "EF Config + DbSet em DbContext"
+  - "Architecture test: Domain nao depende de Infra"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~SessaoCaixa'"
+  - cmd: "dotnet test --filter Architecture"
+handoff_notes_required: true

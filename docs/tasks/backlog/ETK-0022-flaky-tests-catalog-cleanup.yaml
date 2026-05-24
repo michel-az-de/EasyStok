@@ -1,0 +1,23 @@
+id: ETK-0022
+title: "Cleanup do catalogo flaky-tests.md + fixes"
+status: backlog
+priority: P2
+module: infra
+estimate_hours: 3
+methodology: refactor
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  docs/dev/flaky-tests.md tem N entries. Re-validar cada uma. Fixar os <=5 mais criticos.
+
+acceptance_criteria:
+  - "docs/dev/flaky-tests.md re-validado"
+  - "5 fixes priorizados feitos"
+  - "Restante categorizado por causa"
+quality_gates:
+  - cmd: "dotnet test --filter 'Category=Flaky'"
+handoff_notes_required: true

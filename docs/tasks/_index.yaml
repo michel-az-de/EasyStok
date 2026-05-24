@@ -1,0 +1,213 @@
+# _index.yaml — Tasks EasyStok (DERIVADO de tasks/*/*.yaml)
+# REGENERADO em 2026-05-24T20:31:59.351543+00:00. NÃO editar manualmente — re-rode regen-index.sh
+
+schema_version: 1
+regenerated_at: 2026-05-24T20:31:59.351543+00:00
+total_tasks: 25
+by_status:
+  backlog: 25
+  in_progress: 0
+  done: 0
+  blocked: 0
+
+tasks:
+  - id: ETK-0001
+    status: backlog
+    priority: P0
+    module: infra
+    title: "Marco zero - deploy production + tag v1.0"
+    estimate_hours: 4
+    depends_on: []
+    blocks: []
+  - id: ETK-0002
+    status: backlog
+    priority: P0
+    module: infra
+    title: "Defesas estruturais (branch protection + Husky + CI billing)"
+    estimate_hours: 6
+    depends_on: []
+    blocks: []
+  - id: ETK-0003
+    status: backlog
+    priority: P1
+    module: infra
+    title: "Triagem das PRs abertas remanescentes"
+    estimate_hours: 3
+    depends_on: []
+    blocks: []
+  - id: ETK-0004
+    status: backlog
+    priority: P1
+    module: meta
+    title: "Publicar ROADMAP.md publico (nao-CLAUDE)"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0005
+    status: backlog
+    priority: P1
+    module: meta
+    title: "Decidir e iniciar proximo modulo (Caixa V2 vs Rotulagem P-02)"
+    estimate_hours: 4
+    depends_on: []
+    blocks: []
+  - id: ETK-0006
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Entity SessaoCaixa + tests + EF config"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0007
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Entity MovimentoCaixa + tests"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0008
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Entity FechamentoCaixa + tests (1:1 com SessaoCaixa)"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0009
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Use case AbrirSessaoCaixa"
+    estimate_hours: 1.5
+    depends_on: []
+    blocks: []
+  - id: ETK-0010
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Use case RegistrarMovimentoCaixa"
+    estimate_hours: 1.5
+    depends_on: []
+    blocks: []
+  - id: ETK-0011
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Use case FecharSessaoCaixa (3-phase tx + hash)"
+    estimate_hours: 3
+    depends_on: []
+    blocks: []
+  - id: ETK-0012
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Migration consolidada AddCaixaModule"
+    estimate_hours: 1.5
+    depends_on: []
+    blocks: []
+  - id: ETK-0013
+    status: backlog
+    priority: P1
+    module: nota-fiscal
+    title: "NfeEvent outbox entity + tests"
+    estimate_hours: 1.5
+    depends_on: []
+    blocks: []
+  - id: ETK-0014
+    status: backlog
+    priority: P1
+    module: nota-fiscal
+    title: "Use case EmitirNfe (modelo 55)"
+    estimate_hours: 3
+    depends_on: []
+    blocks: []
+  - id: ETK-0015
+    status: backlog
+    priority: P1
+    module: nota-fiscal
+    title: "EmitirNfeBackgroundService no Worker"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0016
+    status: backlog
+    priority: P2
+    module: rotulagem
+    title: "Entity RotuloNutricional + tests"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0017
+    status: backlog
+    priority: P2
+    module: rotulagem
+    title: "Use case GerarRotuloNutricional"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0018
+    status: backlog
+    priority: P1
+    module: infra
+    title: "Resolver SQLite dev-fallback (25 repos faltando)"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0019
+    status: backlog
+    priority: P2
+    module: infra
+    title: "Husky pre-commit hook valida build local"
+    estimate_hours: 1
+    depends_on: []
+    blocks: []
+  - id: ETK-0020
+    status: backlog
+    priority: P0
+    module: infra
+    title: "Desbloquear CI GitHub Actions (billing)"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0021
+    status: backlog
+    priority: P1
+    module: infra
+    title: "Triagem 27 falhas Api+Mongo IntegrationTests (#201)"
+    estimate_hours: 4
+    depends_on: []
+    blocks: []
+  - id: ETK-0022
+    status: backlog
+    priority: P2
+    module: infra
+    title: "Cleanup do catalogo flaky-tests.md + fixes"
+    estimate_hours: 3
+    depends_on: []
+    blocks: []
+  - id: ETK-0023
+    status: backlog
+    priority: P1
+    module: caixa
+    title: "Architecture tests modulo Caixa"
+    estimate_hours: 1.5
+    depends_on: []
+    blocks: []
+  - id: ETK-0024
+    status: backlog
+    priority: P2
+    module: core
+    title: "OpenAPI/Swagger completo + exportar contracts"
+    estimate_hours: 2
+    depends_on: []
+    blocks: []
+  - id: ETK-0025
+    status: backlog
+    priority: P1
+    module: infra
+    title: "Telemetria OTEL/OTLP via Fly.io (observability)"
+    estimate_hours: 3
+    depends_on: []
+    blocks: []

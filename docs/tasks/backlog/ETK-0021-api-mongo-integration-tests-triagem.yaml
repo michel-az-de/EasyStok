@@ -1,0 +1,24 @@
+id: ETK-0021
+title: "Triagem 27 falhas Api+Mongo IntegrationTests (#201)"
+status: backlog
+priority: P1
+module: infra
+estimate_hours: 4
+methodology: refactor
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Issue #201 GitHub: 27 falhas + bug Guid serializer Mongo. Categorizar, fixar bugs reais.
+
+acceptance_criteria:
+  - "Falhas categorizadas em: bug real / flaky / ambiente"
+  - "Bugs reais com fix + teste regressao"
+  - "Flaky catalogados"
+  - "Issue #201 fechada"
+quality_gates:
+  - cmd: "dotnet test EasyStock.Api.IntegrationTests"
+handoff_notes_required: true

@@ -1,0 +1,23 @@
+id: ETK-0024
+title: "OpenAPI/Swagger completo + exportar contracts"
+status: backlog
+priority: P2
+module: core
+estimate_hours: 2
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Endpoints da API tem Swagger mas nao esta completo. Completar + exportar openapi.json pra docs.
+
+acceptance_criteria:
+  - "Swagger UI em /swagger mostra todos endpoints"
+  - "openapi.json exportado em docs/api/"
+  - "Schemas com examples"
+quality_gates:
+  - cmd: "curl http://localhost:5000/swagger/v1/swagger.json | jq '.paths | length'"
+handoff_notes_required: true
