@@ -1,0 +1,23 @@
+id: ETK-0007
+title: "Entity MovimentoCaixa + tests"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 2
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  MovimentoCaixa e child de SessaoCaixa. Tipos: ENTRADA, SAIDA, SANGRIA, TROCO_DEVOLUCAO. Ver docs/plan/01-dominio.md B.1.b.
+
+acceptance_criteria:
+  - "Entity MovimentoCaixa com FK SessaoCaixaId CASCADE"
+  - "Validacao: so permite movimento se Sessao.Status=Aberta"
+  - "Architecture test: MovimentoCaixa nao pode existir sem SessaoCaixa"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~MovimentoCaixa'"
+handoff_notes_required: true

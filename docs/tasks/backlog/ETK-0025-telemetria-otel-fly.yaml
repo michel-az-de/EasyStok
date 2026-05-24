@@ -1,0 +1,23 @@
+id: ETK-0025
+title: "Telemetria OTEL/OTLP via Fly.io (observability)"
+status: backlog
+priority: P1
+module: infra
+estimate_hours: 3
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Stack atual de logs no Fly.io e limitada. Configurar OpenTelemetry exportando pra collector.
+
+acceptance_criteria:
+  - "OTEL configurado em Api + Worker + Admin"
+  - "Traces visiveis em ferramenta de observability"
+  - "Metricas custom (use cases, outbox lag)"
+quality_gates:
+  - cmd: "curl http://api.easystok.com.br/metrics"
+handoff_notes_required: true
