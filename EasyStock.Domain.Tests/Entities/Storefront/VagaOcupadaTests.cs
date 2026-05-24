@@ -1,5 +1,6 @@
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Exceptions.Storefront;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Entities.Storefront;
