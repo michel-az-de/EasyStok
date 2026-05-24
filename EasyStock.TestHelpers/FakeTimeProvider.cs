@@ -1,4 +1,4 @@
-namespace EasyStock.TestHelpers;
+﻿namespace EasyStock.TestHelpers;
 
 /// <summary>
 /// <see cref="TimeProvider"/> fake mínimo para testes determinísticos.

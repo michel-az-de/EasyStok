@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Storefront.Auth;
+﻿namespace EasyStock.Application.UseCases.Storefront.Auth;
 
 /// <summary>
 /// Saída do <see cref="SolicitarOtpUseCase"/>.

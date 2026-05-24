@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Messaging;

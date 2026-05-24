@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions.Storefront;
+﻿namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
 /// Lançada quando o telefone excedeu a cota de OTPs/hora (anti-abuso).
