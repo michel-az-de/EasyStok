@@ -1,0 +1,23 @@
+id: ETK-0005
+title: "Decidir e iniciar proximo modulo (Caixa V2 vs Rotulagem P-02)"
+status: backlog
+priority: P1
+module: meta
+estimate_hours: 4
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  ROADMAP Etapa 5 do CLAUDE.md: 'Modulo novo (Caixa Conciliado V2 OU Rotulagem P-02). Decisao pendente'. Esta task DECIDE entre os dois e materializa o plano vencedor em tasks ETK.
+
+acceptance_criteria:
+  - "Decisao registrada em ADR-0021 (Caixa V2 vs Rotulagem)"
+  - "Plano do modulo vencedor materializado em 5-10 tasks ETK"
+  - "Felipe aprovou em comentario"
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+handoff_notes_required: true

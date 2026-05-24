@@ -1,0 +1,23 @@
+id: ETK-0019
+title: "Husky pre-commit hook valida build local"
+status: backlog
+priority: P2
+module: infra
+estimate_hours: 1
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Adicionar .husky/pre-commit que roda dotnet build + format check local antes de cada commit.
+
+acceptance_criteria:
+  - ".husky/pre-commit instalado"
+  - "Bloqueia commit se dotnet build falha"
+  - "Bloqueia commit se dotnet format detecta diff"
+quality_gates:
+  - cmd: "git commit -m 'test' (deve passar pelo hook)"
+handoff_notes_required: true

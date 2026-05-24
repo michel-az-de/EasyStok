@@ -1,0 +1,23 @@
+id: ETK-0008
+title: "Entity FechamentoCaixa + tests (1:1 com SessaoCaixa)"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 2
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  FechamentoCaixa e gerado quando SessaoCaixa transiciona pra Fechada. Inclui hash SHA-256 (ADR-0016 retencao 5 anos).
+
+acceptance_criteria:
+  - "Entity FechamentoCaixa com hash imutavel de movimentos"
+  - "Factory GerarDe(SessaoCaixa)"
+  - "Architecture test: FechamentoCaixa.Hash e write-once"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~FechamentoCaixa'"
+handoff_notes_required: true

@@ -1,0 +1,25 @@
+id: ETK-0001
+title: "Marco zero - deploy production + tag v1.0"
+status: backlog
+priority: P0
+module: infra
+estimate_hours: 4
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Primeira release oficial em producao. Tag v1.0 + deploy Fly.io estavel + smoke test pos-deploy. Sem feature nova; so consolidar o que esta no master.
+
+acceptance_criteria:
+  - "fly deploy verde em api + worker + admin"
+  - "tag v1.0 criada e pushed"
+  - "smoke test PWA + Mobile pos-deploy"
+  - "release notes em docs/dev/sessoes/"
+quality_gates:
+  - cmd: "fly status --app easystok-api"
+  - cmd: "curl https://api.easystok.com.br/healthz"
+handoff_notes_required: true

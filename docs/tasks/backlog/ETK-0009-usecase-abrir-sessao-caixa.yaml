@@ -1,0 +1,23 @@
+id: ETK-0009
+title: "Use case AbrirSessaoCaixa"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 1.5
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Use case Application layer pra abrir nova SessaoCaixa. Validacoes: 1 sessao aberta por loja/dia.
+
+acceptance_criteria:
+  - "Use case implementado em EasyStock.Application/Caixa/"
+  - "Validacao: rejeita se ja ha sessao aberta na loja no dia"
+  - "8 cenarios de teste minimo"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~AbrirSessaoCaixa'"
+handoff_notes_required: true

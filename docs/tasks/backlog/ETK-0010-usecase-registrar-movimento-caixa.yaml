@@ -1,0 +1,23 @@
+id: ETK-0010
+title: "Use case RegistrarMovimentoCaixa"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 1.5
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-24T20:30:00Z"
+
+depends_on: []
+blocks: []
+
+context: |
+  Registra entrada/saida/sangria/troco numa SessaoCaixa aberta.
+
+acceptance_criteria:
+  - "Use case implementado"
+  - "Rejeita se Sessao nao esta Aberta (4 cenarios por status)"
+  - "Validacoes de valor por tipo"
+quality_gates:
+  - cmd: "dotnet test --filter 'FullyQualifiedName~RegistrarMovimentoCaixa'"
+handoff_notes_required: true
