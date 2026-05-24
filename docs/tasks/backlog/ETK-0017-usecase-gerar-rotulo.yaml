@@ -1,18 +1,21 @@
 id: ETK-0017
 title: "Use case GerarRotuloNutricional"
 status: backlog
-priority: P2
+priority: P1
 module: rotulagem
 estimate_hours: 2
 methodology: tdd
 created_by: claude-opus-4.7
 created_at: "2026-05-24T20:30:00Z"
+updated_at: "2026-05-24T20:45:00Z"
 
-depends_on: []
+depends_on: [ETK-0016]
 blocks: []
 
 context: |
-  Calcula rotulo a partir de Produto + receita (Composicao). Renderiza PDF.
+  Calcula rotulo a partir de Produto + receita (Composicao). Renderiza PDF (QuestPDF).
+  Parte do modulo Rotulagem P-02 (Etapa 5 do ROADMAP, decidida em ADR-0021).
+  Depende de ETK-0016 (Entity RotuloNutricional).
 
 acceptance_criteria:
   - "Use case calcula valores nutricionais agregados da receita"
