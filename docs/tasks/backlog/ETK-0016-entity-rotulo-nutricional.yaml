@@ -1,18 +1,21 @@
 id: ETK-0016
 title: "Entity RotuloNutricional + tests"
 status: backlog
-priority: P2
+priority: P1
 module: rotulagem
 estimate_hours: 2
 methodology: tdd
 created_by: claude-opus-4.7
 created_at: "2026-05-24T20:30:00Z"
+updated_at: "2026-05-24T20:45:00Z"
 
 depends_on: []
-blocks: []
+blocks: [ETK-0017]
 
 context: |
-  Rotulagem nutricional conforme RDC 727/2022 (referenciada em ADR-0011 nomenclatura pt-BR).
+  Rotulagem nutricional conforme RDC 429/2020 + RDC 727/2022 (ver ADR-0011 nomenclatura pt-BR).
+  Porta de entrada do modulo Rotulagem P-02 (Etapa 5 do ROADMAP, decidida em ADR-0021).
+  Plano detalhado: docs/plan/p-02-rotulagem-nutricional.md.
 
 acceptance_criteria:
   - "Entity RotuloNutricional com valor energetico, macros, sodio"

@@ -1,8 +1,8 @@
 # _index.yaml — Tasks EasyStok (DERIVADO de tasks/*/*.yaml)
-# REGENERADO em 2026-05-24T20:31:59.351543+00:00. NÃO editar manualmente — re-rode regen-index.sh
+# REGENERADO em 2026-05-24T21:40:49.566596+00:00. NÃO editar manualmente — re-rode regen-index.sh
 
 schema_version: 1
-regenerated_at: 2026-05-24T20:31:59.351543+00:00
+regenerated_at: 2026-05-24T21:40:49.566596+00:00
 total_tasks: 25
 by_status:
   backlog: 25
@@ -133,19 +133,19 @@ tasks:
     blocks: []
   - id: ETK-0016
     status: backlog
-    priority: P2
+    priority: P1
     module: rotulagem
     title: "Entity RotuloNutricional + tests"
     estimate_hours: 2
     depends_on: []
-    blocks: []
+    blocks: ['ETK-0017']
   - id: ETK-0017
     status: backlog
-    priority: P2
+    priority: P1
     module: rotulagem
     title: "Use case GerarRotuloNutricional"
     estimate_hours: 2
-    depends_on: []
+    depends_on: ['ETK-0016']
     blocks: []
   - id: ETK-0018
     status: backlog
