@@ -1,12 +1,12 @@
 # _index.yaml — Tasks EasyStok (DERIVADO de tasks/*/*.yaml)
-# REGENERADO em 2026-05-24T21:40:49.566596+00:00. NÃO editar manualmente — re-rode regen-index.sh
+# REGENERADO em 2026-05-24T21:55:45.105853+00:00. NÃO editar manualmente — re-rode regen-index.sh
 
 schema_version: 1
-regenerated_at: 2026-05-24T21:40:49.566596+00:00
+regenerated_at: 2026-05-24T21:55:45.105853+00:00
 total_tasks: 25
 by_status:
-  backlog: 25
-  in_progress: 0
+  backlog: 24
+  in_progress: 1
   done: 0
   blocked: 0
 
@@ -41,14 +41,6 @@ tasks:
     module: meta
     title: "Publicar ROADMAP.md publico (nao-CLAUDE)"
     estimate_hours: 2
-    depends_on: []
-    blocks: []
-  - id: ETK-0005
-    status: backlog
-    priority: P1
-    module: meta
-    title: "Decidir e iniciar proximo modulo (Caixa V2 vs Rotulagem P-02)"
-    estimate_hours: 4
     depends_on: []
     blocks: []
   - id: ETK-0006
@@ -209,5 +201,13 @@ tasks:
     module: infra
     title: "Telemetria OTEL/OTLP via Fly.io (observability)"
     estimate_hours: 3
+    depends_on: []
+    blocks: []
+  - id: ETK-0005
+    status: in_progress
+    priority: P1
+    module: meta
+    title: "Decidir e iniciar proximo modulo (Caixa V2 vs Rotulagem P-02)"
+    estimate_hours: 4
     depends_on: []
     blocks: []

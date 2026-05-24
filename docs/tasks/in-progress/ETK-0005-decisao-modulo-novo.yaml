@@ -1,12 +1,14 @@
 id: ETK-0005
 title: "Decidir e iniciar proximo modulo (Caixa V2 vs Rotulagem P-02)"
-status: backlog
+status: in_progress
 priority: P1
 module: meta
 estimate_hours: 4
 methodology: incremental
 created_by: claude-opus-4.7
 created_at: "2026-05-24T20:30:00Z"
+claimed_at: "2026-05-24T21:20:11Z"
+claimed_by: claude-opus-4.7
 
 depends_on: []
 blocks: []
@@ -14,10 +16,24 @@ blocks: []
 context: |
   ROADMAP Etapa 5 do CLAUDE.md: 'Modulo novo (Caixa Conciliado V2 OU Rotulagem P-02). Decisao pendente'. Esta task DECIDE entre os dois e materializa o plano vencedor em tasks ETK.
 
+  RESOLUCAO: Rotulagem P-02 vence (ADR-0021, 2026-05-24). Criterios: dor regulatoria
+  ativa (multa Anvisa R$6k-1,5M/unidade) + diferencial competitivo defensavel (IA
+  extrai ficha + Anvisa compliance) + bloqueadores externos contornaveis em paralelo
+  com F0. Caixa V2 diferido para Etapa 6+.
+
 acceptance_criteria:
-  - "Decisao registrada em ADR-0021 (Caixa V2 vs Rotulagem)"
-  - "Plano do modulo vencedor materializado em 5-10 tasks ETK"
-  - "Felipe aprovou em comentario"
+  - "Decisao registrada em ADR-0021 (Rotulagem P-02 vence Caixa V2) - FEITO"
+  - "ETK-0016 (Entity RotuloNutricional) sobe para P1 - FEITO"
+  - "ETK-0017 (UseCase GerarRotuloNutricional) sobe para P1 - FEITO"
+  - "CLAUDE.md §6 atualizado removendo 'Decisao pendente' - FEITO"
+  - "Felipe aprovou via 8 perguntas + GO explicito em 2026-05-24 - FEITO"
 quality_gates:
   - cmd: "dotnet build EasyStok.sln --nologo"
 handoff_notes_required: true
+
+outcome: |
+  Decisao: Rotulagem P-02 = Etapa 5. Caixa Conciliado V2 = Etapa 6+ (diferido).
+  Materializacao adicional escolhida: minimalista (ETK-0016/0017 cobrem entrada).
+  Novas tasks Rotulagem (F0 setup, PerfilNutricional, etc.) sao criadas conforme
+  avanca a partir da proxima sessao.
+  Bloqueadores externos a destravar em paralelo: contador + politica privacidade QR publico.
