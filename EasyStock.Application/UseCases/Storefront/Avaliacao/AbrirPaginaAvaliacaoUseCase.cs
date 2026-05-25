@@ -16,17 +16,16 @@ public sealed class AbrirPaginaAvaliacaoUseCase(
     AvaliacaoTokenService tokenService,
     AvaliacaoCookieStore cookieStore)
 {
-    public AbrirPaginaAvaliacaoResult Execute(AbrirPaginaAvaliacaoInput input)
+    public async Task<AbrirPaginaAvaliacaoResult> ExecuteAsync(AbrirPaginaAvaliacaoInput input)
     {
         tokenService.Validar(input.JwtToken, input.PedidoId);
 
-        // Gera valor aleatório para o cookie
-        Span<byte> bytes = stackalloc byte[32];
+        var bytes = new byte[32];
         RandomNumberGenerator.Fill(bytes);
         var cookieValue = Convert.ToBase64String(bytes)
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-        cookieStore.Registrar(input.PedidoId, cookieValue);
+        await cookieStore.RegistrarAsync(input.PedidoId, cookieValue);
 
         return new AbrirPaginaAvaliacaoResult(input.PedidoId, cookieValue);
     }

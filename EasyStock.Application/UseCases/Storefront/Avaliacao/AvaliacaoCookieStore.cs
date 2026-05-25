@@ -1,19 +1,19 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Caching.Memory;
+using EasyStock.Application.Ports.Output;
 
 namespace EasyStock.Application.UseCases.Storefront.Avaliacao;
 
 /// <summary>
 /// Armazena e valida o vínculo entre cookie <c>__Host-cdb_aval_{pedidoId}</c>
-/// e o pedido correspondente via IMemoryCache (TTL 30 dias).
+/// e o pedido correspondente via <see cref="ICacheService"/> (TTL 30 dias).
 ///
 /// <para>
 /// Persiste apenas o SHA-256 do valor do cookie — o valor bruto nunca fica em memória
 /// server-side além do momento de emissão.
 /// </para>
 /// </summary>
-public sealed class AvaliacaoCookieStore(IMemoryCache cache)
+public sealed class AvaliacaoCookieStore(ICacheService cache)
 {
     private static readonly TimeSpan Ttl = TimeSpan.FromDays(30);
 
@@ -26,17 +26,17 @@ public sealed class AvaliacaoCookieStore(IMemoryCache cache)
     }
 
     /// <summary>Registra o cookie emitido para o pedido.</summary>
-    public void Registrar(Guid pedidoId, string cookieValue) =>
-        cache.Set(CacheKey(pedidoId), ComputeHash(cookieValue), Ttl);
+    public Task RegistrarAsync(Guid pedidoId, string cookieValue) =>
+        cache.SetAsync(CacheKey(pedidoId), ComputeHash(cookieValue), Ttl);
 
     /// <summary>
     /// Verifica se o cookie recebido é válido para o pedido.
     /// Retorna false se chave não existe ou hash não confere.
     /// </summary>
-    public bool EhValido(Guid pedidoId, string cookieValue)
+    public async Task<bool> EhValidoAsync(Guid pedidoId, string cookieValue)
     {
-        if (!cache.TryGetValue(CacheKey(pedidoId), out string? storedHash))
-            return false;
+        var storedHash = await cache.GetAsync<string>(CacheKey(pedidoId));
+        if (storedHash is null) return false;
         return storedHash == ComputeHash(cookieValue);
     }
 }
