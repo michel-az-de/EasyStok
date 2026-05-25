@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.AspNetCore.Authorization;

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;

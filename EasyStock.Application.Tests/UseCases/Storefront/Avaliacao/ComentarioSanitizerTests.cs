@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Storefront.Avaliacao;
+﻿using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using FluentAssertions;
 using Xunit;
 
