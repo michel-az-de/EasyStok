@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Avaliacao;

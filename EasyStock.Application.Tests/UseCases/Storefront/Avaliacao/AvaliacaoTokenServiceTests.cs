@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Storefront.Avaliacao;
+﻿using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Exceptions.Storefront;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;

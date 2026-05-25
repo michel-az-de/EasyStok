@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Reporting;
+﻿namespace EasyStock.Domain.Reporting;
 
 /// <summary>Formatos de saída suportados pelo motor de relatórios.</summary>
 public enum ReportFormat : short

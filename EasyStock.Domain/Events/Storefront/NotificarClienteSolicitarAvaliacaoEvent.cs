@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Events.Storefront;
+﻿namespace EasyStock.Domain.Events.Storefront;
 
 /// <summary>
 /// Emitido pelo background service +24h após entrega para solicitar avaliação ao cliente.

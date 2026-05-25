@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Notifications;
+﻿using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Events.Storefront;

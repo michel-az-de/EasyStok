@@ -1,4 +1,4 @@
-using EasyStock.Application.Events.Storefront.Handlers;
+﻿using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Events.Storefront;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions.Storefront;
+﻿namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
 /// Token JWT de avaliação ausente, adulterado, expirado ou com scope incorreto.
