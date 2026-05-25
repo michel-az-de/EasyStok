@@ -1,8 +1,11 @@
+﻿using EasyStock.Application.Events.Storefront.Handlers;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
@@ -174,6 +177,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.PedidoAvaliacaoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IPedidoStorefrontRepository,
+                Repositories.Storefront.PedidoStorefrontRepository>();
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();
@@ -207,6 +212,19 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddHostedService<EntityAlteracaoRetentionService>();
             // F10-D: Mobile alert service — verifica devices offline a cada 30min.
             services.AddHostedService<MobileAlertService>();
+            // ADR-0014: cancela pedidos Storefront em AguardandoPagamento há > 30 min.
+            services.AddHostedService<CancelarPedidosAbandonadosBackgroundService>();
+
+            // TASK-EZ-AVAL-001: avaliação pós-pedido via link WhatsApp + cookie.
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<AvaliacaoTokenService>();
+            services.AddSingleton<ComentarioSanitizer>();
+            services.AddSingleton<AvaliacaoCookieStore>();
+            services.AddScoped<AbrirPaginaAvaliacaoUseCase>();
+            services.AddScoped<CriarAvaliacaoPedidoUseCase>();
+            services.AddScoped<ListarAvaliacoesPublicoUseCase>();
+            services.AddScoped<EnviarLinkAvaliacaoWhatsAppHandler>();
+            services.AddHostedService<AgendarSolicitacaoAvaliacaoBackgroundService>();
 
             return services;
         }
