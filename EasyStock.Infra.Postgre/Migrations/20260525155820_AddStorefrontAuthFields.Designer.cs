@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260525155820_AddStorefrontAuthFields")]
+    partial class AddStorefrontAuthFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -7012,7 +7015,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("StorefrontId", "CepInicio", "CepFim")
                         .HasDatabaseName("ix_frete_zona_storefront_cep_range")
-                        .HasFilter("\"CepInicio\" IS NOT NULL");
+                        .HasFilter("\"cep_inicio\" IS NOT NULL");
 
                     b.ToTable("frete_zona", (string)null);
                 });
@@ -7201,7 +7204,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("DominioCustom")
                         .IsUnique()
                         .HasDatabaseName("uq_storefront_dominio_custom")
-                        .HasFilter("\"DominioCustom\" IS NOT NULL");
+                        .HasFilter("\"dominio_custom\" IS NOT NULL");
 
                     b.HasIndex("EmpresaId")
                         .HasDatabaseName("ix_storefront_empresa_id");
@@ -7306,11 +7309,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("PedidoId")
                         .IsUnique()
                         .HasDatabaseName("uq_vaga_ativa_por_pedido")
-                        .HasFilter("\"LiberadoEm\" IS NULL");
+                        .HasFilter("\"liberado_em\" IS NULL");
 
                     b.HasIndex("JanelaEntregaId", "DataEntrega")
                         .HasDatabaseName("ix_vaga_ativa_por_janela_data")
-                        .HasFilter("\"LiberadoEm\" IS NULL");
+                        .HasFilter("\"liberado_em\" IS NULL");
 
                     b.ToTable("vaga_ocupada", (string)null);
                 });
@@ -7364,7 +7367,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("Status", "RecebidoEm")
                         .HasDatabaseName("ix_webhook_processado_received_recebido_em")
-                        .HasFilter("\"Status\" = 0");
+                        .HasFilter("\"status\" = 0");
 
                     b.ToTable("webhook_processado", (string)null);
                 });
