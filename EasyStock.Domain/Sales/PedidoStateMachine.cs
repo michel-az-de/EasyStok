@@ -33,6 +33,11 @@ public static class PedidoStateMachine
     public static IReadOnlyDictionary<StatusPedido, IReadOnlySet<StatusPedido>> Transicoes { get; } =
         new Dictionary<StatusPedido, IReadOnlySet<StatusPedido>>
         {
+            // Fluxo Storefront (ADR-0014 + 0006): Rascunho → AguardandoPagamento → AguardandoAprovacaoBaba → Aguardando → ...
+            [StatusPedido.Rascunho] = new HashSet<StatusPedido> { StatusPedido.AguardandoPagamento, StatusPedido.Cancelado },
+            [StatusPedido.AguardandoPagamento] = new HashSet<StatusPedido> { StatusPedido.AguardandoAprovacaoBaba, StatusPedido.Cancelado },
+            [StatusPedido.AguardandoAprovacaoBaba] = new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.Cancelado },
+            // Fluxo ERP legado
             [StatusPedido.Aguardando] = new HashSet<StatusPedido> { StatusPedido.Preparando, StatusPedido.Cancelado },
             [StatusPedido.Preparando] = new HashSet<StatusPedido> { StatusPedido.Pronto, StatusPedido.Cancelado },
             [StatusPedido.Pronto] = new HashSet<StatusPedido> { StatusPedido.Entregue, StatusPedido.Cancelado },

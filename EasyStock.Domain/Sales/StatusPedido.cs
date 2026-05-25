@@ -44,4 +44,10 @@ public enum StatusPedido
     /// Background service CancelarPedidosAbandonados cancela após 30 min sem confirmação.
     /// </summary>
     AguardandoPagamento = 6,
+
+    /// <summary>
+    /// Pagamento aprovado pelo MP (via webhook). Aguarda decisão manual da babá
+    /// para começar a preparar (TASK-EZ-APROVAR-001). ADR-0006 §Process aprovado.
+    /// </summary>
+    AguardandoAprovacaoBaba = 7,
 }

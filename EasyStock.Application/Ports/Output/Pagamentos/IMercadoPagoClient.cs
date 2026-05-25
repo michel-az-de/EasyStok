@@ -14,4 +14,14 @@ public interface IMercadoPagoClient
     Task<PreferenceCriadaResult> CriarPreferenceAsync(
         CriarPreferenceCommand command,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Busca detalhes de um pagamento (<c>GET /v1/payments/{id}</c>) — fonte da
+    /// verdade do <c>ProcessarWebhookMpUseCase</c> (ADR-0006). Nunca confiamos
+    /// no payload do webhook em si: sempre consultamos esta API com o
+    /// <paramref name="paymentId"/> recebido.
+    /// </summary>
+    Task<MpPaymentDetailsDto> GetPaymentAsync(
+        string paymentId,
+        CancellationToken ct = default);
 }
