@@ -14,6 +14,12 @@ public static class MercadoPagoServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Options sempre registrado — WebhookSecret é usado tanto por adapter real quanto stub.
+        services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.Section));
+
+        // Webhook secret resolver — ADR-0006 (MVP single-tenant via config).
+        services.AddScoped<IMpWebhookSecretProvider, MercadoPagoWebhookSecretProvider>();
+
         var useStub = configuration.GetValue<bool>("MercadoPago:UseStub");
 
         if (useStub)
@@ -22,7 +28,6 @@ public static class MercadoPagoServiceCollectionExtensions
         }
         else
         {
-            services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.Section));
             services.AddHttpClient<MercadoPagoClient>(client =>
             {
                 var baseUrl = configuration["MercadoPago:BaseUrl"] ?? "https://api.mercadopago.com/";

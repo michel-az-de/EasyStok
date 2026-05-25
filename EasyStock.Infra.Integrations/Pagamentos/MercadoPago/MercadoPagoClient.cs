@@ -67,4 +67,59 @@ public sealed class MercadoPagoClient(
 
         return new PreferenceCriadaResult(id, initPoint);
     }
+
+    public async Task<MpPaymentDetailsDto> GetPaymentAsync(
+        string paymentId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(paymentId))
+            throw new ArgumentException("paymentId é obrigatório.", nameof(paymentId));
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"v1/payments/{paymentId}");
+        request.Headers.Add("Authorization", $"Bearer {options.Value.AccessToken}");
+
+        using var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+
+        var root = doc.RootElement;
+
+        // MP retorna id como número. Convertemos para string canonical via raw text.
+        string mpId = root.TryGetProperty("id", out var idEl)
+            ? idEl.ValueKind switch
+            {
+                JsonValueKind.String => idEl.GetString() ?? paymentId,
+                JsonValueKind.Number => idEl.GetRawText(),
+                _ => paymentId,
+            }
+            : paymentId;
+
+        string status = root.TryGetProperty("status", out var statusEl)
+            ? statusEl.GetString() ?? "unknown"
+            : "unknown";
+
+        string? statusDetail = root.TryGetProperty("status_detail", out var sdEl)
+            ? sdEl.GetString()
+            : null;
+
+        string? externalRef = root.TryGetProperty("external_reference", out var erEl)
+            ? erEl.GetString()
+            : null;
+
+        decimal amount = 0m;
+        if (root.TryGetProperty("transaction_amount", out var amtEl)
+            && amtEl.ValueKind == JsonValueKind.Number
+            && amtEl.TryGetDecimal(out var parsed))
+        {
+            amount = parsed;
+        }
+
+        logger.LogDebug(
+            "MP GetPayment paymentId={PaymentId} status={Status} externalRef={Ref}",
+            mpId, status, externalRef);
+
+        return new MpPaymentDetailsDto(mpId, status, statusDetail, externalRef, amount);
+    }
 }

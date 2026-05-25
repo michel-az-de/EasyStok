@@ -214,6 +214,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddHostedService<MobileAlertService>();
             // ADR-0014: cancela pedidos Storefront em AguardandoPagamento há > 30 min.
             services.AddHostedService<CancelarPedidosAbandonadosBackgroundService>();
+            // ADR-0006: processa webhooks MP em status Received (receive-then-process).
+            services.AddHostedService<ProcessarWebhookMpPendenteBackgroundService>();
 
             // TASK-EZ-AVAL-001: avaliação pós-pedido via link WhatsApp + cookie.
             services.TryAddSingleton(TimeProvider.System);
