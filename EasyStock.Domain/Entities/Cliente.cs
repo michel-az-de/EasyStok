@@ -39,6 +39,14 @@ namespace EasyStock.Domain.Entities
         public string? Cidade { get; set; }
         public string? Cpf { get; set; }
 
+        /// <summary>
+        /// SHA-256 hex (64 chars) do telefone normalizado em E.164.
+        /// Preenchido na primeira autenticação via OTP (AUTH-002).
+        /// Permite lookup seguro sem armazenar o número em claro para storefront.
+        /// Null para clientes criados antes do storefront OTP.
+        /// </summary>
+        public string? TelefoneHash { get; set; }
+
         /// <summary>Último acesso autenticado via storefront (cookie de sessão).</summary>
         public DateTime? UltimoAcessoStorefrontEm { get; set; }
 
@@ -76,6 +84,41 @@ namespace EasyStock.Domain.Entities
                 CriadoEm = agora,
                 AlteradoEm = agora
             };
+        }
+
+        /// <summary>
+        /// Factory para criação de cliente via storefront OTP (AUTH-002).
+        /// Usa <see cref="TimeProvider"/> para testes determinísticos.
+        /// </summary>
+        public static Cliente CriarParaStorefront(Guid empresaId, string telefoneHash, TimeProvider time)
+        {
+            if (empresaId == Guid.Empty)
+                throw new ArgumentException("EmpresaId é obrigatório.", nameof(empresaId));
+            if (string.IsNullOrWhiteSpace(telefoneHash))
+                throw new ArgumentException("TelefoneHash é obrigatório.", nameof(telefoneHash));
+            ArgumentNullException.ThrowIfNull(time);
+
+            var agora = time.GetUtcNow().UtcDateTime;
+            return new Cliente
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                Nome = string.Empty,
+                TelefoneHash = telefoneHash,
+                UltimoAcessoStorefrontEm = agora,
+                Ativo = true,
+                CriadoEm = agora,
+                AlteradoEm = agora,
+            };
+        }
+
+        /// <summary>Registra acesso storefront — atualiza <see cref="UltimoAcessoStorefrontEm"/>.</summary>
+        public void RegistrarAcessoStorefront(TimeProvider time)
+        {
+            ArgumentNullException.ThrowIfNull(time);
+            var agora = time.GetUtcNow().UtcDateTime;
+            UltimoAcessoStorefrontEm = agora;
+            AlteradoEm = agora;
         }
 
         public void AtualizarCadastro(
