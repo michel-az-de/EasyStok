@@ -1,0 +1,78 @@
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.Extensions.Logging;
+
+namespace EasyStock.Application.UseCases.Storefront.Menu;
+
+/// <summary>
+/// Resolve o storefront público por slug e retorna a lista de
+/// <c>CardapioItem</c> visíveis (Visivel=true) como <see cref="CardapioItemPublicoDto"/>.
+///
+/// <para>
+/// <strong>Anônimo</strong> — endpoint não exige autenticação. Multi-tenancy via
+/// slug (chave de entrada). Sem risco de vazamento cross-tenant porque nenhuma
+/// requisição pública carrega <c>EmpresaId</c> no contexto.
+/// </para>
+///
+/// <para>
+/// <strong>Storefront inativo</strong> retorna <see cref="StorefrontNaoEncontradoException"/>
+/// (não 403) — não vaza existência do tenant para o público.
+/// </para>
+///
+/// <para>
+/// <strong>Ordenação</strong>: Categoria.Nome ASC → OrdemExibicao ASC. Items sem
+/// categoria caem por último (Categoria=null ordena como string vazia depois de
+/// nomes preenchidos via convenção StringComparer.Ordinal — empurrados para o
+/// fim usando sentinela <c>"￿"</c>).
+/// </para>
+///
+/// <para>
+/// <strong>Preço</strong> retornado em centavos (long) — evita float no transit.
+/// <c>PrecoStorefront</c> override OU <c>Produto.PrecoReferencia</c> como fallback.
+/// </para>
+/// </summary>
+public sealed class ListarCardapioPublicoUseCase(
+    IStorefrontRepository storefrontRepository,
+    ICardapioItemRepository cardapioItemRepository,
+    ILogger<ListarCardapioPublicoUseCase> logger)
+{
+    /// <summary>Sentinela para empurrar items sem categoria para o fim da ordenação.</summary>
+    private const string SemCategoriaSentinela = "￿";
+
+    public async Task<ListarCardapioPublicoResult> ExecuteAsync(
+        ListarCardapioPublicoInput input,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var slug = (input.Slug ?? string.Empty).Trim().ToLowerInvariant();
+        var storefront = await storefrontRepository.GetBySlugAsync(slug, ct);
+        if (storefront is null || !storefront.Ativo)
+        {
+            logger.LogInformation(
+                "Cardápio público solicitado para storefront inexistente/inativo: slug={Slug}",
+                slug);
+            throw new StorefrontNaoEncontradoException(slug);
+        }
+
+        var itens = await cardapioItemRepository.GetVisiveisDoStorefrontAsync(storefront.Id, ct);
+
+        var dtos = itens
+            .OrderBy(i => i.Produto?.Categoria?.Nome ?? SemCategoriaSentinela, StringComparer.Ordinal)
+            .ThenBy(i => i.OrdemExibicao)
+            .Select(i => new CardapioItemPublicoDto(
+                Id: i.Id,
+                Nome: i.Produto?.Nome ?? string.Empty,
+                Descricao: i.DescricaoPublica,
+                PrecoCentavos: (long)Math.Round(i.PrecoEfetivo() * 100m, MidpointRounding.AwayFromZero),
+                ImagemUrl: i.FotoUrl,
+                EstoqueAtual: 0, // snapshot eventual — fora deste escopo (ver YAML TASK-EZ-MENU-001).
+                Categoria: i.Produto?.Categoria?.Nome,
+                Ordem: i.OrdemExibicao,
+                Disponivel: i.Disponivel,
+                Tag: i.Tag))
+            .ToList();
+
+        return new ListarCardapioPublicoResult(dtos);
+    }
+}

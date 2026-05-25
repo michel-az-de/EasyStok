@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -35,6 +35,7 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockNotificationsUseCases()
             .AddEasyStockHelpdeskUseCases()
             .AddEasyStockPublicUseCases()
+            .AddEasyStockStorefrontUseCases()
             .AddEasyStockFinanceiroUseCases();
 
         return services;
