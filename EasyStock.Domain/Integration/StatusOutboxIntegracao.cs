@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Integration;
+﻿namespace EasyStock.Domain.Integration;
 
 /// <summary>
 /// Estados do <see cref="OutboxEventoIntegracao"/>. Workers (dispatchers

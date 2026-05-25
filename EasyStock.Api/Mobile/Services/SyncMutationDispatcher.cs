@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities.Mobile;
@@ -37,12 +37,12 @@ public class SyncMutationDispatcher(
 
         switch (parts[0])
         {
-            case "product":   await ApplyProduct(m, deviceId, operatorName, empresaId, lojaId);   break;
-            case "client":    await ApplyClient(m, deviceId, operatorName, empresaId, lojaId);    break;
-            case "order":     await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId);     break;
-            case "batch":     await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId);     break;
+            case "product": await ApplyProduct(m, deviceId, operatorName, empresaId, lojaId); break;
+            case "client": await ApplyClient(m, deviceId, operatorName, empresaId, lojaId); break;
+            case "order": await ApplyOrder(m, deviceId, operatorName, empresaId, lojaId); break;
+            case "batch": await ApplyBatch(m, deviceId, operatorName, empresaId, lojaId); break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
-            case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
+            case "closing": await ApplyClosing(m, deviceId, empresaId, lojaId); break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
     }
@@ -72,8 +72,13 @@ public class SyncMutationDispatcher(
         {
             _db.Add(new Product
             {
-                Id = dto.Id, Name = dto.Name, Emoji = dto.Emoji, Category = dto.Category,
-                Unit = dto.Unit, Price = dto.Price, Stock = dto.Stock,
+                Id = dto.Id,
+                Name = dto.Name,
+                Emoji = dto.Emoji,
+                Category = dto.Category,
+                Unit = dto.Unit,
+                Price = dto.Price,
+                Stock = dto.Stock,
                 IsCustom = dto.Custom ?? false,
                 Sku = dto.Sku,
                 DefaultWeightG = dto.DefaultWeightG,
@@ -97,9 +102,9 @@ public class SyncMutationDispatcher(
             existing.LastOperatorName = operatorName;
             if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
             if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
-            if (dto.Sku is not null)                 existing.Sku = dto.Sku;
-            if (dto.DefaultWeightG.HasValue)         existing.DefaultWeightG = dto.DefaultWeightG;
-            if (dto.DefaultValidityDays.HasValue)    existing.DefaultValidityDays = dto.DefaultValidityDays;
+            if (dto.Sku is not null) existing.Sku = dto.Sku;
+            if (dto.DefaultWeightG.HasValue) existing.DefaultWeightG = dto.DefaultWeightG;
+            if (dto.DefaultValidityDays.HasValue) existing.DefaultValidityDays = dto.DefaultValidityDays;
         }
     }
 
@@ -115,8 +120,13 @@ public class SyncMutationDispatcher(
         {
             _db.Add(new Client
             {
-                Id = dto.Id, Name = dto.Name, Apt = dto.Apt, Address = dto.Address,
-                Phone = dto.Phone, LastOrder = lastOrderDate, OrderCount = dto.OrderCount,
+                Id = dto.Id,
+                Name = dto.Name,
+                Apt = dto.Apt,
+                Address = dto.Address,
+                Phone = dto.Phone,
+                LastOrder = lastOrderDate,
+                OrderCount = dto.OrderCount,
                 LastDeviceId = deviceId,
                 LastOperatorName = operatorName,
                 EmpresaId = empresaId,
@@ -199,8 +209,13 @@ public class SyncMutationDispatcher(
             foreach (var i in dto.Items)
                 order.Items.Add(new OrderItem
                 {
-                    OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                    Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
+                    OrderId = dto.Id,
+                    ProductId = i.ProductId,
+                    Name = i.Name,
+                    Emoji = i.Emoji,
+                    Unit = i.Unit,
+                    Qty = i.Qty,
+                    UnitPrice = i.UnitPrice
                 });
             _db.Add(order);
             // Onda 3 — pedido criado direto como "entregue" (retroativo) cria Venda.
@@ -233,8 +248,13 @@ public class SyncMutationDispatcher(
             foreach (var i in dto.Items)
                 existing.Items.Add(new OrderItem
                 {
-                    OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                    Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
+                    OrderId = dto.Id,
+                    ProductId = i.ProductId,
+                    Name = i.Name,
+                    Emoji = i.Emoji,
+                    Unit = i.Unit,
+                    Qty = i.Qty,
+                    UnitPrice = i.UnitPrice
                 });
 
             // Onda 3 — vendas mobile -> ERP.
@@ -337,7 +357,9 @@ public class SyncMutationDispatcher(
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var batch = new Batch
         {
-            Id = dto.Id, Code = dto.Code, BatchPhoto = dto.BatchPhoto,
+            Id = dto.Id,
+            Code = dto.Code,
+            BatchPhoto = dto.BatchPhoto,
             CreatedAt = createdAt,
             Lote = dto.Lote,
             LastDeviceId = deviceId,
@@ -354,8 +376,13 @@ public class SyncMutationDispatcher(
         {
             batch.Items.Add(new BatchItem
             {
-                BatchId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, Photo = i.Photo,
+                BatchId = dto.Id,
+                ProductId = i.ProductId,
+                Name = i.Name,
+                Emoji = i.Emoji,
+                Unit = i.Unit,
+                Qty = i.Qty,
+                Photo = i.Photo,
                 WeightG = i.WeightG,
                 ValidityDays = i.ValidityDays,
                 ExpiresAt = i.ExpiresAt.HasValue
@@ -386,8 +413,11 @@ public class SyncMutationDispatcher(
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         _db.Add(new CashEntry
         {
-            Id = dto.Id, Type = dto.Type, Amount = dto.Amount,
-            Description = dto.Description, CreatedAt = createdAt,
+            Id = dto.Id,
+            Type = dto.Type,
+            Amount = dto.Amount,
+            Description = dto.Description,
+            CreatedAt = createdAt,
             LastDeviceId = deviceId,
             LastOperatorName = operatorName,
             EmpresaId = empresaId,

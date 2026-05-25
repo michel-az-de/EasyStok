@@ -1,4 +1,4 @@
-using EasyStock.Infra.Integrations.Resilience;
+﻿using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.CircuitBreaker;

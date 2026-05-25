@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums;
+﻿using EasyStock.Domain.Enums;
 
 namespace EasyStock.Domain.ValueObjects;
 
@@ -19,11 +19,11 @@ public static class UnidadeMedidaConverter
     /// <summary>Fator para converter de uma unidade para a referencia do grupo (g para massa, ml para volume, un para contagem).</summary>
     private static readonly Dictionary<UnidadeMedida, (GrupoUnidade Grupo, decimal FatorParaReferencia)> _fatores = new()
     {
-        [UnidadeMedida.Mg] = (GrupoUnidade.Massa,    0.001m),
-        [UnidadeMedida.G]  = (GrupoUnidade.Massa,    1m),
-        [UnidadeMedida.Kg] = (GrupoUnidade.Massa,    1000m),
-        [UnidadeMedida.Ml] = (GrupoUnidade.Volume,   1m),
-        [UnidadeMedida.L]  = (GrupoUnidade.Volume,   1000m),
+        [UnidadeMedida.Mg] = (GrupoUnidade.Massa, 0.001m),
+        [UnidadeMedida.G] = (GrupoUnidade.Massa, 1m),
+        [UnidadeMedida.Kg] = (GrupoUnidade.Massa, 1000m),
+        [UnidadeMedida.Ml] = (GrupoUnidade.Volume, 1m),
+        [UnidadeMedida.L] = (GrupoUnidade.Volume, 1000m),
         [UnidadeMedida.Un] = (GrupoUnidade.Contagem, 1m),
         [UnidadeMedida.Dz] = (GrupoUnidade.Contagem, 12m),
         // Cx nao entra: tratado a parte como inconvertivel.

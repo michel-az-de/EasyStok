@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;

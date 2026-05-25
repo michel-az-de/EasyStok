@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 

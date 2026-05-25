@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Integration;
+﻿namespace EasyStock.Application.Ports.Output.Integration;
 
 /// <summary>
 /// Publica eventos de integração externa via outbox transacional. Use cases

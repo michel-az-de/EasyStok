@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
+﻿namespace EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
 
 /// <summary>Parâmetros do relatório de inadimplência — Admin SaaS.</summary>
 public sealed record InadimplenciaParams(

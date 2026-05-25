@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums;
+﻿namespace EasyStock.Domain.Enums;
 
 /// <summary>
 /// Tipo do <see cref="Entities.FaturaItem"/>. Permite renderer agrupar/destacar

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.Board;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.Board;
 
 public sealed record GetBoardResult(
     Guid EmpresaId,

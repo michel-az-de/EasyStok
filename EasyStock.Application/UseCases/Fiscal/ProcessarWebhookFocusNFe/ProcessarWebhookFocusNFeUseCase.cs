@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Fiscal;

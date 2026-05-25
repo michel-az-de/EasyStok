@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Reflection;
 using System.Text;
 using CsvHelper;
@@ -16,9 +16,9 @@ namespace EasyStock.Infra.Async.Reporting.Exporters;
 /// </summary>
 public sealed class CsvExporter : IReportExporter
 {
-    public ReportFormat Format      => ReportFormat.Csv;
-    public string ContentType       => "text/csv; charset=utf-8";
-    public string FileExtension     => ".csv";
+    public ReportFormat Format => ReportFormat.Csv;
+    public string ContentType => "text/csv; charset=utf-8";
+    public string FileExtension => ".csv";
 
     public async Task WriteAsync<TRow>(
         IAsyncEnumerable<TRow> rows,
@@ -33,24 +33,24 @@ public sealed class CsvExporter : IReportExporter
             await output.WriteAsync(Encoding.UTF8.GetPreamble(), ct);
 
         var encoding = options.EffectiveEncoding;
-        var culture  = options.EffectiveCulture;
+        var culture = options.EffectiveCulture;
 
         var cfg = new CsvConfiguration(culture)
         {
-            Delimiter    = options.CsvDelimiter,
-            NewLine      = "\r\n",
-            Encoding     = encoding,
+            Delimiter = options.CsvDelimiter,
+            NewLine = "\r\n",
+            Encoding = encoding,
             HasHeaderRecord = true,
             // Quoting RFC 4180: cotar somente quando necessário
-            ShouldQuote  = args =>
+            ShouldQuote = args =>
                 args.Field?.Contains(options.CsvDelimiter) == true ||
-                args.Field?.Contains('"')  == true ||
+                args.Field?.Contains('"') == true ||
                 args.Field?.Contains('\n') == true ||
                 args.Field?.Contains('\r') == true,
         };
 
         await using var writer = new StreamWriter(output, encoding, leaveOpen: true);
-        await using var csv    = new CsvWriter(writer, cfg, leaveOpen: true);
+        await using var csv = new CsvWriter(writer, cfg, leaveOpen: true);
 
         // Registrar mapeamento com ordem e formatação de colunas do schema
         RegisterSchemaMap<TRow>(csv.Context, schema, culture);
@@ -78,12 +78,12 @@ public sealed class CsvExporter : IReportExporter
         CsvContext context, ReportSchema schema, CultureInfo defaultCulture)
         where TRow : class
     {
-        var map   = new DefaultClassMap<TRow>();
+        var map = new DefaultClassMap<TRow>();
         var props = typeof(TRow).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
         for (int i = 0; i < schema.Columns.Count; i++)
         {
-            var col  = schema.Columns[i];
+            var col = schema.Columns[i];
             var prop = props.FirstOrDefault(p =>
                 string.Equals(p.Name, col.PropertyName, StringComparison.OrdinalIgnoreCase));
 

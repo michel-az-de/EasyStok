@@ -1,4 +1,4 @@
-using EasyStock.Infra.Postgre.Data;
+﻿using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

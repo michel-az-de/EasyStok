@@ -1,4 +1,4 @@
-// Domínio - Global usings para reduzir repetição em arquivos da camada Domain
+﻿// Domínio - Global usings para reduzir repetição em arquivos da camada Domain
 // Padrão: tipos base do .NET, anotações de data/validação, entidades de domínio
 
 global using System;

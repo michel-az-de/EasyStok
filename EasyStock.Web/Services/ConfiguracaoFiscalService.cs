@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal;
 
 namespace EasyStock.Web.Services;

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output;
+﻿namespace EasyStock.Application.Ports.Output;
 
 /// <summary>
 /// Servi�o de cache distribu�do para armazenamento tempor�rio de dados.

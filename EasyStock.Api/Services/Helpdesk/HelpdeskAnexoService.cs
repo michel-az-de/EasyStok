@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities;

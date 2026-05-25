@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Dashboard;
+﻿namespace EasyStock.Web.Models.ViewModels.Dashboard;
 
 public class DashboardViewModel
 {

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Storage;
+﻿using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -87,7 +87,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
     /// </summary>
     public Task<Stream> OpenUploadStreamAsync(string storageKey, string contentType, CancellationToken ct)
     {
-        var safeKey  = storageKey.Replace('/', Path.DirectorySeparatorChar);
+        var safeKey = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
         if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
@@ -103,7 +103,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
 
     public Task<Stream> DownloadStreamAsync(string storageKey, CancellationToken ct)
     {
-        var safeKey  = storageKey.Replace('/', Path.DirectorySeparatorChar);
+        var safeKey = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
         if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
@@ -127,18 +127,18 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
     {
         // Implementação MVP: retorna URL relativa que o endpoint de download reconhece.
         // Em produção com S3/Azure, esta implementação é substituída pela real.
-        var encoded    = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(storageKey))
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(storageKey))
                          .Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        var nameEnc    = Uri.EscapeDataString(downloadFileName);
-        var expUnix    = DateTimeOffset.UtcNow.Add(ttl).ToUnixTimeSeconds();
-        var token      = $"{encoded}.{expUnix}.{nameEnc}";
-        var url        = new Uri($"/api/files/local-signed/{token}", UriKind.Relative);
+        var nameEnc = Uri.EscapeDataString(downloadFileName);
+        var expUnix = DateTimeOffset.UtcNow.Add(ttl).ToUnixTimeSeconds();
+        var token = $"{encoded}.{expUnix}.{nameEnc}";
+        var url = new Uri($"/api/files/local-signed/{token}", UriKind.Relative);
         return Task.FromResult(url);
     }
 
     public Task<bool> ExistsAsync(string storageKey, CancellationToken ct)
     {
-        var safeKey  = storageKey.Replace('/', Path.DirectorySeparatorChar);
+        var safeKey = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
         if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))

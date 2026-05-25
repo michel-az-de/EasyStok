@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.CancelamentosInutilizacoes;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.CancelamentosInutilizacoes;
 
 /// <summary>
 /// Parâmetros do relatório "Cancelamentos e inutilizações".

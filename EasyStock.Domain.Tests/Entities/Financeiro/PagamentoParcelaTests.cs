@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Financeiro;
+﻿using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;

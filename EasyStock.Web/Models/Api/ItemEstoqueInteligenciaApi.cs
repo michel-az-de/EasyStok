@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.Api;
+﻿namespace EasyStock.Web.Models.Api;
 
 public record ItemEstoqueInteligenciaApi
 {
@@ -15,5 +15,5 @@ public record ItemEstoqueInteligenciaApi
 }
 
 public record QuantidadeValueApi { public decimal Value { get; init; } }
-public record DinheiroValueApi   { public decimal Valor { get; init; } }
-public record ValidadeValueApi   { public DateTime DataValidade { get; init; } }
+public record DinheiroValueApi { public decimal Valor { get; init; } }
+public record ValidadeValueApi { public DateTime DataValidade { get; init; } }

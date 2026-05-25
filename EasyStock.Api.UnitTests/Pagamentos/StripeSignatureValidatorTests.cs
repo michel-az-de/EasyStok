@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using FluentAssertions;

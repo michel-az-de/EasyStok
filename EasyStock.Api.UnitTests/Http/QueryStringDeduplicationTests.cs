@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace EasyStock.Api.UnitTests.Http;

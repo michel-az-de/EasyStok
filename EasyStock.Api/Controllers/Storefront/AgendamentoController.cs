@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Exceptions.Storefront;

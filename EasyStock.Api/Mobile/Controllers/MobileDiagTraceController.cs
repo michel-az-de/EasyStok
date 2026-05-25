@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;

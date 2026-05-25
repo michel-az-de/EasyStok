@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Integration;
+﻿using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
 using Microsoft.Extensions.Logging;

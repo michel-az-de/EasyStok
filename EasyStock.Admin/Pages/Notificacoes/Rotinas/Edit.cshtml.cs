@@ -1,4 +1,4 @@
-using EasyStock.Admin.Services;
+﻿using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -97,10 +97,14 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
             {
                 await api.PostRawAsync("api/admin/notificacoes/rotinas", new
                 {
-                    codigo = Codigo, nome = Nome,
-                    tipoEvento = TipoEvento, triggerTipo = TriggerTipo,
-                    templateCodigo = TemplateCodigo, categoria = Categoria,
-                    cronExpression = CronExpression, parametrosJson = ParametrosJson
+                    codigo = Codigo,
+                    nome = Nome,
+                    tipoEvento = TipoEvento,
+                    triggerTipo = TriggerTipo,
+                    templateCodigo = TemplateCodigo,
+                    categoria = Categoria,
+                    cronExpression = CronExpression,
+                    parametrosJson = ParametrosJson
                 });
                 SetSucesso("Rotina criada com sucesso.");
             }

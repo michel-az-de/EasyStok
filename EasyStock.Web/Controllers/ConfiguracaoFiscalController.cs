@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal;
+﻿using EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 

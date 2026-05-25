@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.Api;
+﻿namespace EasyStock.Web.Models.Api;
 
 public record Cliente
 {

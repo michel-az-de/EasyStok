@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Web.Models.Api;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 

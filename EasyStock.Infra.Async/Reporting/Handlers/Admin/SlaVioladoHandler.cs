@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Tickets;
@@ -24,7 +24,7 @@ public sealed class SlaVioladoHandler(EasyStockDbContext db)
     {
         var fileNameBase = $"sla-violado_{parametros.De:yyyy-MM-dd}_a_{parametros.Ate:yyyy-MM-dd}";
         return new ReportSchema(
-            title:        "Tickets com SLA violado",
+            title: "Tickets com SLA violado",
             fileNameBase: fileNameBase,
             columns:
             [
@@ -58,7 +58,7 @@ public sealed class SlaVioladoHandler(EasyStockDbContext db)
         SlaVioladoParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
         var query = db.AdminTickets
@@ -102,19 +102,19 @@ public sealed class SlaVioladoHandler(EasyStockDbContext db)
                 minutosAtrasoResolucao = (int)(DateTime.UtcNow - t.PrazoResolucao.Value).TotalMinutes;
 
             yield return new SlaVioladoRow(
-                TicketId:               t.Id,
-                Titulo:                 t.Titulo,
-                EmpresaNome:            t.EmpresaNome,
-                Categoria:              t.Categoria.ToString(),
-                Prioridade:             t.Prioridade.ToString(),
-                CriadoEm:               t.CriadoEm,
-                SlaRespostaViolado:     t.SlaRespostaViolado,
-                SlaResolucaoViolado:    t.SlaResolucaoViolado,
-                PrazoResposta:          t.PrazoResposta,
-                PrazoResolucao:         t.PrazoResolucao,
-                PrimeiraRespostaEm:     t.PrimeiraRespostaEm,
-                ResolvidoEm:            t.ResolvidoEm,
-                MinutosAtrasoResposta:  minutosAtrasoResposta,
+                TicketId: t.Id,
+                Titulo: t.Titulo,
+                EmpresaNome: t.EmpresaNome,
+                Categoria: t.Categoria.ToString(),
+                Prioridade: t.Prioridade.ToString(),
+                CriadoEm: t.CriadoEm,
+                SlaRespostaViolado: t.SlaRespostaViolado,
+                SlaResolucaoViolado: t.SlaResolucaoViolado,
+                PrazoResposta: t.PrazoResposta,
+                PrazoResolucao: t.PrazoResolucao,
+                PrimeiraRespostaEm: t.PrimeiraRespostaEm,
+                ResolvidoEm: t.ResolvidoEm,
+                MinutosAtrasoResposta: minutosAtrasoResposta,
                 MinutosAtrasoResolucao: minutosAtrasoResolucao);
         }
     }

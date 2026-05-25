@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
@@ -13,17 +13,17 @@ namespace EasyStock.Application.UseCases.Reports;
 // ── Command ─────────────────────────────────────────────────────────────────
 
 public sealed record EnqueueReportRunCommand(
-    string          ReportKey,
-    string          ParamsJson,
-    ReportFormat    Format,
-    string?         IdempotencyKey  = null,
-    string?         MotivoExecucao  = null) : ICommand;
+    string ReportKey,
+    string ParamsJson,
+    ReportFormat Format,
+    string? IdempotencyKey = null,
+    string? MotivoExecucao = null) : ICommand;
 
 // ── Result ───────────────────────────────────────────────────────────────────
 
 public sealed record EnqueueReportRunResult(
     ReportRunDto Run,
-    bool         JaExistia);   // true = idempotência — run pré-existente retornada
+    bool JaExistia);   // true = idempotência — run pré-existente retornada
 
 // ── UseCase ──────────────────────────────────────────────────────────────────
 
@@ -33,17 +33,17 @@ public sealed class EnqueueReportRunUseCase
     private static readonly TimeSpan IdempotencyWindow = TimeSpan.FromMinutes(5);
 
     private readonly IReportRunRepository _repo;
-    private readonly ReportRegistry       _registry;
+    private readonly ReportRegistry _registry;
     private readonly ICurrentUserAccessor _user;
 
     public EnqueueReportRunUseCase(
         IReportRunRepository repo,
-        ReportRegistry       registry,
+        ReportRegistry registry,
         ICurrentUserAccessor user)
     {
-        _repo     = repo;
+        _repo = repo;
         _registry = registry;
-        _user     = user;
+        _user = user;
     }
 
     public async Task<EnqueueReportRunResult> ExecuteAsync(EnqueueReportRunCommand command)
@@ -89,19 +89,19 @@ public sealed class EnqueueReportRunUseCase
         // 7. Criar run
         var contexto = definition.Contexto;
         var run = ReportRun.Enqueue(
-            empresaId:       OwnerId() ?? Guid.Empty,
-            usuarioId:       _user.UsuarioId,
-            reportKey:       command.ReportKey,
-            categoria:       definition.Categoria,
-            contexto:        contexto,
-            paramsJson:      command.ParamsJson,
-            paramsHash:      paramsHash,
-            format:          command.Format,
+            empresaId: OwnerId() ?? Guid.Empty,
+            usuarioId: _user.UsuarioId,
+            reportKey: command.ReportKey,
+            categoria: definition.Categoria,
+            contexto: contexto,
+            paramsJson: command.ParamsJson,
+            paramsHash: paramsHash,
+            format: command.Format,
             semanticVersion: definition.SemanticVersion,
-            retention:       definition.Retencao,
-            maxTentativas:   definition.MaxTentativas,
-            idempotencyKey:  command.IdempotencyKey,
-            motivoExecucao:  command.MotivoExecucao);
+            retention: definition.Retencao,
+            maxTentativas: definition.MaxTentativas,
+            idempotencyKey: command.IdempotencyKey,
+            motivoExecucao: command.MotivoExecucao);
 
         await _repo.AddAsync(run, ct);
         return new EnqueueReportRunResult(MapToDto(run, definition), JaExistia: false);
@@ -127,25 +127,25 @@ public sealed class EnqueueReportRunUseCase
 
     private static ReportRunDto MapToDto(ReportRun run, IReportDefinition def) =>
         new(
-            Id:               run.Id,
-            ReportKey:        run.ReportKey,
-            ReportLabel:      def.Label,
-            Categoria:        run.Categoria,
-            Contexto:         run.Contexto,
-            Format:           run.Format,
-            Status:           run.Status,
-            StatusLabel:      run.Status.ToString(),
-            ParamsJson:       run.ParamsJson,
-            Tentativas:       run.Tentativas,
-            MaxTentativas:    run.MaxTentativas,
-            RowCount:         run.RowCount,
+            Id: run.Id,
+            ReportKey: run.ReportKey,
+            ReportLabel: def.Label,
+            Categoria: run.Categoria,
+            Contexto: run.Contexto,
+            Format: run.Format,
+            Status: run.Status,
+            StatusLabel: run.Status.ToString(),
+            ParamsJson: run.ParamsJson,
+            Tentativas: run.Tentativas,
+            MaxTentativas: run.MaxTentativas,
+            RowCount: run.RowCount,
             ArtifactSizeBytes: run.ArtifactSizeBytes,
-            ErrorMessage:     run.ErrorMessage,
-            WarningsJson:     run.WarningsJson,
-            SemanticVersion:  run.SemanticVersion,
-            EnqueuedAt:       run.EnqueuedAt,
-            StartedAt:        run.StartedAt,
-            FinishedAt:       run.FinishedAt,
-            ExpiresAt:        run.ExpiresAt,
-            CanDownload:      run.Status == ReportStatus.Succeeded && run.ArtifactStorageKey is not null);
+            ErrorMessage: run.ErrorMessage,
+            WarningsJson: run.WarningsJson,
+            SemanticVersion: run.SemanticVersion,
+            EnqueuedAt: run.EnqueuedAt,
+            StartedAt: run.StartedAt,
+            FinishedAt: run.FinishedAt,
+            ExpiresAt: run.ExpiresAt,
+            CanDownload: run.Status == ReportStatus.Succeeded && run.ArtifactStorageKey is not null);
 }

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using EasyStock.Application.Ports.Output;
@@ -109,7 +109,7 @@ internal sealed class ValidateEmpresaIdFilter(
         if (prop is null || !prop.CanRead) return null;
 
         var propType = prop.PropertyType;
-        var isGuid  = propType == typeof(Guid);
+        var isGuid = propType == typeof(Guid);
         var isGuidN = Nullable.GetUnderlyingType(propType) == typeof(Guid);
 
         if (!isGuid && !isGuidN) return null;
@@ -117,9 +117,9 @@ internal sealed class ValidateEmpresaIdFilter(
         // Expression tree equivalent to:
         //   (object o) => (Guid?)((TInstance)o).EmpresaId
         var objParam = Expression.Parameter(typeof(object), "o");
-        var casted   = Expression.Convert(objParam, type);
-        var access   = Expression.Property(casted, prop);
-        var boxed    = isGuid
+        var casted = Expression.Convert(objParam, type);
+        var access = Expression.Property(casted, prop);
+        var boxed = isGuid
             ? (Expression)Expression.Convert(access, typeof(Guid?))  // Guid -> Guid?
             : access;                                                // already Guid?
 

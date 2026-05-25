@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output;
+﻿namespace EasyStock.Application.Ports.Output;
 
 /// <summary>
 /// Geracao atomica de numero sequencial fiscal-friendly por empresa+ano para

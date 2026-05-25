@@ -1,4 +1,4 @@
-using DotNet.Testcontainers.Builders;
+﻿using DotNet.Testcontainers.Builders;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -28,9 +28,9 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     private bool _isAvailable;
     private string? _connString;
 
-    private const string JwtIssuer  = "EasyStock";
+    private const string JwtIssuer = "EasyStock";
     private const string JwtAudience = "EasyStock";
-    private const string JwtSecret  = "EasyStock-Test-SuperSecretKey-Min32Chars!!";
+    private const string JwtSecret = "EasyStock-Test-SuperSecretKey-Min32Chars!!";
 
     // Cache classe-scoped: a checagem de "seed demo disponível" é determinística
     // dentro do mesmo processo (mesma Program.cs, mesma config). Sem cache, cada
@@ -105,22 +105,22 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["Database:Provider"]                      = "PostgreSql",
-                        ["ConnectionStrings:DefaultConnection"]     = _connString,
+                        ["Database:Provider"] = "PostgreSql",
+                        ["ConnectionStrings:DefaultConnection"] = _connString,
                         // Production não roda migrations no startup por padrão; forçamos
                         // p/ o banco de teste vazio receber o schema completo (inclui RLS).
-                        ["RunMigrationsOnStartup"]                  = "true",
+                        ["RunMigrationsOnStartup"] = "true",
                         // Em Production a app exige Mobile:ApiKey com >= 24 chars.
-                        ["Mobile:ApiKey"]                           = "easystock-integration-test-mobile-key-0001",
-                        ["ConnectionStrings:Redis"]                 = "localhost:6379",
-                        ["Jwt:Issuer"]                             = JwtIssuer,
-                        ["Jwt:Audience"]                           = JwtAudience,
-                        ["Jwt:SecretKey"]                          = JwtSecret,
-                        ["Jwt:ExpirationMinutes"]                  = "60",
-                        ["Anthropic:Enabled"]                      = "false",
-                        ["FileStorage:Provider"]                   = "Local",
+                        ["Mobile:ApiKey"] = "easystock-integration-test-mobile-key-0001",
+                        ["ConnectionStrings:Redis"] = "localhost:6379",
+                        ["Jwt:Issuer"] = JwtIssuer,
+                        ["Jwt:Audience"] = JwtAudience,
+                        ["Jwt:SecretKey"] = JwtSecret,
+                        ["Jwt:ExpirationMinutes"] = "60",
+                        ["Anthropic:Enabled"] = "false",
+                        ["FileStorage:Provider"] = "Local",
                         // Desabilitar Redis real nos testes
-                        ["ConnectionStrings:Redis"]                = "localhost:6379"
+                        ["ConnectionStrings:Redis"] = "localhost:6379"
                     });
                 });
             });

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Sales;
+﻿namespace EasyStock.Domain.Sales;
 
 /// <summary>
 /// Conversão bidirecional <see cref="StatusPedido"/> ↔ string canônica
@@ -18,6 +18,8 @@ public static class StatusPedidoMapper
     public const string Pronto = "pronto";
     public const string Entregue = "entregue";
     public const string Cancelado = "cancelado";
+    public const string Rascunho = "rascunho";
+    public const string AguardandoPagamento = "aguardando_pagamento";
 
     /// <summary>Converte enum em string canônica lowercase.</summary>
     public static string Format(StatusPedido status) => status switch
@@ -27,6 +29,8 @@ public static class StatusPedidoMapper
         StatusPedido.Pronto => Pronto,
         StatusPedido.Entregue => Entregue,
         StatusPedido.Cancelado => Cancelado,
+        StatusPedido.Rascunho => Rascunho,
+        StatusPedido.AguardandoPagamento => AguardandoPagamento,
         _ => throw new ArgumentOutOfRangeException(
             nameof(status), status, "Status fora do enum StatusPedido."),
     };
@@ -47,6 +51,8 @@ public static class StatusPedidoMapper
             case Pronto: status = StatusPedido.Pronto; return true;
             case Entregue: status = StatusPedido.Entregue; return true;
             case Cancelado: status = StatusPedido.Cancelado; return true;
+            case Rascunho: status = StatusPedido.Rascunho; return true;
+            case AguardandoPagamento: status = StatusPedido.AguardandoPagamento; return true;
             default: return false;
         }
     }

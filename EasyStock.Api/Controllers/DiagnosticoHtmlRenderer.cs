@@ -1,4 +1,4 @@
-using EasyStock.Api.BackgroundServices;
+﻿using EasyStock.Api.BackgroundServices;
 
 namespace EasyStock.Api.Controllers;
 
@@ -151,7 +151,7 @@ internal static class DiagnosticoHtmlRenderer
             : (double?)null;
         string SloNum(double? v, string suffix, double? warnAbove = null, double? critAbove = null) =>
             v == null ? "<span style='color:#475569'>—</span>"
-            : $"<span style='color:{( critAbove.HasValue && v > critAbove ? "#ef4444" : warnAbove.HasValue && v > warnAbove ? "#f59e0b" : "#22c55e")}'>{v}{suffix}</span>";
+            : $"<span style='color:{(critAbove.HasValue && v > critAbove ? "#ef4444" : warnAbove.HasValue && v > warnAbove ? "#f59e0b" : "#22c55e")}'>{v}{suffix}</span>";
         var sloHtml = $"""
             <div class='card' style='margin-bottom:1rem'>
                 <h2 style='margin-bottom:.75rem'>&#128200; SLO — Periodo Analisado</h2>
@@ -445,7 +445,7 @@ internal static class DiagnosticoHtmlRenderer
             $"<div class='card'><h2>&#9201; Performance (48h)</h2><table>" +
             $"<tr><td>Total Requests</td><td><strong>{logs.Resumo.TotalRequests}</strong></td></tr>" +
             $"<tr><td>Tempo Medio Resposta</td><td><strong style='color:{(logs.Resumo.AvgResponseTimeMs < 200 ? "#22c55e" : logs.Resumo.AvgResponseTimeMs < 1000 ? "#f59e0b" : "#ef4444")}'>{logs.Resumo.AvgResponseTimeMs:F0}ms</strong></td></tr>" +
-            $"<tr><td>Taxa de Erro</td><td><strong style='color:{(logs.Resumo.TotalErrors == 0 ? "#22c55e" : "#ef4444")}'>{(logs.Resumo.TotalRequests > 0 ? (100.0 * logs.Resumo.TotalErrors / logs.Resumo.TotalRequests):0):F1}%</strong></td></tr>" +
+            $"<tr><td>Taxa de Erro</td><td><strong style='color:{(logs.Resumo.TotalErrors == 0 ? "#22c55e" : "#ef4444")}'>{(logs.Resumo.TotalRequests > 0 ? (100.0 * logs.Resumo.TotalErrors / logs.Resumo.TotalRequests) : 0):F1}%</strong></td></tr>" +
             $"<tr><td>Warnings</td><td><strong>{logs.Resumo.TotalWarnings}</strong></td></tr>" +
             "</table></div>"
             : "")
@@ -455,7 +455,8 @@ internal static class DiagnosticoHtmlRenderer
         {{(snapshots.Count > 0 ? $@"
         <div class='card'><h2>&#128308; Saude do Banco — Historico de Status</h2>
         <div style='display:flex;flex-wrap:wrap;gap:3px;margin-top:.5rem'>
-        {string.Join("", snapshots.TakeLast(60).Select(s => {
+        {string.Join("", snapshots.TakeLast(60).Select(s =>
+        {
             var color = s.DbStatus == "ok" ? "#16a34a" : "#dc2626";
             var title = $"{s.Timestamp:HH:mm} — DB:{s.DbStatus} {s.DbLatencyMs}ms Erros:{s.ErrorCount}";
             return $"<span title='{System.Net.WebUtility.HtmlEncode(title)}' style='display:inline-block;width:10px;height:20px;border-radius:2px;background:{color};cursor:help'></span>";

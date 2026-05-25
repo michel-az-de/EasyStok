@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Fiscal;
+﻿namespace EasyStock.Domain.Fiscal;
 
 /// <summary>
 /// Regime tributario da empresa emitente. Determina como CST/CSOSN sao

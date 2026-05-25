@@ -1,4 +1,4 @@
-using EasyStock.Domain.Defaults;
+﻿using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;

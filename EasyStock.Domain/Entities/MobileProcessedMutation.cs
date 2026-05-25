@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities;
+﻿namespace EasyStock.Domain.Entities;
 
 /// <summary>
 /// F10-C-3 — Idempotency server-side pra mutations mobile.

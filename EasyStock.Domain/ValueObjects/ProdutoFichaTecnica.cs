@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -43,18 +43,18 @@ namespace EasyStock.Domain.ValueObjects
                 var nutri = doc.Nutricional;
                 var ficha = new ProdutoFichaTecnica
                 {
-                    PorcaoG          = nutri?.PorcaoG,
-                    Kcal             = nutri?.Kcal,
-                    CarbsG           = nutri?.CarbsG,
-                    ProteinaG        = nutri?.ProteinaG,
-                    GorduraG         = nutri?.GorduraG,
+                    PorcaoG = nutri?.PorcaoG,
+                    Kcal = nutri?.Kcal,
+                    CarbsG = nutri?.CarbsG,
+                    ProteinaG = nutri?.ProteinaG,
+                    GorduraG = nutri?.GorduraG,
                     GorduraSaturadaG = nutri?.GorduraSaturadaG,
-                    FibrasG          = nutri?.FibrasG,
-                    SodioMg          = nutri?.SodioMg,
-                    ModoPreparo      = doc.ModoPreparo,
-                    Ingredientes     = doc.Ingredientes ?? [],
-                    Alergenos        = doc.Alergenos ?? [],
-                    AlergenosOutros  = doc.AlergenosOutros,
+                    FibrasG = nutri?.FibrasG,
+                    SodioMg = nutri?.SodioMg,
+                    ModoPreparo = doc.ModoPreparo,
+                    Ingredientes = doc.Ingredientes ?? [],
+                    Alergenos = doc.Alergenos ?? [],
+                    AlergenosOutros = doc.AlergenosOutros,
                 };
 
                 return (ficha, warnings);
@@ -70,18 +70,18 @@ namespace EasyStock.Domain.ValueObjects
         {
             Nutricional = new NutricionalRaw
             {
-                PorcaoG          = PorcaoG,
-                Kcal             = Kcal,
-                CarbsG           = CarbsG,
-                ProteinaG        = ProteinaG,
-                GorduraG         = GorduraG,
+                PorcaoG = PorcaoG,
+                Kcal = Kcal,
+                CarbsG = CarbsG,
+                ProteinaG = ProteinaG,
+                GorduraG = GorduraG,
                 GorduraSaturadaG = GorduraSaturadaG,
-                FibrasG          = FibrasG,
-                SodioMg          = SodioMg,
+                FibrasG = FibrasG,
+                SodioMg = SodioMg,
             },
-            ModoPreparo     = ModoPreparo,
-            Ingredientes    = new List<string>(Ingredientes),
-            Alergenos       = new List<string>(Alergenos),
+            ModoPreparo = ModoPreparo,
+            Ingredientes = new List<string>(Ingredientes),
+            Alergenos = new List<string>(Alergenos),
             AlergenosOutros = AlergenosOutros,
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = false });
 

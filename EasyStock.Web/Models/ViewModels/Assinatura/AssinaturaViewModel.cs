@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Assinatura;
+﻿namespace EasyStock.Web.Models.ViewModels.Assinatura;
 
 public class AssinaturaViewModel
 {

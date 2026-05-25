@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities;
+﻿namespace EasyStock.Domain.Entities;
 
 /// <summary>
 /// Auditoria E2E de mudancas em receita (composicao). Segue padrao <see cref="ProdutoAlteracao"/>:

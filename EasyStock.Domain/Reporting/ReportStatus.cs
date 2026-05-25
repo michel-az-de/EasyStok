@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Reporting;
+﻿namespace EasyStock.Domain.Reporting;
 
 /// <summary>Ciclo de vida de uma execução de relatório.</summary>
 public enum ReportStatus : short

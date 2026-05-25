@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

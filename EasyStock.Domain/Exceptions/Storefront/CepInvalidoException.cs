@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions.Storefront;
+﻿namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
 /// Lançada quando o CEP informado não pode ser normalizado para 8 dígitos

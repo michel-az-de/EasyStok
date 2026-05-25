@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Site;
+﻿namespace EasyStock.Web.Models.ViewModels.Site;
 
 /// <summary>
 /// ViewModel da landing principal. Vazio agora — preparado para futuramente

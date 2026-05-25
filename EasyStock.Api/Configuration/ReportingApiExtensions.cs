@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Reporting;
+﻿using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
 using EasyStock.Application.Reporting.Definitions.Admin.Tenants;
@@ -55,22 +55,22 @@ public static class ReportingApiExtensions
         services.AddSingleton<IReportDefinition, TenantsUsoDefinition>();
 
         // ── Handlers de relatório (Scoped — cada request tem seu EF context) ─────
-        services.AddScoped<IReportHandler<VendasPorPeriodoParams,    VendasPorPeriodoRow>,    VendasPorPeriodoHandler>();
+        services.AddScoped<IReportHandler<VendasPorPeriodoParams, VendasPorPeriodoRow>, VendasPorPeriodoHandler>();
         services.AddScoped<IReportHandler<EstoquePosicaoAtualParams, EstoquePosicaoAtualRow>, EstoquePosicaoAtualHandler>();
 
         // Handlers Tenant — Fase 2 (NFC-e fiscal)
-        services.AddScoped<IReportHandler<LivroSaidasParams,                  LivroSaidasRow>,                  LivroSaidasHandler>();
-        services.AddScoped<IReportHandler<TotalizadoresFiscaisParams,         TotalizadoresFiscaisRow>,         TotalizadoresFiscaisHandler>();
-        services.AddScoped<IReportHandler<CancelamentosInutilizacoesParams,   CancelamentosInutilizacoesRow>,   CancelamentosInutilizacoesHandler>();
-        services.AddScoped<IReportHandler<MapMensalParams,                    MapMensalRow>,                    MapMensalHandler>();
-        services.AddScoped<IReportHandler<XmlBulkDownloadParams,              XmlBulkDownloadRow>,              XmlBulkDownloadHandler>();
+        services.AddScoped<IReportHandler<LivroSaidasParams, LivroSaidasRow>, LivroSaidasHandler>();
+        services.AddScoped<IReportHandler<TotalizadoresFiscaisParams, TotalizadoresFiscaisRow>, TotalizadoresFiscaisHandler>();
+        services.AddScoped<IReportHandler<CancelamentosInutilizacoesParams, CancelamentosInutilizacoesRow>, CancelamentosInutilizacoesHandler>();
+        services.AddScoped<IReportHandler<MapMensalParams, MapMensalRow>, MapMensalHandler>();
+        services.AddScoped<IReportHandler<XmlBulkDownloadParams, XmlBulkDownloadRow>, XmlBulkDownloadHandler>();
 
         // Handlers Admin SaaS (Scoped — usam IgnoreQueryFilters() diretamente, ADR-R07 satisfeito por bypass intencional)
-        services.AddScoped<IReportHandler<MrrArrChurnParams,  MrrArrChurnRow>,  MrrArrChurnHandler>();
+        services.AddScoped<IReportHandler<MrrArrChurnParams, MrrArrChurnRow>, MrrArrChurnHandler>();
         services.AddScoped<IReportHandler<InadimplenciaParams, InadimplenciaRow>, InadimplenciaHandler>();
-        services.AddScoped<IReportHandler<SlaVioladoParams,   SlaVioladoRow>,   SlaVioladoHandler>();
-        services.AddScoped<IReportHandler<CsatMensalParams,   CsatMensalRow>,   CsatMensalHandler>();
-        services.AddScoped<IReportHandler<TenantsUsoParams,   TenantsUsoRow>,   TenantsUsoHandler>();
+        services.AddScoped<IReportHandler<SlaVioladoParams, SlaVioladoRow>, SlaVioladoHandler>();
+        services.AddScoped<IReportHandler<CsatMensalParams, CsatMensalRow>, CsatMensalHandler>();
+        services.AddScoped<IReportHandler<TenantsUsoParams, TenantsUsoRow>, TenantsUsoHandler>();
 
         // ── Contexto de execução (AsyncLocal + defesa multi-tenant) ──────────────
         services.AddScoped<IReportExecutionScope, ReportExecutionContext>();

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Integration;
+﻿namespace EasyStock.Domain.Integration;
 
 /// <summary>
 /// Ambiente de execução da integração. Sandbox e Production têm credenciais

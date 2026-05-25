@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Validators;
 using System.Text.Json;
@@ -34,7 +34,7 @@ public class AtualizarTemplateUseCase(
         if (!validationResult.IsValid)
             throw new UseCaseValidationException(string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)));
 
-        template.Nome       = cmd.Nome.Trim();
+        template.Nome = cmd.Nome.Trim();
         template.LayoutJson = cmd.LayoutJson;
         template.AlteradoEm = DateTime.UtcNow;
 

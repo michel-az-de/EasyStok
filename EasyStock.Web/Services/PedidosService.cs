@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -20,7 +20,7 @@ public class PedidosService(ApiClient api, SessionService session)
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
         if (clienteId.HasValue && clienteId.Value != Guid.Empty) qs += $"&clienteId={clienteId}";
         if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";
-        if (ate.HasValue)   qs += $"&ate={Uri.EscapeDataString(ate.Value.ToString("o"))}";
+        if (ate.HasValue) qs += $"&ate={Uri.EscapeDataString(ate.Value.ToString("o"))}";
         if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
         return api.GetAsync<PagedResult<Pedido>>(qs);
     }
@@ -33,7 +33,7 @@ public class PedidosService(ApiClient api, SessionService session)
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
         if (clienteId.HasValue && clienteId.Value != Guid.Empty) qs += $"&clienteId={clienteId}";
         if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";
-        if (ate.HasValue)   qs += $"&ate={Uri.EscapeDataString(ate.Value.ToString("o"))}";
+        if (ate.HasValue) qs += $"&ate={Uri.EscapeDataString(ate.Value.ToString("o"))}";
         if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
         return api.GetAsync<List<Pedido>>(qs);
     }
@@ -67,7 +67,10 @@ public class PedidosService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
         return api.PatchAsync<Pedido>($"pedidos/{id}/agendamento", new
         {
-            empresaId, pedidoId = Guid.Parse(id), agendadoParaEm, origem = "web"
+            empresaId,
+            pedidoId = Guid.Parse(id),
+            agendadoParaEm,
+            origem = "web"
         });
     }
 
@@ -77,7 +80,10 @@ public class PedidosService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
         return api.PatchAsync<Pedido>($"pedidos/{id}/status", new
         {
-            id = Guid.Parse(id), empresaId, status, origem = "web"
+            id = Guid.Parse(id),
+            empresaId,
+            status,
+            origem = "web"
         });
     }
 
@@ -87,7 +93,10 @@ public class PedidosService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
         return api.PostAsync<Pedido>($"pedidos/{id}/cancelar", new
         {
-            id = Guid.Parse(id), empresaId, motivo, origem = "web"
+            id = Guid.Parse(id),
+            empresaId,
+            motivo,
+            origem = "web"
         });
     }
 
@@ -99,8 +108,15 @@ public class PedidosService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
         return api.PostAsync<Pedido>($"pedidos/{id}/itens", new
         {
-            empresaId, pedidoId = Guid.Parse(id),
-            nome, quantidade, precoUnitario, produtoId, emoji, unidade, observacao,
+            empresaId,
+            pedidoId = Guid.Parse(id),
+            nome,
+            quantidade,
+            precoUnitario,
+            produtoId,
+            emoji,
+            unidade,
+            observacao,
             origem = "web"
         });
     }
@@ -115,8 +131,13 @@ public class PedidosService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
         return api.PostAsync<Pedido>($"pedidos/{id}/pagamentos", new
         {
-            empresaId, pedidoId = Guid.Parse(id),
-            metodo, valor, referencia, observacao, origem = "web"
+            empresaId,
+            pedidoId = Guid.Parse(id),
+            metodo,
+            valor,
+            referencia,
+            observacao,
+            origem = "web"
         });
     }
 

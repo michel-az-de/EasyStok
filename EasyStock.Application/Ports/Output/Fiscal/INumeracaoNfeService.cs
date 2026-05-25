@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Fiscal;
+﻿namespace EasyStock.Application.Ports.Output.Fiscal;
 
 /// <summary>
 /// Servico de numeracao de NFC-e. Reserva proximo numero sob lock pessimista

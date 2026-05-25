@@ -1,4 +1,4 @@
-using EasyStock.Api.Configuration;
+﻿using EasyStock.Api.Configuration;
 using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Analytics.AlertasDias;
 using EasyStock.Application.UseCases.Analytics.Alertas;

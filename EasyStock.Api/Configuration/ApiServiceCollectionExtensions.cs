@@ -1,4 +1,4 @@
-using EasyStock.Api.Authorization;
+﻿using EasyStock.Api.Authorization;
 using EasyStock.Api.Http;
 using EasyStock.Api.Observability;
 using EasyStock.Api.Services;
@@ -32,7 +32,7 @@ public static class ApiServiceCollectionExtensions
         {
             // ── Two language documents ────────────────────────────────────────
             c.SwaggerDoc("v1-ptbr", SwaggerConfiguration.InfoPortuguese);
-            c.SwaggerDoc("v1-en",   SwaggerConfiguration.InfoEnglish);
+            c.SwaggerDoc("v1-en", SwaggerConfiguration.InfoEnglish);
 
             // ── Security ──────────────────────────────────────────────────────
             c.AddSecurityDefinition("Bearer", SwaggerConfiguration.BearerScheme);
@@ -107,15 +107,15 @@ public static class ApiServiceCollectionExtensions
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer           = true,
-                    ValidateAudience         = true,
-                    ValidateLifetime         = true,
-                    ValidateIssuerSigningKey  = true,
-                    ValidIssuer              = jwtIssuer,
-                    ValidAudience            = jwtAudience,
-                    IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                    NameClaimType            = "sub",
-                    RoleClaimType            = "nivel"
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtIssuer,
+                    ValidAudience = jwtAudience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                    NameClaimType = "sub",
+                    RoleClaimType = "nivel"
                 };
             })
             .AddInternalCronJobScheme(configuration);
@@ -123,8 +123,8 @@ public static class ApiServiceCollectionExtensions
         services.AddAuthorization(opts =>
         {
             opts.AddPolicy("SuperAdmin", p => p.RequireClaim("nivel", "SuperAdmin"));
-            opts.AddPolicy("Admin",    p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
-            opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
+            opts.AddPolicy("Admin", p => p.RequireClaim("nivel", "SuperAdmin", "Admin"));
+            opts.AddPolicy("Gerente", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));
             opts.AddInternalCronJobPolicy();
         });

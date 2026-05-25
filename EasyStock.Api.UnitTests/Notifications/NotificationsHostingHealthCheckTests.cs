@@ -1,4 +1,4 @@
-using EasyStock.Application.Services.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
 using EasyStock.Infra.Notifications.Hosting;
 using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

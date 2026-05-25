@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -28,19 +28,19 @@ public class LogEnvioNotificacao
         int? statusHttp = null,
         string? respostaProviderJson = null,
         bool bypassConsentimento = false) => new()
-    {
-        Id = Guid.NewGuid(),
-        OutboxMensagemId = outboxMensagemId,
-        Tentativa = tentativa,
-        Canal = canal,
-        Provider = provider,
-        StatusHttp = statusHttp,
-        RespostaProviderJson = respostaProviderJson,
-        DuracaoMs = duracaoMs,
-        OcorridoEm = DateTime.UtcNow,
-        Sucesso = true,
-        BypassConsentimento = bypassConsentimento
-    };
+        {
+            Id = Guid.NewGuid(),
+            OutboxMensagemId = outboxMensagemId,
+            Tentativa = tentativa,
+            Canal = canal,
+            Provider = provider,
+            StatusHttp = statusHttp,
+            RespostaProviderJson = respostaProviderJson,
+            DuracaoMs = duracaoMs,
+            OcorridoEm = DateTime.UtcNow,
+            Sucesso = true,
+            BypassConsentimento = bypassConsentimento
+        };
 
     public static LogEnvioNotificacao RegistrarFalha(
         Guid outboxMensagemId,
@@ -51,17 +51,17 @@ public class LogEnvioNotificacao
         string erroDetalhado,
         int? statusHttp = null,
         string? respostaProviderJson = null) => new()
-    {
-        Id = Guid.NewGuid(),
-        OutboxMensagemId = outboxMensagemId,
-        Tentativa = tentativa,
-        Canal = canal,
-        Provider = provider,
-        StatusHttp = statusHttp,
-        RespostaProviderJson = respostaProviderJson,
-        DuracaoMs = duracaoMs,
-        OcorridoEm = DateTime.UtcNow,
-        Sucesso = false,
-        ErroDetalhado = erroDetalhado
-    };
+        {
+            Id = Guid.NewGuid(),
+            OutboxMensagemId = outboxMensagemId,
+            Tentativa = tentativa,
+            Canal = canal,
+            Provider = provider,
+            StatusHttp = statusHttp,
+            RespostaProviderJson = respostaProviderJson,
+            DuracaoMs = duracaoMs,
+            OcorridoEm = DateTime.UtcNow,
+            Sucesso = false,
+            ErroDetalhado = erroDetalhado
+        };
 }

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Storage;
+﻿namespace EasyStock.Application.Ports.Output.Storage;
 
 /// <summary>
 /// Otimiza imagens para web: redimensiona e comprime mantendo qualidade visual.

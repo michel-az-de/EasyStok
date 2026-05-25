@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;

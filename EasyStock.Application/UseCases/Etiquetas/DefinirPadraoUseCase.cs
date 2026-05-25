@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
@@ -38,10 +38,10 @@ public class DefinirPadraoUseCase(
         var agora = DateTime.UtcNow;
         var entry = new EtiquetaEmpresaDefault
         {
-            EmpresaId      = cmd.EmpresaId,
+            EmpresaId = cmd.EmpresaId,
             TemplateOrigem = cmd.TemplateOrigem,
-            TemplateId     = cmd.TemplateId,
-            AlteradoEm     = agora,
+            TemplateId = cmd.TemplateId,
+            AlteradoEm = agora,
         };
 
         await repo.UpsertDefaultAsync(entry);

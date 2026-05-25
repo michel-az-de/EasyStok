@@ -1,4 +1,4 @@
-using EasyStock.Admin.Services;
+﻿using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -12,7 +12,7 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
     protected AdminSessionService Session => session;
 
     protected void SetSucesso(string mensagem) => TempData["Sucesso"] = mensagem;
-    protected void SetErro(string mensagem)    => TempData["Erro"] = mensagem;
+    protected void SetErro(string mensagem) => TempData["Erro"] = mensagem;
 
     /// <summary>
     /// Exibe erro amigável: ApiException.Message já é seguro; outros erros

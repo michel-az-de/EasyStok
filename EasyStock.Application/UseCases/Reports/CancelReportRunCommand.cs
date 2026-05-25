@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.UseCases.Common;
 
@@ -22,7 +22,7 @@ public sealed class CancelReportRunUseCase
 
     public async Task<bool> ExecuteAsync(CancelReportRunCommand command)
     {
-        var ct  = CancellationToken.None;
+        var ct = CancellationToken.None;
         var run = await _repo.GetByIdAsync(command.RunId, ct);
         if (run is null) return false;
 

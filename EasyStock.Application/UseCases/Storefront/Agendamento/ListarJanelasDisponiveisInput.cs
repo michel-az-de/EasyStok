@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Storefront.Agendamento;
+﻿namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 
 /// <summary>
 /// Input para <see cref="ListarJanelasDisponiveisUseCase"/>.

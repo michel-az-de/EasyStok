@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Site;
+﻿using EasyStock.Web.Models.ViewModels.Site;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

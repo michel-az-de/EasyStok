@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Admin.Tickets;
+﻿namespace EasyStock.Application.Reporting.Definitions.Admin.Tickets;
 
 /// <summary>Parâmetros do relatório de CSAT mensal — Admin SaaS.</summary>
 public sealed record CsatMensalParams(

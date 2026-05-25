@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Caching;
+﻿using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Infra.Postgre.Configuration;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;

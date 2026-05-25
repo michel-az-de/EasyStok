@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Pagamentos;
+﻿namespace EasyStock.Application.Ports.Output.Pagamentos;
 
 /// <summary>
 /// Contexto para o calculo de rota — input do

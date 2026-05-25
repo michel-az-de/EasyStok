@@ -1,4 +1,4 @@
-using EasyStock.Application.DependencyInjection;
+﻿using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;

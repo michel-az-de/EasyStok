@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Configuration;
+﻿namespace EasyStock.Api.Configuration;
 
 /// <summary>
 /// Chaves de configuracao usadas em Program.cs e demais servicos da API.
@@ -7,30 +7,30 @@ namespace EasyStock.Api.Configuration;
 public static class ConfigurationKeys
 {
     // ── Database ─────────────────────────────────────────────────────────────
-    public const string DatabaseProvider        = "Database:Provider";
-    public const string DatabaseMongoDatabase   = "Database:MongoDatabase";
+    public const string DatabaseProvider = "Database:Provider";
+    public const string DatabaseMongoDatabase = "Database:MongoDatabase";
 
     // ── Connection Strings ───────────────────────────────────────────────────
-    public const string ConnectionDefault       = "DefaultConnection";
-    public const string ConnectionMongo         = "MongoConnection";
-    public const string ConnectionSqlite        = "SqliteConnection";
-    public const string ConnectionRedis         = "Redis";
+    public const string ConnectionDefault = "DefaultConnection";
+    public const string ConnectionMongo = "MongoConnection";
+    public const string ConnectionSqlite = "SqliteConnection";
+    public const string ConnectionRedis = "Redis";
 
     // ── JWT ──────────────────────────────────────────────────────────────────
-    public const string JwtSecretKey            = "Jwt:SecretKey";
-    public const string JwtIssuer               = "Jwt:Issuer";
-    public const string JwtAudience             = "Jwt:Audience";
+    public const string JwtSecretKey = "Jwt:SecretKey";
+    public const string JwtIssuer = "Jwt:Issuer";
+    public const string JwtAudience = "Jwt:Audience";
 
     // ── CORS ─────────────────────────────────────────────────────────────────
-    public const string CorsAllowedOrigins      = "Cors:AllowedOrigins";
+    public const string CorsAllowedOrigins = "Cors:AllowedOrigins";
 
     // ── OpenTelemetry ────────────────────────────────────────────────────────
-    public const string OtlpEndpoint            = "OpenTelemetry:OtlpEndpoint";
+    public const string OtlpEndpoint = "OpenTelemetry:OtlpEndpoint";
 
     // ── App configuration sections ───────────────────────────────────────────
-    public const string SectionEasyStock        = "EasyStock";
-    public const string SectionFileStorage      = "FileStorage";
+    public const string SectionEasyStock = "EasyStock";
+    public const string SectionFileStorage = "FileStorage";
 
     // ── Logging ──────────────────────────────────────────────────────────────
-    public const string LogDirectory            = "LogSettings:LogDirectory";
+    public const string LogDirectory = "LogSettings:LogDirectory";
 }

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -34,8 +34,8 @@ public class AdicionarClienteDocumentoUseCase(
         var valorNormalizado = tipoNorm switch
         {
             "cnpj" => Cnpj.TryFrom(cmd.Valor)?.Value ?? cmd.Valor.Trim(),
-            "cpf"  => new string(cmd.Valor.Where(char.IsDigit).ToArray()),
-            _      => cmd.Valor.Trim()
+            "cpf" => new string(cmd.Valor.Where(char.IsDigit).ToArray()),
+            _ => cmd.Valor.Trim()
         };
 
         var agora = DateTime.UtcNow;

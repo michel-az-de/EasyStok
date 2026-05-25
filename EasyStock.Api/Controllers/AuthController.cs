@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
@@ -230,7 +230,7 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         // Simula o que o interceptor faria — usado nos testes de policy pra
         // isolar a camada do banco do código C# do interceptor. Também garante
         // que o bypass anterior seja explicitamente desligado.
-        await ctx.Database.ExecuteSqlRawAsync(
+        await ctx.Database.ExecuteSqlAsync(
             $"SET app.empresa_id = '{tenantId}'; SET app.bypass_rls = 'false';");
     }
 

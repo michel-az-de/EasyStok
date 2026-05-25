@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Faq;
+﻿namespace EasyStock.Web.Models.ViewModels.Faq;
 
 public sealed record FaqCategoriaDto(
     Guid Id,

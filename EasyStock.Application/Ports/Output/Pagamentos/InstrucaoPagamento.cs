@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Pagamentos;
+﻿namespace EasyStock.Application.Ports.Output.Pagamentos;
 
 /// <summary>
 /// Resultado da criacao de uma cobranca via gateway. Contem os dados que o

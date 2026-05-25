@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Services.Notifications;
+﻿namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
 /// Implementação fallback — apenas aguarda um <see cref="PeriodicTimer"/>.

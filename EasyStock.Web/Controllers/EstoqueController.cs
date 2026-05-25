@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Estoque;

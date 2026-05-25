@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Reporting;
+﻿namespace EasyStock.Domain.Reporting;
 
 /// <summary>
 /// Identifica se o relatório é gerado no contexto de um Tenant

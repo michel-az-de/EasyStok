@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Pagamentos;
+﻿namespace EasyStock.Application.Ports.Output.Pagamentos;
 
 /// <summary>
 /// Processa o payload de um webhook ja autenticado de um gateway de pagamento.

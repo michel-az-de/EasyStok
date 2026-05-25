@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Tickets;
@@ -24,7 +24,7 @@ public sealed class CsatMensalHandler(EasyStockDbContext db)
     {
         var fileNameBase = $"csat-mensal_{parametros.De:yyyy-MM-dd}_a_{parametros.Ate:yyyy-MM-dd}";
         return new ReportSchema(
-            title:        "CSAT mensal",
+            title: "CSAT mensal",
             fileNameBase: fileNameBase,
             columns:
             [
@@ -54,7 +54,7 @@ public sealed class CsatMensalHandler(EasyStockDbContext db)
         CsatMensalParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
         var query = db.AdminTickets
@@ -83,15 +83,15 @@ public sealed class CsatMensalHandler(EasyStockDbContext db)
         await foreach (var t in query.WithCancellation(ct))
         {
             yield return new CsatMensalRow(
-                TicketId:         t.Id,
-                EmpresaNome:      t.EmpresaNome,
-                Categoria:        t.Categoria.ToString(),
-                Prioridade:       t.Prioridade.ToString(),
-                CriadoEm:         t.CriadoEm,
-                ResolvidoEm:      t.ResolvidoEm,
-                NotaCsat:         t.NotaCsat,
-                AvaliadoEm:       t.AvaliadoEm,
-                ConviteEnviado:   t.ConviteCsatEnviadoEm.HasValue,
+                TicketId: t.Id,
+                EmpresaNome: t.EmpresaNome,
+                Categoria: t.Categoria.ToString(),
+                Prioridade: t.Prioridade.ToString(),
+                CriadoEm: t.CriadoEm,
+                ResolvidoEm: t.ResolvidoEm,
+                NotaCsat: t.NotaCsat,
+                AvaliadoEm: t.AvaliadoEm,
+                ConviteEnviado: t.ConviteCsatEnviadoEm.HasValue,
                 ConviteEnviadoEm: t.ConviteCsatEnviadoEm);
         }
     }

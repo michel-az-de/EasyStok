@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -45,8 +45,15 @@ public class LotesService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Lote>());
         return api.PostAsync<Lote>($"lotes/{id}/itens", new
         {
-            empresaId, loteId = Guid.Parse(id),
-            nome, quantidade, produtoId, emoji, unidade, pesoG, validadeDias
+            empresaId,
+            loteId = Guid.Parse(id),
+            nome,
+            quantidade,
+            produtoId,
+            emoji,
+            unidade,
+            pesoG,
+            validadeDias
         });
     }
 

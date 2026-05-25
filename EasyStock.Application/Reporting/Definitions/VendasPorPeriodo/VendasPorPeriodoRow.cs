@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
+﻿namespace EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
 
 /// <summary>
 /// Linha de saída do relatório "Vendas por período".
@@ -10,12 +10,12 @@ namespace EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
 /// </summary>
 public sealed record VendasPorPeriodoRow(
     DateTime DataVenda,
-    string?  NumeroNotaFiscal,
-    string   IdCurto,
-    string?  LojaNome,
-    string?  VendedorNome,
-    string?  FormaPagamentoPrincipal,
-    int      QtdItens,
-    decimal  Subtotal,
-    decimal  ValorDesconto,
-    decimal  ValorTotal);
+    string? NumeroNotaFiscal,
+    string IdCurto,
+    string? LojaNome,
+    string? VendedorNome,
+    string? FormaPagamentoPrincipal,
+    int QtdItens,
+    decimal Subtotal,
+    decimal ValorDesconto,
+    decimal ValorTotal);

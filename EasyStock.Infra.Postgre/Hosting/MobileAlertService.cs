@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Mobile;
+﻿using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

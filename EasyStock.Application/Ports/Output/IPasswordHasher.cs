@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output;
+﻿namespace EasyStock.Application.Ports.Output;
 
 /// <summary>
 /// Porta para hashing/verificacao de senhas. Implementacao concreta vive em

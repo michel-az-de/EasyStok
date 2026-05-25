@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;

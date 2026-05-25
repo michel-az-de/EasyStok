@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Lotes;
+﻿using EasyStock.Web.Models.ViewModels.Lotes;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -186,8 +186,8 @@ public class LotesController(
     [HttpGet("/lotes/{id}/imprimir")]
     public async Task<IActionResult> Imprimir(string id)
     {
-        ViewBag.Title     = "Imprimir etiquetas";
-        ViewBag.LoteId    = id;
+        ViewBag.Title = "Imprimir etiquetas";
+        ViewBag.LoteId = id;
         ViewBag.EmpresaId = Session.GetEmpresaId();
         return View();
     }

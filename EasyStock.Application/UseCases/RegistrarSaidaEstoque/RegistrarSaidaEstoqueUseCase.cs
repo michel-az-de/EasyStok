@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Events;
@@ -103,181 +103,181 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             return await unitOfWork.ExecuteInTransactionAsync(async ct =>
             {
 
-            var agora = DateTime.UtcNow;
+                var agora = DateTime.UtcNow;
 
-            var auditoria = currentUser is null ? null : new AuditoriaContexto(
-                UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
-                Ip: currentUser.Ip,
-                UserAgent: currentUser.UserAgent,
-                DispositivoId: currentUser.DispositivoId);
+                var auditoria = currentUser is null ? null : new AuditoriaContexto(
+                    UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+                    Ip: currentUser.Ip,
+                    UserAgent: currentUser.UserAgent,
+                    DispositivoId: currentUser.DispositivoId);
 
-            var venda = Venda.Criar(
-                Guid.NewGuid(),
-                command.EmpresaId,
-                command.Canal,
-                command.Natureza,
-                command.DataVenda,
-                command.DataEnvio,
-                command.NotaFiscal,
-                command.Observacoes,
-                agora,
-                vendedorId: command.VendedorId,
-                formaPagamentoPrincipal: command.FormaPagamentoPrincipal);
+                var venda = Venda.Criar(
+                    Guid.NewGuid(),
+                    command.EmpresaId,
+                    command.Canal,
+                    command.Natureza,
+                    command.DataVenda,
+                    command.DataEnvio,
+                    command.NotaFiscal,
+                    command.Observacoes,
+                    agora,
+                    vendedorId: command.VendedorId,
+                    formaPagamentoPrincipal: command.FormaPagamentoPrincipal);
 
-            var itensVenda = new List<ItemVenda>();
-            var movimentacoes = new List<MovimentacaoEstoque>();
-            var itensResult = new List<RegistrarSaidaEstoqueItemResult>();
+                var itensVenda = new List<ItemVenda>();
+                var movimentacoes = new List<MovimentacaoEstoque>();
+                var itensResult = new List<RegistrarSaidaEstoqueItemResult>();
 
-            foreach (var comandoItem in command.Itens)
-            {
-                if (comandoItem.Quantidade <= 0) throw new QuantidadeInvalidaException(comandoItem.Quantidade);
-
-                // Aceita 0 apenas em saídas não-comerciais (Perda, Ajuste, Doacao);
-                // venda real exige preço > 0 para auditoria contábil.
-                var ehVendaComercial = command.Natureza == NaturezaMovimentacaoEstoque.Venda;
-                if (ehVendaComercial && comandoItem.ValorVendaUnitario <= 0)
-                    throw new UseCaseValidationException(
-                        "Saída do tipo Venda requer ValorVendaUnitario maior que zero.");
-
-                // Sanidade: valor absurdo (provavelmente erro de digitação) — limite
-                // configurável via appsettings, default 100 milhões.
-                const decimal valorMaximoSanidade = 100_000_000m;
-                if (comandoItem.ValorVendaUnitario > valorMaximoSanidade)
-                    throw new UseCaseValidationException(
-                        $"ValorVendaUnitario excede o teto de sanidade ({valorMaximoSanidade:C}).");
-
-                var quantidadeSolicitada = Quantidade.From(comandoItem.Quantidade);
-                var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
-                var lotes = comandoItem.ItemEstoqueId.HasValue
-                    ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
-                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo)).ToArray();
-
-                if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
-                    throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");
-
-                // Só faz sentido validar "exatamente 1 lote" quando o caller passou
-                // ItemEstoqueId (saída direta de um lote específico). No caminho
-                // FIFO/FEFO por ProdutoId, esperamos N lotes — SingleOrDefault aqui
-                // estouraria com >1 elemento e quebrava a saída automática por lotes.
-                ItemEstoque? item = null;
-                if (comandoItem.ItemEstoqueId.HasValue)
+                foreach (var comandoItem in command.Itens)
                 {
-                    if (lotes.Length != 1)
-                        throw new UseCaseValidationException($"Esperado exatamente 1 item, mas encontrado {lotes.Length}.");
-                    item = lotes[0];
-                }
+                    if (comandoItem.Quantidade <= 0) throw new QuantidadeInvalidaException(comandoItem.Quantidade);
 
-                var produtoId = comandoItem.ItemEstoqueId.HasValue
-                    ? item!.ProdutoId
-                    : comandoItem.ProdutoId;
+                    // Aceita 0 apenas em saídas não-comerciais (Perda, Ajuste, Doacao);
+                    // venda real exige preço > 0 para auditoria contábil.
+                    var ehVendaComercial = command.Natureza == NaturezaMovimentacaoEstoque.Venda;
+                    if (ehVendaComercial && comandoItem.ValorVendaUnitario <= 0)
+                        throw new UseCaseValidationException(
+                            "Saída do tipo Venda requer ValorVendaUnitario maior que zero.");
 
-                if (produtoId == Guid.Empty)
-                    throw new UseCaseValidationException("ProdutoId é obrigatório para registrar a saída.");
+                    // Sanidade: valor absurdo (provavelmente erro de digitação) — limite
+                    // configurável via appsettings, default 100 milhões.
+                    const decimal valorMaximoSanidade = 100_000_000m;
+                    if (comandoItem.ValorVendaUnitario > valorMaximoSanidade)
+                        throw new UseCaseValidationException(
+                            $"ValorVendaUnitario excede o teto de sanidade ({valorMaximoSanidade:C}).");
 
-                var produto = await produtoRepository.GetByIdAsync(produtoId)
-                    ?? throw new UseCaseValidationException("Produto do item de estoque nao encontrado.");
+                    var quantidadeSolicitada = Quantidade.From(comandoItem.Quantidade);
+                    var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
+                    var lotes = comandoItem.ItemEstoqueId.HasValue
+                        ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
+                        : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo)).ToArray();
 
-                if (produto.EmpresaId != command.EmpresaId)
-                    throw new UseCaseValidationException("O produto do item de estoque nao pertence a empresa.");
+                    if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
+                        throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");
 
-                if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(produto))
-                    throw new ProdutoInativoException(produto.Id);
-
-                var disponivel = lotes.Sum(i => i.QuantidadeAtual.Value);
-                if (disponivel < quantidadeSolicitada.Value)
-                    throw new EstoqueInsuficienteException(produto.Id, quantidadeSolicitada.Value, disponivel);
-
-                var restante = quantidadeSolicitada.Value;
-                decimal totalSaidoNoComando = 0m;
-                var lotesTocados = new List<ItemEstoque>();
-
-                foreach (var lote in lotes)
-                {
-                    if (restante <= 0)
-                        break;
-
-                    lote.GarantirDisponivelParaSaida(command.DataSaida);
-                    var quantidadeConsumida = Math.Min(lote.QuantidadeAtual.Value, restante);
-                    if (quantidadeConsumida <= 0)
-                        continue;
-
-                    var quantidadeDoLote = Quantidade.From(quantidadeConsumida);
-                    lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora);
-
-                    var itemVenda = new ItemVenda
+                    // Só faz sentido validar "exatamente 1 lote" quando o caller passou
+                    // ItemEstoqueId (saída direta de um lote específico). No caminho
+                    // FIFO/FEFO por ProdutoId, esperamos N lotes — SingleOrDefault aqui
+                    // estouraria com >1 elemento e quebrava a saída automática por lotes.
+                    ItemEstoque? item = null;
+                    if (comandoItem.ItemEstoqueId.HasValue)
                     {
-                        Id = Guid.NewGuid(),
-                        VendaId = venda.Id,
-                        ItemEstoqueId = lote.Id,
-                        ProdutoId = lote.ProdutoId,
-                        ProdutoVariacaoId = lote.ProdutoVariacaoId,
-                        DescricaoSnapshot = comandoItem.Descricao?.Trim() ?? lote.DescricaoAnuncio ?? produto.DescricaoBase,
-                        VariacaoSnapshot = lote.VariacaoDescricao,
-                        Quantidade = quantidadeDoLote,
-                        PrecoUnitario = valorUnitario,
-                        PrecoTotal = Dinheiro.FromDecimal(valorUnitario.Valor * quantidadeConsumida),
-                        CriadoEm = agora,
-                        Produto = produto
-                    };
+                        if (lotes.Length != 1)
+                            throw new UseCaseValidationException($"Esperado exatamente 1 item, mas encontrado {lotes.Length}.");
+                        item = lotes[0];
+                    }
 
-                    var movimentacao = MovimentacaoEstoque.CriarSaida(
-                        Guid.NewGuid(),
-                        lote.EmpresaId,
-                        lote,
-                        venda.Id,
-                        command.Natureza,
-                        quantidadeDoLote,
-                        valorUnitario,
-                        command.DataSaida,
-                        itemVenda.DescricaoSnapshot,
-                        command.NotaFiscal,
-                        agora,
-                        auditoria);
+                    var produtoId = comandoItem.ItemEstoqueId.HasValue
+                        ? item!.ProdutoId
+                        : comandoItem.ProdutoId;
 
-                    itensVenda.Add(itemVenda);
-                    movimentacoes.Add(movimentacao);
-                    itensResult.Add(new RegistrarSaidaEstoqueItemResult(
-                        lote.Id,
-                        lote.ProdutoId,
-                        itemVenda.Id,
-                        movimentacao.Id,
-                        quantidadeConsumida,
-                        lote.QuantidadeAtual.Value,
-                        command.Observacoes));
+                    if (produtoId == Guid.Empty)
+                        throw new UseCaseValidationException("ProdutoId é obrigatório para registrar a saída.");
 
-                    venda.AdicionarItem(itemVenda);
-                    lotesTocados.Add(lote);
+                    var produto = await produtoRepository.GetByIdAsync(produtoId)
+                        ?? throw new UseCaseValidationException("Produto do item de estoque nao encontrado.");
 
-                    restante -= quantidadeConsumida;
-                    totalSaidoNoComando += quantidadeConsumida;
+                    if (produto.EmpresaId != command.EmpresaId)
+                        throw new UseCaseValidationException("O produto do item de estoque nao pertence a empresa.");
+
+                    if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(produto))
+                        throw new ProdutoInativoException(produto.Id);
+
+                    var disponivel = lotes.Sum(i => i.QuantidadeAtual.Value);
+                    if (disponivel < quantidadeSolicitada.Value)
+                        throw new EstoqueInsuficienteException(produto.Id, quantidadeSolicitada.Value, disponivel);
+
+                    var restante = quantidadeSolicitada.Value;
+                    decimal totalSaidoNoComando = 0m;
+                    var lotesTocados = new List<ItemEstoque>();
+
+                    foreach (var lote in lotes)
+                    {
+                        if (restante <= 0)
+                            break;
+
+                        lote.GarantirDisponivelParaSaida(command.DataSaida);
+                        var quantidadeConsumida = Math.Min(lote.QuantidadeAtual.Value, restante);
+                        if (quantidadeConsumida <= 0)
+                            continue;
+
+                        var quantidadeDoLote = Quantidade.From(quantidadeConsumida);
+                        lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora);
+
+                        var itemVenda = new ItemVenda
+                        {
+                            Id = Guid.NewGuid(),
+                            VendaId = venda.Id,
+                            ItemEstoqueId = lote.Id,
+                            ProdutoId = lote.ProdutoId,
+                            ProdutoVariacaoId = lote.ProdutoVariacaoId,
+                            DescricaoSnapshot = comandoItem.Descricao?.Trim() ?? lote.DescricaoAnuncio ?? produto.DescricaoBase,
+                            VariacaoSnapshot = lote.VariacaoDescricao,
+                            Quantidade = quantidadeDoLote,
+                            PrecoUnitario = valorUnitario,
+                            PrecoTotal = Dinheiro.FromDecimal(valorUnitario.Valor * quantidadeConsumida),
+                            CriadoEm = agora,
+                            Produto = produto
+                        };
+
+                        var movimentacao = MovimentacaoEstoque.CriarSaida(
+                            Guid.NewGuid(),
+                            lote.EmpresaId,
+                            lote,
+                            venda.Id,
+                            command.Natureza,
+                            quantidadeDoLote,
+                            valorUnitario,
+                            command.DataSaida,
+                            itemVenda.DescricaoSnapshot,
+                            command.NotaFiscal,
+                            agora,
+                            auditoria);
+
+                        itensVenda.Add(itemVenda);
+                        movimentacoes.Add(movimentacao);
+                        itensResult.Add(new RegistrarSaidaEstoqueItemResult(
+                            lote.Id,
+                            lote.ProdutoId,
+                            itemVenda.Id,
+                            movimentacao.Id,
+                            quantidadeConsumida,
+                            lote.QuantidadeAtual.Value,
+                            command.Observacoes));
+
+                        venda.AdicionarItem(itemVenda);
+                        lotesTocados.Add(lote);
+
+                        restante -= quantidadeConsumida;
+                        totalSaidoNoComando += quantidadeConsumida;
+                    }
+
+                    await AtualizarIndicadoresFifoAsync(command.EmpresaId, produto.Id, lotesTocados, totalSaidoNoComando, command.DataSaida);
                 }
 
-                await AtualizarIndicadoresFifoAsync(command.EmpresaId, produto.Id, lotesTocados, totalSaidoNoComando, command.DataSaida);
-            }
+                if (!new VendaPossuiItensValidosSpecification().EhSatisfeitaPor(venda))
+                    throw new VendaSemItensException(venda.Id);
 
-            if (!new VendaPossuiItensValidosSpecification().EhSatisfeitaPor(venda))
-                throw new VendaSemItensException(venda.Id);
+                await vendaRepository.InsertAsync(venda);
+                await itemVendaRepository.InsertRangeAsync(itensVenda);
+                await movimentacaoEstoqueRepository.InsertRangeAsync(movimentacoes);
+                await unitOfWork.CommitAsync();
 
-            await vendaRepository.InsertAsync(venda);
-            await itemVendaRepository.InsertRangeAsync(itensVenda);
-            await movimentacaoEstoqueRepository.InsertRangeAsync(movimentacoes);
-            await unitOfWork.CommitAsync();
+                logger.LogWarning("AUDIT: Saida de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",
+                    venda.Id, command.EmpresaId, venda.ValorTotal.Valor, itensResult.Count);
 
-            logger.LogWarning("AUDIT: Saida de estoque registrada. VendaId: {VendaId}, EmpresaId: {EmpresaId}, ValorTotal: {ValorTotal}, Itens: {QuantidadeItens}",
-                venda.Id, command.EmpresaId, venda.ValorTotal.Valor, itensResult.Count);
+                // Eventos publicam DENTRO da tx — caller (Outbox) ja persiste
+                // atomicamente; rollback da tx aborta o evento junto.
+                if (publicadorEventos is not null)
+                {
+                    await publicadorEventos.PublicarAsync(new VendaRegistrada(
+                        Guid.NewGuid(), agora, venda.Id, venda.EmpresaId, venda.ValorTotal.Valor));
+                    foreach (var r in itensResult)
+                        await publicadorEventos.PublicarAsync(new SaidaEstoqueRegistrada(
+                            Guid.NewGuid(), agora, r.ItemEstoqueId, r.ProdutoId, command.EmpresaId, r.QuantidadeSaida, r.Motivo));
+                }
 
-            // Eventos publicam DENTRO da tx — caller (Outbox) ja persiste
-            // atomicamente; rollback da tx aborta o evento junto.
-            if (publicadorEventos is not null)
-            {
-                await publicadorEventos.PublicarAsync(new VendaRegistrada(
-                    Guid.NewGuid(), agora, venda.Id, venda.EmpresaId, venda.ValorTotal.Valor));
-                foreach (var r in itensResult)
-                    await publicadorEventos.PublicarAsync(new SaidaEstoqueRegistrada(
-                        Guid.NewGuid(), agora, r.ItemEstoqueId, r.ProdutoId, command.EmpresaId, r.QuantidadeSaida, r.Motivo));
-            }
-
-            return new RegistrarSaidaEstoqueResult(venda.Id, itensResult, venda.ValorTotal.Valor);
+                return new RegistrarSaidaEstoqueResult(venda.Id, itensResult, venda.ValorTotal.Valor);
             });
         }
 

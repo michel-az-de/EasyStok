@@ -1,4 +1,4 @@
-using EasyStock.Domain.Defaults;
+﻿using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Services;
 using FluentAssertions;

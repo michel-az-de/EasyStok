@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Security.Cryptography;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output;
@@ -244,8 +244,8 @@ public class DevicePairingController(
             return BadRequest(new { error = "deviceId obrigatório" });
 
         var expectedSecret = _appConfig["AppProvisioning:Secret"];
-        var empresaIdStr   = _appConfig["AppProvisioning:EmpresaId"];
-        var lojaIdStr      = _appConfig["AppProvisioning:LojaId"];
+        var empresaIdStr = _appConfig["AppProvisioning:EmpresaId"];
+        var lojaIdStr = _appConfig["AppProvisioning:LojaId"];
 
         if (string.IsNullOrWhiteSpace(expectedSecret)
             || string.IsNullOrWhiteSpace(empresaIdStr)

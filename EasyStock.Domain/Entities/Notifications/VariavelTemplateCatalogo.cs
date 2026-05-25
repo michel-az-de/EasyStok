@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -17,12 +17,12 @@ public class VariavelTemplateCatalogo
         string tipo,
         string descricao,
         string exemplo) => new()
-    {
-        Id = Guid.NewGuid(),
-        TipoEvento = tipoEvento,
-        NomeVariavel = nomeVariavel,
-        Tipo = tipo,
-        Descricao = descricao,
-        Exemplo = exemplo
-    };
+        {
+            Id = Guid.NewGuid(),
+            TipoEvento = tipoEvento,
+            NomeVariavel = nomeVariavel,
+            Tipo = tipo,
+            Descricao = descricao,
+            Exemplo = exemplo
+        };
 }

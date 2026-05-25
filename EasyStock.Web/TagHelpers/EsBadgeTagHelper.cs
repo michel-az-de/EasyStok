@@ -1,4 +1,4 @@
-using EasyStock.Web.Services;
+﻿using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
 namespace EasyStock.Web.TagHelpers;

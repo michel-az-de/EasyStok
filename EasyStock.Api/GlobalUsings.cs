@@ -1,4 +1,4 @@
-// API Layer - Global usings para reduzir repetição em Controllers e Services
+﻿// API Layer - Global usings para reduzir repetição em Controllers e Services
 // Padrão: ASP.NET Core, Entity Framework, autorização, configuração, entidades
 
 global using System;

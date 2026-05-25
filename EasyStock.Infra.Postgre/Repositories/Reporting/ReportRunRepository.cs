@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Reporting;
+﻿using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data;
@@ -22,10 +22,10 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             .FirstOrDefaultAsync(r => r.Id == id, ct);
 
     public Task<ReportRun?> FindRecentByParamsHashAsync(
-        Guid?             empresaId,
-        Guid              usuarioId,
-        string            paramsHash,
-        TimeSpan          window,
+        Guid? empresaId,
+        Guid usuarioId,
+        string paramsHash,
+        TimeSpan window,
         CancellationToken ct)
     {
         var cutoff = DateTimeOffset.UtcNow - window;
@@ -43,9 +43,9 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
     }
 
     public Task<ReportRun?> FindByIdempotencyKeyAsync(
-        Guid?             empresaId,
-        Guid              usuarioId,
-        string            idempotencyKey,
+        Guid? empresaId,
+        Guid usuarioId,
+        string idempotencyKey,
         CancellationToken ct) =>
         db.ReportRuns
             .AsNoTracking()
@@ -57,11 +57,11 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             .FirstOrDefaultAsync(ct);
 
     public Task<IReadOnlyList<ReportRun>> ListMineAsync(
-        Guid?             empresaId,
-        Guid              usuarioId,
-        ReportListFilter  filter,
-        int               skip,
-        int               take,
+        Guid? empresaId,
+        Guid usuarioId,
+        ReportListFilter filter,
+        int skip,
+        int take,
         CancellationToken ct)
     {
         IQueryable<ReportRun> q = db.ReportRuns
@@ -86,8 +86,8 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
     }
 
     public Task<int> CountRunningForOwnerAsync(
-        Guid?             empresaId,
-        Guid?             adminUsuarioId,
+        Guid? empresaId,
+        Guid? adminUsuarioId,
         CancellationToken ct)
     {
         if (empresaId.HasValue)

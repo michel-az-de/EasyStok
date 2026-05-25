@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Etiquetas;
@@ -41,10 +41,10 @@ public class EtiquetaTemplatesController(
         {
             var result = await criarUseCase.ExecuteAsync(command with
             {
-                EmpresaId  = emp,
+                EmpresaId = emp,
                 OperadorId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-                Ip         = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                UserAgent  = Request.Headers.UserAgent.ToString(),
+                Ip = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString(),
             });
             return DataCreated($"/api/etiquetas/templates/{result.Id}", result);
         }
@@ -64,11 +64,11 @@ public class EtiquetaTemplatesController(
         {
             var result = await atualizarUseCase.ExecuteAsync(command with
             {
-                EmpresaId  = emp,
-                Id         = id,
+                EmpresaId = emp,
+                Id = id,
                 OperadorId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-                Ip         = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                UserAgent  = Request.Headers.UserAgent.ToString(),
+                Ip = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString(),
             });
             return result == null ? DataNotFound("Modelo não encontrado.") : DataOk(result);
         }

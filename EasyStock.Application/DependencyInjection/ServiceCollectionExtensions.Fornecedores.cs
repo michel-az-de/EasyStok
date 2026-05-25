@@ -1,4 +1,4 @@
-// Camada de Fornecedores e Pedidos de Fornecedor
+﻿// Camada de Fornecedores e Pedidos de Fornecedor
 // Registra UseCases relacionados a: CRUD de fornecedores, pedidos de compra, recebimento
 
 using Microsoft.Extensions.DependencyInjection;

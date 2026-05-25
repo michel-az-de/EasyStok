@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;

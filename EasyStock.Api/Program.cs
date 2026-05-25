@@ -1,4 +1,4 @@
-using EasyStock.Api.BackgroundServices;
+﻿using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Data;
 using EasyStock.Api.Observability;
@@ -16,6 +16,7 @@ using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Fiscal;
 using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
 using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
+using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -186,6 +187,8 @@ switch (resolvedProvider)
         builder.Services.AddEasyStockIntegrationResilience();
         builder.Services.AddFocusNFeAdapter(builder.Configuration);
         builder.Services.AddMockFiscalGateway();
+        // Storefront pagamentos — MercadoPago (stub em Dev, real em Prod via MercadoPago:UseStub=false)
+        builder.Services.AddMercadoPagoClient(builder.Configuration);
         // Scoped (não Singleton): a factory consome IEnumerable<IGatewayFiscal>, e os
         // adapters (Focus/Mock) são Scoped (dependem de serviços scoped como
         // INfeCertificadoA1Service). Como Singleton, capturava gateways scoped
@@ -333,201 +336,201 @@ if (runMigrationsOnStartup && resolvedProvider is "postgresql")
 
     var acquired = await advisoryLock.TentarExecutarAsync(LockKeys.StartupMigrationsAndSeed, async lockToken =>
     {
-    var migrationsHouveErro = false;
-    try
-    {
-        List<string> appliedMigrations;
-        List<string> pendingMigrations;
-        using (var checkScope = app.Services.CreateScope())
+        var migrationsHouveErro = false;
+        try
         {
-            var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-            // RLS: queries em __EFMigrationsHistory não dependem da policy
-            // tenant_isolation (tabela não tem EmpresaId), mas a connection
-            // ainda assim entra com tenant=Guid.Empty. Bypass garante que
-            // nada residual de outra request afete a leitura — defesa em
-            // profundidade para o caminho de boot.
-            using var _ = checkDb.UseRowLevelSecurityBypass();
-            appliedMigrations = (await checkDb.Database.GetAppliedMigrationsAsync()).ToList();
-            pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
-        }
+            List<string> appliedMigrations;
+            List<string> pendingMigrations;
+            using (var checkScope = app.Services.CreateScope())
+            {
+                var checkDb = checkScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                // RLS: queries em __EFMigrationsHistory não dependem da policy
+                // tenant_isolation (tabela não tem EmpresaId), mas a connection
+                // ainda assim entra com tenant=Guid.Empty. Bypass garante que
+                // nada residual de outra request afete a leitura — defesa em
+                // profundidade para o caminho de boot.
+                using var _ = checkDb.UseRowLevelSecurityBypass();
+                appliedMigrations = (await checkDb.Database.GetAppliedMigrationsAsync()).ToList();
+                pendingMigrations = (await checkDb.Database.GetPendingMigrationsAsync()).ToList();
+            }
 
-        app.Logger.LogInformation(
-            "[Migrations] {AppliedCount} aplicadas, {PendingCount} pendentes. Pendentes: {Pendentes}",
-            appliedMigrations.Count, pendingMigrations.Count,
-            pendingMigrations.Count == 0 ? "(nenhuma)" : string.Join(", ", pendingMigrations));
+            app.Logger.LogInformation(
+                "[Migrations] {AppliedCount} aplicadas, {PendingCount} pendentes. Pendentes: {Pendentes}",
+                appliedMigrations.Count, pendingMigrations.Count,
+                pendingMigrations.Count == 0 ? "(nenhuma)" : string.Join(", ", pendingMigrations));
 
-        // Migrations conhecidas que historicamente colidem com schema mobile pré-existente
-        // (porque criam tabelas que mobile schema raw também cria com IF NOT EXISTS).
-        // Para essas, aceitamos 42P07/42701 e registramos manualmente. Para qualquer
-        // outra migration, falha real é fail-fast.
-        var migrationsComColisaoConhecida = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            // Migrations conhecidas que historicamente colidem com schema mobile pré-existente
+            // (porque criam tabelas que mobile schema raw também cria com IF NOT EXISTS).
+            // Para essas, aceitamos 42P07/42701 e registramos manualmente. Para qualquer
+            // outra migration, falha real é fail-fast.
+            var migrationsComColisaoConhecida = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "20260430193546_AddAdminModule",
             "20260430210354_RenameAdminAuditLogsTable_AddMissingDbSets"
         };
 
-        foreach (var migrationId in pendingMigrations)
-        {
-            var swMigration = System.Diagnostics.Stopwatch.StartNew();
-            app.Logger.LogInformation("[Migrations] >>> Aplicando {MigrationId}...", migrationId);
-            try
+            foreach (var migrationId in pendingMigrations)
             {
-                using var migScope = app.Services.CreateScope();
-                var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-                // RLS: migrations criam/alteram tabelas tenant-aware — precisam
-                // rodar com bypass, senão a própria migration AddRowLevelSecurity
-                // (e qualquer DML em seed_data interno) fica sob a policy que
-                // ela mesma criou.
-                using var _ = migDb.UseRowLevelSecurityBypass();
-                var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
-                await migrator.MigrateAsync(migrationId);
-                swMigration.Stop();
+                var swMigration = System.Diagnostics.Stopwatch.StartNew();
+                app.Logger.LogInformation("[Migrations] >>> Aplicando {MigrationId}...", migrationId);
+                try
+                {
+                    using var migScope = app.Services.CreateScope();
+                    var migDb = migScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                    // RLS: migrations criam/alteram tabelas tenant-aware — precisam
+                    // rodar com bypass, senão a própria migration AddRowLevelSecurity
+                    // (e qualquer DML em seed_data interno) fica sob a policy que
+                    // ela mesma criou.
+                    using var _ = migDb.UseRowLevelSecurityBypass();
+                    var migrator = migDb.GetInfrastructure().GetRequiredService<IMigrator>();
+                    await migrator.MigrateAsync(migrationId);
+                    swMigration.Stop();
+                    app.Logger.LogInformation(
+                        "[Migrations] <<< {MigrationId} aplicada em {ElapsedMs}ms.",
+                        migrationId, swMigration.ElapsedMilliseconds);
+                }
+                catch (Npgsql.PostgresException ex) when (
+                    ex.SqlState is "42701" or "42P07" &&
+                    migrationsComColisaoConhecida.Contains(migrationId))
+                {
+                    swMigration.Stop();
+                    app.Logger.LogWarning(
+                        "[Migrations] {MigrationId}: schema ja existe ({SqlState}), registrando como aplicada.",
+                        migrationId, ex.SqlState);
+                    using var regScope = app.Services.CreateScope();
+                    var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                    using var _ = regDb.UseRowLevelSecurityBypass();
+                    const string productVersion = "9.0.0";
+                    await regDb.Database.ExecuteSqlInterpolatedAsync(
+                        $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
+                }
+                catch (Exception ex)
+                {
+                    migrationsHouveErro = true;
+                    infraState.MigrationsApplied = false;
+                    infraState.MigrationError = $"{migrationId}: {ex.GetType().Name}: {ex.Message}";
+                    app.Logger.LogError(ex,
+                        "[Migrations] !!! FALHA na migration {MigrationId} (SqlState={SqlState}). Stack acima.",
+                        migrationId,
+                        (ex as Npgsql.PostgresException)?.SqlState ?? "(n/a)");
+                    // Continua tentando as proximas pra logar TODAS as falhas. So depois decide se aborta.
+                }
+            }
+
+            if (migrationsHouveErro)
+            {
+                app.Logger.LogError(
+                    "[Migrations] !!! Houve erros aplicando migrations. MigrationsFailFast={FailFast}.",
+                    migrationsFailFast);
+                if (migrationsFailFast)
+                    throw new InvalidOperationException(
+                        "Migrations falharam e MigrationsFailFast=true. Abortando startup. Veja erros acima.");
+            }
+            else
+            {
+                infraState.MigrationsApplied = true;
                 app.Logger.LogInformation(
-                    "[Migrations] <<< {MigrationId} aplicada em {ElapsedMs}ms.",
-                    migrationId, swMigration.ElapsedMilliseconds);
+                    "[Migrations] === Aplicadas com sucesso ({Count} novas). ===",
+                    pendingMigrations.Count);
             }
-            catch (Npgsql.PostgresException ex) when (
-                ex.SqlState is "42701" or "42P07" &&
-                migrationsComColisaoConhecida.Contains(migrationId))
-            {
-                swMigration.Stop();
-                app.Logger.LogWarning(
-                    "[Migrations] {MigrationId}: schema ja existe ({SqlState}), registrando como aplicada.",
-                    migrationId, ex.SqlState);
-                using var regScope = app.Services.CreateScope();
-                var regDb = regScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-                using var _ = regDb.UseRowLevelSecurityBypass();
-                const string productVersion = "9.0.0";
-                await regDb.Database.ExecuteSqlInterpolatedAsync(
-                    $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({migrationId}, {productVersion}) ON CONFLICT DO NOTHING");
-            }
-            catch (Exception ex)
-            {
-                migrationsHouveErro = true;
-                infraState.MigrationsApplied = false;
-                infraState.MigrationError = $"{migrationId}: {ex.GetType().Name}: {ex.Message}";
-                app.Logger.LogError(ex,
-                    "[Migrations] !!! FALHA na migration {MigrationId} (SqlState={SqlState}). Stack acima.",
-                    migrationId,
-                    (ex as Npgsql.PostgresException)?.SqlState ?? "(n/a)");
-                // Continua tentando as proximas pra logar TODAS as falhas. So depois decide se aborta.
-            }
-        }
-
-        if (migrationsHouveErro)
-        {
-            app.Logger.LogError(
-                "[Migrations] !!! Houve erros aplicando migrations. MigrationsFailFast={FailFast}.",
-                migrationsFailFast);
-            if (migrationsFailFast)
-                throw new InvalidOperationException(
-                    "Migrations falharam e MigrationsFailFast=true. Abortando startup. Veja erros acima.");
-        }
-        else
-        {
-            infraState.MigrationsApplied = true;
-            app.Logger.LogInformation(
-                "[Migrations] === Aplicadas com sucesso ({Count} novas). ===",
-                pendingMigrations.Count);
-        }
-    }
-    catch (Exception ex)
-    {
-        infraState.MigrationsApplied = false;
-        infraState.MigrationError ??= ex.Message;
-        app.Logger.LogError(ex, "[Migrations] !!! Erro fatal no bloco de migrations.");
-        if (migrationsFailFast)
-            throw;
-    }
-
-    // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
-    // seed pra garantir que IsSeedData + SeedRunLogs existam, mesmo se uma
-    // migration foi aplicada vazia ou deploy parcial deixou o banco inconsistente.
-    // SQL idempotente — no-op se schema já está correto.
-    try
-    {
-        using var bootstrapScope = app.Services.CreateScope();
-        var bootstrapDb = bootstrapScope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
-        // RLS: schema bootstrap mexe em tabelas tenant-aware sem JWT contextual.
-        using var _ = bootstrapDb.UseRowLevelSecurityBypass();
-        await EasyStock.Api.Data.SeedSchemaBootstrap.EnsureAsync(bootstrapDb, app.Logger);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "[SeedSchema] Bootstrap falhou no startup — seed via UI vai tentar de novo no próprio run.");
-    }
-
-    // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
-    // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
-    // de empresa). Idempotente: no-op se ja existe.
-    // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
-    // por bug de config (env var ausente, senha fraca) e blocker — melhor falhar deploy
-    // do que subir API silenciosamente quebrada.
-    try
-    {
-        using var superSeedScope = app.Services.CreateScope();
-        var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        // RLS: SuperAdmin seed cria registros sem tenant fixo — bypass obrigatório.
-        using var _ = superSeedDb.UseRowLevelSecurityBypass();
-        await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger, app.Environment.IsProduction());
-    }
-    catch (Exception ex) when (!app.Environment.IsProduction())
-    {
-        app.Logger.LogError(ex, "Erro durante SuperAdminSeed (nao-Production, continuando). Painel admin pode ficar inacessivel.");
-    }
-    // Em Production: nao captura — exception sobe e derruba o startup com mensagem clara.
-
-    // R6: SeedData popula tenants demo (PastaBella, CasaDaBaba, etc.) — proibido em Production.
-    // Roda apenas se Development OU SEED_DEMO_DATA=true (opt-in explicito pra staging).
-    // SuperAdminSeed e NotificacoesGlobaisSeed seguem rodando (sao infra, nao demo).
-    var seedDemoEnabled = app.Environment.IsDevelopment()
-        || string.Equals(Environment.GetEnvironmentVariable("SEED_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);
-    if (seedDemoEnabled)
-    {
-        try
-        {
-            using var seedScope = app.Services.CreateScope();
-            // RLS: SeedData percorre todos os tenants demo — bypass no DbContext
-            // do scope para que use cases internos enxerguem o universo todo.
-            var seedDb = seedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-            using var __ = seedDb.UseRowLevelSecurityBypass();
-            await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
         }
         catch (Exception ex)
         {
-            app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+            infraState.MigrationsApplied = false;
+            infraState.MigrationError ??= ex.Message;
+            app.Logger.LogError(ex, "[Migrations] !!! Erro fatal no bloco de migrations.");
+            if (migrationsFailFast)
+                throw;
         }
-    }
-    else
-    {
-        app.Logger.LogInformation(
-            "[SeedData] Skipped — env={Env}, SEED_DEMO_DATA nao e 'true'. Demo seed bloqueado fora de Development (R6).",
-            app.Environment.EnvironmentName);
-    }
 
-    try
-    {
-        using var notifSeedScope = app.Services.CreateScope();
-        var notifDb = notifSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        // RLS: catalogo de notificacoes globais (sem EmpresaId) + writes em
-        // tabelas tenant-aware — bypass cobre os dois.
-        using var _ = notifDb.UseRowLevelSecurityBypass();
-        await NotificacoesGlobaisSeed.ExecutarAsync(notifDb, app.Logger);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Erro durante seed de notificações globais. Continuando.");
-    }
+        // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
+        // seed pra garantir que IsSeedData + SeedRunLogs existam, mesmo se uma
+        // migration foi aplicada vazia ou deploy parcial deixou o banco inconsistente.
+        // SQL idempotente — no-op se schema já está correto.
+        try
+        {
+            using var bootstrapScope = app.Services.CreateScope();
+            var bootstrapDb = bootstrapScope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+            // RLS: schema bootstrap mexe em tabelas tenant-aware sem JWT contextual.
+            using var _ = bootstrapDb.UseRowLevelSecurityBypass();
+            await EasyStock.Api.Data.SeedSchemaBootstrap.EnsureAsync(bootstrapDb, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "[SeedSchema] Bootstrap falhou no startup — seed via UI vai tentar de novo no próprio run.");
+        }
 
-    // Schema do módulo Casa da Baba Mobile (SQL raw, idempotente, fora do EF migrations).
-    try
-    {
-        await EasyStock.Api.Mobile.Schema.MobileSchemaInitializer.InitializeAsync(app.Services, app.Logger);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
-    }
+        // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
+        // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
+        // de empresa). Idempotente: no-op se ja existe.
+        // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel
+        // por bug de config (env var ausente, senha fraca) e blocker — melhor falhar deploy
+        // do que subir API silenciosamente quebrada.
+        try
+        {
+            using var superSeedScope = app.Services.CreateScope();
+            var superSeedDb = superSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            // RLS: SuperAdmin seed cria registros sem tenant fixo — bypass obrigatório.
+            using var _ = superSeedDb.UseRowLevelSecurityBypass();
+            await SuperAdminSeed.ExecutarAsync(superSeedDb, app.Logger, app.Environment.IsProduction());
+        }
+        catch (Exception ex) when (!app.Environment.IsProduction())
+        {
+            app.Logger.LogError(ex, "Erro durante SuperAdminSeed (nao-Production, continuando). Painel admin pode ficar inacessivel.");
+        }
+        // Em Production: nao captura — exception sobe e derruba o startup com mensagem clara.
+
+        // R6: SeedData popula tenants demo (PastaBella, CasaDaBaba, etc.) — proibido em Production.
+        // Roda apenas se Development OU SEED_DEMO_DATA=true (opt-in explicito pra staging).
+        // SuperAdminSeed e NotificacoesGlobaisSeed seguem rodando (sao infra, nao demo).
+        var seedDemoEnabled = app.Environment.IsDevelopment()
+            || string.Equals(Environment.GetEnvironmentVariable("SEED_DEMO_DATA"), "true", StringComparison.OrdinalIgnoreCase);
+        if (seedDemoEnabled)
+        {
+            try
+            {
+                using var seedScope = app.Services.CreateScope();
+                // RLS: SeedData percorre todos os tenants demo — bypass no DbContext
+                // do scope para que use cases internos enxerguem o universo todo.
+                var seedDb = seedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var __ = seedDb.UseRowLevelSecurityBypass();
+                await SeedData.ExecutarAsync(seedScope.ServiceProvider, app.Logger);
+            }
+            catch (Exception ex)
+            {
+                app.Logger.LogError(ex, "Erro durante seed. Continuando sem seed.");
+            }
+        }
+        else
+        {
+            app.Logger.LogInformation(
+                "[SeedData] Skipped — env={Env}, SEED_DEMO_DATA nao e 'true'. Demo seed bloqueado fora de Development (R6).",
+                app.Environment.EnvironmentName);
+        }
+
+        try
+        {
+            using var notifSeedScope = app.Services.CreateScope();
+            var notifDb = notifSeedScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            // RLS: catalogo de notificacoes globais (sem EmpresaId) + writes em
+            // tabelas tenant-aware — bypass cobre os dois.
+            using var _ = notifDb.UseRowLevelSecurityBypass();
+            await NotificacoesGlobaisSeed.ExecutarAsync(notifDb, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Erro durante seed de notificações globais. Continuando.");
+        }
+
+        // Schema do módulo Casa da Baba Mobile (SQL raw, idempotente, fora do EF migrations).
+        try
+        {
+            await EasyStock.Api.Mobile.Schema.MobileSchemaInitializer.InitializeAsync(app.Services, app.Logger);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Falha ao aplicar Mobile schema. Endpoints /api/mobile/* vão falhar.");
+        }
     }, CancellationToken.None);
 
     if (!acquired)
@@ -738,9 +741,9 @@ if (swaggerEnabled)
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
-        c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
+        c.SwaggerEndpoint("/swagger/v1-en/swagger.json", "EasyStock API (English)");
         c.RoutePrefix = "swagger";
-        c.DocumentTitle        = "EasyStock API Docs";
+        c.DocumentTitle = "EasyStock API Docs";
         c.DefaultModelsExpandDepth(1);
         c.DefaultModelExpandDepth(3);
         c.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);

@@ -1,4 +1,4 @@
-using EasyStock.Api.Controllers;
+﻿using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;

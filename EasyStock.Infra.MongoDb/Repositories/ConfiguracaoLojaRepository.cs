@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.MongoDb.Data;
 using MongoDB.Driver;

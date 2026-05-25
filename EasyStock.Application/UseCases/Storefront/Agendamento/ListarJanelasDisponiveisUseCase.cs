@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Exceptions;

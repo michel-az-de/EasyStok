@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Logout;
+﻿using EasyStock.Application.UseCases.Logout;
 using FluentValidation;
 
 namespace EasyStock.Application.Validators;

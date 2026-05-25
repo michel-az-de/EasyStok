@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -177,11 +177,11 @@ public class AdminTenantsController(
             devices,
             processedMutationsLast24h,
             auditEntriesTotal,
-            orders   = new { total = totalOrders,   pending = pendingOrders,   entregueSemVenda },
-            clients  = new { total = totalClients,  pending = pendingClients },
+            orders = new { total = totalOrders, pending = pendingOrders, entregueSemVenda },
+            clients = new { total = totalClients, pending = pendingClients },
             products = new { total = totalProducts, pending = pendingProducts },
-            batches  = new { total = totalBatches,  pending = pendingBatches },
-            cash     = new { total = totalCash,     pending = pendingCash }
+            batches = new { total = totalBatches, pending = pendingBatches },
+            cash = new { total = totalCash, pending = pendingCash }
         });
     }
 

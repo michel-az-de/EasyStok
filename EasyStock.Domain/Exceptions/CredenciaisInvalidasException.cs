@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions
+﻿namespace EasyStock.Domain.Exceptions
 {
     public class CredenciaisInvalidasException : RegraDeDominioVioladaException
     {

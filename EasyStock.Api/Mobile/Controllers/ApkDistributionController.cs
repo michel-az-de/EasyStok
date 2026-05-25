@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Mobile;
+﻿using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

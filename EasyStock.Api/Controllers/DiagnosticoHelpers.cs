@@ -1,4 +1,4 @@
-using EasyStock.Api.Configuration;
+﻿using EasyStock.Api.Configuration;
 
 namespace EasyStock.Api.Controllers;
 

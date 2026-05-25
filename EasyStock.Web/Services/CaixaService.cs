@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -36,8 +36,15 @@ public class CaixaService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<MovimentoCaixa>());
         return api.PostAsync<MovimentoCaixa>("caixa/movimentos", new
         {
-            empresaId, tipo, valor, descricao, metodo, categoria, referencia,
-            dataMovimento, origem = "web"
+            empresaId,
+            tipo,
+            valor,
+            descricao,
+            metodo,
+            categoria,
+            referencia,
+            dataMovimento,
+            origem = "web"
         });
     }
 
@@ -47,7 +54,9 @@ public class CaixaService(ApiClient api, SessionService session)
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<MovimentoCaixa>());
         return api.PostAsync<MovimentoCaixa>($"caixa/movimentos/{id}/estornar", new
         {
-            empresaId, id = Guid.Parse(id), motivo
+            empresaId,
+            id = Guid.Parse(id),
+            motivo
         });
     }
 

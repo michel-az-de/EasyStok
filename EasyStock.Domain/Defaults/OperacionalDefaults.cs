@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Defaults;
+﻿namespace EasyStock.Domain.Defaults;
 
 /// <summary>
 /// Compile-time defaults for operational settings shared across domain,
@@ -6,12 +6,12 @@ namespace EasyStock.Domain.Defaults;
 /// </summary>
 public static class OperacionalDefaults
 {
-    public const int    DiasAlertaValidade = 15;
-    public const int    DiasAlertaParado   = 30;
-    public const int    QuantidadeMinima   = 5;
-    public const int    QuantidadeCritica  = 2;
-    public const string Moeda              = "BRL";
-    public const string Timezone           = "America/Sao_Paulo";
+    public const int DiasAlertaValidade = 15;
+    public const int DiasAlertaParado = 30;
+    public const int QuantidadeMinima = 5;
+    public const int QuantidadeCritica = 2;
+    public const string Moeda = "BRL";
+    public const string Timezone = "America/Sao_Paulo";
 
     /// <summary>
     /// Multiplicador aplicado sobre o custo unitário quando o produto não tem PrecoVendaSugerido definido.

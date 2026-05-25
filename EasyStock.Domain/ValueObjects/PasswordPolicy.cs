@@ -1,4 +1,4 @@
-// Política centralizada de validação de senhas
+﻿// Política centralizada de validação de senhas
 // Define as regras de segurança que toda senha deve cumprir na aplicação
 // Fonte única de verdade para validação de credenciais
 

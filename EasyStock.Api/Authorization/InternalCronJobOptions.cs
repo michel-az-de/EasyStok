@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Authorization;
+﻿namespace EasyStock.Api.Authorization;
 
 /// <summary>
 /// Configuração dos endpoints internos de gatilho HTTP.

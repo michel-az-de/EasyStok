@@ -1,4 +1,4 @@
-using System.Diagnostics.Metrics;
+﻿using System.Diagnostics.Metrics;
 
 namespace EasyStock.Infra.Async.Reporting;
 
@@ -10,29 +10,29 @@ namespace EasyStock.Infra.Async.Reporting;
 public sealed class ReportingMetricsService
 {
     // Runs
-    private readonly Counter<long>   _enqueued;
-    private readonly Counter<long>   _started;
-    private readonly Counter<long>   _completed;
+    private readonly Counter<long> _enqueued;
+    private readonly Counter<long> _started;
+    private readonly Counter<long> _completed;
     private readonly Histogram<long> _waitMs;
     private readonly Histogram<long> _execMs;
     private readonly Histogram<long> _rowsExported;
     private readonly Histogram<long> _artifactBytes;
 
     // Leases / GC
-    private readonly Counter<long>   _leasesReclaimed;
-    private readonly Counter<long>   _artifactsPurged;
+    private readonly Counter<long> _leasesReclaimed;
+    private readonly Counter<long> _artifactsPurged;
 
     // Preview / /data
-    private readonly Counter<long>   _previewRequested;
-    private readonly Counter<long>   _previewTimedOut;
-    private readonly Counter<long>   _dataRequested;
+    private readonly Counter<long> _previewRequested;
+    private readonly Counter<long> _previewTimedOut;
+    private readonly Counter<long> _dataRequested;
 
     // Quick Reports (mobile)
-    private readonly Counter<long>   _quickRequested;
+    private readonly Counter<long> _quickRequested;
     private readonly Histogram<long> _quickLatencyMs;
 
     // Notificações
-    private readonly Counter<long>   _notificationsPublished;
+    private readonly Counter<long> _notificationsPublished;
 
     public ReportingMetricsService(IMeterFactory meterFactory)
     {
@@ -129,22 +129,22 @@ public sealed class ReportingMetricsService
 
         _completed.Add(1, tags);
         _waitMs.Record(waitMs,
-            new KeyValuePair<string, object?>("contexto",   contexto),
+            new KeyValuePair<string, object?>("contexto", contexto),
             new KeyValuePair<string, object?>("report_key", reportKey));
         _execMs.Record(execMs,
-            new KeyValuePair<string, object?>("contexto",   contexto),
+            new KeyValuePair<string, object?>("contexto", contexto),
             new KeyValuePair<string, object?>("report_key", reportKey));
 
         if (rows > 0)
             _rowsExported.Record(rows,
-                new KeyValuePair<string, object?>("contexto",   contexto),
+                new KeyValuePair<string, object?>("contexto", contexto),
                 new KeyValuePair<string, object?>("report_key", reportKey));
 
         if (artifactBytes > 0)
             _artifactBytes.Record(artifactBytes,
-                new KeyValuePair<string, object?>("contexto",   contexto),
+                new KeyValuePair<string, object?>("contexto", contexto),
                 new KeyValuePair<string, object?>("report_key", reportKey),
-                new KeyValuePair<string, object?>("format",     format));
+                new KeyValuePair<string, object?>("format", format));
     }
 
     // ── Lease / GC ───────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ public sealed class ReportingMetricsService
     public void RecordArtifactsPurged(string contexto, string reason, int count) =>
         _artifactsPurged.Add(count,
             new KeyValuePair<string, object?>("contexto", contexto),
-            new KeyValuePair<string, object?>("reason",   reason));
+            new KeyValuePair<string, object?>("reason", reason));
 
     // ── Preview / /data ──────────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ public sealed class ReportingMetricsService
 
     public void RecordDataRequested(string contexto, string reportKey) =>
         _dataRequested.Add(1,
-            new KeyValuePair<string, object?>("contexto",   contexto),
+            new KeyValuePair<string, object?>("contexto", contexto),
             new KeyValuePair<string, object?>("report_key", reportKey));
 
     // ── Quick Reports ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-using EasyStock.Web.Constants;
+﻿using EasyStock.Web.Constants;
 using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Entradas;
@@ -594,7 +594,8 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
         var result = await svc.BuscarAsync(q, Math.Min(limit, 100));
         if (!result.Success) return Json(Array.Empty<object>());
 
-        var items = result.Data!.Where(p => p is not null).Select(p => new {
+        var items = result.Data!.Where(p => p is not null).Select(p => new
+        {
             id = p!.Id,
             nome = p.Nome,
             sku = p.SkuBase?.Value,

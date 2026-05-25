@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Dashboard;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -129,7 +129,7 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         return Json(new
         {
             validade = tasks[0].Result.Success ? tasks[0].Result.Data : null,
-            parados  = tasks[1].Result.Success ? tasks[1].Result.Data : null,
+            parados = tasks[1].Result.Success ? tasks[1].Result.Data : null,
         });
     }
 

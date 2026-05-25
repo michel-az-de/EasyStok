@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums;
+﻿namespace EasyStock.Domain.Enums;
 
 /// <summary>
 /// Origem da <see cref="Entities.Fatura"/> — identifica o agregado que motivou

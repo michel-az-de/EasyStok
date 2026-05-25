@@ -1,4 +1,4 @@
-using EasyStock.Admin.Services;
+﻿using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -22,8 +22,8 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
         {
             var qs = $"api/admin/audit-admin?page={Page}&pageSize=50";
             if (!string.IsNullOrWhiteSpace(Acao)) qs += $"&acao={Uri.EscapeDataString(Acao)}";
-            if (!string.IsNullOrWhiteSpace(De))   qs += $"&de={Uri.EscapeDataString(De)}";
-            if (!string.IsNullOrWhiteSpace(Ate))  qs += $"&ate={Uri.EscapeDataString(Ate)}";
+            if (!string.IsNullOrWhiteSpace(De)) qs += $"&de={Uri.EscapeDataString(De)}";
+            if (!string.IsNullOrWhiteSpace(Ate)) qs += $"&ate={Uri.EscapeDataString(Ate)}";
 
             var raw = await api.GetRawAsync(qs);
             Logs = raw.TryGetProperty("data", out var d) ? d.EnumerateArray().ToList() : Enumerable.Empty<JsonElement>();

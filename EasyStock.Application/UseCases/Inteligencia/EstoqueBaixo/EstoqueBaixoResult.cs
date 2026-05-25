@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
 
 public sealed record EstoqueBaixoResult(
     Guid ItemEstoqueId,

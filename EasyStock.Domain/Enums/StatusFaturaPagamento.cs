@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums;
+﻿namespace EasyStock.Domain.Enums;
 
 /// <summary>
 /// Status de uma <see cref="Entities.FaturaPagamento"/> (tentativa/registro de

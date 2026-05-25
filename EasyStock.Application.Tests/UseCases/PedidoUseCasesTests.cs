@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
@@ -32,9 +32,13 @@ public class PedidoUseCasesTests
 
     private static Cliente CriarCliente(Guid empresaId, string nome = "Maria") => new()
     {
-        Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = nome,
-        Telefone = "11999990000", Apt = "12B",
-        Ativo = true, CriadoEm = DateTime.UtcNow
+        Id = Guid.NewGuid(),
+        EmpresaId = empresaId,
+        Nome = nome,
+        Telefone = "11999990000",
+        Apt = "12B",
+        Ativo = true,
+        CriadoEm = DateTime.UtcNow
     };
 
     // ════════════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Data;

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums
+﻿namespace EasyStock.Domain.Enums
 {
     /// <summary>
     /// Distingue produtos com rotulagem obrigatoria (RDC 727/2022 - conteudo

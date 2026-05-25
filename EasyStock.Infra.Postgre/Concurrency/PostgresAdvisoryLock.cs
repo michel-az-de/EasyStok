@@ -1,4 +1,4 @@
-using EasyStock.Infra.Postgre.Data;
+﻿using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Concurrency;

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.Sazonalidade;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.Sazonalidade;
 
 public sealed record SazonalidadeInteligenciaResult(
     int Ano,

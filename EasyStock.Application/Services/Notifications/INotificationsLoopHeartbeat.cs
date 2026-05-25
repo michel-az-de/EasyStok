@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Services.Notifications;
+﻿namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
 /// Heartbeat dos BackgroundServices do pipeline de notificacoes (Dispatcher,

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -234,7 +234,7 @@ public class ToggleItemListaComprasUseCase(
         if (item == null || item.ListaComprasId != cmd.ListaComprasId) return null;
 
         if (cmd.Done) item.MarcarDone(cmd.UsuarioId, cmd.UsuarioNome);
-        else          item.Desmarcar();
+        else item.Desmarcar();
 
         await repo.UpdateItemAsync(item);
         lista.AlteradoEm = DateTime.UtcNow;

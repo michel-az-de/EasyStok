@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Ai;
+﻿namespace EasyStock.Application.Ports.Output.Ai;
 
 /// <summary>
 /// Gera sugestão de descrição para um produto a partir apenas do nome/contexto,

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Ai;
+﻿using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;

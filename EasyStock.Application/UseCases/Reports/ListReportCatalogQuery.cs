@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Dtos;
 using EasyStock.Application.UseCases.Common;
@@ -12,15 +12,15 @@ public sealed record ListReportCatalogQuery(
 public sealed class ListReportCatalogUseCase
     : IUseCase<ListReportCatalogQuery, IReadOnlyList<ReportCatalogItemDto>>
 {
-    private readonly ReportRegistry       _registry;
+    private readonly ReportRegistry _registry;
     private readonly ICurrentUserAccessor _user;
 
     public ListReportCatalogUseCase(
-        ReportRegistry       registry,
+        ReportRegistry registry,
         ICurrentUserAccessor user)
     {
         _registry = registry;
-        _user     = user;
+        _user = user;
     }
 
     public Task<IReadOnlyList<ReportCatalogItemDto>> ExecuteAsync(ListReportCatalogQuery query)
@@ -35,16 +35,16 @@ public sealed class ListReportCatalogUseCase
                 // Filtro de categoria opcional
                 (query.CategoriaFiltro is null || d.Categoria == query.CategoriaFiltro))
             .Select(d => new ReportCatalogItemDto(
-                Key:                d.Key,
-                Label:              d.Label,
-                Descricao:          d.Descricao,
-                Categoria:          d.Categoria,
-                Contexto:           d.Contexto,
-                IconKey:            d.IconKey,
+                Key: d.Key,
+                Label: d.Label,
+                Descricao: d.Descricao,
+                Categoria: d.Categoria,
+                Contexto: d.Contexto,
+                IconKey: d.IconKey,
                 FormatosSuportados: d.FormatosSuportados,
                 PermissaoRequerida: d.PermissaoRequerida,
-                SemanticVersion:    d.SemanticVersion,
-                SchemaUrl:          $"/api/v1/reports/{d.Key}/schema"))
+                SemanticVersion: d.SemanticVersion,
+                SchemaUrl: $"/api/v1/reports/{d.Key}/schema"))
             .ToList();
 
         return Task.FromResult<IReadOnlyList<ReportCatalogItemDto>>(items);

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Fiscal;
+﻿using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Infra.Integrations.Fiscal;

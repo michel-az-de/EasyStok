@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Services.Notifications;
+﻿namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
 /// Modos de hosting do pipeline de notificações.

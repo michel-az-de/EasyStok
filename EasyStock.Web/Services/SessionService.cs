@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Services;
+﻿namespace EasyStock.Web.Services;
 
 public class SessionService(IHttpContextAccessor acc)
 {

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Common;
+﻿namespace EasyStock.Application.UseCases.Common;
 
 /// <summary>
 /// Centraliza as chaves de cache utilizadas na aplicação.

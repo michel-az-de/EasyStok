@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;

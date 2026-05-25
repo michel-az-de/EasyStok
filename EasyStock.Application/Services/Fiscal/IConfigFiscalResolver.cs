@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Fiscal;
+﻿using EasyStock.Application.Ports.Output.Fiscal;
 
 namespace EasyStock.Application.Services.Fiscal;
 

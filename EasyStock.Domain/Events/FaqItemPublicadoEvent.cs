@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Events
+﻿namespace EasyStock.Domain.Events
 {
     /// <summary>
     /// Disparado quando um item de FAQ passa de Rascunho para Publicado.

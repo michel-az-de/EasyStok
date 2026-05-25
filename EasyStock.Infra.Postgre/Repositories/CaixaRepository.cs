@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +22,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!incluirEstornados) query = query.Where(m => m.EstornadoEm == null);
             if (!string.IsNullOrWhiteSpace(tipo)) query = query.Where(m => m.Tipo == tipo);
             if (desde.HasValue) query = query.Where(m => m.DataMovimento >= desde.Value);
-            if (ate.HasValue)   query = query.Where(m => m.DataMovimento <= ate.Value);
+            if (ate.HasValue) query = query.Where(m => m.DataMovimento <= ate.Value);
 
             var total = await query.CountAsync();
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
@@ -30,8 +30,8 @@ namespace EasyStock.Infra.Postgre.Repositories
             query = sort?.ToLowerInvariant() switch
             {
                 "valor" => desc ? query.OrderByDescending(m => m.Valor) : query.OrderBy(m => m.Valor),
-                "tipo"  => desc ? query.OrderByDescending(m => m.Tipo)  : query.OrderBy(m => m.Tipo),
-                _       => desc ? query.OrderByDescending(m => m.DataMovimento) : query.OrderBy(m => m.DataMovimento),
+                "tipo" => desc ? query.OrderByDescending(m => m.Tipo) : query.OrderBy(m => m.Tipo),
+                _ => desc ? query.OrderByDescending(m => m.DataMovimento) : query.OrderBy(m => m.DataMovimento),
             };
 
             var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
@@ -44,7 +44,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IEnumerable<MovimentoCaixa>> GetMovimentosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
             var inicio = ToUtc(data);
-            var fim    = ToUtc(data.AddDays(1));
+            var fim = ToUtc(data.AddDays(1));
 
             var q = db.MovimentosCaixa.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.EstornadoEm == null
@@ -65,7 +65,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var q = db.FechamentosCaixa.AsNoTracking().Where(f => f.EmpresaId == empresaId);
             if (desde.HasValue) q = q.Where(f => f.Data >= desde.Value);
-            if (ate.HasValue)   q = q.Where(f => f.Data <= ate.Value);
+            if (ate.HasValue) q = q.Where(f => f.Data <= ate.Value);
 
             var total = await q.CountAsync();
             var items = await q.OrderByDescending(f => f.Data)
@@ -78,7 +78,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<decimal> GetTotalVendasDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
             var inicio = ToUtc(data);
-            var fim    = ToUtc(data.AddDays(1));
+            var fim = ToUtc(data.AddDays(1));
 
             var q = db.Vendas.AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId && v.DataVenda >= inicio && v.DataVenda < fim);
@@ -91,7 +91,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
             var inicio = ToUtc(data);
-            var fim    = ToUtc(data.AddDays(1));
+            var fim = ToUtc(data.AddDays(1));
 
             var pagamentos = await db.Set<PedidoPagamento>().AsNoTracking()
                 .Where(pg => pg.PagoEm >= inicio && pg.PagoEm < fim)

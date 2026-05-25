@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;

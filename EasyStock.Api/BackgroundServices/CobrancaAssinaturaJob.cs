@@ -1,4 +1,4 @@
-using EasyStock.Api.Configuration;
+﻿using EasyStock.Api.Configuration;
 using EasyStock.Api.Services.Faturacao;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;

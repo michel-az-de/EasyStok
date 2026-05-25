@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Api.Services.Helpdesk;
 using EasyStock.Domain.Entities;
@@ -132,8 +132,8 @@ public class AutoTicketController(
         origin.ToLowerInvariant() switch
         {
             "runtime" => TicketPrioridade.Critica,
-            "smoke"   => TicketPrioridade.Alta,
-            _         => TicketPrioridade.Normal
+            "smoke" => TicketPrioridade.Alta,
+            _ => TicketPrioridade.Normal
         };
 
     private static string BuildDescricao(AutoTicketRequest req)

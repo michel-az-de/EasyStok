@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json;
 
@@ -121,7 +121,7 @@ public class AdminApiClient(HttpClient httpClient)
         500 => "Erro interno no servidor. Tente novamente em instantes.",
         502 => "Serviço temporariamente indisponível.",
         503 => "Serviço temporariamente indisponível. Tente novamente em instantes.",
-        _   => $"Erro HTTP {status}. Tente novamente — se persistir, contate o suporte."
+        _ => $"Erro HTTP {status}. Tente novamente — se persistir, contate o suporte."
     };
 
     private static T UnwrapData<T>(JsonElement root)

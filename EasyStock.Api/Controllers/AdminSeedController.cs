@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using EasyStock.Api.Data;
 using EasyStock.Api.Http;

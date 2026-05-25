@@ -11,34 +11,34 @@ namespace EasyStok.Mobile.Services;
 /// </summary>
 public sealed class EmpresaService : IEmpresaService
 {
-	private const string ClientName = "easystok-api";
-	private readonly IHttpClientFactory _httpFactory;
-	private readonly ILogger<EmpresaService> _logger;
+    private const string ClientName = "easystok-api";
+    private readonly IHttpClientFactory _httpFactory;
+    private readonly ILogger<EmpresaService> _logger;
 
-	public EmpresaService(IHttpClientFactory httpFactory, ILogger<EmpresaService> logger)
-	{
-		_httpFactory = httpFactory;
-		_logger = logger;
-	}
+    public EmpresaService(IHttpClientFactory httpFactory, ILogger<EmpresaService> logger)
+    {
+        _httpFactory = httpFactory;
+        _logger = logger;
+    }
 
-	public async Task<IReadOnlyList<Loja>> ListLojasAsync(Guid empresaId, CancellationToken ct = default)
-	{
-		var http = _httpFactory.CreateClient(ClientName);
-		try
-		{
-			var env = await http.GetFromJsonAsync<EnvelopeApi<List<Loja>>>(
-				$"/api/lojas?empresaId={empresaId}", ct);
-			return env?.Data ?? new List<Loja>();
-		}
-		catch (Exception ex)
-		{
-			_logger.LogWarning(ex, "Falha ao listar lojas da empresa {EmpresaId}", empresaId);
-			return Array.Empty<Loja>();
-		}
-	}
+    public async Task<IReadOnlyList<Loja>> ListLojasAsync(Guid empresaId, CancellationToken ct = default)
+    {
+        var http = _httpFactory.CreateClient(ClientName);
+        try
+        {
+            var env = await http.GetFromJsonAsync<EnvelopeApi<List<Loja>>>(
+                $"/api/lojas?empresaId={empresaId}", ct);
+            return env?.Data ?? new List<Loja>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falha ao listar lojas da empresa {EmpresaId}", empresaId);
+            return Array.Empty<Loja>();
+        }
+    }
 }
 
 public interface IEmpresaService
 {
-	Task<IReadOnlyList<Loja>> ListLojasAsync(Guid empresaId, CancellationToken ct = default);
+    Task<IReadOnlyList<Loja>> ListLojasAsync(Guid empresaId, CancellationToken ct = default);
 }

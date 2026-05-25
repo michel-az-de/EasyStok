@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Authorization;

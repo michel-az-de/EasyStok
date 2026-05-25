@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Admin.AnonimizarUsuarioPorAdmin;
@@ -596,7 +596,9 @@ public class AdminClientesController(
 
         return DataCreated($"/api/admin/clientes/{tenantId}/notas/{nota.Id}", new
         {
-            id = nota.Id, criadoEm = nota.CriadoEm, autorEmail = nota.AutorEmail
+            id = nota.Id,
+            criadoEm = nota.CriadoEm,
+            autorEmail = nota.AutorEmail
         });
     }
 

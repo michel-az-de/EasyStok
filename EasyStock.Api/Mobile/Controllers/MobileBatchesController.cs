@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;

@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.NotasFiscais;
+﻿using EasyStock.Web.Models.ViewModels.NotasFiscais;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;

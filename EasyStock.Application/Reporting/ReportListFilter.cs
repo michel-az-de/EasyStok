@@ -1,4 +1,4 @@
-using EasyStock.Domain.Reporting;
+﻿using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.Reporting;
 
@@ -6,7 +6,7 @@ namespace EasyStock.Application.Reporting;
 /// Filtros para listagem de execuções de relatório (ListMyReportRunsQuery).
 /// </summary>
 public sealed record ReportListFilter(
-    ReportCategoria? Categoria    = null,
-    ReportStatus?    Status       = null,
-    DateTimeOffset?  De           = null,
-    DateTimeOffset?  Ate          = null);
+    ReportCategoria? Categoria = null,
+    ReportStatus? Status = null,
+    DateTimeOffset? De = null,
+    DateTimeOffset? Ate = null);

@@ -1,4 +1,4 @@
-using EasyStock.Api.BackgroundServices;
+﻿using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;

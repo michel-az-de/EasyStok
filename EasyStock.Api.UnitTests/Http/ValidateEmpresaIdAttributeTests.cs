@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -15,8 +15,8 @@ namespace EasyStock.Api.UnitTests.Http;
 
 public class ValidateEmpresaIdAttributeTests
 {
-    private static readonly Guid UserEmpresa   = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    private static readonly Guid OtherEmpresa  = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid UserEmpresa = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid OtherEmpresa = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
     // ── Query string ─────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Pagamentos;
+﻿using EasyStock.Domain.Enums.Pagamentos;
 
 namespace EasyStock.Domain.Entities.Pagamentos;
 

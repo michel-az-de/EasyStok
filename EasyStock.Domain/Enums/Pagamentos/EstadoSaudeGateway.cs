@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums.Pagamentos;
+﻿namespace EasyStock.Domain.Enums.Pagamentos;
 
 /// <summary>
 /// Estado agregado de saude de um gateway (success rate + latencia + circuit).

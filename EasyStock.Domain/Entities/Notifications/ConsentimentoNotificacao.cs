@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -24,15 +24,15 @@ public class ConsentimentoNotificacao
         string atualizadoPor,
         string? ipOrigem = null,
         string? motivoOptOut = null) => new()
-    {
-        Id = Guid.NewGuid(),
-        UsuarioId = usuarioId,
-        Canal = canal,
-        Categoria = categoria,
-        OptIn = optIn,
-        AtualizadoEm = DateTime.UtcNow,
-        AtualizadoPor = atualizadoPor,
-        IpOrigem = ipOrigem,
-        MotivoOptOut = optIn ? null : motivoOptOut
-    };
+        {
+            Id = Guid.NewGuid(),
+            UsuarioId = usuarioId,
+            Canal = canal,
+            Categoria = categoria,
+            OptIn = optIn,
+            AtualizadoEm = DateTime.UtcNow,
+            AtualizadoPor = atualizadoPor,
+            IpOrigem = ipOrigem,
+            MotivoOptOut = optIn ? null : motivoOptOut
+        };
 }

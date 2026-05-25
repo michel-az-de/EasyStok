@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Faturas.Common;
+﻿using EasyStock.Application.UseCases.Faturas.Common;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;

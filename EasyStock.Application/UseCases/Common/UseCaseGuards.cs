@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Common;
+﻿namespace EasyStock.Application.UseCases.Common;
 
 /// <summary>
 /// Helpers defensivos reutilizáveis em use cases para centralizar validações

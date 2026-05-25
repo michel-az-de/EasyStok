@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Domain.Exceptions;
 

@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Preferencias;
+﻿namespace EasyStock.Web.Models.ViewModels.Preferencias;
 
 public class ConsentimentoDto
 {

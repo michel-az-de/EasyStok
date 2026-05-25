@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
 using EasyStock.Domain.Enums;

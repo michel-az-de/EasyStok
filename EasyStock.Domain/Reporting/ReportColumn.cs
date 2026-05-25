@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace EasyStock.Domain.Reporting;
 
@@ -21,8 +21,8 @@ public sealed class ReportColumn
             throw new ArgumentException("HeaderLabel é obrigatório.", nameof(headerLabel));
 
         PropertyName = propertyName;
-        HeaderLabel  = headerLabel;
-        Order        = order;
+        HeaderLabel = headerLabel;
+        Order = order;
         FormatString = formatString;
         CultureOverride = cultureOverride;
     }

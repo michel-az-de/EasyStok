@@ -1,4 +1,4 @@
-using EasyStock.Domain.ValueObjects;
+﻿using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Common;
 

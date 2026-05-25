@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions.Storefront;
+﻿namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
 /// Lançada quando o CEP é válido mas nenhuma <c>FreteZona</c> ativa do

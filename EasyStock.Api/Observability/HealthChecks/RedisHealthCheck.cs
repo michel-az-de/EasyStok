@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Caching.Distributed;
+﻿using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Diagnostics;
 

@@ -1,4 +1,4 @@
-using Scriban;
+﻿using Scriban;
 using Scriban.Runtime;
 using System.Reflection;
 

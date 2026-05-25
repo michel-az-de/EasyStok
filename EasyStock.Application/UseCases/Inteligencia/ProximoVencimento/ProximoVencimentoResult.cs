@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.ProximoVencimento;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.ProximoVencimento;
 
 public sealed record ProximoVencimentoResult(
     Guid ItemEstoqueId,

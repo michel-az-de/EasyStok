@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
@@ -35,14 +35,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (clienteId.HasValue && clienteId.Value != Guid.Empty)
                 query = query.Where(p => p.ClienteId == clienteId);
             if (desde.HasValue) query = query.Where(p => p.CriadoEm >= desde.Value);
-            if (ate.HasValue)   query = query.Where(p => p.CriadoEm <= ate.Value);
+            if (ate.HasValue) query = query.Where(p => p.CriadoEm <= ate.Value);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
                 query = query.Where(p =>
                     (p.ClienteNome != null && EF.Functions.ILike(p.ClienteNome, $"%{termo}%")) ||
-                    (p.ClienteApt  != null && EF.Functions.ILike(p.ClienteApt,  $"%{termo}%")) ||
+                    (p.ClienteApt != null && EF.Functions.ILike(p.ClienteApt, $"%{termo}%")) ||
                     (p.ClienteTelefone != null && EF.Functions.ILike(p.ClienteTelefone, $"%{termo}%")) ||
                     (p.Observacoes != null && EF.Functions.ILike(p.Observacoes, $"%{termo}%")));
             }
@@ -52,10 +52,10 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             query = sort?.ToLowerInvariant() switch
             {
-                "total"   => desc ? query.OrderByDescending(p => p.Total)     : query.OrderBy(p => p.Total),
-                "status"  => desc ? query.OrderByDescending(p => p.Status)    : query.OrderBy(p => p.Status),
+                "total" => desc ? query.OrderByDescending(p => p.Total) : query.OrderBy(p => p.Total),
+                "status" => desc ? query.OrderByDescending(p => p.Status) : query.OrderBy(p => p.Status),
                 "cliente" => desc ? query.OrderByDescending(p => p.ClienteNome) : query.OrderBy(p => p.ClienteNome),
-                _         => desc ? query.OrderByDescending(p => p.CriadoEm)  : query.OrderBy(p => p.CriadoEm),
+                _ => desc ? query.OrderByDescending(p => p.CriadoEm) : query.OrderBy(p => p.CriadoEm),
             };
 
             var pedidos = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();

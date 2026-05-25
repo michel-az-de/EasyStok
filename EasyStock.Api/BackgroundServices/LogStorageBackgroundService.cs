@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Storage;
+﻿using EasyStock.Application.Ports.Output.Storage;
 
 namespace EasyStock.Api.BackgroundServices;
 

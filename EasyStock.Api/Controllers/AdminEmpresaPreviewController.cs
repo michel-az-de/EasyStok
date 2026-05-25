@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Api.Services.Helpdesk;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Constants;
+﻿namespace EasyStock.Web.Constants;
 
 /// <summary>
 /// Cabeçalhos HTTP customizados usados pelo front-end para sinalizar

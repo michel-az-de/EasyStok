@@ -1,4 +1,4 @@
-using EasyStock.Domain.Integration;
+﻿using EasyStock.Domain.Integration;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Integration;

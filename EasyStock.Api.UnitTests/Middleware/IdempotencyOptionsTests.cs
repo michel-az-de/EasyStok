@@ -1,4 +1,4 @@
-using EasyStock.Api.Middleware;
+﻿using EasyStock.Api.Middleware;
 using FluentAssertions;
 
 namespace EasyStock.Api.UnitTests.Middleware;

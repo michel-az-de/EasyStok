@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 
 namespace EasyStock.Domain.Integration;
 

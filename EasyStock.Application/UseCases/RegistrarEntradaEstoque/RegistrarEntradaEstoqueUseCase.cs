@@ -1,4 +1,4 @@
-using EasyStock.Domain.Defaults;
+﻿using EasyStock.Domain.Defaults;
 using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;

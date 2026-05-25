@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Configuracoes;
 
 namespace EasyStock.Web.Services;

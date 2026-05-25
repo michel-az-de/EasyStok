@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using EasyStock.Application.Services.Notifications;
 
 namespace EasyStock.Infra.Notifications.Hosting;

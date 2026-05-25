@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums
+﻿namespace EasyStock.Domain.Enums
 {
     /// <summary>
     /// Ciclo de vida de um artigo de FAQ: rascunho → publicado → arquivado.

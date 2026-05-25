@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 
@@ -90,4 +90,4 @@ public sealed class MongoUnitOfWork(IMongoClient mongoClient, ILogger<MongoUnitO
         public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
-    }
+}

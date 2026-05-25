@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Storefront.Agendamento;
+﻿namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 
 /// <summary>
 /// DTO público de uma janela de entrega disponível (ou esgotada) numa data.

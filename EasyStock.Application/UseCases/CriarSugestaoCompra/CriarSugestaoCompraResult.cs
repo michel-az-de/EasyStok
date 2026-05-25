@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.CriarSugestaoCompra;
+﻿namespace EasyStock.Application.UseCases.CriarSugestaoCompra;
 
 public sealed record CriarSugestaoCompraResult(
     IReadOnlyList<PedidoCriadoResult> PedidosCriados);

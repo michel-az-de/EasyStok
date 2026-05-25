@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities;
+﻿namespace EasyStock.Domain.Entities;
 
 /// <summary>
 /// Item de pedido de compra (fornecedor). Snapshot do produto+preço no

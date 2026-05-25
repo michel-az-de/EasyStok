@@ -1,4 +1,4 @@
-using EasyStock.Web.Services;
+﻿using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Events
+﻿namespace EasyStock.Domain.Events
 {
     /// <summary>
     /// Disparado quando ticket fechado/resolvido e reaberto pelo cliente.

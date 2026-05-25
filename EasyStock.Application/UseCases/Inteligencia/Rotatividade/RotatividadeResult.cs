@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.Rotatividade;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.Rotatividade;
 
 public sealed record RotatividadeResult(
     Guid EmpresaId,

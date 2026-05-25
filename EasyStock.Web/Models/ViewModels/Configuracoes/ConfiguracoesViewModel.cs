@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Configuracoes;
+﻿namespace EasyStock.Web.Models.ViewModels.Configuracoes;
 
 public class ConfiguracoesViewModel
 {

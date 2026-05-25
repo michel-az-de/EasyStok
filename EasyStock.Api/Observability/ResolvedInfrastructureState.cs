@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Observability;
+﻿namespace EasyStock.Api.Observability;
 
 /// <summary>
 /// Captura o estado da infraestrutura resolvido durante o startup.

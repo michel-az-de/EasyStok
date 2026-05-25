@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace EasyStock.Application.UseCases.Common
 {

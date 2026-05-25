@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -9,15 +9,15 @@ namespace EasyStock.Application.UseCases.AdicionarClienteEndereco;
 public sealed record AdicionarClienteEnderecoCommand(
     [property: Required] Guid EmpresaId,
     [property: Required] Guid ClienteId,
-    [property: MaxLength(20)]  string? Tipo = null,
+    [property: MaxLength(20)] string? Tipo = null,
     [property: MaxLength(255)] string? Logradouro = null,
-    [property: MaxLength(20)]  string? Numero = null,
+    [property: MaxLength(20)] string? Numero = null,
     [property: MaxLength(120)] string? Complemento = null,
     [property: MaxLength(120)] string? Bairro = null,
     [property: MaxLength(120)] string? Cidade = null,
-    [property: MaxLength(2)]   string? Estado = null,
-    [property: MaxLength(16)]  string? Cep = null,
-    [property: MaxLength(60)]  string? Pais = null,
+    [property: MaxLength(2)] string? Estado = null,
+    [property: MaxLength(16)] string? Cep = null,
+    [property: MaxLength(60)] string? Pais = null,
     [property: MaxLength(255)] string? Referencia = null,
     bool Padrao = false);
 

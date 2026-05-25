@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
@@ -14,7 +14,7 @@ namespace EasyStock.Infra.Async.Reporting.Handlers;
 /// Streaming via <see cref="IAsyncEnumerable{T}"/> — sem materializar toda a coleção.
 /// </summary>
 public sealed class VendasPorPeriodoHandler(
-    EasyStockDbContext       db,
+    EasyStockDbContext db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<VendasPorPeriodoParams, VendasPorPeriodoRow>
 {
@@ -28,7 +28,7 @@ public sealed class VendasPorPeriodoHandler(
         var fileNameBase = $"vendas-por-periodo_{parametros.De:yyyy-MM-dd}_a_{parametros.Ate:yyyy-MM-dd}";
 
         return new ReportSchema(
-            title:        "Vendas por período",
+            title: "Vendas por período",
             fileNameBase: fileNameBase,
             columns:
             [
@@ -62,7 +62,7 @@ public sealed class VendasPorPeriodoHandler(
         VendasPorPeriodoParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // ADR-R07: query explícita com WHERE EmpresaId; IgnoreQueryFilters() via tenantQuery.Query<T>()
@@ -87,14 +87,14 @@ public sealed class VendasPorPeriodoHandler(
                 v.DataVenda,
                 v.NumeroNotaFiscal,
                 v.FormaPagamentoPrincipal,
-                LojaNome      = v.LojaId == null ? null
+                LojaNome = v.LojaId == null ? null
                     : db.Lojas.Where(l => l.Id == v.LojaId).Select(l => l.Nome).FirstOrDefault(),
-                VendedorNome  = v.VendedorId == null ? null
+                VendedorNome = v.VendedorId == null ? null
                     : db.Usuarios.Where(u => u.Id == v.VendedorId).Select(u => u.Nome).FirstOrDefault(),
-                QtdItens      = db.ItensVenda.Count(i => i.VendaId == v.Id),
-                Subtotal      = v.Subtotal != null ? v.Subtotal.Valor : v.ValorTotal.Valor,
+                QtdItens = db.ItensVenda.Count(i => i.VendaId == v.Id),
+                Subtotal = v.Subtotal != null ? v.Subtotal.Valor : v.ValorTotal.Valor,
                 ValorDesconto = v.ValorDesconto != null ? v.ValorDesconto.Valor : 0m,
-                ValorTotal    = v.ValorTotal.Valor,
+                ValorTotal = v.ValorTotal.Valor,
             })
             .AsNoTracking()
             .AsAsyncEnumerable();
@@ -102,16 +102,16 @@ public sealed class VendasPorPeriodoHandler(
         await foreach (var r in projected.WithCancellation(ct))
         {
             yield return new VendasPorPeriodoRow(
-                DataVenda:               r.DataVenda,
-                NumeroNotaFiscal:        r.NumeroNotaFiscal,
-                IdCurto:                 r.Id.ToString()[..8],
-                LojaNome:                r.LojaNome,
-                VendedorNome:            r.VendedorNome,
+                DataVenda: r.DataVenda,
+                NumeroNotaFiscal: r.NumeroNotaFiscal,
+                IdCurto: r.Id.ToString()[..8],
+                LojaNome: r.LojaNome,
+                VendedorNome: r.VendedorNome,
                 FormaPagamentoPrincipal: r.FormaPagamentoPrincipal,
-                QtdItens:                r.QtdItens,
-                Subtotal:                r.Subtotal,
-                ValorDesconto:           r.ValorDesconto,
-                ValorTotal:              r.ValorTotal);
+                QtdItens: r.QtdItens,
+                Subtotal: r.Subtotal,
+                ValorDesconto: r.ValorDesconto,
+                ValorTotal: r.ValorTotal);
         }
     }
 

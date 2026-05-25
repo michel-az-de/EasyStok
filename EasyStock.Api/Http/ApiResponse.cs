@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Http;
+﻿namespace EasyStock.Api.Http;
 
 /// <summary>Success envelope: { data, meta }</summary>
 public sealed record ApiResponse<T>(T Data, object Meta);

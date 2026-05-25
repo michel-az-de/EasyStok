@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace EasyStock.Domain.ValueObjects;
 
@@ -59,11 +59,11 @@ public sealed record Gtin
 
         var tipo = normalizado.Length switch
         {
-            8  => TipoGtin.Ean8,
+            8 => TipoGtin.Ean8,
             12 => TipoGtin.Upc12,
             13 => TipoGtin.Ean13,
             14 => TipoGtin.Gtin14,
-            _  => throw new ArgumentException(
+            _ => throw new ArgumentException(
                 $"Codigo de barras deve ter 8, 12, 13 ou 14 digitos (recebido: {normalizado.Length}).", nameof(value))
         };
 

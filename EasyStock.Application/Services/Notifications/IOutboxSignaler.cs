@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Services.Notifications;
+﻿namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
 /// Sinal de wakeup do dispatcher do outbox. Implementação concreta decide o mecanismo:

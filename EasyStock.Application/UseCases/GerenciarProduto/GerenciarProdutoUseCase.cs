@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -171,16 +171,16 @@ public sealed class GerenciarProdutoUseCase(
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         // Captura estado anterior para auditoria
-        var nomeAntes      = produto.Nome;
-        var marcaAntes     = produto.Marca;
-        var statusAntes    = produto.Status;
-        var precoAntes     = produto.PrecoReferencia?.Valor;
-        var custoAntes     = produto.CustoReferencia?.Valor;
-        var margemAntes    = produto.MargemEstimada;
+        var nomeAntes = produto.Nome;
+        var marcaAntes = produto.Marca;
+        var statusAntes = produto.Status;
+        var precoAntes = produto.PrecoReferencia?.Valor;
+        var custoAntes = produto.CustoReferencia?.Valor;
+        var margemAntes = produto.MargemEstimada;
         var descricaoAntes = produto.DescricaoBase;
-        var skuAntes       = produto.SkuBase?.Value;
+        var skuAntes = produto.SkuBase?.Value;
         var codigoBarrasAntes = produto.CodigoBarras;
-        var observacaoAntes   = produto.ObservacaoInterna;
+        var observacaoAntes = produto.ObservacaoInterna;
 
         var categoria = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaId)
             ?? throw new UseCaseValidationException("Categoria nao encontrada.");
@@ -517,7 +517,7 @@ public sealed class GerenciarProdutoUseCase(
 
         // Queries sequenciais — repositórios compartilham o mesmo DbContext (Scoped),
         // Task.WhenAll em paralelo causaria "A second operation was started on this context instance".
-        var itens     = await itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
+        var itens = await itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
         var variacoes = await produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
         var fotos = DesserializarFotos(produto.FotosJson);
 

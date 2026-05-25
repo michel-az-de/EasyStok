@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Mobile.DTOs;
+﻿namespace EasyStock.Api.Mobile.DTOs;
 
 // Os DTOs abaixo espelham o formato JSON que o app envia.
 // Campos opcionais refletem a realidade do client-side.

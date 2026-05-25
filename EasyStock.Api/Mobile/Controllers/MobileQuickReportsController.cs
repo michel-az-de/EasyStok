@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.QuickReports;
+﻿using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Async.Reporting.QuickReports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,11 +21,11 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Route("api/mobile/reports/quick")]
 [Authorize]
 public sealed class MobileQuickReportsController(
-    GetVendasHojeQuery              vendasHoje,
-    GetCaixaTurnoQuery              caixaTurno,
-    GetEstoqueBuscaQuery            estoqueBusca,
-    GetNfceHojeQuery                nfceHoje,
-    GetVendasVendedorTurnoQuery     vendasVendedor,
+    GetVendasHojeQuery vendasHoje,
+    GetCaixaTurnoQuery caixaTurno,
+    GetEstoqueBuscaQuery estoqueBusca,
+    GetNfceHojeQuery nfceHoje,
+    GetVendasVendedorTurnoQuery vendasVendedor,
     ILogger<MobileQuickReportsController> log) : ControllerBase
 {
     // ─────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ public sealed class MobileQuickReportsController(
             log.LogWarning("quick/vendas-hoje excedeu o timeout de 5s");
             return StatusCode(StatusCodes.Status504GatewayTimeout, new
             {
-                error   = "O resumo de vendas demorou mais que o esperado. Tente novamente.",
+                error = "O resumo de vendas demorou mais que o esperado. Tente novamente.",
                 quickKey = "vendas-hoje",
             });
         }
@@ -92,7 +92,7 @@ public sealed class MobileQuickReportsController(
             log.LogWarning("quick/caixa-turno excedeu o timeout de 5s");
             return StatusCode(StatusCodes.Status504GatewayTimeout, new
             {
-                error   = "O resumo de caixa demorou mais que o esperado. Tente novamente.",
+                error = "O resumo de caixa demorou mais que o esperado. Tente novamente.",
                 quickKey = "caixa-turno",
             });
         }
@@ -114,8 +114,8 @@ public sealed class MobileQuickReportsController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> EstoqueBusca(
         [FromQuery] string busca,
-        [FromQuery] Guid?  lojaId,
-        CancellationToken  ct)
+        [FromQuery] Guid? lojaId,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(busca))
             return BadRequest(new { error = "Informe um termo de busca." });
@@ -134,7 +134,7 @@ public sealed class MobileQuickReportsController(
             log.LogWarning("quick/estoque-busca excedeu o timeout de 5s. Busca={Busca}", busca);
             return StatusCode(StatusCodes.Status504GatewayTimeout, new
             {
-                error    = "A busca de estoque demorou mais que o esperado. Tente novamente.",
+                error = "A busca de estoque demorou mais que o esperado. Tente novamente.",
                 quickKey = "estoque-busca",
             });
         }
@@ -168,7 +168,7 @@ public sealed class MobileQuickReportsController(
             log.LogWarning("quick/nfce-hoje excedeu o timeout de 5s");
             return StatusCode(StatusCodes.Status504GatewayTimeout, new
             {
-                error    = "O resumo de NFC-e demorou mais que o esperado. Tente novamente.",
+                error = "O resumo de NFC-e demorou mais que o esperado. Tente novamente.",
                 quickKey = "nfce-hoje",
             });
         }
@@ -202,7 +202,7 @@ public sealed class MobileQuickReportsController(
             log.LogWarning("quick/vendas-vendedor-turno excedeu o timeout de 5s");
             return StatusCode(StatusCodes.Status504GatewayTimeout, new
             {
-                error    = "O ranking de vendedores demorou mais que o esperado. Tente novamente.",
+                error = "O ranking de vendedores demorou mais que o esperado. Tente novamente.",
                 quickKey = "vendas-vendedor-turno",
             });
         }
@@ -212,7 +212,7 @@ public sealed class MobileQuickReportsController(
 
     public sealed record VendasHojeResponse(
         decimal Total,
-        int     QtdVendas,
+        int QtdVendas,
         decimal TicketMedio,
         IReadOnlyList<TopProdutoResponse> TopProdutos)
     {
@@ -227,11 +227,11 @@ public sealed class MobileQuickReportsController(
     public sealed record TopProdutoResponse(Guid ProdutoId, string Nome, decimal Qtd);
 
     public sealed record CaixaTurnoResponse(
-        decimal  TotalEntradas,
-        decimal  TotalSaidas,
-        decimal  TotalVendas,
-        decimal  SaldoAtual,
-        string?  Operador)
+        decimal TotalEntradas,
+        decimal TotalSaidas,
+        decimal TotalVendas,
+        decimal SaldoAtual,
+        string? Operador)
     {
         public CaixaTurnoResponse(CaixaTurnoDto dto) : this(
             dto.TotalEntradas,
@@ -243,15 +243,15 @@ public sealed class MobileQuickReportsController(
     }
 
     public sealed record EstoqueBuscaResponse(
-        Guid     ItemEstoqueId,
-        string   Sku,
-        string   Nome,
-        string?  Variacao,
-        string?  LojaNome,
-        decimal  QtdAtual,
-        decimal  CustoUnitario,
-        decimal  ValorEstoque,
-        string   StatusEstoque)
+        Guid ItemEstoqueId,
+        string Sku,
+        string Nome,
+        string? Variacao,
+        string? LojaNome,
+        decimal QtdAtual,
+        decimal CustoUnitario,
+        decimal ValorEstoque,
+        string StatusEstoque)
     {
         public EstoqueBuscaResponse(EstoqueBuscaDto dto) : this(
             dto.ItemEstoqueId,
@@ -267,10 +267,10 @@ public sealed class MobileQuickReportsController(
     }
 
     public sealed record NfceHojeResponse(
-        int     Autorizadas,
-        int     Canceladas,
-        int     Rejeitadas,
-        int     Pendentes,
+        int Autorizadas,
+        int Canceladas,
+        int Rejeitadas,
+        int Pendentes,
         decimal PercentSucesso)
     {
         public NfceHojeResponse(NfceHojeDto dto) : this(
@@ -285,7 +285,7 @@ public sealed class MobileQuickReportsController(
     public sealed record VendasVendedorTurnoResponse(
         IReadOnlyList<VendedorTurnoItemResponse> Vendedores,
         decimal TotalGeral,
-        int     QtdVendasGeral)
+        int QtdVendasGeral)
     {
         public VendasVendedorTurnoResponse(VendasVendedorTurnoDto dto) : this(
             dto.Vendedores.Select(v => new VendedorTurnoItemResponse(
@@ -296,9 +296,9 @@ public sealed class MobileQuickReportsController(
     }
 
     public sealed record VendedorTurnoItemResponse(
-        Guid?   VendedorId,
-        string  VendedorNome,
-        int     QtdVendas,
+        Guid? VendedorId,
+        string VendedorNome,
+        int QtdVendas,
         decimal TotalVendido,
-        int     Ranking);
+        int Ranking);
 }

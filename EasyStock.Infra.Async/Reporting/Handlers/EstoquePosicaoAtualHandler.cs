@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.EstoquePosicaoAtual;
@@ -15,7 +15,7 @@ namespace EasyStock.Infra.Async.Reporting.Handlers;
 /// Nota: CustoUnitario = custo da última entrada; não é Custo Médio Acumulado (CMA).
 /// </summary>
 public sealed class EstoquePosicaoAtualHandler(
-    EasyStockDbContext        db,
+    EasyStockDbContext db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<EstoquePosicaoAtualParams, EstoquePosicaoAtualRow>
 {
@@ -27,7 +27,7 @@ public sealed class EstoquePosicaoAtualHandler(
     public ReportSchema GetSchema(EstoquePosicaoAtualParams parametros)
     {
         return new ReportSchema(
-            title:        "Posição de estoque",
+            title: "Posição de estoque",
             fileNameBase: $"estoque-posicao_{DateOnly.FromDateTime(DateTime.Today):yyyy-MM-dd}",
             columns:
             [
@@ -65,41 +65,41 @@ public sealed class EstoquePosicaoAtualHandler(
                 i.ProdutoId,
                 i.ProdutoVariacaoId,
                 i.LojaId,
-                QtdAtual          = i.QuantidadeAtual.Value,
-                CustoUnitario     = i.CustoUnitario.Valor,
+                QtdAtual = i.QuantidadeAtual.Value,
+                CustoUnitario = i.CustoUnitario.Valor,
                 UltimaMovimentacaoEm = i.UltimaMovimentacaoEm,
 
                 // Produto
                 // SkuBase eh CodigoSku? (nullable VO). Conditional p/ alinhar
                 // tipo do anonimo a string? — downstream (linha do "??") ja trata null.
-                ProdutoSkuBase    = db.Produtos
+                ProdutoSkuBase = db.Produtos
                     .Where(p => p.Id == i.ProdutoId)
                     .Select(p => p.SkuBase != null ? p.SkuBase.Value : null)
                     .FirstOrDefault(),
-                ProdutoNome       = db.Produtos
+                ProdutoNome = db.Produtos
                     .Where(p => p.Id == i.ProdutoId)
                     .Select(p => p.Nome)
                     .FirstOrDefault(),
-                CategoriaId       = db.Produtos
+                CategoriaId = db.Produtos
                     .Where(p => p.Id == i.ProdutoId)
                     .Select(p => p.CategoriaId)
                     .FirstOrDefault(),
 
                 // Variação (se existir)
-                VariacaoSku       = i.ProdutoVariacaoId == null ? null
+                VariacaoSku = i.ProdutoVariacaoId == null ? null
                     : db.ProdutosVariacao
                         .Where(v => v.Id == i.ProdutoVariacaoId)
                         // Sku eh CodigoSku? — conditional preserva null (downstream "??")
                         .Select(v => v.Sku != null ? v.Sku.Value : null)
                         .FirstOrDefault(),
-                VariacaoNome      = i.ProdutoVariacaoId == null ? null
+                VariacaoNome = i.ProdutoVariacaoId == null ? null
                     : db.ProdutosVariacao
                         .Where(v => v.Id == i.ProdutoVariacaoId)
                         .Select(v => v.Nome)
                         .FirstOrDefault(),
 
                 // Loja (opcional)
-                LojaNome          = i.LojaId == null ? null
+                LojaNome = i.LojaId == null ? null
                     : db.Lojas
                         .Where(l => l.Id == i.LojaId)
                         .Select(l => l.Nome)
@@ -120,7 +120,7 @@ public sealed class EstoquePosicaoAtualHandler(
                     .FirstOrDefaultAsync(ct) ?? "Sem categoria";
 
             // SKU: variação prevalece sobre o produto base
-            var sku  = r.VariacaoSku ?? r.ProdutoSkuBase ?? "-";
+            var sku = r.VariacaoSku ?? r.ProdutoSkuBase ?? "-";
 
             // Nome: Produto + "(Variação)" se aplicável
             var nome = r.VariacaoNome is { Length: > 0 }
@@ -134,13 +134,13 @@ public sealed class EstoquePosicaoAtualHandler(
                 : null;
 
             yield return new EstoquePosicaoAtualRow(
-                Sku:               sku,
-                Nome:              nome,
-                Categoria:         categoriaNome,
-                LojaNome:          r.LojaNome,
-                QtdAtual:          r.QtdAtual,
-                CustoUnitario:     r.CustoUnitario,
-                ValorEstoque:      valor,
+                Sku: sku,
+                Nome: nome,
+                Categoria: categoriaNome,
+                LojaNome: r.LojaNome,
+                QtdAtual: r.QtdAtual,
+                CustoUnitario: r.CustoUnitario,
+                ValorEstoque: valor,
                 UltimaMovimentacao: ultimaMov);
         }
     }

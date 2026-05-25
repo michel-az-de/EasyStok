@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
@@ -25,7 +25,7 @@ public sealed class MrrArrChurnHandler(EasyStockDbContext db)
     {
         var fileNameBase = $"mrr-arr-churn_{parametros.De:yyyy-MM}_a_{parametros.Ate:yyyy-MM}";
         return new ReportSchema(
-            title:        "MRR/ARR/Churn",
+            title: "MRR/ARR/Churn",
             fileNameBase: fileNameBase,
             columns:
             [
@@ -70,7 +70,7 @@ public sealed class MrrArrChurnHandler(EasyStockDbContext db)
             ct.ThrowIfCancellationRequested();
 
             var inicioMes = new DateTime(ano, mes, 1, 0, 0, 0, DateTimeKind.Utc);
-            var fimMes    = inicioMes.AddMonths(1).AddTicks(-1);
+            var fimMes = inicioMes.AddMonths(1).AddTicks(-1);
 
             // Assinaturas ativas no mês
             var ativas = await db.AssinaturasEmpresa
@@ -81,10 +81,10 @@ public sealed class MrrArrChurnHandler(EasyStockDbContext db)
                 .Include(a => a.Plano)
                 .ToListAsync(ct);
 
-            var assinaturasAtivas     = ativas.Count;
-            var mrr                   = ativas.Sum(a => a.Plano?.PrecoMensal ?? 0m);
-            var arr                   = mrr * 12m;
-            var ticketMedio           = assinaturasAtivas > 0 ? mrr / assinaturasAtivas : 0m;
+            var assinaturasAtivas = ativas.Count;
+            var mrr = ativas.Sum(a => a.Plano?.PrecoMensal ?? 0m);
+            var arr = mrr * 12m;
+            var ticketMedio = assinaturasAtivas > 0 ? mrr / assinaturasAtivas : 0m;
 
             var novas = await db.AssinaturasEmpresa
                 .IgnoreQueryFilters()
@@ -119,16 +119,16 @@ public sealed class MrrArrChurnHandler(EasyStockDbContext db)
                 : 0m;
 
             yield return new MrrArrChurnRow(
-                Competencia:              $"{ano:D4}-{mes:D2}",
-                AssinaturasAtivas:        assinaturasAtivas,
-                AssinaturasCanceladas:    canceladas,
-                AssinaturasSuspensas:     suspensas,
-                AssinaturasNovas:         novas,
-                Mrr:                      mrr,
-                Arr:                      arr,
-                ChurnRatePercent:         churnRate,
-                ReceitaRealizada:         receitaRealizada,
-                TicketMedio:              ticketMedio);
+                Competencia: $"{ano:D4}-{mes:D2}",
+                AssinaturasAtivas: assinaturasAtivas,
+                AssinaturasCanceladas: canceladas,
+                AssinaturasSuspensas: suspensas,
+                AssinaturasNovas: novas,
+                Mrr: mrr,
+                Arr: arr,
+                ChurnRatePercent: churnRate,
+                ReceitaRealizada: receitaRealizada,
+                TicketMedio: ticketMedio);
         }
     }
 

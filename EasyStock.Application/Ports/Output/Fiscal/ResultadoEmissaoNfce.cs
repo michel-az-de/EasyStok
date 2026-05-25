@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Fiscal;
+﻿namespace EasyStock.Application.Ports.Output.Fiscal;
 
 /// <summary>
 /// Resultado bem-sucedido de uma emissao NFC-e via <see cref="IGatewayFiscal.EmitirAsync"/>.

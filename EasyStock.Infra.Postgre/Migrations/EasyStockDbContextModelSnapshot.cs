@@ -5629,6 +5629,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("AlteradoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("AvaliacaoSolicitadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("avaliacao_solicitada_em");
+
                     b.Property<DateTime?>("CanceladoEm")
                         .HasColumnType("timestamp with time zone");
 

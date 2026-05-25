@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;

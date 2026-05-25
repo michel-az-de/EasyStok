@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Pagamentos;
+﻿using EasyStock.Domain.Entities.Pagamentos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

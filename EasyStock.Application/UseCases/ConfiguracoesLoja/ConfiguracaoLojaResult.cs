@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.ConfiguracoesLoja;
+﻿namespace EasyStock.Application.UseCases.ConfiguracoesLoja;
 
 public sealed record ConfiguracaoLojaResult(
     Guid LojaId,

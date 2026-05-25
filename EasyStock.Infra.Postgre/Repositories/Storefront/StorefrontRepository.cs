@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;

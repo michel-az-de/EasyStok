@@ -1,4 +1,4 @@
-using EasyStock.Admin.Services;
+﻿using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -114,9 +114,13 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
             {
                 await api.PostRawAsync("api/admin/notificacoes/templates", new
                 {
-                    codigo = Codigo, nome = Nome, canal = Canal,
-                    tipoEvento = TipoEvento, assuntoTemplate = AssuntoTemplate,
-                    corpoTemplate = CorpoTemplate, idioma = Idioma
+                    codigo = Codigo,
+                    nome = Nome,
+                    canal = Canal,
+                    tipoEvento = TipoEvento,
+                    assuntoTemplate = AssuntoTemplate,
+                    corpoTemplate = CorpoTemplate,
+                    idioma = Idioma
                 });
                 SetSucesso("Template criado. Aprove para ativar.");
             }

@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace EasyStock.Web.Helpers;
 
@@ -15,24 +15,24 @@ public static class StatusHelper
     private static readonly Dictionary<string, StatusInfo> Map = new(StringComparer.OrdinalIgnoreCase)
     {
         // ----- Pedidos -----
-        ["aguardando"] = new("Aguardando", "badge-warn",    "warn"),
-        ["preparando"] = new("Preparando", "badge-info",    "info"),
-        ["pronto"]     = new("Pronto",     "badge-info",    "info"),
-        ["entregue"]   = new("Entregue",   "badge-ok",      "ok"),
-        ["cancelado"]  = new("Cancelado",  "badge-crit",    "crit"),
-        ["em_producao"] = new("Em produção", "badge-info",  "info"),
+        ["aguardando"] = new("Aguardando", "badge-warn", "warn"),
+        ["preparando"] = new("Preparando", "badge-info", "info"),
+        ["pronto"] = new("Pronto", "badge-info", "info"),
+        ["entregue"] = new("Entregue", "badge-ok", "ok"),
+        ["cancelado"] = new("Cancelado", "badge-crit", "crit"),
+        ["em_producao"] = new("Em produção", "badge-info", "info"),
 
         // ----- Lotes -----
-        ["finalizado"] = new("Finalizado", "badge-ok",      "ok"),
-        ["expirado"]   = new("Expirado",   "badge-crit",    "crit"),
-        ["vencido"]    = new("Vencido",    "badge-crit",    "crit"),
-        ["disponivel"] = new("Disponível", "badge-ok",      "ok"),
+        ["finalizado"] = new("Finalizado", "badge-ok", "ok"),
+        ["expirado"] = new("Expirado", "badge-crit", "crit"),
+        ["vencido"] = new("Vencido", "badge-crit", "crit"),
+        ["disponivel"] = new("Disponível", "badge-ok", "ok"),
 
         // ----- Caixa -----
-        ["aberto"]            = new("Aberto",  "badge-ok",      "ok"),
-        ["fechado"]           = new("Fechado", "badge-neutral", "neutral"),
-        ["fechado-pendente"]  = new("Aguardando abertura", "badge-warn", "warn"),
-        ["fechado_pendente"]  = new("Aguardando abertura", "badge-warn", "warn"),
+        ["aberto"] = new("Aberto", "badge-ok", "ok"),
+        ["fechado"] = new("Fechado", "badge-neutral", "neutral"),
+        ["fechado-pendente"] = new("Aguardando abertura", "badge-warn", "warn"),
+        ["fechado_pendente"] = new("Aguardando abertura", "badge-warn", "warn"),
 
         // ----- Comum -----
         ["critico"] = new("Crítico", "badge-crit", "crit"),

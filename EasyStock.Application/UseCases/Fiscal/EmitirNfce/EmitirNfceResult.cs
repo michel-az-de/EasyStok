@@ -1,4 +1,4 @@
-using EasyStock.Domain.Fiscal;
+﻿using EasyStock.Domain.Fiscal;
 
 namespace EasyStock.Application.UseCases.Fiscal.EmitirNfce;
 

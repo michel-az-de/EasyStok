@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
@@ -40,7 +40,7 @@ public class FecharCaixaUseCase(
 
         decimal saldoInicial = movList.Where(m => m.Tipo == "abertura").Sum(m => m.Valor);
         decimal totalEntradas = movList.Where(m => m.Tipo == "entrada").Sum(m => m.Valor);
-        decimal totalSaidas   = movList.Where(m => m.Tipo == "saida").Sum(m => m.Valor);
+        decimal totalSaidas = movList.Where(m => m.Tipo == "saida").Sum(m => m.Valor);
         var totalVendas = await repo.GetTotalVendasDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
         var totalPagamentosPedidos = await repo.GetTotalPagamentosPedidosDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
 

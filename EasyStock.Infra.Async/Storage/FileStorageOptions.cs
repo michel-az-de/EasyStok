@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Async.Storage;
+﻿namespace EasyStock.Infra.Async.Storage;
 
 public sealed class FileStorageOptions
 {

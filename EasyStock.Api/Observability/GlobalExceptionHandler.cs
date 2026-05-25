@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;

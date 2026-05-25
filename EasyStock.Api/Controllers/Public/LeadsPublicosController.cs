@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Public;
 using EasyStock.Domain.Enums;

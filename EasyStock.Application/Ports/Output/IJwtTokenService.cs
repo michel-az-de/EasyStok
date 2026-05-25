@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.AutenticarUsuario;
+﻿using EasyStock.Application.UseCases.AutenticarUsuario;
 
 namespace EasyStock.Application.Ports.Output;
 

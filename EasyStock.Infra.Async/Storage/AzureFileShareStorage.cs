@@ -1,4 +1,4 @@
-using Azure.Storage;
+﻿using Azure.Storage;
 using Azure.Storage.Files.Shares;
 using Azure.Storage.Sas;
 using EasyStock.Application.Ports.Output.Storage;
@@ -101,12 +101,12 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
     public async Task<Stream> OpenUploadStreamAsync(string storageKey, string contentType, CancellationToken ct = default)
     {
         var serviceClient = new ShareServiceClient(_opts.ConnectionString);
-        var shareClient   = serviceClient.GetShareClient(_opts.ShareName);
+        var shareClient = serviceClient.GetShareClient(_opts.ShareName);
         await shareClient.CreateIfNotExistsAsync(cancellationToken: ct);
-        var parts    = storageKey.Split('/');
-        var dirPath  = string.Join("/", parts[..^1]);
+        var parts = storageKey.Split('/');
+        var dirPath = string.Join("/", parts[..^1]);
         var fileName = parts[^1];
-        var dirClient  = shareClient.GetDirectoryClient(dirPath);
+        var dirClient = shareClient.GetDirectoryClient(dirPath);
         await dirClient.CreateIfNotExistsAsync(cancellationToken: ct);
         var fileClient = dirClient.GetFileClient(fileName);
         return await fileClient.OpenWriteAsync(overwrite: true, position: 0, cancellationToken: ct);
@@ -115,23 +115,23 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
     public async Task<Stream> DownloadStreamAsync(string storageKey, CancellationToken ct = default)
     {
         var serviceClient = new ShareServiceClient(_opts.ConnectionString);
-        var shareClient   = serviceClient.GetShareClient(_opts.ShareName);
-        var parts     = storageKey.Split('/');
-        var dirPath   = string.Join("/", parts[..^1]);
-        var fileName  = parts[^1];
-        var dirClient  = shareClient.GetDirectoryClient(dirPath);
+        var shareClient = serviceClient.GetShareClient(_opts.ShareName);
+        var parts = storageKey.Split('/');
+        var dirPath = string.Join("/", parts[..^1]);
+        var fileName = parts[^1];
+        var dirClient = shareClient.GetDirectoryClient(dirPath);
         var fileClient = dirClient.GetFileClient(fileName);
-        var download   = await fileClient.DownloadAsync(cancellationToken: ct);
+        var download = await fileClient.DownloadAsync(cancellationToken: ct);
         return download.Value.Content;
     }
 
     public async Task<Uri> CreatePreSignedDownloadUrlAsync(string storageKey, TimeSpan ttl, string downloadFileName, CancellationToken ct = default)
     {
         var serviceClient = new ShareServiceClient(_opts.ConnectionString);
-        var shareClient   = serviceClient.GetShareClient(_opts.ShareName);
-        var parts     = storageKey.Split('/');
-        var dirPath   = string.Join("/", parts[..^1]);
-        var fileName  = parts[^1];
+        var shareClient = serviceClient.GetShareClient(_opts.ShareName);
+        var parts = storageKey.Split('/');
+        var dirPath = string.Join("/", parts[..^1]);
+        var fileName = parts[^1];
         var fileClient = shareClient.GetDirectoryClient(dirPath).GetFileClient(fileName);
 
         var connParts = _opts.ConnectionString
@@ -144,28 +144,28 @@ public sealed class AzureFileShareStorage(IOptions<FileStorageOptions> options) 
             !connParts.TryGetValue("AccountKey", out var accountKey))
             return fileClient.Uri;
 
-        var safeName   = Uri.EscapeDataString(downloadFileName);
+        var safeName = Uri.EscapeDataString(downloadFileName);
         var sasBuilder = new ShareSasBuilder
         {
-            ShareName        = _opts.ShareName,
-            FilePath         = storageKey,
-            Resource         = "f",
-            ExpiresOn        = DateTimeOffset.UtcNow.Add(ttl),
+            ShareName = _opts.ShareName,
+            FilePath = storageKey,
+            Resource = "f",
+            ExpiresOn = DateTimeOffset.UtcNow.Add(ttl),
             ContentDisposition = $"attachment; filename=\"{safeName}\""
         };
         sasBuilder.SetPermissions(ShareFileSasPermissions.Read);
         var credential = new StorageSharedKeyCredential(accountName, accountKey);
-        var sasToken   = sasBuilder.ToSasQueryParameters(credential).ToString();
+        var sasToken = sasBuilder.ToSasQueryParameters(credential).ToString();
         return new Uri($"{fileClient.Uri}?{sasToken}");
     }
 
     public async Task<bool> ExistsAsync(string storageKey, CancellationToken ct = default)
     {
         var serviceClient = new ShareServiceClient(_opts.ConnectionString);
-        var shareClient   = serviceClient.GetShareClient(_opts.ShareName);
-        var parts     = storageKey.Split('/');
-        var dirPath   = string.Join("/", parts[..^1]);
-        var fileName  = parts[^1];
+        var shareClient = serviceClient.GetShareClient(_opts.ShareName);
+        var parts = storageKey.Split('/');
+        var dirPath = string.Join("/", parts[..^1]);
+        var fileName = parts[^1];
         var fileClient = shareClient.GetDirectoryClient(dirPath).GetFileClient(fileName);
         var exists = await fileClient.ExistsAsync(cancellationToken: ct);
         return exists.Value;

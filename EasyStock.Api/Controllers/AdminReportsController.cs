@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.UseCases.Reports;
 using EasyStock.Domain.Reporting;
@@ -18,17 +18,17 @@ namespace EasyStock.Api.Controllers;
 [Route("api/admin/reports")]
 [Authorize(Policy = "SuperAdmin")]
 public sealed class AdminReportsController(
-    EnqueueReportRunUseCase  enqueue,
-    GetReportRunUseCase      getById,
-    ListMyReportRunsUseCase  listMy,
-    CancelReportRunUseCase   cancel,
+    EnqueueReportRunUseCase enqueue,
+    GetReportRunUseCase getById,
+    ListMyReportRunsUseCase listMy,
+    CancelReportRunUseCase cancel,
     ListReportCatalogUseCase catalog,
-    GetReportSchemaUseCase   schema,
-    PreviewReportUseCase     preview,
-    GetReportDataUseCase     data,
-    IReportExecutionScope    executionScope,
-    ICurrentUserAccessor     currentUser,
-    ReportingMetricsService  reportingMetrics)
+    GetReportSchemaUseCase schema,
+    PreviewReportUseCase preview,
+    GetReportDataUseCase data,
+    IReportExecutionScope executionScope,
+    ICurrentUserAccessor currentUser,
+    ReportingMetricsService reportingMetrics)
     : EasyStockControllerBase
 {
     // ── GET /api/admin/reports/catalog ───────────────────────────────────────
@@ -52,19 +52,19 @@ public sealed class AdminReportsController(
     /// </summary>
     [HttpPost("{key}/runs")]
     public async Task<IActionResult> EnqueueRun(
-        [FromRoute] string           key,
-        [FromBody]  AdminEnqueueRunRequest request,
+        [FromRoute] string key,
+        [FromBody] AdminEnqueueRunRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey = null,
-        [FromHeader(Name = "X-Admin-Motivo")]  string? motivo = null)
+        [FromHeader(Name = "X-Admin-Motivo")] string? motivo = null)
     {
         if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length < 10)
             return DataBadRequest(
                 "O header 'X-Admin-Motivo' é obrigatório e deve ter pelo menos 10 caracteres.");
 
         var command = new EnqueueReportRunCommand(
-            ReportKey:      key,
-            ParamsJson:     request.ParamsJson,
-            Format:         request.Format,
+            ReportKey: key,
+            ParamsJson: request.ParamsJson,
+            Format: request.Format,
             IdempotencyKey: idempotencyKey,
             MotivoExecucao: motivo.Trim());
 
@@ -97,20 +97,20 @@ public sealed class AdminReportsController(
     [HttpGet("runs")]
     public async Task<IActionResult> ListRuns(
         [FromQuery] ReportCategoria? categoria = null,
-        [FromQuery] ReportStatus?    status    = null,
-        [FromQuery] DateTimeOffset?  de        = null,
-        [FromQuery] DateTimeOffset?  ate       = null,
-        [FromQuery] int              skip      = 0,
-        [FromQuery] int              take      = 25)
+        [FromQuery] ReportStatus? status = null,
+        [FromQuery] DateTimeOffset? de = null,
+        [FromQuery] DateTimeOffset? ate = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 25)
     {
         take = Math.Clamp(take, 1, 100);
         skip = Math.Max(0, skip);
 
         var filter = new ReportListFilter(
             Categoria: categoria,
-            Status:    status,
-            De:        de,
-            Ate:       ate);
+            Status: status,
+            De: de,
+            Ate: ate);
 
         var runs = await listMy.ExecuteAsync(
             new ListMyReportRunsQuery(Filter: filter, Skip: skip, Take: take));
@@ -138,7 +138,7 @@ public sealed class AdminReportsController(
     public async Task<IActionResult> RepeatRun(
         [FromRoute] Guid id,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey = null,
-        [FromHeader(Name = "X-Admin-Motivo")]  string? motivo = null)
+        [FromHeader(Name = "X-Admin-Motivo")] string? motivo = null)
     {
         if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length < 10)
             return DataBadRequest(
@@ -149,9 +149,9 @@ public sealed class AdminReportsController(
             return DataNotFound("Execução de relatório não encontrada.");
 
         var command = new EnqueueReportRunCommand(
-            ReportKey:      original.ReportKey,
-            ParamsJson:     original.ParamsJson,
-            Format:         original.Format,
+            ReportKey: original.ReportKey,
+            ParamsJson: original.ParamsJson,
+            Format: original.Format,
             IdempotencyKey: idempotencyKey,
             MotivoExecucao: motivo.Trim());
 
@@ -171,7 +171,7 @@ public sealed class AdminReportsController(
     [HttpGet("{key}/schema")]
     public async Task<IActionResult> GetSchema(
         [FromRoute] string key,
-        CancellationToken  ct)
+        CancellationToken ct)
     {
         var result = await schema.ExecuteAsync(key, ct);
         if (result is null)
@@ -188,14 +188,14 @@ public sealed class AdminReportsController(
     /// </summary>
     [HttpPost("{key}/preview")]
     public async Task<IActionResult> Preview(
-        [FromRoute] string              key,
-        [FromBody]  AdminPreviewRequest request,
-        CancellationToken               ct)
+        [FromRoute] string key,
+        [FromBody] AdminPreviewRequest request,
+        CancellationToken ct)
     {
         using var _ = executionScope.Begin(
-            empresaId:            null,
+            empresaId: null,
             usuarioSolicitanteId: currentUser.UsuarioId,
-            contexto:             ReportContexto.AdminSaaS);
+            contexto: ReportContexto.AdminSaaS);
 
         reportingMetrics.RecordPreviewRequested(key);
 
@@ -219,27 +219,27 @@ public sealed class AdminReportsController(
     /// </summary>
     [HttpPost("{key}/data")]
     public async Task<IActionResult> GetData(
-        [FromRoute] string            key,
-        [FromBody]  AdminDataRequest  request,
+        [FromRoute] string key,
+        [FromBody] AdminDataRequest request,
         [FromHeader(Name = "X-Admin-Motivo")] string? motivo = null,
-        CancellationToken             ct = default)
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length < 10)
             return DataBadRequest(
                 "O header 'X-Admin-Motivo' é obrigatório e deve ter pelo menos 10 caracteres.");
 
         using var _ = executionScope.Begin(
-            empresaId:            null,
+            empresaId: null,
             usuarioSolicitanteId: currentUser.UsuarioId,
-            contexto:             ReportContexto.AdminSaaS);
+            contexto: ReportContexto.AdminSaaS);
 
         reportingMetrics.RecordDataRequested("admin", key);
 
         var query = new GetReportDataQuery(
-            ReportKey:  key,
+            ReportKey: key,
             ParamsJson: request.ParamsJson,
-            Page:       request.Page,
-            PageSize:   request.PageSize);
+            Page: request.Page,
+            PageSize: request.PageSize);
 
         var result = await data.ExecuteAsync(query, ct);
 
@@ -254,7 +254,7 @@ public sealed class AdminReportsController(
 
 /// <summary>Body do POST /api/admin/reports/{key}/runs</summary>
 public sealed record AdminEnqueueRunRequest(
-    string       ParamsJson,
+    string ParamsJson,
     ReportFormat Format);
 
 /// <summary>Body do POST /api/admin/reports/{key}/preview</summary>
@@ -263,5 +263,5 @@ public sealed record AdminPreviewRequest(string ParamsJson);
 /// <summary>Body do POST /api/admin/reports/{key}/data</summary>
 public sealed record AdminDataRequest(
     string ParamsJson,
-    int    Page     = 1,
-    int    PageSize = 50);
+    int Page = 1,
+    int PageSize = 50);

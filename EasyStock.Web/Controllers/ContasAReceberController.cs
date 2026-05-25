@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Financeiro;
+﻿using EasyStock.Web.Models.ViewModels.Financeiro;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 

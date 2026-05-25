@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Observability;
@@ -158,8 +158,8 @@ public sealed class DiagnosticoLogsController(
     {
         var logsDir = GetLogDirectory();
 
-        Response.ContentType  = "text/event-stream";
-        Response.Headers["Cache-Control"]     = "no-cache";
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["X-Accel-Buffering"] = "no"; // desabilita buffer do nginx/proxy
 
         var cursor = DateTimeOffset.TryParse(since, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
@@ -183,8 +183,8 @@ public sealed class DiagnosticoLogsController(
                     continue;
                 }
 
-                var dir        = new DirectoryInfo(logsDir);
-                var logFiles   = dir.GetFiles("easystock-*.log")
+                var dir = new DirectoryInfo(logsDir);
+                var logFiles = dir.GetFiles("easystock-*.log")
                     .Where(f => f.LastWriteTimeUtc >= cursor.AddHours(-1))
                     .OrderBy(f => f.Name)
                     .ToList();
@@ -207,22 +207,22 @@ public sealed class DiagnosticoLogsController(
                         var levelClass = e.Level switch
                         {
                             "ERROR" or "FATAL" => "log-error",
-                            "WARN"             => "log-warn",
-                            "DEBUG"            => "log-debug",
-                            _                  => "log-info"
+                            "WARN" => "log-warn",
+                            "DEBUG" => "log-debug",
+                            _ => "log-info"
                         };
                         var cat = e.Categoria switch
                         {
                             "http_request" => $"<span class='log-cat cat-http'>{e.HttpMethod} {e.StatusCode}</span>",
-                            "migration"    => "<span class='log-cat cat-migration'>MIGRATION</span>",
-                            "startup"      => "<span class='log-cat cat-startup'>STARTUP</span>",
-                            "error"        => "<span class='log-cat cat-error'>ERROR</span>",
+                            "migration" => "<span class='log-cat cat-migration'>MIGRATION</span>",
+                            "startup" => "<span class='log-cat cat-startup'>STARTUP</span>",
+                            "error" => "<span class='log-cat cat-error'>ERROR</span>",
                             "db_operation" => "<span class='log-cat cat-db'>DB</span>",
-                            _              => ""
+                            _ => ""
                         };
                         var elapsed = e.ElapsedMs.HasValue ? $"<span class='log-elapsed'>{e.ElapsedMs:F0}ms</span>" : "";
-                        var msg     = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "…" : e.Message);
-                        var exc     = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
+                        var msg = System.Net.WebUtility.HtmlEncode(e.Message.Length > 500 ? e.Message[..500] + "…" : e.Message);
+                        var exc = e.Exception != null ? $"<div class='log-exception'>{System.Net.WebUtility.HtmlEncode(e.Exception)}</div>" : "";
                         return $"<div class='log-row {levelClass}' data-level='{e.Level}' data-cat='{e.Categoria}'>" +
                                $"<span class='log-time'>{e.Timestamp:HH:mm:ss}</span>" +
                                $"<span class='log-level'>{e.Level}</span>" +
@@ -230,7 +230,7 @@ public sealed class DiagnosticoLogsController(
                                $"<span class='log-msg'>{msg}</span>{exc}</div>";
                     }).ToArray();
 
-                    var json    = System.Text.Json.JsonSerializer.Serialize(new { rows, count = rows.Length, cursor = cursor.ToString("O") });
+                    var json = System.Text.Json.JsonSerializer.Serialize(new { rows, count = rows.Length, cursor = cursor.ToString("O") });
                     await Response.WriteAsync($"event: log-batch\ndata: {json}\n\n", ct);
                 }
                 else

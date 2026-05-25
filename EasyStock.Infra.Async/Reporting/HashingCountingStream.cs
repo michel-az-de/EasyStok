@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 
 namespace EasyStock.Infra.Async.Reporting;
 
@@ -33,10 +33,10 @@ public sealed class HashingCountingStream : Stream
 
     // ── Stream overrides necessários ─────────────────────────────────────────
 
-    public override bool CanRead  => false;
-    public override bool CanSeek  => false;
+    public override bool CanRead => false;
+    public override bool CanSeek => false;
     public override bool CanWrite => _inner.CanWrite;
-    public override long Length   => _inner.Length;
+    public override long Length => _inner.Length;
     public override long Position
     {
         get => _inner.Position;

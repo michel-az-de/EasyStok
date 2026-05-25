@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.ItensParados;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.ItensParados;
 
 public sealed record ItensParadosResult(
     Guid ItemEstoqueId,

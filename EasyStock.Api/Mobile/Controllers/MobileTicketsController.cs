@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Application.Ports.Output.Notifications;

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Infra.Postgre.Data;
@@ -12,7 +12,7 @@ namespace EasyStock.Infra.Async.Reporting.QuickReports;
 /// Síncrono, &lt; 1s, sem paginação (§27.7).
 /// </summary>
 public sealed class GetNfceHojeQuery(
-    EasyStockDbContext   db,
+    EasyStockDbContext db,
     ICurrentUserAccessor currentUser)
 {
     // Pendentes = ainda em processo (não tiveram resultado final da SEFAZ)
@@ -26,8 +26,8 @@ public sealed class GetNfceHojeQuery(
     public async Task<NfceHojeDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        var hoje = DateTime.UtcNow.Date;
+        var amanha = hoje.AddDays(1);
 
         // Nota: NfeDocumento não possui LojaId — está vinculado à loja via PedidoId.
         // O filtro de lojaId não é aplicável nesta query; o parâmetro é mantido
@@ -38,16 +38,16 @@ public sealed class GetNfceHojeQuery(
             .AsNoTracking()
             .Where(n => n.EmpresaId == empresaId
                      && n.CriadoEm >= hoje
-                     && n.CriadoEm <  amanha);
+                     && n.CriadoEm < amanha);
 
         var contagens = await query
             .GroupBy(n => n.Status)
             .Select(g => new { Status = g.Key, Qtd = g.Count() })
             .ToListAsync(ct);
 
-        var autorizadas = contagens.FirstOrDefault(c => c.Status == StatusNfe.Autorizada)?.Qtd  ?? 0;
-        var canceladas  = contagens.FirstOrDefault(c => c.Status == StatusNfe.Cancelada)?.Qtd   ?? 0;
-        var rejeitadas  = contagens.FirstOrDefault(c => c.Status == StatusNfe.Rejeitada)?.Qtd   ?? 0;
+        var autorizadas = contagens.FirstOrDefault(c => c.Status == StatusNfe.Autorizada)?.Qtd ?? 0;
+        var canceladas = contagens.FirstOrDefault(c => c.Status == StatusNfe.Cancelada)?.Qtd ?? 0;
+        var rejeitadas = contagens.FirstOrDefault(c => c.Status == StatusNfe.Rejeitada)?.Qtd ?? 0;
 
         var pendentes = contagens
             .Where(c => _statusPendentes.Contains(c.Status))
@@ -55,15 +55,15 @@ public sealed class GetNfceHojeQuery(
 
         // Sucesso = Autorizadas / (tudo exceto pendentes e inutilizadas)
         var totalFinalizados = autorizadas + canceladas + rejeitadas;
-        var percentSucesso   = totalFinalizados > 0
+        var percentSucesso = totalFinalizados > 0
             ? Math.Round((decimal)autorizadas / totalFinalizados * 100, 1)
             : 0m;
 
         return new NfceHojeDto(
-            Autorizadas:   autorizadas,
-            Canceladas:    canceladas,
-            Rejeitadas:    rejeitadas,
-            Pendentes:     pendentes,
+            Autorizadas: autorizadas,
+            Canceladas: canceladas,
+            Rejeitadas: rejeitadas,
+            Pendentes: pendentes,
             PercentSucesso: percentSucesso);
     }
 }

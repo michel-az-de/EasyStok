@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Caixa;
+﻿namespace EasyStock.Application.UseCases.Caixa;
 
 /// <summary>DTOs de retorno do módulo Caixa (Onda P3).</summary>
 public sealed record MovimentoCaixaResult(

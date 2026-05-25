@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Common;
+﻿using EasyStock.Application.UseCases.Common;
 
 namespace EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 

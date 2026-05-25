@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Auth;
@@ -495,6 +495,6 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
                 : null;
         }
         catch (FormatException) { return null; }  // base64 malformado — token de versão antiga
-        catch (JsonException)   { return null; }  // payload inválido — degradação esperada
+        catch (JsonException) { return null; }  // payload inválido — degradação esperada
     }
 }

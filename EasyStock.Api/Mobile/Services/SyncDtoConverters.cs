@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;

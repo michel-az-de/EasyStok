@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting;
+﻿namespace EasyStock.Application.Reporting;
 
 /// <summary>
 /// Catálogo em memória de todas as definições de relatório registradas via DI.

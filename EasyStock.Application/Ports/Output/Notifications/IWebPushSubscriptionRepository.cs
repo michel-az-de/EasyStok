@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Domain.Entities.Notifications;
 
 namespace EasyStock.Application.Ports.Output.Notifications;
 

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Caching;
+﻿using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;

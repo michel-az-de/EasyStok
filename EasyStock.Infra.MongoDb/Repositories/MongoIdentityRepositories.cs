@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.MongoDb.Data;
@@ -79,7 +79,7 @@ public sealed class FornecedorRepository(MongoEasyStockContext context, MongoUni
         var sorted = sort?.ToLowerInvariant() switch
         {
             "criadoem" => desc ? findFluent.SortByDescending(x => x.CriadoEm) : findFluent.SortBy(x => x.CriadoEm),
-            _          => desc ? findFluent.SortByDescending(x => x.Nome) : findFluent.SortBy(x => x.Nome),
+            _ => desc ? findFluent.SortByDescending(x => x.Nome) : findFluent.SortBy(x => x.Nome),
         };
         var items = await sorted
             .Skip((page - 1) * pageSize)

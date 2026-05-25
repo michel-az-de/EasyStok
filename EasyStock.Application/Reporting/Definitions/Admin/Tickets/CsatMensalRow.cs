@@ -1,14 +1,14 @@
-namespace EasyStock.Application.Reporting.Definitions.Admin.Tickets;
+﻿namespace EasyStock.Application.Reporting.Definitions.Admin.Tickets;
 
 /// <summary>Linha do relatório de CSAT mensal — um ticket avaliado.</summary>
 public sealed record CsatMensalRow(
-    Guid     TicketId,
-    string   EmpresaNome,
-    string   Categoria,
-    string   Prioridade,
+    Guid TicketId,
+    string EmpresaNome,
+    string Categoria,
+    string Prioridade,
     DateTime CriadoEm,
     DateTime? ResolvidoEm,
-    int?     NotaCsat,
+    int? NotaCsat,
     DateTime? AvaliadoEm,
-    bool     ConviteEnviado,
+    bool ConviteEnviado,
     DateTime? ConviteEnviadoEm);

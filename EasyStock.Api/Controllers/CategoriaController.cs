@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.GerenciarCategoria;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

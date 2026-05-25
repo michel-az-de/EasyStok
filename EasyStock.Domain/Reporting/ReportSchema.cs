@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Reporting;
+﻿namespace EasyStock.Domain.Reporting;
 
 /// <summary>
 /// Metadados do esquema de saída de um relatório — colunas ordenadas,
@@ -15,9 +15,9 @@ public sealed class ReportSchema
         if (string.IsNullOrWhiteSpace(fileNameBase))
             throw new ArgumentException("FileNameBase é obrigatório.", nameof(fileNameBase));
 
-        Title        = title;
+        Title = title;
         FileNameBase = fileNameBase;
-        _columns     = columns.OrderBy(c => c.Order).ToList();
+        _columns = columns.OrderBy(c => c.Order).ToList();
     }
 
     /// <summary>Título exibido no header do PDF e como nome da aba do Excel.</summary>

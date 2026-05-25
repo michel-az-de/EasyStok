@@ -1,4 +1,4 @@
-using EasyStock.Api.Services.Faturacao;
+﻿using EasyStock.Api.Services.Faturacao;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;

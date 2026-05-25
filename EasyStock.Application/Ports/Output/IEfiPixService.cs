@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output;
+﻿namespace EasyStock.Application.Ports.Output;
 
 public sealed record EfiCobrancaResult(
     string Txid,

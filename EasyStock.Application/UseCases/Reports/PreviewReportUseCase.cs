@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
@@ -12,8 +12,8 @@ namespace EasyStock.Application.UseCases.Reports;
 /// Requer que <see cref="IReportExecutionScope"/> esteja inicializado ANTES de chamar ExecuteAsync.
 /// </summary>
 public sealed class PreviewReportUseCase(
-    ReportRegistry       registry,
-    IServiceProvider     serviceProvider)
+    ReportRegistry registry,
+    IServiceProvider serviceProvider)
 {
     // Reflection handle para o wrapper genérico — evita CS8416 (não é possível await foreach em dynamic)
     private static readonly MethodInfo s_wrapMethod =
@@ -31,22 +31,22 @@ public sealed class PreviewReportUseCase(
         var handlerType = typeof(IReportHandler<,>)
             .MakeGenericType(definition.ParamsType, definition.RowType);
 
-        dynamic handler   = serviceProvider.GetRequiredService(handlerType);
+        dynamic handler = serviceProvider.GetRequiredService(handlerType);
         dynamic paramsObj = handler.DeserializeParams(query.ParamsJson);
 
         // Timeout 3 s — se demorar, retorna Available=false
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
 
-        var rows     = new List<Dictionary<string, object?>>();
+        var rows = new List<Dictionary<string, object?>>();
         var timedOut = false;
 
         try
         {
             // Obtém IAsyncEnumerable<TRow> como object e converte para IAsyncEnumerable<object>
             // via método genérico chamado por reflection — evita await foreach em dynamic (CS8416).
-            var rawStream      = (object)handler.StreamAsync(paramsObj, timeoutCts.Token);
-            var wrapGeneric    = s_wrapMethod.MakeGenericMethod(definition.RowType);
+            var rawStream = (object)handler.StreamAsync(paramsObj, timeoutCts.Token);
+            var wrapGeneric = s_wrapMethod.MakeGenericMethod(definition.RowType);
             var rowsEnumerable = (IAsyncEnumerable<object>)wrapGeneric.Invoke(null, [rawStream])!;
 
             await foreach (var row in rowsEnumerable
@@ -102,6 +102,6 @@ public sealed record PreviewReportQuery(
 
 /// <summary>Resultado da pré-visualização.</summary>
 public sealed record PreviewResult(
-    bool                                   Available,
+    bool Available,
     IReadOnlyList<Dictionary<string, object?>> Rows,
-    string?                                Reason);
+    string? Reason);

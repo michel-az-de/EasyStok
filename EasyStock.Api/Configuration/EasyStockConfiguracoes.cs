@@ -1,4 +1,4 @@
-using EasyStock.Domain.Defaults;
+﻿using EasyStock.Domain.Defaults;
 using EasyStock.Application.Configuration;
 
 namespace EasyStock.Api.Configuration

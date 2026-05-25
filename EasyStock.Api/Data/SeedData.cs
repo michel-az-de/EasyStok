@@ -1,4 +1,4 @@
-using EasyStock.Api.Data.Tenants;
+﻿using EasyStock.Api.Data.Tenants;
 using EasyStock.Api.Data.Tenants.MassasVeneza;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -67,13 +67,13 @@ public static partial class SeedData
     public static async Task ExecutarMinimalAsync(IServiceProvider services, ILogger logger)
     {
         var empresaNome = Environment.GetEnvironmentVariable("SEED_EMPRESA_NOME") ?? "Minha Empresa";
-        var empresaDoc  = Environment.GetEnvironmentVariable("SEED_EMPRESA_DOCUMENTO") ?? "00.000.000/0001-00";
-        var lojaNome    = Environment.GetEnvironmentVariable("SEED_LOJA_NOME") ?? "Loja Principal";
-        var adminNome   = Environment.GetEnvironmentVariable("SEED_ADMIN_NOME") ?? "Administrador";
-        var adminEmail  = Environment.GetEnvironmentVariable("SEED_ADMIN_EMAIL") ?? "admin@easystock.local";
-        var adminSenha  = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD") ?? "Admin@123";
+        var empresaDoc = Environment.GetEnvironmentVariable("SEED_EMPRESA_DOCUMENTO") ?? "00.000.000/0001-00";
+        var lojaNome = Environment.GetEnvironmentVariable("SEED_LOJA_NOME") ?? "Loja Principal";
+        var adminNome = Environment.GetEnvironmentVariable("SEED_ADMIN_NOME") ?? "Administrador";
+        var adminEmail = Environment.GetEnvironmentVariable("SEED_ADMIN_EMAIL") ?? "admin@easystock.local";
+        var adminSenha = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD") ?? "Admin@123";
 
-        var context  = services.GetRequiredService<EasyStockDbContext>();
+        var context = services.GetRequiredService<EasyStockDbContext>();
         var agora = ArredondarAoMinuto(DateTime.UtcNow);
 
         if (await context.Usuarios.AnyAsync())

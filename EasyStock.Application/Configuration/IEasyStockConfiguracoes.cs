@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Configuration;
+﻿namespace EasyStock.Application.Configuration;
 
 public interface IEasyStockConfiguracoes
 {

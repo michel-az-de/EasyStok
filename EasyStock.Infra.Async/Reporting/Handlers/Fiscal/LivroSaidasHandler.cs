@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
@@ -15,7 +15,7 @@ namespace EasyStock.Infra.Async.Reporting.Handlers.Fiscal;
 /// NFC-e legadas (pré-PR-D) aparecem com tributos = R$ 0,00 e flag TributosRastreados=false.
 /// </summary>
 public sealed class LivroSaidasHandler(
-    EasyStockDbContext        db,
+    EasyStockDbContext db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<LivroSaidasParams, LivroSaidasRow>
 {
@@ -28,7 +28,7 @@ public sealed class LivroSaidasHandler(
     {
         var competencia = $"{parametros.De:yyyy-MM}";
         return new ReportSchema(
-            title:        "Livro de Saídas (NFC-e)",
+            title: "Livro de Saídas (NFC-e)",
             fileNameBase: $"livro-saidas-nfce_{competencia}",
             columns:
             [
@@ -65,12 +65,12 @@ public sealed class LivroSaidasHandler(
         LivroSaidasParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Livro fiscal: Autorizada + Cancelada com DataAutorizacao no período.
         var statusAutorizada = StatusNfe.Autorizada.ToString();
-        var statusCancelada  = StatusNfe.Cancelada.ToString();
+        var statusCancelada = StatusNfe.Cancelada.ToString();
 
         var documentos = tenantQuery.Query<NfeDocumento>()
             .Where(n => (n.Status == StatusNfe.Autorizada || n.Status == StatusNfe.Cancelada)
@@ -101,25 +101,25 @@ public sealed class LivroSaidasHandler(
                 })
                 .ToListAsync(ct);
 
-            var temTributos   = itens.Any(i => i.BaseIcms.HasValue);
-            var baseIcms      = itens.Sum(i => i.BaseIcms ?? 0m);
-            var valorIcms     = itens.Sum(i => i.ValorIcms ?? 0m);
-            var pis           = itens.Sum(i => i.Pis ?? 0m);
-            var cofins        = itens.Sum(i => i.Cofins ?? 0m);
+            var temTributos = itens.Any(i => i.BaseIcms.HasValue);
+            var baseIcms = itens.Sum(i => i.BaseIcms ?? 0m);
+            var valorIcms = itens.Sum(i => i.ValorIcms ?? 0m);
+            var pis = itens.Sum(i => i.Pis ?? 0m);
+            var cofins = itens.Sum(i => i.Cofins ?? 0m);
 
             yield return new LivroSaidasRow(
-                DataAutorizacao:   doc.DataAutorizacao,
-                Numero:            doc.Numero,
-                Serie:             doc.Serie,
-                ChaveAcesso:       doc.ChaveAcesso,
-                Status:            doc.Status.ToString(),
-                DestinatarioNome:  doc.DadosDestinatario?.Nome,
-                CfopPrincipal:     cfopPrincipal,
-                TotalNota:         doc.TotalNota.Valor,
-                BaseIcms:          baseIcms,
-                ValorIcms:         valorIcms,
-                Pis:               pis,
-                Cofins:            cofins,
+                DataAutorizacao: doc.DataAutorizacao,
+                Numero: doc.Numero,
+                Serie: doc.Serie,
+                ChaveAcesso: doc.ChaveAcesso,
+                Status: doc.Status.ToString(),
+                DestinatarioNome: doc.DadosDestinatario?.Nome,
+                CfopPrincipal: cfopPrincipal,
+                TotalNota: doc.TotalNota.Valor,
+                BaseIcms: baseIcms,
+                ValorIcms: valorIcms,
+                Pis: pis,
+                Cofins: cofins,
                 TributosRastreados: temTributos);
         }
     }

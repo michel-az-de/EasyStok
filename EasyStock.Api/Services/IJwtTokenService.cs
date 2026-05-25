@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.AutenticarUsuario;
+﻿using EasyStock.Application.UseCases.AutenticarUsuario;
 
 namespace EasyStock.Api.Services;
 

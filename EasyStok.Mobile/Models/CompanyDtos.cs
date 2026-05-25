@@ -5,7 +5,7 @@ namespace EasyStok.Mobile.Models;
 // GET /api/lojas?empresaId={guid} — espelha LojaResult em
 // EasyStock.Application.UseCases.Loja: (Id, EmpresaId, Nome, Ativa).
 public sealed record Loja(
-	[property: JsonPropertyName("id")] Guid Id,
-	[property: JsonPropertyName("empresaId")] Guid EmpresaId,
-	[property: JsonPropertyName("nome")] string Nome,
-	[property: JsonPropertyName("ativa")] bool Ativa);
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("empresaId")] Guid EmpresaId,
+    [property: JsonPropertyName("nome")] string Nome,
+    [property: JsonPropertyName("ativa")] bool Ativa);

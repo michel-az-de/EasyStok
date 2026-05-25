@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using EasyStock.Application.Reporting;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,7 +11,7 @@ namespace EasyStock.Application.UseCases.Reports;
 /// Máx. pageSize = 200. Requer <see cref="IReportExecutionScope"/> inicializado.
 /// </summary>
 public sealed class GetReportDataUseCase(
-    ReportRegistry   registry,
+    ReportRegistry registry,
     IServiceProvider serviceProvider)
 {
     public const int MaxPageSize = 200;
@@ -29,21 +29,21 @@ public sealed class GetReportDataUseCase(
             return null;
 
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
-        int page     = Math.Max(1, query.Page);
-        int skip     = (page - 1) * pageSize;
+        int page = Math.Max(1, query.Page);
+        int skip = (page - 1) * pageSize;
 
         var handlerType = typeof(IReportHandler<,>)
             .MakeGenericType(definition.ParamsType, definition.RowType);
 
-        dynamic handler   = serviceProvider.GetRequiredService(handlerType);
+        dynamic handler = serviceProvider.GetRequiredService(handlerType);
         dynamic paramsObj = handler.DeserializeParams(query.ParamsJson);
 
-        var rows     = new List<Dictionary<string, object?>>();
+        var rows = new List<Dictionary<string, object?>>();
         int rowIndex = 0;
 
         // Obtém IAsyncEnumerable<TRow> como object e converte via reflection — evita CS8416
-        var rawStream      = (object)handler.StreamAsync(paramsObj, ct);
-        var wrapGeneric    = s_wrapMethod.MakeGenericMethod(definition.RowType);
+        var rawStream = (object)handler.StreamAsync(paramsObj, ct);
+        var wrapGeneric = s_wrapMethod.MakeGenericMethod(definition.RowType);
         var rowsEnumerable = (IAsyncEnumerable<object>)wrapGeneric.Invoke(null, [rawStream])!;
 
         await foreach (var row in rowsEnumerable.WithCancellation(ct).ConfigureAwait(false))
@@ -67,10 +67,10 @@ public sealed class GetReportDataUseCase(
             rows.RemoveAt(rows.Count - 1);
 
         return new ReportDataResult(
-            Rows:     rows,
-            Page:     page,
+            Rows: rows,
+            Page: page,
             PageSize: pageSize,
-            HasMore:  hasMore);
+            HasMore: hasMore);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -103,13 +103,13 @@ public sealed class GetReportDataUseCase(
 public sealed record GetReportDataQuery(
     string ReportKey,
     string ParamsJson,
-    int    Page     = 1,
-    int    PageSize = 50,
+    int Page = 1,
+    int PageSize = 50,
     string? MotivoAdmin = null);
 
 /// <summary>Resposta paginada do endpoint /data.</summary>
 public sealed record ReportDataResult(
     IReadOnlyList<Dictionary<string, object?>> Rows,
-    int    Page,
-    int    PageSize,
-    bool   HasMore);
+    int Page,
+    int PageSize,
+    bool HasMore);

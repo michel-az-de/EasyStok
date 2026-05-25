@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 
 namespace EasyStock.Application.UseCases.Etiquetas;
@@ -11,9 +11,9 @@ public class ListarTemplatesUseCase(IEtiquetaTemplateRepository repo)
     {
         UseCaseGuards.EnsureEmpresaId(q.EmpresaId);
 
-        var sistema  = await repo.ListSistemaAsync();
-        var empresa  = await repo.ListEmpresaAsync(q.EmpresaId);
-        var padrao   = await repo.GetDefaultAsync(q.EmpresaId);
+        var sistema = await repo.ListSistemaAsync();
+        var empresa = await repo.ListEmpresaAsync(q.EmpresaId);
+        var padrao = await repo.GetDefaultAsync(q.EmpresaId);
 
         var result = new List<EtiquetaTemplateListItem>();
 

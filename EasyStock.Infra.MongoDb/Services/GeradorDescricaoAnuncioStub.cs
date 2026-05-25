@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Ai;
+﻿using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Domain.Entities;
 
 namespace EasyStock.Infra.MongoDb.Services;

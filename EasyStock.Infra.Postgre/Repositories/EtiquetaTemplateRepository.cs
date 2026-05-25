@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -56,8 +56,8 @@ public sealed class EtiquetaTemplateRepository(EasyStockDbContext db) : IEtiquet
         else
         {
             existing.TemplateOrigem = defaultEntry.TemplateOrigem;
-            existing.TemplateId    = defaultEntry.TemplateId;
-            existing.AlteradoEm    = defaultEntry.AlteradoEm;
+            existing.TemplateId = defaultEntry.TemplateId;
+            existing.AlteradoEm = defaultEntry.AlteradoEm;
         }
     }
 

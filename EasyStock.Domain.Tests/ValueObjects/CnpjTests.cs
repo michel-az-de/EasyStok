@@ -1,4 +1,4 @@
-using EasyStock.Domain.ValueObjects;
+﻿using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.ValueObjects;
@@ -7,9 +7,9 @@ public class CnpjTests
 {
     [Theory]
     [InlineData("11.222.333/0001-81", "11222333000181")]
-    [InlineData("11222333000181",      "11222333000181")]
-    [InlineData("123.456.789-09",      "12345678909")]
-    [InlineData("12345678909",          "12345678909")]
+    [InlineData("11222333000181", "11222333000181")]
+    [InlineData("123.456.789-09", "12345678909")]
+    [InlineData("12345678909", "12345678909")]
     public void From_normaliza_e_armazena_apenas_digitos(string input, string expected)
     {
         Cnpj.From(input).Value.Should().Be(expected);

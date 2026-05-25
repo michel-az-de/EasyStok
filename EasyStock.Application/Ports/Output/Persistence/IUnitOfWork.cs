@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Persistence;
+﻿namespace EasyStock.Application.Ports.Output.Persistence;
 
 public interface IUnitOfWork
 {

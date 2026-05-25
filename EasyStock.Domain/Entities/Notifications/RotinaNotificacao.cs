@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 

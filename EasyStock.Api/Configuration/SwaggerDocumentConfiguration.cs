@@ -1,4 +1,4 @@
-using Microsoft.OpenApi.Any;
+﻿using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
@@ -14,22 +14,22 @@ public static class SwaggerConfiguration
 
     private static readonly OpenApiContact Contact = new()
     {
-        Name  = "EasyStock Support",
+        Name = "EasyStock Support",
         Email = "suporte@easystock.com.br",
-        Url   = new Uri("https://easystock.com.br")
+        Url = new Uri("https://easystock.com.br")
     };
 
     private static readonly OpenApiLicense License = new()
     {
         Name = "Proprietária / Proprietary",
-        Url  = new Uri("https://easystock.com.br/terms")
+        Url = new Uri("https://easystock.com.br/terms")
     };
 
     // ── English document ─────────────────────────────────────────────────────
 
     public static OpenApiInfo InfoEnglish => new()
     {
-        Title   = "EasyStock API",
+        Title = "EasyStock API",
         Version = "v1",
         Contact = Contact,
         License = License,
@@ -87,7 +87,7 @@ public static class SwaggerConfiguration
 
     public static OpenApiInfo InfoPortuguese => new()
     {
-        Title   = "EasyStock API",
+        Title = "EasyStock API",
         Version = "v1",
         Contact = Contact,
         License = License,
@@ -146,10 +146,10 @@ public static class SwaggerConfiguration
     public static OpenApiSecurityScheme BearerScheme => new()
     {
         Description = "JWT Bearer token. Enter: **Bearer** &lt;token&gt;",
-        Name        = "Authorization",
-        In          = ParameterLocation.Header,
-        Type        = SecuritySchemeType.Http,
-        Scheme      = "bearer",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
         BearerFormat = "JWT"
     };
 
@@ -204,16 +204,16 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
     {
         schema.Example = new OpenApiObject
         {
-            ["empresaId"]         = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
-            ["categoriaId"]       = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa7"),
-            ["nome"]              = new OpenApiString("Camiseta Polo Masculina"),
-            ["descricaoBase"]     = new OpenApiString("Camiseta polo 100% algodão, disponível em várias cores."),
-            ["marca"]             = new OpenApiString("Polo Brasil"),
-            ["codigoBarras"]      = new OpenApiString("7891234567890"),
-            ["tipo"]              = new OpenApiString("FISICO"),
-            ["custoReferencia"]   = new OpenApiDouble(29.90),
-            ["precoReferencia"]   = new OpenApiDouble(79.90),
-            ["controlaValidade"]  = new OpenApiBoolean(false)
+            ["empresaId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
+            ["categoriaId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa7"),
+            ["nome"] = new OpenApiString("Camiseta Polo Masculina"),
+            ["descricaoBase"] = new OpenApiString("Camiseta polo 100% algodão, disponível em várias cores."),
+            ["marca"] = new OpenApiString("Polo Brasil"),
+            ["codigoBarras"] = new OpenApiString("7891234567890"),
+            ["tipo"] = new OpenApiString("FISICO"),
+            ["custoReferencia"] = new OpenApiDouble(29.90),
+            ["precoReferencia"] = new OpenApiDouble(79.90),
+            ["controlaValidade"] = new OpenApiBoolean(false)
         };
     }
 
@@ -221,13 +221,13 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
     {
         schema.Example = new OpenApiObject
         {
-            ["empresaId"]             = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
-            ["nome"]                  = new OpenApiString("Distribuidora ABC Ltda"),
-            ["documento"]             = new OpenApiString("12.345.678/0001-90"),
-            ["email"]                 = new OpenApiString("comercial@abc.com.br"),
-            ["telefone"]              = new OpenApiString("(11) 99999-9999"),
-            ["contato"]               = new OpenApiString("João da Silva"),
-            ["leadTimeEstimadoDias"]  = new OpenApiInteger(7)
+            ["empresaId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
+            ["nome"] = new OpenApiString("Distribuidora ABC Ltda"),
+            ["documento"] = new OpenApiString("12.345.678/0001-90"),
+            ["email"] = new OpenApiString("comercial@abc.com.br"),
+            ["telefone"] = new OpenApiString("(11) 99999-9999"),
+            ["contato"] = new OpenApiString("João da Silva"),
+            ["leadTimeEstimadoDias"] = new OpenApiInteger(7)
         };
     }
 
@@ -235,11 +235,11 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
     {
         schema.Example = new OpenApiObject
         {
-            ["empresaId"]    = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
+            ["empresaId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
             ["itemEstoqueId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa8"),
-            ["quantidade"]   = new OpenApiInteger(50),
+            ["quantidade"] = new OpenApiInteger(50),
             ["custoUnitario"] = new OpenApiDouble(29.90),
-            ["descricao"]    = new OpenApiString("Recebimento NF 12345")
+            ["descricao"] = new OpenApiString("Recebimento NF 12345")
         };
     }
 
@@ -247,8 +247,8 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
     {
         schema.Example = new OpenApiObject
         {
-            ["email"]     = new OpenApiString("usuario@empresa.com.br"),
-            ["senha"]     = new OpenApiString("Senha@123"),
+            ["email"] = new OpenApiString("usuario@empresa.com.br"),
+            ["senha"] = new OpenApiString("Senha@123"),
             ["empresaId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6")
         };
     }
@@ -258,7 +258,7 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
         schema.Example = new OpenApiObject
         {
             ["empresaId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
-            ["nome"]      = new OpenApiString("Vestuário"),
+            ["nome"] = new OpenApiString("Vestuário"),
             ["descricao"] = new OpenApiString("Roupas e acessórios em geral")
         };
     }
@@ -267,10 +267,10 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
     {
         schema.Example = new OpenApiObject
         {
-            ["nome"]      = new OpenApiString("Minha Empresa ME"),
+            ["nome"] = new OpenApiString("Minha Empresa ME"),
             ["documento"] = new OpenApiString("12.345.678/0001-90"),
             ["adminEmail"] = new OpenApiString("admin@minhaempresa.com.br"),
-            ["adminNome"]  = new OpenApiString("Admin"),
+            ["adminNome"] = new OpenApiString("Admin"),
             ["adminSenha"] = new OpenApiString("Senha@123")
         };
     }
@@ -293,11 +293,11 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
         {
             operation.Parameters.Add(new OpenApiParameter
             {
-                Name        = "X-Correlation-Id",
-                In          = ParameterLocation.Header,
-                Required    = false,
+                Name = "X-Correlation-Id",
+                In = ParameterLocation.Header,
+                Required = false,
                 Description = "Optional correlation ID for distributed tracing.",
-                Schema      = new OpenApiSchema { Type = "string", Format = "uuid" }
+                Schema = new OpenApiSchema { Type = "string", Format = "uuid" }
             });
         }
 
@@ -319,8 +319,8 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
             {
                 ["data"] = new OpenApiObject
                 {
-                    ["id"]    = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
-                    ["nome"]  = new OpenApiString("João da Silva"),
+                    ["id"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
+                    ["nome"] = new OpenApiString("João da Silva"),
                     ["email"] = new OpenApiString("joao@empresa.com.br"),
                     ["nivel"] = new OpenApiString("Gerente"),
                     ["ativo"] = new OpenApiBoolean(true)
@@ -345,10 +345,10 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
                 },
                 ["meta"] = new OpenApiObject
                 {
-                    ["total"]  = new OpenApiInteger(120),
-                    ["pages"]  = new OpenApiInteger(6),
-                    ["page"]   = new OpenApiInteger(1),
-                    ["limit"]  = new OpenApiInteger(20)
+                    ["total"] = new OpenApiInteger(120),
+                    ["pages"] = new OpenApiInteger(6),
+                    ["page"] = new OpenApiInteger(1),
+                    ["limit"] = new OpenApiInteger(20)
                 }
             });
         }
@@ -369,8 +369,10 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
                 },
                 ["meta"] = new OpenApiObject
                 {
-                    ["total"] = new OpenApiInteger(80), ["pages"] = new OpenApiInteger(4),
-                    ["page"]  = new OpenApiInteger(1),  ["limit"]  = new OpenApiInteger(20)
+                    ["total"] = new OpenApiInteger(80),
+                    ["pages"] = new OpenApiInteger(4),
+                    ["page"] = new OpenApiInteger(1),
+                    ["limit"] = new OpenApiInteger(20)
                 }
             });
         }
@@ -380,11 +382,11 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
             {
                 ["data"] = new OpenApiObject
                 {
-                    ["totalProdutos"]    = new OpenApiInteger(150),
-                    ["itensEstoque"]     = new OpenApiInteger(320),
-                    ["itensEstoqueBaixo"]= new OpenApiInteger(12),
-                    ["itensVencendo"]    = new OpenApiInteger(3),
-                    ["receitaMes"]       = new OpenApiDouble(48250.75)
+                    ["totalProdutos"] = new OpenApiInteger(150),
+                    ["itensEstoque"] = new OpenApiInteger(320),
+                    ["itensEstoqueBaixo"] = new OpenApiInteger(12),
+                    ["itensVencendo"] = new OpenApiInteger(3),
+                    ["receitaMes"] = new OpenApiDouble(48250.75)
                 },
                 ["meta"] = new OpenApiObject()
             });
@@ -395,7 +397,7 @@ public sealed class GetOperationExamplesFilter : IOperationFilter
             {
                 ["data"] = new OpenApiObject
                 {
-                    ["total"]   = new OpenApiInteger(5),
+                    ["total"] = new OpenApiInteger(5),
                     ["critica"] = new OpenApiInteger(1)
                 },
                 ["meta"] = new OpenApiObject()
@@ -433,24 +435,24 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
 {
     private static readonly Dictionary<string, string> Descriptions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Auth"]           = "Autenticação e gerenciamento de sessão. Registro, login, refresh de token e perfil do usuário autenticado.",
-        ["Empresas"]       = "Registro e configuração de empresas (tenants). Cada recurso da API é vinculado a um `empresaId`.",
-        ["Usuarios"]       = "Gerenciamento de usuários: criação, atualização de perfil, desativação e listagem por empresa.",
-        ["Produtos"]       = "Catálogo de produtos com suporte a variações, embalagens, fotos e geração de anúncios via IA.",
-        ["ItemEstoque"]    = "Itens de estoque vinculados a produtos. Controle de quantidade atual, mínima e alertas de reposição.",
-        ["Movimentacao"]   = "Entradas e saídas de estoque. Registro de compras, ajustes e saídas com rastreabilidade.",
-        ["Fornecedor"]     = "Cadastro de fornecedores e configuração de lead time para cálculo de ponto de pedido.",
-        ["Categoria"]      = "Categorias de produtos para organização do catálogo.",
-        ["Analytics"]      = "Dashboard, projeções de demanda, análise de sazonalidade e relatórios de movimentação.",
-        ["Inteligencia"]   = "Alertas inteligentes de estoque baixo, validade próxima e sugestões de reposição.",
-        ["Notificacao"]    = "Gerenciamento de notificações do sistema: listagem, marcação como lida e contagem de não lidas.",
-        ["Configuracoes"]  = "Configurações por empresa: limites de estoque, preferências de alerta e parametrizações gerais.",
-        ["Loja"]           = "Configurações e dados da loja vinculada à empresa.",
-        ["Plano"]          = "Gerenciamento de planos e assinaturas.",
-        ["Uploads"]        = "Upload e gerenciamento de arquivos (fotos de produtos, documentos).",
-        ["IaAnuncio"]      = "Geração de anúncios e descrições de produtos via Inteligência Artificial (Anthropic Claude).",
-        ["Venda"]          = "Registro e consulta de vendas realizadas.",
-        ["Diagnostico"]    = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
+        ["Auth"] = "Autenticação e gerenciamento de sessão. Registro, login, refresh de token e perfil do usuário autenticado.",
+        ["Empresas"] = "Registro e configuração de empresas (tenants). Cada recurso da API é vinculado a um `empresaId`.",
+        ["Usuarios"] = "Gerenciamento de usuários: criação, atualização de perfil, desativação e listagem por empresa.",
+        ["Produtos"] = "Catálogo de produtos com suporte a variações, embalagens, fotos e geração de anúncios via IA.",
+        ["ItemEstoque"] = "Itens de estoque vinculados a produtos. Controle de quantidade atual, mínima e alertas de reposição.",
+        ["Movimentacao"] = "Entradas e saídas de estoque. Registro de compras, ajustes e saídas com rastreabilidade.",
+        ["Fornecedor"] = "Cadastro de fornecedores e configuração de lead time para cálculo de ponto de pedido.",
+        ["Categoria"] = "Categorias de produtos para organização do catálogo.",
+        ["Analytics"] = "Dashboard, projeções de demanda, análise de sazonalidade e relatórios de movimentação.",
+        ["Inteligencia"] = "Alertas inteligentes de estoque baixo, validade próxima e sugestões de reposição.",
+        ["Notificacao"] = "Gerenciamento de notificações do sistema: listagem, marcação como lida e contagem de não lidas.",
+        ["Configuracoes"] = "Configurações por empresa: limites de estoque, preferências de alerta e parametrizações gerais.",
+        ["Loja"] = "Configurações e dados da loja vinculada à empresa.",
+        ["Plano"] = "Gerenciamento de planos e assinaturas.",
+        ["Uploads"] = "Upload e gerenciamento de arquivos (fotos de produtos, documentos).",
+        ["IaAnuncio"] = "Geração de anúncios e descrições de produtos via Inteligência Artificial (Anthropic Claude).",
+        ["Venda"] = "Registro e consulta de vendas realizadas.",
+        ["Diagnostico"] = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
     };
 
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)

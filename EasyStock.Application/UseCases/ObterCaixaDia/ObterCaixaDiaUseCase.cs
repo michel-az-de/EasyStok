@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
@@ -23,7 +23,7 @@ public class ObterCaixaDiaUseCase(ICaixaRepository repo)
 
         decimal saldoInicial = movList.Where(m => m.Tipo == "abertura").Sum(m => m.Valor);
         decimal totalEntradas = movList.Where(m => m.Tipo == "entrada").Sum(m => m.Valor);
-        decimal totalSaidas   = movList.Where(m => m.Tipo == "saida").Sum(m => m.Valor);
+        decimal totalSaidas = movList.Where(m => m.Tipo == "saida").Sum(m => m.Valor);
 
         var totalVendas = await repo.GetTotalVendasDoDiaAsync(q.EmpresaId, q.Data, q.LojaId);
         var totalPagamentosPedidos = await repo.GetTotalPagamentosPedidosDoDiaAsync(q.EmpresaId, q.Data, q.LojaId);

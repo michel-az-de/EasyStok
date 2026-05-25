@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;

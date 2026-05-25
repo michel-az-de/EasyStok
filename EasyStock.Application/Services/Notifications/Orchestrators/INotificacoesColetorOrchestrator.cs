@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Services.Notifications.Orchestrators;
+﻿namespace EasyStock.Application.Services.Notifications.Orchestrators;
 
 /// <summary>
 /// Orquestra 1 rodada de coleta de eventos de estado: itera todos os

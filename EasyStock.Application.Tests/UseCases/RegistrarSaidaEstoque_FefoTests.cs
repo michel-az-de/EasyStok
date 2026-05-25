@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
@@ -62,9 +62,13 @@ public class RegistrarSaidaEstoque_FefoTests
         var produtoId = Guid.NewGuid();
         var lote = new ItemEstoque
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
-            QuantidadeAtual = Quantidade.From(5), QuantidadeInicial = Quantidade.From(5),
-            CustoUnitario = Dinheiro.FromDecimal(1m), Status = StatusItemEstoque.Ok,
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(5),
+            QuantidadeInicial = Quantidade.From(5),
+            CustoUnitario = Dinheiro.FromDecimal(1m),
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow.AddDays(-1),
             ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(30))
         };
@@ -83,9 +87,13 @@ public class RegistrarSaidaEstoque_FefoTests
         var produtoId = Guid.NewGuid();
         var lote = new ItemEstoque
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
-            QuantidadeAtual = Quantidade.From(5), QuantidadeInicial = Quantidade.From(5),
-            CustoUnitario = Dinheiro.FromDecimal(1m), Status = StatusItemEstoque.Ok,
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(5),
+            QuantidadeInicial = Quantidade.From(5),
+            CustoUnitario = Dinheiro.FromDecimal(1m),
+            Status = StatusItemEstoque.Ok,
             EntradaEm = DateTime.UtcNow.AddDays(-1)
         };
 

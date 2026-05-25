@@ -1,4 +1,4 @@
-// Camada Public — UseCases anonimos servidos pela landing publica
+﻿// Camada Public — UseCases anonimos servidos pela landing publica
 // (captura de leads, newsletter, fale-conosco). Sem multi-tenant.
 
 using EasyStock.Application.UseCases.Public;

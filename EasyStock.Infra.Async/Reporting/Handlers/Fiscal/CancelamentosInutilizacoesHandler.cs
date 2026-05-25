@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.CancelamentosInutilizacoes;
@@ -15,7 +15,7 @@ namespace EasyStock.Infra.Async.Reporting.Handlers.Fiscal;
 /// O escopo de tenant é garantido via JOIN com <see cref="NfeDocumento"/> que possui EmpresaId.
 /// </summary>
 public sealed class CancelamentosInutilizacoesHandler(
-    EasyStockDbContext        db,
+    EasyStockDbContext db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<CancelamentosInutilizacoesParams, CancelamentosInutilizacoesRow>
 {
@@ -31,7 +31,7 @@ public sealed class CancelamentosInutilizacoesHandler(
     {
         var competencia = $"{parametros.De:yyyy-MM}";
         return new ReportSchema(
-            title:        "Cancelamentos e Inutilizações (NFC-e)",
+            title: "Cancelamentos e Inutilizações (NFC-e)",
             fileNameBase: $"nfce-cancelamentos_{competencia}",
             columns:
             [
@@ -64,7 +64,7 @@ public sealed class CancelamentosInutilizacoesHandler(
         CancelamentosInutilizacoesParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // JOIN com NfeDocumento garante escopo de tenant (NfeEvento não tem EmpresaId diretamente).
@@ -92,15 +92,15 @@ public sealed class CancelamentosInutilizacoesHandler(
         await foreach (var e in eventos.WithCancellation(ct))
         {
             yield return new CancelamentosInutilizacoesRow(
-                OcorridoEm:       e.OcorridoEm,
-                TipoEvento:       CapitalizarTipo(e.Tipo),
-                Numero:           e.Numero,
-                Serie:            e.Serie,
-                ChaveAcesso:      e.ChaveAcesso,
-                TotalNota:        e.TotalNota,
-                ProtocoloEvento:  e.ProtocoloEvento,
-                UsuarioNome:      e.UsuarioNome,
-                Origem:           e.Origem);
+                OcorridoEm: e.OcorridoEm,
+                TipoEvento: CapitalizarTipo(e.Tipo),
+                Numero: e.Numero,
+                Serie: e.Serie,
+                ChaveAcesso: e.ChaveAcesso,
+                TotalNota: e.TotalNota,
+                ProtocoloEvento: e.ProtocoloEvento,
+                UsuarioNome: e.UsuarioNome,
+                Origem: e.Origem);
         }
     }
 
@@ -110,8 +110,8 @@ public sealed class CancelamentosInutilizacoesHandler(
 
     private static string CapitalizarTipo(string tipo) => tipo switch
     {
-        "cancelado"    => "Cancelamento",
-        "inutilizado"  => "Inutilização",
-        _              => tipo,
+        "cancelado" => "Cancelamento",
+        "inutilizado" => "Inutilização",
+        _ => tipo,
     };
 }

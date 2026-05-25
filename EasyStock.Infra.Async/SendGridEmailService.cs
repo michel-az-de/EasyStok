@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using SendGrid;
 using SendGrid.Helpers.Mail;
 

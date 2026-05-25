@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.ExportarMeusDados;
 using EasyStock.Domain.Entities;

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums
+﻿namespace EasyStock.Domain.Enums
 {
     public static class SegmentoEmpresa
     {

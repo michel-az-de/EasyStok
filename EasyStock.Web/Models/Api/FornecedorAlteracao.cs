@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.Api;
+﻿namespace EasyStock.Web.Models.Api;
 
 /// <summary>Onda P4 — entrada do trail de alterações de fornecedor.</summary>
 public record FornecedorAlteracaoDto(

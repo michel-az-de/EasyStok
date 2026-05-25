@@ -1,4 +1,4 @@
-using EasyStock.Domain.Exceptions;
+﻿using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.ValueObjects;
 using FluentAssertions;

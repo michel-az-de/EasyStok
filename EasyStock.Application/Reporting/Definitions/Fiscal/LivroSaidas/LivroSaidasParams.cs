@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
 
 /// <summary>
 /// Parâmetros do relatório "Livro de Saídas (NFC-e)".

@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
@@ -15,7 +15,7 @@ namespace EasyStock.Infra.Async.Reporting.Handlers.Fiscal;
 /// Máximo estimado de 31 linhas (um por dia).
 /// </summary>
 public sealed class MapMensalHandler(
-    EasyStockDbContext        db,
+    EasyStockDbContext db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<MapMensalParams, MapMensalRow>
 {
@@ -28,7 +28,7 @@ public sealed class MapMensalHandler(
     {
         var competencia = $"{parametros.De:yyyy-MM}";
         return new ReportSchema(
-            title:        "MAP — Mapa Resumo NFC-e",
+            title: "MAP — Mapa Resumo NFC-e",
             fileNameBase: $"map-nfce_{competencia}",
             columns:
             [
@@ -62,7 +62,7 @@ public sealed class MapMensalHandler(
         MapMensalParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Passo 1: Carregar todos os documentos do período (max ~31 dias × 500 NFC-e/dia = ~15k rows).
@@ -89,8 +89,8 @@ public sealed class MapMensalHandler(
             .ToDictionary(
                 g => g.Key,
                 g => (
-                    Icms:   g.Sum(i => i.ValorIcms ?? 0m),
-                    Pis:    g.Sum(i => i.Pis ?? 0m),
+                    Icms: g.Sum(i => i.ValorIcms ?? 0m),
+                    Pis: g.Sum(i => i.Pis ?? 0m),
                     Cofins: g.Sum(i => i.Cofins ?? 0m)));
 
         // Passo 3: Agrupar por dia e gerar linhas.
@@ -101,24 +101,24 @@ public sealed class MapMensalHandler(
         foreach (var dia in porDia)
         {
             var autorizadas = dia.Where(d => d.Status == StatusNfe.Autorizada).ToList();
-            var canceladas  = dia.Where(d => d.Status == StatusNfe.Cancelada).ToList();
+            var canceladas = dia.Where(d => d.Status == StatusNfe.Cancelada).ToList();
 
-            var totalAut  = autorizadas.Sum(d => d.TotalNota.Valor);
-            var totalCan  = canceladas.Sum(d => d.TotalNota.Valor);
+            var totalAut = autorizadas.Sum(d => d.TotalNota.Valor);
+            var totalCan = canceladas.Sum(d => d.TotalNota.Valor);
             var totalIcms = dia.Sum(d => tributosDoc.TryGetValue(d.Id, out var t) ? t.Icms : 0m);
-            var totalPis  = dia.Sum(d => tributosDoc.TryGetValue(d.Id, out var t) ? t.Pis : 0m);
-            var totalCof  = dia.Sum(d => tributosDoc.TryGetValue(d.Id, out var t) ? t.Cofins : 0m);
+            var totalPis = dia.Sum(d => tributosDoc.TryGetValue(d.Id, out var t) ? t.Pis : 0m);
+            var totalCof = dia.Sum(d => tributosDoc.TryGetValue(d.Id, out var t) ? t.Cofins : 0m);
 
             yield return new MapMensalRow(
-                Data:             dia.Key,
-                QtdAutorizadas:   autorizadas.Count,
-                QtdCanceladas:    canceladas.Count,
+                Data: dia.Key,
+                QtdAutorizadas: autorizadas.Count,
+                QtdCanceladas: canceladas.Count,
                 TotalAutorizadas: totalAut,
-                TotalCanceladas:  totalCan,
-                TotalLiquido:     totalAut - totalCan,
-                TotalIcms:        totalIcms,
-                TotalPis:         totalPis,
-                TotalCofins:      totalCof);
+                TotalCanceladas: totalCan,
+                TotalLiquido: totalAut - totalCan,
+                TotalIcms: totalIcms,
+                TotalPis: totalPis,
+                TotalCofins: totalCof);
         }
     }
 

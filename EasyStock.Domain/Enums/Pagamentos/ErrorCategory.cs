@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums.Pagamentos;
+﻿namespace EasyStock.Domain.Enums.Pagamentos;
 
 /// <summary>
 /// Classificacao do erro de uma chamada a gateway. Direciona a politica de

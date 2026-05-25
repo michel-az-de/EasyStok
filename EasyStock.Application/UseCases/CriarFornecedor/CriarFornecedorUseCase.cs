@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Fornecedor;
@@ -40,7 +40,7 @@ public class CriarFornecedorUseCase(
         // se for inválido, mantém o input original (tolerância para dados legados
         // ou fornecedores estrangeiros que não batem com CPF/CNPJ brasileiro).
         var documentoNormalizado = Cnpj.TryFrom(command.Documento)?.Value ?? command.Documento;
-        var telefoneNormalizado  = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
+        var telefoneNormalizado = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
 
         var fornecedor = FornecedorEntity.Criar(command.EmpresaId, command.Nome.Trim());
         fornecedor.AtualizarCadastro(

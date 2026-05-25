@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace EasyStock.Web.Services;
 
@@ -151,7 +151,7 @@ public static class UserFacingErrors
         502 => "Servidor indisponível no momento. Tente novamente em instantes.",
         503 => "Serviço temporariamente indisponível. Tente novamente em instantes.",
         504 => "O servidor demorou para responder. Tente novamente.",
-        0   => "Ocorreu um erro inesperado. Tente novamente.",
-        _   => $"Não foi possível concluir a operação (erro {status}). Se persistir, contate o suporte."
+        0 => "Ocorreu um erro inesperado. Tente novamente.",
+        _ => $"Não foi possível concluir a operação (erro {status}). Se persistir, contate o suporte."
     };
 }

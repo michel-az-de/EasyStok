@@ -1,4 +1,4 @@
-// Application Tests - Global usings para reduzir repetição em testes
+﻿// Application Tests - Global usings para reduzir repetição em testes
 // Padrão: test frameworks, assertions, mocks, tipos do domínio
 
 global using System;

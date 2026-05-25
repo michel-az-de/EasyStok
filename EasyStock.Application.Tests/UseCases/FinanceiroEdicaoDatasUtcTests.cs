@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Domain.Entities.Financeiro;

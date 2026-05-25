@@ -1,4 +1,4 @@
-using EasyStock.Web.Services;
+﻿using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
@@ -8,9 +8,9 @@ public class EtiquetasController(SessionService session, EtiquetasService etique
     [HttpGet("/etiquetas/modelos")]
     public IActionResult Modelos()
     {
-        ViewBag.Title          = "Modelos de etiqueta";
+        ViewBag.Title = "Modelos de etiqueta";
         ViewBag.ActiveMenuItem = "Lotes";
-        ViewBag.EmpresaId      = Session.GetEmpresaId();
+        ViewBag.EmpresaId = Session.GetEmpresaId();
         return View();
     }
 
@@ -20,12 +20,12 @@ public class EtiquetasController(SessionService session, EtiquetasService etique
         var result = await etiquetas.ObterAsync("Empresa", id);
         if (!result.Success || result.Data is null) return RedirectToAction(nameof(Modelos));
 
-        ViewBag.Title          = $"Editar — {result.Data.Nome}";
+        ViewBag.Title = $"Editar — {result.Data.Nome}";
         ViewBag.ActiveMenuItem = "Lotes";
-        ViewBag.TemplateId     = id;
-        ViewBag.LayoutJson     = result.Data.LayoutJson;
-        ViewBag.EmpresaId      = Session.GetEmpresaId();
-        ViewBag.Nome           = result.Data.Nome;
+        ViewBag.TemplateId = id;
+        ViewBag.LayoutJson = result.Data.LayoutJson;
+        ViewBag.EmpresaId = Session.GetEmpresaId();
+        ViewBag.Nome = result.Data.Nome;
         return View();
     }
 }

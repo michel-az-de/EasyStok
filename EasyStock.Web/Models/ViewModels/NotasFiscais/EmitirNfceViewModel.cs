@@ -1,4 +1,4 @@
-using EasyStock.Web.Services;
+﻿using EasyStock.Web.Services;
 
 namespace EasyStock.Web.Models.ViewModels.NotasFiscais;
 

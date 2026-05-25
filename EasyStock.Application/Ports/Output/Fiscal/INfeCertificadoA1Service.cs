@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Fiscal;
+﻿namespace EasyStock.Application.Ports.Output.Fiscal;
 
 /// <summary>
 /// Servico de decifragem e validacao de certificados A1. Implementacao em

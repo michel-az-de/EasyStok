@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Common;
+﻿namespace EasyStock.Application.UseCases.Common;
 
 public interface IUseCase<TCommand, TResult> where TCommand : ICommand
 {

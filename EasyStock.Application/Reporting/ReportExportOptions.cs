@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 
 namespace EasyStock.Application.Reporting;
@@ -7,14 +7,14 @@ namespace EasyStock.Application.Reporting;
 /// Opções de formatação aplicadas ao exporter.
 /// </summary>
 public sealed record ReportExportOptions(
-    CultureInfo?  Culture               = null,
-    string        CsvDelimiter          = ";",
-    bool          WriteUtf8Bom          = true,
-    string        DefaultDateFormat     = "dd/MM/yyyy",
-    string        DefaultDateTimeFormat  = "dd/MM/yyyy HH:mm:ss",
-    string        DefaultDecimalFormat  = "0.00",
-    int           FlushEveryRows        = 1000,
-    Encoding?     TextEncoding          = null)
+    CultureInfo? Culture = null,
+    string CsvDelimiter = ";",
+    bool WriteUtf8Bom = true,
+    string DefaultDateFormat = "dd/MM/yyyy",
+    string DefaultDateTimeFormat = "dd/MM/yyyy HH:mm:ss",
+    string DefaultDecimalFormat = "0.00",
+    int FlushEveryRows = 1000,
+    Encoding? TextEncoding = null)
 {
     /// <summary>Culture padrão pt-BR usada quando <see cref="Culture"/> não é especificada.</summary>
     public static readonly CultureInfo DefaultCulture =

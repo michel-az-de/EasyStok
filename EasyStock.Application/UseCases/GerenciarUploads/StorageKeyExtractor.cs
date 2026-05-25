@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.GerenciarUploads;
+﻿namespace EasyStock.Application.UseCases.GerenciarUploads;
 
 /// <summary>
 /// Helper puro para converter uma URL (absoluta ou relativa) na chave de

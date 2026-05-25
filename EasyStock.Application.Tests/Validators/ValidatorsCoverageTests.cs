@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.AlterarSenha;
+﻿using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.CadastrarUsuario;
@@ -92,13 +92,16 @@ public class EsqueciSenhaCommandValidatorTests
 {
     private readonly EsqueciSenhaCommandValidator _v = new();
 
-    [Fact] public void IsValid_quando_email_valido() =>
+    [Fact]
+    public void IsValid_quando_email_valido() =>
         _v.Validate(new EsqueciSenhaCommand("a@b.com")).IsValid.Should().BeTrue();
 
-    [Fact] public void Falha_quando_email_vazio() =>
+    [Fact]
+    public void Falha_quando_email_vazio() =>
         _v.Validate(new EsqueciSenhaCommand("")).IsValid.Should().BeFalse();
 
-    [Fact] public void Falha_quando_email_invalido() =>
+    [Fact]
+    public void Falha_quando_email_invalido() =>
         _v.Validate(new EsqueciSenhaCommand("nao-eh-email")).IsValid.Should().BeFalse();
 }
 
@@ -106,10 +109,12 @@ public class LogoutCommandValidatorTests
 {
     private readonly LogoutCommandValidator _v = new();
 
-    [Fact] public void IsValid_quando_refresh_token_presente() =>
+    [Fact]
+    public void IsValid_quando_refresh_token_presente() =>
         _v.Validate(new LogoutCommand("token")).IsValid.Should().BeTrue();
 
-    [Fact] public void Falha_quando_refresh_token_vazio() =>
+    [Fact]
+    public void Falha_quando_refresh_token_vazio() =>
         _v.Validate(new LogoutCommand("")).IsValid.Should().BeFalse();
 }
 
@@ -117,10 +122,12 @@ public class RefreshTokenCommandValidatorTests
 {
     private readonly RefreshTokenCommandValidator _v = new();
 
-    [Fact] public void IsValid_quando_refresh_token_presente() =>
+    [Fact]
+    public void IsValid_quando_refresh_token_presente() =>
         _v.Validate(new RefreshTokenCommand("token")).IsValid.Should().BeTrue();
 
-    [Fact] public void Falha_quando_refresh_token_vazio() =>
+    [Fact]
+    public void Falha_quando_refresh_token_vazio() =>
         _v.Validate(new RefreshTokenCommand("")).IsValid.Should().BeFalse();
 }
 

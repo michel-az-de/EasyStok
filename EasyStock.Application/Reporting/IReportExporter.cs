@@ -1,4 +1,4 @@
-using EasyStock.Domain.Reporting;
+﻿using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.Reporting;
 
@@ -7,15 +7,15 @@ namespace EasyStock.Application.Reporting;
 /// </summary>
 public interface IReportExporter
 {
-    ReportFormat Format    { get; }
-    string       ContentType   { get; }
-    string       FileExtension { get; }
+    ReportFormat Format { get; }
+    string ContentType { get; }
+    string FileExtension { get; }
 
     Task WriteAsync<TRow>(
         IAsyncEnumerable<TRow> rows,
-        ReportSchema           schema,
-        Stream                 output,
-        ReportExportOptions    options,
-        CancellationToken      ct,
-        Action?                onRowFlushed = null) where TRow : class;
+        ReportSchema schema,
+        Stream output,
+        ReportExportOptions options,
+        CancellationToken ct,
+        Action? onRowFlushed = null) where TRow : class;
 }

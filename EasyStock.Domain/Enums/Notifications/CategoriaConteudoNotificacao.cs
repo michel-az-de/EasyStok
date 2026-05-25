@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums.Notifications;
+﻿namespace EasyStock.Domain.Enums.Notifications;
 
 public enum CategoriaConteudoNotificacao
 {

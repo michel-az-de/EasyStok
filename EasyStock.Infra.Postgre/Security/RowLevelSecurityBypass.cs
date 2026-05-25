@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Security;
+﻿using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Security;

@@ -1,4 +1,4 @@
-namespace EasyStock.Admin.Pages.Notificacoes;
+﻿namespace EasyStock.Admin.Pages.Notificacoes;
 
 /// <summary>
 /// Catalogo: para cada TipoEventoNotificacao, lista as variaveis Scriban que

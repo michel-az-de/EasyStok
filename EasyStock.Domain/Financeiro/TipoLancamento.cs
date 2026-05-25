@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Financeiro;
+﻿namespace EasyStock.Domain.Financeiro;
 
 /// <summary>
 /// Direcao do lancamento financeiro previsto/realizado.

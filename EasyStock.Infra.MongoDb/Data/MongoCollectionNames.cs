@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.MongoDb.Data;
+﻿namespace EasyStock.Infra.MongoDb.Data;
 
 internal static class MongoCollectionNames
 {

@@ -1,4 +1,4 @@
-using EasyStock.Web.Services;
+﻿using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
@@ -35,7 +35,7 @@ public class FinanceiroController(FinanceiroService svc, SessionService session)
             return new JsonResult(new { message = "Nome é obrigatório." }) { StatusCode = 400 };
 
         var nomeTrimmed = req.Nome.Trim();
-        var codigoBase  = GerarCodigoCc(nomeTrimmed);
+        var codigoBase = GerarCodigoCc(nomeTrimmed);
 
         for (var tentativa = 1; tentativa <= 5; tentativa++)
         {

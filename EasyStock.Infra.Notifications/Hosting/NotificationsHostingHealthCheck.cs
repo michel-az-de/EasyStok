@@ -1,4 +1,4 @@
-using EasyStock.Application.Services.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 

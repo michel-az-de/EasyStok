@@ -1,4 +1,4 @@
-using EasyStock.Application.Configuration;
+﻿using EasyStock.Application.Configuration;
 using EasyStock.Application.Ports.Output.Persistence;
 using Microsoft.Extensions.Logging;
 

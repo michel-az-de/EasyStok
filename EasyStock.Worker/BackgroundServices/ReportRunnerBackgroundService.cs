@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Notifications;
+﻿using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Reporting;
@@ -23,8 +23,8 @@ namespace EasyStock.Worker.BackgroundServices;
 /// Fairness por tenant via round-robin (ADR-R04); lease + heartbeat (ADR-R03).
 /// </summary>
 public sealed class ReportRunnerBackgroundService(
-    IServiceProvider               serviceProvider,
-    ReportingMetricsService        metrics,
+    IServiceProvider serviceProvider,
+    ReportingMetricsService metrics,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
     ILogger<ReportRunnerBackgroundService> logger)
     : BackgroundService
@@ -32,10 +32,10 @@ public sealed class ReportRunnerBackgroundService(
     // ── Configurações (appsettings.json: "Reporting:Runner") ─────────────────
 
     private static readonly TimeSpan DefaultPollingInterval = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan DefaultLeaseDuration   = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DefaultHeartbeatPeriod = TimeSpan.FromSeconds(30);
-    private const int  DefaultBatchSize              = 20;
-    private const int  DefaultMaxConcurrentInstances = 20;
+    private const int DefaultBatchSize = 20;
+    private const int DefaultMaxConcurrentInstances = 20;
 
     // Controla paralelismo máximo desta instância.
     private SemaphoreSlim? _instanceSemaphore;
@@ -49,10 +49,10 @@ public sealed class ReportRunnerBackgroundService(
             return;
         }
 
-        var pollingInterval   = TimeSpan.FromSeconds(configuration.GetValue("Reporting:Runner:PollingIntervalSeconds", 5));
-        var batchSize         = configuration.GetValue("Reporting:Runner:BatchSize", DefaultBatchSize);
-        var maxConcurrent     = configuration.GetValue("Reporting:Runner:MaxConcurrentRunsPerInstance", DefaultMaxConcurrentInstances);
-        var leaseDuration     = TimeSpan.FromMinutes(configuration.GetValue("Reporting:Runner:LeaseDurationMinutes", 5.0));
+        var pollingInterval = TimeSpan.FromSeconds(configuration.GetValue("Reporting:Runner:PollingIntervalSeconds", 5));
+        var batchSize = configuration.GetValue("Reporting:Runner:BatchSize", DefaultBatchSize);
+        var maxConcurrent = configuration.GetValue("Reporting:Runner:MaxConcurrentRunsPerInstance", DefaultMaxConcurrentInstances);
+        var leaseDuration = TimeSpan.FromMinutes(configuration.GetValue("Reporting:Runner:LeaseDurationMinutes", 5.0));
 
         _instanceSemaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
 
@@ -121,7 +121,7 @@ public sealed class ReportRunnerBackgroundService(
             // Fire-and-forget com Task.Run para não bloquear o loop.
             _ = Task.Run(async () =>
             {
-                try    { await TryStartAndExecuteAsync(runId, leaseDuration, ct); }
+                try { await TryStartAndExecuteAsync(runId, leaseDuration, ct); }
                 finally { _instanceSemaphore.Release(); }
             }, ct);
 
@@ -140,7 +140,7 @@ public sealed class ReportRunnerBackgroundService(
         // Transação de start: advisory lock + TryStart + commit.
         using (var startScope = serviceProvider.CreateScope())
         {
-            var db   = startScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var db = startScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var repo = startScope.ServiceProvider.GetRequiredService<IReportRunRepository>();
 
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
@@ -179,25 +179,25 @@ public sealed class ReportRunnerBackgroundService(
     {
         using var execScope = serviceProvider.CreateScope();
 
-        var scope         = execScope.ServiceProvider.GetRequiredService<IReportExecutionScope>();
-        var registry      = execScope.ServiceProvider.GetRequiredService<ReportRegistry>();
+        var scope = execScope.ServiceProvider.GetRequiredService<IReportExecutionScope>();
+        var registry = execScope.ServiceProvider.GetRequiredService<ReportRegistry>();
         var exporterFactory = execScope.ServiceProvider.GetRequiredService<ReportExporterResolver>();
-        var storage       = execScope.ServiceProvider.GetRequiredService<IFileStorage>();
-        var repo          = execScope.ServiceProvider.GetRequiredService<IReportRunRepository>();
-        var db            = execScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var storage = execScope.ServiceProvider.GetRequiredService<IFileStorage>();
+        var repo = execScope.ServiceProvider.GetRequiredService<IReportRunRepository>();
+        var db = execScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
 
         var definition = registry.Get(run.ReportKey);
 
         // Cancellation combinada: stoppingToken do host + token de Canceling do run.
-        using var runCts     = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        var runCt            = runCts.Token;
+        using var runCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var runCt = runCts.Token;
 
         // Contexto do tenant (ADR-R06).
         using var execContext = scope.Begin(run.EmpresaId, run.UsuarioSolicitanteId, run.Contexto);
 
         // Storage key conforme convenção B-15.
-        var ext         = exporterFactory.Resolve(run.Format).FileExtension;
-        var storageKey  = run.Contexto == ReportContexto.AdminSaaS
+        var ext = exporterFactory.Resolve(run.Format).FileExtension;
+        var storageKey = run.Contexto == ReportContexto.AdminSaaS
             ? $"admin/reports/{run.EnqueuedAt:yyyy}/{run.EnqueuedAt:MM}/{run.Id}{ext}"
             : $"tenants/{run.EmpresaId}/reports/{run.EnqueuedAt:yyyy}/{run.EnqueuedAt:MM}/{run.Id}{ext}";
 
@@ -206,14 +206,14 @@ public sealed class ReportRunnerBackgroundService(
         using var logScope = logger.BeginScope(new Dictionary<string, object>
         {
             ["ReportRunId"] = run.Id,
-            ["ReportKey"]   = run.ReportKey,
-            ["TenantId"]    = run.EmpresaId?.ToString() ?? "admin",
+            ["ReportKey"] = run.ReportKey,
+            ["TenantId"] = run.EmpresaId?.ToString() ?? "admin",
         });
 
         logger.LogInformation("ReportRunner: iniciando execução de run {RunId} (key={Key}).", run.Id, run.ReportKey);
 
-        var execSw      = Stopwatch.StartNew();
-        var waitMs      = run.StartedAt.HasValue
+        var execSw = Stopwatch.StartNew();
+        var waitMs = run.StartedAt.HasValue
             ? (long)(run.StartedAt.Value - run.EnqueuedAt).TotalMilliseconds
             : 0L;
         var contextoTag = run.Contexto == ReportContexto.AdminSaaS ? "admin" : "tenant";
@@ -253,11 +253,11 @@ public sealed class ReportRunnerBackgroundService(
             await handler.ValidateAsync(paramsObj, runCt);
 
             var exporter = exporterFactory.Resolve(run.Format);
-            var schema   = (ReportSchema)handler.GetSchema(paramsObj);
-            var options  = new ReportExportOptions();
+            var schema = (ReportSchema)handler.GetSchema(paramsObj);
+            var options = new ReportExportOptions();
 
             await using var uploadStream = await storage.OpenUploadStreamAsync(storageKey, contentType, runCt);
-            await using var hashStream   = new Infra.Async.Reporting.HashingCountingStream(uploadStream);
+            await using var hashStream = new Infra.Async.Reporting.HashingCountingStream(uploadStream);
 
             // rowsEnumerable é IAsyncEnumerable<TRow> — o exporter o consome em streaming.
             var rowsEnumerable = (IAsyncEnumerable<object>)ConvertToObjectEnumerable(
@@ -273,7 +273,7 @@ public sealed class ReportRunnerBackgroundService(
 
             await hashStream.FlushAsync(runCt);
 
-            var hexHash   = hashStream.GetHexHash();
+            var hexHash = hashStream.GetHexHash();
             var sizeBytes = hashStream.BytesWritten;
 
             // Commit: marca run como Succeeded em transação.
@@ -300,10 +300,10 @@ public sealed class ReportRunnerBackgroundService(
                     var notif = execScope.ServiceProvider.GetRequiredService<INotificadorService>();
                     var payload = JsonSerializer.Serialize(new
                     {
-                        reportKey   = run.ReportKey,
+                        reportKey = run.ReportKey,
                         reportLabel = definition.Label,
-                        runId       = run.Id,
-                        format      = run.Format.ToString(),
+                        runId = run.Id,
+                        format = run.Format.ToString(),
                         rowCount,
                     });
                     await notif.PublicarEventoAsync(
@@ -332,9 +332,9 @@ public sealed class ReportRunnerBackgroundService(
         }
         catch (Exception ex)
         {
-            var errorClass   = ex.GetType().FullName ?? ex.GetType().Name;
-            var friendlyMsg  = MapErrorToFriendlyMessage(ex);
-            var isTerminal   = IsTerminalFailure(ex);
+            var errorClass = ex.GetType().FullName ?? ex.GetType().Name;
+            var friendlyMsg = MapErrorToFriendlyMessage(ex);
+            var isTerminal = IsTerminalFailure(ex);
 
             logger.LogError(ex,
                 "ReportRunner: run {RunId} falhou (terminal={Terminal}, class={Class}).",
@@ -354,10 +354,10 @@ public sealed class ReportRunnerBackgroundService(
                     var notif = execScope.ServiceProvider.GetRequiredService<INotificadorService>();
                     var payload = JsonSerializer.Serialize(new
                     {
-                        reportKey        = run.ReportKey,
-                        reportLabel      = definition.Label,
-                        runId            = run.Id,
-                        errorMensagem    = friendlyMsg,
+                        reportKey = run.ReportKey,
+                        reportLabel = definition.Label,
+                        runId = run.Id,
+                        errorMensagem = friendlyMsg,
                     });
                     await notif.PublicarEventoAsync(
                         TipoEventoNotificacao.RelatorioFalhou,
@@ -422,10 +422,10 @@ public sealed class ReportRunnerBackgroundService(
     {
         OperationCanceledException => "O relatório demorou mais que o esperado.",
         InvalidOperationException { Message: var m } when m.Contains("timeout")
-            || m.Contains("Timeout")         => "O relatório demorou mais que o esperado. Tente um período menor.",
-        OutOfMemoryException                 => "O volume de dados é grande demais para um único arquivo. Divida em períodos menores.",
+            || m.Contains("Timeout") => "O relatório demorou mais que o esperado. Tente um período menor.",
+        OutOfMemoryException => "O volume de dados é grande demais para um único arquivo. Divida em períodos menores.",
         ArgumentException { Message: var m } => $"Parâmetros inválidos: {m}",
-        _                                    => "Algo deu errado na geração. Tente de novo.",
+        _ => "Algo deu errado na geração. Tente de novo.",
     };
 
     // Referência estática ao Serilog sem injetar ILogger (usado no catch de cleanup).

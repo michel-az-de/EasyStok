@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
+﻿namespace EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
 
 /// <summary>
 /// Linha do relatório MRR/ARR/Churn agrupada por mês.

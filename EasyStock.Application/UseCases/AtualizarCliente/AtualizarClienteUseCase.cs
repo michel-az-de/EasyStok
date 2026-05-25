@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Cliente;
 using EasyStock.Application.UseCases.Common;
@@ -14,11 +14,11 @@ public sealed record AtualizarClienteCommand(
     [property: Required] Guid EmpresaId,
     [property: Required] Guid Id,
     [property: Required][property: MaxLength(150)] string Nome,
-    [property: MaxLength(32)]  string? Apt = null,
+    [property: MaxLength(32)] string? Apt = null,
     [property: MaxLength(255)] string? Endereco = null,
-    [property: MaxLength(32)]  string? Telefone = null,
+    [property: MaxLength(32)] string? Telefone = null,
     [property: MaxLength(255)] string? Email = null,
-    [property: MaxLength(30)]  string? Documento = null,
+    [property: MaxLength(30)] string? Documento = null,
     string? Observacoes = null,
     Guid? AlteradoPorUserId = null,
     string? AlteradoPorNome = null,
@@ -77,13 +77,13 @@ public class AtualizarClienteUseCase(
         ClienteEntity atual, AtualizarClienteCommand cmd, string? docNormalizado, string? telNormalizado)
     {
         var diffs = new List<(string, string?, string?)>();
-        Compare("Nome",        atual.Nome,        cmd.Nome,           diffs);
-        Compare("Apt",         atual.Apt,         cmd.Apt,            diffs);
-        Compare("Endereco",    atual.Endereco,    cmd.Endereco,       diffs);
-        Compare("Telefone",    atual.Telefone,    telNormalizado,     diffs);
-        Compare("Email",       atual.Email,       cmd.Email,          diffs);
-        Compare("Documento",   atual.Documento,   docNormalizado,     diffs);
-        Compare("Observacoes", atual.Observacoes, cmd.Observacoes,    diffs);
+        Compare("Nome", atual.Nome, cmd.Nome, diffs);
+        Compare("Apt", atual.Apt, cmd.Apt, diffs);
+        Compare("Endereco", atual.Endereco, cmd.Endereco, diffs);
+        Compare("Telefone", atual.Telefone, telNormalizado, diffs);
+        Compare("Email", atual.Email, cmd.Email, diffs);
+        Compare("Documento", atual.Documento, docNormalizado, diffs);
+        Compare("Observacoes", atual.Observacoes, cmd.Observacoes, diffs);
         return diffs;
     }
 

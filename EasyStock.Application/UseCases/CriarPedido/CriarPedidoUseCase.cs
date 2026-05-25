@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Pedidos;
@@ -23,8 +23,8 @@ public sealed record CriarPedidoCommand(
     Guid? LojaId = null,
     Guid? ClienteId = null,
     [property: MaxLength(150)] string? ClienteNomeAdHoc = null,
-    [property: MaxLength(32)]  string? ClienteAptAdHoc = null,
-    [property: MaxLength(32)]  string? ClienteTelefoneAdHoc = null,
+    [property: MaxLength(32)] string? ClienteAptAdHoc = null,
+    [property: MaxLength(32)] string? ClienteTelefoneAdHoc = null,
     string? Observacoes = null,
     [property: MaxLength(20)] string? Origem = "web",
     [property: MaxLength(64)] string? MobileOrderId = null,

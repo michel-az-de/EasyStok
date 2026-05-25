@@ -1,4 +1,4 @@
-using Amazon;
+﻿using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
@@ -99,24 +99,24 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
 
     public async Task<Stream> DownloadStreamAsync(string storageKey, CancellationToken ct = default)
     {
-        var client   = GetClient();
+        var client = GetClient();
         var response = await client.GetObjectAsync(new GetObjectRequest
         {
             BucketName = _options.S3.BucketName,
-            Key        = storageKey
+            Key = storageKey
         }, ct);
         return response.ResponseStream;
     }
 
     public Task<Uri> CreatePreSignedDownloadUrlAsync(string storageKey, TimeSpan ttl, string downloadFileName, CancellationToken ct = default)
     {
-        var client  = GetClient();
+        var client = GetClient();
         var request = new GetPreSignedUrlRequest
         {
             BucketName = _options.S3.BucketName,
-            Key        = storageKey,
-            Expires    = DateTime.UtcNow.Add(ttl),
-            Verb       = HttpVerb.GET,
+            Key = storageKey,
+            Expires = DateTime.UtcNow.Add(ttl),
+            Verb = HttpVerb.GET,
             ResponseHeaderOverrides =
             {
                 ContentDisposition = $"attachment; filename=\"{Uri.EscapeDataString(downloadFileName)}\""
@@ -152,11 +152,11 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
             if (!_uploaded)
             {
                 _uploaded = true;
-                Position  = 0;
+                Position = 0;
                 client.PutObjectAsync(new PutObjectRequest
                 {
-                    BucketName  = bucket,
-                    Key         = key,
+                    BucketName = bucket,
+                    Key = key,
                     InputStream = this,
                     ContentType = contentType
                 }).GetAwaiter().GetResult();

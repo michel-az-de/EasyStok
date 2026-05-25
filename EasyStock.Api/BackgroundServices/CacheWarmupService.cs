@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
@@ -32,9 +32,9 @@ public sealed class CacheWarmupService(
                 return;
             }
 
-            var empresaRepo   = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
+            var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
             var analyticsRepo = scope.ServiceProvider.GetService<IAnalyticsRepository>();
-            var lojaRepo      = scope.ServiceProvider.GetRequiredService<ILojaRepository>();
+            var lojaRepo = scope.ServiceProvider.GetRequiredService<ILojaRepository>();
 
             // Buscar todas as empresas ativas para aquecer o cache de cada uma
             var empresas = await empresaRepo.GetAllAsync();

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Exceptions;
+﻿using EasyStock.Domain.Exceptions;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Exceptions;

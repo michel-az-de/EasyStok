@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -10,14 +10,14 @@ namespace EasyStock.Infra.Async.Reporting.QuickReports;
 /// Síncrono, &lt; 1s, sem paginação, sem persistir ReportRun (§27.7).
 /// </summary>
 public sealed class GetVendasHojeQuery(
-    EasyStockDbContext    db,
-    ICurrentUserAccessor  currentUser)
+    EasyStockDbContext db,
+    ICurrentUserAccessor currentUser)
 {
     public async Task<VendasHojeDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        var hoje = DateTime.UtcNow.Date;
+        var amanha = hoje.AddDays(1);
 
         var vendasQuery = db.Vendas
             .AsNoTracking()
@@ -33,13 +33,13 @@ public sealed class GetVendasHojeQuery(
             .GroupBy(_ => true)
             .Select(g => new
             {
-                QtdVendas  = g.Count(),
+                QtdVendas = g.Count(),
                 TotalValor = g.Sum(v => (decimal?)v.ValorTotal.Valor) ?? 0m,
             })
             .FirstOrDefaultAsync(ct);
 
-        var qtdVendas   = totais?.QtdVendas  ?? 0;
-        var totalValor  = totais?.TotalValor ?? 0m;
+        var qtdVendas = totais?.QtdVendas ?? 0;
+        var totalValor = totais?.TotalValor ?? 0m;
         var ticketMedio = qtdVendas > 0 ? Math.Round(totalValor / qtdVendas, 2) : 0m;
 
         // Top-5 produtos do dia (via ItensVenda)

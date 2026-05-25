@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Notifications;
+﻿using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

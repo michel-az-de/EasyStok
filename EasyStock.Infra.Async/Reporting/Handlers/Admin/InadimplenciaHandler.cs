@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
@@ -25,7 +25,7 @@ public sealed class InadimplenciaHandler(EasyStockDbContext db)
     {
         var fileNameBase = $"inadimplencia_{parametros.DataReferencia:yyyy-MM-dd}";
         return new ReportSchema(
-            title:        "Inadimplência",
+            title: "Inadimplência",
             fileNameBase: fileNameBase,
             columns:
             [
@@ -88,14 +88,14 @@ public sealed class InadimplenciaHandler(EasyStockDbContext db)
             var saldoDevedor = Math.Max(0m, r.Total - r.ValorPago);
 
             yield return new InadimplenciaRow(
-                EmpresaNome:    r.EmpresaNome,
-                FaturaNumero:   r.Numero,
+                EmpresaNome: r.EmpresaNome,
+                FaturaNumero: r.Numero,
                 DataVencimento: r.DataVencimento,
-                DiasAtraso:     diasAtraso,
-                ValorTotal:     r.Total,
-                ValorPago:      r.ValorPago,
-                SaldoDevedor:   saldoDevedor,
-                StatusFatura:   r.Status.ToString());
+                DiasAtraso: diasAtraso,
+                ValorTotal: r.Total,
+                ValorPago: r.ValorPago,
+                SaldoDevedor: saldoDevedor,
+                StatusFatura: r.Status.ToString());
         }
     }
 

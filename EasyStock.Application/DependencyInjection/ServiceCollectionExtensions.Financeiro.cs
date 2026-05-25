@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Financeiro.Categorias;
+﻿using EasyStock.Application.UseCases.Financeiro.Categorias;
 using EasyStock.Application.UseCases.Financeiro.CentrosCusto;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;

@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Integrations.Fiscal.FocusNFe;
+﻿namespace EasyStock.Infra.Integrations.Fiscal.FocusNFe;
 
 /// <summary>
 /// Configuracao do adapter Focus NFe. Bind no appsettings.json em <c>FocusNFe</c>.

@@ -1,4 +1,4 @@
-using EasyStock.Infra.Postgre.Data;
+﻿using EasyStock.Infra.Postgre.Data;
 using Npgsql;
 
 namespace EasyStock.Api.Data;

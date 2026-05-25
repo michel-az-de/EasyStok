@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Preferencias;
+﻿using EasyStock.Web.Models.ViewModels.Preferencias;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities
+﻿namespace EasyStock.Domain.Entities
 {
     public class AnuncioIa
     {

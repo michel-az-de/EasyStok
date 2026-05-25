@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Pedidos;
+﻿namespace EasyStock.Application.UseCases.Pedidos;
 
 /// <summary>DTO de retorno de Use cases de Pedido (Onda P2).</summary>
 public sealed record PedidoResult(

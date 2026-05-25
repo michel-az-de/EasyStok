@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
@@ -46,7 +46,7 @@ public class AtualizarFornecedorUseCase(
         // Normalização via VOs: se o formato for válido, armazena só os dígitos;
         // se for inválido, mantém o input original (tolerância para dados legados).
         var documentoNormalizado = Cnpj.TryFrom(command.Documento)?.Value ?? command.Documento;
-        var telefoneNormalizado  = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
+        var telefoneNormalizado = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
 
         // Onda P4 — diff campo-a-campo pra audit log.
         var diffs = BuildDiff(fornecedor, command, documentoNormalizado, telefoneNormalizado);
@@ -92,18 +92,18 @@ public class AtualizarFornecedorUseCase(
         string? docNormalizado, string? telNormalizado)
     {
         var diffs = new List<(string, string?, string?)>();
-        Compare("Nome",                atual.Nome,                  cmd.Nome,                                       diffs);
-        Compare("Documento",           atual.Documento,             docNormalizado,                                 diffs);
-        Compare("Email",               atual.Email,                 cmd.Email,                                      diffs);
-        Compare("Telefone",            atual.Telefone,              telNormalizado,                                 diffs);
-        Compare("Contato",             atual.Contato,               cmd.Contato,                                    diffs);
-        Compare("Categoria",           atual.Categoria,             cmd.Categoria,                                  diffs);
-        Compare("Tipo",                atual.Tipo,                  cmd.Tipo,                                       diffs);
-        Compare("LeadTimeEstimadoDias",atual.LeadTimeEstimadoDias?.ToString(), cmd.LeadTimeEstimadoDias?.ToString(),diffs);
-        Compare("SiteUrl",             atual.SiteUrl,               cmd.SiteUrl,                                    diffs);
-        Compare("PedidoMinimo",        atual.PedidoMinimo,          cmd.PedidoMinimo,                               diffs);
-        Compare("FretePadrao",         atual.FretePadrao,           cmd.FretePadrao,                                diffs);
-        Compare("Observacoes",         atual.Observacoes,           cmd.Observacoes,                                diffs);
+        Compare("Nome", atual.Nome, cmd.Nome, diffs);
+        Compare("Documento", atual.Documento, docNormalizado, diffs);
+        Compare("Email", atual.Email, cmd.Email, diffs);
+        Compare("Telefone", atual.Telefone, telNormalizado, diffs);
+        Compare("Contato", atual.Contato, cmd.Contato, diffs);
+        Compare("Categoria", atual.Categoria, cmd.Categoria, diffs);
+        Compare("Tipo", atual.Tipo, cmd.Tipo, diffs);
+        Compare("LeadTimeEstimadoDias", atual.LeadTimeEstimadoDias?.ToString(), cmd.LeadTimeEstimadoDias?.ToString(), diffs);
+        Compare("SiteUrl", atual.SiteUrl, cmd.SiteUrl, diffs);
+        Compare("PedidoMinimo", atual.PedidoMinimo, cmd.PedidoMinimo, diffs);
+        Compare("FretePadrao", atual.FretePadrao, cmd.FretePadrao, diffs);
+        Compare("Observacoes", atual.Observacoes, cmd.Observacoes, diffs);
         return diffs;
     }
 

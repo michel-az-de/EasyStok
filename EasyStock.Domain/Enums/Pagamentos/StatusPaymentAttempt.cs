@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums.Pagamentos;
+﻿namespace EasyStock.Domain.Enums.Pagamentos;
 
 /// <summary>
 /// Status de uma <see cref="Entities.Pagamentos.PaymentAttempt"/> — uma

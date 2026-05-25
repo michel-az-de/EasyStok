@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
 
 public sealed record SugestaoReposicaoResult(
     Guid ItemEstoqueId,

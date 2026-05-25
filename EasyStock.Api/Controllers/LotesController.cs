@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AdicionarItemLote;
@@ -164,7 +164,7 @@ public class LotesController(
             {
                 error = new
                 {
-                    code    = "SNAPSHOT_CONFLICT",
+                    code = "SNAPSHOT_CONFLICT",
                     message = $"{result.IgnoradasSnapshotDivergente} etiquetas já impressas com modelo diferente. Use X-Overwrite-Snapshot: true para substituir."
                 }
             });

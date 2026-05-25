@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Fiscal;
+﻿namespace EasyStock.Domain.Fiscal;
 
 /// <summary>
 /// Audit trail append-only do <see cref="NfeDocumento"/>. Cada transicao de

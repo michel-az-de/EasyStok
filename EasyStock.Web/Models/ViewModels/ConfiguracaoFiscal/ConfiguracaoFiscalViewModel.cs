@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal;
+﻿namespace EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal;
 
 /// <summary>
 /// Espelha o response do GET /api/configuracao-fiscal. Usado pela tela

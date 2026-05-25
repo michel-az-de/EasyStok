@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Financeiro;
+﻿namespace EasyStock.Domain.Financeiro;
 
 /// <summary>
 /// Evento de baixa (pagamento total ou parcial) de um <see cref="Lancamento"/>.

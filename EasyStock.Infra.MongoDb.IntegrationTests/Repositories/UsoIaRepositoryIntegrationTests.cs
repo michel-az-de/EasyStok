@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Infra.MongoDb.Data;
 using EasyStock.Infra.MongoDb.IntegrationTests;
 using FluentAssertions;

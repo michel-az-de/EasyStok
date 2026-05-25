@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Postgre.Configuration;
+﻿namespace EasyStock.Infra.Postgre.Configuration;
 
 /// <summary>
 /// Configuracoes de TTL para o cache Redis nos repositorios PostgreSQL.

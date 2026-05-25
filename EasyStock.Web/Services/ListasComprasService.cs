@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -24,7 +24,9 @@ public class ListasComprasService(ApiClient api, SessionService session)
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<ListaCompras>());
         return api.PostAsync<ListaCompras>("listas-compras", new
         {
-            empresaId = emp, nome, observacoes,
+            empresaId = emp,
+            nome,
+            observacoes,
             criadaPorNome = session.GetUsuarioNome(),
             origem = "web"
         });
@@ -36,7 +38,9 @@ public class ListasComprasService(ApiClient api, SessionService session)
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<ListaCompras>());
         return api.PostAsync<ListaCompras>("listas-compras/gerar", new
         {
-            empresaId = emp, nome, observacoes,
+            empresaId = emp,
+            nome,
+            observacoes,
             criadaPorNome = session.GetUsuarioNome(),
             origem = "web",
             itens
@@ -66,8 +70,14 @@ public class ListasComprasService(ApiClient api, SessionService session)
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
         return api.PostAsync<object>($"listas-compras/{id}/itens", new
         {
-            empresaId = emp, listaComprasId = Guid.Parse(id),
-            texto, quantidade, unidade, categoria, observacao, produtoId
+            empresaId = emp,
+            listaComprasId = Guid.Parse(id),
+            texto,
+            quantidade,
+            unidade,
+            categoria,
+            observacao,
+            produtoId
         });
     }
 
@@ -77,7 +87,9 @@ public class ListasComprasService(ApiClient api, SessionService session)
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
         return api.PatchAsync<object>($"listas-compras/{id}/itens/{itemId}", new
         {
-            empresaId = emp, done, usuarioNome = session.GetUsuarioNome()
+            empresaId = emp,
+            done,
+            usuarioNome = session.GetUsuarioNome()
         });
     }
 

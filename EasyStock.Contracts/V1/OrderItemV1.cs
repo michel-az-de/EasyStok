@@ -1,4 +1,4 @@
-namespace EasyStock.Contracts.V1;
+﻿namespace EasyStock.Contracts.V1;
 
 /// <summary>
 /// Item do pedido no contrato V1. Snapshot de produto, preserva nome/preço

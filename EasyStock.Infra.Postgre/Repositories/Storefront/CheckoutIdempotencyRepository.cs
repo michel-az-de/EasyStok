@@ -46,10 +46,10 @@ public sealed class CheckoutIdempotencyRepository(EasyStockDbContext db) : IChec
         return Task.CompletedTask;
     }
 
-    public Task UpdateAsync(CheckoutIdempotency registro, CancellationToken ct = default)
+    public async Task UpdateAsync(CheckoutIdempotency registro, CancellationToken ct = default)
     {
         db.CheckoutsIdempotency.Update(registro);
-        return Task.CompletedTask;
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<(bool reservado, CheckoutIdempotency registro)> TentarReservarAsync(

@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
@@ -14,17 +14,17 @@ namespace EasyStock.Infra.Async.Reporting.Exporters;
 /// </summary>
 public sealed class XmlBulkZipExporter(IFileStorage fileStorage) : IReportExporter
 {
-    public ReportFormat Format        => ReportFormat.Zip;
-    public string       ContentType   => "application/zip";
-    public string       FileExtension => ".zip";
+    public ReportFormat Format => ReportFormat.Zip;
+    public string ContentType => "application/zip";
+    public string FileExtension => ".zip";
 
     public async Task WriteAsync<TRow>(
         IAsyncEnumerable<TRow> rows,
-        ReportSchema           schema,
-        Stream                 output,
-        ReportExportOptions    options,
-        CancellationToken      ct,
-        Action?                onRowFlushed = null) where TRow : class
+        ReportSchema schema,
+        Stream output,
+        ReportExportOptions options,
+        CancellationToken ct,
+        Action? onRowFlushed = null) where TRow : class
     {
         if (rows is not IAsyncEnumerable<XmlBulkDownloadRow> xmlRows)
             throw new InvalidOperationException(
@@ -40,8 +40,8 @@ public sealed class XmlBulkZipExporter(IFileStorage fileStorage) : IReportExport
             // Cria a entrada no ZIP com o nome do arquivo (sem subdiretório).
             var entry = zip.CreateEntry(row.NomeArquivo, CompressionLevel.Optimal);
 
-            await using var entryStream  = entry.Open();
-            await using var xmlStream    = await fileStorage.DownloadStreamAsync(row.StorageKey, ct);
+            await using var entryStream = entry.Open();
+            await using var xmlStream = await fileStorage.DownloadStreamAsync(row.StorageKey, ct);
 
             await xmlStream.CopyToAsync(entryStream, ct);
 

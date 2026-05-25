@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities;
+﻿namespace EasyStock.Domain.Entities;
 
 /// <summary>
 /// Registro persistente de erros do sistema originados de múltiplas fontes.

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Sales;
+﻿namespace EasyStock.Domain.Sales;
 
 /// <summary>
 /// Máquina de estados do agregado <see cref="Entities.Pedido"/>. Centraliza
@@ -28,6 +28,8 @@ public static class PedidoStateMachine
     ///   <item>Pronto → {Entregue, Cancelado}</item>
     ///   <item>Entregue → {Cancelado}  (cancela pós-entrega devolve estoque)</item>
     ///   <item>Cancelado → ∅</item>
+    ///   <item>Rascunho → {AguardandoPagamento, Cancelado}  (Storefront ADR-0014)</item>
+    ///   <item>AguardandoPagamento → {Aguardando, Cancelado}  (Storefront ADR-0014)</item>
     /// </list>
     /// </summary>
     public static IReadOnlyDictionary<StatusPedido, IReadOnlySet<StatusPedido>> Transicoes { get; } =
@@ -38,15 +40,23 @@ public static class PedidoStateMachine
             [StatusPedido.Pronto] = new HashSet<StatusPedido> { StatusPedido.Entregue, StatusPedido.Cancelado },
             [StatusPedido.Entregue] = new HashSet<StatusPedido> { StatusPedido.Cancelado },
             [StatusPedido.Cancelado] = new HashSet<StatusPedido>(),
+            // Storefront checkout flow (ADR-0014)
+            [StatusPedido.Rascunho] = new HashSet<StatusPedido> { StatusPedido.AguardandoPagamento, StatusPedido.Cancelado },
+            [StatusPedido.AguardandoPagamento] = new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.Cancelado },
         };
 
     /// <summary>
     /// Status que indicam pedido "em curso". Usado por
     /// <see cref="Application.Ports.Output.Persistence.IPedidoRepository.ExistemPedidosAbertosComProdutoAsync"/>
     /// pra bloquear inativação de produto que orfanaria itens em produção.
+    /// Inclui estados do fluxo Storefront (ADR-0014) que ainda consomem capacidade.
     /// </summary>
     public static IReadOnlySet<StatusPedido> Abertos { get; } =
-        new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.Preparando, StatusPedido.Pronto };
+        new HashSet<StatusPedido>
+        {
+            StatusPedido.Aguardando, StatusPedido.Preparando, StatusPedido.Pronto,
+            StatusPedido.Rascunho, StatusPedido.AguardandoPagamento,
+        };
 
     /// <summary>Status terminais — não há mais transição saindo.</summary>
     public static IReadOnlySet<StatusPedido> Finais { get; } =

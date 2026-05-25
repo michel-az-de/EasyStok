@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Mobile.Services;
+﻿namespace EasyStock.Api.Mobile.Services;
 
 /// <summary>
 /// Lançada quando uma mutation chega com timestamp anterior à versão do servidor.

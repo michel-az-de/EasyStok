@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Notifications;
+﻿namespace EasyStock.Application.Ports.Output.Notifications;
 
 /// <summary>
 /// Contrato do dispatcher do Worker. Lê lotes do outbox e envia via ICanalNotificacao.

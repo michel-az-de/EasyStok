@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;

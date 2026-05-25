@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Shared;
+﻿namespace EasyStock.Web.Models.ViewModels.Shared;
 
 public class PaginationViewModel
 {

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting;
+﻿namespace EasyStock.Application.Reporting;
 
 /// <summary>
 /// Defesa em profundidade contra vazamento cross-tenant em handlers de relatório.

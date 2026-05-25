@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Utilities;
+﻿namespace EasyStock.Api.Utilities;
 
 public static class PiiMaskingHelper
 {

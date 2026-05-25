@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Exceptions
+﻿namespace EasyStock.Domain.Exceptions
 {
     public class ConflitoConcorrenciaException(string entidade, string? detalhe = null)
         : RegraDeDominioVioladaException(

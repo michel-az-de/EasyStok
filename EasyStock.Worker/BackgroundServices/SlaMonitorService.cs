@@ -1,4 +1,4 @@
-using System.Diagnostics.Metrics;
+﻿using System.Diagnostics.Metrics;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities;

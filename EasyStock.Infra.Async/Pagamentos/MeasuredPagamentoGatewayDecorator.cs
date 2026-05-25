@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums.Pagamentos;

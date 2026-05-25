@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.ValueObjects;
+﻿namespace EasyStock.Domain.ValueObjects;
 
 /// <summary>
 /// Snapshot dos dados do emissor (empresa) no momento da emissao da fatura.

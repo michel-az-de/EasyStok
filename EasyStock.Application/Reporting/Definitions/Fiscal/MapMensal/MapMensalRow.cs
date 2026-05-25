@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
 
 /// <summary>
 /// Linha de saída do relatório "MAP — Mapa Resumo NFC-e".
@@ -7,11 +7,11 @@ namespace EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
 /// </summary>
 public sealed record MapMensalRow(
     DateOnly Data,
-    int      QtdAutorizadas,
-    int      QtdCanceladas,
-    decimal  TotalAutorizadas,
-    decimal  TotalCanceladas,
-    decimal  TotalLiquido,
-    decimal  TotalIcms,
-    decimal  TotalPis,
-    decimal  TotalCofins);
+    int QtdAutorizadas,
+    int QtdCanceladas,
+    decimal TotalAutorizadas,
+    decimal TotalCanceladas,
+    decimal TotalLiquido,
+    decimal TotalIcms,
+    decimal TotalPis,
+    decimal TotalCofins);

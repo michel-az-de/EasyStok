@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text.Json;
 using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -138,17 +138,17 @@ app.MapGet("/api-proxy/dashboard-badges", async (
             && v.TryGetDecimal(out var d) ? d : 0m;
         return Results.Ok(new
         {
-            totalTenants              = G("totalTenants"),
-            tenantsAtivos             = G("tenantsAtivos"),
-            tenantsSuspensos          = G("tenantsSuspensos"),
-            tenantsNovos              = G("tenantsNovosUltimos30Dias"),
-            ticketsAbertos            = G("ticketsAbertos"),
-            ticketsCriticos           = G("ticketsCriticos"),
-            ticketsEmAtendimento      = G("ticketsEmAtendimento"),
-            ticketsComNovaMensagem    = G("ticketsComNovaMensagem"),
-            totalUsuariosAtivos       = G("totalUsuariosAtivos"),
-            logins24h                 = G("logins24h"),
-            receitaMensalEstimada     = GD("receitaMensalEstimada")
+            totalTenants = G("totalTenants"),
+            tenantsAtivos = G("tenantsAtivos"),
+            tenantsSuspensos = G("tenantsSuspensos"),
+            tenantsNovos = G("tenantsNovosUltimos30Dias"),
+            ticketsAbertos = G("ticketsAbertos"),
+            ticketsCriticos = G("ticketsCriticos"),
+            ticketsEmAtendimento = G("ticketsEmAtendimento"),
+            ticketsComNovaMensagem = G("ticketsComNovaMensagem"),
+            totalUsuariosAtivos = G("totalUsuariosAtivos"),
+            logins24h = G("logins24h"),
+            receitaMensalEstimada = GD("receitaMensalEstimada")
         });
     }
     catch (EasyStock.Admin.Services.SessionExpiredException)

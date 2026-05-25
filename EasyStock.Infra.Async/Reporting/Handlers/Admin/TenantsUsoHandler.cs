@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Tenants;
@@ -24,7 +24,7 @@ public sealed class TenantsUsoHandler(EasyStockDbContext db)
     public ReportSchema GetSchema(TenantsUsoParams parametros)
     {
         return new ReportSchema(
-            title:        "Uso de tenants",
+            title: "Uso de tenants",
             fileNameBase: "tenants-uso",
             columns:
             [
@@ -103,17 +103,17 @@ public sealed class TenantsUsoHandler(EasyStockDbContext db)
                 .SumAsync(v => (decimal?)v.ValorTotal.Valor, ct) ?? 0m;
 
             yield return new TenantsUsoRow(
-                EmpresaId:                empresa.Id,
-                EmpresaNome:              empresa.Nome,
-                EmpresaDocumento:         empresa.Documento ?? "—",
-                Plano:                    assinatura?.Plano?.Nome ?? "—",
-                StatusAssinatura:         assinatura?.Status.ToString() ?? "Sem assinatura",
-                DataCadastro:             empresa.CriadoEm,
-                DataUltimoLogin:          null, // Empresa não possui UltimoLoginEm
-                TotalUsuarios:            totalUsuarios,
-                TotalLojas:               totalLojas,
-                TotalVendas30Dias:        totalVendas30Dias,
-                ReceitaUltimos30Dias:     receita30Dias,
+                EmpresaId: empresa.Id,
+                EmpresaNome: empresa.Nome,
+                EmpresaDocumento: empresa.Documento ?? "—",
+                Plano: assinatura?.Plano?.Nome ?? "—",
+                StatusAssinatura: assinatura?.Status.ToString() ?? "Sem assinatura",
+                DataCadastro: empresa.CriadoEm,
+                DataUltimoLogin: null, // Empresa não possui UltimoLoginEm
+                TotalUsuarios: totalUsuarios,
+                TotalLojas: totalLojas,
+                TotalVendas30Dias: totalVendas30Dias,
+                ReceitaUltimos30Dias: receita30Dias,
                 DataVencimentoAssinatura: assinatura?.DataFim);
         }
     }

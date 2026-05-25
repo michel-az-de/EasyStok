@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +35,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(l => l.EmpresaId == empresaId);
             if (!string.IsNullOrWhiteSpace(status)) q = q.Where(l => l.Status == status);
             if (desde.HasValue) q = q.Where(l => l.DataProducao >= desde.Value);
-            if (ate.HasValue)   q = q.Where(l => l.DataProducao <= ate.Value);
+            if (ate.HasValue) q = q.Where(l => l.DataProducao <= ate.Value);
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
@@ -51,7 +51,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             {
                 "codigo" => desc ? q.OrderByDescending(l => l.Codigo) : q.OrderBy(l => l.Codigo),
                 "status" => desc ? q.OrderByDescending(l => l.Status) : q.OrderBy(l => l.Status),
-                _        => desc ? q.OrderByDescending(l => l.DataProducao) : q.OrderBy(l => l.DataProducao),
+                _ => desc ? q.OrderByDescending(l => l.DataProducao) : q.OrderBy(l => l.DataProducao),
             };
             var items = await q.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (items, total);
@@ -60,7 +60,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<int> GetNextSequencialDoDiaAsync(Guid empresaId, DateOnly data)
         {
             var inicio = data.ToDateTime(TimeOnly.MinValue);
-            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var fim = data.AddDays(1).ToDateTime(TimeOnly.MinValue);
             return await db.Lotes.AsNoTracking()
                 .Where(l => l.EmpresaId == empresaId
                          && l.DataProducao >= inicio && l.DataProducao < fim)

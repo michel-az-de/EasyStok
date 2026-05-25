@@ -1,4 +1,4 @@
-using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
+﻿using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
 

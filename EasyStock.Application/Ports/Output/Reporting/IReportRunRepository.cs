@@ -1,4 +1,4 @@
-using EasyStock.Application.Reporting;
+﻿using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.Ports.Output.Reporting;
@@ -14,29 +14,29 @@ public interface IReportRunRepository
     /// Procura uma run recente com o mesmo owner + paramsHash dentro da janela de idempotência.
     /// </summary>
     Task<ReportRun?> FindRecentByParamsHashAsync(
-        Guid?          empresaId,
-        Guid           usuarioId,
-        string         paramsHash,
-        TimeSpan       window,
+        Guid? empresaId,
+        Guid usuarioId,
+        string paramsHash,
+        TimeSpan window,
         CancellationToken ct);
 
     /// <summary>
     /// Procura run com idempotency_key forte (sem limite de tempo).
     /// </summary>
     Task<ReportRun?> FindByIdempotencyKeyAsync(
-        Guid?  empresaId,
-        Guid   usuarioId,
+        Guid? empresaId,
+        Guid usuarioId,
         string idempotencyKey,
         CancellationToken ct);
 
     Task AddAsync(ReportRun run, CancellationToken ct);
 
     Task<IReadOnlyList<ReportRun>> ListMineAsync(
-        Guid?           empresaId,
-        Guid            usuarioId,
+        Guid? empresaId,
+        Guid usuarioId,
         ReportListFilter filter,
-        int             skip,
-        int             take,
+        int skip,
+        int take,
         CancellationToken ct);
 
     /// <summary>

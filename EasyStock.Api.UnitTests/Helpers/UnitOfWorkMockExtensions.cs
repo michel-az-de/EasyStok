@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Helpers;

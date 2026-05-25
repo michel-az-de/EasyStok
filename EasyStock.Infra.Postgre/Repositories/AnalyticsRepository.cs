@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -19,8 +19,8 @@ namespace EasyStock.Infra.Postgre.Repositories
         // ── Specialised query objects ────────────────────────────────────────
 
         private readonly DashboardAnalyticsQueries _dashboard = new(dbContext, cache);
-        private readonly ReceitaAnalyticsQueries   _receita   = new(dbContext, cache);
-        private readonly EstoqueAnalyticsQueries   _estoque   = new(dbContext, cache);
+        private readonly ReceitaAnalyticsQueries _receita = new(dbContext, cache);
+        private readonly EstoqueAnalyticsQueries _estoque = new(dbContext, cache);
 
         // ── Cache helpers (used only by store-intelligence methods below) ────
 
@@ -468,7 +468,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             // Sort: critico first, then alto, medio, baixo, positivo
             var severityOrder = new Dictionary<string, int>
             {
-                ["critico"] = 0, ["alto"] = 1, ["medio"] = 2, ["baixo"] = 3, ["positivo"] = 4
+                ["critico"] = 0,
+                ["alto"] = 1,
+                ["medio"] = 2,
+                ["baixo"] = 3,
+                ["positivo"] = 4
             };
             var result = indicadores
                 .OrderBy(i => severityOrder.GetValueOrDefault(i.Severidade, 5))
@@ -607,8 +611,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 saldoCaixa += m.Tipo switch
                 {
                     "abertura" => +m.Valor,
-                    "entrada"  => +m.Valor,
-                    "saida"    => -m.Valor,
+                    "entrada" => +m.Valor,
+                    "saida" => -m.Valor,
                     _ => 0m
                 };
             }

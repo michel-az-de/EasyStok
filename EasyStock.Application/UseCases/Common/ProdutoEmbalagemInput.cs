@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Common
+﻿namespace EasyStock.Application.UseCases.Common
 {
     public sealed record ProdutoEmbalagemInput(
         string Nome,

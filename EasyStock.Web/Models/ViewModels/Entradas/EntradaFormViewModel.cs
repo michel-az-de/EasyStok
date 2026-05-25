@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Web.Helpers;
 
 namespace EasyStock.Web.Models.ViewModels.Entradas;

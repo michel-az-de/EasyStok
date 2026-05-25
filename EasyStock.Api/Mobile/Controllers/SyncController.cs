@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.DTOs;
+﻿using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -60,10 +60,10 @@ public class SyncController(
         var accepted = new List<string>();
         var rejected = new List<SyncConflict>();
         var autoLinkProductIds = new HashSet<string>(StringComparer.Ordinal);
-        var autoLinkClientIds  = new HashSet<string>(StringComparer.Ordinal);
-        var autoLinkOrderIds   = new HashSet<string>(StringComparer.Ordinal);
-        var autoLinkBatchIds   = new HashSet<string>(StringComparer.Ordinal);
-        var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkClientIds = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkOrderIds = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkBatchIds = new HashSet<string>(StringComparer.Ordinal);
+        var autoLinkCashIds = new HashSet<string>(StringComparer.Ordinal);
 
         // F10-C-3 — Idempotency: pre-check mutations já processadas.
         // Dedup por MutationId GLOBAL (não por device). Os ids são UUID v4
@@ -110,11 +110,11 @@ public class SyncController(
                             var payloadId = idEl.GetString();
                             if (!string.IsNullOrEmpty(payloadId))
                             {
-                                if (typePrefix == "product")        autoLinkProductIds.Add(payloadId);
-                                else if (typePrefix == "client")    autoLinkClientIds.Add(payloadId);
-                                else if (typePrefix == "order")     autoLinkOrderIds.Add(payloadId);
-                                else if (typePrefix == "batch")     autoLinkBatchIds.Add(payloadId);
-                                else                                 autoLinkCashIds.Add(payloadId);
+                                if (typePrefix == "product") autoLinkProductIds.Add(payloadId);
+                                else if (typePrefix == "client") autoLinkClientIds.Add(payloadId);
+                                else if (typePrefix == "order") autoLinkOrderIds.Add(payloadId);
+                                else if (typePrefix == "batch") autoLinkBatchIds.Add(payloadId);
+                                else autoLinkCashIds.Add(payloadId);
                             }
                         }
                     }
@@ -177,7 +177,7 @@ public class SyncController(
         // F0/F1/F2/F3 — auto-link Product/Client/Order/Batch/CashEntry ↔ ERP.
         if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0
             || autoLinkOrderIds.Count > 0 || autoLinkBatchIds.Count > 0
-            || autoLinkCashIds.Count  > 0)
+            || autoLinkCashIds.Count > 0)
         {
             try
             {

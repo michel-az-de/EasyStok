@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums;
+﻿using EasyStock.Domain.Enums;
 
 namespace EasyStock.Api.Services.Helpdesk;
 

@@ -1,4 +1,4 @@
-namespace EasyStock.Admin.Services;
+﻿namespace EasyStock.Admin.Services;
 
 public class AdminSessionService(IHttpContextAccessor httpContextAccessor)
 {

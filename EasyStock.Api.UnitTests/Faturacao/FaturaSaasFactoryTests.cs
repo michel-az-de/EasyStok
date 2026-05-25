@@ -1,4 +1,4 @@
-using EasyStock.Api.Services.Faturacao;
+﻿using EasyStock.Api.Services.Faturacao;
 using EasyStock.Application.UseCases.Faturas.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;

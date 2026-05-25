@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Reporting;
+﻿using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Reporting;
 using EasyStock.Infra.Postgre.Data;
@@ -37,10 +37,10 @@ public sealed class ReportWatchdogBackgroundService(
 
         var leaseReclaimIntervalSec = configuration.GetValue("Reporting:Watchdog:LeaseReclaimIntervalSeconds", 60);
         var artifactGcIntervalHours = configuration.GetValue("Reporting:Watchdog:ArtifactGcIntervalHours", 6.0);
-        var artifactGcBatchSize     = configuration.GetValue("Reporting:Watchdog:ArtifactGcBatchSize", 100);
+        var artifactGcBatchSize = configuration.GetValue("Reporting:Watchdog:ArtifactGcBatchSize", 100);
 
         var leaseReclaimInterval = TimeSpan.FromSeconds(leaseReclaimIntervalSec);
-        var artifactGcInterval   = TimeSpan.FromHours(artifactGcIntervalHours);
+        var artifactGcInterval = TimeSpan.FromHours(artifactGcIntervalHours);
 
         logger.LogInformation(
             "ReportWatchdogBackgroundService iniciado — leaseReclaim={LeaseInterval}s artifactGc={GcInterval}h.",
@@ -100,10 +100,10 @@ public sealed class ReportWatchdogBackgroundService(
 
     private async Task RunArtifactGcAsync(int batchSize, CancellationToken ct)
     {
-        using var scope   = serviceProvider.CreateScope();
-        var repo    = scope.ServiceProvider.GetRequiredService<IReportRunRepository>();
+        using var scope = serviceProvider.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IReportRunRepository>();
         var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
-        var db      = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
 
         // Advisory lock: apenas 1 Worker executa o GC de artefatos por vez.
         bool gotLock = await TryAcquireWatchdogLockAsync(db, ct);

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Ai;
+﻿using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Events;
+﻿using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
@@ -196,8 +196,11 @@ public class BaixarLancamentoUseCaseTests
             .Returns(lancamento);
 
         var sut = MakeSut();
-        try { await sut.ExecuteAsync(new BaixarLancamentoCommand(
-            empresaId, lancamento.Id, 50m, DateTime.UtcNow, "pix")); }
+        try
+        {
+            await sut.ExecuteAsync(new BaixarLancamentoCommand(
+            empresaId, lancamento.Id, 50m, DateTime.UtcNow, "pix"));
+        }
         catch (UseCaseValidationException) { /* esperado */ }
 
         await _uow.DidNotReceive().CommitAsync();

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
 
 /// <summary>
 /// Parâmetros do relatório "XMLs autorizados (em lote)".

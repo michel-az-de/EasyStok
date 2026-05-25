@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Financeiro;
+﻿namespace EasyStock.Web.Models.ViewModels.Financeiro;
 
 public class CategoriaFinanceiraApi
 {

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
@@ -107,7 +107,7 @@ public sealed class ButtonTagHelper : TagHelper
         "xs" => 12,
         "sm" => 14,
         "lg" => 18,
-        _    => 16
+        _ => 16
     };
 
     private static string BuildIcon(string name, int size)

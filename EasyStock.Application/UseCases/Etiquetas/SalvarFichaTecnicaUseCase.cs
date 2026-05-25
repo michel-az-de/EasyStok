@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Validators;
@@ -32,18 +32,18 @@ public class SalvarFichaTecnicaUseCase(
 
         var ficha = new ProdutoFichaTecnica
         {
-            PorcaoG          = cmd.PorcaoG,
-            Kcal             = cmd.Kcal,
-            CarbsG           = cmd.CarbsG,
-            ProteinaG        = cmd.ProteinaG,
-            GorduraG         = cmd.GorduraG,
+            PorcaoG = cmd.PorcaoG,
+            Kcal = cmd.Kcal,
+            CarbsG = cmd.CarbsG,
+            ProteinaG = cmd.ProteinaG,
+            GorduraG = cmd.GorduraG,
             GorduraSaturadaG = cmd.GorduraSaturadaG,
-            FibrasG          = cmd.FibrasG,
-            SodioMg          = cmd.SodioMg,
-            ModoPreparo      = cmd.ModoPreparo,
-            Ingredientes     = cmd.Ingredientes ?? [],
-            Alergenos        = cmd.Alergenos ?? [],
-            AlergenosOutros  = cmd.AlergenosOutros,
+            FibrasG = cmd.FibrasG,
+            SodioMg = cmd.SodioMg,
+            ModoPreparo = cmd.ModoPreparo,
+            Ingredientes = cmd.Ingredientes ?? [],
+            Alergenos = cmd.Alergenos ?? [],
+            AlergenosOutros = cmd.AlergenosOutros,
         };
 
         produto.AtributosJson = ficha.ToJson();

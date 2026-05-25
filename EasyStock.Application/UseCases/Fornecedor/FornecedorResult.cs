@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Fornecedor;
+﻿namespace EasyStock.Application.UseCases.Fornecedor;
 
 public sealed record FornecedorResult(
     Guid Id,

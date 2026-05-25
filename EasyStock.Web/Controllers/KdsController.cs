@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Kds;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -27,21 +27,21 @@ public class KdsController(PedidosService svc, SessionService session) : BaseCon
         // Como o filtro é por status único na API, fazemos 3 chamadas paralelas.
         var aguardandoTask = svc.ListarAsync(status: "aguardando");
         var preparandoTask = svc.ListarAsync(status: "preparando");
-        var prontoTask     = svc.ListarAsync(status: "pronto");
+        var prontoTask = svc.ListarAsync(status: "pronto");
         await Task.WhenAll(aguardandoTask, preparandoTask, prontoTask);
 
         var aguardando = await aguardandoTask;
         var preparando = await preparandoTask;
-        var pronto     = await prontoTask;
+        var pronto = await prontoTask;
 
         vm.Aguardando = (aguardando.Success ? aguardando.Data : null) ?? new List<Pedido>();
         vm.Preparando = (preparando.Success ? preparando.Data : null) ?? new List<Pedido>();
-        vm.Pronto     = (pronto.Success     ? pronto.Data     : null) ?? new List<Pedido>();
+        vm.Pronto = (pronto.Success ? pronto.Data : null) ?? new List<Pedido>();
 
         // Ordenação: mais antigo primeiro (FIFO da cozinha).
         vm.Aguardando = vm.Aguardando.OrderBy(p => p.CriadoEm).ToList();
         vm.Preparando = vm.Preparando.OrderBy(p => p.CriadoEm).ToList();
-        vm.Pronto     = vm.Pronto.OrderBy(p => p.CriadoEm).ToList();
+        vm.Pronto = vm.Pronto.OrderBy(p => p.CriadoEm).ToList();
 
         return View(vm);
     }
@@ -52,19 +52,19 @@ public class KdsController(PedidosService svc, SessionService session) : BaseCon
     {
         var aguardandoTask = svc.ListarAsync(status: "aguardando");
         var preparandoTask = svc.ListarAsync(status: "preparando");
-        var prontoTask     = svc.ListarAsync(status: "pronto");
+        var prontoTask = svc.ListarAsync(status: "pronto");
         await Task.WhenAll(aguardandoTask, preparandoTask, prontoTask);
 
         var aguardando = await aguardandoTask;
         var preparando = await preparandoTask;
-        var pronto     = await prontoTask;
+        var pronto = await prontoTask;
 
         return Ok(new
         {
             aguardando = (aguardando.Success ? aguardando.Data : null) ?? new List<Pedido>(),
             preparando = (preparando.Success ? preparando.Data : null) ?? new List<Pedido>(),
-            pronto     = (pronto.Success     ? pronto.Data     : null) ?? new List<Pedido>(),
-            servidoEm  = DateTimeOffset.UtcNow
+            pronto = (pronto.Success ? pronto.Data : null) ?? new List<Pedido>(),
+            servidoEm = DateTimeOffset.UtcNow
         });
     }
 

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
+﻿namespace EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
 
 public sealed record AdicionarItemPedidoFornecedorCommand(
     Guid EmpresaId,

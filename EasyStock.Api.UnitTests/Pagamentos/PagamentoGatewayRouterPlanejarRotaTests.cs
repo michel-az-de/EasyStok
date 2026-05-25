@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Pagamentos;
+﻿using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Infra.Async.Pagamentos;
 using FluentAssertions;

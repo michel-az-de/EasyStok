@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums
+﻿namespace EasyStock.Domain.Enums
 {
     /// <summary>
     /// Origem do lead capturado na landing publica. Define qual fluxo do site

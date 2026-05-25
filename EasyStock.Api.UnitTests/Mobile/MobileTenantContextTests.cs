@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

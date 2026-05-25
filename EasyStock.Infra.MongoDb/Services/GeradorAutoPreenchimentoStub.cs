@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Ai;
+﻿using EasyStock.Application.Ports.Output.Ai;
 using System.Runtime.CompilerServices;
 
 namespace EasyStock.Infra.MongoDb.Services;

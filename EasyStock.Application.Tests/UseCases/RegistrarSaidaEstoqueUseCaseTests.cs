@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Common;
@@ -240,7 +240,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             unitOfWork,
             logger);
 
-        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda bloqueada")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -305,7 +305,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             unitOfWork,
             logger);
 
-        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 3, 399.90m, "Venda sem saldo")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -441,7 +441,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             unitOfWork,
             logger);
 
-        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             Guid.NewGuid(),
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda invalida")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -507,7 +507,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             unitOfWork,
             logger);
 
-        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda invalida")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -572,7 +572,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             unitOfWork,
             logger);
 
-        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [new RegistrarSaidaEstoqueItemCommand(item.Id, 1, 399.90m, "Venda vencida")],
             new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
@@ -649,7 +649,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             unitOfWork,
             logger);
 
-        var act =() => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             empresaId,
             [
                 new RegistrarSaidaEstoqueItemCommand(itemValido.Id, 2, 399.90m, "Item 1"),

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.EstoquePosicaoAtual;
@@ -73,15 +73,15 @@ public static class ReportingWorkerExtensions
                            EstoquePosicaoAtualHandler>();
 
         // Handlers Tenant — Fase 2 (NFC-e fiscal)
-        services.AddScoped<IReportHandler<LivroSaidasParams,                LivroSaidasRow>,
+        services.AddScoped<IReportHandler<LivroSaidasParams, LivroSaidasRow>,
                            LivroSaidasHandler>();
-        services.AddScoped<IReportHandler<TotalizadoresFiscaisParams,       TotalizadoresFiscaisRow>,
+        services.AddScoped<IReportHandler<TotalizadoresFiscaisParams, TotalizadoresFiscaisRow>,
                            TotalizadoresFiscaisHandler>();
         services.AddScoped<IReportHandler<CancelamentosInutilizacoesParams, CancelamentosInutilizacoesRow>,
                            CancelamentosInutilizacoesHandler>();
-        services.AddScoped<IReportHandler<MapMensalParams,                  MapMensalRow>,
+        services.AddScoped<IReportHandler<MapMensalParams, MapMensalRow>,
                            MapMensalHandler>();
-        services.AddScoped<IReportHandler<XmlBulkDownloadParams,            XmlBulkDownloadRow>,
+        services.AddScoped<IReportHandler<XmlBulkDownloadParams, XmlBulkDownloadRow>,
                            XmlBulkDownloadHandler>();
 
         // ── Métricas (Singleton — IMeterFactory resolve internamente) ────────────

@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.ResetarSenha;
+﻿using EasyStock.Application.UseCases.ResetarSenha;
 using FluentValidation;
 
 namespace EasyStock.Application.Validators;

@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Produtos;
+﻿namespace EasyStock.Web.Models.ViewModels.Produtos;
 
 // Espelha ProdutoFichaTecnicaCommand do Application + omite EmpresaId/ProdutoId
 // (resolvidos pelo controller a partir da sessao e da rota).

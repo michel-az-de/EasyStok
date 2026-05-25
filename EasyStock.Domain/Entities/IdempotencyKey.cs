@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities;
+﻿namespace EasyStock.Domain.Entities;
 
 /// <summary>
 /// Registra a chave de idempotencia de um POST critico (entrada/saida/estorno

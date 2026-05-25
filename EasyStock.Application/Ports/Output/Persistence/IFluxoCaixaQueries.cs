@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Persistence;
+﻿namespace EasyStock.Application.Ports.Output.Persistence;
 
 /// <summary>
 /// Queries read-only agregadas pra dashboard financeiro e fluxo de caixa.

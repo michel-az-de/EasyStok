@@ -1,4 +1,4 @@
-using EasyStock.Domain.Fiscal;
+﻿using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

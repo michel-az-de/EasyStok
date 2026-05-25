@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Financeiro.Events;
 

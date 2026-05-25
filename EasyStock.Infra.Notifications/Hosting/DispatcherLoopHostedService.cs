@@ -1,4 +1,4 @@
-using EasyStock.Application.Services.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

@@ -1,4 +1,4 @@
-// Camada Analytics e Inteligência
+﻿// Camada Analytics e Inteligência
 // Registra UseCases relacionados a: Dashboard, Projeções, Alertas, Margem, Inteligência
 
 using Microsoft.Extensions.DependencyInjection;

@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Notifications.Options;
+﻿namespace EasyStock.Infra.Notifications.Options;
 
 /// <summary>
 /// Onda 2.2 — config VAPID para Web Push.

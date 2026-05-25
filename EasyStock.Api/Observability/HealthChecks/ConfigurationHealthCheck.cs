@@ -1,4 +1,4 @@
-using EasyStock.Api.Configuration;
+﻿using EasyStock.Api.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace EasyStock.Api.Observability.HealthChecks;

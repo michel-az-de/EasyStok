@@ -1,4 +1,4 @@
-using EasyStock.Domain.Reporting;
+﻿using EasyStock.Domain.Reporting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

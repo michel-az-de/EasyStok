@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Specifications;
+﻿namespace EasyStock.Domain.Specifications;
 
 public interface IEspecificacao<T>
 {

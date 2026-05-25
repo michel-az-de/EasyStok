@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;

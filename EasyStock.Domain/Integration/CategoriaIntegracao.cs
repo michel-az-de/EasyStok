@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Integration;
+﻿namespace EasyStock.Domain.Integration;
 
 /// <summary>
 /// Categoria de integração externa. Usada como discriminador na tabela

@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.ViewModels.Estoque;
+﻿namespace EasyStock.Web.Models.ViewModels.Estoque;
 
 public class QuickSaidaRequest
 {

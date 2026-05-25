@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Fiscal;
+﻿using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Infra.Postgre.Data;

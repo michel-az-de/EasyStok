@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Middleware;
+﻿namespace EasyStock.Api.Middleware;
 
 /// <summary>
 /// Adiciona headers de segurança padrão em todas as respostas HTTP.

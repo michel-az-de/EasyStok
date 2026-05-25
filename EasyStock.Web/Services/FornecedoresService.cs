@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -30,8 +30,19 @@ public class FornecedoresService(ApiClient api, SessionService session)
 
         return api.PostAsync<Fornecedor>("fornecedores", new
         {
-            empresaId, nome, documento, contato, email, telefone, leadTimeEstimadoDias,
-            tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes
+            empresaId,
+            nome,
+            documento,
+            contato,
+            email,
+            telefone,
+            leadTimeEstimadoDias,
+            tipo,
+            categoria,
+            siteUrl,
+            pedidoMinimo,
+            fretePadrao,
+            observacoes
         });
     }
 
@@ -50,8 +61,19 @@ public class FornecedoresService(ApiClient api, SessionService session)
         return api.PatchAsync<object>($"fornecedores/{id}", new
         {
             fornecedorId = fid,
-            empresaId, nome, documento, contato, email, telefone, leadTimeEstimadoDias,
-            tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes,
+            empresaId,
+            nome,
+            documento,
+            contato,
+            email,
+            telefone,
+            leadTimeEstimadoDias,
+            tipo,
+            categoria,
+            siteUrl,
+            pedidoMinimo,
+            fretePadrao,
+            observacoes,
             // Onda P4 — audit context (backend escreve em FornecedorAlteracao).
             alteradoPorNome = session.GetUsuarioNome(),
             origem = "web"

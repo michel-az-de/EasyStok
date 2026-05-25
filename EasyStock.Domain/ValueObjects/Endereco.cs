@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.ValueObjects;
+﻿namespace EasyStock.Domain.ValueObjects;
 
 /// <summary>
 /// Endereco basico usado em snapshots de <see cref="DadosFaturado"/> e

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Notifications;
+﻿using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Notifications.Email;
 using EasyStock.Infra.Notifications.InApp;
 using EasyStock.Infra.Notifications.Options;

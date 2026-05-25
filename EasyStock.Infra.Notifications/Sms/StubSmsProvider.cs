@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Notifications;
+﻿using EasyStock.Application.Ports.Output.Notifications;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Notifications.Sms;

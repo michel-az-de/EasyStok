@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Controllers;
+﻿namespace EasyStock.Api.Controllers;
 
 // ──────────────────────────────────────────────────────────────────────────
 // DTOs — Existentes

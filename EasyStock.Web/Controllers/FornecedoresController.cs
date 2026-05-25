@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Fornecedores;
+﻿using EasyStock.Web.Models.ViewModels.Fornecedores;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -62,14 +62,14 @@ public class FornecedoresController(FornecedoresService svc, SessionService sess
         if (result.Data is null) return RedirectToAction(nameof(Index));
         var vm = new FornecedorDetailViewModel { Fornecedor = result.Data };
 
-        var historicoTask     = svc.ObterHistoricoAsync(id);
-        var estatisticasTask  = svc.ObterEstatisticasAsync(id);
-        var alteracoesTask    = svc.ObterAlteracoesAsync(id);
+        var historicoTask = svc.ObterHistoricoAsync(id);
+        var estatisticasTask = svc.ObterEstatisticasAsync(id);
+        var alteracoesTask = svc.ObterAlteracoesAsync(id);
         await Task.WhenAll(historicoTask, estatisticasTask, alteracoesTask);
 
-        var historicoResult    = historicoTask.Result;
+        var historicoResult = historicoTask.Result;
         var estatisticasResult = estatisticasTask.Result;
-        var alteracoesResult   = alteracoesTask.Result;
+        var alteracoesResult = alteracoesTask.Result;
 
         if (historicoResult.Success && historicoResult.Data is not null)
             vm.Historico = historicoResult.Data;

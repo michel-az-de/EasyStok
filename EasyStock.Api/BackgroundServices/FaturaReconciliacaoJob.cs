@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Pagamentos;
+﻿using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;

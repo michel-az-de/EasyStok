@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Integration;
+﻿namespace EasyStock.Application.Ports.Output.Integration;
 
 /// <summary>
 /// Despacha eventos pendentes do outbox de integração. Invocado por

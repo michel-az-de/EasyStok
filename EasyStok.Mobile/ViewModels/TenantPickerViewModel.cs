@@ -14,17 +14,17 @@ namespace EasyStok.Mobile.ViewModels;
 /// </summary>
 public sealed partial class TenantPickerViewModel : BaseViewModel
 {
-	private readonly IAutenticacaoService _auth;
+    private readonly IAutenticacaoService _auth;
 
-	public TenantPickerViewModel(IAutenticacaoService auth)
-	{
-		_auth = auth;
-	}
+    public TenantPickerViewModel(IAutenticacaoService auth)
+    {
+        _auth = auth;
+    }
 
-	[RelayCommand]
-	private Task SairAsync() => RunAsync(async () =>
-	{
-		await _auth.SairAsync();
-		await Shell.Current.GoToAsync("//login");
-	});
+    [RelayCommand]
+    private Task SairAsync() => RunAsync(async () =>
+    {
+        await _auth.SairAsync();
+        await Shell.Current.GoToAsync("//login");
+    });
 }

@@ -1,4 +1,4 @@
-using NetArchTest.Rules;
+﻿using NetArchTest.Rules;
 using FluentAssertions;
 
 namespace EasyStock.ArchitectureTests;

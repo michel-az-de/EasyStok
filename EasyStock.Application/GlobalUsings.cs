@@ -1,4 +1,4 @@
-// Application Layer - Global usings para reduzir repetição em UseCases e Validators
+﻿// Application Layer - Global usings para reduzir repetição em UseCases e Validators
 // Padrão: validação, logging, portas (repositórios), entidades de domínio, helpers
 
 global using System;

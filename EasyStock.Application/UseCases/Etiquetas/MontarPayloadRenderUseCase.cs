@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.ValueObjects;
 
@@ -26,7 +26,7 @@ public class MontarPayloadRenderUseCase(
 
         // Loja para logoUrl e nome da empresa
         var lojas = (await lojaRepo.GetByEmpresaAsync(q.EmpresaId)).ToList();
-        var loja  = lojas.FirstOrDefault(l => l.Ativa) ?? lojas.FirstOrDefault();
+        var loja = lojas.FirstOrDefault(l => l.Ativa) ?? lojas.FirstOrDefault();
         var empresa = new EmpresaRenderDto(
             loja?.Nome ?? "EasyStok",
             loja?.LogoUrl);

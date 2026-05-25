@@ -128,9 +128,9 @@ namespace EasyStock.Infra.Postgre.Migrations
             ");
 
             // Seed — 3 modelos prontos do sistema
-            var idIdentificacao      = new Guid("10000000-0000-0000-0000-000000000001");
-            var idNutricional        = new Guid("10000000-0000-0000-0000-000000000002");
-            var idRefeicao           = new Guid("10000000-0000-0000-0000-000000000003");
+            var idIdentificacao = new Guid("10000000-0000-0000-0000-000000000001");
+            var idNutricional = new Guid("10000000-0000-0000-0000-000000000002");
+            var idRefeicao = new Guid("10000000-0000-0000-0000-000000000003");
 
             var layoutIdentificacao = """
                 {"v":1,"size":{"preset":"80x40mm","w_mm":80,"h_mm":40,"orientation":"horizontal"},"elements":[

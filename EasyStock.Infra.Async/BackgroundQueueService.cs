@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using System.Collections.Concurrent;
 using System.Text.Json;
 

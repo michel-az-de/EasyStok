@@ -1,4 +1,4 @@
-using EasyStock.Api.Controllers;
+﻿using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Fiscal;

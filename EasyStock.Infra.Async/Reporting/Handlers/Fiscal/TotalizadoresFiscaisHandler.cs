@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.TotalizadoresFiscais;
@@ -15,7 +15,7 @@ namespace EasyStock.Infra.Async.Reporting.Handlers.Fiscal;
 /// Itens de NFC-e legadas (pré-PR-D) aparecem com tributos = R$ 0,00 e TributosRastreados=false.
 /// </summary>
 public sealed class TotalizadoresFiscaisHandler(
-    EasyStockDbContext        db,
+    EasyStockDbContext db,
     ITenantScopedQueryBuilder tenantQuery)
     : IReportHandler<TotalizadoresFiscaisParams, TotalizadoresFiscaisRow>
 {
@@ -28,7 +28,7 @@ public sealed class TotalizadoresFiscaisHandler(
     {
         var competencia = $"{parametros.De:yyyy-MM}";
         return new ReportSchema(
-            title:        "Totalizadores fiscais por CFOP/CST/NCM",
+            title: "Totalizadores fiscais por CFOP/CST/NCM",
             fileNameBase: $"nfce-totalizadores_{competencia}",
             columns:
             [
@@ -62,7 +62,7 @@ public sealed class TotalizadoresFiscaisHandler(
         TotalizadoresFiscaisParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Passo 1: IDs das NFC-e autorizadas no período (escopo de tenant garantido).
@@ -95,15 +95,15 @@ public sealed class TotalizadoresFiscaisHandler(
             var temTributos = grupo.Any(i => i.BaseIcms.HasValue);
 
             yield return new TotalizadoresFiscaisRow(
-                Cfop:               grupo.Key.Cfop,
-                CstOuCsosn:         grupo.Key.Cst,
-                Ncm:                grupo.Key.Ncm,
-                QtdItens:           grupo.Count(),
-                TotalItens:         grupo.Sum(i => i.Subtotal.Valor),
-                BaseIcms:           grupo.Sum(i => i.BaseIcms ?? 0m),
-                ValorIcms:          grupo.Sum(i => i.ValorIcms ?? 0m),
-                Pis:                grupo.Sum(i => i.Pis ?? 0m),
-                Cofins:             grupo.Sum(i => i.Cofins ?? 0m),
+                Cfop: grupo.Key.Cfop,
+                CstOuCsosn: grupo.Key.Cst,
+                Ncm: grupo.Key.Ncm,
+                QtdItens: grupo.Count(),
+                TotalItens: grupo.Sum(i => i.Subtotal.Valor),
+                BaseIcms: grupo.Sum(i => i.BaseIcms ?? 0m),
+                ValorIcms: grupo.Sum(i => i.ValorIcms ?? 0m),
+                Pis: grupo.Sum(i => i.Pis ?? 0m),
+                Cofins: grupo.Sum(i => i.Cofins ?? 0m),
                 TributosRastreados: temTributos);
         }
     }

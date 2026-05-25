@@ -1,4 +1,4 @@
-using EasyStock.Application.Services.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;

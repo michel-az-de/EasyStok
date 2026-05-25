@@ -1,4 +1,4 @@
-using DotNet.Testcontainers.Builders;
+﻿using DotNet.Testcontainers.Builders;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;

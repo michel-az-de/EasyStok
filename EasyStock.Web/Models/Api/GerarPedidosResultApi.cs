@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.Api;
+﻿namespace EasyStock.Web.Models.Api;
 
 // Mapeia o GerarPedidosDaListaResult do endpoint listas-compras/{id}/gerar-pedidos.
 public record GerarPedidosResultApi

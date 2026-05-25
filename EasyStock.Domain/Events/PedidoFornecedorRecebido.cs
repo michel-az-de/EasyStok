@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Events
+﻿namespace EasyStock.Domain.Events
 {
     public sealed record PedidoFornecedorRecebido(
         Guid EventoId,

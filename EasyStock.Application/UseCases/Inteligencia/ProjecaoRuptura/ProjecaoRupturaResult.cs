@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
+﻿namespace EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
 
 public sealed record ProjecaoRupturaResult(
     Guid ItemEstoqueId,

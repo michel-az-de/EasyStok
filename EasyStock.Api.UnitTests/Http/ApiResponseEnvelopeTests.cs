@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using FluentAssertions;
 
 namespace EasyStock.Api.UnitTests.Http;

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Exceptions;
+﻿using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Domain.Entities.Pagamentos;
 

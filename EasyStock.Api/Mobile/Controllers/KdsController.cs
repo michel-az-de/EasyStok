@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.Security;
+﻿using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;

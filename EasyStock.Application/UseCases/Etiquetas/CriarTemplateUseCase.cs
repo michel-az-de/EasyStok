@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.Validators;
 using EasyStock.Domain.Entities;
@@ -38,14 +38,14 @@ public class CriarTemplateUseCase(
         var agora = DateTime.UtcNow;
         var template = new EtiquetaTemplate
         {
-            Id           = Guid.NewGuid(),
-            EmpresaId    = cmd.EmpresaId,
-            Nome         = cmd.Nome.Trim(),
+            Id = Guid.NewGuid(),
+            EmpresaId = cmd.EmpresaId,
+            Nome = cmd.Nome.Trim(),
             BaseSistemaId = cmd.BaseSistemaId,
-            LayoutJson   = cmd.LayoutJson,
-            IsDefault    = false,
-            CriadoEm    = agora,
-            AlteradoEm  = agora,
+            LayoutJson = cmd.LayoutJson,
+            IsDefault = false,
+            CriadoEm = agora,
+            AlteradoEm = agora,
         };
 
         await repo.AddEmpresaAsync(template);
@@ -54,10 +54,10 @@ public class CriarTemplateUseCase(
         {
             await repo.UpsertDefaultAsync(new EtiquetaEmpresaDefault
             {
-                EmpresaId      = cmd.EmpresaId,
+                EmpresaId = cmd.EmpresaId,
                 TemplateOrigem = "Empresa",
-                TemplateId     = template.Id,
-                AlteradoEm     = agora,
+                TemplateId = template.Id,
+                AlteradoEm = agora,
             });
         }
 

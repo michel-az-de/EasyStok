@@ -1,4 +1,4 @@
-using System.Diagnostics.Metrics;
+﻿using System.Diagnostics.Metrics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Cryptography;

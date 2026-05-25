@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
+﻿using EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 using EasyStock.Infra.Postgre.Concurrency;
 using Microsoft.Extensions.Options;
 

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 

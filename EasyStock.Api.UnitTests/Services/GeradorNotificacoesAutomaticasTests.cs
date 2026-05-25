@@ -1,4 +1,4 @@
-using EasyStock.Api.Services;
+﻿using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;

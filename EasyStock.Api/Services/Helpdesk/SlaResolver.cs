@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Helpdesk;
+﻿using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;

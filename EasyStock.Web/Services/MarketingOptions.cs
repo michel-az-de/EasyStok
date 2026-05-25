@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Services;
+﻿namespace EasyStock.Web.Services;
 
 /// <summary>
 /// Configuracoes da landing publica e canais de aquisicao. Lidas da secao

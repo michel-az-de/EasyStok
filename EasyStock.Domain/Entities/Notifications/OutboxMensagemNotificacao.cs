@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 using System.Security.Cryptography;
 using System.Text;
 

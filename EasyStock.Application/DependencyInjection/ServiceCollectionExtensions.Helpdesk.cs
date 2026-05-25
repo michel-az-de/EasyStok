@@ -1,4 +1,4 @@
-// Camada Helpdesk + FAQ — UseCases para suporte ao cliente e base de conhecimento.
+﻿// Camada Helpdesk + FAQ — UseCases para suporte ao cliente e base de conhecimento.
 // Tickets seguem o cliente e respeitam empresaId via filtro global.
 // FAQ eh base global publica (sem multi-tenant).
 

@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Notifications.Options;
+﻿namespace EasyStock.Infra.Notifications.Options;
 
 public sealed class TwilioWhatsAppOptions
 {

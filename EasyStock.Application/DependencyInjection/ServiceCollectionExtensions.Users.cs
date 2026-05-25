@@ -1,4 +1,4 @@
-// Camada de Gerenciamento de Usuários, Lojas e Empresas
+﻿// Camada de Gerenciamento de Usuários, Lojas e Empresas
 // Registra UseCases relacionados a: CRUD de usuários, lojas, empresas, perfis
 
 using Microsoft.Extensions.DependencyInjection;

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reflection;
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
@@ -36,26 +36,26 @@ public sealed class DiagnosticoController(
         // Executar checks de infra em paralelo para reduzir latência.
         // Usar await direto nas tasks iniciadas garante que qualquer exceção
         // seja propagada sem bloquear thread via .Result.
-        var bancoTask   = GetBancoStatusAsync(ct);
-        var redisTask   = GetRedisStatusAsync(ct);
+        var bancoTask = GetBancoStatusAsync(ct);
+        var redisTask = GetRedisStatusAsync(ct);
         var storageTask = GetStorageStatusAsync(ct);
 
-        var banco   = await bancoTask;
-        var redis   = await redisTask;
+        var banco = await bancoTask;
+        var redis = await redisTask;
         var storage = await storageTask;
 
         var result = new DiagnosticoResult
         {
-            Status        = "ok",
-            Timestamp     = DateTimeOffset.UtcNow,
-            Ambiente      = infraState.Environment,
-            Uptime        = FormatUptime(DateTimeOffset.UtcNow - infraState.StartupTime),
-            Versao        = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
-            Banco         = banco,
-            Redis         = redis,
-            Smtp          = GetSmtpStatus(),
-            Storage       = storage,
-            Ia            = GetIaStatus(),
+            Status = "ok",
+            Timestamp = DateTimeOffset.UtcNow,
+            Ambiente = infraState.Environment,
+            Uptime = FormatUptime(DateTimeOffset.UtcNow - infraState.StartupTime),
+            Versao = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
+            Banco = banco,
+            Redis = redis,
+            Smtp = GetSmtpStatus(),
+            Storage = storage,
+            Ia = GetIaStatus(),
             Configuracoes = GetConfiguracoesStatus()
         };
 

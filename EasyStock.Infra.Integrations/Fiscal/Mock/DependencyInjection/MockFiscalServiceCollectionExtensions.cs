@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Fiscal;
+﻿using EasyStock.Application.Ports.Output.Fiscal;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;

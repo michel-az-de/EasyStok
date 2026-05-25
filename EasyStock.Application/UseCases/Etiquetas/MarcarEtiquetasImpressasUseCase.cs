@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using System.Text.Json;
@@ -43,9 +43,9 @@ public class MarcarEtiquetasImpressasUseCase(
 
         var snapshotMeta = JsonSerializer.Serialize(new
         {
-            origem    = cmd.LayoutMeta.Origem,
-            id        = cmd.LayoutMeta.Id,
-            nome      = cmd.LayoutMeta.Nome,
+            origem = cmd.LayoutMeta.Origem,
+            id = cmd.LayoutMeta.Id,
+            nome = cmd.LayoutMeta.Nome,
             snapshotAt = DateTime.UtcNow
         }, JsonOpts);
 

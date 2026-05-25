@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Helpers;
+﻿namespace EasyStock.Web.Helpers;
 
 // "Hoje" no fuso BR — usado em telas onde o servidor (Render = UTC) renderizaria
 // um dia adiantado durante a janela 21:00–23:59 BRT. Antes Caixa, SaidaFormViewModel

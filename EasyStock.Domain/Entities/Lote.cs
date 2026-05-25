@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -145,12 +145,12 @@ namespace EasyStock.Domain.Entities
     /// <summary>Constantes de status da etiqueta — evita strings mágicas.</summary>
     public static class LoteEtiquetaStatus
     {
-        public const string Pendente          = "pendente";
-        public const string EnviadaImpressao  = "enviada_impressao";
-        public const string Impressa          = "impressa";
-        public const string Conferida         = "conferida";
-        public const string Divergente        = "divergente";
-        public const string Consumida         = "consumida";
+        public const string Pendente = "pendente";
+        public const string EnviadaImpressao = "enviada_impressao";
+        public const string Impressa = "impressa";
+        public const string Conferida = "conferida";
+        public const string Divergente = "divergente";
+        public const string Consumida = "consumida";
 
         public static readonly IReadOnlyList<string> Todos =
             [Pendente, EnviadaImpressao, Impressa, Conferida, Divergente, Consumida];

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
@@ -103,7 +103,7 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         var repository = new ItemEstoqueRepository(context);
 
         var primeira = (await repository.SearchAsync(empresaId, "sku teste", maxResults: 3)).Select(i => i.CodigoInterno).ToList();
-        var segunda  = (await repository.SearchAsync(empresaId, "sku teste", maxResults: 3)).Select(i => i.CodigoInterno).ToList();
+        var segunda = (await repository.SearchAsync(empresaId, "sku teste", maxResults: 3)).Select(i => i.CodigoInterno).ToList();
 
         primeira.Should().HaveCount(3);
         primeira.Should().Equal(segunda, "chamadas consecutivas devem retornar a mesma ordem determinística");

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.ValueObjects;
+﻿namespace EasyStock.Domain.ValueObjects;
 
 /// <summary>
 /// Dados fiscais opcionais — preparados para emissao de NFS-e futura. Persistido

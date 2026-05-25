@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.CadastrarProduto;
+﻿using EasyStock.Application.UseCases.CadastrarProduto;
 using FluentValidation;
 
 namespace EasyStock.Application.Validators;

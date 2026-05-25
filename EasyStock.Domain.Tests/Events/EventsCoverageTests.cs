@@ -1,4 +1,4 @@
-using EasyStock.Domain.Events;
+﻿using EasyStock.Domain.Events;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Events;

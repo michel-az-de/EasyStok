@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Shared;

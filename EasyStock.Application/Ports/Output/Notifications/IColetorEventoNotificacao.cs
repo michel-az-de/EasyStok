@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Notifications;
+﻿namespace EasyStock.Application.Ports.Output.Notifications;
 
 /// <summary>
 /// Varredores de estado que geram EventoNotificacao para rotinas de batch/cron.

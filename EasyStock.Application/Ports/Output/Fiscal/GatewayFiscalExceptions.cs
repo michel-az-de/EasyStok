@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Fiscal;
+﻿namespace EasyStock.Application.Ports.Output.Fiscal;
 
 /// <summary>Exception base para falhas do gateway fiscal. Use as subclasses para distinguir tratamento no use case.</summary>
 public abstract class GatewayFiscalException : Exception

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Reporting;
+﻿using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.Reporting;
 
@@ -8,7 +8,7 @@ namespace EasyStock.Application.Reporting;
 /// </summary>
 public interface IReportHandler<TParams, TRow>
     where TParams : class
-    where TRow    : class
+    where TRow : class
 {
     /// <summary>
     /// Retorna o esquema de colunas derivado do TRow.

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Financeiro;
+﻿using EasyStock.Domain.Entities.Financeiro;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

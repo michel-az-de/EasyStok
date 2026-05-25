@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.GerenciarComposicao;
+﻿namespace EasyStock.Application.UseCases.GerenciarComposicao;
 
 public sealed record ObterComposicaoQuery(
     Guid EmpresaId,

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;

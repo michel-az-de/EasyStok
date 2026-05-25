@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Storage;
+﻿namespace EasyStock.Application.Ports.Output.Storage;
 
 public interface IFileStorage
 {

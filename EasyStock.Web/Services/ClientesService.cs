@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -20,7 +20,7 @@ public class ClientesService(ApiClient api, SessionService session)
     public Task<ApiResult<List<Cliente>>> ListarAsync(string? status = null, string? search = null)
     {
         var qs = $"clientes?empresaId={GetEmpresaId()}&page=1&pageSize=200";
-        if (status == "ativo")        qs += "&ativo=true";
+        if (status == "ativo") qs += "&ativo=true";
         else if (status == "inativo") qs += "&ativo=false";
         if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
         return api.GetAsync<List<Cliente>>(qs);
@@ -38,7 +38,14 @@ public class ClientesService(ApiClient api, SessionService session)
 
         return api.PostAsync<Cliente>("clientes", new
         {
-            empresaId, nome, apt, endereco, telefone, email, documento, observacoes
+            empresaId,
+            nome,
+            apt,
+            endereco,
+            telefone,
+            email,
+            documento,
+            observacoes
         });
     }
 
@@ -54,7 +61,15 @@ public class ClientesService(ApiClient api, SessionService session)
 
         return api.PatchAsync<Cliente>($"clientes/{id}", new
         {
-            id = cid, empresaId, nome, apt, endereco, telefone, email, documento, observacoes,
+            id = cid,
+            empresaId,
+            nome,
+            apt,
+            endereco,
+            telefone,
+            email,
+            documento,
+            observacoes,
             origem = "web"
         });
     }
@@ -77,9 +92,19 @@ public class ClientesService(ApiClient api, SessionService session)
 
         return api.PostAsync<object>($"clientes/{clienteId}/enderecos", new
         {
-            empresaId, clienteId = Guid.Parse(clienteId),
-            tipo, logradouro, numero, complemento, bairro, cidade, estado, cep, pais,
-            referencia, padrao
+            empresaId,
+            clienteId = Guid.Parse(clienteId),
+            tipo,
+            logradouro,
+            numero,
+            complemento,
+            bairro,
+            cidade,
+            estado,
+            cep,
+            pais,
+            referencia,
+            padrao
         });
     }
 
@@ -94,8 +119,13 @@ public class ClientesService(ApiClient api, SessionService session)
 
         return api.PostAsync<object>($"clientes/{clienteId}/telefones", new
         {
-            empresaId, clienteId = Guid.Parse(clienteId),
-            numero, tipo, whatsapp, principal, observacao
+            empresaId,
+            clienteId = Guid.Parse(clienteId),
+            numero,
+            tipo,
+            whatsapp,
+            principal,
+            observacao
         });
     }
 
@@ -110,8 +140,14 @@ public class ClientesService(ApiClient api, SessionService session)
 
         return api.PostAsync<object>($"clientes/{clienteId}/documentos", new
         {
-            empresaId, clienteId = Guid.Parse(clienteId),
-            tipo, valor, emissor, emitidoEm, validoAte, principal
+            empresaId,
+            clienteId = Guid.Parse(clienteId),
+            tipo,
+            valor,
+            emissor,
+            emitidoEm,
+            validoAte,
+            principal
         });
     }
 

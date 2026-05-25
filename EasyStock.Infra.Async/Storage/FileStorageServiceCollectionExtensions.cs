@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Storage;
+﻿using EasyStock.Application.Ports.Output.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

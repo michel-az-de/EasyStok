@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Cliente;
 using EasyStock.Application.UseCases.Common;
@@ -11,11 +11,11 @@ namespace EasyStock.Application.UseCases.CriarCliente;
 public sealed record CriarClienteCommand(
     [property: Required] Guid EmpresaId,
     [property: Required][property: MaxLength(150)] string Nome,
-    [property: MaxLength(32)]  string? Apt = null,
+    [property: MaxLength(32)] string? Apt = null,
     [property: MaxLength(255)] string? Endereco = null,
-    [property: MaxLength(32)]  string? Telefone = null,
+    [property: MaxLength(32)] string? Telefone = null,
     [property: MaxLength(255)] string? Email = null,
-    [property: MaxLength(30)]  string? Documento = null,
+    [property: MaxLength(30)] string? Documento = null,
     string? Observacoes = null);
 
 public class CriarClienteUseCase(

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Caching;
+﻿using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;

@@ -1,4 +1,4 @@
-using EasyStock.Api.Configuration;
+﻿using EasyStock.Api.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Api.BackgroundServices;

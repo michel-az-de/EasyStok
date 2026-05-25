@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Cliente;
+﻿namespace EasyStock.Application.UseCases.Cliente;
 
 /// <summary>DTO de retorno de Use cases de Cliente.</summary>
 public sealed record ClienteResult(

@@ -1,4 +1,4 @@
-using EasyStok.Mobile.Services;
+﻿using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
 
 namespace EasyStok.Mobile.Views;
@@ -11,15 +11,15 @@ namespace EasyStok.Mobile.Views;
 /// </summary>
 public partial class WebOpsPage : ContentPage
 {
-	private readonly IAutenticacaoService _auth;
-	private readonly ISecureStore _store;
-	private readonly AppIdentity _identity;
+    private readonly IAutenticacaoService _auth;
+    private readonly ISecureStore _store;
+    private readonly AppIdentity _identity;
 
-	public WebOpsPage(IAutenticacaoService auth, ISecureStore store, AppIdentity identity)
-	{
-		InitializeComponent();
-		_auth = auth;
-		_store = store;
-		_identity = identity;
-	}
+    public WebOpsPage(IAutenticacaoService auth, ISecureStore store, AppIdentity identity)
+    {
+        InitializeComponent();
+        _auth = auth;
+        _store = store;
+        _identity = identity;
+    }
 }

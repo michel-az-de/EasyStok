@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Observability;
@@ -337,11 +337,11 @@ public sealed class DiagnosticoInfraController(
             {
                 queries.Add(new
                 {
-                    query     = reader.GetString(0),
-                    calls     = reader.GetInt64(1),
-                    avgMs     = Math.Round(reader.GetDouble(2), 2),
-                    stddevMs  = reader.IsDBNull(3) ? (double?)null : Math.Round(reader.GetDouble(3), 2),
-                    avgRows   = Math.Round(reader.GetDouble(4), 1)
+                    query = reader.GetString(0),
+                    calls = reader.GetInt64(1),
+                    avgMs = Math.Round(reader.GetDouble(2), 2),
+                    stddevMs = reader.IsDBNull(3) ? (double?)null : Math.Round(reader.GetDouble(3), 2),
+                    avgRows = Math.Round(reader.GetDouble(4), 1)
                 });
             }
 

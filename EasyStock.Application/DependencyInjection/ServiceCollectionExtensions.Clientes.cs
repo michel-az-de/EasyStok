@@ -1,4 +1,4 @@
-// Camada de Clientes
+﻿// Camada de Clientes
 // Registra UseCases relacionados a: CRUD de clientes, endereços, telefones, documentos
 
 using Microsoft.Extensions.DependencyInjection;

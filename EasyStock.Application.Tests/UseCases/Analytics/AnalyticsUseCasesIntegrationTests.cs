@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Analytics.Alertas;
 using EasyStock.Application.UseCases.Analytics.Margem;
 using EasyStock.Application.UseCases.Analytics.Movimentacoes;

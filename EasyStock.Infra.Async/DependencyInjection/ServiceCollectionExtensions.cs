@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Infra.Async.Pagamentos;

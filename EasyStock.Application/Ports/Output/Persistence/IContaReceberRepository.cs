@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Financeiro;
+﻿using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 
 namespace EasyStock.Application.Ports.Output.Persistence;

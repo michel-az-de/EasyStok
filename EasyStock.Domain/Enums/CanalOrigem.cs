@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums
+﻿namespace EasyStock.Domain.Enums
 {
     /// <summary>
     /// Canal de origem pelo qual um ticket ou interação foi iniciado.

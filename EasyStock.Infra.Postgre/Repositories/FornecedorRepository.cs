@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -41,7 +41,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             query = sort?.ToLowerInvariant() switch
             {
                 "criadoem" => desc ? query.OrderByDescending(f => f.CriadoEm) : query.OrderBy(f => f.CriadoEm),
-                _          => desc ? query.OrderByDescending(f => f.Nome) : query.OrderBy(f => f.Nome),
+                _ => desc ? query.OrderByDescending(f => f.Nome) : query.OrderBy(f => f.Nome),
             };
 
             var fornecedores = await query

@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums.Financeiro;
+﻿namespace EasyStock.Domain.Enums.Financeiro;
 
 public enum TipoLadoFinanceiro
 {

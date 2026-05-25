@@ -1,4 +1,4 @@
-namespace EasyStock.Contracts.V1;
+﻿namespace EasyStock.Contracts.V1;
 
 /// <summary>
 /// DTO público do pedido no contrato V1. Estável — não pode mudar sem

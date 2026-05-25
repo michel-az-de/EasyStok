@@ -1,4 +1,4 @@
-
+﻿
 namespace EasyStock.Domain.Entities
 {
     /// <summary>

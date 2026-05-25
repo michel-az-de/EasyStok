@@ -1,4 +1,4 @@
-using EasyStock.Infra.Postgre.Data;
+﻿using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Data.Tenants.MassasVeneza;
 

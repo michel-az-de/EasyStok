@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums;
+﻿namespace EasyStock.Domain.Enums;
 
 /// <summary>
 /// Unidade de medida usada em <see cref="Entities.Produto"/>, receita (composicao) e lote.

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output;
+﻿namespace EasyStock.Application.Ports.Output;
 
 /// <summary>
 /// Port que recebe notificacoes de falha em processamento de pagamento. A

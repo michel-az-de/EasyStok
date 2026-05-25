@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Enums;
 using Microsoft.AspNetCore.Http;
@@ -15,8 +15,8 @@ namespace EasyStock.Infra.Async.Reporting;
 /// O Api mantém a implementação HTTP (<c>CurrentUserAccessor</c>).
 /// </remarks>
 public sealed class WorkerCurrentUserAccessor(
-    IHttpContextAccessor?    httpContextAccessor,
-    IReportExecutionScope    executionScope) : ICurrentUserAccessor
+    IHttpContextAccessor? httpContextAccessor,
+    IReportExecutionScope executionScope) : ICurrentUserAccessor
 {
     public bool IsAuthenticated => true; // Worker executa apenas jobs autenticados
 

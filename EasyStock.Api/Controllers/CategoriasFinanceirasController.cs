@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.Categorias;

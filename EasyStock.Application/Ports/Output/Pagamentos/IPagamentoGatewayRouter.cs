@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Pagamentos;
+﻿namespace EasyStock.Application.Ports.Output.Pagamentos;
 
 /// <summary>
 /// Resolve qual <see cref="IPagamentoGateway"/> usar dado o contexto

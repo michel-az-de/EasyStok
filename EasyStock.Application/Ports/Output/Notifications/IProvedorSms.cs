@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Notifications;
+﻿namespace EasyStock.Application.Ports.Output.Notifications;
 
 public interface IProvedorSms
 {

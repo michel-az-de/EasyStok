@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
 
 /// <summary>
 /// Linha de saída do relatório "Livro de Saídas (NFC-e)".
@@ -10,16 +10,16 @@ namespace EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
 /// "Não rastreado" no arquivo gerado (ver aviso inserido no cabeçalho do relatório).
 /// </summary>
 public sealed record LivroSaidasRow(
-    DateTime?  DataAutorizacao,
-    long       Numero,
-    short      Serie,
-    string?    ChaveAcesso,
-    string     Status,
-    string?    DestinatarioNome,
-    string?    CfopPrincipal,
-    decimal    TotalNota,
-    decimal    BaseIcms,
-    decimal    ValorIcms,
-    decimal    Pis,
-    decimal    Cofins,
-    bool       TributosRastreados);
+    DateTime? DataAutorizacao,
+    long Numero,
+    short Serie,
+    string? ChaveAcesso,
+    string Status,
+    string? DestinatarioNome,
+    string? CfopPrincipal,
+    decimal TotalNota,
+    decimal BaseIcms,
+    decimal ValorIcms,
+    decimal Pis,
+    decimal Cofins,
+    bool TributosRastreados);

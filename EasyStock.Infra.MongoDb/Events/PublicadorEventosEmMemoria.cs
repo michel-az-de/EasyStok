@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Events;
+﻿using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Domain.Events;
 using Microsoft.Extensions.Logging;
 

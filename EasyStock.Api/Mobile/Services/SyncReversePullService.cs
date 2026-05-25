@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.DTOs;
+﻿using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;

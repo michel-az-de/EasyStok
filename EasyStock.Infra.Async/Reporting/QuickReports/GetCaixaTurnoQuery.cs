@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -11,14 +11,14 @@ namespace EasyStock.Infra.Async.Reporting.QuickReports;
 /// mais as vendas registradas. Síncrono, &lt; 1s, sem paginação (§27.7).
 /// </summary>
 public sealed class GetCaixaTurnoQuery(
-    EasyStockDbContext    db,
-    ICurrentUserAccessor  currentUser)
+    EasyStockDbContext db,
+    ICurrentUserAccessor currentUser)
 {
     public async Task<CaixaTurnoDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        var hoje = DateTime.UtcNow.Date;
+        var amanha = hoje.AddDays(1);
 
         var movQuery = db.MovimentosCaixa
             .AsNoTracking()
@@ -64,9 +64,9 @@ public sealed class GetCaixaTurnoQuery(
 
         return new CaixaTurnoDto(
             TotalEntradas: Math.Round(totalEntradas, 2),
-            TotalSaidas:   Math.Round(totalSaidas,   2),
-            TotalVendas:   Math.Round(totalVendas,   2),
-            SaldoAtual:    Math.Round(saldoAtual,    2),
-            Operador:      operador);
+            TotalSaidas: Math.Round(totalSaidas, 2),
+            TotalVendas: Math.Round(totalVendas, 2),
+            SaldoAtual: Math.Round(saldoAtual, 2),
+            Operador: operador);
     }
 }

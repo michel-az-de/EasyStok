@@ -1,4 +1,4 @@
-namespace EasyStock.Api.Configuration;
+﻿namespace EasyStock.Api.Configuration;
 
 public sealed class BackgroundJobOptions
 {

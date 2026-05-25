@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
+﻿namespace EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
 
 /// <summary>Parâmetros do relatório MRR/ARR/Churn — Admin SaaS.</summary>
 public sealed record MrrArrChurnParams(

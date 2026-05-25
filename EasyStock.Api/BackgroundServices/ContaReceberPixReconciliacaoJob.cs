@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Infra.Postgre.Data;

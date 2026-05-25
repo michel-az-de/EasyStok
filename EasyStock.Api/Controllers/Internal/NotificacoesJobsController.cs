@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using EasyStock.Api.Authorization;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;

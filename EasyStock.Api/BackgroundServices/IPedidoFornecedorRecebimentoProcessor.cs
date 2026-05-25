@@ -1,4 +1,4 @@
-namespace EasyStock.Api.BackgroundServices;
+﻿namespace EasyStock.Api.BackgroundServices;
 
 public interface IPedidoFornecedorRecebimentoProcessor
 {

@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Financeiro;
 
 namespace EasyStock.Web.Services;
@@ -76,9 +76,9 @@ public class FinanceiroService(ApiClient api, SessionService session)
             return ApiResult<ContasPagarPaginadas>.Fail(r.ErrorCode ?? "ERROR", r.ErrorMessage ?? "Erro.", r.HttpStatus, r.CorrelationId);
         return ApiResult<ContasPagarPaginadas>.Ok(new ContasPagarPaginadas
         {
-            Itens    = r.Data.Data,
-            Total    = r.Data.Meta.Total,
-            Page     = r.Data.Meta.Page,
+            Itens = r.Data.Data,
+            Total = r.Data.Meta.Total,
+            Page = r.Data.Meta.Page,
             PageSize = r.Data.Meta.Limit
         });
     }
@@ -139,9 +139,9 @@ public class FinanceiroService(ApiClient api, SessionService session)
             return ApiResult<ContasReceberPaginadas>.Fail(r.ErrorCode ?? "ERROR", r.ErrorMessage ?? "Erro.", r.HttpStatus, r.CorrelationId);
         return ApiResult<ContasReceberPaginadas>.Ok(new ContasReceberPaginadas
         {
-            Itens    = r.Data.Data,
-            Total    = r.Data.Meta.Total,
-            Page     = r.Data.Meta.Page,
+            Itens = r.Data.Data,
+            Total = r.Data.Meta.Total,
+            Page = r.Data.Meta.Page,
             PageSize = r.Data.Meta.Limit
         });
     }

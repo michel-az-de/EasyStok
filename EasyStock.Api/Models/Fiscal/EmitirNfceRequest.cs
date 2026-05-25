@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace EasyStock.Api.Models.Fiscal;
 
@@ -31,10 +31,12 @@ public sealed class EmitirNfceRequest
 
 public sealed class EmitirNfceEmitenteDto
 {
-    [Required][StringLength(14, MinimumLength = 14)]
+    [Required]
+    [StringLength(14, MinimumLength = 14)]
     public string Cnpj { get; set; } = null!;
 
-    [Required][StringLength(120)]
+    [Required]
+    [StringLength(120)]
     public string RazaoSocial { get; set; } = null!;
 
     [StringLength(120)]
@@ -55,13 +57,15 @@ public sealed class EmitirNfceDestinatarioDto
     [StringLength(120)]
     public string? Nome { get; set; }
 
-    [EmailAddress][StringLength(120)]
+    [EmailAddress]
+    [StringLength(120)]
     public string? Email { get; set; }
 }
 
 public sealed class EmitirNfceItemDto
 {
-    [Required][StringLength(120)]
+    [Required]
+    [StringLength(120)]
     public string NomeSnapshot { get; set; } = null!;
 
     [Range(0.0001, double.MaxValue)]
@@ -70,7 +74,8 @@ public sealed class EmitirNfceItemDto
     [Range(0.01, double.MaxValue)]
     public decimal PrecoUnitario { get; set; }
 
-    [Required][StringLength(6)]
+    [Required]
+    [StringLength(6)]
     public string Unidade { get; set; } = "UN";
 
     [StringLength(8, MinimumLength = 8)]

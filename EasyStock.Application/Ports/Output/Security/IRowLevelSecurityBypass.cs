@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Security;
+﻿namespace EasyStock.Application.Ports.Output.Security;
 
 /// <summary>
 /// Abstracao para suspender temporariamente o Row Level Security (RLS) do

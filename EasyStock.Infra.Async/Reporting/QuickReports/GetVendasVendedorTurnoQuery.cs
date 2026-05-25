@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -11,20 +11,20 @@ namespace EasyStock.Infra.Async.Reporting.QuickReports;
 /// Síncrono, &lt; 1s, sem paginação (§27.7).
 /// </summary>
 public sealed class GetVendasVendedorTurnoQuery(
-    EasyStockDbContext   db,
+    EasyStockDbContext db,
     ICurrentUserAccessor currentUser)
 {
     public async Task<VendasVendedorTurnoDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        var hoje = DateTime.UtcNow.Date;
+        var amanha = hoje.AddDays(1);
 
         var query = db.Vendas
             .AsNoTracking()
             .Where(v => v.EmpresaId == empresaId
                      && v.DataVenda >= hoje
-                     && v.DataVenda <  amanha);
+                     && v.DataVenda < amanha);
 
         if (lojaId.HasValue)
             query = query.Where(v => v.LojaId == lojaId.Value);
@@ -39,27 +39,27 @@ public sealed class GetVendasVendedorTurnoQuery(
             {
                 g.Key.VendedorId,
                 g.Key.VendedorNome,
-                QtdVendas    = g.Count(),
+                QtdVendas = g.Count(),
                 TotalVendido = g.Sum(v => (decimal?)v.ValorTotal.Valor) ?? 0m,
             })
             .OrderByDescending(x => x.TotalVendido)
             .ToListAsync(ct);
 
-        var totalGeral      = porVendedor.Sum(x => x.TotalVendido);
-        var qtdVendasGeral  = porVendedor.Sum(x => x.QtdVendas);
+        var totalGeral = porVendedor.Sum(x => x.TotalVendido);
+        var qtdVendasGeral = porVendedor.Sum(x => x.QtdVendas);
 
         var vendedores = porVendedor
             .Select((x, idx) => new VendedorTurnoDto(
-                VendedorId:   x.VendedorId,
+                VendedorId: x.VendedorId,
                 VendedorNome: x.VendedorNome ?? "Sem vendedor",
-                QtdVendas:    x.QtdVendas,
+                QtdVendas: x.QtdVendas,
                 TotalVendido: Math.Round(x.TotalVendido, 2),
-                Ranking:      idx + 1))
+                Ranking: idx + 1))
             .ToList();
 
         return new VendasVendedorTurnoDto(
-            Vendedores:    vendedores,
-            TotalGeral:    Math.Round(totalGeral, 2),
+            Vendedores: vendedores,
+            TotalGeral: Math.Round(totalGeral, 2),
             QtdVendasGeral: qtdVendasGeral);
     }
 }

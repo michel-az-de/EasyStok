@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums;
+﻿namespace EasyStock.Domain.Enums;
 
 /// <summary>
 /// Tipos de evento registrados em <see cref="Entities.FaturaEvento"/> — audit

@@ -1,4 +1,4 @@
-using EasyStock.Api.Http;
+﻿using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Inteligencia.Board;
 using EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
 using EasyStock.Application.UseCases.Inteligencia.Rotatividade;

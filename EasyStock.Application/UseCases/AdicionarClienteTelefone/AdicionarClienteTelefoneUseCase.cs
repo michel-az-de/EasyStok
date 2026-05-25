@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -11,7 +11,7 @@ public sealed record AdicionarClienteTelefoneCommand(
     [property: Required] Guid EmpresaId,
     [property: Required] Guid ClienteId,
     [property: Required][property: MaxLength(32)] string Numero,
-    [property: MaxLength(20)]  string? Tipo = null,
+    [property: MaxLength(20)] string? Tipo = null,
     bool Whatsapp = false,
     bool Principal = false,
     [property: MaxLength(255)] string? Observacao = null);

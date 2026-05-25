@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.RefreshToken;
+﻿using EasyStock.Application.UseCases.RefreshToken;
 using FluentValidation;
 
 namespace EasyStock.Application.Validators;

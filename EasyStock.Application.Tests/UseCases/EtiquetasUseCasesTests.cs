@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Etiquetas;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +15,10 @@ namespace EasyStock.Application.Tests.UseCases;
 public class EtiquetasUseCasesTests
 {
     // ── Fixtures comuns ─────────────────────────────────────────────────────
-    private static readonly Guid EmpId    = Guid.NewGuid();
-    private static readonly Guid LoteId   = Guid.NewGuid();
-    private static readonly Guid TplId    = Guid.NewGuid();
-    private static readonly Guid OperId   = Guid.NewGuid();
+    private static readonly Guid EmpId = Guid.NewGuid();
+    private static readonly Guid LoteId = Guid.NewGuid();
+    private static readonly Guid TplId = Guid.NewGuid();
+    private static readonly Guid OperId = Guid.NewGuid();
     // Layout mínimo válido: 1 texto + 1 QR dentro dos bounds, sem variável inválida
     private static readonly string Layout = """{"v":1,"size":{"w_mm":80,"h_mm":40,"orientation":"horizontal"},"elements":[{"id":"t1","type":"text","content":"{produto.nome}","font":"sans","size_pt":10,"weight":400,"align":"left","overflow":"clip","x_mm":0,"y_mm":0,"w_mm":40,"h_mm":8},{"id":"qr1","type":"code","content":"{etiqueta.codigo}","format":"qr","x_mm":60,"y_mm":2,"w_mm":18,"h_mm":18}]}""";
 
@@ -53,16 +53,16 @@ public class EtiquetasUseCasesTests
         IAuditLogRepository? audit = null,
         IUnitOfWork? uow = null)
     {
-        lote  ??= Substitute.For<ILoteRepository>();
+        lote ??= Substitute.For<ILoteRepository>();
         audit ??= Substitute.For<IAuditLogRepository>();
-        uow   ??= Substitute.For<IUnitOfWork>();
+        uow ??= Substitute.For<IUnitOfWork>();
         return new MarcarEtiquetasImpressasUseCase(lote, audit, uow);
     }
 
     [Fact]
     public async Task Marcar_EmpresaIdVazio_LancaValidation()
     {
-        var uc  = BuildMarcar();
+        var uc = BuildMarcar();
         var cmd = CmdMarcar([Guid.NewGuid()]) with { EmpresaId = Guid.Empty };
         await Assert.ThrowsAsync<UseCaseValidationException>(() => uc.ExecuteAsync(cmd));
     }
@@ -70,7 +70,7 @@ public class EtiquetasUseCasesTests
     [Fact]
     public async Task Marcar_StatusInvalido_LancaValidation()
     {
-        var uc  = BuildMarcar();
+        var uc = BuildMarcar();
         var cmd = CmdMarcar([Guid.NewGuid()], status: "cancelada");
         await Assert.ThrowsAsync<UseCaseValidationException>(() => uc.ExecuteAsync(cmd));
     }
@@ -79,13 +79,13 @@ public class EtiquetasUseCasesTests
     public async Task Marcar_SemSnapshot_GravaSnapshotEStatus()
     {
         var etqId = Guid.NewGuid();
-        var etq   = Etiqueta(etqId); // sem snapshot
-        var lote  = Substitute.For<ILoteRepository>();
+        var etq = Etiqueta(etqId); // sem snapshot
+        var lote = Substitute.For<ILoteRepository>();
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
         var audit = Substitute.For<IAuditLogRepository>();
-        var uow   = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>();
 
-        var uc  = BuildMarcar(lote, audit, uow);
+        var uc = BuildMarcar(lote, audit, uow);
         var res = await uc.ExecuteAsync(CmdMarcar([etqId]));
 
         res.Atualizadas.Should().Be(1);
@@ -100,12 +100,12 @@ public class EtiquetasUseCasesTests
     public async Task Marcar_SnapshotIgual_ApenasAtualizaStatus_NaoGravaSnapshot()
     {
         var etqId = Guid.NewGuid();
-        var etq   = Etiqueta(etqId, MetaComTpl(TplId)); // snapshot com mesmo TplId
-        var lote  = Substitute.For<ILoteRepository>();
+        var etq = Etiqueta(etqId, MetaComTpl(TplId)); // snapshot com mesmo TplId
+        var lote = Substitute.For<ILoteRepository>();
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
         var uow = Substitute.For<IUnitOfWork>();
 
-        var uc  = BuildMarcar(lote, uow: uow);
+        var uc = BuildMarcar(lote, uow: uow);
         var res = await uc.ExecuteAsync(CmdMarcar([etqId]));
 
         res.Atualizadas.Should().Be(1);
@@ -121,12 +121,12 @@ public class EtiquetasUseCasesTests
     {
         var outroTplId = Guid.NewGuid();
         var etqId = Guid.NewGuid();
-        var etq   = Etiqueta(etqId, MetaComTpl(outroTplId)); // snapshot com OUTRO template
-        var lote  = Substitute.For<ILoteRepository>();
+        var etq = Etiqueta(etqId, MetaComTpl(outroTplId)); // snapshot com OUTRO template
+        var lote = Substitute.For<ILoteRepository>();
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
         var uow = Substitute.For<IUnitOfWork>();
 
-        var uc  = BuildMarcar(lote, uow: uow);
+        var uc = BuildMarcar(lote, uow: uow);
         var res = await uc.ExecuteAsync(CmdMarcar([etqId], overwrite: false));
 
         res.IgnoradasSnapshotDivergente.Should().Be(1);
@@ -140,13 +140,13 @@ public class EtiquetasUseCasesTests
     {
         var outroTplId = Guid.NewGuid();
         var etqId = Guid.NewGuid();
-        var etq   = Etiqueta(etqId, MetaComTpl(outroTplId));
-        var lote  = Substitute.For<ILoteRepository>();
+        var etq = Etiqueta(etqId, MetaComTpl(outroTplId));
+        var lote = Substitute.For<ILoteRepository>();
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
         var audit = Substitute.For<IAuditLogRepository>();
-        var uow   = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>();
 
-        var uc  = BuildMarcar(lote, audit, uow);
+        var uc = BuildMarcar(lote, audit, uow);
         var res = await uc.ExecuteAsync(CmdMarcar([etqId], overwrite: true));
 
         res.Atualizadas.Should().Be(1);
@@ -163,11 +163,11 @@ public class EtiquetasUseCasesTests
     public async Task Marcar_StatusImpressaEComOperador_GravaAuditImpressas()
     {
         var etqId = Guid.NewGuid();
-        var etq   = Etiqueta(etqId);
-        var lote  = Substitute.For<ILoteRepository>();
+        var etq = Etiqueta(etqId);
+        var lote = Substitute.For<ILoteRepository>();
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
         var audit = Substitute.For<IAuditLogRepository>();
-        var uow   = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>();
 
         var uc = BuildMarcar(lote, audit, uow);
         await uc.ExecuteAsync(CmdMarcar([etqId], status: "impressa"));
@@ -180,12 +180,12 @@ public class EtiquetasUseCasesTests
     public async Task Marcar_RevertePendente_AtualizaSoStatus()
     {
         var etqId = Guid.NewGuid();
-        var etq   = Etiqueta(etqId, MetaComTpl(TplId));
-        var lote  = Substitute.For<ILoteRepository>();
+        var etq = Etiqueta(etqId, MetaComTpl(TplId));
+        var lote = Substitute.For<ILoteRepository>();
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
         var uow = Substitute.For<IUnitOfWork>();
 
-        var uc  = BuildMarcar(lote, uow: uow);
+        var uc = BuildMarcar(lote, uow: uow);
         var res = await uc.ExecuteAsync(CmdMarcar([etqId], status: "pendente"));
 
         res.Atualizadas.Should().Be(1);
@@ -201,7 +201,7 @@ public class EtiquetasUseCasesTests
         lote.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([]);
         var uow = Substitute.For<IUnitOfWork>();
 
-        var uc  = BuildMarcar(lote, uow: uow);
+        var uc = BuildMarcar(lote, uow: uow);
         var res = await uc.ExecuteAsync(CmdMarcar([Guid.NewGuid()]));
 
         res.Atualizadas.Should().Be(0);
@@ -218,18 +218,21 @@ public class EtiquetasUseCasesTests
     {
         var tpl = new EasyStock.Domain.Entities.EtiquetaTemplate
         {
-            Id = TplId, EmpresaId = EmpId, Nome = "Teste", LayoutJson = Layout
+            Id = TplId,
+            EmpresaId = EmpId,
+            Nome = "Teste",
+            LayoutJson = Layout
         };
-        var repo  = Substitute.For<IEtiquetaTemplateRepository>();
+        var repo = Substitute.For<IEtiquetaTemplateRepository>();
         var audit = Substitute.For<IAuditLogRepository>();
-        var uow   = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>();
 
         repo.GetEmpresaByIdAsync(EmpId, TplId).Returns(tpl);
         // Simula conflito de concorrência no commit (EF Core lança via uow.CommitAsync em produção;
         // GlobalExceptionHandler mapeia DbUpdateConcurrencyException → 409 Conflict).
         uow.CommitAsync().ThrowsAsync(new DbUpdateConcurrencyException("conflito"));
 
-        var uc  = new AtualizarTemplateUseCase(repo, audit, uow);
+        var uc = new AtualizarTemplateUseCase(repo, audit, uow);
         var cmd = new AtualizarTemplateCommand(EmpId, TplId, "Novo Nome", Layout, OperId, null, null);
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => uc.ExecuteAsync(cmd));
@@ -238,12 +241,12 @@ public class EtiquetasUseCasesTests
     [Fact]
     public async Task AtualizarTemplate_TemplateNaoEncontrado_RetornaNull()
     {
-        var repo  = Substitute.For<IEtiquetaTemplateRepository>();
+        var repo = Substitute.For<IEtiquetaTemplateRepository>();
         var audit = Substitute.For<IAuditLogRepository>();
-        var uow   = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>();
         repo.GetEmpresaByIdAsync(EmpId, TplId).Returns((EasyStock.Domain.Entities.EtiquetaTemplate?)null);
 
-        var uc  = new AtualizarTemplateUseCase(repo, audit, uow);
+        var uc = new AtualizarTemplateUseCase(repo, audit, uow);
         var cmd = new AtualizarTemplateCommand(EmpId, TplId, "Nome", Layout, null, null, null);
 
         var res = await uc.ExecuteAsync(cmd);
@@ -255,16 +258,19 @@ public class EtiquetasUseCasesTests
     {
         var tpl = new EasyStock.Domain.Entities.EtiquetaTemplate
         {
-            Id = TplId, EmpresaId = EmpId, Nome = "Teste", LayoutJson = Layout
+            Id = TplId,
+            EmpresaId = EmpId,
+            Nome = "Teste",
+            LayoutJson = Layout
         };
-        var repo  = Substitute.For<IEtiquetaTemplateRepository>();
+        var repo = Substitute.For<IEtiquetaTemplateRepository>();
         var audit = Substitute.For<IAuditLogRepository>();
-        var uow   = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>();
         repo.GetEmpresaByIdAsync(EmpId, TplId).Returns(tpl);
 
         var layoutInvalido = """{"v":1,"size":{"w_mm":80,"h_mm":40,"orientation":"horizontal"},"elements":[{"id":"","type":"text","content":"ok","x_mm":0,"y_mm":0,"w_mm":10,"h_mm":5}]}""";
 
-        var uc  = new AtualizarTemplateUseCase(repo, audit, uow);
+        var uc = new AtualizarTemplateUseCase(repo, audit, uow);
         var cmd = new AtualizarTemplateCommand(EmpId, TplId, "Nome", layoutInvalido, null, null, null);
 
         await Assert.ThrowsAsync<UseCaseValidationException>(() => uc.ExecuteAsync(cmd));
@@ -279,7 +285,7 @@ public class EtiquetasUseCasesTests
         ILoteRepository? loteRepo = null,
         ILojaRepository? lojaRepo = null)
     {
-        tplRepo  ??= Substitute.For<IEtiquetaTemplateRepository>();
+        tplRepo ??= Substitute.For<IEtiquetaTemplateRepository>();
         loteRepo ??= Substitute.For<ILoteRepository>();
         lojaRepo ??= Substitute.For<ILojaRepository>();
         return new MontarPayloadRenderUseCase(tplRepo, loteRepo, lojaRepo);
@@ -299,7 +305,7 @@ public class EtiquetasUseCasesTests
         var loteRepo = Substitute.For<ILoteRepository>();
         loteRepo.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([]);
 
-        var uc  = BuildRender(loteRepo: loteRepo);
+        var uc = BuildRender(loteRepo: loteRepo);
         var res = await uc.ExecuteAsync(new MontarPayloadRenderQuery(EmpId, LoteId, null, null));
 
         res.Should().BeNull();
@@ -309,18 +315,23 @@ public class EtiquetasUseCasesTests
     public async Task Render_ProdutoSemFicha_IncluiNaListaSemFicha()
     {
         var prodId = Guid.NewGuid();
-        var prod   = new EasyStock.Domain.Entities.Produto { Id = prodId, Nome = "Pão", Marca = "M", AtributosJson = null };
-        var item   = new EasyStock.Domain.Entities.LoteItem { Produto = prod, Emoji = "🍞", Unidade = "un" };
-        var etq    = new LoteEtiqueta
+        var prod = new EasyStock.Domain.Entities.Produto { Id = prodId, Nome = "Pão", Marca = "M", AtributosJson = null };
+        var item = new EasyStock.Domain.Entities.LoteItem { Produto = prod, Emoji = "🍞", Unidade = "un" };
+        var etq = new LoteEtiqueta
         {
-            Id = Guid.NewGuid(), Sequencial = 1, Codigo = "ETQ-001",
-            Status = LoteEtiquetaStatus.Pendente, LoteItem = item,
+            Id = Guid.NewGuid(),
+            Sequencial = 1,
+            Codigo = "ETQ-001",
+            Status = LoteEtiquetaStatus.Pendente,
+            LoteItem = item,
             Lote = new Lote { Codigo = "LOT-001" }
         };
 
         var sistemaTemplate = new EasyStock.Domain.Entities.EtiquetaTemplateSistema
         {
-            Id = Guid.NewGuid(), LayoutJson = Layout, Ordem = 0
+            Id = Guid.NewGuid(),
+            LayoutJson = Layout,
+            Ordem = 0
         };
 
         var loteRepo = Substitute.For<ILoteRepository>();
@@ -333,7 +344,7 @@ public class EtiquetasUseCasesTests
         var lojaRepo = Substitute.For<ILojaRepository>();
         lojaRepo.GetByEmpresaAsync(EmpId).Returns([]);
 
-        var uc  = BuildRender(tplRepo, loteRepo, lojaRepo);
+        var uc = BuildRender(tplRepo, loteRepo, lojaRepo);
         var res = await uc.ExecuteAsync(new MontarPayloadRenderQuery(EmpId, LoteId, null, null));
 
         res.Should().NotBeNull();
@@ -344,18 +355,24 @@ public class EtiquetasUseCasesTests
     public async Task Render_FallbackParaPrimeiroSistema_QuandoSemDefault()
     {
         var prodId = Guid.NewGuid();
-        var prod   = new EasyStock.Domain.Entities.Produto { Id = prodId, Nome = "Caldo", Marca = "M", AtributosJson = null };
-        var item   = new EasyStock.Domain.Entities.LoteItem { Produto = prod };
-        var etq    = new LoteEtiqueta
+        var prod = new EasyStock.Domain.Entities.Produto { Id = prodId, Nome = "Caldo", Marca = "M", AtributosJson = null };
+        var item = new EasyStock.Domain.Entities.LoteItem { Produto = prod };
+        var etq = new LoteEtiqueta
         {
-            Id = Guid.NewGuid(), Sequencial = 1, Codigo = "ETQ-002",
-            Status = LoteEtiquetaStatus.Pendente, LoteItem = item,
+            Id = Guid.NewGuid(),
+            Sequencial = 1,
+            Codigo = "ETQ-002",
+            Status = LoteEtiquetaStatus.Pendente,
+            LoteItem = item,
             Lote = new Lote { Codigo = "LOT-002" }
         };
 
         var sistemaTemplate = new EasyStock.Domain.Entities.EtiquetaTemplateSistema
         {
-            Id = TplId, LayoutJson = Layout, Ordem = 0, Nome = "Identificação"
+            Id = TplId,
+            LayoutJson = Layout,
+            Ordem = 0,
+            Nome = "Identificação"
         };
 
         var loteRepo = Substitute.For<ILoteRepository>();
@@ -368,7 +385,7 @@ public class EtiquetasUseCasesTests
         var lojaRepo = Substitute.For<ILojaRepository>();
         lojaRepo.GetByEmpresaAsync(EmpId).Returns([]);
 
-        var uc  = BuildRender(tplRepo, loteRepo, lojaRepo);
+        var uc = BuildRender(tplRepo, loteRepo, lojaRepo);
         var res = await uc.ExecuteAsync(new MontarPayloadRenderQuery(EmpId, LoteId, null, null));
 
         res.Should().NotBeNull();

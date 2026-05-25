@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;

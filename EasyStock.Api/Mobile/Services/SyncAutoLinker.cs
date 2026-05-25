@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.DTOs;
+﻿using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities;
@@ -47,20 +47,20 @@ public class SyncAutoLinker(
         HashSet<string> orderIds, HashSet<string> batchIds, HashSet<string> cashIds,
         Guid? empresaId)
     {
-        var autoLinkProd   = _appConfig.GetValue<bool>("MobileSync:AutoLink:Product", true);
+        var autoLinkProd = _appConfig.GetValue<bool>("MobileSync:AutoLink:Product", true);
         var autoLinkClient = _appConfig.GetValue<bool>("MobileSync:AutoLink:Client", true);
-        var autoLinkOrder  = _appConfig.GetValue<bool>("MobileSync:AutoLink:Order", true);
-        var autoLinkBatch  = _appConfig.GetValue<bool>("MobileSync:AutoLink:Batch", true);
-        var autoLinkCash   = _appConfig.GetValue<bool>("MobileSync:AutoLink:CashEntry", true);
+        var autoLinkOrder = _appConfig.GetValue<bool>("MobileSync:AutoLink:Order", true);
+        var autoLinkBatch = _appConfig.GetValue<bool>("MobileSync:AutoLink:Batch", true);
+        var autoLinkCash = _appConfig.GetValue<bool>("MobileSync:AutoLink:CashEntry", true);
 
-        if (autoLinkProd   && productIds.Count > 0) await TryAutoLinkProductsAsync(productIds, empresaId);
-        if (autoLinkClient && clientIds.Count  > 0) await TryAutoLinkClientsAsync(clientIds, empresaId);
+        if (autoLinkProd && productIds.Count > 0) await TryAutoLinkProductsAsync(productIds, empresaId);
+        if (autoLinkClient && clientIds.Count > 0) await TryAutoLinkClientsAsync(clientIds, empresaId);
         // F1/F2/F3 — promove orders/batches/cash DEPOIS de products/clients pra que
         // FKs (ErpProductId, ErpClienteId) já estejam preenchidas.
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-        if (autoLinkOrder  && orderIds.Count   > 0) await TryAutoLinkOrdersAsync(orderIds, empresaId);
-        if (autoLinkBatch  && batchIds.Count   > 0) await TryAutoLinkBatchesAsync(batchIds, empresaId);
-        if (autoLinkCash   && cashIds.Count    > 0) await TryAutoLinkCashEntriesAsync(cashIds, empresaId);
+        if (autoLinkOrder && orderIds.Count > 0) await TryAutoLinkOrdersAsync(orderIds, empresaId);
+        if (autoLinkBatch && batchIds.Count > 0) await TryAutoLinkBatchesAsync(batchIds, empresaId);
+        if (autoLinkCash && cashIds.Count > 0) await TryAutoLinkCashEntriesAsync(cashIds, empresaId);
     }
 
     /// <summary>
@@ -262,11 +262,11 @@ public class SyncAutoLinker(
                 }
 
                 var novoC = Cliente.Criar(empresaId.Value, mobileC.Name);
-                novoC.Apt      = mobileC.Apt;
+                novoC.Apt = mobileC.Apt;
                 novoC.Endereco = mobileC.Address;
                 novoC.Telefone = mobileC.Phone;
                 novoC.LastOrderAt = mobileC.LastOrder;
-                novoC.OrderCount  = mobileC.OrderCount;
+                novoC.OrderCount = mobileC.OrderCount;
                 _db.Add(novoC);
                 mobileC.ErpClienteId = novoC.Id;
                 _db.Add(new ClienteAlteracao
@@ -714,8 +714,8 @@ public class SyncAutoLinker(
 
                 var lote = Lote.Criar(empresaId.Value, codigo, mobileB.CreatedAt, mobileB.LojaId);
                 lote.MobileBatchId = mobileB.Id;
-                lote.OperadorNome  = mobileB.LastOperatorName;
-                lote.Origem        = "mobile";
+                lote.OperadorNome = mobileB.LastOperatorName;
+                lote.Origem = "mobile";
 
                 foreach (var item in mobileB.Items)
                 {

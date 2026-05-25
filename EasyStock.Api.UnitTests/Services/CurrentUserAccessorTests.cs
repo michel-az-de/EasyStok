@@ -1,4 +1,4 @@
-using EasyStock.Api.Services;
+﻿using EasyStock.Api.Services;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;

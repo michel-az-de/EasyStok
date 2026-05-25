@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.TotalizadoresFiscais;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.TotalizadoresFiscais;
 
 /// <summary>
 /// Linha de saída do relatório "Totalizadores fiscais por CFOP/CST/NCM".
@@ -9,13 +9,13 @@ namespace EasyStock.Application.Reporting.Definitions.Fiscal.TotalizadoresFiscai
 /// e a coluna <see cref="TributosRastreados"/> indica false.
 /// </summary>
 public sealed record TotalizadoresFiscaisRow(
-    string?  Cfop,
-    string?  CstOuCsosn,
-    string?  Ncm,
-    int      QtdItens,
-    decimal  TotalItens,
-    decimal  BaseIcms,
-    decimal  ValorIcms,
-    decimal  Pis,
-    decimal  Cofins,
-    bool     TributosRastreados);
+    string? Cfop,
+    string? CstOuCsosn,
+    string? Ncm,
+    int QtdItens,
+    decimal TotalItens,
+    decimal BaseIcms,
+    decimal ValorIcms,
+    decimal Pis,
+    decimal Cofins,
+    bool TributosRastreados);

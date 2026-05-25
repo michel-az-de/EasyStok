@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.UseCases.Reports;
 using EasyStock.Domain.Reporting;
@@ -17,17 +17,17 @@ namespace EasyStock.Api.Controllers;
 [Route("api/reports")]
 [Authorize]
 public sealed class ReportsController(
-    EnqueueReportRunUseCase     enqueue,
-    GetReportRunUseCase         getById,
-    ListMyReportRunsUseCase     listMy,
-    CancelReportRunUseCase      cancel,
-    ListReportCatalogUseCase    catalog,
-    GetReportSchemaUseCase      schema,
-    PreviewReportUseCase        preview,
-    GetReportDataUseCase        data,
-    IReportExecutionScope       executionScope,
-    ICurrentUserAccessor        currentUser,
-    ReportingMetricsService     reportingMetrics)
+    EnqueueReportRunUseCase enqueue,
+    GetReportRunUseCase getById,
+    ListMyReportRunsUseCase listMy,
+    CancelReportRunUseCase cancel,
+    ListReportCatalogUseCase catalog,
+    GetReportSchemaUseCase schema,
+    PreviewReportUseCase preview,
+    GetReportDataUseCase data,
+    IReportExecutionScope executionScope,
+    ICurrentUserAccessor currentUser,
+    ReportingMetricsService reportingMetrics)
     : EasyStockControllerBase
 {
     // ── GET /api/reports/catalog ─────────────────────────────────────────────
@@ -50,14 +50,14 @@ public sealed class ReportsController(
     /// </summary>
     [HttpPost("{key}/runs")]
     public async Task<IActionResult> EnqueueRun(
-        [FromRoute] string           key,
-        [FromBody]  EnqueueRunRequest request,
+        [FromRoute] string key,
+        [FromBody] EnqueueRunRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey = null)
     {
         var command = new EnqueueReportRunCommand(
-            ReportKey:      key,
-            ParamsJson:     request.ParamsJson,
-            Format:         request.Format,
+            ReportKey: key,
+            ParamsJson: request.ParamsJson,
+            Format: request.Format,
             IdempotencyKey: idempotencyKey,
             MotivoExecucao: null);
 
@@ -98,21 +98,21 @@ public sealed class ReportsController(
     /// </summary>
     [HttpGet("runs")]
     public async Task<IActionResult> ListRuns(
-        [FromQuery] ReportCategoria?  categoria = null,
-        [FromQuery] ReportStatus?     status    = null,
-        [FromQuery] DateTimeOffset?   de        = null,
-        [FromQuery] DateTimeOffset?   ate       = null,
-        [FromQuery] int               skip      = 0,
-        [FromQuery] int               take      = 25)
+        [FromQuery] ReportCategoria? categoria = null,
+        [FromQuery] ReportStatus? status = null,
+        [FromQuery] DateTimeOffset? de = null,
+        [FromQuery] DateTimeOffset? ate = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 25)
     {
         take = Math.Clamp(take, 1, 100);
         skip = Math.Max(0, skip);
 
         var filter = new ReportListFilter(
             Categoria: categoria,
-            Status:    status,
-            De:        de,
-            Ate:       ate);
+            Status: status,
+            De: de,
+            Ate: ate);
 
         var runs = await listMy.ExecuteAsync(
             new ListMyReportRunsQuery(Filter: filter, Skip: skip, Take: take));
@@ -152,9 +152,9 @@ public sealed class ReportsController(
             return DataNotFound("Execução de relatório não encontrada.");
 
         var command = new EnqueueReportRunCommand(
-            ReportKey:      original.ReportKey,
-            ParamsJson:     original.ParamsJson,
-            Format:         original.Format,
+            ReportKey: original.ReportKey,
+            ParamsJson: original.ParamsJson,
+            Format: original.Format,
             IdempotencyKey: idempotencyKey,
             MotivoExecucao: null);
 
@@ -195,14 +195,14 @@ public sealed class ReportsController(
     /// </summary>
     [HttpPost("{key}/preview")]
     public async Task<IActionResult> Preview(
-        [FromRoute] string         key,
-        [FromBody]  PreviewRequest request,
-        CancellationToken          ct)
+        [FromRoute] string key,
+        [FromBody] PreviewRequest request,
+        CancellationToken ct)
     {
         using var _ = executionScope.Begin(
-            empresaId:            currentUser.EmpresaId,
+            empresaId: currentUser.EmpresaId,
             usuarioSolicitanteId: currentUser.UsuarioId,
-            contexto:             Domain.Reporting.ReportContexto.Tenant);
+            contexto: Domain.Reporting.ReportContexto.Tenant);
 
         reportingMetrics.RecordPreviewRequested(key);
 
@@ -227,22 +227,22 @@ public sealed class ReportsController(
     /// </summary>
     [HttpPost("{key}/data")]
     public async Task<IActionResult> GetData(
-        [FromRoute] string       key,
-        [FromBody]  DataRequest  request,
-        CancellationToken        ct)
+        [FromRoute] string key,
+        [FromBody] DataRequest request,
+        CancellationToken ct)
     {
         using var _ = executionScope.Begin(
-            empresaId:            currentUser.EmpresaId,
+            empresaId: currentUser.EmpresaId,
             usuarioSolicitanteId: currentUser.UsuarioId,
-            contexto:             Domain.Reporting.ReportContexto.Tenant);
+            contexto: Domain.Reporting.ReportContexto.Tenant);
 
         reportingMetrics.RecordDataRequested("tenant", key);
 
         var query = new GetReportDataQuery(
-            ReportKey:  key,
+            ReportKey: key,
             ParamsJson: request.ParamsJson,
-            Page:       request.Page,
-            PageSize:   request.PageSize);
+            Page: request.Page,
+            PageSize: request.PageSize);
 
         var result = await data.ExecuteAsync(query, ct);
 
@@ -257,7 +257,7 @@ public sealed class ReportsController(
 
 /// <summary>Body do POST /api/reports/{key}/runs</summary>
 public sealed record EnqueueRunRequest(
-    string       ParamsJson,
+    string ParamsJson,
     ReportFormat Format);
 
 /// <summary>Body do POST /api/reports/{key}/preview</summary>
@@ -266,5 +266,5 @@ public sealed record PreviewRequest(string ParamsJson);
 /// <summary>Body do POST /api/reports/{key}/data</summary>
 public sealed record DataRequest(
     string ParamsJson,
-    int    Page     = 1,
-    int    PageSize = 50);
+    int Page = 1,
+    int PageSize = 50);

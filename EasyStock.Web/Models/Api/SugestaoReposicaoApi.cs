@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.Api;
+﻿namespace EasyStock.Web.Models.Api;
 
 // Mapeia o SugestaoReposicaoResult do endpoint inteligencia/sugestao-reposicao.
 public record SugestaoReposicaoApi

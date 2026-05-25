@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
+﻿namespace EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
 
 /// <summary>
 /// Parâmetros do relatório "MAP — Mapa Resumo NFC-e" (mensal).

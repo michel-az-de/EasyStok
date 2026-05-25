@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Models.ViewModels.Produtos;
 
@@ -42,9 +42,16 @@ public class ProdutoDetailViewModel
 
     public static readonly Dictionary<string, int> IntegrityMissingStepMap = new()
     {
-        ["Foto"] = 2, ["Preço"] = 2, ["Custo"] = 2,
-        ["Variações"] = 3, ["Dimensões"] = 3,
-        ["Descrição"] = 1, ["Cód.Barras"] = 1, ["Marca"] = 1, ["Nome"] = 1, ["Categoria"] = 1,
+        ["Foto"] = 2,
+        ["Preço"] = 2,
+        ["Custo"] = 2,
+        ["Variações"] = 3,
+        ["Dimensões"] = 3,
+        ["Descrição"] = 1,
+        ["Cód.Barras"] = 1,
+        ["Marca"] = 1,
+        ["Nome"] = 1,
+        ["Categoria"] = 1,
         ["Nutricional"] = 0,
     };
 

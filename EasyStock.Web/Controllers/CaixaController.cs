@@ -1,4 +1,4 @@
-using EasyStock.Web.Helpers;
+﻿using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Caixa;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;

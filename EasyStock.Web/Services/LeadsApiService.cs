@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Site;
+﻿using EasyStock.Web.Models.ViewModels.Site;
 
 namespace EasyStock.Web.Services;
 

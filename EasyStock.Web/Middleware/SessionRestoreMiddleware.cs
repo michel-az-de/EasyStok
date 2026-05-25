@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication;

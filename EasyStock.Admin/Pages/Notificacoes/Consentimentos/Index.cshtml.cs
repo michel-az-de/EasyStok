@@ -1,4 +1,4 @@
-using EasyStock.Admin.Services;
+﻿using EasyStock.Admin.Services;
 using System.Text.Json;
 
 namespace EasyStock.Admin.Pages.Notificacoes.Consentimentos;

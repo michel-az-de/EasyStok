@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.ViewModels.Pedidos;
+﻿using EasyStock.Web.Models.ViewModels.Pedidos;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 

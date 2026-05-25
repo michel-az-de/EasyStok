@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.Security;
+﻿using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;

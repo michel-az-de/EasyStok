@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Pdf;
+﻿using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Domain.Entities;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;

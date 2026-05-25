@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Fiscal;
+﻿namespace EasyStock.Domain.Fiscal;
 
 /// <summary>
 /// Estados possiveis de um <see cref="NfeDocumento"/> ao longo do ciclo

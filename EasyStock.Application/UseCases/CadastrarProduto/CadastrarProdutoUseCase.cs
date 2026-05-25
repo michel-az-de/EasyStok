@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
@@ -167,8 +167,8 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             };
 
             var caracteristicasIds = new List<Guid>();
-            var embalagensIds      = new List<Guid>();
-            var variacoesIds       = new List<Guid>();
+            var embalagensIds = new List<Guid>();
+            var variacoesIds = new List<Guid>();
 
             try
             {

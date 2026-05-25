@@ -103,11 +103,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             bool semPreco = false,
             Guid? categoriaId = null)
         {
-            var sortNorm  = (sort  ?? "criadoem").ToLowerInvariant();
+            var sortNorm = (sort ?? "criadoem").ToLowerInvariant();
             var orderNorm = (order ?? "desc").ToLowerInvariant();
 
             // Cache key inclui os filtros para evitar hit incorreto entre combinações distintas.
-            var versao   = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
+            var versao = cache is not null ? await cache.GetStringAsync(VersaoKey(empresaId)) ?? "0" : "0";
             var filterKey = $"s={status?.ToString() ?? "_"}_np={(semPreco ? "1" : "0")}_c={categoriaId?.ToString() ?? "_"}";
             var cacheKey = $"produtos_paginados_{empresaId}_v{versao}_{page}_{pageSize}_{sortNorm}_{orderNorm}_{filterKey}";
 
@@ -145,12 +145,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             query = (sortNorm, orderNorm) switch
             {
-                ("nome",       "asc")  => query.OrderBy(p => p.Nome).ThenByDescending(p => p.Id),
-                ("nome",       _)      => query.OrderByDescending(p => p.Nome).ThenByDescending(p => p.Id),
-                ("criadoem",   "asc")  => query.OrderBy(p => p.CriadoEm).ThenByDescending(p => p.Id),
-                ("criadoem",   _)      => query.OrderByDescending(p => p.CriadoEm).ThenByDescending(p => p.Id),
-                ("alteradoem", "asc")  => query.OrderBy(p => p.AlteradoEm).ThenByDescending(p => p.Id),
-                _                      => query.OrderByDescending(p => p.AlteradoEm)
+                ("nome", "asc") => query.OrderBy(p => p.Nome).ThenByDescending(p => p.Id),
+                ("nome", _) => query.OrderByDescending(p => p.Nome).ThenByDescending(p => p.Id),
+                ("criadoem", "asc") => query.OrderBy(p => p.CriadoEm).ThenByDescending(p => p.Id),
+                ("criadoem", _) => query.OrderByDescending(p => p.CriadoEm).ThenByDescending(p => p.Id),
+                ("alteradoem", "asc") => query.OrderBy(p => p.AlteradoEm).ThenByDescending(p => p.Id),
+                _ => query.OrderByDescending(p => p.AlteradoEm)
                                                 .ThenByDescending(p => p.CriadoEm)
                                                 .ThenByDescending(p => p.Id)
             };

@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
+﻿namespace EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
 
 /// <summary>
 /// Parâmetros de entrada do relatório "Vendas por período".
@@ -6,6 +6,6 @@ namespace EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
 public sealed record VendasPorPeriodoParams(
     DateOnly De,
     DateOnly Ate,
-    Guid?    LojaId              = null,
-    string?  FormaPagamento      = null,
-    Guid?    VendedorId          = null);
+    Guid? LojaId = null,
+    string? FormaPagamento = null,
+    Guid? VendedorId = null);

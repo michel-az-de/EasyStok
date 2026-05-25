@@ -1,4 +1,4 @@
-using EasyStock.Domain.Events;
+﻿using EasyStock.Domain.Events;
 
 namespace EasyStock.Domain.Financeiro.Events;
 

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;

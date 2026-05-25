@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;

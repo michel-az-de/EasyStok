@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Pagamentos;
+﻿using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 
 namespace EasyStock.Infra.Async.Pagamentos;

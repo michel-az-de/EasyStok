@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -24,15 +24,15 @@ public class ConfiguracaoCanal
         Guid? empresaId = null,
         byte[]? credenciaisCifradas = null,
         bool ativoNoTenant = true) => new()
-    {
-        Id = Guid.NewGuid(),
-        EmpresaId = empresaId,
-        Canal = canal,
-        ProviderAtivo = providerAtivo,
-        CredenciaisCifradas = credenciaisCifradas,
-        AtivoNoTenant = ativoNoTenant,
-        AtualizadoEm = DateTime.UtcNow
-    };
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Canal = canal,
+            ProviderAtivo = providerAtivo,
+            CredenciaisCifradas = credenciaisCifradas,
+            AtivoNoTenant = ativoNoTenant,
+            AtualizadoEm = DateTime.UtcNow
+        };
 
     public void TrocarProvider(string novoProvider, byte[]? novasCredenciais, string atualizadoPor)
     {

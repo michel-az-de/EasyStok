@@ -1,4 +1,4 @@
-using EasyStock.Domain.ValueObjects;
+﻿using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.ValueObjects;

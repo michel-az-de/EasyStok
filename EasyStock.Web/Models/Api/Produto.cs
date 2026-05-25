@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Models.Api;
+﻿namespace EasyStock.Web.Models.Api;
 
 /// <summary>Produto inline retornado dentro de EstoqueSku e Movimentacao (apenas 6 campos mapeados pela API).</summary>
 public record ProdutoResumoApi

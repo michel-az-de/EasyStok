@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.CadastrarUsuario;
+﻿using EasyStock.Application.UseCases.CadastrarUsuario;
 using FluentValidation;
 
 namespace EasyStock.Application.Validators;

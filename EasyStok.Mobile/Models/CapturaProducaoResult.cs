@@ -1,4 +1,4 @@
-namespace EasyStok.Mobile.Models;
+﻿namespace EasyStok.Mobile.Models;
 
 /// <summary>
 /// Resultado do popup de captura de producao. Todos os campos sao opcionais
@@ -6,7 +6,7 @@ namespace EasyStok.Mobile.Models;
 /// validade, replicando a UX do PWA Casa da Baba.
 /// </summary>
 public sealed record CapturaProducaoResult(
-	int Quantidade,
-	decimal? PesoG,
-	DateTime? Validade,
-	string? FotoPath);
+    int Quantidade,
+    decimal? PesoG,
+    DateTime? Validade,
+    string? FotoPath);

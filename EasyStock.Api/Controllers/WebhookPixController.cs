@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Enums;

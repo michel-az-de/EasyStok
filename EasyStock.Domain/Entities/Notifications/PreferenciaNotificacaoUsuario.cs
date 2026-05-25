@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -20,14 +20,14 @@ public class PreferenciaNotificacaoUsuario
         string rotinaCodigo,
         bool habilitada = true,
         CanalNotificacao? canalPreferido = null) => new()
-    {
-        UsuarioId = usuarioId,
-        EmpresaId = empresaId,
-        RotinaCodigo = rotinaCodigo,
-        Habilitada = habilitada,
-        CanalPreferido = canalPreferido,
-        AtualizadaEm = DateTime.UtcNow
-    };
+        {
+            UsuarioId = usuarioId,
+            EmpresaId = empresaId,
+            RotinaCodigo = rotinaCodigo,
+            Habilitada = habilitada,
+            CanalPreferido = canalPreferido,
+            AtualizadaEm = DateTime.UtcNow
+        };
 
     public void Atualizar(bool habilitada, CanalNotificacao? canalPreferido)
     {

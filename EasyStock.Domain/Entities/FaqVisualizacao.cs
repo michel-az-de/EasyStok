@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities
+﻿namespace EasyStock.Domain.Entities
 {
     /// <summary>
     /// Registra acesso a um FaqItem para metrica de popularidade.

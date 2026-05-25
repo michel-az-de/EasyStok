@@ -1,4 +1,4 @@
-// Infrastructure - PostgreSQL - Global usings para reduzir repetição
+﻿// Infrastructure - PostgreSQL - Global usings para reduzir repetição
 // Padrão: Entity Framework Core, entidades, tipos base
 
 global using System;

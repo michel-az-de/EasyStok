@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Fiscal;
+﻿using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Domain.Fiscal;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

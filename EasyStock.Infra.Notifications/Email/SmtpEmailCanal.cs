@@ -1,4 +1,4 @@
-using System.Net.Mail;
+﻿using System.Net.Mail;
 using System.Net.Sockets;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;

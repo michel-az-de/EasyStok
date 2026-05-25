@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Lotes;
+﻿namespace EasyStock.Application.UseCases.Lotes;
 
 /// <summary>DTOs do módulo Lote (Onda P5.A).</summary>
 public sealed record LoteResult(

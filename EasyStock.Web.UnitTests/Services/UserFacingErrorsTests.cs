@@ -1,4 +1,4 @@
-using EasyStock.Web.Services;
+﻿using EasyStock.Web.Services;
 using FluentAssertions;
 
 namespace EasyStock.Web.UnitTests.Services;

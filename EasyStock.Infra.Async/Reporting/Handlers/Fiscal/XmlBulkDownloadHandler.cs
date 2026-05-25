@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
@@ -29,9 +29,9 @@ public sealed class XmlBulkDownloadHandler(
         // Esquema mínimo — o exporter ZIP não renderiza colunas tabulates.
         var competencia = $"{parametros.De:yyyy-MM}";
         return new ReportSchema(
-            title:        "XMLs autorizados (em lote)",
+            title: "XMLs autorizados (em lote)",
             fileNameBase: $"xmls-nfce_{competencia}",
-            columns:      []);
+            columns: []);
     }
 
     public async Task ValidateAsync(XmlBulkDownloadParams parametros, CancellationToken ct)
@@ -51,7 +51,7 @@ public sealed class XmlBulkDownloadHandler(
         XmlBulkDownloadParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        var de = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
         // Apenas NFC-e autorizadas com XML disponível no storage.
@@ -79,12 +79,12 @@ public sealed class XmlBulkDownloadHandler(
                 : $"{doc.Numero:D9}_{doc.Serie:D3}.xml";
 
             yield return new XmlBulkDownloadRow(
-                StorageKey:      doc.XmlAssinadoStorageKey!,
-                NomeArquivo:     nomeArquivo,
-                ChaveAcesso:     doc.ChaveAcesso ?? string.Empty,
+                StorageKey: doc.XmlAssinadoStorageKey!,
+                NomeArquivo: nomeArquivo,
+                ChaveAcesso: doc.ChaveAcesso ?? string.Empty,
                 DataAutorizacao: doc.DataAutorizacao!.Value,
-                Numero:          doc.Numero,
-                Serie:           doc.Serie);
+                Numero: doc.Numero,
+                Serie: doc.Serie);
         }
     }
 

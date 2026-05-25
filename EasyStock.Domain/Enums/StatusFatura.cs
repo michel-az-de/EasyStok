@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums;
+﻿namespace EasyStock.Domain.Enums;
 
 /// <summary>
 /// Estados do ciclo de vida de uma <see cref="Entities.Fatura"/>.

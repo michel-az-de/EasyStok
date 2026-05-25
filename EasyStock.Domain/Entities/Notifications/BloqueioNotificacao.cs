@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -22,15 +22,15 @@ public class BloqueioNotificacao
         Guid? empresaId = null,
         CanalNotificacao? canal = null,
         DateTime? expiraEm = null) => new()
-    {
-        Id = Guid.NewGuid(),
-        EmpresaId = empresaId,
-        Canal = canal,
-        Motivo = motivo,
-        AtivadoEm = DateTime.UtcNow,
-        AtivadoPor = ativadoPor,
-        ExpiraEm = expiraEm
-    };
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Canal = canal,
+            Motivo = motivo,
+            AtivadoEm = DateTime.UtcNow,
+            AtivadoPor = ativadoPor,
+            ExpiraEm = expiraEm
+        };
 
     public void Remover(string removidoPor)
     {

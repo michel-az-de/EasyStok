@@ -1,4 +1,4 @@
-// Camada de Autenticação e Autorização
+﻿// Camada de Autenticação e Autorização
 // Registra UseCases relacionados a: login, logout, tokens, recuperação de senha
 
 using Microsoft.Extensions.DependencyInjection;

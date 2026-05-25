@@ -1,4 +1,4 @@
-namespace EasyStock.Worker;
+﻿namespace EasyStock.Worker;
 
 /// <summary>
 /// Opções específicas do Worker. Props relacionadas ao pipeline de notificações

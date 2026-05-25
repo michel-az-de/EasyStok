@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Fiscal;
+﻿namespace EasyStock.Application.Ports.Output.Fiscal;
 
 /// <summary>
 /// Repositorio de Certificados Digitais A1 cifrados em rest. O .pfx + senha

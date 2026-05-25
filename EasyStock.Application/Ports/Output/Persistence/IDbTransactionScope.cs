@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Persistence;
+﻿namespace EasyStock.Application.Ports.Output.Persistence;
 
 /// <summary>
 /// Escopo de transação explícita. Semântica:

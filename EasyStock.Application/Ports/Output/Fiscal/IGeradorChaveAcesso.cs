@@ -1,4 +1,4 @@
-namespace EasyStock.Application.Ports.Output.Fiscal;
+﻿namespace EasyStock.Application.Ports.Output.Fiscal;
 
 /// <summary>
 /// Gera a chave de acesso de 44 digitos da NFC-e segundo o layout SEFAZ:

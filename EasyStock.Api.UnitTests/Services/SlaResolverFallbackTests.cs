@@ -1,4 +1,4 @@
-using EasyStock.Api.Services.Helpdesk;
+﻿using EasyStock.Api.Services.Helpdesk;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 

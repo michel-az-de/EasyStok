@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Postgre.Concurrency;
+﻿namespace EasyStock.Infra.Postgre.Concurrency;
 
 /// <summary>
 /// Chaves estaveis para advisory locks do PostgreSQL (pg_try_advisory_lock).

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Web.Models.ViewModels.Notificacoes;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;

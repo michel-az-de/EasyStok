@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -302,10 +302,10 @@ public static partial class SeedData
     {
         "aguardando" => new[] { "aguardando" },
         "preparando" => new[] { "aguardando", "preparando" },
-        "pronto"     => new[] { "aguardando", "preparando", "pronto" },
-        "entregue"   => new[] { "aguardando", "preparando", "pronto", "entregue" },
-        "cancelado"  => new[] { "aguardando", "cancelado" },
-        _            => new[] { statusFinal }
+        "pronto" => new[] { "aguardando", "preparando", "pronto" },
+        "entregue" => new[] { "aguardando", "preparando", "pronto", "entregue" },
+        "cancelado" => new[] { "aguardando", "cancelado" },
+        _ => new[] { statusFinal }
     };
 
     internal static Task EnsurePedidoPagamentoAsync(

@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.TicketSuporte;
@@ -25,9 +25,14 @@ public class AvaliarTicketClienteUseCaseTests
 
     private static AdminTicket TicketResolvido() => new()
     {
-        Id = Guid.NewGuid(), EmpresaId = EmpresaId, CriadoPorId = UsuarioId,
-        Titulo = "x", Descricao = "y", Status = TicketStatus.Resolvido,
-        Prioridade = TicketPrioridade.Normal, Categoria = TicketCategoria.Duvida,
+        Id = Guid.NewGuid(),
+        EmpresaId = EmpresaId,
+        CriadoPorId = UsuarioId,
+        Titulo = "x",
+        Descricao = "y",
+        Status = TicketStatus.Resolvido,
+        Prioridade = TicketPrioridade.Normal,
+        Categoria = TicketCategoria.Duvida,
         CriadoEm = DateTime.UtcNow.AddDays(-3),
         AlteradoEm = DateTime.UtcNow.AddHours(-1),
         ResolvidoEm = DateTime.UtcNow.AddHours(-1)

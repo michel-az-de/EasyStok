@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Entities.Notifications;
+﻿namespace EasyStock.Domain.Entities.Notifications;
 
 /// <summary>
 /// Onda 2.2 — assinatura de Web Push (PWA). Browser pede permission e cria

@@ -1,4 +1,4 @@
-using EasyStock.Application.Reporting;
+﻿using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Infra.Async.Reporting;
@@ -12,10 +12,10 @@ public sealed class ReportExecutionContext : IReportExecutionScope
 {
     private static readonly AsyncLocal<ReportExecutionFrame?> _frame = new();
 
-    public Guid? EmpresaId           => _frame.Value?.EmpresaId;
-    public Guid  UsuarioSolicitanteId => _frame.Value?.UsuarioSolicitanteId ?? throw new InvalidOperationException(NotSetMessage);
-    public ReportContexto Contexto   => _frame.Value?.Contexto ?? throw new InvalidOperationException(NotSetMessage);
-    public bool  IsSet               => _frame.Value is not null;
+    public Guid? EmpresaId => _frame.Value?.EmpresaId;
+    public Guid UsuarioSolicitanteId => _frame.Value?.UsuarioSolicitanteId ?? throw new InvalidOperationException(NotSetMessage);
+    public ReportContexto Contexto => _frame.Value?.Contexto ?? throw new InvalidOperationException(NotSetMessage);
+    public bool IsSet => _frame.Value is not null;
 
     private const string NotSetMessage =
         "Nenhum contexto de execução de relatório ativo. " +
@@ -51,6 +51,6 @@ public sealed class ReportExecutionContext : IReportExecutionScope
 /// Frame imutável do contexto de execução. Valores da run corrente.
 /// </summary>
 internal sealed record ReportExecutionFrame(
-    Guid?         EmpresaId,
-    Guid          UsuarioSolicitanteId,
+    Guid? EmpresaId,
+    Guid UsuarioSolicitanteId,
     ReportContexto Contexto);

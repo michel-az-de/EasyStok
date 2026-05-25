@@ -1,4 +1,4 @@
-using EasyStock.Application.Services.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using FluentAssertions;

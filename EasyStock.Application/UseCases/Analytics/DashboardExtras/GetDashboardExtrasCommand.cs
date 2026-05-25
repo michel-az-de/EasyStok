@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Analytics.DashboardExtras;
+﻿namespace EasyStock.Application.UseCases.Analytics.DashboardExtras;
 
 public sealed record GetDashboardExtrasCommand(
     Guid EmpresaId,

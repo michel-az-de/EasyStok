@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

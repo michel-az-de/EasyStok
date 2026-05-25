@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;

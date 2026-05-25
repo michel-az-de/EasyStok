@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Reflection;
 using EasyStock.Domain.ValueObjects;
 using MongoDB.Bson;
@@ -140,11 +140,11 @@ internal static class MongoClassMapRegistrar
             var bsonType = context.Reader.GetCurrentBsonType();
             return bsonType switch
             {
-                BsonType.Int32     => Quantidade.From((decimal)context.Reader.ReadInt32()),
-                BsonType.Int64     => Quantidade.From((decimal)context.Reader.ReadInt64()),
-                BsonType.Double    => Quantidade.From((decimal)context.Reader.ReadDouble()),
+                BsonType.Int32 => Quantidade.From((decimal)context.Reader.ReadInt32()),
+                BsonType.Int64 => Quantidade.From((decimal)context.Reader.ReadInt64()),
+                BsonType.Double => Quantidade.From((decimal)context.Reader.ReadDouble()),
                 BsonType.Decimal128 => Quantidade.From((decimal)context.Reader.ReadDecimal128()),
-                _                  => Quantidade.From((decimal)context.Reader.ReadInt32()),
+                _ => Quantidade.From((decimal)context.Reader.ReadInt32()),
             };
         }
 

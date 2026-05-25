@@ -1,4 +1,4 @@
-namespace EasyStock.Application.UseCases.Common;
+﻿namespace EasyStock.Application.UseCases.Common;
 
 /// <summary>
 /// Normaliza <see cref="DateTime"/> para UTC antes de persistir.

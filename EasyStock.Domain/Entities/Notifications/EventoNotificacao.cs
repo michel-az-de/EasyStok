@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -23,16 +23,16 @@ public class EventoNotificacao
         string payloadJson,
         Guid? refEntidadeId = null,
         string? correlationId = null) => new()
-    {
-        Id = Guid.NewGuid(),
-        Tipo = tipo,
-        EmpresaId = empresaId,
-        RefEntidadeId = refEntidadeId,
-        PayloadJson = payloadJson,
-        OcorridoEm = DateTime.UtcNow,
-        Status = StatusEventoNotificacao.Pendente,
-        CorrelationId = correlationId ?? Guid.NewGuid().ToString("N")
-    };
+        {
+            Id = Guid.NewGuid(),
+            Tipo = tipo,
+            EmpresaId = empresaId,
+            RefEntidadeId = refEntidadeId,
+            PayloadJson = payloadJson,
+            OcorridoEm = DateTime.UtcNow,
+            Status = StatusEventoNotificacao.Pendente,
+            CorrelationId = correlationId ?? Guid.NewGuid().ToString("N")
+        };
 
     public void MarcarComoProcessado()
     {

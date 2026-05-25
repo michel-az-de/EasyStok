@@ -1,4 +1,4 @@
-using EasyStock.Application.Validators;
+﻿using EasyStock.Application.Validators;
 
 namespace EasyStock.Application.Tests.Validators;
 
@@ -9,7 +9,7 @@ public class ProdutoFichaTecnicaValidatorTests
 {
     private static readonly ProdutoFichaTecnicaValidator _v = new();
 
-    private static readonly Guid EmpId  = Guid.NewGuid();
+    private static readonly Guid EmpId = Guid.NewGuid();
     private static readonly Guid ProdId = Guid.NewGuid();
 
     private static ProdutoFichaTecnicaCommand CmdValido() => new(

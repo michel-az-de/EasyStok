@@ -1,4 +1,4 @@
-using EasyStock.Api.Middleware;
+﻿using EasyStock.Api.Middleware;
 using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;

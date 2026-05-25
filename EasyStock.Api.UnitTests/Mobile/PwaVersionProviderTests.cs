@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.Services;
+﻿using EasyStock.Api.Mobile.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;

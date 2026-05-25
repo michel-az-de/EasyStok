@@ -1,4 +1,4 @@
-using EasyStock.Web.Models.Api;
+﻿using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
@@ -76,10 +76,10 @@ public class EstoqueService(ApiClient api, SessionService session)
 
         return filter switch
         {
-            "ok"       => effective is "ok" or "normal",
-            "critico"  => effective is "critico" or "crítico" or "critical",
-            "atencao"  => effective is "atencao" or "warn",
-            "parado"   => effective is "parado" or "slow",
+            "ok" => effective is "ok" or "normal",
+            "critico" => effective is "critico" or "crítico" or "critical",
+            "atencao" => effective is "atencao" or "warn",
+            "parado" => effective is "parado" or "slow",
             "esgotado" => effective is "esgotado",
             _ => effective == filter
         };

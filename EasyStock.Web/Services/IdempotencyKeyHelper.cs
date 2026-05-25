@@ -1,4 +1,4 @@
-namespace EasyStock.Web.Services;
+﻿namespace EasyStock.Web.Services;
 
 /// <summary>
 /// Helper que decide se um POST web deve carregar header Idempotency-Key.

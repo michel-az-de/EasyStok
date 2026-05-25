@@ -1,4 +1,4 @@
-// Camada Core de Negócio
+﻿// Camada Core de Negócio
 // Registra UseCases relacionados a: Pedidos, Caixa, Lotes, Produtos, Estoque, Listas de Compras
 
 using Microsoft.Extensions.DependencyInjection;

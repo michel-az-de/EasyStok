@@ -1,4 +1,4 @@
-using EasyStock.Domain.Integration;
+﻿using EasyStock.Domain.Integration;
 
 namespace EasyStock.Application.Ports.Output.Integration.Crypto;
 

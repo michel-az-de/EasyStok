@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Domain.Fiscal;
 using Microsoft.Extensions.Logging;

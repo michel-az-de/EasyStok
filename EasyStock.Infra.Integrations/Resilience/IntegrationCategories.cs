@@ -1,4 +1,4 @@
-namespace EasyStock.Infra.Integrations.Resilience;
+﻿namespace EasyStock.Infra.Integrations.Resilience;
 
 /// <summary>
 /// Identificadores das categorias de integração externa. Servem de chave
