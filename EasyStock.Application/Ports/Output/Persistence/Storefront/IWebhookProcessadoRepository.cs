@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Storefront;
+﻿using EasyStock.Domain.Entities.Storefront;
 
 namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
 
@@ -13,8 +13,15 @@ public interface IWebhookProcessadoRepository
 
     /// <summary>
     /// Tenta INSERT de novo webhook. Se já existe (mesma provider+evento_id), retorna
-    /// (false, existente) sem lançar. Senão retorna (true, novo). Não chama SaveChanges —
-    /// caller decide quando comitar (necessário para tx atômica do endpoint).
+    /// (false, existente) sem lançar. Senão retorna (true, novo).
+    ///
+    /// <para>
+    /// <strong>Chama SaveChanges internamente</strong> — atomicidade do dedup depende
+    /// da unique constraint <c>uq_webhook_processado_provider_evento</c> disparar
+    /// <see cref="Microsoft.EntityFrameworkCore.DbUpdateException"/>, o que só acontece
+    /// no flush. O contrato "receive" do ADR-0006 é uma transação curta independente
+    /// do processamento subsequente, então isso casa com o pattern.
+    /// </para>
     /// </summary>
     Task<(bool inserido, WebhookProcessado registro)> TentarRegistrarRecebidoAsync(
         WebhookProcessado novo,

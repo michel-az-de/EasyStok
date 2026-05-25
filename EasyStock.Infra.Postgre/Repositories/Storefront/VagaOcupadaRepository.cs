@@ -1,18 +1,25 @@
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using NpgsqlTypes;
 
 namespace EasyStock.Infra.Postgre.Repositories.Storefront;
 
 /// <summary>
-/// EF Repository de <see cref="VagaOcupada"/>. <see cref="OcuparAsync"/> faz INSERT
-/// atômico via SQL raw (necessário porque EF Core LINQ não expressa
-/// "INSERT ... SELECT WHERE COUNT &lt; capacidade" — ADR-0014 §Solução 1).
+/// EF Repository de <see cref="VagaOcupada"/>. <see cref="OcuparAsync"/> serializa
+/// ocupações da mesma janela via <c>pg_advisory_xact_lock(hashtext(janelaId))</c>
+/// (auto-release no commit), evitando race condition em READ COMMITTED entre o
+/// COUNT e o INSERT (ADR-0014 §Solução 1, refinada).
+///
+/// <para>
+/// Roda dentro de transação ambiente quando existe (caller controla commit);
+/// senão abre uma local via <see cref="Microsoft.EntityFrameworkCore.Storage.IExecutionStrategy"/>
+/// — compatível com <c>EnableRetryOnFailure</c>.
+/// </para>
 /// </summary>
 public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaRepository
 {
@@ -25,48 +32,80 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
         Guid pedidoId,
         CancellationToken ct = default)
     {
-        // INSERT atômico condicionado: só insere se COUNT atual < CapacidadeMaxima da janela.
-        // RETURNING garante que sabemos o que foi inserido. Se 0 linhas, janela cheia.
-        const string sql = @"
-            INSERT INTO vaga_ocupada (""Id"", ""JanelaEntregaId"", ""DataEntrega"", ""PedidoId"", ""OcupadoEm"")
-            SELECT @id, @janelaId, @data, @pedidoId, @ocupadoEm
-            WHERE (
-                SELECT COUNT(*) FROM vaga_ocupada
-                WHERE ""JanelaEntregaId"" = @janelaId
-                  AND ""DataEntrega"" = @data
-                  AND ""LiberadoEm"" IS NULL
-            ) < (
-                SELECT ""CapacidadeMaxima"" FROM janela_entrega WHERE ""Id"" = @janelaId
-            )
-            RETURNING ""Id"";";
+        // Se já existe tx ambiente, reusa (caller é dono do commit). Senão envolve
+        // em ExecutionStrategy + tx local — ExecutionStrategy é obrigatório quando
+        // EnableRetryOnFailure está ligado (Npgsql) e abrimos transação explícita.
+        if (db.Database.CurrentTransaction is not null)
+            return await OcuparDentroDeTxAsync(janelaEntregaId, dataEntrega, pedidoId, ct);
 
-        var novoId = Guid.NewGuid();
-        var agora = DateTime.UtcNow;
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(
+            state: (janelaEntregaId, dataEntrega, pedidoId),
+            operation: async (_, s, ct2) =>
+            {
+                await using var tx = await db.Database.BeginTransactionAsync(ct2);
+                var vaga = await OcuparDentroDeTxAsync(s.janelaEntregaId, s.dataEntrega, s.pedidoId, ct2);
+                await tx.CommitAsync(ct2);
+                return vaga;
+            },
+            verifySucceeded: null,
+            cancellationToken: ct);
+    }
 
-        var conn = (NpgsqlConnection)db.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
-            await conn.OpenAsync(ct);
+    private async Task<VagaOcupada> OcuparDentroDeTxAsync(
+        Guid janelaEntregaId,
+        DateOnly dataEntrega,
+        Guid pedidoId,
+        CancellationToken ct)
+    {
+        // Advisory lock serializa ocupações da mesma janela. hashtext(uuid) mapeia
+        // pra int4 — colisões entre janelas distintas só geram serialização extra,
+        // nunca corretude (worst case: dois locks de janelas diferentes contendem
+        // por compartilhar hash). O lock é liberado automaticamente no commit/rollback.
+        var janelaIdTexto = janelaEntregaId.ToString();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext({janelaIdTexto}))",
+            ct);
 
-        await using var cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.Add(new NpgsqlParameter("@id", NpgsqlDbType.Uuid) { Value = novoId });
-        cmd.Parameters.Add(new NpgsqlParameter("@janelaId", NpgsqlDbType.Uuid) { Value = janelaEntregaId });
-        cmd.Parameters.Add(new NpgsqlParameter("@data", NpgsqlDbType.Date) { Value = dataEntrega });
-        cmd.Parameters.Add(new NpgsqlParameter("@pedidoId", NpgsqlDbType.Uuid) { Value = pedidoId });
-        cmd.Parameters.Add(new NpgsqlParameter("@ocupadoEm", NpgsqlDbType.TimestampTz) { Value = agora });
+        var capacidade = await db.JanelasEntrega
+            .IgnoreQueryFilters()
+            .Where(j => j.Id == janelaEntregaId)
+            .Select(j => (int?)j.CapacidadeMaxima)
+            .FirstOrDefaultAsync(ct);
 
-        var inserted = await cmd.ExecuteScalarAsync(ct);
+        if (capacidade is null)
+            throw new InvalidOperationException(
+                $"Janela {janelaEntregaId} não encontrada.");
 
-        if (inserted is null)
+        var atual = await db.VagasOcupadas
+            .IgnoreQueryFilters()
+            .CountAsync(v =>
+                v.JanelaEntregaId == janelaEntregaId
+                && v.DataEntrega == dataEntrega
+                && v.LiberadoEm == null, ct);
+
+        if (atual >= capacidade.Value)
             throw new JanelaSemVagasException(
                 $"Janela {janelaEntregaId} esgotada para {dataEntrega:yyyy-MM-dd}.");
 
-        // Carrega a entity recém-criada pra retornar ao caller (state tracking).
-        var entity = await db.VagasOcupadas
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(v => v.Id == novoId, ct);
+        var vaga = VagaOcupada.Ocupar(janelaEntregaId, dataEntrega, pedidoId);
 
-        return entity ?? throw new InvalidOperationException(
-            $"VagaOcupada {novoId} inserida mas não encontrada no DbContext — race condition inesperada.");
+        try
+        {
+            await db.VagasOcupadas.AddAsync(vaga, ct);
+            await db.SaveChangesAsync(ct);
+            return vaga;
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            // uq_vaga_ativa_por_pedido — pedido já tem vaga ativa (em qualquer janela/data).
+            // Não é race da capacidade desta janela (advisory lock cobre isso); é violação
+            // de invariante de business. Caller deve liberar a anterior antes de ocupar.
+            db.Entry(vaga).State = EntityState.Detached;
+            throw new RegraDeDominioVioladaException(
+                $"Pedido {pedidoId} já tem vaga ativa — libere/cancele a anterior antes de ocupar nova.",
+                ex);
+        }
     }
 
     public async Task<bool> LiberarPorPedidoAsync(Guid pedidoId, string motivo, CancellationToken ct = default)
@@ -109,4 +148,7 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
 
         return orfas;
     }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException pg && pg.SqlState == "23505";
 }
