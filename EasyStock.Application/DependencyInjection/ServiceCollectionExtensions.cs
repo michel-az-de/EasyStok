@@ -35,6 +35,7 @@ public static partial class ServiceCollectionExtensions
             .AddEasyStockNotificationsUseCases()
             .AddEasyStockHelpdeskUseCases()
             .AddEasyStockPublicUseCases()
+            .AddEasyStockStorefrontUseCases()
             .AddEasyStockFinanceiroUseCases();
 
         return services;
