@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Sales;
+﻿namespace EasyStock.Domain.Sales;
 
 /// <summary>
 /// Status do agregado <see cref="Entities.Pedido"/>. Ordem reflete o ciclo
@@ -30,4 +30,33 @@ public enum StatusPedido
 
     /// <summary>Cancelado. Se estava com estoque baixado, é devolvido na transição.</summary>
     Cancelado = 5,
+
+    // ── Estados do fluxo Storefront (ADR-0014) ────────────────────────
+
+    /// <summary>
+    /// Pedido criado em Fase 1 do checkout — reserva de vaga não ocorreu ainda.
+    /// Status transitório (máx. ~30 s até avançar para AguardandoPagamento ou Cancelado).
+    /// </summary>
+    Rascunho = 0,
+
+    /// <summary>
+    /// Vaga reservada (Fase 2 OK), aguardando confirmação de pagamento via webhook MP.
+    /// Background service CancelarPedidosAbandonados cancela após 30 min sem confirmação.
+    /// </summary>
+    AguardandoPagamento = 6,
+
+    /// <summary>
+    /// Pagamento confirmado pelo webhook MP; aguarda a Babá aprovar (ou recusar) no painel.
+    /// Use cases <c>AprovarPedidoStorefrontUseCase</c> / <c>RecusarPedidoStorefrontUseCase</c>
+    /// (TASK-EZ-APROVAR-001) transitam para <see cref="AprovadoBaba"/> ou
+    /// <see cref="Cancelado"/> com SELECT FOR UPDATE.
+    /// </summary>
+    AguardandoAprovacaoBaba = 7,
+
+    /// <summary>
+    /// Aprovado pela Babá — pedido entra na fila de produção do ERP via
+    /// transição <see cref="AprovadoBaba"/> -&gt; <see cref="Preparando"/>.
+    /// Notificação ao cliente via WhatsApp enfileirada no outbox.
+    /// </summary>
+    AprovadoBaba = 8,
 }

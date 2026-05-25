@@ -114,6 +114,36 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public DateTime? AgendadoParaEm { get; set; }
 
+        // ── Resolução Storefront pela Babá (TASK-EZ-APROVAR-001) ───────
+
+        /// <summary>
+        /// Timestamp da aprovação pela Babá. Preenchido pelo
+        /// <c>AprovarPedidoStorefrontUseCase</c> na transição
+        /// <see cref="StatusPedido.AguardandoAprovacaoBaba"/> → <see cref="StatusPedido.AprovadoBaba"/>.
+        /// </summary>
+        public DateTime? AprovadoEm { get; set; }
+
+        /// <summary>Usuário Babá/staff que clicou "Aprovar" no painel ERP.</summary>
+        public Guid? AprovadoPorUsuarioId { get; set; }
+
+        /// <summary>Timestamp da recusa pela Babá. Espelha <see cref="CanceladoEm"/> no caso de recusa.</summary>
+        public DateTime? RecusadoEm { get; set; }
+
+        /// <summary>Usuário Babá/staff que clicou "Recusar" no painel ERP.</summary>
+        public Guid? RecusadoPorUsuarioId { get; set; }
+
+        /// <summary>
+        /// Motivo canônico da recusa: <c>"estoque_insuficiente"</c>, <c>"operacional"</c>, <c>"outro"</c>.
+        /// Persistido como <c>varchar(40)</c>. Use <see cref="Sales.MotivoRecusa"/> via mapper na Application.
+        /// </summary>
+        public string? MotivoRecusa { get; set; }
+
+        /// <summary>
+        /// Mensagem livre (max 280 chars) que vai no WhatsApp ao cliente quando a Babá recusa.
+        /// Não é audit trail interno (use <see cref="Observacoes"/> para esse fim).
+        /// </summary>
+        public string? MensagemRecusaCliente { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
