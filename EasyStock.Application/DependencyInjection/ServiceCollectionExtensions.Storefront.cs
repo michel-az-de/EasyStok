@@ -5,6 +5,7 @@
 // Use cases sao stateless e por requisicao — registro Scoped (padrao do projeto).
 
 using EasyStock.Application.UseCases.Storefront.Auth;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -19,6 +20,9 @@ public static partial class ServiceCollectionExtensions
     {
         // Autenticacao via OTP (EZ-AUTH-001, EZ-AUTH-002)
         services.AddScoped<SolicitarOtpUseCase>();
+
+        // Frete (EZ-FRETE-001)
+        services.AddScoped<CalcularFreteUseCase>();
 
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja

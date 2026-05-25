@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -36,5 +36,32 @@ public sealed class FreteZonaRepository(EasyStockDbContext db) : IFreteZonaRepos
     {
         db.FreteZonas.Update(zona);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Implementação in-memory deliberada: cada storefront tem poucas zonas
+    /// (tipicamente &lt;20) e a lógica de match (CEP range / bairros JSON) já
+    /// vive em <see cref="FreteZona.CobreCep"/> / <see cref="FreteZona.CobreBairro"/>.
+    /// Duplicá-la em SQL traria fragilidade (JSON contains com LIKE textual
+    /// não é portável) sem ganho de performance. Quando o catálogo crescer
+    /// acima de algumas centenas de zonas, otimizar com filtro CEP range
+    /// SQL-side + filtro bairro client-side.
+    /// </remarks>
+    public async Task<FreteZona?> BuscarZonaPorCepAsync(
+        Guid storefrontId,
+        string cep,
+        string bairroNormalizado,
+        CancellationToken ct = default)
+    {
+        var zonas = await GetAtivasDoStorefrontOrdenadasAsync(storefrontId, ct);
+        foreach (var zona in zonas)
+        {
+            if (zona.CobreCep(cep))
+                return zona;
+            if (!string.IsNullOrEmpty(bairroNormalizado) && zona.CobreBairro(bairroNormalizado))
+                return zona;
+        }
+        return null;
     }
 }
