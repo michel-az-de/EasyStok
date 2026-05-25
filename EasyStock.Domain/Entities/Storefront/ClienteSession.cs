@@ -39,6 +39,13 @@ public class ClienteSession
     /// <summary>User-Agent da emissão (logging). Max 300 chars.</summary>
     public string? UaInicial { get; private set; }
 
+    /// <summary>
+    /// SHA-256 hex de (UserAgent + Accept-Language) no momento da emissão.
+    /// Validado pelo middleware a cada request — divergência força re-login (anti-hijacking).
+    /// Pode ser null para sessões legadas ou quando UA/AL não disponíveis.
+    /// </summary>
+    public string? Fingerprint { get; private set; }
+
     public bool Revogada { get; private set; }
     public string? MotivoRevogacao { get; private set; }
 
@@ -50,7 +57,8 @@ public class ClienteSession
         Guid empresaId,
         TimeProvider time,
         string? ipInicial = null,
-        string? uaInicial = null)
+        string? uaInicial = null,
+        string? fingerprint = null)
     {
         if (clienteId == Guid.Empty)
             throw new RegraDeDominioVioladaException("ClienteId é obrigatório.");
@@ -68,6 +76,7 @@ public class ClienteSession
             UltimoUsoEm = agora,
             IpInicial = string.IsNullOrWhiteSpace(ipInicial) ? null : ipInicial.Trim(),
             UaInicial = string.IsNullOrWhiteSpace(uaInicial) ? null : uaInicial.Trim(),
+            Fingerprint = string.IsNullOrWhiteSpace(fingerprint) ? null : fingerprint.Trim(),
             Revogada = false,
             MotivoRevogacao = null,
         };
