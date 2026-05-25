@@ -10,7 +10,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
-using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Avaliacao;
 
@@ -41,14 +40,12 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
     private sealed record Fakes(
         IPedidoStorefrontRepository PedidoRepo,
         IPedidoAvaliacaoRepository AvaliacaoRepo,
-        IStorefrontRepository StorefrontRepo,
         IMemoryCache Cache,
         ComentarioSanitizer Sanitizer);
 
     private static Fakes BuildFakes(
         Pedido? pedido = null,
         PedidoAvaliacao? avaliacaoExistente = null,
-        StorefrontEntity? storefront = null,
         bool cookieNoCache = true)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
@@ -67,15 +64,11 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
         var avaliacaoRepo = Substitute.For<IPedidoAvaliacaoRepository>();
         avaliacaoRepo.GetByPedidoAsync(PedidoId, Arg.Any<CancellationToken>()).Returns(avaliacaoExistente);
 
-        var sfRepo = Substitute.For<IStorefrontRepository>();
-        if (storefront is not null)
-            sfRepo.GetBySlugAsync(Slug, Arg.Any<CancellationToken>()).Returns(storefront);
-
-        return new Fakes(pedidoRepo, avaliacaoRepo, sfRepo, cache, new ComentarioSanitizer());
+        return new Fakes(pedidoRepo, avaliacaoRepo, cache, new ComentarioSanitizer());
     }
 
     private static CriarAvaliacaoPedidoUseCase BuildUseCase(Fakes fakes) =>
-        new(fakes.PedidoRepo, fakes.AvaliacaoRepo, fakes.StorefrontRepo,
+        new(fakes.PedidoRepo, fakes.AvaliacaoRepo,
             new AvaliacaoCookieStore(fakes.Cache),
             fakes.Sanitizer,
             TimeProvider.System,
@@ -96,13 +89,6 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
             AlteradoEm = DateTime.UtcNow.AddDays(-2),
         };
         return pedido;
-    }
-
-    private static StorefrontEntity BuildStorefront()
-    {
-        var sf = StorefrontEntity.Criar(EmpresaId, Slug, "Casa da Babá", 0m);
-        sf.Ativar();
-        return sf;
     }
 
     // ── Testes ────────────────────────────────────────────────────────────
@@ -178,7 +164,7 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
     public async Task NotaForaDe1A5_LancaRegraDeDominio()
     {
         var pedido = BuildPedidoEntregue();
-        var fakes = BuildFakes(pedido: pedido, storefront: BuildStorefront());
+        var fakes = BuildFakes(pedido: pedido);
         var useCase = BuildUseCase(fakes);
         var input = new CriarAvaliacaoPedidoInput(Slug, PedidoId, 6, null, true, null, CookieValido);
 
@@ -191,8 +177,7 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
     public async Task HappyPath_CriaAvaliacaoRetorna201Dto()
     {
         var pedido = BuildPedidoEntregue();
-        var storefront = BuildStorefront();
-        var fakes = BuildFakes(pedido: pedido, storefront: storefront);
+        var fakes = BuildFakes(pedido: pedido);
         var useCase = BuildUseCase(fakes);
         var input = new CriarAvaliacaoPedidoInput(
             Slug, PedidoId, 5, "Excelente serviço!", true, null, CookieValido);

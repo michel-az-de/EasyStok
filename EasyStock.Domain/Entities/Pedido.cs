@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects;
@@ -100,6 +100,12 @@ namespace EasyStock.Domain.Entities
         public DateTime AlteradoEm { get; set; }
         public DateTime? EntreguEm { get; set; }
         public DateTime? CanceladoEm { get; set; }
+
+        /// <summary>
+        /// Quando o background service enviou o link de avaliação WhatsApp (+24h após entrega).
+        /// Null = notificação ainda não enviada. Atua como flag anti-duplicata do agendador.
+        /// </summary>
+        public DateTime? AvaliacaoSolicitadaEm { get; set; }
 
         /// <summary>
         /// Data/hora agendada para entrega. NULL = pedido pra agora (caso padrão).
