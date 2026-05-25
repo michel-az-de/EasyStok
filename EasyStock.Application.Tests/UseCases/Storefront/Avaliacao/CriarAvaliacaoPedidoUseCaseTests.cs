@@ -1,4 +1,5 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
@@ -6,7 +7,6 @@ using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using FluentAssertions;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
@@ -40,7 +40,7 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
     private sealed record Fakes(
         IPedidoStorefrontRepository PedidoRepo,
         IPedidoAvaliacaoRepository AvaliacaoRepo,
-        IMemoryCache Cache,
+        ICacheService Cache,
         ComentarioSanitizer Sanitizer);
 
     private static Fakes BuildFakes(
@@ -48,13 +48,17 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
         PedidoAvaliacao? avaliacaoExistente = null,
         bool cookieNoCache = true)
     {
-        var cache = new MemoryCache(new MemoryCacheOptions());
+        var cache = Substitute.For<ICacheService>();
 
         if (cookieNoCache)
         {
-            // Simula cookie válido no cache: armazena hash do cookieValido
+            // Simula cookie válido no cache: hash do CookieValido armazenado na chave
             var hash = AvaliacaoCookieStore.ComputeHash(CookieValido);
-            cache.Set(AvaliacaoCookieStore.CacheKey(PedidoId), hash, TimeSpan.FromDays(30));
+            cache.GetAsync<string>(AvaliacaoCookieStore.CacheKey(PedidoId)).Returns(hash);
+        }
+        else
+        {
+            cache.GetAsync<string>(AvaliacaoCookieStore.CacheKey(PedidoId)).Returns((string?)null);
         }
 
         var pedidoRepo = Substitute.For<IPedidoStorefrontRepository>();
