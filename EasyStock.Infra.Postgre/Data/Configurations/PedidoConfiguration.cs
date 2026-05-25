@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -36,6 +36,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.Observacoes).HasColumnType("text");
             b.Property(p => p.Origem).HasMaxLength(20);
             b.Property(p => p.MobileOrderId).HasMaxLength(64);
+            b.Property(p => p.AvaliacaoSolicitadaEm)
+                .HasColumnName("avaliacao_solicitada_em")
+                .IsRequired(false);
 
             b.HasOne(p => p.Empresa)
                 .WithMany()
