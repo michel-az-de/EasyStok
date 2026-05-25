@@ -24,7 +24,7 @@ public sealed class CriarAvaliacaoPedidoUseCase(
         CancellationToken ct = default)
     {
         // ── 1. Validar cookie ────────────────────────────────────────────
-        if (!cookieStore.EhValido(input.PedidoId, input.CookieValue))
+        if (!await cookieStore.EhValidoAsync(input.PedidoId, input.CookieValue))
             throw new AvaliacaoCookieAusenteException();
 
         // ── 2. Buscar pedido ─────────────────────────────────────────────

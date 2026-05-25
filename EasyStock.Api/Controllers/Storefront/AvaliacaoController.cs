@@ -35,13 +35,13 @@ public sealed class AvaliacaoController(
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status410Gone)]
     [HttpGet("/avaliar/abrir")]
-    public IActionResult AbrirPaginaAvaliacao(
+    public async Task<IActionResult> AbrirPaginaAvaliacao(
         [FromQuery(Name = "p")] Guid pedidoId,
         [FromQuery(Name = "t")] string token)
     {
         try
         {
-            var result = abrirUseCase.Execute(new AbrirPaginaAvaliacaoInput(pedidoId, token));
+            var result = await abrirUseCase.ExecuteAsync(new AbrirPaginaAvaliacaoInput(pedidoId, token));
 
             var cookieName = $"__Host-cdb_aval_{result.PedidoId}";
             Response.Cookies.Append(cookieName, result.CookieValue, new CookieOptions
