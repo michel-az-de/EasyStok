@@ -1,4 +1,4 @@
-using EasyStock.Api.BackgroundServices;
+﻿using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Data;
 using EasyStock.Api.Observability;
@@ -224,6 +224,13 @@ if (!builder.Environment.IsProduction())
 {
     builder.Services.AddEasyStockWhatsAppStub();
 }
+
+// ── Storefront — CEP lookup (ViaCEP em prod, NoOp por default) ────────────────
+// TASK-EZ-FRETE-001: feature flag ENABLE_VIACEP_LOOKUP (default false). Quando
+// off, registra NoOpCepLookupClient (não bate na API externa). Quando on,
+// registra ViaCepLookupClient com timeout 1s.
+builder.Services.AddEasyStockCepLookup(builder.Configuration);
+
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
 
