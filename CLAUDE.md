@@ -222,37 +222,56 @@ Passo 3: cleanup
   - Branches mergeadas: git branch -d
   - Stashes nao-relevantes: revisar e drop com autorizacao R9
 
-## 5. ESTADO CONHECIDO DO REPO (snapshot 2026-05-22)
+## 5. ESTADO CONHECIDO DO REPO (snapshot 2026-05-26 pos-faxina)
 
 Master: sincronizado com origin (0/0 ahead/behind)
-HEAD master: c5dbb555 fix(migrations): remove creates duplicados que quebravam o replay do-zero
-Build: verde (0 erros, 31 warnings pre-existentes — EF Core Relational 9.0.1 vs
-  9.0.4 MSB3277, CS8602 nullable x4, CS9113, CS9107, XA0141 Android/Mobile)
-Suite logica: 1544 passando / 0 falhas (IntegrationTests exigem Docker, nao rodam aqui)
-Working tree principal: 1 doc untracked (sessoes/2026-05-17-1245-redeploy-fly-3-apps.md)
+HEAD master: a18a09c0 fix(TASK-EZ-009): elimina race conditions em 3 repos criticos do storefront (#230)
+Build: verde (0 erros, 0 warnings)
+Suite logica: passa (IntegrationTests exigem Docker, nao rodam aqui)
 
-Worktrees ativos (5):
-- principal (master)
-- brave-shannon-078b0e (dev/brave-shannon-078b0e) — sessao merge PRs #191/#192;
-  ha 1 auto-stash desta sessao (NAO dropar sem dono)
-- wt-hardening-validate (dev/hardening-validateonbuild, ahead 2)
-- wt-validate-190 (detached HEAD)
-- worktrees efemeros de sessao podem aparecer; limpar ao encerrar
+PRs abertas em revisao (5 — todas com mergeStateStatus=DIRTY/CONFLICTING):
+- #236 recover/pr232-frete (SolicitarOtp + CalcularFrete; base=master)
+- #235 recover/pr231-menu (cardapio publico storefront; base=master)
+- #234 feat/task-ez-auth-002-validar-otp (ClienteSession server-side)
+- #233 feat/task-ez-agend-001-listar-janelas (janelas de entrega; ADR-0011)
+- #229 feat/task-ez-auth-001-solicitar-otp (OTP via WhatsApp/SMS)
 
-Pendencias documentadas para sessoes futuras:
-- 0 PRs abertas (triagem concluida; gh pr list vazio)
-- 10 branches locais com trabalho ahead (revisao individual); compras-ux e
-  blindar-deploy-migrations sao pre-squash de #192/#191 (candidatos a delete)
-- 1 stash (auto-stash da sessao de merge — nao dropar sem dono)
-- Achado arquitetural EM ABERTO: SQLite dev-fallback incompleto
-  (AddEasyStockSqliteInfrastructure registra ~25 repos a menos que Postgres; app
-  nao sobe em SQLite/Development). Ver sessoes/2026-05-21-2345-varredura-estabilizacao.
+Worktrees registrados (6 — todos com prefixo wt- ou em path EasyStok.worktrees/):
+- principal C:\easy\EasyStok (varia conforme sessao ativa do Felipe)
+- .claude/worktrees/wt-ez-007 (feat/task-ez-007-entities-avaliacao-feedback, 3 ahead)
+- .claude/worktrees/wt-ez-auth-002 (feat/task-ez-auth-002-validar-otp; PR #234)
+- .claude/worktrees/wt-tasks-bootstrap (master; tem 4 docs untracked nao commitados)
+- EasyStok.worktrees/task-cdb-comp-001-* (0 ahead, branch mergeada via squash)
+- EasyStok.worktrees/task-ez-aprovar-001-* (53 ahead, sem PR ainda)
+- EasyStok.worktrees/task-ez-webhook-001-* (51 ahead, sem PR ainda)
+NOTA: EasyStok.worktrees/ e path legado de sessoes pre-v2.1 — novos worktrees
+devem ir em .claude/worktrees/wt-* (R4 + sistema ETK).
+
+Stashes ativos (3 — todos <5 dias, donos identificados):
+- stash@{0}: fix/email-provider-selection-and-tests (2026-05-25)
+- stash@{1}: feat/task-ez-006-entities-idempotency-webhook (2026-05-24)
+- stash@{2}: feat/task-ez-004-entities-janela-vaga (2026-05-24)
+NAO dropar nenhum sem confirmar dono.
+
+Branches locais com trabalho ahead (10 — todas <2 dias):
+- recover/pr231-menu, recover/pr232-frete (PRs #235 #236)
+- feat/task-ez-* (varias, sistema ETK em curso)
+- fix/email-provider-selection-and-tests (0 ahead mas stash@{0} depende)
+
+Pendencias arquiteturais EM ABERTO:
+- SQLite dev-fallback incompleto (AddEasyStockSqliteInfrastructure registra ~25
+  repos a menos que Postgres; app nao sobe em SQLite/Development).
+  Ver docs/dev/sessoes/_arquivo/2026-05-21-2345-varredura-estabilizacao.md.
 
 Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018 (Aceito, 2026-05-17).
 Master mantem Nfe* em codigo + "Nota Fiscal" em UI + "notas-fiscais" em REST.
 PR #99 fechado como superseded (ver ADR-0018).
 
 Plano avanco NF: docs/plan/nota-fiscal/00-README.md
+
+Faxina mais recente: 2026-05-26 (chore/faxina-2026-05-26) — removeu 10 worktrees
+orfaos (458 MB), limpou bin/obj de 6 worktrees (~4 GB), arquivou 17 sessoes 5+
+dias em docs/dev/sessoes/_arquivo/, atualizou este §5 e criou docs/dev/QUICK-REF.md.
 
 ## 6. ROADMAP PROXIMOS PASSOS
 
@@ -269,13 +288,16 @@ Etapa 6+: Caixa Conciliado V2 (diferido; retomar apos F2 da Etapa 5).
 
 ## 7. RECURSOS DE LEITURA
 
+Atalho 1 pagina: docs/dev/QUICK-REF.md (comandos do §0, matriz tarefa-comando,
+                 onde fica o que, atalhos de R9).
+
 Antes de operar:
 - docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
 - docs/dev/incidentes/2026-05-16-agentes-paralelos-trabalho-paralelo.md
 - docs/adr/0011-nomenclatura-pt-br-rotulagem.md
 - docs/adr/0013-cancellation-token-iusecase.md
 - docs/adr/0020-tdd-tasks-numeradas-multitarefa.md  # ESTE PROTOCOLO v2.1
-- docs/dev/sessoes/2026-05-16-1245-fases-1-2-3-handoff-final.md
+- docs/dev/sessoes/_arquivo/2026-05-16-1245-fases-1-2-3-handoff-final.md
 
 ## 8. SISTEMA DE TASKS ETK-NNNN (v2.1)
 
