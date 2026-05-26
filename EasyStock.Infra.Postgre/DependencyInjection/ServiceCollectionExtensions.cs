@@ -149,6 +149,32 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Security.RowLevelSecurityBypass>();
             // TODO F2: registrar IGatewayFiscal (FocusNFeAdapter) e INfeCertificadoA1Service em EasyStock.Infra.Integrations.Fiscal
 
+            // Storefront — 12 repos para entities novas (ADR-0011, 0012, 0014, 0006)
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontRepository,
+                Repositories.Storefront.StorefrontRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioItemRepository,
+                Repositories.Storefront.CardapioItemRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IFreteZonaRepository,
+                Repositories.Storefront.FreteZonaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IJanelaEntregaRepository,
+                Repositories.Storefront.JanelaEntregaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IBloqueioEntregaRepository,
+                Repositories.Storefront.BloqueioEntregaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IVagaOcupadaRepository,
+                Repositories.Storefront.VagaOcupadaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteOtpRepository,
+                Repositories.Storefront.ClienteOtpRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteSessionRepository,
+                Repositories.Storefront.ClienteSessionRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IWebhookProcessadoRepository,
+                Repositories.Storefront.WebhookProcessadoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICheckoutIdempotencyRepository,
+                Repositories.Storefront.CheckoutIdempotencyRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IPedidoAvaliacaoRepository,
+                Repositories.Storefront.PedidoAvaliacaoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
+                Repositories.Storefront.StorefrontFaleConoscoRepository>();
+
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();
 

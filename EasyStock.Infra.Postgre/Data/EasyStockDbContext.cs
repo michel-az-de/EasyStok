@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -150,6 +150,16 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Domain DbSets
         public DbSet<Empresa> Empresas { get; set; } = null!;
+
+        // Storefront aggregates (ver ADR-0002 multi-tenancy, ADR-0014 vaga lifecycle)
+        public DbSet<EasyStock.Domain.Entities.Storefront.Storefront> Storefronts { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.CardapioItem> CardapioItens { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.FreteZona> FreteZonas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.JanelaEntrega> JanelasEntrega { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.BloqueioEntrega> BloqueiosEntrega { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.VagaOcupada> VagasOcupadas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.WebhookProcessado> WebhooksProcessados { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.CheckoutIdempotency> CheckoutsIdempotency { get; set; } = null!;
         public DbSet<Categoria> Categorias { get; set; } = null!;
         public DbSet<Produto> Produtos { get; set; } = null!;
         public DbSet<ProdutoVariacao> ProdutosVariacao { get; set; } = null!;
@@ -184,6 +194,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EntityAlteracao> EntityAlteracoes { get; set; } = null!;
         public DbSet<MobileProcessedMutation> MobileProcessedMutations { get; set; } = null!;
         public DbSet<IdempotencyKey> IdempotencyKeys { get; set; } = null!;
+
+        // Storefront Module DbSets
+        public DbSet<EasyStock.Domain.Entities.Storefront.PedidoAvaliacao> PedidoAvaliacoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.StorefrontFaleConosco> StorefrontFaleConoscos { get; set; } = null!;
 
         // Admin Module DbSets
         public DbSet<SystemErrorLog> SystemErrorLogs { get; set; } = null!;
@@ -288,6 +302,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<BloqueioNotificacao> NotifBloqueios { get; set; } = null!;
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
         public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
+
+        // Storefront — autenticação (TASK-EZ-005)
+        public DbSet<EasyStock.Domain.Entities.Storefront.ClienteOtp> ClienteOtps { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.ClienteSession> ClienteSessions { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {
