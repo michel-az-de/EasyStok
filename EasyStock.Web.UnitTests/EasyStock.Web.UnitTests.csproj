@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EasyStock.Web\EasyStock.Web.csproj" />
+    <ProjectReference Include="..\EasyStock.Admin\EasyStock.Admin.csproj" />
   </ItemGroup>
 
 </Project>

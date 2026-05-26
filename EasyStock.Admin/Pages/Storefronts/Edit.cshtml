@@ -1,0 +1,84 @@
+@page "{id:guid}"
+@model EasyStock.Admin.Pages.Storefronts.EditModel
+@{
+    ViewData["Title"] = $"Editar storefront — {Model.SlugAtual}";
+}
+
+<es-breadcrumb>
+    <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts/Detail/@Model.Id">@Model.SlugAtual</es-breadcrumb-item>
+    <es-breadcrumb-item>Editar</es-breadcrumb-item>
+</es-breadcrumb>
+
+<es-card padding="lg" card-class="mt-4" style="max-width:720px;">
+    <h2 style="margin:0 0 4px; font-size:18px; font-weight:600; color:var(--text-primary);">
+        Editar storefront
+        @if (Model.Ativo)
+        {
+            <es-badge variant="ok" with-dot="true">Ativo</es-badge>
+        }
+        else
+        {
+            <es-badge variant="neutral" with-dot="true">Inativo</es-badge>
+        }
+    </h2>
+    <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">
+        Slug (<code>@Model.SlugAtual</code>) e título (<strong>@Model.TituloAtual</strong>)
+        são imutáveis. Para mudar slug, crie outro storefront com redirect.
+    </p>
+
+    <form method="post" novalidate x-data="{ submitting: false }" x-on:submit="submitting = true">
+        @Html.AntiForgeryToken()
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div style="background:rgba(239,68,68,.10); border:1px solid rgba(239,68,68,.30); color:var(--erro-600); border-radius:var(--r-md); padding:10px 14px; margin-bottom:16px; font-size:13px;">
+                @foreach (var entry in ViewData.ModelState)
+                {
+                    foreach (var err in entry.Value!.Errors)
+                    {
+                        <div>• @err.ErrorMessage</div>
+                    }
+                }
+            </div>
+        }
+
+        <h3 style="margin:24px 0 8px; font-size:14px; font-weight:600; color:var(--text-primary);">Branding</h3>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <es-input asp-for="Input.SubtituloPublico" label="Subtítulo público" maxlength="200" />
+            <es-input asp-for="Input.LogoUrl" type="url" label="URL do logo" placeholder="https://..." />
+            <es-input asp-for="Input.CorPrimaria" label="Cor primária (hex)" placeholder="#E85814" />
+            <es-input asp-for="Input.WhatsappPedidos" label="WhatsApp pedidos (E.164)" placeholder="+5511997573992" />
+            <es-input asp-for="Input.MensagemForaArea" label="Mensagem fora da área" placeholder="Por enquanto a Babá entrega só em ..." />
+        </div>
+
+        <h3 style="margin:24px 0 8px; font-size:14px; font-weight:600; color:var(--text-primary);">Negócio</h3>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <es-input asp-for="Input.PedidoMinimoEntrega" type="number" step="0.01" label="Pedido mínimo (R$)" />
+            <es-input asp-for="Input.FreteGratisAcima" type="number" step="0.01" label="Frete grátis acima de (R$)" help-text="Deixe vazio para nunca dar frete grátis." />
+            <es-input asp-for="Input.DominioCustom" label="Domínio custom" placeholder="casadababa.com" />
+        </div>
+
+        <h3 style="margin:24px 0 8px; font-size:14px; font-weight:600; color:var(--text-primary);">Fiscal</h3>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <es-select asp-for="Input.ModeloFiscal" label="Modelo fiscal" help-text="Definido com contador (ver ADR-0007/0010).">
+                <option value="manual">Manual — não emite NF-e (default)</option>
+                <option value="nfe55">NF-e modelo 55</option>
+                <option value="nfce65">NFC-e modelo 65</option>
+            </es-select>
+            <es-checkbox asp-for="Input.HabilitarNfeAutomatica" label="Habilitar emissão automática" help-text="Só funciona se modelo fiscal ≠ manual." />
+        </div>
+
+        <h3 style="margin:24px 0 8px; font-size:14px; font-weight:600; color:var(--text-primary);">Auditoria</h3>
+        <es-input asp-for="Input.Motivo" label="Motivo (opcional)" placeholder="Ex.: cliente solicitou ajuste de branding" help-text="Registrado no audit log." />
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">
+            <es-button variant="ghost" href="/Storefronts/Detail/@Model.Id" :disabled="submitting">Cancelar</es-button>
+            <button type="submit" class="btn btn-primary btn-md" :disabled="submitting">
+                <span x-show="!submitting">Salvar alterações</span>
+                <span x-show="submitting" x-cloak>Salvando…</span>
+            </button>
+        </div>
+    </form>
+</es-card>

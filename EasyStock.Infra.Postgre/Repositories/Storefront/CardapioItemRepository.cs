@@ -41,4 +41,14 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
         db.CardapioItens.Update(item);
         return Task.CompletedTask;
     }
+
+    public Task<int> ContarPorStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        db.CardapioItens.CountAsync(c => c.StorefrontId == storefrontId, ct);
+
+    public async Task<IReadOnlyCollection<Guid>> GetProdutoIdsDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        await db.CardapioItens
+            .AsNoTracking()
+            .Where(c => c.StorefrontId == storefrontId)
+            .Select(c => c.ProdutoId)
+            .ToListAsync(ct);
 }

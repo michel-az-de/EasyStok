@@ -1,0 +1,73 @@
+@page "{storefrontId:guid}/Cardapio/Edit/{itemId:guid}"
+@model EasyStock.Admin.Pages.Storefronts.Cardapio.EditModel
+@{
+    ViewData["Title"] = $"Editar item — {Model.ProdutoNome}";
+}
+
+<es-breadcrumb>
+    <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts/Detail/@Model.StorefrontId">@Model.StorefrontSlug</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts/@Model.StorefrontId/Cardapio">Cardápio</es-breadcrumb-item>
+    <es-breadcrumb-item>Editar</es-breadcrumb-item>
+</es-breadcrumb>
+
+<es-card padding="lg" card-class="mt-4" style="max-width:720px;">
+    <h2 style="margin:0 0 4px; font-size:18px; font-weight:600;">@Model.ProdutoNome</h2>
+    <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">
+        Editar metadata pública. Visibilidade / disponibilidade / ordem têm controles
+        próprios na <a href="/Storefronts/@Model.StorefrontId/Cardapio" style="color:var(--accent);">listagem</a>.
+    </p>
+
+    <form method="post" novalidate x-data="{ submitting: false }" x-on:submit="submitting = true">
+        @Html.AntiForgeryToken()
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div style="background:rgba(239,68,68,.10); border:1px solid rgba(239,68,68,.30); color:var(--erro-600); border-radius:var(--r-md); padding:10px 14px; margin-bottom:16px; font-size:13px;">
+                @foreach (var entry in ViewData.ModelState)
+                {
+                    foreach (var err in entry.Value!.Errors)
+                    {
+                        <div>• @err.ErrorMessage</div>
+                    }
+                }
+            </div>
+        }
+
+        <div style="display:flex; flex-direction:column; gap:16px;">
+            <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0" label="Preço override (R$)" help-text="Vazio = usa Produto.PrecoReferencia." />
+
+            <es-input asp-for="Input.FotoUrl" type="url" label="URL da foto" placeholder="https://cdn..." />
+
+            <es-input asp-for="Input.DescricaoPublica" label="Descrição pública" maxlength="240" />
+
+            <es-input asp-for="Input.Ingredientes" label="Ingredientes" maxlength="500" />
+
+            <es-input asp-for="Input.Alergenos" label="Alergênicos" maxlength="200" />
+
+            <es-input asp-for="Input.SugestaoMolho" label="Sugestão de molho" maxlength="200" />
+
+            <es-input asp-for="Input.TempoPreparo" label="Tempo de preparo" maxlength="50" />
+
+            <es-input asp-for="Input.PesoExibicao" label="Peso de exibição" maxlength="50" />
+
+            <es-select asp-for="Input.Tag" label="Tag">
+                <option value="">— Sem tag —</option>
+                <option value="assinatura">Assinatura</option>
+                <option value="novo">Novo</option>
+                <option value="vegetariano">Vegetariano</option>
+            </es-select>
+
+            <es-input asp-for="Input.Motivo" label="Motivo (opcional)" />
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">
+            <es-button variant="ghost" href="/Storefronts/@Model.StorefrontId/Cardapio" :disabled="submitting">Cancelar</es-button>
+            <button type="submit" class="btn btn-primary btn-md" :disabled="submitting">
+                <span x-show="!submitting">Salvar</span>
+                <span x-show="submitting" x-cloak>Salvando…</span>
+            </button>
+        </div>
+    </form>
+</es-card>

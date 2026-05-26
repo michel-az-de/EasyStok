@@ -1,13 +1,24 @@
-﻿namespace EasyStock.Domain.Exceptions.Storefront;
+namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
-/// Lançada quando um slug de storefront não resolve para nenhum tenant — ou
-/// resolve mas o storefront está inativo. Mapeada para HTTP 404 pelo handler.
+/// Lançada quando um Storefront não é encontrado — seja por slug (resolução pública,
+/// também cobre o caso de storefront inativo) ou por id/empresa (admin). Mapeada
+/// para HTTP 404 pelo handler.
 /// </summary>
 public class StorefrontNaoEncontradoException : RegraDeDominioVioladaException
 {
+    public StorefrontNaoEncontradoException()
+        : base("Storefront não encontrado.")
+    {
+    }
+
     public StorefrontNaoEncontradoException(string slug)
         : base($"Storefront '{slug}' não encontrado.")
+    {
+    }
+
+    public StorefrontNaoEncontradoException(Guid storefrontId)
+        : base($"Storefront {storefrontId} não encontrado.")
     {
     }
 
