@@ -20,6 +20,7 @@ public static partial class ServiceCollectionExtensions
     {
         // Autenticacao via OTP (EZ-AUTH-001, EZ-AUTH-002)
         services.AddScoped<SolicitarOtpUseCase>();
+        services.AddScoped<ValidarOtpUseCase>();
 
         // Frete (EZ-FRETE-001)
         services.AddScoped<CalcularFreteUseCase>();

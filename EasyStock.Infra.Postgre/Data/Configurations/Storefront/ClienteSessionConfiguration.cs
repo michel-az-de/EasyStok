@@ -19,6 +19,7 @@ public class ClienteSessionConfiguration : IEntityTypeConfiguration<ClienteSessi
 
         builder.Property(s => s.IpInicial).HasMaxLength(45);
         builder.Property(s => s.UaInicial).HasMaxLength(300);
+        builder.Property(s => s.Fingerprint).HasMaxLength(64);
 
         builder.Property(s => s.Revogada).IsRequired().HasDefaultValue(false);
         builder.Property(s => s.MotivoRevogacao).HasMaxLength(200);

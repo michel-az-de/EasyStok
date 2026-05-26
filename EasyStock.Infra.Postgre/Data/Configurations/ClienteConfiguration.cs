@@ -18,6 +18,14 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(c => c.Documento).HasMaxLength(30);
             builder.Property(c => c.Observacoes).HasColumnType("text");
 
+            // ── AUTH-002: identificação por telefone hash (SHA-256, 64 chars hex) ──
+            builder.Property(c => c.TelefoneHash).HasMaxLength(64);
+            // Lookup principal storefront OTP: empresaId + hash → cliente.
+            builder.HasIndex(c => new { c.EmpresaId, c.TelefoneHash })
+                .HasDatabaseName("ix_clientes_empresa_telefone_hash")
+                .IsUnique()
+                .HasFilter("\"TelefoneHash\" IS NOT NULL");
+
             // ── Aditivos storefront (TASK-EZ-005) ──────────────────────
             builder.Property(c => c.Cep).HasMaxLength(8);
             builder.Property(c => c.Complemento).HasMaxLength(100);

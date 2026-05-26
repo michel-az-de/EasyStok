@@ -174,6 +174,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.PedidoAvaliacaoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
+            // Storefront — autenticação OTP cliente (AUTH-002)
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteStorefrontRepository,
+                Repositories.Storefront.ClienteStorefrontRepository>();
 
             // Notification repositories (Templates, Rotinas, Outbox, Consentimentos, etc.)
             services.AddEasyStockNotificationsRepositories();
