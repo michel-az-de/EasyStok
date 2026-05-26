@@ -11,6 +11,10 @@ public class StatusPedidoMapperTests
     [InlineData(StatusPedido.Pronto, "pronto")]
     [InlineData(StatusPedido.Entregue, "entregue")]
     [InlineData(StatusPedido.Cancelado, "cancelado")]
+    [InlineData(StatusPedido.Rascunho, "rascunho")]
+    [InlineData(StatusPedido.AguardandoPagamento, "aguardando_pagamento")]
+    [InlineData(StatusPedido.AguardandoAprovacaoBaba, "aguardando_aprovacao_baba")]
+    [InlineData(StatusPedido.AprovadoBaba, "aprovado_baba")]
     public void Format_retorna_string_canonica_lowercase(StatusPedido status, string esperado)
     {
         StatusPedidoMapper.Format(status).Should().Be(esperado);
@@ -30,6 +34,10 @@ public class StatusPedidoMapperTests
     [InlineData("pronto", StatusPedido.Pronto)]
     [InlineData("entregue", StatusPedido.Entregue)]
     [InlineData("cancelado", StatusPedido.Cancelado)]
+    [InlineData("rascunho", StatusPedido.Rascunho)]
+    [InlineData("aguardando_pagamento", StatusPedido.AguardandoPagamento)]
+    [InlineData("aguardando_aprovacao_baba", StatusPedido.AguardandoAprovacaoBaba)]
+    [InlineData("aprovado_baba", StatusPedido.AprovadoBaba)]
     public void Parse_string_canonica_retorna_enum_correto(string raw, StatusPedido esperado)
     {
         StatusPedidoMapper.Parse(raw).Should().Be(esperado);
@@ -103,6 +111,10 @@ public class StatusPedidoMapperTests
     [InlineData(StatusPedido.Pronto)]
     [InlineData(StatusPedido.Entregue)]
     [InlineData(StatusPedido.Cancelado)]
+    [InlineData(StatusPedido.Rascunho)]
+    [InlineData(StatusPedido.AguardandoPagamento)]
+    [InlineData(StatusPedido.AguardandoAprovacaoBaba)]
+    [InlineData(StatusPedido.AprovadoBaba)]
     public void RoundTrip_Parse_de_Format_preserva_status(StatusPedido original)
     {
         var raw = StatusPedidoMapper.Format(original);
