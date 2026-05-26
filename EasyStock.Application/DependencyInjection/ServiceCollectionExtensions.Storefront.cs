@@ -6,6 +6,7 @@
 
 using EasyStock.Application.UseCases.Storefront.Auth;
 using EasyStock.Application.UseCases.Storefront.Frete;
+using EasyStock.Application.UseCases.Storefront.Menu;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -24,6 +25,9 @@ public static partial class ServiceCollectionExtensions
 
         // Frete (EZ-FRETE-001)
         services.AddScoped<CalcularFreteUseCase>();
+
+        // Menu / cardapio publico (EZ-MENU-001)
+        services.AddScoped<ListarCardapioPublicoUseCase>();
 
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja
