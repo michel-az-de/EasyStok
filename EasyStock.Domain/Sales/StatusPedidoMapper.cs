@@ -20,6 +20,8 @@ public static class StatusPedidoMapper
     public const string Cancelado = "cancelado";
     public const string Rascunho = "rascunho";
     public const string AguardandoPagamento = "aguardando_pagamento";
+    public const string AguardandoAprovacaoBaba = "aguardando_aprovacao_baba";
+    public const string AprovadoBaba = "aprovado_baba";
 
     /// <summary>Converte enum em string canônica lowercase.</summary>
     public static string Format(StatusPedido status) => status switch
@@ -31,6 +33,8 @@ public static class StatusPedidoMapper
         StatusPedido.Cancelado => Cancelado,
         StatusPedido.Rascunho => Rascunho,
         StatusPedido.AguardandoPagamento => AguardandoPagamento,
+        StatusPedido.AguardandoAprovacaoBaba => AguardandoAprovacaoBaba,
+        StatusPedido.AprovadoBaba => AprovadoBaba,
         _ => throw new ArgumentOutOfRangeException(
             nameof(status), status, "Status fora do enum StatusPedido."),
     };
@@ -53,6 +57,8 @@ public static class StatusPedidoMapper
             case Cancelado: status = StatusPedido.Cancelado; return true;
             case Rascunho: status = StatusPedido.Rascunho; return true;
             case AguardandoPagamento: status = StatusPedido.AguardandoPagamento; return true;
+            case AguardandoAprovacaoBaba: status = StatusPedido.AguardandoAprovacaoBaba; return true;
+            case AprovadoBaba: status = StatusPedido.AprovadoBaba; return true;
             default: return false;
         }
     }

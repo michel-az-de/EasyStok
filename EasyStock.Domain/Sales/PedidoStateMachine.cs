@@ -29,7 +29,9 @@ public static class PedidoStateMachine
     ///   <item>Entregue → {Cancelado}  (cancela pós-entrega devolve estoque)</item>
     ///   <item>Cancelado → ∅</item>
     ///   <item>Rascunho → {AguardandoPagamento, Cancelado}  (Storefront ADR-0014)</item>
-    ///   <item>AguardandoPagamento → {Aguardando, Cancelado}  (Storefront ADR-0014)</item>
+    ///   <item>AguardandoPagamento → {Aguardando, AguardandoAprovacaoBaba, Cancelado}  (Storefront ADR-0014)</item>
+    ///   <item>AguardandoAprovacaoBaba → {AprovadoBaba, Cancelado}  (Storefront TASK-EZ-APROVAR-001)</item>
+    ///   <item>AprovadoBaba → {Preparando, Cancelado}  (Storefront: aprovação → fila ERP)</item>
     /// </list>
     /// </summary>
     public static IReadOnlyDictionary<StatusPedido, IReadOnlySet<StatusPedido>> Transicoes { get; } =
@@ -42,7 +44,19 @@ public static class PedidoStateMachine
             [StatusPedido.Cancelado] = new HashSet<StatusPedido>(),
             // Storefront checkout flow (ADR-0014)
             [StatusPedido.Rascunho] = new HashSet<StatusPedido> { StatusPedido.AguardandoPagamento, StatusPedido.Cancelado },
-            [StatusPedido.AguardandoPagamento] = new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.Cancelado },
+            [StatusPedido.AguardandoPagamento] = new HashSet<StatusPedido>
+            {
+                StatusPedido.Aguardando, StatusPedido.AguardandoAprovacaoBaba, StatusPedido.Cancelado,
+            },
+            // Storefront approval flow (TASK-EZ-APROVAR-001)
+            [StatusPedido.AguardandoAprovacaoBaba] = new HashSet<StatusPedido>
+            {
+                StatusPedido.AprovadoBaba, StatusPedido.Cancelado,
+            },
+            [StatusPedido.AprovadoBaba] = new HashSet<StatusPedido>
+            {
+                StatusPedido.Preparando, StatusPedido.Cancelado,
+            },
         };
 
     /// <summary>
@@ -56,6 +70,7 @@ public static class PedidoStateMachine
         {
             StatusPedido.Aguardando, StatusPedido.Preparando, StatusPedido.Pronto,
             StatusPedido.Rascunho, StatusPedido.AguardandoPagamento,
+            StatusPedido.AguardandoAprovacaoBaba, StatusPedido.AprovadoBaba,
         };
 
     /// <summary>Status terminais — não há mais transição saindo.</summary>

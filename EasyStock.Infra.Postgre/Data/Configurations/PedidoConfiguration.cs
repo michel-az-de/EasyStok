@@ -21,7 +21,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.ClienteNome).HasMaxLength(150);
             b.Property(p => p.ClienteApt).HasMaxLength(32);
             b.Property(p => p.ClienteTelefone).HasMaxLength(32);
-            b.Property(p => p.Status).IsRequired().HasMaxLength(20);
+            // Status: 32 chars cobrem todos os enum values (maior atual = "aguardando_aprovacao_baba" = 25).
+            // Aumento de 20 → 32 acompanha migration aditiva de TASK-EZ-APROVAR-001.
+            b.Property(p => p.Status).IsRequired().HasMaxLength(32);
 
             // Total: Dinheiro VO persistido como decimal numeric(14,2).
             // Schema do DB inalterado — só o tipo no Domain virou tipado.
@@ -38,6 +40,28 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.MobileOrderId).HasMaxLength(64);
             b.Property(p => p.AvaliacaoSolicitadaEm)
                 .HasColumnName("avaliacao_solicitada_em")
+                .IsRequired(false);
+
+            // ── Resolução Storefront (TASK-EZ-APROVAR-001) ─────────────
+            b.Property(p => p.AprovadoEm)
+                .HasColumnName("aprovado_em")
+                .IsRequired(false);
+            b.Property(p => p.AprovadoPorUsuarioId)
+                .HasColumnName("aprovado_por_usuario_id")
+                .IsRequired(false);
+            b.Property(p => p.RecusadoEm)
+                .HasColumnName("recusado_em")
+                .IsRequired(false);
+            b.Property(p => p.RecusadoPorUsuarioId)
+                .HasColumnName("recusado_por_usuario_id")
+                .IsRequired(false);
+            b.Property(p => p.MotivoRecusa)
+                .HasColumnName("motivo_recusa")
+                .HasMaxLength(40)
+                .IsRequired(false);
+            b.Property(p => p.MensagemRecusaCliente)
+                .HasColumnName("mensagem_recusa_cliente")
+                .HasMaxLength(280)
                 .IsRequired(false);
 
             b.HasOne(p => p.Empresa)

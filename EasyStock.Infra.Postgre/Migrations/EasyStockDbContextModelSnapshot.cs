@@ -5676,14 +5676,40 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<decimal>("Total")
                         .HasColumnType("numeric(14,2)");
 
                     b.Property<Guid?>("VendaId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AprovadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("aprovado_em");
+
+                    b.Property<Guid?>("AprovadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("aprovado_por_usuario_id");
+
+                    b.Property<DateTime?>("RecusadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recusado_em");
+
+                    b.Property<Guid?>("RecusadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recusado_por_usuario_id");
+
+                    b.Property<string>("MotivoRecusa")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("motivo_recusa");
+
+                    b.Property<string>("MensagemRecusaCliente")
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)")
+                        .HasColumnName("mensagem_recusa_cliente");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
