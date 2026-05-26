@@ -15,6 +15,16 @@ public class PedidoStateMachineTests
         new object[] { StatusPedido.Pronto, StatusPedido.Entregue },
         new object[] { StatusPedido.Pronto, StatusPedido.Cancelado },
         new object[] { StatusPedido.Entregue, StatusPedido.Cancelado },
+        // Storefront flow (ADR-0014)
+        new object[] { StatusPedido.Rascunho, StatusPedido.AguardandoPagamento },
+        new object[] { StatusPedido.Rascunho, StatusPedido.Cancelado },
+        new object[] { StatusPedido.AguardandoPagamento, StatusPedido.Aguardando },
+        new object[] { StatusPedido.AguardandoPagamento, StatusPedido.AguardandoAprovacaoBaba },
+        new object[] { StatusPedido.AguardandoPagamento, StatusPedido.Cancelado },
+        new object[] { StatusPedido.AguardandoAprovacaoBaba, StatusPedido.AprovadoBaba },
+        new object[] { StatusPedido.AguardandoAprovacaoBaba, StatusPedido.Cancelado },
+        new object[] { StatusPedido.AprovadoBaba, StatusPedido.Preparando },
+        new object[] { StatusPedido.AprovadoBaba, StatusPedido.Cancelado },
     };
 
     public static IEnumerable<object[]> TransicoesInvalidas() => new[]
