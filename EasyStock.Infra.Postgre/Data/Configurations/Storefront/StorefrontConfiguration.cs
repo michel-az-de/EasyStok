@@ -31,7 +31,7 @@ public class StorefrontConfiguration : IEntityTypeConfiguration<StorefrontEntity
             .HasMaxLength(100);
         builder.HasIndex(s => s.DominioCustom)
             .IsUnique()
-            .HasFilter("\"dominio_custom\" IS NOT NULL")
+            .HasFilter("\"DominioCustom\" IS NOT NULL")
             .HasDatabaseName("uq_storefront_dominio_custom");
 
         builder.Property(s => s.TituloPublico)

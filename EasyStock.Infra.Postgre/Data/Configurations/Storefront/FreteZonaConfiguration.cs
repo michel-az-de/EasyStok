@@ -53,7 +53,7 @@ public class FreteZonaConfiguration : IEntityTypeConfiguration<FreteZona>
         // Range query helper para zonas por CEP. Filtro parcial evita índice em
         // linhas bairros_lista (CepInicio NULL).
         builder.HasIndex(z => new { z.StorefrontId, z.CepInicio, z.CepFim })
-            .HasFilter("\"cep_inicio\" IS NOT NULL")
+            .HasFilter("\"CepInicio\" IS NOT NULL")
             .HasDatabaseName("ix_frete_zona_storefront_cep_range");
 
         // FK Storefront — CASCADE: ao deletar storefront, apaga todas as zonas.

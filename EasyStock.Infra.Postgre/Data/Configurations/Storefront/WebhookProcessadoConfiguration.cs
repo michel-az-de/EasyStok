@@ -46,7 +46,7 @@ public class WebhookProcessadoConfiguration : IEntityTypeConfiguration<WebhookPr
         // Lookup do job de processamento: pega só pendentes, ordenando por chegada.
         // Índice filtrado (status = 0 = Received) mantém só o backlog ativo, evitando bloat.
         builder.HasIndex(w => new { w.Status, w.RecebidoEm })
-            .HasFilter("\"status\" = 0")
+            .HasFilter("\"Status\" = 0")
             .HasDatabaseName("ix_webhook_processado_received_recebido_em");
     }
 }

@@ -480,7 +480,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                 name: "ix_frete_zona_storefront_cep_range",
                 table: "frete_zona",
                 columns: new[] { "StorefrontId", "CepInicio", "CepFim" },
-                filter: "\"cep_inicio\" IS NOT NULL");
+                filter: "\"CepInicio\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "ix_frete_zona_storefront_ordem",
@@ -523,7 +523,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                 table: "storefront",
                 column: "DominioCustom",
                 unique: true,
-                filter: "\"dominio_custom\" IS NOT NULL");
+                filter: "\"DominioCustom\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "uq_storefront_slug",
@@ -545,20 +545,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                 name: "ix_vaga_ativa_por_janela_data",
                 table: "vaga_ocupada",
                 columns: new[] { "JanelaEntregaId", "DataEntrega" },
-                filter: "\"liberado_em\" IS NULL");
+                filter: "\"LiberadoEm\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "uq_vaga_ativa_por_pedido",
                 table: "vaga_ocupada",
                 column: "PedidoId",
                 unique: true,
-                filter: "\"liberado_em\" IS NULL");
+                filter: "\"LiberadoEm\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "ix_webhook_processado_received_recebido_em",
                 table: "webhook_processado",
                 columns: new[] { "Status", "RecebidoEm" },
-                filter: "\"status\" = 0");
+                filter: "\"Status\" = 0");
 
             migrationBuilder.CreateIndex(
                 name: "uq_webhook_processado_provider_evento",

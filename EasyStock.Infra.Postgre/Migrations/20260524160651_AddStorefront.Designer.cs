@@ -7002,7 +7002,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("StorefrontId", "CepInicio", "CepFim")
                         .HasDatabaseName("ix_frete_zona_storefront_cep_range")
-                        .HasFilter("\"cep_inicio\" IS NOT NULL");
+                        .HasFilter("\"CepInicio\" IS NOT NULL");
 
                     b.ToTable("frete_zona", (string)null);
                 });
@@ -7191,7 +7191,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("DominioCustom")
                         .IsUnique()
                         .HasDatabaseName("uq_storefront_dominio_custom")
-                        .HasFilter("\"dominio_custom\" IS NOT NULL");
+                        .HasFilter("\"DominioCustom\" IS NOT NULL");
 
                     b.HasIndex("EmpresaId")
                         .HasDatabaseName("ix_storefront_empresa_id");
@@ -7296,11 +7296,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("PedidoId")
                         .IsUnique()
                         .HasDatabaseName("uq_vaga_ativa_por_pedido")
-                        .HasFilter("\"liberado_em\" IS NULL");
+                        .HasFilter("\"LiberadoEm\" IS NULL");
 
                     b.HasIndex("JanelaEntregaId", "DataEntrega")
                         .HasDatabaseName("ix_vaga_ativa_por_janela_data")
-                        .HasFilter("\"liberado_em\" IS NULL");
+                        .HasFilter("\"LiberadoEm\" IS NULL");
 
                     b.ToTable("vaga_ocupada", (string)null);
                 });
@@ -7354,7 +7354,7 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("Status", "RecebidoEm")
                         .HasDatabaseName("ix_webhook_processado_received_recebido_em")
-                        .HasFilter("\"status\" = 0");
+                        .HasFilter("\"Status\" = 0");
 
                     b.ToTable("webhook_processado", (string)null);
                 });
