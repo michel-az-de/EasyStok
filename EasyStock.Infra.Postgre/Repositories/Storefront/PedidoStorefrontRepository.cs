@@ -17,6 +17,26 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(p => p.Id == pedidoId, ct);
 
+    /// <summary>
+    /// SELECT FOR UPDATE — lock pessimista no Pedido. ADR-0014 (vaga lifecycle) + TASK-EZ-APROVAR-001.
+    /// Falha rápido (InvalidOperationException) se chamado fora de transação ativa para evitar
+    /// que o lock seja descartado silenciosamente — causando race condition que destrói a serialização.
+    /// </summary>
+    public async Task<Pedido?> GetForUpdateAsync(Guid pedidoId, CancellationToken ct = default)
+    {
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException(
+                "GetForUpdateAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — " +
+                "sem transação ativa, o FOR UPDATE é descartado pelo Postgres e a serialização entre " +
+                "agentes Babá fica quebrada (race em aprovar/recusar concorrente).");
+
+        const string sql = "SELECT * FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
+        return await db.Pedidos
+            .FromSqlRaw(sql, pedidoId)
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task AddAsync(Pedido pedido, CancellationToken ct = default)
     {
         await db.Pedidos.AddAsync(pedido, ct);
@@ -32,6 +52,12 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
     public async Task AddItemAsync(PedidoItem item, CancellationToken ct = default)
     {
         await db.Set<PedidoItem>().AddAsync(item, ct);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task AddEventoAsync(PedidoEvento evento, CancellationToken ct = default)
+    {
+        await db.Set<PedidoEvento>().AddAsync(evento, ct);
         await db.SaveChangesAsync(ct);
     }
 

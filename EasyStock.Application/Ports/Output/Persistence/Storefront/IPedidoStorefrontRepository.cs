@@ -12,11 +12,30 @@ public interface IPedidoStorefrontRepository
 {
     Task<Pedido?> GetByIdAsync(Guid pedidoId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Carrega o pedido com <c>SELECT FOR UPDATE</c> (lock pessimista — ADR-0014).
+    /// DEVE ser chamado dentro de <see cref="IUnitOfWork.ExecuteInTransactionAsync"/>:
+    /// fora de transação explícita o lock é descartado e a corrida fica aberta.
+    ///
+    /// <para>
+    /// Garante que dois agentes Babá não aprovem/recusem o mesmo pedido
+    /// simultaneamente. O segundo aguarda commit/rollback do primeiro antes
+    /// de ler o registro — o use case então detecta o status novo e devolve 409.
+    /// </para>
+    /// </summary>
+    Task<Pedido?> GetForUpdateAsync(Guid pedidoId, CancellationToken ct = default);
+
     Task AddAsync(Pedido pedido, CancellationToken ct = default);
 
     Task UpdateAsync(Pedido pedido, CancellationToken ct = default);
 
     Task AddItemAsync(PedidoItem item, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adiciona um <see cref="PedidoEvento"/> de audit trail (status_changed,
+    /// aprovado_storefront, recusado_storefront, etc.) na MESMA transação ativa.
+    /// </summary>
+    Task AddEventoAsync(PedidoEvento evento, CancellationToken ct = default);
 
     /// <summary>
     /// Retorna pedidos com status <c>aguardando_pagamento</c> E
