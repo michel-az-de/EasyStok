@@ -4,6 +4,7 @@
 //
 // Use cases sao stateless e por requisicao — registro Scoped (padrao do projeto).
 
+using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Application.UseCases.Storefront.Auth;
 using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Application.UseCases.Storefront.Menu;
@@ -28,6 +29,9 @@ public static partial class ServiceCollectionExtensions
 
         // Menu / cardapio publico (EZ-MENU-001)
         services.AddScoped<ListarCardapioPublicoUseCase>();
+
+        // Agendamento de entrega (EZ-AGEND-001)
+        services.AddScoped<ListarJanelasDisponiveisUseCase>();
 
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja

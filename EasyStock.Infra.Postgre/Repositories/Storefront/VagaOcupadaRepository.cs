@@ -149,6 +149,31 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
         return orfas;
     }
 
+    public async Task<IReadOnlyDictionary<(Guid JanelaId, DateOnly Data), int>> ContarPorJanelaPeriodoAsync(
+        IReadOnlyList<Guid> janelaIds,
+        DateOnly dataInicio,
+        DateOnly dataFim,
+        CancellationToken ct = default)
+    {
+        if (janelaIds.Count == 0)
+            return new Dictionary<(Guid, DateOnly), int>();
+
+        var grupos = await db.VagasOcupadas
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(v => janelaIds.Contains(v.JanelaEntregaId)
+                     && v.DataEntrega >= dataInicio
+                     && v.DataEntrega <= dataFim
+                     && v.LiberadoEm == null)
+            .GroupBy(v => new { v.JanelaEntregaId, v.DataEntrega })
+            .Select(g => new { g.Key.JanelaEntregaId, g.Key.DataEntrega, Count = g.Count() })
+            .ToListAsync(ct);
+
+        return grupos.ToDictionary(
+            g => (g.JanelaEntregaId, g.DataEntrega),
+            g => g.Count);
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException pg && pg.SqlState == "23505";
 }
