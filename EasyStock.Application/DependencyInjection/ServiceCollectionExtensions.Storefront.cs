@@ -1,11 +1,15 @@
-﻿// Camada Storefront — use cases publicos consumidos pela storefront
+// Camada Storefront — use cases publicos consumidos pela storefront
 // (Casa da Baba e tenants futuros). Inclui: autenticacao OTP, agendamento,
-// menu, frete, checkout, avaliacao.
+// menu, frete, checkout, avaliacao, aprovacao, pedidos.
 //
 // Use cases sao stateless e por requisicao — registro Scoped (padrao do projeto).
 
+using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
+using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Auth;
+using EasyStock.Application.UseCases.Storefront.Checkout;
+using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +36,15 @@ public static partial class ServiceCollectionExtensions
 
         // Agendamento de entrega (EZ-AGEND-001)
         services.AddScoped<ListarJanelasDisponiveisUseCase>();
+
+        // Checkout (CHECKOUT-001 base + WEBHOOK-001)
+        services.AddScoped<CheckoutIdempotencyService>();
+        services.AddScoped<IniciarCheckoutUseCase>();
+        services.AddScoped<LiberarVagaOnPedidoCanceladoHandler>();
+
+        // TASK-EZ-APROVAR-001 — use cases Babá aprovar/recusar pedido.
+        services.AddScoped<AprovarPedidoStorefrontUseCase>();
+        services.AddScoped<RecusarPedidoStorefrontUseCase>();
 
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja
