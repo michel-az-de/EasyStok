@@ -36,4 +36,16 @@ public interface IVagaOcupadaRepository
     /// (cinto+suspensório — ADR-0014 §Solução 4).
     /// </summary>
     Task<IReadOnlyList<VagaOcupada>> GetOrfasAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Conta vagas ativas (LiberadoEm IS NULL) agrupadas por (janelaId, data) para
+    /// um conjunto de janelas num período. Retorna apenas combinações com COUNT ≥ 1 —
+    /// ausentes têm contagem implícita de zero. Anti-N+1: uma query para o período
+    /// inteiro (TASK-EZ-AGEND-001).
+    /// </summary>
+    Task<IReadOnlyDictionary<(Guid JanelaId, DateOnly Data), int>> ContarPorJanelaPeriodoAsync(
+        IReadOnlyList<Guid> janelaIds,
+        DateOnly dataInicio,
+        DateOnly dataFim,
+        CancellationToken ct = default);
 }

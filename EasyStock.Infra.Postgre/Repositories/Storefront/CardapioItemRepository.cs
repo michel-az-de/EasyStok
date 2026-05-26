@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -16,8 +16,10 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
         await db.CardapioItens
             .AsNoTracking()
             .Include(c => c.Produto)
+                .ThenInclude(p => p!.Categoria)
             .Where(c => c.StorefrontId == storefrontId && c.Visivel)
-            .OrderBy(c => c.OrdemExibicao)
+            .OrderBy(c => c.Produto!.Categoria!.Nome)
+            .ThenBy(c => c.OrdemExibicao)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<CardapioItem>> GetTodosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
