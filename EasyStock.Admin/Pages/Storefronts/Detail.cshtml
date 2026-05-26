@@ -1,0 +1,126 @@
+@page "{id:guid}"
+@model EasyStock.Admin.Pages.Storefronts.DetailModel
+@{
+    ViewData["Title"] = "Storefront";
+    if (!Model.Encontrado)
+    {
+    }
+    var sf = Model.Storefront;
+    string Str(string prop) => sf.TryGetProperty(prop, out var p) ? (p.GetString() ?? "—") : "—";
+    bool Bln(string prop) => sf.TryGetProperty(prop, out var p) && p.GetBoolean();
+    int Itn(string prop) => sf.TryGetProperty(prop, out var p) && p.TryGetInt32(out var v) ? v : 0;
+    decimal Dec(string prop)
+    {
+        if (sf.TryGetProperty(prop, out var p) && p.TryGetDecimal(out var v)) return v;
+        return 0m;
+    }
+    var slug = Str("slug");
+    var titulo = Str("tituloPublico");
+    var empresaNome = Str("empresaNome");
+    var ativo = Bln("ativo");
+    var cardapioCount = Itn("cardapioCount");
+    var criadoStr = Str("criadoEm");
+    DateTime.TryParse(criadoStr, out var criadoDt);
+}
+
+@if (!Model.Encontrado)
+{
+    <es-empty-state icon="alert-triangle"
+                    title="Storefront não encontrado"
+                    description="Pode ter sido removido. Volte e atualize a listagem.">
+        <es-button variant="ghost" href="/Storefronts">Voltar</es-button>
+    </es-empty-state>
+}
+else
+{
+    <es-breadcrumb>
+        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+        <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+        <es-breadcrumb-item>@slug</es-breadcrumb-item>
+    </es-breadcrumb>
+
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:16px 0 24px; flex-wrap:wrap;">
+        <div>
+            <h2 style="margin:0 0 4px; font-size:20px; font-weight:600; color:var(--text-primary);">
+                @titulo
+                @if (ativo)
+                {
+                    <es-badge variant="ok" with-dot="true">Ativo</es-badge>
+                }
+                else
+                {
+                    <es-badge variant="neutral" with-dot="true">Inativo</es-badge>
+                }
+            </h2>
+            <div style="color:var(--text-muted); font-size:13px; font-family:var(--font-mono);">@slug</div>
+            <div style="color:var(--text-muted); font-size:13px; margin-top:4px;">
+                Empresa: <strong style="color:var(--text-primary);">@empresaNome</strong> ·
+                Criado em @criadoDt.ToLocalTime().ToString("dd/MM/yyyy")
+            </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <es-button variant="ghost" href="/Storefronts/Edit/@Model.Id" icon="edit">Editar</es-button>
+        </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+        <es-card padding="md">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Cardápio</h3>
+                <es-icon name="utensils" size="18" />
+            </div>
+            <div style="font-size:28px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">@cardapioCount</div>
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">item(ns) cadastrado(s)</div>
+            <es-button variant="primary" size="sm" href="/Storefronts/@Model.Id/Cardapio" icon="arrow-right">
+                Gerenciar cardápio
+            </es-button>
+        </es-card>
+
+        <es-card padding="md">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Frete</h3>
+                <es-icon name="truck" size="18" />
+            </div>
+            <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+                Zonas de entrega e taxa por CEP.
+            </div>
+            <es-badge variant="warn">Configurado em ADMIN-002</es-badge>
+        </es-card>
+
+        <es-card padding="md">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Janelas de entrega</h3>
+                <es-icon name="calendar" size="18" />
+            </div>
+            <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+                Horários disponíveis + capacidade por janela.
+            </div>
+            <es-badge variant="warn">Configurado em ADMIN-002</es-badge>
+        </es-card>
+
+        <es-card padding="md">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Mercado Pago</h3>
+                <es-icon name="credit-card" size="18" />
+            </div>
+            <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+                Credenciais cifradas AES-256-GCM.
+            </div>
+            <es-badge variant="warn">Configurado em ADMIN-002</es-badge>
+        </es-card>
+    </div>
+
+    <es-card padding="md" card-class="mt-6">
+        <h3 style="margin:0 0 12px; font-size:14px; font-weight:600; color:var(--text-primary);">Configuração</h3>
+        <dl style="display:grid; grid-template-columns:max-content 1fr; gap:6px 24px; font-size:13px; margin:0;">
+            <dt style="color:var(--text-muted);">Subtítulo</dt><dd style="margin:0;">@Str("subtituloPublico")</dd>
+            <dt style="color:var(--text-muted);">Domínio custom</dt><dd style="margin:0;">@Str("dominioCustom")</dd>
+            <dt style="color:var(--text-muted);">WhatsApp pedidos</dt><dd style="margin:0;">@Str("whatsappPedidos")</dd>
+            <dt style="color:var(--text-muted);">Cor primária</dt><dd style="margin:0;">@Str("corPrimaria")</dd>
+            <dt style="color:var(--text-muted);">Pedido mínimo</dt><dd style="margin:0;">R$ @Dec("pedidoMinimoEntrega").ToString("F2")</dd>
+            <dt style="color:var(--text-muted);">Frete grátis acima</dt><dd style="margin:0;">@(sf.TryGetProperty("freteGratisAcima", out var fg) && fg.ValueKind == System.Text.Json.JsonValueKind.Number ? $"R$ {fg.GetDecimal():F2}" : "Nunca")</dd>
+            <dt style="color:var(--text-muted);">Modelo fiscal</dt><dd style="margin:0;">@Str("modeloFiscal")</dd>
+            <dt style="color:var(--text-muted);">NF-e automática</dt><dd style="margin:0;">@(Bln("nfeAutomaticaHabilitada") ? "Habilitada" : "Desabilitada")</dd>
+        </dl>
+    </es-card>
+}

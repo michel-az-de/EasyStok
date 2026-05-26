@@ -1,0 +1,171 @@
+@page
+@model EasyStock.Admin.Pages.Storefronts.IndexModel
+@{
+    ViewData["Title"] = "Storefronts";
+}
+
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <div>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Storefronts</es-breadcrumb-item>
+        </es-breadcrumb>
+        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
+            <strong style="color:var(--text-primary);">@Model.Total</strong> resultado(s)
+        </div>
+    </div>
+    <div>
+        <es-button variant="primary" href="/Storefronts/Create" icon="plus">Novo storefront</es-button>
+    </div>
+</div>
+
+<es-card padding="md" card-class="mb-4">
+    <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end;">
+        <es-input name="search" label="Buscar" value="@Model.Search"
+                  placeholder="Slug ou título..." prefix-icon="search"
+                  field-class="md:col-span-2" />
+        <es-select name="ativo" label="Status">
+            <option value="">Todos</option>
+            <option value="true" selected="@(Model.Ativo == "true")">Ativo</option>
+            <option value="false" selected="@(Model.Ativo == "false")">Inativo</option>
+        </es-select>
+        <div style="display:flex; gap:8px;">
+            <es-button type="submit" variant="primary" icon="filter">Filtrar</es-button>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Ativo))
+            {
+                <es-button variant="ghost" href="/Storefronts">Limpar</es-button>
+            }
+        </div>
+    </form>
+</es-card>
+
+<div x-data="{ confirmId: null, confirmAcao: null, confirmTitulo: '' }">
+    <es-data-table is-empty="@(!Model.Storefronts.Any())">
+        <es-data-table-column key="slug" label="Slug" />
+        <es-data-table-column key="titulo" label="Título público" />
+        <es-data-table-column label="Domínio custom" />
+        <es-data-table-column label="Status" />
+        <es-data-table-column label="Cardápio" align="right" />
+        <es-data-table-column key="criadoEm" label="Criado em" align="right" />
+        <es-data-table-column label="" actions="true" width="280px" />
+
+        @foreach (var s in Model.Storefronts)
+        {
+            var id = s.TryGetProperty("id", out var idP) ? idP.GetGuid() : Guid.Empty;
+            var slug = s.TryGetProperty("slug", out var sP) ? sP.GetString() : "";
+            var titulo = s.TryGetProperty("tituloPublico", out var tP) ? tP.GetString() : "";
+            var dominio = s.TryGetProperty("dominioCustom", out var dP) ? dP.GetString() : null;
+            var ativo = s.TryGetProperty("ativo", out var aP) && aP.GetBoolean();
+            var cardapio = s.TryGetProperty("cardapioCount", out var ccP) && ccP.TryGetInt32(out var ccv) ? ccv : 0;
+            var criadoStr = s.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : "";
+            DateTime.TryParse(criadoStr, out var criadoDt);
+
+            <tr>
+                <td data-label="Slug" style="font-family:var(--font-mono); font-size:13px;">
+                    <a href="/Storefronts/Detail/@id" style="color:var(--text-primary); text-decoration:none;">@slug</a>
+                </td>
+                <td data-label="Título" style="color:var(--text-secondary);">@titulo</td>
+                <td data-label="Domínio" style="color:var(--text-muted); font-family:var(--font-mono); font-size:12px;">
+                    @(string.IsNullOrEmpty(dominio) ? "—" : dominio)
+                </td>
+                <td data-label="Status">
+                    @if (ativo)
+                    {
+                        <es-badge variant="ok" with-dot="true">Ativo</es-badge>
+                    }
+                    else
+                    {
+                        <es-badge variant="neutral" with-dot="true">Inativo</es-badge>
+                    }
+                </td>
+                <td data-label="Cardápio" class="es-data-table-td-numeric">
+                    <a href="/Storefronts/@id/Cardapio" style="color:var(--text-primary); font-weight:500;">@cardapio</a>
+                </td>
+                <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">
+                    @criadoDt.ToLocalTime().ToString("dd/MM/yy")
+                </td>
+                <td class="es-data-table-td-actions">
+                    <div class="es-row-actions">
+                        <es-button variant="ghost" size="xs" href="/Storefronts/Detail/@id" icon="eye">Ver</es-button>
+                        <es-button variant="ghost" size="xs" href="/Storefronts/Edit/@id" icon="edit">Editar</es-button>
+                        @if (ativo)
+                        {
+                            <es-button variant="ghost" size="xs" icon="power-off"
+                                       x-on:click="confirmId = '@id'; confirmAcao = 'desativar'; confirmTitulo = '@System.Text.Json.JsonEncodedText.Encode(titulo ?? slug ?? "")'; $dispatch('open-modal-storefront-confirm')">
+                                Desativar
+                            </es-button>
+                        }
+                        else
+                        {
+                            <es-button variant="ghost" size="xs" icon="check"
+                                       x-on:click="confirmId = '@id'; confirmAcao = 'ativar'; confirmTitulo = '@System.Text.Json.JsonEncodedText.Encode(titulo ?? slug ?? "")'; $dispatch('open-modal-storefront-confirm')">
+                                Ativar
+                            </es-button>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+
+        <es-data-table-empty>
+            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Ativo))
+            {
+                <es-empty-state icon="search"
+                                title="Nenhum storefront encontrado"
+                                description="Ajuste os filtros ou crie um novo.">
+                    <es-button variant="ghost" href="/Storefronts">Limpar filtros</es-button>
+                </es-empty-state>
+            }
+            else
+            {
+                <es-empty-state icon="shopping-bag"
+                                title="Nenhum storefront cadastrado"
+                                description="Crie o primeiro storefront para um cliente.">
+                    <es-button variant="primary" href="/Storefronts/Create" icon="plus">Novo storefront</es-button>
+                </es-empty-state>
+            }
+        </es-data-table-empty>
+    </es-data-table>
+
+    @if (Model.TotalPages > 1)
+    {
+        <es-pagination page="@Model.Page" page-size="20" total="@Model.Total" />
+    }
+
+    <!-- Modal de confirmação ativar/desativar -->
+    <es-modal id="storefront-confirm" size="sm">
+        <div x-show="confirmAcao === 'desativar'">
+            <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Desativar storefront?</h2>
+            <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+                <strong x-text="confirmTitulo"></strong> não receberá novos pedidos enquanto estiver inativo.
+                Pedidos pendentes não são cancelados automaticamente. Esta ação é auditada.
+            </p>
+        </div>
+        <div x-show="confirmAcao === 'ativar'">
+            <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Ativar storefront?</h2>
+            <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+                <strong x-text="confirmTitulo"></strong> voltará a aceitar pedidos.
+                Verifique antes se cardápio, frete e Mercado Pago estão configurados — ADMIN-002 vai validar tudo automaticamente.
+            </p>
+        </div>
+        <form method="post" x-bind:action="confirmAcao === 'desativar' ? '?handler=Desativar' : '?handler=Ativar'"
+              x-data="{ loading: false }" x-on:submit="loading = true">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" x-bind:value="confirmId" />
+            <div style="margin-bottom:14px;">
+                <es-input name="motivo"
+                          label="Motivo (opcional)"
+                          placeholder="Ex.: cliente solicitou pausa, manutenção..." />
+            </div>
+            <es-modal-footer>
+                <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+                <button type="submit"
+                        class="btn btn-primary btn-md"
+                        :disabled="loading">
+                    <span x-show="!loading" x-text="confirmAcao === 'desativar' ? 'Desativar' : 'Ativar'"></span>
+                    <span x-show="loading" x-cloak>Salvando…</span>
+                </button>
+            </es-modal-footer>
+        </form>
+    </es-modal>
+</div>

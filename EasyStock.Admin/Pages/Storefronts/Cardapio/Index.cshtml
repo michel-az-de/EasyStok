@@ -1,0 +1,119 @@
+@page "{storefrontId:guid}/Cardapio"
+@model EasyStock.Admin.Pages.Storefronts.Cardapio.IndexModel
+@{
+    ViewData["Title"] = $"Cardápio — {Model.StorefrontSlug}";
+}
+
+<es-breadcrumb>
+    <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+    <es-breadcrumb-item href="/Storefronts/Detail/@Model.StorefrontId">@Model.StorefrontSlug</es-breadcrumb-item>
+    <es-breadcrumb-item>Cardápio</es-breadcrumb-item>
+</es-breadcrumb>
+
+<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin:16px 0 24px; flex-wrap:wrap;">
+    <div>
+        <h2 style="margin:0 0 4px; font-size:18px; font-weight:600; color:var(--text-primary);">Cardápio de @Model.StorefrontTitulo</h2>
+        <div style="font-size:13px; color:var(--text-muted);">@(Model.Itens.Count()) item(ns) cadastrado(s)</div>
+    </div>
+    <div>
+        <es-button variant="primary" href="/Storefronts/@Model.StorefrontId/Cardapio/Create" icon="plus">
+            Adicionar item
+        </es-button>
+    </div>
+</div>
+
+<es-data-table is-empty="@(!Model.Itens.Any())">
+    <es-data-table-column key="ordem" label="Ordem" align="right" width="100px" />
+    <es-data-table-column key="produto" label="Produto" />
+    <es-data-table-column label="Preço" align="right" />
+    <es-data-table-column label="Visível" align="center" width="100px" />
+    <es-data-table-column label="Disponível" align="center" width="120px" />
+    <es-data-table-column label="Tag" />
+    <es-data-table-column label="" actions="true" width="180px" />
+
+    @foreach (var item in Model.Itens)
+    {
+        var id = item.TryGetProperty("id", out var idP) ? idP.GetGuid() : Guid.Empty;
+        var produtoNome = item.TryGetProperty("produtoNome", out var pn) ? pn.GetString() ?? "(?)" : "(?)";
+        var ordem = item.TryGetProperty("ordemExibicao", out var oP) && oP.TryGetDouble(out var ov) ? ov : 0;
+        var preco = item.TryGetProperty("precoEfetivo", out var pP) && pP.TryGetDecimal(out var pv) ? pv : 0m;
+        var overrideP = item.TryGetProperty("precoStorefrontOverride", out var pop)
+            && pop.ValueKind == System.Text.Json.JsonValueKind.Number;
+        var visivel = item.TryGetProperty("visivel", out var vP) && vP.GetBoolean();
+        var disponivel = item.TryGetProperty("disponivel", out var dP) && dP.GetBoolean();
+        var tag = item.TryGetProperty("tag", out var tP) && tP.ValueKind != System.Text.Json.JsonValueKind.Null
+            ? tP.GetString()
+            : null;
+
+        <tr>
+            <td data-label="Ordem" class="es-data-table-td-numeric">
+                <form method="post" asp-page-handler="Reordenar" style="display:inline;"
+                      x-data="{ valor: @ordem.ToString(System.Globalization.CultureInfo.InvariantCulture) }">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="itemId" value="@id" />
+                    <input type="number"
+                           name="novaOrdem"
+                           x-model.number="valor"
+                           step="0.5"
+                           min="0"
+                           style="width:80px; padding:4px 8px; text-align:right; font-family:var(--font-mono); border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--text-primary);"
+                           x-on:blur="if (parseFloat($el.value) !== @ordem.ToString(System.Globalization.CultureInfo.InvariantCulture)) $el.form.submit()" />
+                </form>
+            </td>
+            <td data-label="Produto" style="color:var(--text-primary); font-weight:500;">@produtoNome</td>
+            <td data-label="Preço" class="es-data-table-td-numeric">
+                R$ @preco.ToString("F2")
+                @if (overrideP)
+                {
+                    <span style="margin-left:4px; font-size:11px; color:var(--accent); cursor:help;" title="Preço override (não usa o do Produto)">↻</span>
+                }
+            </td>
+            <td data-label="Visível" style="text-align:center;">
+                <form method="post" asp-page-handler="ToggleVisivel" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="itemId" value="@id" />
+                    <es-button type="submit"
+                               variant="@(visivel ? "primary" : "ghost")"
+                               size="xs"
+                               icon="@(visivel ? "eye" : "eye-off")"
+                               icon-only="true"
+                               aria-label="@(visivel ? "Ocultar" : "Tornar visível")" />
+                </form>
+            </td>
+            <td data-label="Disponível" style="text-align:center;">
+                <form method="post" asp-page-handler="ToggleDisponivel" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="itemId" value="@id" />
+                    <es-button type="submit"
+                               variant="@(disponivel ? "primary" : "ghost")"
+                               size="xs"
+                               icon="@(disponivel ? "check" : "x")"
+                               icon-only="true"
+                               aria-label="@(disponivel ? "Marcar esgotado" : "Marcar disponível")" />
+                </form>
+            </td>
+            <td data-label="Tag">
+                @if (!string.IsNullOrEmpty(tag))
+                {
+                    <es-badge variant="neutral">@tag</es-badge>
+                }
+                else
+                {
+                    <span style="color:var(--text-muted);">—</span>
+                }
+            </td>
+            <td class="es-data-table-td-actions">
+                <es-button variant="ghost" size="xs" href="/Storefronts/@Model.StorefrontId/Cardapio/Edit/@id" icon="edit">Editar</es-button>
+            </td>
+        </tr>
+    }
+
+    <es-data-table-empty>
+        <es-empty-state icon="utensils"
+                        title="Cardápio vazio"
+                        description="Adicione produtos do estoque ao cardápio público.">
+            <es-button variant="primary" href="/Storefronts/@Model.StorefrontId/Cardapio/Create" icon="plus">Adicionar item</es-button>
+        </es-empty-state>
+    </es-data-table-empty>
+</es-data-table>

@@ -107,6 +107,10 @@
                       class="ml-auto bg-es-surface-2 text-es-ink-dim text-xs rounded-full px-2 py-0.5 sidebar-label"
                       x-cloak></span>
             </a>
+            <a href="/Storefronts" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Storefronts") == true ? "is-active" : "")">
+                <es-icon name="shopping-bag" size="18" />
+                <span class="text-sm font-medium sidebar-label">Storefronts</span>
+            </a>
             <a href="/Tickets" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Tickets") == true ? "is-active" : "")">
                 <es-icon name="ticket" size="18" />
                 <span class="text-sm font-medium sidebar-label">Tickets</span>

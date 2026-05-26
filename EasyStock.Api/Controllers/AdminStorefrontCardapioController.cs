@@ -1,0 +1,194 @@
+﻿using EasyStock.Api.Http;
+using EasyStock.Api.Services;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace EasyStock.Api.Controllers;
+
+/// <summary>
+/// CRUD admin do Cardápio de um Storefront. Toda rota exige Policy SuperAdmin.
+/// Aninhado em /api/admin/storefronts/{storefrontId}/cardapio — convenção REST.
+/// </summary>
+[ApiController]
+[Route("api/admin/storefronts/{storefrontId:guid}/cardapio")]
+[Authorize(Policy = "SuperAdmin")]
+public class AdminStorefrontCardapioController(
+    ListarCardapioAdminUseCase listar,
+    AdicionarCardapioItemAdminUseCase adicionar,
+    EditarCardapioItemAdminUseCase editar,
+    ToggleVisibilidadeCardapioItemAdminUseCase toggleVisivel,
+    ToggleDisponibilidadeCardapioItemAdminUseCase toggleDisponivel,
+    ReordenarCardapioItemAdminUseCase reordenar,
+    AdminAuditService audit,
+    ILogger<AdminStorefrontCardapioController> logger) : EasyStockControllerBase
+{
+    public sealed record AdicionarItemRequest(
+        Guid ProdutoId,
+        double OrdemExibicao,
+        bool Visivel,
+        string? DescricaoPublica,
+        string? Ingredientes,
+        string? Alergenos,
+        string? SugestaoMolho,
+        string? TempoPreparo,
+        string? FotoUrl,
+        decimal? PrecoStorefront,
+        string? Tag,
+        string? PesoExibicao,
+        string? FiltrosJson,
+        string? Motivo);
+
+    public sealed record EditarItemRequest(
+        string? DescricaoPublica,
+        string? Ingredientes,
+        string? Alergenos,
+        string? SugestaoMolho,
+        string? TempoPreparo,
+        string? FotoUrl,
+        decimal? PrecoStorefront,
+        string? Tag,
+        string? PesoExibicao,
+        string? FiltrosJson,
+        string? Motivo);
+
+    public sealed record ReordenarRequest(double NovaOrdem);
+
+    [HttpGet]
+    public async Task<IActionResult> Listar(Guid storefrontId)
+    {
+        try
+        {
+            var result = await listar.ExecuteAsync(new ListarCardapioAdminCommand(storefrontId));
+            return DataOk(result);
+        }
+        catch (StorefrontNaoEncontradoException) { return DataNotFound("Storefront não encontrado."); }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Adicionar(Guid storefrontId, [FromBody] AdicionarItemRequest req)
+    {
+        try
+        {
+            var result = await adicionar.ExecuteAsync(new AdicionarCardapioItemAdminCommand(
+                storefrontId,
+                req.ProdutoId,
+                req.OrdemExibicao,
+                req.Visivel,
+                req.DescricaoPublica,
+                req.Ingredientes,
+                req.Alergenos,
+                req.SugestaoMolho,
+                req.TempoPreparo,
+                req.FotoUrl,
+                req.PrecoStorefront,
+                req.Tag,
+                req.PesoExibicao,
+                req.FiltrosJson));
+
+            await audit.LogAsync(
+                "AdminAdicionouCardapioItem",
+                $"StorefrontId={storefrontId}, ItemId={result.ItemId}, ProdutoId={req.ProdutoId}",
+                motivo: req.Motivo,
+                entidadeAfetadaId: result.ItemId);
+
+            return DataCreated(
+                $"/api/admin/storefronts/{storefrontId}/cardapio/{result.ItemId}",
+                result);
+        }
+        catch (StorefrontNaoEncontradoException) { return DataNotFound("Storefront não encontrado."); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao adicionar item ao cardápio {StorefrontId}", storefrontId);
+            return Problem(detail: ex.Message, statusCode: 500);
+        }
+    }
+
+    [HttpPut("{itemId:guid}")]
+    public async Task<IActionResult> Editar(Guid storefrontId, Guid itemId, [FromBody] EditarItemRequest req)
+    {
+        try
+        {
+            var result = await editar.ExecuteAsync(new EditarCardapioItemAdminCommand(
+                storefrontId,
+                itemId,
+                req.DescricaoPublica,
+                req.Ingredientes,
+                req.Alergenos,
+                req.SugestaoMolho,
+                req.TempoPreparo,
+                req.FotoUrl,
+                req.PrecoStorefront,
+                req.Tag,
+                req.PesoExibicao,
+                req.FiltrosJson));
+
+            await audit.LogAsync(
+                "AdminEditouCardapioItem",
+                $"StorefrontId={storefrontId}, ItemId={itemId}",
+                motivo: req.Motivo,
+                entidadeAfetadaId: itemId);
+
+            return DataOk(result);
+        }
+        catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
+        catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao editar item {ItemId}", itemId);
+            return Problem(detail: ex.Message, statusCode: 500);
+        }
+    }
+
+    [HttpPost("{itemId:guid}/toggle-visivel")]
+    public async Task<IActionResult> ToggleVisivel(Guid storefrontId, Guid itemId)
+    {
+        try
+        {
+            var result = await toggleVisivel.ExecuteAsync(new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, itemId));
+            await audit.LogAsync(
+                "AdminToggleVisivelCardapioItem",
+                $"StorefrontId={storefrontId}, ItemId={itemId}, VisivelAgora={result.VisivelAgora}",
+                entidadeAfetadaId: itemId);
+            return DataOk(result);
+        }
+        catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
+    }
+
+    [HttpPost("{itemId:guid}/toggle-disponivel")]
+    public async Task<IActionResult> ToggleDisponivel(Guid storefrontId, Guid itemId)
+    {
+        try
+        {
+            var result = await toggleDisponivel.ExecuteAsync(new ToggleDisponibilidadeCardapioItemAdminCommand(storefrontId, itemId));
+            await audit.LogAsync(
+                "AdminToggleDisponivelCardapioItem",
+                $"StorefrontId={storefrontId}, ItemId={itemId}, DisponivelAgora={result.DisponivelAgora}",
+                entidadeAfetadaId: itemId);
+            return DataOk(result);
+        }
+        catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
+    }
+
+    [HttpPost("{itemId:guid}/reordenar")]
+    public async Task<IActionResult> Reordenar(Guid storefrontId, Guid itemId, [FromBody] ReordenarRequest req)
+    {
+        try
+        {
+            var result = await reordenar.ExecuteAsync(new ReordenarCardapioItemAdminCommand(storefrontId, itemId, req.NovaOrdem));
+            return DataOk(result);
+        }
+        catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
+        catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+    }
+}
