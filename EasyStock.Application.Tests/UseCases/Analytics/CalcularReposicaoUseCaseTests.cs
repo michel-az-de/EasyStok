@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Analytics.Reposicao;
 using EasyStock.Application.UseCases.Common;
 using FluentAssertions;

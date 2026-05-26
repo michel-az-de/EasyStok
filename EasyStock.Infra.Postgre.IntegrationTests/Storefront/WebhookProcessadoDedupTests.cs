@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Storefront;
+﻿using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Infra.Postgre.Repositories.Storefront;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

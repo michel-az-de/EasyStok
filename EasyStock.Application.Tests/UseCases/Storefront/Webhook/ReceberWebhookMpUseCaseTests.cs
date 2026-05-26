@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -74,7 +74,7 @@ public class ReceberWebhookMpUseCaseTests
         var (chamada, _) = f.WebhookRepo.ReceivedCalls()
             .First(c => c.GetMethodInfo().Name == nameof(IWebhookProcessadoRepository.TentarRegistrarRecebidoAsync))
             .GetArguments() switch
-            { var args => (args[0] as WebhookProcessado, args[1]) };
+        { var args => (args[0] as WebhookProcessado, args[1]) };
 
         chamada.Should().NotBeNull();
         chamada!.Provider.Should().Be("mercadopago");

@@ -1,4 +1,4 @@
-using EasyStock.Application.Services.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
 using FluentAssertions;
 
 namespace EasyStock.Application.Tests.Services.Notifications;

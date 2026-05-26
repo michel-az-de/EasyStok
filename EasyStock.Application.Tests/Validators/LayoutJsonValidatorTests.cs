@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.Etiquetas;
+﻿using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.Validators;
 
 namespace EasyStock.Application.Tests.Validators;

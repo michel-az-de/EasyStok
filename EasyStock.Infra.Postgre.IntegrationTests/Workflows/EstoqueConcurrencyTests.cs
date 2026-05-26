@@ -1,4 +1,4 @@
-using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+﻿using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;

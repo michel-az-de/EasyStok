@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
@@ -108,8 +108,11 @@ public class GerenciarProdutoUseCaseTests
         var carac = new ProdutoCaracteristica { Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, Nome = "Material", Descricao = "Algodao", OrdemExibicao = 0 };
         var emb = new ProdutoEmbalagem
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
-            Nome = "Caixa", Padrao = true,
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produtoId,
+            Nome = "Caixa",
+            Padrao = true,
             Dimensoes = Dimensoes.From(0.5m, 35m, 25m, 45m)
         };
 

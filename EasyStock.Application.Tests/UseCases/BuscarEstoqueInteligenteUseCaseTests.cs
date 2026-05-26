@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;

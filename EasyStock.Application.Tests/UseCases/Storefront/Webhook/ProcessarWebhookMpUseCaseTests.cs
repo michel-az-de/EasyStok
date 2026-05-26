@@ -1,4 +1,4 @@
-using EasyStock.Application.Events.Storefront;
+﻿using EasyStock.Application.Events.Storefront;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;

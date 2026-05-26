@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -78,8 +78,11 @@ public class CalcularProducaoUseCaseTests
 
         var insumoFarinha = new Produto
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Farinha",
-            CategoriaId = Guid.NewGuid(), UnidadeMedidaBase = UnidadeMedida.Kg,
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Farinha",
+            CategoriaId = Guid.NewGuid(),
+            UnidadeMedidaBase = UnidadeMedida.Kg,
             CustoReferencia = Dinheiro.FromDecimal(5m)
         };
 
@@ -117,14 +120,22 @@ public class CalcularProducaoUseCaseTests
 
         var insumo = new Produto
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Acucar",
-            CategoriaId = Guid.NewGuid(), UnidadeMedidaBase = UnidadeMedida.Kg
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Acucar",
+            CategoriaId = Guid.NewGuid(),
+            UnidadeMedidaBase = UnidadeMedida.Kg
         };
 
         var composicao = new ProdutoComposicao
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoFinalId = produto.Id, InsumoId = insumo.Id,
-            Quantidade = 1m, Unidade = UnidadeMedida.Kg, Insumo = insumo
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoFinalId = produto.Id,
+            InsumoId = insumo.Id,
+            Quantidade = 1m,
+            Unidade = UnidadeMedida.Kg,
+            Insumo = insumo
         };
 
         _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
@@ -150,15 +161,22 @@ public class CalcularProducaoUseCaseTests
 
         var insumo = new Produto
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Farinha",
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Farinha",
             CategoriaId = Guid.NewGuid(),
             UnidadeMedidaBase = UnidadeMedida.Un  // estoque conta em Un, receita pede G
         };
 
         var composicao = new ProdutoComposicao
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoFinalId = produto.Id, InsumoId = insumo.Id,
-            Quantidade = 200m, Unidade = UnidadeMedida.G, Insumo = insumo
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoFinalId = produto.Id,
+            InsumoId = insumo.Id,
+            Quantidade = 200m,
+            Unidade = UnidadeMedida.G,
+            Insumo = insumo
         };
 
         _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
@@ -193,9 +211,13 @@ public class CalcularProducaoUseCaseTests
 
         var composicoes = insumos.Select(ins => new ProdutoComposicao
         {
-            Id = Guid.NewGuid(), EmpresaId = empresaId,
-            ProdutoFinalId = produto.Id, InsumoId = ins.Id,
-            Quantidade = 1m, Unidade = UnidadeMedida.Kg, Insumo = ins
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoFinalId = produto.Id,
+            InsumoId = ins.Id,
+            Quantidade = 1m,
+            Unidade = UnidadeMedida.Kg,
+            Insumo = ins
         }).ToList();
 
         _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);

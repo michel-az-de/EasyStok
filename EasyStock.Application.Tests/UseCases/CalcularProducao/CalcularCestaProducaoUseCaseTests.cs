@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
