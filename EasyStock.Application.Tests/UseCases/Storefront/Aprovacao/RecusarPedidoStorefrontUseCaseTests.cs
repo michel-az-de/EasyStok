@@ -1,4 +1,4 @@
-using EasyStock.Application.Events.Storefront;
+﻿using EasyStock.Application.Events.Storefront;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
