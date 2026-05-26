@@ -118,7 +118,11 @@ public static class ApiServiceCollectionExtensions
                     RoleClaimType            = "nivel"
                 };
             })
-            .AddInternalCronJobScheme(configuration);
+            .AddInternalCronJobScheme(configuration)
+            // Sessões server-side do storefront (ADR-0012) — cookie __Host-cdb_session
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
+                EasyStock.Api.Authentication.ClienteSessionAuthenticationHandler>(
+                EasyStock.Api.Authentication.ClienteSessionAuthenticationHandler.SchemeName, _ => { });
 
         services.AddAuthorization(opts =>
         {

@@ -1,8 +1,9 @@
-﻿namespace EasyStock.Domain.Exceptions.Storefront;
+namespace EasyStock.Domain.Exceptions.Storefront;
 
 /// <summary>
-/// Lançada quando um Storefront não é encontrado — seja por slug (resolução
-/// pública), por id (admin) ou por empresa. Mapeada para HTTP 404 pelo handler.
+/// Lançada quando um Storefront não é encontrado — seja por slug (resolução pública,
+/// também cobre o caso de storefront inativo) ou por id/empresa (admin). Mapeada
+/// para HTTP 404 pelo handler.
 /// </summary>
 public class StorefrontNaoEncontradoException : RegraDeDominioVioladaException
 {

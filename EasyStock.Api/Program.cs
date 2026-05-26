@@ -1,4 +1,4 @@
-using EasyStock.Api.BackgroundServices;
+﻿using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Data;
 using EasyStock.Api.Observability;
@@ -210,10 +210,28 @@ switch (resolvedProvider)
 
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
+builder.Services.AddEasyStockStorefrontUseCases();
 builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
+
+// ── Storefront — WhatsApp OTP provider (stub em Development, real em Prod) ────
+// TASK-EZ-AUTH-001: stub apenas em ambientes nao-Production. Provider real
+// (Meta WhatsApp Cloud API) entra em TASK-EZ-WA-001 apos Meta Business
+// Verification (TASK-HUM-001). Em Production sem provider real, AuthController
+// nao resolve — fail fast intencional.
+if (!builder.Environment.IsProduction())
+{
+    builder.Services.AddEasyStockWhatsAppStub();
+}
+
+// ── Storefront — CEP lookup (ViaCEP em prod, NoOp por default) ────────────────
+// TASK-EZ-FRETE-001: feature flag ENABLE_VIACEP_LOOKUP (default false). Quando
+// off, registra NoOpCepLookupClient (não bate na API externa). Quando on,
+// registra ViaCepLookupClient com timeout 1s.
+builder.Services.AddEasyStockCepLookup(builder.Configuration);
+
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
 
@@ -273,6 +291,9 @@ builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.IPwaVersionProvider,
 // SeedProgressService: Singleton pra compartilhar estado de runs entre requests.
 // O background job e o polling endpoint falam com a mesma instância.
 builder.Services.AddSingleton<EasyStock.Api.Services.SeedProgressService>();
+
+// Storefront — expirar sessões de clientes (ADR-0012: sliding window 30d).
+builder.Services.AddHostedService<EasyStock.Api.Services.Storefront.ExpirarClienteSessionsBackgroundService>();
 
 // DiagnosticoModeService: Singleton que controla LoggingLevelSwitch em tempo real.
 builder.Services.AddSingleton(diagLevelSwitch);
@@ -786,6 +807,8 @@ app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// Sliding window: atualiza UltimoUsoEm da ClienteSession após cada request autenticado (ADR-0012).
+app.UseMiddleware<EasyStock.Api.Middleware.ClienteSessionMiddleware>();
 app.UseMiddleware<EasyStock.Api.Middleware.SubscriptionGateMiddleware>();
 // Idempotencia: aplicado APOS auth para que ICurrentUserAccessor.EmpresaId esteja disponivel.
 // Whitelist de POSTs criticos (R5: dedup retry de mobile/web).
