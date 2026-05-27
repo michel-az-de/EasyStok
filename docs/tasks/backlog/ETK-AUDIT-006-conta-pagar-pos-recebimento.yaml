@@ -1,0 +1,50 @@
+id: ETK-AUDIT-006
+title: "Verificar/garantir wire automático ContaPagar pós-recebimento mercadoria"
+status: backlog
+priority: P1
+module: financeiro
+estimate_hours: 2
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-013]
+audit_status: PASS-com-nota
+
+depends_on: []
+blocks: []
+
+context: |
+  GOLDEN-PATHS.md GP-013 critério: "Conta a pagar é gerada em Financeiro
+  (GP-031 vinculado)" após receber mercadoria de pedido fornecedor.
+
+  Auditoria Fase 1 (2026-05-27) verificou:
+  - ProcessarRecebimentoPedidoFornecedorUseCase EXISTE e cria
+    MovimentacaoEstoque de entrada (✓)
+  - GerarContaPagarDePedidoFornecedorUseCase EXISTE em
+    EasyStock.Application/UseCases/Financeiro/Integracao/ (✓)
+  - Mas o WIRE automático entre os dois NÃO foi confirmado durante a
+    auditoria — pode ser via background job, domain event handler, ou
+    chamada direta dentro de ProcessarRecebimentoPedidoFornecedorUseCase
+
+  Análoga ao caso GP-032 (CR) que JÁ tem AtualizarStatusPedidoUseCase
+  com gerarContaReceberUseCase chamado best-effort dentro do mesmo
+  use case (linha 132 do AtualizarStatusPedido).
+
+  Tarefa: investigar e, se necessário, conectar.
+
+files_to_modify:
+  - "EasyStock.Application/UseCases/Pedido/ProcessarRecebimentoPedidoFornecedorUseCase.cs (se faltar wire, chamar GerarContaPagarDePedidoFornecedorUseCase best-effort)"
+
+acceptance_criteria:
+  - "Investigação documentada: existe wire? onde? por job ou inline?"
+  - "Se faltar: chamar GerarContaPagarDePedidoFornecedorUseCase no Processar (best-effort, idempotente)"
+  - "Testar: receber mercadoria → ContaPagar aparece em status EmAberto"
+  - "Teste de regressão: ConfiguracaoLoja.GerarContaPagarAutomaticaDePedidoFornecedor=false NÃO gera conta"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~ProcessarRecebimento|FullyQualifiedName~GerarContaPagar'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+handoff_notes_required: true

@@ -1,0 +1,77 @@
+id: ETK-AUDIT-001
+title: "Checkout storefront end-to-end (Carrinho → Pedido → Pagamento)"
+status: backlog
+priority: P0
+module: pedido
+estimate_hours: 12
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-017, GP-023, GP-029]
+audit_status: INDISPONIVEL
+
+depends_on: []
+blocks: [ETK-AUDIT-002, ETK-AUDIT-004]
+
+context: |
+  Auditoria Fase 1 (2026-05-27) detectou que NÃO existe controller/use case
+  end-to-end para criar pedido via storefront em master. Os componentes-folha
+  estão maduros (Auth, Menu, Frete, Agendamento), mas o fluxo de checkout
+  não fecha: cliente autenticado não consegue transformar carrinho + endereço
+  + janela em um Pedido persistido com Origem=Storefront e status
+  AguardandoAprovacao.
+
+  EasyStock.Application/UseCases/Storefront/ contém Auth, Avaliacao,
+  Agendamento, Menu, Frete — mas NÃO Checkout/Pedido/Carrinho.
+
+  EasyStock.Api/Controllers/Storefront/ contém AgendamentoController,
+  AuthController, FreteController, MenuController — mas NÃO PedidoController
+  nem CheckoutController.
+
+  CheckoutIdempotency entity existe em Domain/Entities/Storefront/ (preparado)
+  mas sem use case que a use em master.
+
+  Há trabalho parcial na branch feat/task-ez-agend-001-listar-janelas
+  (sessão paralela) que introduz IniciarCheckoutUseCase + CheckoutIdempotencyService
+  + LiberarVagaOnPedidoCanceladoHandler — pendente de cherry-pick / mergeação.
+
+  Bloqueia o super-path GP-029 ("golden path nº 1 do v1.0").
+
+files_to_create:
+  - "EasyStock.Application/UseCases/Storefront/Checkout/IniciarCheckoutUseCase.cs"
+  - "EasyStock.Application/UseCases/Storefront/Checkout/Idempotency/CheckoutIdempotencyService.cs"
+  - "EasyStock.Application/UseCases/Storefront/Checkout/CheckoutPayload.cs"
+  - "EasyStock.Application/Events/Storefront/Handlers/LiberarVagaOnPedidoCanceladoHandler.cs"
+  - "EasyStock.Api/Controllers/Storefront/CheckoutController.cs"
+
+files_to_modify:
+  - "EasyStock.Application/DependencyInjection/ServiceCollectionExtensions.Storefront.cs (registrar use cases novos)"
+
+acceptance_criteria:
+  - "POST /api/storefront/{slug}/checkout com header X-Idempotency-Key cria Pedido em status AguardandoAprovacao + Origem=Storefront"
+  - "ClienteSession obrigatório (401 se não autenticado)"
+  - "Valida itens contra cardápio público (Visivel=true, Disponivel=true)"
+  - "Valida zona de entrega (FreteZona.CobreCep/CobreBairro) e calcula frete"
+  - "Valida janela de entrega disponível e capacidade não excedida (BloqueioEntrega)"
+  - "Reserva vaga na JanelaEntrega; libera ao cancelar (LiberarVagaOnPedidoCanceladoHandler)"
+  - "CheckoutIdempotency com TTL 24h previne pedido duplicado se cliente clica 2x"
+  - "Resposta inclui PedidoId + status + total + frete"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~Checkout|FullyQualifiedName~Storefront'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+phases:
+  red:
+    description: "IniciarCheckoutUseCaseTests com cenários: happy path, cliente não autenticado, item inativo, zona fora, janela cheia, idempotência (mesmo X-Idempotency-Key retorna mesma resposta)"
+    commit_template: "test(ETK-AUDIT-001): red - IniciarCheckoutUseCase + CheckoutController testes"
+  green:
+    description: "Implementar IniciarCheckoutUseCase + CheckoutIdempotencyService + CheckoutController + LiberarVagaOnPedidoCanceladoHandler. Considerar reaproveitar trabalho da branch feat/task-ez-agend-001-listar-janelas (cherry-pick autorizado pelo dono da sessão)"
+    commit_template: "feat(ETK-AUDIT-001): green - checkout storefront end-to-end"
+  refactor:
+    description: "Extrair validações repetidas, ajustar nomes, limpar"
+    commit_template: "refactor(ETK-AUDIT-001): limpa duplicação"
+
+handoff_notes_required: true

@@ -1,0 +1,56 @@
+id: ETK-AUDIT-007
+title: "Defesa em profundidade: validar re-uso de OTP consumido (storefront)"
+status: backlog
+priority: P2
+module: core
+estimate_hours: 1
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-003]
+audit_status: PARCIAL
+
+depends_on: []
+blocks: []
+
+context: |
+  GOLDEN-PATHS.md GP-003 critério: "Tentar com OTP errado 5x bloqueia
+  temporariamente. OTP expira em 5min e retorna 410 Gone."
+
+  Auditoria Fase 1 (2026-05-27) verificou ValidarOtpUseCase
+  (EasyStock.Application/UseCases/Storefront/Auth/ValidarOtpUseCase.cs):
+  - Tentativas 5x: ✓ (RegistrarTentativa + OtpTentativasExcedidasException)
+  - Expiração 5min: ✓ (Expirou + OtpExpiradoException)
+  - Consumir após sucesso: ✓ (linha 136)
+
+  Gap menor: a entity ClienteOtp.Consumir() marca consumido, mas o
+  repository GetAtivoPorTelefoneHashAsync filtra por status — se o
+  filter falhar (bug futuro), o mesmo OTP poderia ser reaproveitado.
+  Defesa em profundidade: validar explicitamente `!Consumido` no use
+  case antes de tentar.
+
+  É P2 porque depende da camada de repositório falhar — risco baixo.
+  Mas defense-in-depth tem custo trivial.
+
+files_to_modify:
+  - "EasyStock.Application/UseCases/Storefront/Auth/ValidarOtpUseCase.cs (adicionar guard explícito !otp.Consumido)"
+
+acceptance_criteria:
+  - "ValidarOtpUseCase rejeita explicitamente OTP com Consumido=true (não apenas confia no repository filter)"
+  - "Teste: invocar ValidarOtp duas vezes com mesmo OTP correto - 2ª retorna OtpInvalidoException ou similar"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~ValidarOtp'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+phases:
+  red:
+    description: "Teste: ValidarOtp 2x com mesmo OTP → 2ª falha"
+    commit_template: "test(ETK-AUDIT-007): red - defesa re-uso OTP consumido"
+  green:
+    description: "Adicionar guard"
+    commit_template: "feat(ETK-AUDIT-007): green - guard !otp.Consumido"
+
+handoff_notes_required: false
