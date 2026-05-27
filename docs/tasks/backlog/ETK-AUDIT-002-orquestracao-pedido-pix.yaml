@@ -1,0 +1,71 @@
+id: ETK-AUDIT-002
+title: "Orquestração Pedido→PIX (gerar QR code para pagamento de pedido)"
+status: backlog
+priority: P0
+module: pedido
+estimate_hours: 6
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-022, GP-023, GP-029]
+audit_status: PARCIAL
+
+depends_on: []
+blocks: []
+
+context: |
+  Auditoria Fase 1 (2026-05-27) detectou que NÃO há use case nem endpoint
+  para gerar PIX QR code a partir de um Pedido. As interfaces existem:
+  - EasyStock.Application/Ports/Output/IEfiPixService.cs (CriarCobrancaAsync etc.)
+  - EasyStock.Application/Ports/Output/Pagamentos/IPagamentoOrchestrator.cs
+
+  Mas o único use case que GERA QR PIX em master é GerarPixQrParcelaReceberUseCase
+  (EasyStock.Application/UseCases/Financeiro/Pagamentos/), que opera sobre
+  ParcelaContaReceber — não sobre Pedido.
+
+  Faltam:
+  - Use case GerarPixQrPedidoUseCase que use IPagamentoOrchestrator
+  - Endpoint REST POST /api/pedidos/{id}/pagamento/pix (vendedor balcão = GP-022)
+  - Endpoint REST POST /api/storefront/{slug}/pedidos/{id}/pagamento/pix
+    (cliente storefront = GP-023) — depende de ETK-AUDIT-001
+  - Idempotência por (PedidoId, AttemptId) para evitar QRs duplicados
+  - Expiração configurável (default 15min)
+
+  Quando ETK-AUDIT-001 (checkout storefront) ficar pronto, este ETK
+  completa o ciclo: cliente confirma → QR gerado → paga → webhook
+  reconcilia (GP-024 já PASS).
+
+files_to_create:
+  - "EasyStock.Application/UseCases/Pedido/Pagamentos/GerarPixQrPedidoUseCase.cs"
+  - "EasyStock.Application/UseCases/Pedido/Pagamentos/GerarPixQrPedidoCommand.cs"
+
+files_to_modify:
+  - "EasyStock.Api/Controllers/PedidosController.cs (endpoint POST /api/pedidos/{id}/pagamento/pix)"
+  - "EasyStock.Application/DependencyInjection/ServiceCollectionExtensions.cs (registrar use case)"
+
+acceptance_criteria:
+  - "POST /api/pedidos/{id}/pagamento/pix gera QR via IPagamentoOrchestrator → Efi"
+  - "Idempotência via PaymentAttempt (mesmo PedidoId + status pendente retorna QR existente)"
+  - "QR expira em 15min default (configurável via PedidoPagamentoOptions)"
+  - "Cancelar QR antes do pagamento marca PaymentAttempt como Cancelado"
+  - "Pedido com PaymentAttempt 'Pago' não permite gerar QR novo (409 Conflict)"
+  - "Webhook Efi (GP-024) já reconcilia e fecha pedido"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~GerarPixQrPedido'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+phases:
+  red:
+    description: "GerarPixQrPedidoUseCaseTests: happy path, pedido pago, pedido cancelado, idempotência, QR expirado"
+    commit_template: "test(ETK-AUDIT-002): red - GerarPixQrPedidoUseCase testes"
+  green:
+    description: "Implementar use case + endpoint + idempotência via PaymentAttempt"
+    commit_template: "feat(ETK-AUDIT-002): green - orquestração Pedido→PIX"
+  refactor:
+    description: "Limpar"
+    commit_template: "refactor(ETK-AUDIT-002): limpa"
+
+handoff_notes_required: true

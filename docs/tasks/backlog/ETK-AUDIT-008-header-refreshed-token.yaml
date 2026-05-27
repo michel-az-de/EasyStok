@@ -1,0 +1,46 @@
+id: ETK-AUDIT-008
+title: "Header X-Refreshed-Token na resposta de refresh (divergência de spec)"
+status: backlog
+priority: P2
+module: core
+estimate_hours: 0.5
+methodology: incremental
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-004]
+audit_status: PASS-com-nota
+
+depends_on: []
+blocks: []
+
+context: |
+  GOLDEN-PATHS.md GP-004 critério: "Header X-Refreshed-Token presente
+  na resposta."
+
+  Auditoria Fase 1 (2026-05-27) verificou TokenRefreshHandler
+  (EasyStock.Web/Services/TokenRefreshHandler.cs):
+  - Refresh transparente ao cliente: ✓ (detecta 401 → refresh → retry)
+  - Mas NÃO seta header X-Refreshed-Token na resposta
+
+  Cliente Web funciona porque o token vai em Session (server-side), não
+  via header. A spec do GP-004 espera o header para outros consumidores
+  (JS client, mobile MAUI, parceiros).
+
+  Decisão: ou (a) implementar o header, ou (b) revisar a spec do GP-004
+  para refletir que refresh é transparente via Session em MVC e via
+  header só em REST.
+
+files_to_modify:
+  - "EasyStock.Api/Controllers/AuthController.cs (setar header X-Refreshed-Token quando refresh executado, se aplicável)"
+  - "docs/plan/v1.0/GOLDEN-PATHS.md (se decidir alterar a spec)"
+
+acceptance_criteria:
+  - "Decisão registrada: implementar header OU ajustar spec"
+  - "Se implementar: testar via HttpClient direto"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+handoff_notes_required: false

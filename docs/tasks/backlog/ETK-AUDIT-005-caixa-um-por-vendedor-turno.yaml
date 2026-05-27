@@ -1,0 +1,66 @@
+id: ETK-AUDIT-005
+title: "Validação: 1 caixa por vendedor por turno (regra de domínio)"
+status: backlog
+priority: P1
+module: caixa
+estimate_hours: 3
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-019]
+audit_status: PARCIAL
+
+depends_on: []
+blocks: []
+
+context: |
+  GOLDEN-PATHS.md GP-019 critério: "Tentar abrir 2 caixas para mesmo
+  vendedor → bloqueia. Outro vendedor pode abrir seu próprio caixa em
+  paralelo."
+
+  Auditoria Fase 1 (2026-05-27) verificou AbrirCaixaUseCase
+  (EasyStock.Application/UseCases/AbrirCaixa/AbrirCaixaUseCase.cs):
+  - Checa se há fechamento do dia (GetFechamentoDoDiaAsync)
+  - NÃO checa se o vendedor atual já tem caixa aberto naquele turno
+
+  Falta:
+  - Conceito de "turno" (manhã/tarde/noite, ou simplesmente Caixa aberto
+    sem fechamento ainda)
+  - Validação por (usuário, loja, sem fechamento) — pode ser simples:
+    rejeitar segunda abertura se existe MovimentoCaixa tipo='abertura'
+    sem MovimentoCaixa tipo='fechamento' correspondente, para o mesmo
+    usuárioId+lojaId
+  - Constraint UNIQUE em DB para defesa em profundidade
+
+  Não bloqueia GP-019 inteiro — só permite estado inconsistente que
+  usuário precavido evita.
+
+files_to_modify:
+  - "EasyStock.Application/UseCases/AbrirCaixa/AbrirCaixaUseCase.cs (adicionar validação)"
+  - "EasyStock.Domain/Entities/MovimentoCaixa.cs (campo Turno opcional ou regra implícita)"
+  - "EasyStock.Infra.Postgre/Migrations/... (constraint ou índice parcial)"
+
+acceptance_criteria:
+  - "AbrirCaixaUseCase rejeita 2ª abertura para mesmo (usuarioId, lojaId) sem fechamento intermediário"
+  - "Mensagem de erro clara: 'Você já tem um caixa aberto na loja X. Feche antes de abrir outro.'"
+  - "Outro usuário pode abrir caixa em paralelo (não bloqueia)"
+  - "DB constraint impede inserção mesmo se aplicação for bypassed"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~Caixa'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+phases:
+  red:
+    description: "Atualizar CaixaUseCasesTests com cenário '2ª abertura mesmo usuário rejeitada'"
+    commit_template: "test(ETK-AUDIT-005): red - 1 caixa por usuário por turno"
+  green:
+    description: "Adicionar validação + migration"
+    commit_template: "feat(ETK-AUDIT-005): green - validação 1-por-turno"
+  refactor:
+    description: "Limpar"
+    commit_template: "refactor(ETK-AUDIT-005): limpa"
+
+handoff_notes_required: true

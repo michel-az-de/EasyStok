@@ -1,0 +1,69 @@
+id: ETK-AUDIT-004
+title: "SSE/polling de status do pedido em tempo real (storefront)"
+status: backlog
+priority: P1
+module: core
+estimate_hours: 4
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-029]
+audit_status: INDISPONIVEL
+
+depends_on: [ETK-AUDIT-001]
+blocks: []
+
+context: |
+  GOLDEN-PATHS.md GP-029 critério: "Cliente vê status atualizado em tempo
+  real (SSE ou polling)". Auditoria Fase 1 (2026-05-27) confirmou que não
+  há endpoint SSE para status de pedido no storefront, nem cliente
+  implementado.
+
+  Cliente PWA storefront precisa saber quando pedido transitou de
+  AguardandoAprovacao → Aprovado → EmPreparo → Pronto → Entregue.
+  Sem isso, cliente precisa recarregar a página manualmente.
+
+  Decisão de implementação: SSE (Server-Sent Events) prefere a WebSocket
+  porque é unidirecional (servidor → cliente), atrás de proxies/CDN, e
+  combina bem com domain events que já existem.
+
+  Alternativa: polling agressivo (5s) com cabeçalho If-None-Match. Menos
+  eficiente mas mais simples se infraestrutura não suportar SSE em fly.io.
+
+  Não é P0 porque o cliente sobrevive recarregando a página, mas degrada
+  UX seriamente em pedidos em preparo.
+
+files_to_create:
+  - "EasyStock.Api/Controllers/Storefront/PedidoStatusStreamController.cs (SSE endpoint)"
+  - "EasyStock.Api/Services/PedidoStatusBroadcaster.cs (publicador de eventos)"
+  - "EasyStock.Application/Events/PedidoStatusChangedEvent.cs (se ainda não existir)"
+
+files_to_modify:
+  - "EasyStock.Application/UseCases/AtualizarStatusPedido/AtualizarStatusPedidoUseCase.cs (publicar evento após commit)"
+
+acceptance_criteria:
+  - "GET /api/storefront/{slug}/pedidos/{id}/status/stream retorna text/event-stream"
+  - "ClienteSession obrigatório + pedido pertence ao cliente (403 caso contrário)"
+  - "Emite evento 'status' com payload {pedidoId, status, mudadoEm} quando status muda"
+  - "Heartbeat a cada 30s para manter conexão viva atrás de CDN/proxy"
+  - "Cliente PWA storefront consome SSE via EventSource"
+  - "Reconnect automático via padrão SSE (Last-Event-ID)"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~PedidoStatus'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+phases:
+  red:
+    description: "PedidoStatusStreamControllerTests: SSE format, auth, broadcast funciona, heartbeat"
+    commit_template: "test(ETK-AUDIT-004): red - SSE status pedido storefront"
+  green:
+    description: "Implementar SSE endpoint + broadcaster + integração com AtualizarStatusPedidoUseCase"
+    commit_template: "feat(ETK-AUDIT-004): green - SSE status pedido storefront"
+  refactor:
+    description: "Limpar"
+    commit_template: "refactor(ETK-AUDIT-004): limpa"
+
+handoff_notes_required: true

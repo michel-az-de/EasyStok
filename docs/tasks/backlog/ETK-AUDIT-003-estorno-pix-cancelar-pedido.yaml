@@ -1,0 +1,70 @@
+id: ETK-AUDIT-003
+title: "Estorno PIX automático + devolução estoque ao cancelar pedido"
+status: backlog
+priority: P0
+module: pedido
+estimate_hours: 4
+methodology: tdd
+created_by: claude-opus-4.7
+created_at: "2026-05-27T00:00:00Z"
+
+golden_paths: [GP-018, GP-030]
+audit_status: FAIL
+
+depends_on: []
+blocks: []
+
+context: |
+  Auditoria Fase 1 (2026-05-27) detectou bug funcional crítico:
+  CancelarPedidoUseCase (EasyStock.Application/UseCases/CancelarPedido/CancelarPedidoUseCase.cs)
+  apenas:
+  1. Chama pedido.Cancelar() (state machine)
+  2. Registra evento "cancelado"
+  3. Commita
+
+  NÃO faz:
+  - Estorno PIX se pedido foi pago (não chama IEfiPixService.EstornarAsync nem
+    EstornarPagamentoParcelaUseCase)
+  - Devolução de estoque (não chama PedidoEstoqueIntegrationService.DevolverAsync)
+
+  AtualizarStatusPedidoUseCase com status novo=Cancelado SIM devolve estoque,
+  mas TAMBÉM não estorna PIX.
+
+  Logo, recusar pedido pago via PIX = cliente fica sem dinheiro de volta,
+  loja fica sem estoque baixado de volta (no caminho CancelarPedidoUseCase).
+
+  EstornarPagamentoParcelaUseCase EXISTE em Financeiro/Pagamentos/ mas só é
+  chamado por ContasAReceberController/ContasAPagarController — sem hook
+  no fluxo de cancelar/recusar pedido.
+
+  Risco: GOLDEN-PATHS.md GP-018 critério "Recusa estorna PIX automaticamente
+  (via Efi API)" — NÃO atendido.
+
+files_to_modify:
+  - "EasyStock.Application/UseCases/CancelarPedido/CancelarPedidoUseCase.cs (injetar PedidoEstoqueIntegrationService + use case de estorno; chamar ambos antes do commit; idempotência via PedidoEvento)"
+  - "EasyStock.Application/UseCases/AtualizarStatusPedido/AtualizarStatusPedidoUseCase.cs (chamar estorno PIX quando statusNovo=Cancelado e havia PaymentAttempt confirmado)"
+
+acceptance_criteria:
+  - "Cancelar pedido com PaymentAttempt 'Pago' via PIX dispara EstornarPagamentoParcelaUseCase / IEfiPixService.EstornarAsync()"
+  - "Cancelar pedido devolve estoque (PedidoEstoqueIntegrationService.DevolverAsync)"
+  - "Estorno é idempotente (PedidoEvento tipo='estorno_iniciado' + retry safe)"
+  - "Falha de estorno PIX NÃO impede cancelamento do pedido — registra evento 'estorno_falhou' e tenta novamente em retry job"
+  - "Pedido sem pagamento (apenas AguardandoAprovacao) cancela sem chamar estorno (no-op silencioso)"
+
+quality_gates:
+  - cmd: "dotnet build EasyStok.sln --nologo"
+  - cmd: "dotnet test --filter 'FullyQualifiedName~CancelarPedido|FullyQualifiedName~AtualizarStatusPedido'"
+  - cmd: "dotnet test --filter 'Category=Architecture'"
+
+phases:
+  red:
+    description: "Atualizar CancelarPedidoUseCaseTests + AtualizarStatusPedidoUseCaseTests com cenários: pedido pago → estorno disparado, pedido pago → devolução estoque, falha estorno → evento registrado mas pedido cancelado, idempotência"
+    commit_template: "test(ETK-AUDIT-003): red - estorno PIX + devolução estoque no cancelar"
+  green:
+    description: "Injetar dependências + chamar estorno + devolução nas use cases. Cuidado: PedidoEstoqueIntegrationService.DevolverAsync já é idempotente; EstornarPagamentoParcelaUseCase precisa ser chamado de forma idempotente também"
+    commit_template: "feat(ETK-AUDIT-003): green - cancelar pedido estorna PIX + devolve estoque"
+  refactor:
+    description: "Extrair PedidoCancelamentoOrchestrator se ficou complexo"
+    commit_template: "refactor(ETK-AUDIT-003): extrai orchestrator"
+
+handoff_notes_required: true
