@@ -42,6 +42,11 @@ builder.Services.AddHttpContextAccessor();
 // 4. Register SessionService first (used by TokenRefreshHandler)
 builder.Services.AddScoped<SessionService>();
 
+// 4a. Leitor de claims JWT — stateless, sem deps. Consumido por AuthController,
+// SessionRestoreMiddleware e TokenRefreshHandler para extrair sub/nivel/empresaId
+// do payload (sem validar assinatura — quem valida e a API).
+builder.Services.AddSingleton<IJwtClaimsReader, JwtClaimsReader>();
+
 // 4b. Design system: Lucide icon resolver (cache de SVGs em memoria, singleton)
 builder.Services.AddSingleton<LucideIconResolver>();
 

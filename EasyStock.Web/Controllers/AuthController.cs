@@ -10,7 +10,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
-public class AuthController(ApiClient api, SessionService session, IWebHostEnvironment env) : Controller
+public class AuthController(
+    ApiClient api,
+    SessionService session,
+    IWebHostEnvironment env,
+    IJwtClaimsReader jwt) : Controller
 {
     [AllowAnonymous]
     [HttpGet("/auth/login")]
@@ -69,7 +73,7 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 
         session.SetTokens(token, refreshToken ?? string.Empty);
 
-        var empresaId = ExtractClaim(token, "empresaId");
+        var empresaId = jwt.TryReadClaim(token, "empresaId");
         if (!string.IsNullOrEmpty(empresaId))
             session.SetEmpresaId(empresaId);
 
@@ -206,11 +210,11 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         session.Clear();
         session.SetTokens(token, refreshToken ?? string.Empty);
 
-        var nome = ExtractClaim(token, "nome") ?? ExtractClaim(token, ClaimTypes.Name) ?? "Operador";
-        var email = ExtractClaim(token, "email") ?? "";
-        var nivel = ExtractClaim(token, "nivel") ?? "Admin";
-        var empresaId = ExtractClaim(token, "empresaId");
-        var userId = ExtractClaim(token, "sub") ?? "";
+        var nome = jwt.TryReadClaim(token, "nome") ?? jwt.TryReadClaim(token, ClaimTypes.Name) ?? "Operador";
+        var email = jwt.TryReadClaim(token, "email") ?? "";
+        var nivel = jwt.TryReadClaim(token, "nivel") ?? "Admin";
+        var empresaId = jwt.TryReadClaim(token, "empresaId");
+        var userId = jwt.TryReadClaim(token, "sub") ?? "";
 
         if (!string.IsNullOrEmpty(empresaId))
             session.SetEmpresaId(empresaId);
@@ -280,7 +284,7 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
 
         session.SetTokens(token, refreshToken ?? string.Empty);
 
-        var empresaId = ExtractClaim(token, "empresaId");
+        var empresaId = jwt.TryReadClaim(token, "empresaId");
         if (!string.IsNullOrEmpty(empresaId))
             session.SetEmpresaId(empresaId);
 
@@ -472,29 +476,5 @@ public class AuthController(ApiClient api, SessionService session, IWebHostEnvir
         return uri.GetLeftPart(UriPartial.Authority);
     }
 
-    private static string? ExtractClaim(string token, string claimType)
-    {
-        var parts = token.Split('.');
-        if (parts.Length < 2) return null;
-
-        var payload = parts[1];
-        switch (payload.Length % 4)
-        {
-            case 2: payload += "=="; break;
-            case 3: payload += "="; break;
-        }
-
-        payload = payload.Replace('-', '+').Replace('_', '/');
-
-        try
-        {
-            var bytes = Convert.FromBase64String(payload);
-            using var doc = JsonDocument.Parse(bytes);
-            return doc.RootElement.TryGetProperty(claimType, out var value) && value.ValueKind == JsonValueKind.String
-                ? value.GetString()
-                : null;
-        }
-        catch (FormatException) { return null; }  // base64 malformado — token de versão antiga
-        catch (JsonException)   { return null; }  // payload inválido — degradação esperada
-    }
+    // ExtractClaim removido — consolidado em IJwtClaimsReader (TASK-EZ-WEB-005).
 }
