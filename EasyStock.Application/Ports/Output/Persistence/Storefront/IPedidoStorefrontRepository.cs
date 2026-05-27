@@ -57,4 +57,27 @@ public interface IPedidoStorefrontRepository
         DateTime entregueAntesDe,
         int maxBatch = 50,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Lista os pedidos storefront do cliente autenticado dentro do tenant
+    /// (<paramref name="empresaId"/>), ordenados por <c>CriadoEm DESC</c>.
+    /// Inclui <see cref="Pedido.Itens"/> via eager-load para o use case montar
+    /// os DTOs sem N+1.
+    ///
+    /// <para>
+    /// Filtros aplicados: <c>EmpresaId = @empresaId</c>, <c>ClienteId = @clienteId</c>,
+    /// <c>Origem = "storefront"</c>, <c>Status != "rascunho"</c>
+    /// (pedido em rascunho ainda não é visível pro cliente).
+    /// </para>
+    ///
+    /// <para>
+    /// <strong>Limit:</strong> caller responsável pelo clamp prévio (ver
+    /// <c>ListarPedidosClienteUseCase</c> que aplica clamp [1, 50] default 20).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<Pedido>> ListarPorClienteAsync(
+        Guid empresaId,
+        Guid clienteId,
+        int limit,
+        CancellationToken ct = default);
 }

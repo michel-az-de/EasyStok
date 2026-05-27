@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
+using EasyStock.Application.UseCases.Storefront.Pedidos;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -21,6 +22,8 @@ public static partial class ServiceCollectionExtensions
         // TASK-EZ-APROVAR-001 — use cases Babá aprovar/recusar pedido.
         services.AddScoped<AprovarPedidoStorefrontUseCase>();
         services.AddScoped<RecusarPedidoStorefrontUseCase>();
+        // TASK-EZ-PEDIDOS-001 — listagem do histórico de pedidos do cliente.
+        services.AddScoped<ListarPedidosClienteUseCase>();
         return services;
     }
 }

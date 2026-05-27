@@ -13,6 +13,23 @@ public sealed class PedidoAvaliacaoRepository(EasyStockDbContext db) : IPedidoAv
     public Task<PedidoAvaliacao?> GetByPedidoAsync(Guid pedidoId, CancellationToken ct = default) =>
         db.PedidoAvaliacoes.FirstOrDefaultAsync(a => a.PedidoId == pedidoId, ct);
 
+    public async Task<IReadOnlyDictionary<Guid, PedidoAvaliacao>> GetByPedidoIdsAsync(
+        IReadOnlyCollection<Guid> pedidoIds,
+        CancellationToken ct = default)
+    {
+        if (pedidoIds is null || pedidoIds.Count == 0)
+            return new Dictionary<Guid, PedidoAvaliacao>();
+
+        var ids = pedidoIds.Distinct().ToArray();
+        var lista = await db.PedidoAvaliacoes
+            .AsNoTracking()
+            .Where(a => ids.Contains(a.PedidoId))
+            .ToListAsync(ct);
+
+        // UNIQUE(PedidoId) garantido pelo EF Config — 1 avaliação por pedido.
+        return lista.ToDictionary(a => a.PedidoId);
+    }
+
     public async Task<IReadOnlyList<PedidoAvaliacao>> GetVisiveisDaEmpresaAsync(
         Guid empresaId,
         int max = 50,

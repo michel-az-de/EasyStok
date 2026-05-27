@@ -91,4 +91,27 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .Take(maxBatch)
             .ToListAsync(ct)
             .ContinueWith<IReadOnlyList<Pedido>>(t => t.Result, ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+    public async Task<IReadOnlyList<Pedido>> ListarPorClienteAsync(
+        Guid empresaId,
+        Guid clienteId,
+        int limit,
+        CancellationToken ct = default)
+    {
+        // IgnoreQueryFilters porque o filtro de tenant é aplicado manualmente
+        // (EmpresaId) — alinhado com os outros métodos do repo storefront.
+        var pedidos = await db.Pedidos
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId
+                     && p.ClienteId == clienteId
+                     && p.Origem == "storefront"
+                     && p.Status != StatusPedidoMapper.Rascunho)
+            .Include(p => p.Itens)
+            .OrderByDescending(p => p.CriadoEm)
+            .Take(limit)
+            .ToListAsync(ct);
+
+        return pedidos;
+    }
 }
