@@ -15,7 +15,7 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
 {
     private const string RememberCookie = "_rt";
 
-    public async Task InvokeAsync(HttpContext context, SessionService session, ApiClient api)
+    public async Task InvokeAsync(HttpContext context, SessionService session, ApiClient api, IJwtClaimsReader jwt)
     {
         var path = context.Request.Path.Value ?? "";
 
@@ -30,7 +30,7 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
                 var rt = context.Request.Cookies[RememberCookie];
                 if (!string.IsNullOrEmpty(rt))
                 {
-                    var restored = await TryRestoreAsync(context, session, api, rt);
+                    var restored = await TryRestoreAsync(context, session, api, jwt, rt);
                     if (!restored)
                     {
                         // Refresh token inválido/expirado — limpa tudo e força login
@@ -45,7 +45,7 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
         await next(context);
     }
 
-    private async Task<bool> TryRestoreAsync(HttpContext context, SessionService session, ApiClient api, string refreshToken)
+    private async Task<bool> TryRestoreAsync(HttpContext context, SessionService session, ApiClient api, IJwtClaimsReader jwt, string refreshToken)
     {
         try
         {
@@ -68,10 +68,10 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
             session.SetTokens(newToken, newRefresh ?? refreshToken);
 
             // Extrai dados do usuário do JWT
-            var userId = ExtractClaim(newToken, "sub");
-            var nome = ExtractClaim(newToken, "nome");
-            var nivel = ExtractClaim(newToken, "nivel");
-            var empresaId = ExtractClaim(newToken, "empresaId");
+            var userId = jwt.TryReadClaim(newToken, "sub");
+            var nome = jwt.TryReadClaim(newToken, "nome");
+            var nivel = jwt.TryReadClaim(newToken, "nivel");
+            var empresaId = jwt.TryReadClaim(newToken, "empresaId");
             session.SetUsuario(userId ?? "", nome ?? "Usuário", nivel ?? "Operador");
             if (!string.IsNullOrEmpty(empresaId))
                 session.SetEmpresaId(empresaId);
@@ -111,26 +111,5 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
     private static string? GetString(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-    private static string? ExtractClaim(string token, string claimType)
-    {
-        var parts = token.Split('.');
-        if (parts.Length < 2) return null;
-        var payload = parts[1];
-        // Padding base64url → base64
-        payload = (payload.Length % 4) switch
-        {
-            2 => payload + "==",
-            3 => payload + "=",
-            _ => payload
-        };
-        payload = payload.Replace('-', '+').Replace('_', '/');
-        try
-        {
-            var bytes = Convert.FromBase64String(payload);
-            using var doc = JsonDocument.Parse(bytes);
-            return doc.RootElement.TryGetProperty(claimType, out var v) && v.ValueKind == JsonValueKind.String
-                ? v.GetString() : null;
-        }
-        catch { return null; }
-    }
+    // ExtractClaim removido — consolidado em IJwtClaimsReader (TASK-EZ-WEB-005).
 }
