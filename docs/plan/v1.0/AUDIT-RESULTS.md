@@ -1,5 +1,16 @@
 # AUDIT-RESULTS.md — Auditoria funcional dos 33 golden paths v1.0
 
+> [!WARNING]
+> **OBSOLETO-PARCIAL** desde 2026-05-27 ~20:00 UTC.
+>
+> Master avançou 13 commits do Felipe entre PR #248 (auditoria mergeada 17:27 UTC) e PR #250 (handoff mergeado 19:42 UTC), implementando TASK-EZ-AVAL-001 (5 commits TDD), TASK-EZ-APROVAR-001 (5 commits TDD), TASK-EZ-PEDIDOS-001 e TASK-EZ-WEBHOOK-001 (base CHECKOUT-001). Provavelmente invalida ~50% dos achados deste relatório:
+> - **ETK-AUDIT-001** (checkout storefront) → `IniciarCheckoutUseCase` + `CheckoutController` agora em master
+> - **ETK-AUDIT-002** (Pedido→PIX) → gateway mudou Efi → MercadoPago (`IMercadoPagoClient`); novo status `AguardandoPagamento`
+> - **ETK-AUDIT-003** (estorno em cancelar) → `AprovarPedidoStorefrontUseCase` + `RecusarPedidoStorefrontUseCase` existem; precisa confirmar se recusa estorna
+> - ETK-AUDIT-004..009 — provavelmente ainda válidos
+>
+> **Próxima ação:** Fase 1.5 — re-auditoria em sessão Claude nova sobre master atual. Registro do drift e perguntas para Felipe em [docs/dev/incidentes/2026-05-27-tdd-direto-master-tasks-etk.md](../../dev/incidentes/2026-05-27-tdd-direto-master-tasks-etk.md).
+
 **Sessão:** Fase 1 — 2026-05-27
 **Branch:** `docs/audit-fase-1-marco-zero`
 **Worktree:** `wt-audit-v1-fase-1`
