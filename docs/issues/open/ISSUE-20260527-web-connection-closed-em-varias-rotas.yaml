@@ -1,0 +1,56 @@
+id: ISSUE-20260527-web-connection-closed-em-varias-rotas
+title: "easystok-web fecha conexao sem responder em varias rotas (login + financeiro/contas)"
+severity: P1-major
+found_during: production
+found_by: claude-opus-4.7
+timestamp: 2026-05-27T17:55:00Z
+affects_files:
+  - "EasyStock.Web/Program.cs"
+  - "EasyStock.Web/Middleware/SessionRestoreMiddleware.cs"
+  - "EasyStock.Web/Middleware/LojaRequiredMiddleware.cs"
+  - "EasyStock.Web/Controllers/FinanceiroController.cs"
+description: |
+  Em easystok-web v46 (e versoes anteriores — bug pre-existente NAO causado por
+  esta sessao de deploy), varias rotas retornam `WebException: ConnectionClosed`
+  sem objeto Response.
+
+  Rotas que reproduzem:
+  - /Login, /login (rotas INEXISTENTES — esperado seria 404)
+  - /FluxoCaixa, /financeiro/contas-a-pagar, /financeiro/contas-a-receber (rotas EXISTENTES)
+
+  Rotas que funcionam normalmente:
+  - / (HTTP 200, landing)
+  - /health (HTTP 200)
+  - /auth/login (HTTP 200, page login)
+  - /financeiro, /financeiro/fluxo-caixa (HTTP 200)
+  - /Pedidos, /Produtos, /Caixa (HTTP 200)
+
+  O servidor aceita o TLS handshake, recebe o request HTTP, e fecha o socket
+  sem enviar response. Cliente ve `[System.Net.WebException]
+  WebException Status: ConnectionClosed, No response object`.
+
+  Provavel causa: algum middleware na pipeline (SessionRestoreMiddleware,
+  LojaRequiredMiddleware, ou tratamento de exception) chamando
+  context.Response.Close() ou abortando sem retornar status code para
+  caminhos especificos. Order da pipeline relevante em Program.cs:
+    UseAuthentication
+    UseMiddleware<SessionRestoreMiddleware>
+    UseAuthorization
+    UseMiddleware<LojaRequiredMiddleware>
+
+  Conclusao parcial: rotas que exigem LojaId resolvido mas chegam SEM
+  contexto (usuario nao logado ou sem cookie de loja) podem cair no
+  LojaRequiredMiddleware e dar abort. Mas /Pedidos / /Produtos tambem
+  exigem auth e respondem 200 (page de login redirect) — entao nao e
+  diretamente isso. Investigar com fly logs.
+
+repro_steps:
+  - "Invoke-WebRequest -Uri https://easystok-web.fly.dev/Login -UseBasicParsing"
+  - "Erro: 'A solicitacao foi anulada: A conexao foi fechada de modo inesperado.'"
+  - "Em PowerShell 5.1 ou 7+ (limitacao nao e do cliente)"
+  - "Tambem reproduz com curl/HttpWebRequest direto: WebException Status=ConnectionClosed"
+  - "Rotas validas (/auth/login, /financeiro, /financeiro/fluxo-caixa) funcionam"
+resolution: ""
+resolved_by: ""
+resolved_at: ""
+status: open
