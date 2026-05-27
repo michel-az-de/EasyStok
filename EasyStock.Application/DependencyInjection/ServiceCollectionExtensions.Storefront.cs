@@ -12,6 +12,7 @@ using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Application.UseCases.Storefront.Menu;
+using EasyStock.Application.UseCases.Storefront.Pedidos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -45,6 +46,9 @@ public static partial class ServiceCollectionExtensions
         // TASK-EZ-APROVAR-001 — use cases Babá aprovar/recusar pedido.
         services.AddScoped<AprovarPedidoStorefrontUseCase>();
         services.AddScoped<RecusarPedidoStorefrontUseCase>();
+
+        // TASK-EZ-PEDIDOS-001 — listagem do histórico de pedidos do cliente.
+        services.AddScoped<ListarPedidosClienteUseCase>();
 
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja

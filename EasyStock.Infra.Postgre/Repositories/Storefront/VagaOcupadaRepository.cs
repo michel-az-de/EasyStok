@@ -174,6 +174,49 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
             g => g.Count);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, (VagaOcupada Vaga, JanelaEntrega Janela)>> GetByPedidoIdsAsync(
+        IReadOnlyCollection<Guid> pedidoIds,
+        CancellationToken ct = default)
+    {
+        if (pedidoIds is null || pedidoIds.Count == 0)
+            return new Dictionary<Guid, (VagaOcupada, JanelaEntrega)>();
+
+        var ids = pedidoIds.Distinct().ToArray();
+
+        // Join na app pra evitar carregar JanelaEntrega via Include (sem navigation property
+        // configurada no domínio). Anti-N+1: 2 queries (vagas + janelas), não 2×N.
+        var vagas = await db.VagasOcupadas
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(v => ids.Contains(v.PedidoId))
+            .ToListAsync(ct);
+
+        if (vagas.Count == 0)
+            return new Dictionary<Guid, (VagaOcupada, JanelaEntrega)>();
+
+        var janelaIds = vagas.Select(v => v.JanelaEntregaId).Distinct().ToArray();
+        var janelas = await db.JanelasEntrega
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(j => janelaIds.Contains(j.Id))
+            .ToDictionaryAsync(j => j.Id, ct);
+
+        var resultado = new Dictionary<Guid, (VagaOcupada, JanelaEntrega)>(vagas.Count);
+        foreach (var vaga in vagas)
+        {
+            // Convenção: 1 pedido ↔ 1 vaga (ativa OU liberada — pegamos a "principal").
+            // Se houver duplicidade por concorrência histórica, mantemos a primeira
+            // encontrada (DESC por OcupadoEm seria mais "verdadeira" mas é overhead pro caso raro).
+            if (resultado.ContainsKey(vaga.PedidoId)) continue;
+            if (janelas.TryGetValue(vaga.JanelaEntregaId, out var janela))
+            {
+                resultado[vaga.PedidoId] = (vaga, janela);
+            }
+        }
+
+        return resultado;
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException pg && pg.SqlState == "23505";
 }

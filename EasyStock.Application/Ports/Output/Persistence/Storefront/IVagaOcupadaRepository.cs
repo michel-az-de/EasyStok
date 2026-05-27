@@ -48,4 +48,19 @@ public interface IVagaOcupadaRepository
         DateOnly dataInicio,
         DateOnly dataFim,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Lookup em batch: carrega vagas (ativas OU liberadas — qualquer estado)
+    /// associadas a um conjunto de PedidoIds, com a <see cref="JanelaEntrega"/>
+    /// eager-loaded. Anti-N+1 para listagem de pedidos do cliente
+    /// (<c>ListarPedidosClienteUseCase</c>).
+    ///
+    /// <para>
+    /// Convenção: 1 pedido tem no máximo 1 vaga viva (UNIQUE pedido_id WHERE liberado_em IS NULL).
+    /// Se o pedido foi cancelado e a vaga liberada, a tupla pode estar ausente.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, (VagaOcupada Vaga, JanelaEntrega Janela)>> GetByPedidoIdsAsync(
+        IReadOnlyCollection<Guid> pedidoIds,
+        CancellationToken ct = default);
 }
