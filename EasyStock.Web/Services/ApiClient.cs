@@ -14,28 +14,11 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public async Task<ApiResult<T>> GetAsync<T>(string path)
-    {
-        try
-        {
-            var response = await http.GetAsync(path);
-            return await ParseResponse<T>(response);
-        }
-        catch (TaskCanceledException)
-        {
-            log.LogWarning("GET {Path} timed out", path);
-            return ApiResult<T>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
-        }
-        catch (HttpRequestException ex)
-        {
-            log.LogError(ex, "Network error on GET {Path}", path);
-            return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
-        }
-    }
+    public Task<ApiResult<T>> GetAsync<T>(string path) =>
+        WrapHttpCallAsync<T>(() => http.GetAsync(path), "GET", path);
 
-    public async Task<ApiResult<T>> PostAsync<T>(string path, object body, string? idempotencyKey = null)
-    {
-        try
+    public Task<ApiResult<T>> PostAsync<T>(string path, object body, string? idempotencyKey = null) =>
+        WrapHttpCallAsync<T>(async () =>
         {
             var content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json");
             using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content };
@@ -45,61 +28,28 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             var key = idempotencyKey ?? IdempotencyKeyHelper.AutoGenerateIfApplicable(path);
             if (!string.IsNullOrWhiteSpace(key))
                 request.Headers.TryAddWithoutValidation("Idempotency-Key", key);
+            return await http.SendAsync(request);
+        }, "POST", path);
 
-            var response = await http.SendAsync(request);
-            return await ParseResponse<T>(response);
-        }
-        catch (TaskCanceledException)
-        {
-            return ApiResult<T>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
-        }
-        catch (HttpRequestException ex)
-        {
-            log.LogError(ex, "Network error on POST {Path}", path);
-            return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
-        }
-    }
-
-    public async Task<ApiResult<T>> PutAsync<T>(string path, object body)
-    {
-        try
+    public Task<ApiResult<T>> PutAsync<T>(string path, object body) =>
+        WrapHttpCallAsync<T>(() =>
         {
             var content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json");
-            var response = await http.PutAsync(path, content);
-            return await ParseResponse<T>(response);
-        }
-        catch (TaskCanceledException)
-        {
-            return ApiResult<T>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
-        }
-        catch (HttpRequestException ex)
-        {
-            log.LogError(ex, "Network error on PUT {Path}", path);
-            return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
-        }
-    }
+            return http.PutAsync(path, content);
+        }, "PUT", path);
 
-    public async Task<ApiResult<T>> PatchAsync<T>(string path, object body)
-    {
-        try
+    public Task<ApiResult<T>> PatchAsync<T>(string path, object body) =>
+        WrapHttpCallAsync<T>(() =>
         {
             var content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json");
-            var response = await http.PatchAsync(path, content);
-            return await ParseResponse<T>(response);
-        }
-        catch (TaskCanceledException)
-        {
-            return ApiResult<T>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
-        }
-        catch (HttpRequestException ex)
-        {
-            log.LogError(ex, "Network error on PATCH {Path}", path);
-            return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
-        }
-    }
+            return http.PatchAsync(path, content);
+        }, "PATCH", path);
 
     public async Task<ApiResult<bool>> DeleteAsync(string path)
     {
+        // Wrapper genérico WrapHttpCallAsync usa ParseResponse para o caminho de sucesso,
+        // que não cobre o curto-circuito Ok(true) sem body deste verbo — try/catch local
+        // permanece, apenas logging de timeout é alinhado aos demais verbos.
         try
         {
             var response = await http.DeleteAsync(path);
@@ -108,6 +58,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         }
         catch (TaskCanceledException)
         {
+            log.LogWarning("DELETE {Path} timed out", path);
             return ApiResult<bool>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
         }
         catch (HttpRequestException ex)
@@ -207,20 +158,27 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         }
     }
 
-    public async Task<ApiResult<T>> PostMultipartAsync<T>(string path, MultipartFormDataContent form)
+    public Task<ApiResult<T>> PostMultipartAsync<T>(string path, MultipartFormDataContent form) =>
+        WrapHttpCallAsync<T>(() => http.PostAsync(path, form), "POST multipart", path);
+
+    private async Task<ApiResult<T>> WrapHttpCallAsync<T>(
+        Func<Task<HttpResponseMessage>> httpCall,
+        string method,
+        string path)
     {
         try
         {
-            var response = await http.PostAsync(path, form);
+            var response = await httpCall();
             return await ParseResponse<T>(response);
         }
         catch (TaskCanceledException)
         {
+            log.LogWarning("{Method} {Path} timed out", method, path);
             return ApiResult<T>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
         }
         catch (HttpRequestException ex)
         {
-            log.LogError(ex, "Network error on POST multipart {Path}", path);
+            log.LogError(ex, "Network error on {Method} {Path}", method, path);
             return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
         }
     }
