@@ -15,16 +15,15 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Pagamentos;
 
 /// <summary>
 /// Integration tests do <see cref="EfiPixWebhookProcessor"/> contra Postgres
-/// real (Testcontainers). Cobertura focada no caminho do bug aberto #289 +
+/// real (Testcontainers). Cobertura focada na regressao do bug #289 +
 /// guard-rails do contrato (valor exato, subpagamento, payload invalido,
 /// multiplos txids no mesmo payload).
 ///
 /// <para>
 /// O cenario <c>DoisWebhooks_simultaneos_renovam_assinatura_apenas_uma_vez</c>
-/// EXPOE o bug #289 (check-then-act sem <c>SELECT FOR UPDATE</c> +
-/// <c>ExecuteInTransactionAsync</c>) — fica <see cref="SkippableFactAttribute"/>
-/// com <c>Skip.If(true)</c> ate que #289 seja resolvido. Quando o fix entrar,
-/// remover o skip; o teste deve passar naturalmente.
+/// e o teste de regressao do bug #289 (check-then-act sem
+/// <c>SELECT FOR UPDATE</c> + <c>ExecuteInTransactionAsync</c>) e roda sempre
+/// que Docker/Postgres estiverem disponiveis.
 /// </para>
 /// </summary>
 public class EfiPixWebhookConcurrencyTests(PostgreSqlDatabaseFixture fixture)
@@ -35,9 +34,6 @@ public class EfiPixWebhookConcurrencyTests(PostgreSqlDatabaseFixture fixture)
     public async Task DoisWebhooks_simultaneos_renovam_assinatura_apenas_uma_vez()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
-        Skip.If(true,
-            "Aguardando fix do bug #289 (EfiPixWebhookProcessor sem SELECT FOR UPDATE). " +
-            "Remover este Skip.If quando o processor passar a usar GetByTxidComLockAsync + ExecuteInTransactionAsync.");
 
         var txid = $"RACE-{Guid.NewGuid():N}";
         var dataFimInicial = DateTime.UtcNow.AddDays(5);
