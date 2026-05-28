@@ -535,7 +535,7 @@ public sealed class GerenciarProdutoUseCase(
                     variacao.CodigoBarras,
                     variacao.Ativa,
                     itensDaVariacao.Sum(i => i.QuantidadeAtual.Value),
-                    itensDaVariacao.OrderByDescending(i => i.EntradaEm).Select(i => (DateTime?)i.EntradaEm).FirstOrDefault());
+                    itensDaVariacao.MaxBy(i => i.EntradaEm)?.EntradaEm);
             })
             .ToArray();
 
@@ -585,7 +585,7 @@ public sealed class GerenciarProdutoUseCase(
             produto.MargemEstimada,
             produto.Dimensoes is null ? null : new DimensoesDetalheResult(produto.Dimensoes.Peso, produto.Dimensoes.Largura, produto.Dimensoes.Altura, produto.Dimensoes.Comprimento),
             itens.Sum(i => i.QuantidadeAtual.Value),
-            itens.OrderByDescending(i => i.EntradaEm).Select(i => (DateTime?)i.EntradaEm).FirstOrDefault(),
+            itens.MaxBy(i => i.EntradaEm)?.EntradaEm,
             fotos.Select(f => new ProdutoFotoResult(f.FotoId, f.Url, f.CriadoEm)).ToArray(),
             variacoesResult,
             caracteristicasResult,
