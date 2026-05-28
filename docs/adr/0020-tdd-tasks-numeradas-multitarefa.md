@@ -1,7 +1,8 @@
 # ADR-0020 — Tasks numeradas, TDD obrigatório, multitarefa via worktree
 
-**Status:** Aceito
+**Status:** SUPERSEDED por [ADR-0022](0022-master-first-trunk-based.md) em 2026-05-28
 **Data:** 2026-05-24
+**Resultado medido:** 3.6% de conclusão em 4 dias (2 done / 55 tasks). Branches infinitas acumularam, 5 PRs travaram em conflito, multitarefa nunca foi exercitada de fato. Ver ADR-0022 para o diagnóstico completo e a política substituta (master-first trunk-based).
 
 ## Contexto
 
