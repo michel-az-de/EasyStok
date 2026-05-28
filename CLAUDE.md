@@ -150,8 +150,10 @@ Sistema ETK (v2.1) arquivado em:
 Pendencias arquiteturais EM ABERTO: rastreadas no board GitHub.
 Lista live: https://github.com/michel-az-de/EasyStok/issues
 
-Estado em 2026-05-28 pos-investigacao-completa: 34 issues abertas
-  - 3 P0 (bloqueadores): #263 checkout E2E, #274 test coverage <30%, #275 RLS audit prod
+Estado em 2026-05-28 final: 36 issues abertas
+  - 5 P0 (bloqueadores): #263 checkout E2E, #274 test coverage <30%,
+                         #275 RLS audit prod, #289 EfiPix sem SELECT FOR UPDATE,
+                         #290 NFC-e duplicada SEFAZ
   - 18 P1 (alta): features (Caixa #258, NFe #259, Rotulagem #260, marco-zero #256),
                  hardening (#276 NFe cert decrypt, #277 rate limit, #278 idempotency,
                  #279 backup retention, #280 Fly volume, #281 LGPD exclusao,
