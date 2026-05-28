@@ -143,6 +143,117 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         count.Should().Be(1, "tenant A deve enxergar exatamente seu produto");
     }
 
+    [SkippableFact]
+    public async Task Update_cross_tenant_afeta_zero_linhas()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (a, b) = await SeedDuasEmpresasComProdutosAsync();
+
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
+        await SetTenantManualAsync(ctx, a.Id);
+
+        // Policy USING + WITH CHECK: UPDATE/DELETE NAO levantam 42501 quando o filtro
+        // exclui linhas (diferente do INSERT, que dispara WITH CHECK). O comportamento
+        // esperado e que o UPDATE simplesmente nao encontre linhas a alterar — proteção
+        // real do isolamento sem exception fluir pra logs/alarmes.
+        var rowsAffected = await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE produtos SET \"Nome\" = 'hacked' WHERE \"EmpresaId\" = {b.Id}");
+        rowsAffected.Should().Be(0, "policy USING deve bloquear UPDATE cross-tenant transparente");
+
+        // Releitura via bypass confirma que o produto do tenant B nao foi tocado.
+        await ctx.Database.ExecuteSqlRawAsync("SET app.bypass_rls = 'true'");
+        var produtoB = await ctx.Database.SqlQueryRaw<string>(
+            @"SELECT ""Nome"" AS ""Value"" FROM produtos WHERE ""EmpresaId"" = {0}", b.Id)
+            .FirstAsync();
+        produtoB.Should().Be("Produto B");
+    }
+
+    [SkippableFact]
+    public async Task Delete_cross_tenant_afeta_zero_linhas()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (a, b) = await SeedDuasEmpresasComProdutosAsync();
+
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
+        await SetTenantManualAsync(ctx, a.Id);
+
+        var rowsAffected = await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"DELETE FROM produtos WHERE \"EmpresaId\" = {b.Id}");
+        rowsAffected.Should().Be(0, "policy USING deve bloquear DELETE cross-tenant transparente");
+
+        await ctx.Database.ExecuteSqlRawAsync("SET app.bypass_rls = 'true'");
+        var totalProdutos = await ctx.Database.SqlQueryRaw<int>(
+            @"SELECT COUNT(*)::int AS ""Value"" FROM produtos").FirstAsync();
+        totalProdutos.Should().Be(2, "ambos os produtos (A e B) devem continuar existindo");
+    }
+
+    [SkippableFact]
+    public async Task Conexao_reciclada_de_pool_recebe_novo_tenant_antes_de_query()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (a, b) = await SeedDuasEmpresasComProdutosAsync();
+
+        // Pooling LIGADO + tamanho 1: a segunda conexao OBRIGATORIAMENTE reusa a primeira
+        // (mesma conexao fisica). Sem o re-SET do interceptor no ConnectionOpened, o
+        // tenant da request anterior vazaria — exatamente o cenario de "reentrada de pool"
+        // descrito no SetTenantOnConnectionInterceptor (linhas 22-27).
+        var pooledConnString = new Npgsql.NpgsqlConnectionStringBuilder(fixture.RlsClientConnectionString)
+        {
+            Pooling = true,
+            MinPoolSize = 0,
+            MaxPoolSize = 1,
+            ApplicationName = $"pool-reuse-test-{Guid.NewGuid():N}",
+        }.ConnectionString;
+
+        var interceptor = new SetTenantOnConnectionInterceptor();
+        var userA = Substitute.For<ICurrentUserAccessor>();
+        userA.IsAuthenticated.Returns(true);
+        userA.EmpresaId.Returns(a.Id);
+        userA.Nivel.Returns(NivelAcesso.Admin);
+
+        var userB = Substitute.For<ICurrentUserAccessor>();
+        userB.IsAuthenticated.Returns(true);
+        userB.EmpresaId.Returns(b.Id);
+        userB.Nivel.Returns(NivelAcesso.Admin);
+
+        // Primeira "request": tenant A le seu produto e fecha a conexao (volta pro pool).
+        await using (var ctxA = BuildPooledCtx(pooledConnString, interceptor, userA))
+        {
+            var produtoA = await ctxA.Database.SqlQueryRaw<string>(
+                @"SELECT ""Nome"" AS ""Value"" FROM produtos").FirstAsync();
+            produtoA.Should().Be("Produto A");
+        }
+
+        // Segunda "request" — reusa a conexao fisica do pool. O ConnectionOpenedAsync
+        // do interceptor deve emitir SET app.empresa_id=b.Id ANTES de qualquer query,
+        // sobrescrevendo o valor residual de A — mesmo se o RESET no fechamento falhou.
+        await using (var ctxB = BuildPooledCtx(pooledConnString, interceptor, userB))
+        {
+            var settingNoCtxB = await ctxB.Database.SqlQueryRaw<string>(
+                @"SELECT current_setting('app.empresa_id', true) AS ""Value""").FirstAsync();
+            settingNoCtxB.Should().Be(b.Id.ToString(),
+                "interceptor deve re-emitir SET ao reusar conexao do pool — sem isso o tenant residual vazaria");
+
+            var produtoB = await ctxB.Database.SqlQueryRaw<string>(
+                @"SELECT ""Nome"" AS ""Value"" FROM produtos").FirstAsync();
+            produtoB.Should().Be("Produto B");
+        }
+    }
+
+    private static EasyStockDbContext BuildPooledCtx(
+        string connString,
+        SetTenantOnConnectionInterceptor interceptor,
+        ICurrentUserAccessor currentUser)
+    {
+        var options = new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseNpgsql(connString)
+            .AddInterceptors(interceptor)
+            .Options;
+        return new EasyStockDbContext(options, currentUser);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<(Empresa A, Empresa B)> SeedDuasEmpresasComProdutosAsync()

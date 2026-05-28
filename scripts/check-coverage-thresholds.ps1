@@ -13,13 +13,19 @@ $thresholds = @{
     "EasyStock.Domain"      = 70
     "EasyStock.Application" = 45
     "EasyStock.Api"         = 9
-    "EasyStock.Infra.Async" = 50
+    "EasyStock.Infra.Async" = 55
 }
 # Api gate intencionalmente baixo (9%) nesta onda. O modulo tem ~5500 linhas
 # em controllers, services, background jobs — subir significativamente exige
 # E2E tests via WebApplicationFactory + Testcontainers, escopo da Onda 2
 # (ver plano em ~/.claude/plans/ + roadmap stability). Meta evolutiva: +5pp
 # por onda ate atingir 25-30%.
+#
+# Infra.Async subiu de 50 para 55 na Onda D.1 (issue #274): os novos testes
+# de concorrencia EfiPix (EfiPixWebhookConcurrencyTests) exercitam o caminho
+# EfiPixWebhookProcessor.ProcessarPagamentoAsync — antes sem cobertura
+# dedicada (apenas indireto via WebhookPixController). Plano D.7 prevê novas
+# elevacoes graduais conforme ondas seguintes adicionarem cobertura organica.
 
 if (-not (Test-Path $CoberturaXmlPath)) {
     Write-Error "Cobertura.xml nao encontrado em $CoberturaXmlPath"
