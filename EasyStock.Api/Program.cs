@@ -946,6 +946,17 @@ if (app.Environment.IsProduction())
     }
 }
 
+// Modo openapi-export: o Swashbuckle.AspNetCore.Cli (scripts/export-openapi.ps1)
+// captura o IServiceProvider via HostFactoryResolver e nao precisa do Host
+// iniciado. Saimos antes de app.Run() pra evitar Host.StartAsync() — que
+// dispararia hosted services do pipeline de notificacoes dependendo de DI
+// Postgres-only (DispatcherLoopHostedService precisa de INotificacoesDispatcherOrchestrator).
+if (string.Equals(Environment.GetEnvironmentVariable("OPENAPI_EXPORT"), "true", StringComparison.OrdinalIgnoreCase))
+{
+    app.Logger.LogInformation("[openapi-export] OPENAPI_EXPORT=true — saindo antes de app.Run().");
+    return;
+}
+
 app.Run();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -8,6 +8,13 @@
         "husky"
       ],
       "rollForward": false
+    },
+    "swashbuckle.aspnetcore.cli": {
+      "version": "6.4.0",
+      "commands": [
+        "swagger"
+      ],
+      "rollForward": false
     }
   }
 }
