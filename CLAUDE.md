@@ -181,7 +181,7 @@ michel-az-de/EasyStok. Board visual: **GitHub Project v2** "EasyStok"
 
 URLs:
 - Issues: https://github.com/michel-az-de/EasyStok/issues
-- Project: https://github.com/users/michel-az-de/projects/<n>  (TBD apos criacao)
+- Project board v2: https://github.com/users/michel-az-de/projects/1
 
 Fluxo de trabalho diario:
 1. Abre o board, escolhe uma issue da coluna "Doing" (ou move uma de "Backlog")
