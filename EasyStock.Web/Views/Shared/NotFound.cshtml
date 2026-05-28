@@ -1,18 +1,81 @@
 @{
     ViewBag.Title = "Página não encontrada";
-    Layout = "_Layout";
+    Layout = null;
 }
-
-<div class="ws max-w-lg mx-auto mt-16 text-center">
-    <div class="text-7xl font-extrabold text-slate-200 mb-2">404</div>
-    <h1 class="text-xl font-bold text-slate-900 mb-2">Página não encontrada</h1>
-    <p class="text-slate-500 text-sm mb-6">A página que você está procurando não existe ou foi movida.</p>
-    <div class="flex items-center justify-center gap-3">
-        <a href="/dashboard" class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
-            Voltar ao início
-        </a>
-        <button onclick="history.back()" class="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
-            Voltar
-        </button>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Página não encontrada — EasyStock</title>
+    <link rel="icon" href="~/img/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-app);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .nf-card {
+            max-width: 520px;
+            width: 100%;
+            padding: 40px 32px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 16px;
+            text-align: center;
+        }
+        .nf-code {
+            font-size: 84px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--ink-300);
+            margin-bottom: 12px;
+        }
+        .nf-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: var(--text-primary); }
+        .nf-msg   { font-size: 14px; color: var(--text-muted); line-height: 1.55; margin: 0 0 24px; }
+        .nf-cta {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .nf-btn {
+            display: inline-block;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: background .12s ease, border-color .12s ease;
+        }
+        .nf-btn--primary { background: var(--brand-600); color: var(--white); }
+        .nf-btn--primary:hover { background: var(--brand-700); }
+        .nf-btn--ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-strong);
+        }
+        .nf-btn--ghost:hover { background: var(--ink-100); }
+    </style>
+</head>
+<body>
+    <div class="nf-card" role="alert">
+        <div class="nf-code">404</div>
+        <h1 class="nf-title">Página não encontrada</h1>
+        <p class="nf-msg">A página que você está procurando não existe ou foi movida.</p>
+        <div class="nf-cta">
+            <a href="/dashboard" class="nf-btn nf-btn--primary">Voltar ao início</a>
+            <button type="button" onclick="history.back()" class="nf-btn nf-btn--ghost">Voltar</button>
+        </div>
     </div>
-</div>
+</body>
+</html>

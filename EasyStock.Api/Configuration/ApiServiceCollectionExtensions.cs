@@ -30,9 +30,8 @@ public static class ApiServiceCollectionExtensions
     {
         services.AddSwaggerGen(c =>
         {
-            // ── Two language documents ────────────────────────────────────────
-            c.SwaggerDoc("v1-ptbr", SwaggerConfiguration.InfoPortuguese);
-            c.SwaggerDoc("v1-en",   SwaggerConfiguration.InfoEnglish);
+            // ── Single API document (idioma pt-BR — único do produto) ────────
+            c.SwaggerDoc("v1", SwaggerConfiguration.Info);
 
             // ── Security ──────────────────────────────────────────────────────
             c.AddSecurityDefinition("Bearer", SwaggerConfiguration.BearerScheme);

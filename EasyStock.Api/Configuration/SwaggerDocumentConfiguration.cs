@@ -25,67 +25,9 @@ public static class SwaggerConfiguration
         Url  = new Uri("https://easystock.com.br/terms")
     };
 
-    // ── English document ─────────────────────────────────────────────────────
+    // ── API document (Portuguese BR — idioma único do produto) ──────────────
 
-    public static OpenApiInfo InfoEnglish => new()
-    {
-        Title   = "EasyStock API",
-        Version = "v1",
-        Contact = Contact,
-        License = License,
-        Description = """
-            ## EasyStock Inventory Management API
-
-            A **professional, multi-tenant inventory management platform** built with .NET 9 and Clean Architecture.
-
-            ### Key Features
-            - 🔐 **JWT Bearer authentication** with role-based access control
-            - 🏢 **Multi-tenant** — every resource is scoped to a `empresaId`
-            - 📦 **Product catalogue** with variants, packaging and photo management
-            - 📊 **Analytics & Intelligence** — projections, seasonality, replenishment alerts
-            - 🤖 **AI-powered** product listing generation (Anthropic Claude)
-            - 🔔 **Notifications** for low-stock and expiry alerts
-            - 🗄️ **Database-agnostic** (PostgreSQL or MongoDB)
-
-            ### Authentication
-            1. `POST /api/auth/register` — create a user account
-            2. `POST /api/empresas/registrar` — register your company
-            3. `POST /api/auth/login` — obtain a JWT token
-            4. Click **Authorize** and enter `Bearer <your-token>`
-
-            ### Response Envelope
-            All responses follow a consistent envelope:
-            ```json
-            {
-              "data": { /* payload */ },
-              "meta": { "total": 100, "pages": 5, "page": 1, "limit": 20 }
-            }
-            ```
-            Errors use:
-            ```json
-            {
-              "error": {
-                "code": "NOT_FOUND",
-                "message": "Resource not found.",
-                "detail": "Optional detail",
-                "correlationId": "uuid"
-              }
-            }
-            ```
-
-            ### Access Levels
-            | Level      | Can access                          |
-            |------------|-------------------------------------|
-            | Operador   | Read-only + stock entries/exits     |
-            | Gerente    | + Create/update products, suppliers |
-            | Admin      | + Delete, user management           |
-            | SuperAdmin | Full access                         |
-            """
-    };
-
-    // ── Portuguese document ──────────────────────────────────────────────────
-
-    public static OpenApiInfo InfoPortuguese => new()
+    public static OpenApiInfo Info => new()
     {
         Title   = "EasyStock API",
         Version = "v1",
@@ -104,6 +46,8 @@ public static class SwaggerConfiguration
             - 🤖 **Geração de anúncios por IA** (Anthropic Claude)
             - 🔔 **Notificações** de estoque baixo e validade próxima
             - 🗄️ **Banco de dados agnóstico** (PostgreSQL ou MongoDB)
+            - 🛒 **Storefront público** (OTP via WhatsApp, checkout MercadoPago, frete)
+            - 📱 **Módulo Mobile** (Casa da Babá PWA — sync delta offline-first)
 
             ### Autenticação
             1. `POST /api/auth/register` — cadastre um usuário
@@ -197,6 +141,21 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
             case "RegistrarEmpresaCommand":
                 AddEmpresaExample(schema);
                 break;
+            case "SolicitarOtpRequest":
+                AddSolicitarOtpExample(schema);
+                break;
+            case "ValidarOtpRequest":
+                AddValidarOtpExample(schema);
+                break;
+            case "CheckoutRequestBody":
+                AddCheckoutExample(schema);
+                break;
+            case "PairRequest":
+                AddPairDeviceExample(schema);
+                break;
+            case "SyncPushRequest":
+                AddSyncPushExample(schema);
+                break;
         }
     }
 
@@ -272,6 +231,85 @@ public sealed class SchemaExamplesFilter : ISchemaFilter
             ["adminEmail"] = new OpenApiString("admin@minhaempresa.com.br"),
             ["adminNome"]  = new OpenApiString("Admin"),
             ["adminSenha"] = new OpenApiString("Senha@123")
+        };
+    }
+
+    private static void AddSolicitarOtpExample(OpenApiSchema schema)
+    {
+        schema.Example = new OpenApiObject
+        {
+            ["telefone"] = new OpenApiString("+5511999998888")
+        };
+    }
+
+    private static void AddValidarOtpExample(OpenApiSchema schema)
+    {
+        schema.Example = new OpenApiObject
+        {
+            ["telefone"] = new OpenApiString("+5511999998888"),
+            ["codigo"]   = new OpenApiString("123456")
+        };
+    }
+
+    private static void AddCheckoutExample(OpenApiSchema schema)
+    {
+        schema.Example = new OpenApiObject
+        {
+            ["items"] = new OpenApiArray
+            {
+                new OpenApiObject
+                {
+                    ["cardapioItemId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
+                    ["qtd"]            = new OpenApiInteger(2)
+                }
+            },
+            ["janelaId"]    = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa7"),
+            ["dataEntrega"] = new OpenApiString("2026-06-15"),
+            ["cep"]         = new OpenApiString("01310-100"),
+            ["observacoes"] = new OpenApiString("Sem cebola por favor")
+        };
+    }
+
+    private static void AddPairDeviceExample(OpenApiSchema schema)
+    {
+        schema.Example = new OpenApiObject
+        {
+            ["pairingCode"] = new OpenApiString("A1B2C3"),
+            ["deviceId"]    = new OpenApiString("tab-cozinha-01"),
+            ["label"]       = new OpenApiString("Tablet Cozinha 01")
+        };
+    }
+
+    private static void AddSyncPushExample(OpenApiSchema schema)
+    {
+        schema.Example = new OpenApiObject
+        {
+            ["deviceId"] = new OpenApiString("tab-cozinha-01"),
+            ["operatorName"] = new OpenApiString("Thati"),
+            ["mutations"] = new OpenApiArray
+            {
+                new OpenApiObject
+                {
+                    ["id"]       = new OpenApiString("01HZX9K1QY8N3F2RT0V5MZBPYA"),
+                    ["deviceId"] = new OpenApiString("tab-cozinha-01"),
+                    ["type"]     = new OpenApiString("order.upsert"),
+                    ["payload"]  = new OpenApiObject
+                    {
+                        ["id"]         = new OpenApiString("01HZX9K1QY8N3F2RT0V5MZBPYB"),
+                        ["clientName"] = new OpenApiString("Maria Silva"),
+                        ["items"]      = new OpenApiArray
+                        {
+                            new OpenApiObject
+                            {
+                                ["productId"]  = new OpenApiString("11111111-1111-1111-1111-111111111111"),
+                                ["qty"]        = new OpenApiInteger(2),
+                                ["unitPrice"]  = new OpenApiDouble(35.00)
+                            }
+                        }
+                    },
+                    ["ts"] = new OpenApiLong(1717000000000)
+                }
+            }
         };
     }
 }
@@ -433,6 +471,7 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
 {
     private static readonly Dictionary<string, string> Descriptions = new(StringComparer.OrdinalIgnoreCase)
     {
+        // ── Core ─────────────────────────────────────────────────────────────
         ["Auth"]           = "Autenticação e gerenciamento de sessão. Registro, login, refresh de token e perfil do usuário autenticado.",
         ["Empresas"]       = "Registro e configuração de empresas (tenants). Cada recurso da API é vinculado a um `empresaId`.",
         ["Usuarios"]       = "Gerenciamento de usuários: criação, atualização de perfil, desativação e listagem por empresa.",
@@ -451,6 +490,67 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["IaAnuncio"]      = "Geração de anúncios e descrições de produtos via Inteligência Artificial (Anthropic Claude).",
         ["Venda"]          = "Registro e consulta de vendas realizadas.",
         ["Diagnostico"]    = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
+
+        // ── Admin (SuperAdmin painel global) ─────────────────────────────────
+        ["AdminAdmins"]         = "Gerenciamento de SuperAdmins globais (admins da plataforma EasyStock, não dos tenants).",
+        ["AdminApkRelease"]     = "Publicação e versionamento de APKs do app mobile (rollout controlado).",
+        ["AdminAudit"]          = "Trilha de auditoria de ações administrativas globais.",
+        ["AdminAuditLogs"]      = "Consulta de logs de auditoria por tenant, usuário e período.",
+        ["AdminBuscaGlobal"]    = "Busca global cross-tenant para suporte (acesso restrito a SuperAdmin).",
+        ["AdminClientes"]       = "Gestão de tenants/clientes da plataforma SaaS (cadastro, suspensão, exclusão).",
+        ["AdminConfiguracoes"]  = "Configurações globais da plataforma (limites de plano, feature flags, integrações).",
+        ["AdminCupons"]         = "Cupons promocionais globais para assinatura SaaS.",
+        ["AdminDashboard"]      = "Métricas executivas da plataforma: tenants ativos, MRR, churn, uso por módulo.",
+        ["AdminDiagnostico"]    = "Diagnóstico cross-tenant: filas, health checks, latências por instância.",
+        ["AdminEmpresaPreview"] = "Login como empresa (impersonation) para suporte e diagnóstico.",
+        ["AdminNotificacoes"]   = "Envio de notificações broadcast para todos os tenants ou segmentos.",
+        ["AdminPlanos"]         = "CRUD dos planos da plataforma SaaS (preço, limites, features incluídas).",
+        ["AdminReports"]        = "Relatórios consolidados cross-tenant para tomada de decisão.",
+        ["AdminSeed"]           = "Disparo manual de seed/reset de dados de demo (apenas Development/Staging).",
+        ["AdminSla"]            = "Configuração e acompanhamento de SLAs de helpdesk por plano.",
+        ["AdminStatus"]         = "Página de status pública da plataforma (incidentes, manutenções).",
+        ["AdminStorefront"]     = "Gestão dos sites storefront por tenant (slug, domínio, branding).",
+        ["AdminStorefrontCardapio"] = "Curadoria do cardápio público (storefront) por tenant.",
+        ["AdminTenants"]        = "Operações administrativas em tenants individuais (admin global).",
+        ["AdminTickets"]        = "Visão consolidada dos tickets de helpdesk de todos os tenants.",
+        ["AdminUsuariosTenant"] = "Gestão dos usuários de um tenant específico (admin global).",
+        ["AdminFaturas"]        = "Gestão de faturas SaaS por tenant (admin global).",
+
+        // ── Mobile (Casa da Babá PWA — sync delta offline-first) ─────────────
+        ["ApkDistribution"]     = "Distribuição de APKs assinados para tablets Casa da Babá.",
+        ["DeviceBackup"]        = "Backup e restore do estado local do device (PWA).",
+        ["DevicePairing"]       = "Pareamento de tablets via código (provisioning + emissão de API key).",
+        ["Kds"]                 = "Kitchen Display System — fila de pedidos em produção.",
+        ["MobileAdmin"]         = "Endpoints admin do módulo mobile (estado dos devices, comandos remotos).",
+        ["MobileBatches"]       = "Lotes de produção sincronizados do mobile (vinculo opcional com Lote ERP).",
+        ["MobileCalculadora"]   = "Calculadora de compras Casa da Babá (precificação + receita).",
+        ["MobileCash"]          = "Caixa do tablet: entradas, saídas, fechamento diário.",
+        ["MobileClients"]       = "Clientes cadastrados no PWA (vinculo opcional com Cliente ERP).",
+        ["MobileDiagTrace"]     = "Traces de diagnóstico do PWA (request lifecycle, falhas de sync).",
+        ["MobileDiagnostics"]   = "Erros e telemetria do PWA reportados ao servidor.",
+        ["MobileEstoque"]       = "Visão de estoque do tablet (read-mostly, sync com ERP).",
+        ["MobileOrders"]        = "Pedidos do tablet (Casa da Babá): rascunho, pago, entregue.",
+        ["MobileProducts"]      = "Catálogo de produtos do tablet (cardápio + variações).",
+        ["MobilePush"]          = "Notificações push para tablets/PWA (FCM/WebPush).",
+        ["MobileQuickReports"]  = "Relatórios resumo offline para o tablet (vendas, fechamento).",
+        ["Operation"]           = "Operações cross-device do módulo mobile (comandos remotos, broadcast).",
+
+        // ── Storefront público (OTP + checkout) ──────────────────────────────
+        ["Public"]              = "Endpoints públicos sem autenticação (captura de leads, formulários landing).",
+
+        // ── Outros ───────────────────────────────────────────────────────────
+        ["Tickets"]             = "Helpdesk: abertura, resposta e acompanhamento de tickets de suporte por clientes.",
+        ["Reports"]             = "Relatórios gerenciais (estoque, vendas, financeiro).",
+        ["Consentimentos"]      = "Registro de consentimentos LGPD por usuário/cliente.",
+        ["EntityAudit"]         = "Consulta da trilha de auditoria de entidades específicas (quem alterou o quê).",
+        ["DiagnosticoInfra"]    = "Diagnóstico de infraestrutura (PostgreSQL, Redis, S3, SMTP) com self-test.",
+        ["DiagnosticoLogs"]     = "Live tail de logs estruturados (SSE) para diagnóstico em produção.",
+        ["Faq"]                 = "FAQ público (artigos de ajuda, busca por categoria).",
+        ["FaqAdmin"]            = "Curadoria do FAQ (admin global): criação e edição de artigos.",
+        ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
+        ["WebhookFocusNFe"]     = "Webhook público da Focus NFe (HMAC) para retorno de emissão fiscal.",
+        ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
+        ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",
     };
 
     public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)

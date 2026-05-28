@@ -758,8 +758,7 @@ if (swaggerEnabled)
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1-ptbr/swagger.json", "EasyStock API (Português BR)");
-        c.SwaggerEndpoint("/swagger/v1-en/swagger.json",   "EasyStock API (English)");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "EasyStock API v1");
         c.RoutePrefix = "swagger";
         c.DocumentTitle        = "EasyStock API Docs";
         c.DefaultModelsExpandDepth(1);
