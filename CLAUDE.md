@@ -150,19 +150,23 @@ Sistema ETK (v2.1) arquivado em:
 Pendencias arquiteturais EM ABERTO: rastreadas no board GitHub.
 Lista live: https://github.com/michel-az-de/EasyStok/issues
 
-Estado em 2026-05-28 pos-board-setup: 19 issues abertas
-  - 1 P0: #263 checkout storefront E2E (bloqueia golden path GP-029)
-  - 10 P1: #256 v1.0, #258 Caixa, #259 NFe, #260 Rotulagem,
-           #262 code-review epic, #264 Pedido x Pix, #265 estorno Pix,
-           #268 reuso OTP, #272 OTel, #273 web ConnectionClosed
-  - 8 P2: #201 IntegrationTests Mongo, #257 defesas, #261 SQLite dev,
-          #266 SSE pedido, #267 ContaPagar P2P, #269 refresh token,
-          #270 flaky cleanup, #271 OpenAPI Swagger
+Estado em 2026-05-28 pos-investigacao-completa: 34 issues abertas
+  - 3 P0 (bloqueadores): #263 checkout E2E, #274 test coverage <30%, #275 RLS audit prod
+  - 18 P1 (alta): features (Caixa #258, NFe #259, Rotulagem #260, marco-zero #256),
+                 hardening (#276 NFe cert decrypt, #277 rate limit, #278 idempotency,
+                 #279 backup retention, #280 Fly volume, #281 LGPD exclusao,
+                 #282 cache deadlock, #283 NuGet outdated),
+                 bugs (#268 OTP reuse, #273 web ConnectionClosed),
+                 outros (#262 CR epic, #264/265 Pedido x Pix, #272 OTel)
+  - 12 P2 (media): #201 IntegrationTests Mongo, #257 defesas, #261 SQLite dev,
+                  #266 SSE, #267 P2P, #269 refresh token, #270 flaky, #271 Swagger,
+                  #284 auth hardening, #285 audit log, #286 CSP, #287 async patterns
+  - 1 P3 (baixa): #288 quality cleanup (warnings + god class + DateTime.Now + etc)
 
 Filtros uteis:
 - gh issue list --label priority:p0
-- gh issue list --label priority:p1
-- gh issue list --label caixa
+- gh issue list --label priority:p1 --label caixa
+- gh issue list --search "bug in:title"
 
 Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018 (Aceito, 2026-05-17).
 
