@@ -5638,6 +5638,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("AlteradoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("AprovadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("aprovado_em");
+
+                    b.Property<Guid?>("AprovadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("aprovado_por_usuario_id");
+
                     b.Property<DateTime?>("CanceladoEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -5668,9 +5676,19 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("MensagemRecusaCliente")
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)")
+                        .HasColumnName("mensagem_recusa_cliente");
+
                     b.Property<string>("MobileOrderId")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MotivoRecusa")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("motivo_recusa");
 
                     b.Property<string>("Observacoes")
                         .HasColumnType("text");
@@ -5678,6 +5696,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Origem")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("RecusadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recusado_em");
+
+                    b.Property<Guid?>("RecusadoPorUsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recusado_por_usuario_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -5689,32 +5715,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<Guid?>("VendaId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("AprovadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("aprovado_em");
-
-                    b.Property<Guid?>("AprovadoPorUsuarioId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("aprovado_por_usuario_id");
-
-                    b.Property<DateTime?>("RecusadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("recusado_em");
-
-                    b.Property<Guid?>("RecusadoPorUsuarioId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("recusado_por_usuario_id");
-
-                    b.Property<string>("MotivoRecusa")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("motivo_recusa");
-
-                    b.Property<string>("MensagemRecusaCliente")
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)")
-                        .HasColumnName("mensagem_recusa_cliente");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
@@ -8162,6 +8162,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("Modelo")
                         .IsRequired()
                         .HasMaxLength(2)
@@ -8211,6 +8215,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_nfe_documentos_empresa_chave_acesso")
                         .HasFilter("\"ChaveAcesso\" IS NOT NULL");
+
+                    b.HasIndex("EmpresaId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_nfe_documentos_empresa_idempotency")
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
 
                     b.HasIndex("EmpresaId", "Status")
                         .HasDatabaseName("ix_nfe_documentos_empresa_status");

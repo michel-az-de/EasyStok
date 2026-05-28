@@ -38,7 +38,19 @@ public interface INfeRepository
     /// </summary>
     Task<NfeDocumento?> FindByChaveAcessoAsync(string chaveAcesso, CancellationToken ct = default);
 
-    // TODO F1.5: FindByIdempotencyKeyAsync — requer coluna IdempotencyKey via migration AddNfeF1RepoIndexes.
+    /// <summary>
+    /// Busca <see cref="NfeDocumento"/> ja emitido com a mesma <paramref name="idempotencyKey"/>
+    /// para a empresa. Usado pelo <c>EmitirNfceUseCase</c> ANTES de reservar numero,
+    /// garantindo que retry com mesma chave nao queime segundo numero fiscal.
+    ///
+    /// <para>
+    /// Respeita Global Query Filter (multi-tenant): so retorna documentos da
+    /// <paramref name="empresaId"/> informada. Unique partial index
+    /// <c>ux_nfe_documentos_empresa_idempotency</c> serve como ultima linha de
+    /// defesa contra race entre 2 requests concorrentes.
+    /// </para>
+    /// </summary>
+    Task<NfeDocumento?> FindByIdempotencyKeyAsync(Guid empresaId, string idempotencyKey, CancellationToken ct = default);
 
     Task<(IEnumerable<NfeDocumento> items, int total)> GetByEmpresaAsync(
         Guid empresaId,

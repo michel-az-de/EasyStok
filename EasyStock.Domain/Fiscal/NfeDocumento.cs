@@ -20,9 +20,15 @@ namespace EasyStock.Domain.Fiscal;
 /// </para>
 ///
 /// <para>
-/// <b>Idempotencia:</b> a unique constraint (EmpresaId, ChaveAcesso) WHERE
-/// ChaveAcesso IS NOT NULL impede duplicar autorizacao. A unique
-/// (EmpresaId, Modelo, Serie, Numero) impede reutilizar numero ja consumido.
+/// <b>Idempotencia:</b> tres camadas de defesa contra duplicacao fiscal:
+/// (a) unique (EmpresaId, ChaveAcesso) WHERE ChaveAcesso IS NOT NULL impede
+/// duplicar autorizacao apos SEFAZ devolver a chave;
+/// (b) unique (EmpresaId, Modelo, Serie, Numero) impede reutilizar numero ja
+/// consumido por modelo+serie;
+/// (c) unique (EmpresaId, IdempotencyKey) WHERE IdempotencyKey IS NOT NULL
+/// impede que retry HTTP com mesma <see cref="IdempotencyKey"/> queime um
+/// segundo numero ANTES de chegar ao SEFAZ — defesa em DB para o caso de
+/// falha de persistencia do cache HTTP-level (middleware) silenciar a chave.
 /// </para>
 ///
 /// <para>
@@ -49,6 +55,17 @@ public class NfeDocumento
 
     /// <summary>Chave de acesso de 44 digitos atribuida pela SEFAZ na autorizacao. Null ate <see cref="MarcarAutorizada"/>.</summary>
     public string? ChaveAcesso { get; set; }
+
+    /// <summary>
+    /// Chave de idempotencia HTTP-level propagada pelo middleware (header
+    /// <c>Idempotency-Key</c>) e gravada em DB para defesa em profundidade.
+    /// Quando o caller faz retry da mesma emissao (mesma <c>IdempotencyKey</c>),
+    /// o use case devolve este <see cref="NfeDocumento"/> em vez de queimar
+    /// um segundo numero fiscal — protege contra falha de persistencia do
+    /// cache HTTP do middleware (que e silenciada como WARN).
+    /// Null para documentos criados antes da migration <c>AddNfeF1RepoIndexes</c>.
+    /// </summary>
+    public string? IdempotencyKey { get; set; }
 
     public StatusNfe Status { get; set; } = StatusNfe.Rascunho;
 
@@ -90,7 +107,8 @@ public class NfeDocumento
         Dinheiro totalNota,
         Guid? usuarioId = null,
         string? usuarioNome = null,
-        string? origem = null)
+        string? origem = null,
+        string? idempotencyKey = null)
     {
         if (empresaId == Guid.Empty)
             throw new ArgumentException("EmpresaId obrigatorio.", nameof(empresaId));
@@ -104,6 +122,8 @@ public class NfeDocumento
             throw new ArgumentNullException(nameof(dadosEmitente));
         if (totalNota.Valor <= 0m)
             throw new RegraDeDominioVioladaException("Total da nota deve ser maior que zero.");
+        if (idempotencyKey is not null && idempotencyKey.Length > 120)
+            throw new ArgumentException("IdempotencyKey nao pode exceder 120 caracteres.", nameof(idempotencyKey));
 
         var agora = DateTime.UtcNow;
         var doc = new NfeDocumento
@@ -118,6 +138,7 @@ public class NfeDocumento
             DadosEmitente = dadosEmitente,
             DadosDestinatario = dadosDestinatario,
             TotalNota = totalNota,
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
             CriadoEm = agora,
             AlteradoEm = agora,
         };

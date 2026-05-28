@@ -26,6 +26,7 @@ public class NfeDocumentoConfiguration : IEntityTypeConfiguration<NfeDocumento>
         builder.Property(n => n.MotivoRejeicao).HasMaxLength(2000);
         builder.Property(n => n.XmlAssinadoStorageKey).HasMaxLength(300);
         builder.Property(n => n.DanfeUrl).HasMaxLength(500);
+        builder.Property(n => n.IdempotencyKey).HasMaxLength(120);
 
         // Snapshots como jsonb com value converter (espelha padrao Fatura).
         builder.Property(n => n.DadosEmitente)
@@ -89,6 +90,14 @@ public class NfeDocumentoConfiguration : IEntityTypeConfiguration<NfeDocumento>
         builder.HasIndex(n => new { n.EmpresaId, n.Modelo, n.Serie, n.Numero })
             .IsUnique()
             .HasDatabaseName("ux_nfe_documentos_empresa_modelo_serie_numero");
+
+        // Idempotencia HTTP-level com defesa em DB: retry com mesma IdempotencyKey
+        // nao pode queimar segundo numero. Partial unique cobre apenas linhas com
+        // chave gravada (NULL = legado pre-AddNfeF1RepoIndexes).
+        builder.HasIndex(n => new { n.EmpresaId, n.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_nfe_documentos_empresa_idempotency")
+            .HasFilter("\"IdempotencyKey\" IS NOT NULL");
 
         builder.HasIndex(n => new { n.EmpresaId, n.Status })
             .HasDatabaseName("ix_nfe_documentos_empresa_status");

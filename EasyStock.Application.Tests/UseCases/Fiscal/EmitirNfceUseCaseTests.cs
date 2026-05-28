@@ -73,6 +73,100 @@ public class EmitirNfceUseCaseTests
             .WithMessage("*IdempotencyKey*");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ComIdempotencyKeyJaUsada_RetornaNfeExistenteSemReservarNumero()
+    {
+        // issue #290: retry HTTP com mesma IdempotencyKey nao pode queimar
+        // segundo numero fiscal. A consulta antes de reservar numero precisa
+        // devolver o NfeDocumento ja emitido sem chamar numeracao nem gateway.
+        var cmd = ValidCommand();
+        var nfeExistente = NfeDocumento.Criar(
+            empresaId: cmd.EmpresaId,
+            pedidoId: cmd.PedidoId,
+            serie: 1,
+            numero: 42L,
+            dadosEmitente: new DadosEmissor("Empresa Teste", "11444777000161"),
+            dadosDestinatario: null,
+            totalNota: Dinheiro.FromDecimal(100m),
+            idempotencyKey: cmd.IdempotencyKey);
+        nfeExistente.AdicionarItem("Produto", 1m, Dinheiro.FromDecimal(100m), "UN");
+        nfeExistente.MarcarEnviada();
+        nfeExistente.MarcarAutorizada(
+            chaveAcesso: "12345678901234567890123456789012345678901234",
+            protocoloAutorizacao: "PROTO-EXISTENTE");
+
+        _nfeRepo.FindByIdempotencyKeyAsync(cmd.EmpresaId, cmd.IdempotencyKey)
+            .Returns(nfeExistente);
+
+        var result = await NewUseCase().ExecuteAsync(cmd);
+
+        result.NfeId.Should().Be(nfeExistente.Id);
+        result.ChaveAcesso.Should().Be("12345678901234567890123456789012345678901234");
+        result.ProtocoloAutorizacao.Should().Be("PROTO-EXISTENTE");
+
+        await _numeracao.DidNotReceive().ReservarProximoNumeroAsync(Arg.Any<Guid>());
+        await _gateway.DidNotReceive().EmitirAsync(Arg.Any<NfeDocumento>(), Arg.Any<ConfigFiscalDto>());
+        await _nfeRepo.DidNotReceive().AddAsync(Arg.Any<NfeDocumento>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PrimeiraChamada_PersisteIdempotencyKeyNoDocumento()
+    {
+        // issue #290: primeira emissao bem-sucedida precisa armazenar IdempotencyKey
+        // no agregado para que o retry consiga encontrar via FindByIdempotencyKeyAsync.
+        var cmd = ValidCommand();
+        var config = ValidConfig(cmd.EmpresaId);
+
+        _nfeRepo.FindByIdempotencyKeyAsync(cmd.EmpresaId, cmd.IdempotencyKey).Returns((NfeDocumento?)null);
+        _configResolver.ResolveAsync(cmd.EmpresaId).Returns(config);
+        _numeracao.ReservarProximoNumeroAsync(cmd.EmpresaId).Returns(((short)1, 100L));
+        _geradorChave
+            .Gerar(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<short>(), Arg.Any<long>(),
+                Arg.Any<DateTime>(), Arg.Any<string>(), Arg.Any<byte>())
+            .Returns("12345678901234567890123456789012345678901234");
+
+        _uow.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task<Guid>>>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<Guid>>>().Invoke(CancellationToken.None));
+
+        NfeDocumento? capturada = null;
+        _nfeRepo.AddAsync(Arg.Do<NfeDocumento>(n => capturada = n))
+            .Returns(Task.CompletedTask);
+
+        _gateway.EmitirAsync(Arg.Any<NfeDocumento>(), Arg.Any<ConfigFiscalDto>())
+            .Returns(new ResultadoEmissaoNfce(
+                ChaveAcesso: "12345678901234567890123456789012345678901234",
+                ProtocoloAutorizacao: "PROTO-NOVO",
+                DataAutorizacao: DateTime.UtcNow,
+                XmlAssinadoUrl: null,
+                DanfeUrl: null));
+
+        _nfeRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, Arg.Any<Guid>())
+            .Returns(call => capturada);
+        _nfeRepo.GetByIdAsync(cmd.EmpresaId, Arg.Any<Guid>())
+            .Returns(call => capturada);
+
+        await NewUseCase().ExecuteAsync(cmd);
+
+        capturada.Should().NotBeNull();
+        capturada!.IdempotencyKey.Should().Be(cmd.IdempotencyKey);
+    }
+
+    private static ConfigFiscalDto ValidConfig(Guid empresaId) => new(
+        EmpresaId: empresaId,
+        Provedor: "focus",
+        Ambiente: AmbienteIntegracao.Sandbox,
+        RegimeTributario: RegimeTributario.Simples,
+        Cnpj: "11444777000161",
+        InscricaoEstadual: "ISENTO",
+        InscricaoMunicipal: null,
+        Endereco: new Endereco(Uf: "SP"),
+        SerieNfce: 1,
+        CredencialToken: "tok",
+        CertificadoA1Bytes: null,
+        CertificadoA1Senha: null,
+        CscId: null,
+        CscToken: null);
+
     private static EmitirNfceCommand ValidCommand() => new(
         EmpresaId: Guid.NewGuid(),
         PedidoId: Guid.NewGuid(),

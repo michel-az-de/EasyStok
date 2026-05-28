@@ -25,10 +25,17 @@ namespace EasyStock.Application.UseCases.Fiscal.EmitirNfce;
 /// </list>
 ///
 /// <para>
-/// <b>Idempotencia:</b> Por enquanto, idempotencia HTTP-level fica a cargo do middleware
-/// <see cref="IIdempotencyKeyRepository"/>. Migration F1.5 (AddNfeF1RepoIndexes) adicionara
-/// coluna <c>IdempotencyKey</c> em <c>nfe_documentos</c> para hardening defensivo no DB.
-/// Ate la, controller deve confiar no middleware.
+/// <b>Idempotencia (defesa em duas camadas):</b>
+/// (1) <c>IdempotencyMiddleware</c> HTTP-level cacheia a resposta por
+/// <c>(EmpresaId, Idempotency-Key)</c> com TTL 24h — mas pode silenciar a falha
+/// de <c>SaveAsync</c> do cache (catch WARN), abrindo brecha para duplicacao em
+/// retry. (2) Esta camada consulta <see cref="INfeRepository.FindByIdempotencyKeyAsync"/>
+/// ANTES de reservar numero fiscal e armazena <c>IdempotencyKey</c> no
+/// <see cref="NfeDocumento"/>. Unique partial index
+/// <c>ux_nfe_documentos_empresa_idempotency</c> serve como ultima linha de
+/// defesa contra race entre 2 requests concorrentes — quem perde a corrida
+/// pega <c>DbUpdateException</c> e o use case re-pesquisa para devolver o
+/// vencedor. Ver issue #290.
 /// </para>
 /// </summary>
 public class EmitirNfceUseCase(
@@ -51,59 +58,92 @@ public class EmitirNfceUseCase(
         if (cmd.Itens.Count == 0)
             throw new UseCaseValidationException("Itens obrigatorios.");
 
+        // === Defesa em DB (issue #290): consulta antes de reservar numero ===
+        // Se o middleware HTTP-level falhou ao persistir o cache (catch WARN),
+        // retry chega aqui sem hit no cache. Antes de queimar segundo numero
+        // fiscal — ou de resolver config / acionar gateway — checa o repo.
+        // Hit -> devolve a NFC-e ja emitida sem efeito colateral.
+        var jaEmitida = await nfeRepo.FindByIdempotencyKeyAsync(cmd.EmpresaId, cmd.IdempotencyKey);
+        if (jaEmitida is not null)
+        {
+            logger.LogInformation(
+                "Nfe {Id} ja emitida com IdempotencyKey={Key} (retry idempotente). Chave={Chave}.",
+                jaEmitida.Id, cmd.IdempotencyKey, jaEmitida.ChaveAcesso);
+            return ToResult(jaEmitida);
+        }
+
         var config = await configResolver.ResolveAsync(cmd.EmpresaId);
         var gateway = gatewayFactory.ObterPara(config.Provedor);
 
         // === Tx 1: reservar numero, criar NfeDocumento Rascunho->EnviadaAguardando ===
-        var nfeId = await uow.ExecuteInTransactionAsync(async _ =>
+        Guid nfeId;
+        try
         {
-            var (serie, numero) = await numeracao.ReservarProximoNumeroAsync(cmd.EmpresaId);
-
-            var ufEmitente = config.Endereco?.Uf
-                ?? throw new UseCaseValidationException("UF do emitente obrigatoria na configuracao fiscal.");
-
-            var chave = geradorChave.Gerar(
-                uf: ufEmitente,
-                cnpjEmitente: config.Cnpj,
-                serie: serie,
-                numero: numero,
-                dataEmissao: DateTime.UtcNow,
-                modeloFiscal: NfeDocumento.ModeloNfce,
-                tipoEmissao: 1);
-
-            var nfe = NfeDocumento.Criar(
-                empresaId: cmd.EmpresaId,
-                pedidoId: cmd.PedidoId,
-                serie: serie,
-                numero: numero,
-                dadosEmitente: MapEmitente(cmd.Emitente),
-                dadosDestinatario: MapDestinatario(cmd.Destinatario),
-                totalNota: Dinheiro.FromDecimal(cmd.TotalNota),
-                usuarioId: cmd.UsuarioId,
-                usuarioNome: cmd.UsuarioNome,
-                origem: cmd.Origem);
-
-            nfe.ChaveAcesso = chave;
-
-            foreach (var item in cmd.Itens)
+            nfeId = await uow.ExecuteInTransactionAsync(async _ =>
             {
-                nfe.AdicionarItem(
-                    nomeSnapshot: item.NomeSnapshot,
-                    quantidade: item.Quantidade,
-                    precoUnitario: Dinheiro.FromDecimal(item.PrecoUnitario),
-                    unidade: item.Unidade,
-                    ncm: item.Ncm,
-                    cfop: item.Cfop,
-                    produtoIdSnapshot: item.ProdutoIdSnapshot,
-                    origemMercadoria: item.OrigemMercadoria,
-                    cstOuCsosn: item.CstOuCsosn);
-            }
+                var (serie, numero) = await numeracao.ReservarProximoNumeroAsync(cmd.EmpresaId);
 
-            nfe.MarcarEnviada(cmd.UsuarioId, cmd.UsuarioNome, cmd.Origem);
+                var ufEmitente = config.Endereco?.Uf
+                    ?? throw new UseCaseValidationException("UF do emitente obrigatoria na configuracao fiscal.");
 
-            await nfeRepo.AddAsync(nfe);
-            return nfe.Id;
-        });
+                var chave = geradorChave.Gerar(
+                    uf: ufEmitente,
+                    cnpjEmitente: config.Cnpj,
+                    serie: serie,
+                    numero: numero,
+                    dataEmissao: DateTime.UtcNow,
+                    modeloFiscal: NfeDocumento.ModeloNfce,
+                    tipoEmissao: 1);
+
+                var nfe = NfeDocumento.Criar(
+                    empresaId: cmd.EmpresaId,
+                    pedidoId: cmd.PedidoId,
+                    serie: serie,
+                    numero: numero,
+                    dadosEmitente: MapEmitente(cmd.Emitente),
+                    dadosDestinatario: MapDestinatario(cmd.Destinatario),
+                    totalNota: Dinheiro.FromDecimal(cmd.TotalNota),
+                    usuarioId: cmd.UsuarioId,
+                    usuarioNome: cmd.UsuarioNome,
+                    origem: cmd.Origem,
+                    idempotencyKey: cmd.IdempotencyKey);
+
+                nfe.ChaveAcesso = chave;
+
+                foreach (var item in cmd.Itens)
+                {
+                    nfe.AdicionarItem(
+                        nomeSnapshot: item.NomeSnapshot,
+                        quantidade: item.Quantidade,
+                        precoUnitario: Dinheiro.FromDecimal(item.PrecoUnitario),
+                        unidade: item.Unidade,
+                        ncm: item.Ncm,
+                        cfop: item.Cfop,
+                        produtoIdSnapshot: item.ProdutoIdSnapshot,
+                        origemMercadoria: item.OrigemMercadoria,
+                        cstOuCsosn: item.CstOuCsosn);
+                }
+
+                nfe.MarcarEnviada(cmd.UsuarioId, cmd.UsuarioNome, cmd.Origem);
+
+                await nfeRepo.AddAsync(nfe);
+                return nfe.Id;
+            });
+        }
+        catch (Exception ex)
+        {
+            // Race-resolution: 2 calls com mesma IdempotencyKey chegaram quase juntos.
+            // O perdedor da unique constraint ux_nfe_documentos_empresa_idempotency
+            // recebe DbUpdateException; o vencedor ja esta gravado. Re-query confirma
+            // race (vencedor existe). Se nao existe, e' outro erro real -> propaga.
+            var raceWinner = await nfeRepo.FindByIdempotencyKeyAsync(cmd.EmpresaId, cmd.IdempotencyKey);
+            if (raceWinner is null) throw;
+
+            logger.LogInformation(ex,
+                "Nfe {Id} race-resolved: outra TX venceu unique constraint IdempotencyKey={Key}.",
+                raceWinner.Id, cmd.IdempotencyKey);
+            return ToResult(raceWinner);
+        }
 
         // === HTTP: chamada Focus FORA de transacao (anti-padrao B-052 evitado) ===
         var nfePreEnvio = await nfeRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, nfeId)

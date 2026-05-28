@@ -21,7 +21,9 @@ public sealed class NfeRepository(EasyStockDbContext db) : INfeRepository
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(n => n.ChaveAcesso == chaveAcesso, ct);
 
-    // TODO F1.5: FindByIdempotencyKeyAsync — requer coluna IdempotencyKey via migration AddNfeF1RepoIndexes.
+    public Task<NfeDocumento?> FindByIdempotencyKeyAsync(Guid empresaId, string idempotencyKey, CancellationToken ct = default) =>
+        db.NfeDocumentos
+            .FirstOrDefaultAsync(n => n.EmpresaId == empresaId && n.IdempotencyKey == idempotencyKey, ct);
 
     public async Task<(IEnumerable<NfeDocumento> items, int total)> GetByEmpresaAsync(
         Guid empresaId,
