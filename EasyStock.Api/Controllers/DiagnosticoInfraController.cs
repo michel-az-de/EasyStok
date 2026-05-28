@@ -369,9 +369,8 @@ public sealed class DiagnosticoInfraController(
     [HttpGet("health/empresas")]
     public async Task<IActionResult> HealthEmpresas(CancellationToken ct)
     {
-        if (!infraState.DatabaseProvider.Equals("postgresql", StringComparison.OrdinalIgnoreCase) &&
-            !infraState.DatabaseProvider.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
-            return Ok(new { disponivel = false, motivo = "Apenas disponível com PostgreSQL ou SQLite." });
+        if (!infraState.DatabaseProvider.Equals("postgresql", StringComparison.OrdinalIgnoreCase))
+            return Ok(new { disponivel = false, motivo = "Apenas disponível com PostgreSQL." });
 
         try
         {

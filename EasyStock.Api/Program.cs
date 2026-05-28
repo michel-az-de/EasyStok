@@ -19,8 +19,6 @@ using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
-using EasyStock.Infra.Sqlite.DependencyInjection;
-using EasyStock.Infra.Sqlite.HealthChecks;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
 using FluentValidation;
@@ -123,7 +121,6 @@ var databaseProvider = builder.Configuration[ConfigurationKeys.DatabaseProvider]
 var postgresConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionDefault);
 var mongoConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionMongo);
 var mongoDatabaseName = builder.Configuration[ConfigurationKeys.DatabaseMongoDatabase] ?? "EasyStockDbMongo";
-var sqliteConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionSqlite) ?? "Data Source=easystock.db";
 
 // Em produção, pula a checagem de auto-detect (custa 3-5s no cold start)
 // quando o provider está explicitamente configurado.
@@ -135,7 +132,6 @@ if (builder.Environment.IsProduction() &&
     {
         "postgres" or "postgresql" => "postgresql",
         "mongodb" or "mongo" => "mongodb",
-        "sqlite" => "sqlite",
         _ => "postgresql"
     };
 }
@@ -145,20 +141,12 @@ else
         databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
 }
 
-var isFallback = !string.Equals(databaseProvider.Trim(), resolvedProvider, StringComparison.OrdinalIgnoreCase)
-    && !(databaseProvider.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase) && resolvedProvider == "postgresql");
-
-// Fail-fast: nunca subir em produção usando SQLite (seria banco local efêmero no container)
-if (resolvedProvider == "sqlite" && builder.Environment.IsProduction())
-    throw new InvalidOperationException(
-        "PostgreSQL indisponível e SQLite não é permitido em Production. " +
-        "Verifique a connection string 'DefaultConnection' e a conectividade com o banco.");
-
+// PostgreSQL é o único provedor suportado (#261) — não há mais fallback runtime.
 var infraState = new ResolvedInfrastructureState
 {
     DatabaseProvider = resolvedProvider,
     ConfiguredProvider = databaseProvider,
-    IsFallback = isFallback,
+    IsFallback = false,
     StartupTime = DateTimeOffset.UtcNow,
     Environment = builder.Environment.EnvironmentName
 };
@@ -193,15 +181,6 @@ switch (resolvedProvider)
         // ValidateOnBuild fica off lá. Os consumidores (use cases fiscais) são Scoped.
         builder.Services.AddScoped<IGatewayFiscalFactory, GatewayFiscalFactory>();
         builder.Services.AddDataProtection();
-        break;
-
-    case "sqlite":
-        builder.Services.AddEasyStockSqliteInfrastructure(sqliteConnectionString, builder.Configuration);
-        builder.Services.AddHealthChecks()
-            .AddCheck<SqliteDatabaseHealthCheck>("SQLite", tags: ["ready", "api"])
-            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready"
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
-            .AddNotificationsHosting();
         break;
 
     default:
@@ -574,11 +553,6 @@ if (resolvedProvider is "postgresql")
 }
 
 // ── Startup hardening ─────────────────────────────────────────────────────────
-if (resolvedProvider is "sqlite" && !app.Environment.IsDevelopment())
-    app.Logger.LogWarning(
-        "ATENCAO: Banco SQLite em uso em ambiente {Env}. Isso pode indicar falha de conexao com banco principal.",
-        app.Environment.EnvironmentName);
-
 var jwtSecret = builder.Configuration[ConfigurationKeys.JwtSecretKey];
 if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Contains("${JWT_SECRET_KEY}"))
     throw new InvalidOperationException("JWT_SECRET_KEY environment variable is required (min 32 chars). Set it before starting the API.");
@@ -620,14 +594,13 @@ Log.Information("""
       EasyStock API
       Ambiente:     {Environment}
       Banco:        {Provider} (configurado: {Configured})
-      Fallback:     {Fallback}
       Raiz (/):     → redireciona para /swagger
       Swagger:      /swagger
       Diagnostico:  /diagnostico
       Health:       /health, /health/live, /health/ready
     ======================================
     """,
-    app.Environment.EnvironmentName, resolvedProvider, databaseProvider, isFallback);
+    app.Environment.EnvironmentName, resolvedProvider, databaseProvider);
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
 // ExceptionHandler deve ser o primeiro middleware para capturar exceções de qualquer
@@ -992,24 +965,29 @@ static async Task<string> ResolveDatabaseProviderAsync(
 {
     var normalized = configuredProvider.Trim().ToLowerInvariant();
 
-    if (normalized is "sqlite")
-        return "sqlite";
+    // OPENAPI_EXPORT=true: Swashbuckle.AspNetCore.Cli precisa do builder DI registrado
+    // mas nao toca DB real. Aceita PostgreSQL "imaginario" — DbContext nao chega a abrir
+    // conexao (script retorna antes de app.Run() — ver bloco openapi-export ao final).
+    var isOpenApiExport = string.Equals(
+        Environment.GetEnvironmentVariable("OPENAPI_EXPORT"), "true", StringComparison.OrdinalIgnoreCase);
 
     if (normalized is "postgres" or "postgresql")
     {
+        if (isOpenApiExport) return "postgresql";
+
         if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
             await IsPostgresAvailableAsync(postgresConnectionString, logger))
             return "postgresql";
 
-        logger.Warning(
-            "PostgreSQL não disponível (connection string: {HasCs}). Usando SQLite como fallback.",
-            !string.IsNullOrWhiteSpace(postgresConnectionString));
-        return "sqlite";
+        throw new InvalidOperationException(
+            "PostgreSQL configurado mas indisponível. " +
+            "Verifique a connection string 'DefaultConnection' e a conectividade com o banco. " +
+            "Em dev, suba Postgres via Docker Compose ou aponte para o banco Render dev.");
     }
 
     if (normalized is "mongodb" or "mongo")
     {
-        // B2: Mongo descontinuado como provedor transacional. Falha r�pido para
+        // B2: Mongo descontinuado como provedor transacional. Falha rápido para
         // operador notar que precisa migrar para Postgres.
         throw new NotSupportedException(
             "MongoDB foi descontinuado como provedor transacional. " +
@@ -1018,6 +996,8 @@ static async Task<string> ResolveDatabaseProviderAsync(
 
     if (normalized is "auto")
     {
+        if (isOpenApiExport) return "postgresql";
+
         if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
             await IsPostgresAvailableAsync(postgresConnectionString, logger))
         {
@@ -1025,9 +1005,10 @@ static async Task<string> ResolveDatabaseProviderAsync(
             return "postgresql";
         }
 
-        // Auto n�o cai mais em Mongo (B2). PostgreSQL indispon�vel + Auto = SQLite (dev only).
-        logger.Warning("Auto-deteccao: PostgreSQL indispon�vel. Usando SQLite (dev/fallback).");
-        return "sqlite";
+        // Sem fallback: PostgreSQL é o único provedor transacional suportado (#261).
+        throw new InvalidOperationException(
+            "Auto-deteccao: PostgreSQL indisponível e não há fallback. " +
+            "Verifique a connection string 'DefaultConnection' (suba Postgres via Docker Compose em dev).");
     }
 
     throw new InvalidOperationException($"Database:Provider '{configuredProvider}' não suportado.");

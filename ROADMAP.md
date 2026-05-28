@@ -104,7 +104,7 @@ abertos hoje. Sao endereçados conforme aparece janela; nao bloqueiam Etapa 5.
 
 | ID | Item | Prioridade | Status |
 |---|---|---|---|
-| [ETK-0018](docs/tasks/backlog/ETK-0018-fix-sqlite-dev-fallback.yaml) | SQLite dev-fallback completo (paridade DI Postgre) | P1 | Backlog |
+| ~~ETK-0018~~ | ~~SQLite dev-fallback completo~~ | — | Resolvido em 2026-05-28 — Infra.Sqlite removida ([#261](https://github.com/michel-az-de/EasyStok/issues/261)) |
 | [ETK-0021](docs/tasks/backlog/ETK-0021-api-mongo-integration-tests-triagem.yaml) | Integration tests Mongo (triagem) | P1 | Backlog |
 | [ETK-0022](docs/tasks/backlog/ETK-0022-flaky-tests-catalog-cleanup.yaml) | Flaky tests catalog cleanup | P2 | Backlog |
 | [ETK-0023](docs/tasks/backlog/ETK-0023-architecture-tests-caixa.yaml) | Arch tests modulo Caixa | P2 | Backlog |

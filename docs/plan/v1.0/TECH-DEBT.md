@@ -64,17 +64,9 @@ Itens **conhecidos** que não bloqueiam v1.0 mas precisam ser tratados depois. C
 
 ---
 
-## D-005 — SQLite dev-fallback incompleto (`AddEasyStockSqliteInfrastructure`)
+## D-005 — ~~SQLite dev-fallback incompleto~~ (RESOLVIDO #261)
 
-**O que:** Registra ~25 repos a menos que Postgres. App **não sobe local sem Postgres em Development**.
-
-**Adiado por:** funcional sob Postgres em todos os ambientes.
-
-**Risco:** trava onboarding de dev novo + bloqueia testes ad-hoc.
-
-**Gatilho para tratar:**
-- ETK-DEV-001 (proposto no plano v1.0, Fase 2) — decide entre completar SQLite OU docker-compose Postgres dev.
-- Se ETK-DEV-001 entrar em v1.0, este débito sai daqui.
+**Resolvido em 2026-05-28** pela remoção do `EasyStock.Infra.Sqlite` (issue #261). PostgreSQL é o único provedor transacional suportado; dev usa Docker Compose ou Render dev DB.
 
 ---
 

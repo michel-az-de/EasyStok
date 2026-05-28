@@ -4,8 +4,8 @@ Guia para subir o módulo Mobile (Casa da Baba PWA) no EasyStock em produção.
 
 ## 1. Pré-requisitos
 
-- **PostgreSQL** acessível pela API. SQLite local funciona pra dev mas o
-  `MobileSchemaInitializer` só roda em PG (SQL é Postgres-specific).
+- **PostgreSQL** acessível pela API — provedor único suportado (#261). Em dev,
+  use Docker Compose ou aponte para o banco Render dev.
 - ASP.NET Core 9 + Capacitor 6 (já no repo).
 - Para APK: Android SDK + JDK 17+ (script `build-wsl.sh` cuida do rest).
 
@@ -179,10 +179,6 @@ Apps pareados continuam funcionando normalmente.
 - Comando expira em 24h se device não buscar.
 
 ## 6. Troubleshooting
-
-### "no such table: mobile_devices" em SQLite local
-**Causa**: `MobileSchemaInitializer` só roda em PostgreSQL. SQLite é só
-fallback dev sem suporte ao módulo mobile. Use Postgres em produção.
 
 ### Device aparece "inativo há X horas"
 **Causa**: app não consegue sincronizar. Verifica:

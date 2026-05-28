@@ -74,7 +74,7 @@ public sealed class FaturaReconciliacaoJob(
         var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
         if (db is null || !db.Database.IsNpgsql())
         {
-            // DEV/SQLite: roda sem lock (replica unica).
+            // Provider nao-PG (DI de teste): roda sem lock (replica unica).
             await action(ct);
             return;
         }

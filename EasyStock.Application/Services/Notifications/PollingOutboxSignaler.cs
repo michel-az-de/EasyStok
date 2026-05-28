@@ -3,7 +3,7 @@ namespace EasyStock.Application.Services.Notifications;
 /// <summary>
 /// Implementação fallback — apenas aguarda um <see cref="PeriodicTimer"/>.
 /// Sem capacidade de wakeup imediato (Signal é no-op). Usado quando LISTEN/NOTIFY
-/// não está disponível (SQLite, ambientes restritos, modo cron-only).
+/// não está disponível (ambientes restritos, modo cron-only).
 /// Singleton.
 /// </summary>
 public sealed class PollingOutboxSignaler : IOutboxSignaler, IDisposable

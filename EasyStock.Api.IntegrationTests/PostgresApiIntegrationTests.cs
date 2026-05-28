@@ -51,8 +51,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             _connString = externalPg;
             // WebApplicationFactory + Minimal API top-level: o ConfigureAppConfiguration
             // nem sempre sobrescreve o que o Program lê no startup (o GetConnectionString
-            // saía null → AddNpgSql quebrava / auto-detect caía p/ SQLite). Env vars são
-            // lidas pelo CreateBuilder de forma confiável (precedência alta, cedo).
+            // saía null → AddNpgSql quebrava). Env vars são lidas pelo CreateBuilder de
+            // forma confiável (precedência alta, cedo).
             Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", externalPg);
             Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
             Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
@@ -97,10 +97,9 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             {
                 // Development (padrão do WebApplicationFactory): roda migrations + seed
                 // demo (cria o admin de teste) no startup e liga ValidateOnBuild — que
-                // valida o container REAL de produção (branch postgresql). O auto-detect
-                // resolve PostgreSql porque a connection string vai via env var
-                // (ConnectionStrings__DefaultConnection, ver InitializeAsync) — antes saía
-                // null e caía no fallback SQLite.
+                // valida o container REAL de produção (branch postgresql). A connection
+                // string vai via env var (ConnectionStrings__DefaultConnection, ver
+                // InitializeAsync) — sem ela o resolver da-fail-fast (sem fallback, #261).
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>

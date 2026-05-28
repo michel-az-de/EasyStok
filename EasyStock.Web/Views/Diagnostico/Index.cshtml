@@ -386,7 +386,6 @@
                         <div class="flex justify-between"><span>Provider</span><span class="font-medium">@Model.Banco.Provider</span></div>
                         <div class="flex justify-between"><span>Latencia</span><span class="font-medium @LatBadgeClass(Model.Banco.LatenciaMs) px-1.5 rounded">@(Model.Banco.LatenciaMs)ms</span></div>
                         <div class="flex justify-between"><span>Migrations</span><span class="font-medium @(Model.Banco.MigrationsAplicadas == true ? "text-green-600" : "text-red-600")">@(Model.Banco.MigrationsAplicadas == true ? "OK" : "Falha")</span></div>
-                        @if (Model.Banco.Fallback) { <div class="text-amber-600 font-medium mt-1">Modo Fallback (SQLite)</div> }
                     </div>
                 </div>
 

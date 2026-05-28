@@ -34,8 +34,8 @@ public sealed class CobrancaAssinaturaJob(
             return;
         }
 
-        // pg_try_advisory_lock é exclusivo do PostgreSQL. Se outro provider (SQLite em dev),
-        // pulamos com warning para deixar explícito o risco em ambientes não-PG.
+        // pg_try_advisory_lock é exclusivo do PostgreSQL. Em provider não-PG (DI de teste
+        // ou config quebrada), pulamos com warning para deixar explícito o risco.
         if (!db.Database.IsNpgsql())
         {
             logger.LogWarning("CobrancaAssinaturaJob: provider {Provider} não suporta advisory lock — executando SEM lock.", db.Database.ProviderName);

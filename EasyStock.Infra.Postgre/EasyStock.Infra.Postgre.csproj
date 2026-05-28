@@ -7,12 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>EasyStock.Infra.Sqlite</_Parameter1>
-    </AssemblyAttribute>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
     <!-- Pin explícito: uma dep transitiva trazia EntityFrameworkCore.Relational 9.0.1
          enquanto EF Core/Npgsql são 9.0.4 — o Worker falhava no runtime ao carregar

@@ -38,20 +38,21 @@ try {
 
     # Env vars minimas pros validators de startup do Program.cs.
     # Fake/local — Swashbuckle CLI nao chega a abrir socket nem a tocar banco.
-    # OPENAPI_EXPORT=true sinaliza ao Program.cs pra retornar antes de app.Run(),
+    # OPENAPI_EXPORT=true sinaliza ao Program.cs pra (a) pular a checagem de
+    # disponibilidade do Postgres no resolver e (b) retornar antes de app.Run(),
     # evitando Host.StartAsync e os hosted services Postgres-only.
     # Staging desliga DI ValidateOnBuild (default so em Development) e evita
     # as fail-fasts Production-only do Program.cs. Swagger continua habilitado
-    # (Program.cs:753-755: app.Environment.IsStaging() habilita Swagger).
-    $env:OPENAPI_EXPORT                     = 'true'
-    $env:ASPNETCORE_ENVIRONMENT             = 'Staging'
-    $env:Jwt__SecretKey                     = 'openapi-export-fake-secret-key-32chars-min-len-ok'
-    $env:Jwt__Issuer                        = 'easystock-openapi-export'
-    $env:Jwt__Audience                      = 'easystock-openapi-export'
-    $env:Database__Provider                 = 'Sqlite'
-    $env:ConnectionStrings__SqliteConnection = 'Data Source=:memory:'
-    $env:RunMigrationsOnStartup             = 'false'
-    $env:Cors__AllowedOrigins__0            = 'http://localhost'
+    # (Program.cs: app.Environment.IsStaging() habilita Swagger).
+    $env:OPENAPI_EXPORT                          = 'true'
+    $env:ASPNETCORE_ENVIRONMENT                  = 'Staging'
+    $env:Jwt__SecretKey                          = 'openapi-export-fake-secret-key-32chars-min-len-ok'
+    $env:Jwt__Issuer                             = 'easystock-openapi-export'
+    $env:Jwt__Audience                           = 'easystock-openapi-export'
+    $env:Database__Provider                      = 'PostgreSQL'
+    $env:ConnectionStrings__DefaultConnection    = 'Host=openapi-export-fake;Database=fake;Username=fake;Password=fake'
+    $env:RunMigrationsOnStartup                  = 'false'
+    $env:Cors__AllowedOrigins__0                 = 'http://localhost'
 
     dotnet swagger tofile --output $outputFile $apiDll v1 | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet swagger tofile falhou (exit $LASTEXITCODE)" }

@@ -13,7 +13,6 @@ public static class ConfigurationKeys
     // ── Connection Strings ───────────────────────────────────────────────────
     public const string ConnectionDefault       = "DefaultConnection";
     public const string ConnectionMongo         = "MongoConnection";
-    public const string ConnectionSqlite        = "SqliteConnection";
     public const string ConnectionRedis         = "Redis";
 
     // ── JWT ──────────────────────────────────────────────────────────────────

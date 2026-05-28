@@ -139,7 +139,7 @@ public sealed class DiagnosticoLogsController(
                 TotalEntries = allEntries.Count,
                 Entradas = allEntries.ToArray(),
                 Resumo = DiagnosticoLogAnalyzer.BuildLogSummary(allEntries),
-                Padroes = DiagnosticoLogAnalyzer.DetectPatterns(allEntries, isFallback: false).ToArray()
+                Padroes = DiagnosticoLogAnalyzer.DetectPatterns(allEntries).ToArray()
             });
         }
         catch (Exception ex)
@@ -719,7 +719,7 @@ public sealed class DiagnosticoLogsController(
                 var cutoff = DateTime.UtcNow.AddDays(-30);
                 var entries = DiagnosticoLogAnalyzer.ParseEnhancedLogFile(tmpPath, cutoff);
                 var summary = DiagnosticoLogAnalyzer.BuildLogSummary(entries);
-                var padroes = DiagnosticoLogAnalyzer.DetectPatterns(entries, isFallback: false);
+                var padroes = DiagnosticoLogAnalyzer.DetectPatterns(entries);
 
                 return Ok(new EnhancedLogsResult
                 {

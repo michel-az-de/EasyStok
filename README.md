@@ -47,7 +47,7 @@ Categorias da `EasyStok.sln`:
 
 - **UI**: `EasyStock.Web`, `EasyStock.Admin`, `EasyStok.Mobile`
 - **Core**: `EasyStock.Domain`, `EasyStock.Application`
-- **Infra**: `EasyStock.Infra.Postgre` (migrations assembly), `EasyStock.Infra.MongoDb` (descartada como transacional — ADR 0001), `EasyStock.Infra.Sqlite` (fallback), `EasyStock.Infra.Notifications`, `EasyStock.Infra.Async`
+- **Infra**: `EasyStock.Infra.Postgre` (migrations assembly), `EasyStock.Infra.MongoDb` (descartada como transacional — ADR 0001), `EasyStock.Infra.Notifications`, `EasyStock.Infra.Async`
 - **Tests**: Domain.Tests, Application.Tests, Api.UnitTests, Api.IntegrationTests (Testcontainers), Infra.Postgre.IntegrationTests, ArchitectureTests
 - **Outros**: `EasyStock.Api`, `EasyStock.Worker`, `EasyStock.Benchmarks`
 

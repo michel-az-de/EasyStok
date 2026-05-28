@@ -244,7 +244,7 @@ public static class DiagnosticoLogAnalyzer
     /// <summary>
     /// Detecta padrões anômalos nas entradas de log. Inclui regressão de performance entre deploys.
     /// </summary>
-    public static List<DetectedPattern> DetectPatterns(List<EnhancedLogEntry> entries, bool isFallback = false)
+    public static List<DetectedPattern> DetectPatterns(List<EnhancedLogEntry> entries)
     {
         var patterns = new List<DetectedPattern>();
         var errorEntries = entries.Where(e => e.Level is "ERROR" or "FATAL").ToList();
@@ -378,21 +378,6 @@ public static class DiagnosticoLogAnalyzer
                     AlertaId = ComputeAlertaId("error_spike", $"Pico de erros: {spike.Value} erros em 5min")
                 });
             }
-        }
-
-        // 6. Aviso de configuração (fallback ativo)
-        if (isFallback)
-        {
-            const string descricao = "API operando em modo fallback (SQLite)";
-            patterns.Add(new DetectedPattern
-            {
-                Tipo = "config_warning",
-                Severidade = "warning",
-                Descricao = descricao,
-                Sugestao = "O banco principal estava indisponível no startup. Reinicie a API após corrigir a conexão principal.",
-                Ocorrencias = 1,
-                AlertaId = ComputeAlertaId("config_warning", descricao)
-            });
         }
 
         // 7. Regressão de performance entre deploys

@@ -1,23 +1,14 @@
 using System.Data.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace EasyStock.Infra.Postgre.Services;
 
 /// <summary>
 /// Implementacao do <see cref="IFaturaNumeradorService"/> para PostgreSQL.
-///
-/// <para>
 /// Usa <c>INSERT ... ON CONFLICT DO UPDATE RETURNING</c> em transacao curta —
 /// atomico em multi-pod sem locking pessimista no agregado <c>Fatura</c>.
-/// </para>
-///
-/// <para>
-/// Em provedores nao-PG (SQLite em dev), usa fallback com <see cref="DbContext"/>
-/// e bloqueio via SaveChanges (concorrencia limitada).
-/// </para>
 /// </summary>
 public sealed class FaturaNumeradorService(EasyStockDbContext db) : IFaturaNumeradorService
 {
@@ -27,18 +18,7 @@ public sealed class FaturaNumeradorService(EasyStockDbContext db) : IFaturaNumer
             throw new ArgumentException("EmpresaId obrigatorio.", nameof(empresaId));
 
         var ano = dataEmissao.Year;
-
-        long ultimoNumero;
-
-        if (db.Database.IsNpgsql())
-        {
-            ultimoNumero = await GerarPostgresAsync(empresaId, ano, ct);
-        }
-        else
-        {
-            ultimoNumero = await GerarFallbackAsync(empresaId, ano, ct);
-        }
-
+        var ultimoNumero = await GerarPostgresAsync(empresaId, ano, ct);
         return $"{ano}-{ultimoNumero:D6}";
     }
 
@@ -69,32 +49,6 @@ public sealed class FaturaNumeradorService(EasyStockDbContext db) : IFaturaNumer
         var result = await cmd.ExecuteScalarAsync(ct)
             ?? throw new InvalidOperationException("Nao foi possivel gerar numero de fatura.");
         return Convert.ToInt64(result);
-    }
-
-    private async Task<long> GerarFallbackAsync(Guid empresaId, int ano, CancellationToken ct)
-    {
-        var contador = await db.FaturaContadores
-            .FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Ano == ano, ct);
-
-        if (contador is null)
-        {
-            contador = new Domain.Entities.FaturaContador
-            {
-                EmpresaId = empresaId,
-                Ano = ano,
-                UltimoNumero = 1,
-                AtualizadoEm = DateTime.UtcNow
-            };
-            db.FaturaContadores.Add(contador);
-        }
-        else
-        {
-            contador.UltimoNumero += 1;
-            contador.AtualizadoEm = DateTime.UtcNow;
-        }
-
-        await db.SaveChangesAsync(ct);
-        return contador.UltimoNumero;
     }
 
     private static void AddParam(DbCommand cmd, string name, object value)

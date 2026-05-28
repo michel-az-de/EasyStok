@@ -129,7 +129,7 @@ public sealed class DiagnosticoController(
                             TotalEntries = allEntries.Count,
                             Entradas = allEntries.TakeLast(500).ToArray(),
                             Resumo = DiagnosticoLogAnalyzer.BuildLogSummary(allEntries),
-                            Padroes = DiagnosticoLogAnalyzer.DetectPatterns(allEntries, infraState.IsFallback).ToArray()
+                            Padroes = DiagnosticoLogAnalyzer.DetectPatterns(allEntries).ToArray()
                         };
                     }
                 }
@@ -168,7 +168,7 @@ public sealed class DiagnosticoController(
 
         try
         {
-            if (infraState.DatabaseProvider is "postgresql" or "sqlite")
+            if (infraState.DatabaseProvider is "postgresql")
             {
                 using var scope = HttpContext.RequestServices.CreateScope();
                 var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
@@ -191,9 +191,6 @@ public sealed class DiagnosticoController(
 
         sw.Stop();
         status.LatenciaMs = sw.ElapsedMilliseconds;
-
-        if (status.Fallback)
-            status.CausaProvavel ??= "Banco principal indisponível — operando em modo fallback (SQLite).";
 
         return status;
     }
@@ -346,15 +343,6 @@ public sealed class DiagnosticoController(
                 Severidade = "critical",
                 Descricao = r.Banco.CausaProvavel ?? "Banco de dados inacessível.",
                 Sugestao = "Verifique a connection string em ConnectionStrings:DefaultConnection e se o serviço está no ar."
-            });
-
-        if (r.Banco.Fallback)
-            causas.Add(new CausaProvavel
-            {
-                Componente = "Banco de Dados",
-                Severidade = "warning",
-                Descricao = "Operando em modo fallback (SQLite).",
-                Sugestao = "O banco principal (PostgreSQL/MongoDB) estava indisponível no startup. Reinicie a API após corrigir a conexão."
             });
 
         if (!r.Configuracoes.JwtSecretPresente)
