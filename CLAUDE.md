@@ -147,14 +147,22 @@ Sistema ETK (v2.1) arquivado em:
   - scripts/_arquivo/tasks-2026-05-28/
   - ADR-0020 marcado como Superseded por ADR-0022
 
-Pendencias arquiteturais EM ABERTO (rastreadas como GitHub Issues — ver §4.5):
-- SQLite dev-fallback incompleto (issue #261)
-- Modulo Caixa (issue #258)
-- Modulo NFe (issue #259)
-- Rotulagem P-02 (issue #260)
-- Marco zero v1.0 (issue #256)
-- Defesas estruturais (issue #257)
-- IntegrationTests Api+Mongo (issue #201)
+Pendencias arquiteturais EM ABERTO: rastreadas no board GitHub.
+Lista live: https://github.com/michel-az-de/EasyStok/issues
+
+Estado em 2026-05-28 pos-board-setup: 19 issues abertas
+  - 1 P0: #263 checkout storefront E2E (bloqueia golden path GP-029)
+  - 10 P1: #256 v1.0, #258 Caixa, #259 NFe, #260 Rotulagem,
+           #262 code-review epic, #264 Pedido x Pix, #265 estorno Pix,
+           #268 reuso OTP, #272 OTel, #273 web ConnectionClosed
+  - 8 P2: #201 IntegrationTests Mongo, #257 defesas, #261 SQLite dev,
+          #266 SSE pedido, #267 ContaPagar P2P, #269 refresh token,
+          #270 flaky cleanup, #271 OpenAPI Swagger
+
+Filtros uteis:
+- gh issue list --label priority:p0
+- gh issue list --label priority:p1
+- gh issue list --label caixa
 
 Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018 (Aceito, 2026-05-17).
 
