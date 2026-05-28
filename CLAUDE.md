@@ -150,7 +150,7 @@ Sistema ETK (v2.1) arquivado em:
 Pendencias arquiteturais EM ABERTO: rastreadas no board GitHub.
 Lista live: https://github.com/michel-az-de/EasyStok/issues
 
-Estado em 2026-05-28 final: 36 issues abertas
+Estado em 2026-05-28 final: 35 issues abertas (apos #261 resolvida)
   - 5 P0 (bloqueadores): #263 checkout E2E, #274 test coverage <30%,
                          #275 RLS audit prod, #289 EfiPix sem SELECT FOR UPDATE,
                          #290 NFC-e duplicada SEFAZ
@@ -160,7 +160,7 @@ Estado em 2026-05-28 final: 36 issues abertas
                  #282 cache deadlock, #283 NuGet outdated),
                  bugs (#268 OTP reuse, #273 web ConnectionClosed),
                  outros (#262 CR epic, #264/265 Pedido x Pix, #272 OTel)
-  - 12 P2 (media): #201 IntegrationTests Mongo, #257 defesas, #261 SQLite dev,
+  - 11 P2 (media): #201 IntegrationTests Mongo, #257 defesas,
                   #266 SSE, #267 P2P, #269 refresh token, #270 flaky, #271 Swagger,
                   #284 auth hardening, #285 audit log, #286 CSP, #287 async patterns
   - 1 P3 (baixa): #288 quality cleanup (warnings + god class + DateTime.Now + etc)
@@ -185,30 +185,64 @@ URLs:
 - Issues: https://github.com/michel-az-de/EasyStok/issues
 - Project board v2: https://github.com/users/michel-az-de/projects/1
 
-Fluxo de trabalho diario:
-1. Abre o board, escolhe uma issue da coluna "Doing" (ou move uma de "Backlog")
-2. Trabalha em master direto (sem branch — politica R1)
-3. Commit com referencia: \`tipo(escopo): descricao\\n\\ncloses #NNN\`
-4. Push (apos GO do Felipe — R9)
-5. Issue fecha automatico, board move pra "Done"
+### Politica canonica (vinculante para todo agente)
 
-Labels existentes:
+**P1. Toda tarefa abre issue.** Sem isencao por tamanho. Typo de 1 linha,
+refactor de 10 arquivos, plano arquitetural — tudo abre issue ANTES de
+qualquer commit. Sem issue, sem trabalho. (Substitui a antiga isencao
+de < 100 LoC / < 5 arquivos.)
+
+**P2. Agente abre issue se nao existir.** Fluxo padrao:
+  1. Felipe pede X.
+  2. Agente busca: \`gh issue list --search "X"\` + lista de abertas relevantes.
+  3. Se existe issue cobrindo X -> agente confirma com Felipe e usa essa.
+  4. Se nao existe -> agente abre draft via \`gh issue create\` com:
+     - Titulo imperativo curto (< 70 chars)
+     - Body em markdown: Contexto + Escopo proposto + Entrega + Acceptance
+     - Labels: modulo + prioridade
+  5. **Agente aguarda aprovacao explicita do Felipe antes de tocar codigo.**
+
+**P3. Status no board atualiza junto com o trabalho.**
+  - Ao iniciar: agente comenta na issue "Doing — iniciado em \`<data>\`. Plano
+    confirmado: ..." e move para \`Doing\` no Project board (manualmente ou
+    via automation do board).
+  - Ao fechar: commit com \`closes #N\` move automaticamente para \`Done\`.
+
+**P4. Comentarios no decorrer (apenas nos 4 momentos abaixo — nao a cada commit):**
+  - **Plano inicial confirmado** (1 comentario ao comecar).
+  - **Decisao nao-obvia** (escolha entre 2+ opcoes com trade-off): registra
+    opcoes consideradas + escolha + porque.
+  - **Blocker / premissa refutada (R10):** medicao contradiz o que o plano
+    supunha -> comenta + pede direcao.
+  - **Fechamento** (1 comentario antes do \`closes #N\`): o que ficou pra
+    outra issue (linkar), gotchas descobertos, proximos passos sugeridos.
+
+**P5. Commit referencia a issue.** Mensagem obrigatoria:
+\`tipo(escopo): descricao\\n\\ncloses #NNN\`
+(ou \`refs #NNN\` em commits intermediarios de um trabalho fatiado).
+
+### Comandos uteis
+
+Filtros:
+- \`gh issue list --label priority:p0\`
+- \`gh issue list --label priority:p1 --label caixa\`
+- \`gh issue list --search "X in:title"\`
+- \`gh issue view N --comments\`
+
+Criar issue (template basico):
+  gh issue create --repo michel-az-de/EasyStok \\
+    --title "..." --label "modulo,priority:pN" --body-file <path>
+
+Comentar via arquivo (evita problemas de escape no shell):
+  gh issue comment N --repo michel-az-de/EasyStok --body-file <path>
+
+### Labels existentes
+
 - Modulo: \`caixa\`, \`nfe\`, \`rotulagem\`, \`mobile\`, \`storefront\`, \`pwa\`,
   \`infra\`, \`web-api\`, \`domain\`, \`migrations\`
 - Prioridade: \`priority:p0\` (bloqueador), \`priority:p1\` (alta),
   \`priority:p2\` (media), \`priority:p3\` (baixa)
 - Default: \`bug\`, \`enhancement\`, \`documentation\`, etc.
-
-Criar issue nova:
-  gh issue create --repo michel-az-de/EasyStok \\
-    --title "..." --label "modulo,priority:pN" --body "..."
-
-Fechar via commit (sem precisar abrir issue manualmente):
-  git commit -m "fix(caixa): bla bla\\n\\ncloses #258"
-
-Para tarefas micro (< 100 LoC, < 5 arquivos): NAO precisa abrir issue.
-Commit direto em master conforme R1. Issue e para trabalho que merece
-rastrear (>= ~1h de esforco ou que sera retomado em outra sessao).
 
 ## 5. PROTOCOLO DE FIM DE SESSAO
 
@@ -232,3 +266,45 @@ Antes de operar em area sensivel:
 - docs/adr/0019-mobile-controllers-response-pattern.md
 - docs/adr/0022-master-first-trunk-based.md  # ESTE PROTOCOLO v3.0
 - docs/dev/flaky-tests.md
+
+## 7. COMPORTAMENTO DE DESENVOLVEDOR SENIOR
+
+Todo agente que opera neste repositorio segue os 7 principios abaixo. VINCULANTE.
+
+**PS1. Medir antes de afirmar (R10 reforcada).**
+Toda afirmacao quantitativa, taxonomica ou de estado ("X e Y", "isto e trivial",
+"Z nao usa isto", "N% disso e W") exige 1 comando de medicao imediatamente antes
+(\`grep\`, \`git diff\`, \`git log\`, \`dotnet build\`, \`gh api\`, etc.). Sem
+medicao, nao afirma — pergunta ou investiga primeiro.
+
+**PS2. Root-cause antes de sintoma.**
+Bug ou falha NAO e silenciado com try/catch generico, \`--no-verify\`, retry
+loop, ou ignorar warning. Investiga ate a causa real ficar clara. Se a fix
+paliativa e a escolha consciente (custo da fix real > custo do bug), o
+trade-off vai documentado na issue.
+
+**PS3. Recusa pedido ambiguo, pergunta antes (R13 reforcada).**
+Quando o pedido tem 2+ interpretacoes razoaveis com consequencias diferentes,
+pergunta — 1 decisao > 1 commit errado. Nunca "infere generosamente" e segue.
+Pergunta UMA vez, decisiva — sem hesitacao serial.
+
+**PS4. Fatia trabalho grande em commits build-verdes.**
+Qualquer R5 (> 100 LoC / > 5 arquivos / breaking change / toca
+Program.cs/migrations/Dockerfile/fly.toml) e fatiavel em sequencia de commits
+build-verdes em master. Apresenta o plano de fatiamento, espera OK. Nada de
+WIP entre commits.
+
+**PS5. Registra trade-offs no lugar certo.**
+Decisao com 2+ opcoes defensaveis -> justificativa vai na **issue** (ou ADR
+se afetar arquitetura), nunca apenas na commit message. Commit message
+reflete a decisao; issue/ADR explica por que.
+
+**PS6. Self-review do plano antes de apresentar.**
+Antes de cada plano significativo, agente roda mentalmente as 5 perguntas:
+contradicao interna, premissas nao-medidas, capacidade realista, correlacao
+entre fases, pior cenario. Se alguma falhar, refaz o plano antes de apresentar.
+
+**PS7. Pausa quando estado contradiz premissa.**
+Working tree, \`git log\`, build, ou output de comando contradiz o que foi
+assumido no inicio -> PARA, reporta, espera direcao. Nunca reconcilia
+silenciosamente. (Ver tambem R10 e PS1.)
