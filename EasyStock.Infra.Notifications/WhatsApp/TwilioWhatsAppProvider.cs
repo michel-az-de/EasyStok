@@ -2,10 +2,10 @@ using System.Net.Http.Headers;
 using System.Text;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Notifications.Options;
+using EasyStock.Infra.Notifications.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
-using Polly.Retry;
 
 namespace EasyStock.Infra.Notifications.WhatsApp;
 
@@ -16,15 +16,8 @@ public sealed class TwilioWhatsAppProvider(
 {
     public string Nome => "twilio";
 
-    private static readonly ResiliencePipeline Pipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 3,
-            BackoffType = DelayBackoffType.Exponential,
-            Delay = TimeSpan.FromSeconds(1),
-            ShouldHandle = new PredicateBuilder().Handle<HttpRequestException>()
-        })
-        .Build();
+    private static readonly ResiliencePipeline Pipeline =
+        NotificationResiliencePipelineFactory.CreateHttpProviderPipeline();
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
