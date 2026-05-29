@@ -16,7 +16,6 @@ using EasyStock.Infra.Postgre.Repositories.Reporting;
 using EasyStock.Infra.Postgre.Reporting;
 using EasyStock.Worker.BackgroundServices;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Worker.DependencyInjection;
 

@@ -3,9 +3,6 @@ using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Reporting;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Worker.BackgroundServices;
 

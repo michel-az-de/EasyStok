@@ -1,7 +1,4 @@
 using EasyStock.Application.Ports.Output.Integration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Worker.BackgroundServices;
 
