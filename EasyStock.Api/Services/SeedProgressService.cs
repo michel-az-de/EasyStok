@@ -1,9 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Api.Services;
 

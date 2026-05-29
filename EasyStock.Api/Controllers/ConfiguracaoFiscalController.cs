@@ -1,16 +1,8 @@
-using EasyStock.Api.Http;
 using EasyStock.Api.Models.Fiscal;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Fiscal;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

@@ -1,12 +1,7 @@
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Public;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
-using System.ComponentModel.DataAnnotations;
 
 namespace EasyStock.Api.Controllers.Public;
 

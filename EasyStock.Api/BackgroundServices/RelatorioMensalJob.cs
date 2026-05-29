@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Entities;
-
 namespace EasyStock.Api.BackgroundServices;
 
 /// <summary>

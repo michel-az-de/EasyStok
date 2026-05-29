@@ -1,11 +1,7 @@
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.UseCases.Reports;
 using EasyStock.Domain.Reporting;
-using EasyStock.Api.Http;
 using EasyStock.Infra.Async.Reporting;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Controllers;
 

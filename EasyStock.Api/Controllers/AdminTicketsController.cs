@@ -1,13 +1,6 @@
-using EasyStock.Api.Http;
-using EasyStock.Api.Services;
 using EasyStock.Api.Services.Helpdesk;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
-using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Controllers;
 

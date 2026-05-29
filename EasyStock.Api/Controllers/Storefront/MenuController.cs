@@ -1,12 +1,8 @@
 ﻿using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 

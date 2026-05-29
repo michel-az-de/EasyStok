@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EasyStock.Api.Models.Fiscal;
 
 public sealed class ConfigurarCscRequest

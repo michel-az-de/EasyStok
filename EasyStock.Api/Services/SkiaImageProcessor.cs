@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Storage;
-using Microsoft.Extensions.Logging;
 using SkiaSharp;
 
 namespace EasyStock.Api.Services;

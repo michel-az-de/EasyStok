@@ -1,5 +1,3 @@
-using EasyStock.Api.Configuration;
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Analytics.AlertasDias;
 using EasyStock.Application.UseCases.Analytics.Alertas;
 using EasyStock.Application.UseCases.Analytics.Dashboard;
@@ -16,9 +14,6 @@ using EasyStock.Application.UseCases.Analytics.Validade;
 using EasyStock.Application.UseCases.Analytics.ReceitaCusto;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
 using EasyStock.Application.UseCases.Analytics.DashboardExtras;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 

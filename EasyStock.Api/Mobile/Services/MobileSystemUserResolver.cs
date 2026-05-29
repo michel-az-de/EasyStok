@@ -1,6 +1,4 @@
-using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Mobile.Services;
 

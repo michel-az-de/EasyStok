@@ -1,8 +1,5 @@
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace EasyStock.Api.Mobile.Controllers;
 

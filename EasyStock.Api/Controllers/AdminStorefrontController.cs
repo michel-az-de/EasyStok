@@ -1,16 +1,11 @@
-﻿using EasyStock.Api.Http;
-using EasyStock.Api.Services;
-using EasyStock.Application.UseCases.Admin.Storefront.AtivarStorefrontAdmin;
+﻿using EasyStock.Application.UseCases.Admin.Storefront.AtivarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.CriarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.DesativarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.EditarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.ListarStorefrontsAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.ObterStorefrontAdmin;
 using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Controllers;
 

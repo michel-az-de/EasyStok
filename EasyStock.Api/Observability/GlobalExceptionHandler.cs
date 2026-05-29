@@ -1,12 +1,7 @@
 using System.Text.Json;
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Api.Observability;
 

@@ -1,14 +1,10 @@
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Services.Faturacao;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.BackgroundServices;

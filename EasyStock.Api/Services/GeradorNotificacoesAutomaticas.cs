@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Api.Services;
 
 public sealed class GeradorNotificacoesAutomaticas(

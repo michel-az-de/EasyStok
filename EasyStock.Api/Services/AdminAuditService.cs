@@ -1,4 +1,3 @@
-using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using System.Security.Claims;
 

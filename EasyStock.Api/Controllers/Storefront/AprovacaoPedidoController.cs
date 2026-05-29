@@ -1,10 +1,6 @@
 ﻿using System.Security.Claims;
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers.Storefront;

@@ -1,5 +1,4 @@
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace EasyStock.Api.Mobile.Schema;

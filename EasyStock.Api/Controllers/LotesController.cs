@@ -1,6 +1,3 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
 using EasyStock.Application.UseCases.ConferirEtiqueta;
@@ -10,11 +7,6 @@ using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.RemoverItemLote;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

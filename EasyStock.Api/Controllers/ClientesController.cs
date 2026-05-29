@@ -1,5 +1,3 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AdicionarClienteDocumento;
 using EasyStock.Application.UseCases.AdicionarClienteEndereco;
 using EasyStock.Application.UseCases.AdicionarClienteTelefone;
@@ -13,9 +11,6 @@ using EasyStock.Application.UseCases.ReativarCliente;
 using EasyStock.Application.UseCases.RemoverClienteDocumento;
 using EasyStock.Application.UseCases.RemoverClienteEndereco;
 using EasyStock.Application.UseCases.RemoverClienteTelefone;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

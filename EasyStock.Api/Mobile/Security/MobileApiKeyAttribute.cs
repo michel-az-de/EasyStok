@@ -3,9 +3,7 @@ using System.Text;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Mobile.Security;
 

@@ -1,6 +1,4 @@
 using EasyStock.Application.Ports.Output.Caching;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Enums;
 using System.Security.Claims;
 using System.Text.Json;
 

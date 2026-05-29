@@ -1,4 +1,3 @@
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Inteligencia.Board;
 using EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
 using EasyStock.Application.UseCases.Inteligencia.Rotatividade;
@@ -7,9 +6,6 @@ using EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
 using EasyStock.Application.UseCases.Inteligencia.ProximoVencimento;
 using EasyStock.Application.UseCases.Inteligencia.ItensParados;
 using EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 

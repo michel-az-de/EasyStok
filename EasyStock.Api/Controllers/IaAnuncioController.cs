@@ -1,11 +1,6 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.UseCases.AnuncioIa;
 using EasyStock.Application.UseCases.Common;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Text;
 using System.Text.Json;

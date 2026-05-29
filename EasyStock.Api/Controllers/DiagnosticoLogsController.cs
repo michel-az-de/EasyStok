@@ -1,14 +1,9 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Observability;
 using EasyStock.Application.Ports.Output.Storage;
-using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Controllers;
 

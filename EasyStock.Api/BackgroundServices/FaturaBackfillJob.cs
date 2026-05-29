@@ -1,12 +1,7 @@
 using EasyStock.Api.Services.Faturacao;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Api.BackgroundServices;
 

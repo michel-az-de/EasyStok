@@ -1,10 +1,4 @@
-using EasyStock.Api.Http;
-using EasyStock.Api.Services;
-using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Controllers;
 

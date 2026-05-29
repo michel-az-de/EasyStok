@@ -1,13 +1,5 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
-using System.ComponentModel.DataAnnotations;
 
 namespace EasyStock.Api.Controllers;
 

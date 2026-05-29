@@ -1,16 +1,6 @@
-using EasyStock.Api.Http;
-using EasyStock.Api.Services;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
 using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Constants;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Services.Helpdesk;
 

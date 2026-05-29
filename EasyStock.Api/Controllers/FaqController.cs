@@ -1,8 +1,5 @@
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Faq;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Controllers

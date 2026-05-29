@@ -1,7 +1,4 @@
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.ListarPlanos;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

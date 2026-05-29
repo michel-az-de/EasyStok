@@ -1,8 +1,5 @@
-﻿using EasyStock.Api.Http;
-using EasyStock.Application.UseCases.Storefront.Avaliacao;
+﻿using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 

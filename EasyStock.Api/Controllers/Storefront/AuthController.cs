@@ -1,9 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using EasyStock.Api.Http;
-using EasyStock.Application.UseCases.Storefront.Auth;
+﻿using EasyStock.Application.UseCases.Storefront.Auth;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 

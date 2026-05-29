@@ -1,10 +1,6 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.BackgroundServices;
 

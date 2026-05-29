@@ -1,9 +1,5 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Notifications.WhatsApp;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Controllers;
 

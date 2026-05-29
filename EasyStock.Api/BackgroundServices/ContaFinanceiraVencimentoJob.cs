@@ -1,11 +1,9 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.BackgroundServices;
 

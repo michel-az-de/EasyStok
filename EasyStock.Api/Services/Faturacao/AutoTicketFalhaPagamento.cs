@@ -1,9 +1,5 @@
 using EasyStock.Api.Services.Helpdesk;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Services.Faturacao;
 

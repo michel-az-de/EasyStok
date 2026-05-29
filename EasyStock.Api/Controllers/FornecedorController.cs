@@ -1,6 +1,3 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarFornecedor;
 using EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor;
 using EasyStock.Application.UseCases.CriarFornecedor;
@@ -9,9 +6,6 @@ using EasyStock.Application.UseCases.ReativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
 using EasyStock.Application.UseCases.Pedido;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

@@ -1,13 +1,7 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AlterarPlano;
 using EasyStock.Application.UseCases.CancelarAssinatura;
 using EasyStock.Application.UseCases.ListarFaturas;
 using EasyStock.Application.UseCases.PagarAgora;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

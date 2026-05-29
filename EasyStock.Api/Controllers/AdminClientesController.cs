@@ -1,18 +1,10 @@
-using EasyStock.Api.Http;
-using EasyStock.Api.Services;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Admin.AnonimizarUsuarioPorAdmin;
 using EasyStock.Application.UseCases.AtualizarLoja;
 using EasyStock.Application.UseCases.CriarLoja;
 using EasyStock.Application.UseCases.DesativarLoja;
 using EasyStock.Application.UseCases.ReativarLoja;
 using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace EasyStock.Api.Controllers;

@@ -1,11 +1,7 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Api.Http;
 

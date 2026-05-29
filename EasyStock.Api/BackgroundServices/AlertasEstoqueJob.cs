@@ -1,5 +1,3 @@
-using EasyStock.Api.Services;
-
 namespace EasyStock.Api.BackgroundServices;
 
 /// <summary>

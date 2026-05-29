@@ -1,12 +1,6 @@
-using System.Text;
 using System.Text.Json;
-using EasyStock.Api.Http;
 using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
 using EasyStock.Infra.Integrations.Fiscal.FocusNFe;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

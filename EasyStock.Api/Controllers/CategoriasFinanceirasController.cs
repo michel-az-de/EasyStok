@@ -1,11 +1,6 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.Categorias;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Financeiro;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

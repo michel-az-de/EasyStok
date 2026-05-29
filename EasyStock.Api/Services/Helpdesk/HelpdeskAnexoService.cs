@@ -1,10 +1,6 @@
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Services.Helpdesk;
 

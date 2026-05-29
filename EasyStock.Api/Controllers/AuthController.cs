@@ -1,8 +1,5 @@
-using EasyStock.Api.Http;
-using EasyStock.Api.Services;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
-using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
@@ -15,12 +12,8 @@ using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.ResetarSenha;
-using EasyStock.Application.Ports.Output.Persistence;
-using Microsoft.AspNetCore.Mvc;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Swashbuckle.AspNetCore.Annotations;
 using IJwtTokenService = EasyStock.Api.Services.IJwtTokenService;
 

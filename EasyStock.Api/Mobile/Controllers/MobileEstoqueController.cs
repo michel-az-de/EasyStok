@@ -1,6 +1,4 @@
 using EasyStock.Api.Mobile.Security;
-using EasyStock.Application.Ports.Output.Persistence;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Mobile.Controllers;
 

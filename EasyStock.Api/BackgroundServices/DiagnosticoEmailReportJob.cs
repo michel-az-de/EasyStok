@@ -1,6 +1,5 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Observability;
-using EasyStock.Application.Ports.Output;
 
 namespace EasyStock.Api.BackgroundServices;
 

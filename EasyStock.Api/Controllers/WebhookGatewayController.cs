@@ -1,9 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Pagamentos;
-using EasyStock.Application.Ports.Output.Persistence;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Controllers;
 

@@ -1,13 +1,7 @@
 using System.Security.Claims;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CriarCliente;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
 namespace EasyStock.Api.Mobile.Controllers;
 

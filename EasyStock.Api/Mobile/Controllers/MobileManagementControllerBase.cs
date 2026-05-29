@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Mvc;
-
 namespace EasyStock.Api.Mobile.Controllers;
 
 /// <summary>

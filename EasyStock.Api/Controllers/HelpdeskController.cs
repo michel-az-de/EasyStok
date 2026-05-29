@@ -1,11 +1,6 @@
-using EasyStock.Api.Http;
 using EasyStock.Api.Services.Helpdesk;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.TicketSuporte;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

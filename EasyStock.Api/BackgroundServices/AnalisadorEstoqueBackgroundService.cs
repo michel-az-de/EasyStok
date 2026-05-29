@@ -1,7 +1,3 @@
-using EasyStock.Api.Configuration;
-using Microsoft.Extensions.Options;
-using EasyStock.Api.Services;
-
 namespace EasyStock.Api.BackgroundServices
 {
     public sealed class AnalisadorEstoqueBackgroundService(

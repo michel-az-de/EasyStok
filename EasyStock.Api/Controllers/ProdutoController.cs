@@ -1,5 +1,3 @@
-using EasyStock.Api.Http;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Etiquetas;
@@ -7,10 +5,6 @@ using EasyStock.Application.UseCases.GerenciarProduto;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
 using EasyStock.Application.Validators;
-using EasyStock.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

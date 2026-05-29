@@ -1,9 +1,7 @@
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.Integration;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Data.Tenants;
 

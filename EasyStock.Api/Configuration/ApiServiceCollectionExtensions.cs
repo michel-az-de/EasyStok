@@ -1,15 +1,10 @@
 using EasyStock.Api.Authorization;
-using EasyStock.Api.Http;
 using EasyStock.Api.Observability;
-using EasyStock.Api.Services;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;

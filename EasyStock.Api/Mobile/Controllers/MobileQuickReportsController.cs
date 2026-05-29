@@ -1,7 +1,5 @@
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Async.Reporting.QuickReports;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Api.Mobile.Controllers;
 

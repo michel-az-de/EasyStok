@@ -1,19 +1,12 @@
-using EasyStock.Api.Http;
 using EasyStock.Api.Models.Fiscal;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
 // Aliases para evitar fully-qualified names no MapearExcecaoFiscal abaixo.
 using EasyStock.Application.UseCases.Fiscal.ConsultarNfe;
 using EasyStock.Application.UseCases.Fiscal.EmitirNfce;
 using EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Fiscal;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;

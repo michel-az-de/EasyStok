@@ -1,14 +1,9 @@
 using System.Security.Claims;
 using EasyStock.Api.Mobile.Security;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Api.Mobile.Controllers;
 

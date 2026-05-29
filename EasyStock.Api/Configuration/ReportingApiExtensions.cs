@@ -18,7 +18,6 @@ using EasyStock.Infra.Async.Reporting.Handlers.Admin;
 using EasyStock.Infra.Async.Reporting.Handlers.Fiscal;
 using EasyStock.Infra.Postgre.Repositories.Reporting;
 using EasyStock.Infra.Postgre.Reporting;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Api.Configuration;
 
