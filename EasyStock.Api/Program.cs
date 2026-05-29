@@ -5,7 +5,6 @@ using EasyStock.Api.DependencyInjection;
 using EasyStock.Api.Observability;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Validators;
-using EasyStock.Infra.Notifications.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Infra.Integrations.DependencyInjection;
@@ -181,29 +180,8 @@ builder.Services.Configure<EasyStockConfiguracoes>(
 builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfiguracoes>(sp =>
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EasyStockConfiguracoes>>().Value);
 
-// ── Notifications: infra (canal adapters + Scriban) + hosting (orchestrators/options) ──
-// Hosting fica como "Disabled" por default na API — ative trocando "Notifications:Hosting:Mode"
-// para "Hosted" se quiser rodar o pipeline in-process (modo sem Worker).
-// AddPostgresOutboxSignaler é no-op se Mode=Disabled ou Signaler!=Postgres (ver impl).
-builder.Services.AddNotificationsInfra(builder.Configuration);
-builder.Services
-    .AddNotificationsHosting(builder.Configuration)
-    .AddPostgresOutboxSignaler(builder.Configuration);
-builder.Services.AddScoped<PostgresAdvisoryLock>();
-
-// Aviso explicito quando o pipeline de notificacoes vai rodar in-process: nao ha bulkhead
-// real entre HTTP da API e os 3 loops (compartilham ThreadPool, GC e memoria). Modo
-// suportado para Render free tier ou dev/teste; em producao prefira Worker como deploy
-// separado (Notifications:Hosting:Mode=Disabled aqui + Mode=Hosted no Worker).
-{
-    var notifMode = builder.Configuration["Notifications:Hosting:Mode"];
-    if (string.Equals(notifMode, "Hosted", StringComparison.OrdinalIgnoreCase))
-    {
-        Log.Warning(
-            "Notifications:Hosting:Mode=Hosted na API — pipeline rodando in-process. " +
-            "Sem isolamento de processo entre HTTP e loops; monitore /health/dispatcher.");
-    }
-}
+// ── Notifications: infra (canais + Scriban) + hosting (orchestrators) + signaler ──
+builder.Services.AddEasyStockNotificationsModule(builder.Configuration);
 
 // ── Background Services + misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
