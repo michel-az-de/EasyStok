@@ -30,6 +30,8 @@
     <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
+    <!-- F2: ControllerDiscipline reflete sobre tipos terminados em "Controller". -->
+    <ProjectReference Include="..\EasyStock.Api\EasyStock.Api.csproj" />
   </ItemGroup>
 
 </Project>
