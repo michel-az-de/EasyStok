@@ -5,8 +5,6 @@ using System.Text;
 using EasyStock.Application.Ports.Output.Notifications;
 using Microsoft.Extensions.Logging;
 using Scriban;
-using Scriban.Parsing;
-using Scriban.Runtime;
 using Scriban.Syntax;
 
 namespace EasyStock.Infra.Notifications.Templating;
