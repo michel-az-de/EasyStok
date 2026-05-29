@@ -1,82 +1,15 @@
-using System.IO.Compression;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.ResponseCompression;
+﻿using EasyStock.Admin.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Globalization ────────────────────────────────────────────────────────────
+// â”€â”€ Globalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 var ptBR = new System.Globalization.CultureInfo("pt-BR");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = ptBR;
 System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = ptBR;
 
-// ── Services ─────────────────────────────────────────────────────────────────
-builder.Services.AddRazorPages();
-builder.Services.AddHttpContextAccessor();
-
-// Session
-builder.Services.AddDistributedMemoryCache();
-builder.Services.AddSession(options =>
-{
-    var timeoutMinutes = builder.Configuration.GetValue<int>("Session:TimeoutMinutes", 480);
-    var cookieName = builder.Configuration["Session:CookieName"] ?? ".EasyStock.Admin";
-    options.IdleTimeout = TimeSpan.FromMinutes(timeoutMinutes);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-    options.Cookie.Name = cookieName;
-    options.Cookie.SameSite = SameSiteMode.Strict;
-    // Em prod sempre HTTPS; em dev permite HTTP local.
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
-});
-
-// HTTP Client para API
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"]
-    ?? throw new InvalidOperationException("ApiBaseUrl não configurado.");
-
-builder.Services.AddTransient<AdminTokenRefreshHandler>();
-builder.Services.AddHttpClient<AdminApiClient>(c =>
-{
-    c.BaseAddress = new Uri(apiBaseUrl);
-    c.Timeout = TimeSpan.FromSeconds(15);
-}).AddHttpMessageHandler<AdminTokenRefreshHandler>();
-
-// Session e API services
-builder.Services.AddScoped<AdminSessionService>();
-
-// Cookie auth (apenas para controlar acesso às pages via middleware)
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.LogoutPath = "/Auth/Logout";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(480);
-        options.SlidingExpiration = true;
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-            ? CookieSecurePolicy.SameAsRequest
-            : CookieSecurePolicy.Always;
-    });
-
-builder.Services.AddAuthorization();
-
-// Response compression — Brotli/Gzip pra Razor Pages + JSON dos /api-proxy/*.
-// Render cobra bandwidth; CPU overhead marginal.
-builder.Services.AddResponseCompression(o =>
-{
-    o.EnableForHttps = true;
-    o.Providers.Add<BrotliCompressionProvider>();
-    o.Providers.Add<GzipCompressionProvider>();
-    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
-    {
-        "application/json",
-        "application/javascript",
-        "image/svg+xml"
-    });
-});
-builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
-builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+// â”€â”€ Services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// === Services (DI) ===
+builder.AddEasyStockAdminServices();
 
 var app = builder.Build();
 
@@ -91,7 +24,7 @@ app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
     KnownProxies = { }
 });
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// â”€â”€ Middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -108,13 +41,13 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 
-// Aliases /Clientes → /Tenants (sidebar label foi renomeada na slice de Gestão de Cliente,
-// mas as rotas internas seguem `/Tenants`. Redirect mantém URLs digitadas funcionando).
+// Aliases /Clientes â†’ /Tenants (sidebar label foi renomeada na slice de GestÃ£o de Cliente,
+// mas as rotas internas seguem `/Tenants`. Redirect mantÃ©m URLs digitadas funcionando).
 app.MapGet("/Clientes", () => Results.Redirect("/Tenants", permanent: false));
 app.MapGet("/Clientes/Detail/{id:guid}", (Guid id) => Results.Redirect($"/Tenants/Detail/{id}", permanent: false));
 
-// /Status absorvido em /Diagnostico (slice "Diagnóstico de Erros + Seed Visível").
-// Redirect 301 mantém bookmarks/links externos funcionando. Remover daqui a 1-2 releases.
+// /Status absorvido em /Diagnostico (slice "DiagnÃ³stico de Erros + Seed VisÃ­vel").
+// Redirect 301 mantÃ©m bookmarks/links externos funcionando. Remover daqui a 1-2 releases.
 app.MapGet("/Status", () => Results.Redirect("/Diagnostico", permanent: true));
 
 // Proxy endpoint para badges do sidebar (polling JS a cada 60s)
@@ -156,7 +89,7 @@ app.MapGet("/api-proxy/dashboard-badges", async (
     catch (Exception ex)
     {
         // Antes devolvia 200 OK com tudo zerado, mascarando outage como "estado real".
-        // Agora 502 sinaliza falha pro JS do front exibir "atualizando…" em vez de "tudo zero".
+        // Agora 502 sinaliza falha pro JS do front exibir "atualizandoâ€¦" em vez de "tudo zero".
         log.LogError(ex, "Proxy dashboard-badges: falha ao consultar API");
         return Results.Json(new { error = "upstream_unavailable" }, statusCode: StatusCodes.Status502BadGateway);
     }
@@ -186,7 +119,7 @@ app.MapGet("/api-proxy/status", async (
     }
 });
 
-// Proxy endpoint para exportação CSV de Audit Logs
+// Proxy endpoint para exportaÃ§Ã£o CSV de Audit Logs
 app.MapGet("/api-proxy/audit-logs-csv", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -210,7 +143,7 @@ app.MapGet("/api-proxy/audit-logs-csv", async (
         log.LogError(ex, "Proxy audit-logs-csv: falha ao baixar CSV");
         return Results.Problem(
             title: "Erro ao gerar CSV",
-            detail: "Não foi possível obter os logs de auditoria. Tente novamente em instantes.",
+            detail: "NÃ£o foi possÃ­vel obter os logs de auditoria. Tente novamente em instantes.",
             statusCode: StatusCodes.Status502BadGateway);
     }
 });
@@ -241,7 +174,7 @@ app.MapGet("/api-proxy/buscar-global", async (
     }
 });
 
-// Proxy revelar dados de cliente (LGPD). POST com motivo no body — o motivo
+// Proxy revelar dados de cliente (LGPD). POST com motivo no body â€” o motivo
 // vai para AdminAuditLog. Usado pelo modal "Revelar dados completos" no detalhe
 // do ticket (Pages/Tickets/Detail.cshtml).
 app.MapPost("/api-proxy/admin-empresas-revelar", async (
@@ -255,7 +188,7 @@ app.MapPost("/api-proxy/admin-empresas-revelar", async (
 
     var empresaIdStr = ctx.Request.Query["empresaId"].FirstOrDefault();
     if (!Guid.TryParse(empresaIdStr, out var empresaId))
-        return Results.BadRequest(new { error = "empresaId inválido." });
+        return Results.BadRequest(new { error = "empresaId invÃ¡lido." });
 
     Guid? ticketId = null;
     if (Guid.TryParse(ctx.Request.Query["ticketId"].FirstOrDefault(), out var tid))
@@ -268,10 +201,10 @@ app.MapPost("/api-proxy/admin-empresas-revelar", async (
         if (doc.RootElement.TryGetProperty("motivo", out var m) && m.ValueKind == JsonValueKind.String)
             motivo = m.GetString();
     }
-    catch { /* corpo invalido — vai cair na validacao do backend */ }
+    catch { /* corpo invalido â€” vai cair na validacao do backend */ }
 
     if (string.IsNullOrWhiteSpace(motivo) || motivo.Length < 10)
-        return Results.BadRequest(new { error = "motivo deve ter no mínimo 10 caracteres." });
+        return Results.BadRequest(new { error = "motivo deve ter no mÃ­nimo 10 caracteres." });
 
     try
     {
@@ -291,12 +224,12 @@ app.MapPost("/api-proxy/admin-empresas-revelar", async (
     }
 });
 
-// ──────────────────────────────────────────────────────────────────────
-// Proxies /api-proxy/diag/* — alimentam a tela /Diagnostico do Admin.
-// Mantemos a sessão cookie no Admin e injetamos o Bearer no AdminApiClient.
-// ──────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Proxies /api-proxy/diag/* â€” alimentam a tela /Diagnostico do Admin.
+// Mantemos a sessÃ£o cookie no Admin e injetamos o Bearer no AdminApiClient.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Header counters (última hora + 24h) — usa /diagnostico/logs/enhanced.
+// Header counters (Ãºltima hora + 24h) â€” usa /diagnostico/logs/enhanced.
 app.MapGet("/api-proxy/diag/summary", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -319,7 +252,7 @@ app.MapGet("/api-proxy/diag/summary", async (
     }
 });
 
-// Listagem paginada+filtrada — núcleo da tab Erros.
+// Listagem paginada+filtrada â€” nÃºcleo da tab Erros.
 app.MapGet("/api-proxy/diag/search", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -342,7 +275,7 @@ app.MapGet("/api-proxy/diag/search", async (
     }
 });
 
-// ── Seed async (progresso em tempo real) ──────────────────────────────────────
+// â”€â”€ Seed async (progresso em tempo real) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Inicia run em background e retorna runId imediatamente.
 app.MapPost("/api-proxy/seed/run-async", async (
@@ -367,7 +300,7 @@ app.MapPost("/api-proxy/seed/run-async", async (
     }
 });
 
-// Polling de status de um run específico.
+// Polling de status de um run especÃ­fico.
 app.MapGet("/api-proxy/seed/run/{runId:guid}", async (
     Guid runId,
     EasyStock.Admin.Services.AdminApiClient api,
@@ -389,7 +322,7 @@ app.MapGet("/api-proxy/seed/run/{runId:guid}", async (
     }
 });
 
-// Histórico de runs (auditoria).
+// HistÃ³rico de runs (auditoria).
 app.MapGet("/api-proxy/seed/runs", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -412,8 +345,8 @@ app.MapGet("/api-proxy/seed/runs", async (
     }
 });
 
-// Export JSON (binário passthrough) — alimenta o botão "Exportar JSON".
-// Não consegue usar GetAsync<JsonElement> porque o endpoint devolve File(); usa GetBytesAsync.
+// Export JSON (binÃ¡rio passthrough) â€” alimenta o botÃ£o "Exportar JSON".
+// NÃ£o consegue usar GetAsync<JsonElement> porque o endpoint devolve File(); usa GetBytesAsync.
 app.MapGet("/api-proxy/diag/export", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -440,7 +373,7 @@ app.MapGet("/api-proxy/diag/export", async (
     }
 });
 
-// ── Proxies SystemErrorLog + DiagnosticoMode ──────────────────────────────────
+// â”€â”€ Proxies SystemErrorLog + DiagnosticoMode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Recebe erros de frontend e repassa para a API.
 app.MapPost("/api-proxy/diag/frontend-error", async (
@@ -458,8 +391,8 @@ app.MapPost("/api-proxy/diag/frontend-error", async (
     }
     catch (Exception ex)
     {
-        log.LogDebug(ex, "Proxy diag/frontend-error falhou (não crítico)");
-        return Results.Ok(new { ok = false }); // nunca 5xx — não quebra o UI
+        log.LogDebug(ex, "Proxy diag/frontend-error falhou (nÃ£o crÃ­tico)");
+        return Results.Ok(new { ok = false }); // nunca 5xx â€” nÃ£o quebra o UI
     }
 });
 
@@ -509,7 +442,7 @@ app.MapPost("/api-proxy/diag/system-errors/expurgar", async (
     }
 });
 
-// Lê estado atual do logging mode.
+// LÃª estado atual do logging mode.
 app.MapGet("/api-proxy/diag/logging-mode", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -576,7 +509,7 @@ app.MapGet("/api-proxy/diag/infra", async (
     }
 });
 
-// Health de cada endpoint-chave (latência, status, timeout).
+// Health de cada endpoint-chave (latÃªncia, status, timeout).
 app.MapGet("/api-proxy/diag/endpoints", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -597,7 +530,7 @@ app.MapGet("/api-proxy/diag/endpoints", async (
     }
 });
 
-// SLO — uptime 24h, avg/p95 response time, error rate (pass-through de ?hours=).
+// SLO â€” uptime 24h, avg/p95 response time, error rate (pass-through de ?hours=).
 app.MapGet("/api-proxy/diag/slo", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -641,14 +574,14 @@ app.MapGet("/api-proxy/diag/queries-lentas", async (
     }
 });
 
-// ──────────────────────────────────────────────────────────────────────
-// Proxies /api-proxy/mobile/* — alimentam as páginas /Operacao e /Dispositivos
-// (gestão de devices PWA pareados, dashboard live, comandos remotos OTA).
-// SuperAdmin pode operar em qualquer empresa; Admin de empresa só na própria
-// (regra aplicada já no backend via ICurrentUserAccessor).
-// ──────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Proxies /api-proxy/mobile/* â€” alimentam as pÃ¡ginas /Operacao e /Dispositivos
+// (gestÃ£o de devices PWA pareados, dashboard live, comandos remotos OTA).
+// SuperAdmin pode operar em qualquer empresa; Admin de empresa sÃ³ na prÃ³pria
+// (regra aplicada jÃ¡ no backend via ICurrentUserAccessor).
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Dashboard live de operação (KPIs do dia da empresa/loja).
+// Dashboard live de operaÃ§Ã£o (KPIs do dia da empresa/loja).
 app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -670,7 +603,7 @@ app.MapGet("/api-proxy/mobile/operacao/dashboard", async (
     }
 });
 
-// Onda 1.3 — proxy do diagnostico de email (envia teste pelo provedor ativo).
+// Onda 1.3 â€” proxy do diagnostico de email (envia teste pelo provedor ativo).
 app.MapPost("/api-proxy/diag/email-teste", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -692,7 +625,7 @@ app.MapPost("/api-proxy/diag/email-teste", async (
     }
 });
 
-// Onda 2.1 — proxy do diagnostico de WhatsApp (envia texto ou template via Meta Cloud).
+// Onda 2.1 â€” proxy do diagnostico de WhatsApp (envia texto ou template via Meta Cloud).
 app.MapPost("/api-proxy/diag/whatsapp-teste", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -714,7 +647,7 @@ app.MapPost("/api-proxy/diag/whatsapp-teste", async (
     }
 });
 
-// Onda 1.4 — proxy do resumo de tickets criticos.
+// Onda 1.4 â€” proxy do resumo de tickets criticos.
 // - Sem empresaId: cross-tenant (badge global no _Layout admin)
 // - Com empresaId: por empresa (widget na pagina Operacao)
 app.MapGet("/api-proxy/admin/tickets/criticos-resumo", async (
@@ -738,7 +671,7 @@ app.MapGet("/api-proxy/admin/tickets/criticos-resumo", async (
     }
 });
 
-// Saúde dos devices da empresa (badge ok/warn/err + último visto).
+// SaÃºde dos devices da empresa (badge ok/warn/err + Ãºltimo visto).
 app.MapGet("/api-proxy/mobile/operacao/devices-health", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -760,7 +693,7 @@ app.MapGet("/api-proxy/mobile/operacao/devices-health", async (
     }
 });
 
-// Listagem de devices pareados (sumarização básica).
+// Listagem de devices pareados (sumarizaÃ§Ã£o bÃ¡sica).
 app.MapGet("/api-proxy/mobile/devices", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -782,7 +715,7 @@ app.MapGet("/api-proxy/mobile/devices", async (
     }
 });
 
-// Gera código de pareamento (6 dígitos válidos por 10 min).
+// Gera cÃ³digo de pareamento (6 dÃ­gitos vÃ¡lidos por 10 min).
 app.MapPost("/api-proxy/mobile/devices/pair-codes", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -834,7 +767,7 @@ app.MapPost("/api-proxy/mobile/devices/{id}/commands", async (
 });
 
 // Broadcast: enfileira mesmo comando pra todos os devices da empresa/loja.
-// Use case primário: gestor força "atualização pelo web" (commandType=pwa_update)
+// Use case primÃ¡rio: gestor forÃ§a "atualizaÃ§Ã£o pelo web" (commandType=pwa_update)
 // pra todos os PWAs ativos de uma vez.
 app.MapPost("/api-proxy/mobile/devices/broadcast", async (
     EasyStock.Admin.Services.AdminApiClient api,
@@ -881,8 +814,8 @@ app.MapDelete("/api-proxy/mobile/devices/{id}", async (
     }
 });
 
-// Versão atual reportada pelo backend (pra mostrar no Admin qual CACHE_VERSION
-// o servidor está servindo).
+// VersÃ£o atual reportada pelo backend (pra mostrar no Admin qual CACHE_VERSION
+// o servidor estÃ¡ servindo).
 app.MapGet("/api-proxy/mobile/version", async (
     EasyStock.Admin.Services.AdminApiClient api,
     EasyStock.Admin.Services.AdminSessionService session,
@@ -902,7 +835,7 @@ app.MapGet("/api-proxy/mobile/version", async (
     }
 });
 
-// ── Proxy /api-proxy/notif/preview-draft ────────────────────────────────────
+// â”€â”€ Proxy /api-proxy/notif/preview-draft â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Editor de Template (Admin) chama isto pra preview ao vivo (debounce 400ms).
 app.MapPost("/api-proxy/notif/preview-draft", async (
     EasyStock.Admin.Services.AdminApiClient api,
