@@ -1,6 +1,6 @@
 namespace EasyStock.Admin.Pages.Planos;
 
-public class IndexModel(AdminApiClient api, AdminSessionService session) : AdminPageBase(session)
+public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log) : AdminPageBase(session)
 {
     public IEnumerable<JsonElement> Planos { get; private set; } = Enumerable.Empty<JsonElement>();
     public string? Erro { get; private set; }
@@ -12,7 +12,11 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
             var data = await api.GetAsync<JsonElement>("api/admin/planos");
             Planos = data.ValueKind == JsonValueKind.Array ? data.EnumerateArray().ToList() : Enumerable.Empty<JsonElement>();
         }
-        catch (Exception ex) { Erro = ex.Message; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao carregar planos");
+            Erro = ex.Message;
+        }
     }
 
     public async Task<IActionResult> OnPostCriarAsync(

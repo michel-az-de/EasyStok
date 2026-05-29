@@ -1,6 +1,6 @@
 namespace EasyStock.Admin.Pages.AuditLogs;
 
-public class IndexModel(AdminApiClient api, AdminSessionService session) : AdminPageBase(session)
+public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log) : AdminPageBase(session)
 {
     [BindProperty(SupportsGet = true)] public new int Page { get; set; } = 1;
     [BindProperty(SupportsGet = true)] public string? Acao { get; set; }
@@ -29,6 +29,10 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
                 TotalPages = meta.TryGetProperty("pages", out var p) ? p.GetInt32() : 1;
             }
         }
-        catch (Exception ex) { Erro = ex.Message; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao carregar audit logs (page={Page})", Page);
+            Erro = ex.Message;
+        }
     }
 }

@@ -94,7 +94,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             SetSucesso("Template aprovado com sucesso.");
         }
         catch (SessionExpiredException) { throw; }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Aprovar template"); }
         return RedirectToPage();
     }
 }

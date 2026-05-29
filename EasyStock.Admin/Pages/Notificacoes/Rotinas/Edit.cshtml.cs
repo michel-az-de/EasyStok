@@ -105,7 +105,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
-            SetErro(ex.Message);
+            SetErroSeguro(ex, "Salvar rotina de notificacao");
             return Page();
         }
     }

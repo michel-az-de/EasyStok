@@ -36,7 +36,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             SetSucesso("Kill-switch ativado.");
         }
         catch (SessionExpiredException) { throw; }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Operacao em canais de notificacao"); }
         return RedirectToPage();
     }
 
@@ -50,7 +50,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             SetSucesso("Kill-switch removido.");
         }
         catch (SessionExpiredException) { throw; }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Operacao em canais de notificacao"); }
         return RedirectToPage();
     }
 }

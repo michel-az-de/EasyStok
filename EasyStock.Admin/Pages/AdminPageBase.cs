@@ -13,9 +13,20 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
     /// <summary>
     /// Exibe erro amigável: ApiException.Message já é seguro; outros erros
     /// recebem mensagem genérica para não vazar detalhes técnicos ao operador.
+    /// Também loga via ILoggerFactory pra forensics (best-effort — falha de
+    /// log nunca derruba o handler).
     /// </summary>
     protected void SetErroSeguro(Exception ex, string contexto = "Operação")
     {
+        // Log first — UX (toast) sai mesmo se o logger falhar.
+        try
+        {
+            var loggerFactory = HttpContext?.RequestServices?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
+            loggerFactory?.CreateLogger(GetType()).LogError(ex,
+                "[{Contexto}] {ExceptionType}: {Mensagem}", contexto, ex.GetType().Name, ex.Message);
+        }
+        catch { /* logging best-effort — sem fallback */ }
+
         if (ex is ApiException api)
             SetErro(api.Message);
         else

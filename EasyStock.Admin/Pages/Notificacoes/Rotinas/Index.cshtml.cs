@@ -40,7 +40,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             SetSucesso(ativa ? "Rotina desativada." : "Rotina ativada.");
         }
         catch (SessionExpiredException) { throw; }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Toggle de rotina"); }
         return RedirectToPage();
     }
 }

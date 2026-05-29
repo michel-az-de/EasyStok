@@ -36,11 +36,11 @@ public class RazorPagesCatchDiscipline
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     private static readonly Regex CatchWithLogPattern = new(
-        @"catch\s*\(\s*Exception[^)]*\)\s*\{[^}]{0,800}?(?:_logger|logger)\.Log",
+        @"catch\s*\(\s*Exception[^)]*\)\s*\{[^}]{0,800}?(?:(?:_logger|logger|\blog)\.Log|SetErroSeguro)",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
     [Fact]
-    [Trait("Category", "ArchitectureDebt")]
+    [Trait("Category", "Architecture")]
     public void Admin_Pages_CatchException_DeveTer_LogErrorAssociado()
     {
         // Arrange

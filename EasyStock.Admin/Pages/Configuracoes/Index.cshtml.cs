@@ -1,6 +1,6 @@
 namespace EasyStock.Admin.Pages.Configuracoes;
 
-public class IndexModel(AdminApiClient api, AdminSessionService session) : AdminPageBase(session)
+public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log) : AdminPageBase(session)
 {
     public Dictionary<string, string> Config { get; private set; } = new();
     public string? Erro { get; private set; }
@@ -20,7 +20,11 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
                 }
             }
         }
-        catch (Exception ex) { Erro = ex.Message; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao carregar configuracoes");
+            Erro = ex.Message;
+        }
     }
 
     public async Task<IActionResult> OnPostDisponibilidadeAsync(
@@ -39,7 +43,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
             });
             SetSucesso("Configurações de disponibilidade salvas.");
         }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Salvar configuracoes"); }
         return RedirectToPage();
     }
 
@@ -57,7 +61,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
             });
             SetSucesso("Configurações de onboarding salvas.");
         }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Salvar configuracoes"); }
         return RedirectToPage();
     }
 
@@ -71,7 +75,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session) : Admin
             });
             SetSucesso("Configurações PWA salvas.");
         }
-        catch (Exception ex) { SetErro(ex.Message); }
+        catch (Exception ex) { SetErroSeguro(ex, "Salvar configuracoes"); }
         return RedirectToPage();
     }
 
