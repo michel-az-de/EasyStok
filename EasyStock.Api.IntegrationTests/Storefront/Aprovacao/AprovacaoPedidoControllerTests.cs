@@ -21,7 +21,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
-using Xunit;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 

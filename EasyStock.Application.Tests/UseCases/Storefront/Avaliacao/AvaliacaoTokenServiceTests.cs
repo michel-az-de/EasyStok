@@ -1,8 +1,6 @@
 ﻿using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Exceptions.Storefront;
-using FluentAssertions;
 using Microsoft.Extensions.Configuration;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Avaliacao;
 

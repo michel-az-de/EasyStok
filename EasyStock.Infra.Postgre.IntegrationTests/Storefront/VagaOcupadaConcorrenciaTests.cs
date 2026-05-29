@@ -2,11 +2,9 @@
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
-using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories.Storefront;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Storefront;
 

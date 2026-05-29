@@ -1,12 +1,8 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
-using FluentAssertions;
-using NSubstitute;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Admin.Storefront.Cardapio;

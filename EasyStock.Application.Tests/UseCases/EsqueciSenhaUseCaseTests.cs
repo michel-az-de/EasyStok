@@ -2,10 +2,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.EsqueciSenha;
-using EasyStock.Domain.Entities;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

@@ -2,11 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.Fiscal.ProcessarWebhookFocusNFe;
 using EasyStock.Domain.Fiscal;
-using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Fiscal;
 

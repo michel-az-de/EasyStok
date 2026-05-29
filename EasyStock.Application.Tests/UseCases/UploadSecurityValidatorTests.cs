@@ -1,5 +1,4 @@
 using EasyStock.Application.UseCases.GerenciarUploads;
-using FluentAssertions;
 
 namespace EasyStock.Application.Tests.UseCases;
 

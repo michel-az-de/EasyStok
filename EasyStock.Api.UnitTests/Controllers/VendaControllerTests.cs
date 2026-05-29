@@ -9,7 +9,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Api.UnitTests.Controllers;
 

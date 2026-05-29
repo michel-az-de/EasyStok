@@ -1,7 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.ListarStorefrontsAdmin;
-using FluentAssertions;
-using NSubstitute;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Admin.Storefront;

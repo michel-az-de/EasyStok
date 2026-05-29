@@ -1,7 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Async;
 using FluentAssertions;
-using Xunit;
 
 namespace EasyStock.Api.IntegrationTests.Infrastructure;
 

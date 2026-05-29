@@ -1,14 +1,11 @@
 ﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Messaging;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Auth;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.TestHelpers;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 

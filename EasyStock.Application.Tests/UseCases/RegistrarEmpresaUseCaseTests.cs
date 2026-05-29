@@ -1,10 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEmpresa;
-using EasyStock.Domain.Entities;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

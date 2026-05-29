@@ -1,10 +1,7 @@
 using EasyStock.Application.Configuration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Analytics.AlertasDias;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Analytics;
 

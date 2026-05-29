@@ -1,14 +1,8 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

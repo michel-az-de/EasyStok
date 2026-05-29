@@ -1,10 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Analytics.Projecoes;
-using EasyStock.Application.UseCases.Common;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Analytics;
 

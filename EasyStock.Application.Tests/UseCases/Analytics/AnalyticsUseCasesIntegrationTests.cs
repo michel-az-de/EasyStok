@@ -6,11 +6,7 @@ using EasyStock.Application.UseCases.Analytics.Parados;
 using EasyStock.Application.UseCases.Analytics.Receita;
 using EasyStock.Application.UseCases.Analytics.Validade;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
-using EasyStock.Domain.Enums;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Analytics;
 

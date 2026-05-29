@@ -1,15 +1,10 @@
 ﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Avaliacao;
 

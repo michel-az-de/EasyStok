@@ -1,11 +1,7 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
-using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Storefront;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Checkout.Idempotency;
 

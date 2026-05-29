@@ -1,11 +1,7 @@
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
-using EasyStock.Infra.Postgre.Data;
-using EasyStock.Infra.Postgre.IntegrationTests;
 using FluentAssertions;
-using Xunit;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 

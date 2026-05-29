@@ -1,13 +1,9 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Menu;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Menu;

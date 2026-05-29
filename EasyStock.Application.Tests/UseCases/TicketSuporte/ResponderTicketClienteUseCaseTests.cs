@@ -2,9 +2,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Helpdesk;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.TicketSuporte;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.Tests.UseCases.TicketSuporte;

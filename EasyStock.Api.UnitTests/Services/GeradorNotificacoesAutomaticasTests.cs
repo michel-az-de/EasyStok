@@ -3,7 +3,6 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 

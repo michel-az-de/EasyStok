@@ -1,11 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AutenticarUsuario;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

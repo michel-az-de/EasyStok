@@ -1,15 +1,10 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
-using EasyStock.Application.UseCases.AtualizarFornecedor;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarFornecedor;
 using EasyStock.Application.UseCases.DesativarFornecedor;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Application.UseCases.ListarFornecedores;
-using EasyStock.Domain.Entities;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

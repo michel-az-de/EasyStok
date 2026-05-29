@@ -1,14 +1,11 @@
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.MongoDb.Data;
-using EasyStock.Infra.MongoDb.IntegrationTests;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
-using Xunit;
 
 namespace EasyStock.Infra.MongoDb.IntegrationTests.Repositories;
 

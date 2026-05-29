@@ -1,5 +1,4 @@
 using EasyStock.Api.Controllers;
-using EasyStock.Api.Services;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AlterarSenha;
@@ -15,10 +14,8 @@ using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Api.UnitTests.Controllers;
 

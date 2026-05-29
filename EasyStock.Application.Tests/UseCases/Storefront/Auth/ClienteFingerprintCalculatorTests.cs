@@ -1,5 +1,4 @@
 using EasyStock.Application.UseCases.Storefront.Auth;
-using FluentAssertions;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Auth;
 

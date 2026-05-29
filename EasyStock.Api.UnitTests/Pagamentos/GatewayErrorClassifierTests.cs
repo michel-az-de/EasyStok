@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Infra.Async.Pagamentos;

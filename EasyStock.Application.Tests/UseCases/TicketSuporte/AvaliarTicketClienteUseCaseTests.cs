@@ -1,8 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.TicketSuporte;
-using EasyStock.Domain.Entities;
 
 namespace EasyStock.Application.Tests.UseCases.TicketSuporte;
 

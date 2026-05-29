@@ -1,4 +1,3 @@
-using System.Text;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Notifications.Templating;
 using FluentAssertions;

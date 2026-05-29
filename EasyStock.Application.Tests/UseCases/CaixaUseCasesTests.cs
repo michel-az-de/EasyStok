@@ -1,13 +1,9 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
-using EasyStock.Domain.Entities;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

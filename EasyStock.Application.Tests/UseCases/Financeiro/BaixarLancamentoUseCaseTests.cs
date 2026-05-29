@@ -1,12 +1,9 @@
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases.Financeiro;
 

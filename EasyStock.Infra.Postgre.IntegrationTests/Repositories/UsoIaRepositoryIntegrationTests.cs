@@ -1,9 +1,5 @@
 using EasyStock.Domain.Entities;
-using EasyStock.Infra.Postgre.Data;
-using EasyStock.Infra.Postgre.IntegrationTests;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 

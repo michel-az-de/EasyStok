@@ -1,10 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

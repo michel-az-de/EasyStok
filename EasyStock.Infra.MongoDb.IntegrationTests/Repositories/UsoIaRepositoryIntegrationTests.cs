@@ -1,10 +1,8 @@
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.MongoDb.Data;
-using EasyStock.Infra.MongoDb.IntegrationTests;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
-using Xunit;
 
 namespace EasyStock.Infra.MongoDb.IntegrationTests.Repositories;
 

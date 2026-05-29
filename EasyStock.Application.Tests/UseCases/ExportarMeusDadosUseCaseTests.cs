@@ -1,11 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.ExportarMeusDados;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

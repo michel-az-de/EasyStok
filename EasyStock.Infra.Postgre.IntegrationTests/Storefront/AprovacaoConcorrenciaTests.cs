@@ -9,7 +9,6 @@ using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Repositories.Storefront;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Storefront;
 

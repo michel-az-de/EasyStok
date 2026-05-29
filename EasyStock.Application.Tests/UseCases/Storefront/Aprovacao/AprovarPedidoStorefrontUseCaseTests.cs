@@ -4,13 +4,9 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Sales;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Aprovacao;
 

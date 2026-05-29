@@ -1,7 +1,5 @@
 ﻿using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
-using FluentAssertions;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Checkout.Idempotency;
 

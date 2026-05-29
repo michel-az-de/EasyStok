@@ -1,16 +1,11 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

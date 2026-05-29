@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

@@ -1,5 +1,3 @@
-using Xunit;
-
 namespace EasyStock.Infra.Postgre.IntegrationTests;
 
 [CollectionDefinition("PostgreSqlTestCollection")]

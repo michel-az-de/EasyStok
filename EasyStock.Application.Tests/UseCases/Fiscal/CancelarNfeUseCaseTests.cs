@@ -1,14 +1,9 @@
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Fiscal;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Fiscal.CancelarNfe;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Fiscal;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
-using Xunit;
 
 namespace EasyStock.Application.Tests.UseCases.Fiscal;
 

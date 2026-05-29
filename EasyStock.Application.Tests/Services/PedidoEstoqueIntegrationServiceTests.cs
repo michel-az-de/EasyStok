@@ -1,13 +1,8 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.Services;
 

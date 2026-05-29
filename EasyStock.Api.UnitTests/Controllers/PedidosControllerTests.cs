@@ -17,7 +17,6 @@ using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
-using EasyStock.Domain.Sales;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;

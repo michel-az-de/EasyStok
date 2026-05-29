@@ -1,9 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

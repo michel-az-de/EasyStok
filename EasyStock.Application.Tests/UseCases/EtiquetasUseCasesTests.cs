@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Etiquetas;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute.ExceptionExtensions;

@@ -4,7 +4,6 @@ using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
-using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

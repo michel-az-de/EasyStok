@@ -1,9 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faq;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using FluentAssertions;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases.Faq;
 

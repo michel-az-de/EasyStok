@@ -1,12 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
-using FluentAssertions;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

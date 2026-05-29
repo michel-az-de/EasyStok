@@ -1,9 +1,6 @@
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 
 namespace EasyStock.Application.Tests.Services.Notifications.Orchestrators;
 

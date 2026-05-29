@@ -1,4 +1,3 @@
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;

@@ -1,11 +1,8 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RemoverClienteDocumento;
 using EasyStock.Application.UseCases.RemoverClienteEndereco;
 using EasyStock.Application.UseCases.RemoverClienteTelefone;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

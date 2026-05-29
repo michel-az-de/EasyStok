@@ -2,12 +2,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
-using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace EasyStock.Application.Tests.UseCases;
 

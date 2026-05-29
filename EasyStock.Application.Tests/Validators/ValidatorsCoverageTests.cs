@@ -7,8 +7,6 @@ using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Application.Validators;
-using EasyStock.Domain.Enums;
-using FluentAssertions;
 
 namespace EasyStock.Application.Tests.Validators;
 

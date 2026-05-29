@@ -1,5 +1,4 @@
 using EasyStock.Domain.Entities.Notifications;
-using EasyStock.Domain.Enums.Notifications;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Entities.Notifications;

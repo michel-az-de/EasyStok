@@ -1,6 +1,4 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using FluentAssertions;
-using Xunit;
 
 namespace EasyStock.Application.Tests.Analytics;
 
