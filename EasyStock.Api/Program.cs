@@ -1,6 +1,7 @@
 ﻿using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Data;
+using EasyStock.Api.DependencyInjection;
 using EasyStock.Api.Observability;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Validators;
@@ -17,7 +18,6 @@ using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
 using FluentValidation;
-using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
@@ -25,8 +25,6 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using EasyStock.Api.Observability.HealthChecks;
-using Microsoft.AspNetCore.ResponseCompression;
-using System.IO.Compression;
 
 // Handler global para exceções não tratadas que derrubam o processo
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -70,35 +68,7 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // ── Core MVC ─────────────────────────────────────────────────────────────────
-builder.Services.AddControllers()
-    .AddJsonOptions(opts =>
-    {
-        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
-        opts.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-        opts.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-    });
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddEndpointsApiExplorer();
-
-// Response compression — Brotli/Gzip para JSON e estaticos (PWA). Reduz bandwidth
-// significativamente em listagens grandes (catalogos, mobile sync). Render cobra
-// bandwidth acima do free tier; CPU overhead e' marginal.
-builder.Services.AddResponseCompression(o =>
-{
-    o.EnableForHttps = true;
-    o.Providers.Add<BrotliCompressionProvider>();
-    o.Providers.Add<GzipCompressionProvider>();
-    o.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
-    {
-        "application/json",
-        "application/javascript",
-        "image/svg+xml"
-    });
-});
-builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
-builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.AddEasyStockCoreMvc();
 
 // ── Feature DI groups ─────────────────────────────────────────────────────────
 builder.Services.AddEasyStockSwagger();
