@@ -25,3 +25,11 @@ end_of_line = lf
 
 [*.md]
 trim_trailing_whitespace = false
+
+# Regras de analyzer .NET — só as efetivamente enforçadas.
+# Outras IDE rules são deixadas no default (silent) — não sufoca o build
+# com warnings que ainda não vamos atacar.
+[*.cs]
+# IDE0005: Using directive is unnecessary.
+# Em warning agora pra worklist (F1 limpa). Vira error na F0b.
+dotnet_diagnostic.IDE0005.severity = warning
