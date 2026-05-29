@@ -1,8 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
-using EasyStock.Domain.Entities;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;

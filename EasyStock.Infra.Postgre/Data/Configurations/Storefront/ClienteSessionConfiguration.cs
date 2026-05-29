@@ -1,7 +1,4 @@
-﻿using EasyStock.Domain.Entities;
-using EasyStock.Domain.Entities.Storefront;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
+﻿using EasyStock.Domain.Entities.Storefront;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Storefront;
 

@@ -8,7 +8,6 @@ using EasyStock.Infra.Postgre.Notifications.Maintenance;
 using EasyStock.Infra.Postgre.Repositories.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace EasyStock.Infra.Postgre.DependencyInjection;
 

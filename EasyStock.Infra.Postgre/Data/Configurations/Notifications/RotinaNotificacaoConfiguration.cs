@@ -1,6 +1,4 @@
 using EasyStock.Domain.Entities.Notifications;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Notifications;
 

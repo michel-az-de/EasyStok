@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EasyStock.Infra.Postgre.Data.Extensions;
 

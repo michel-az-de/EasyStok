@@ -1,9 +1,7 @@
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.Services.Fiscal;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Infra.Postgre.Services;

@@ -3,7 +3,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using EasyStock.Application.Reporting;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Postgre.Reporting;
 

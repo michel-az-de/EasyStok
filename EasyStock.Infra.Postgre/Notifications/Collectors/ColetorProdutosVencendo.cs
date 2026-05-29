@@ -1,11 +1,9 @@
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Notifications.Collectors;

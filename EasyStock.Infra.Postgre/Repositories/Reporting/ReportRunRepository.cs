@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Postgre.Repositories.Reporting;
 

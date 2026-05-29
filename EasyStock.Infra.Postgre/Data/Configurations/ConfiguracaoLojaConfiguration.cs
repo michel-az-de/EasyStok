@@ -1,7 +1,4 @@
 using EasyStock.Domain.Defaults;
-using EasyStock.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations;
 

@@ -1,7 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 

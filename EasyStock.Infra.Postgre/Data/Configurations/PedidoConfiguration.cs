@@ -1,8 +1,4 @@
-﻿using EasyStock.Domain.Entities;
-using EasyStock.Domain.ValueObjects;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+﻿using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {

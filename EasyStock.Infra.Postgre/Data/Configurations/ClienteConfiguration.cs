@@ -1,8 +1,4 @@
-﻿using EasyStock.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-
-namespace EasyStock.Infra.Postgre.Data.Configurations
+﻿namespace EasyStock.Infra.Postgre.Data.Configurations
 {
     public class ClienteConfiguration : IEntityTypeConfiguration<Cliente>
     {

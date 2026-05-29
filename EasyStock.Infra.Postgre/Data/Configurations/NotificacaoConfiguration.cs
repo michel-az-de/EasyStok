@@ -1,8 +1,4 @@
-﻿using EasyStock.Domain.Entities;
-using EasyStock.Domain.Entities.Notifications;
-using EasyStock.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
+﻿using EasyStock.Domain.Entities.Notifications;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {

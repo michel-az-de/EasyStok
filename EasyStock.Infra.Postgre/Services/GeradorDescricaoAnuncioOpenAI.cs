@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Ai;
-using EasyStock.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;

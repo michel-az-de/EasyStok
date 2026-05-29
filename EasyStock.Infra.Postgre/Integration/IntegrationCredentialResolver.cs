@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
 using EasyStock.Application.Ports.Output.Persistence;

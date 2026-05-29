@@ -1,7 +1,6 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Infra.Postgre.Repositories.Pagamentos;

@@ -14,7 +14,6 @@ using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Events;
 using EasyStock.Infra.Postgre.Hosting;
 using EasyStock.Infra.Postgre.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,15 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.Integration;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading.Tasks;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Reporting;

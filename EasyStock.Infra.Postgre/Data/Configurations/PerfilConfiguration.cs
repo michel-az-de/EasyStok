@@ -1,8 +1,3 @@
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {
     public class PerfilConfiguration : IEntityTypeConfiguration<Perfil>

@@ -1,7 +1,5 @@
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Infra.Postgre.Data.Extensions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Pagamentos;
 

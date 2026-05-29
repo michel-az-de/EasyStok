@@ -1,7 +1,4 @@
 using EasyStock.Application.Ports.Output.Caching;
-using EasyStock.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EasyStock.Infra.Postgre.Data.Interceptors;

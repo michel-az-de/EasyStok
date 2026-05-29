@@ -1,7 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
-using Microsoft.EntityFrameworkCore;
 namespace EasyStock.Infra.Postgre.Repositories
 {
     public sealed class UsuarioPerfilRepository(EasyStockDbContext dbContext) : IUsuarioPerfilRepository
