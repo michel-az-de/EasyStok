@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Infra.Postgre.Data.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,8 +23,8 @@ public class GatewayRoutingRuleConfiguration : IEntityTypeConfiguration<GatewayR
         b.Property(r => r.Moeda).IsRequired().HasMaxLength(3).HasDefaultValue("BRL");
         b.Property(r => r.Pais).IsRequired().HasMaxLength(2).HasDefaultValue("BR");
         b.Property(r => r.RegrasJson).HasColumnType("jsonb");
-        b.Property(r => r.CriadoEm).IsRequired();
-        b.Property(r => r.AtualizadoEm).IsRequired();
+        b.ConfigureCriadoEm(r => r.CriadoEm)
+         .ConfigureAtualizadoEm(r => r.AtualizadoEm);
 
         // RowVersion via xmin (Postgres system column)
         b.Property(r => r.Versao)

@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Infra.Postgre.Data.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -23,8 +24,8 @@ public class TemplateNotificacaoConfiguration : IEntityTypeConfiguration<Templat
         b.Property(x => x.EmpresaId);
         b.Property(x => x.Versao).IsRequired();
         b.Property(x => x.ChecksumSha256).HasMaxLength(64);
-        b.Property(x => x.CriadoEm).IsRequired();
-        b.Property(x => x.AtualizadoEm).IsRequired();
+        b.ConfigureCriadoEm(x => x.CriadoEm)
+         .ConfigureAtualizadoEm(x => x.AtualizadoEm);
         b.Property(x => x.AtualizadoPor).HasMaxLength(256).IsRequired();
 
         b.HasIndex(x => new { x.Codigo, x.EmpresaId, x.Versao }).IsUnique();
