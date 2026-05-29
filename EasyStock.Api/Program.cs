@@ -1,7 +1,9 @@
 ﻿using EasyStock.Api.Configuration;
 using EasyStock.Api.Data;
 using EasyStock.Api.DependencyInjection;
+using EasyStock.Api.Hosting;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Startup;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Fiscal;
@@ -18,8 +20,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
 using System.Reflection;
-using System.Text.Json;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using EasyStock.Api.Observability.HealthChecks;
 
 // Handler global para exceções não tratadas que derrubam o processo
@@ -96,7 +96,7 @@ if (builder.Environment.IsProduction() &&
 }
 else
 {
-    resolvedProvider = await ResolveDatabaseProviderAsync(
+    resolvedProvider = await DatabaseProviderResolver.ResolveAsync(
         databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
 }
 
@@ -722,7 +722,7 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
-    ResponseWriter = WriteHealthCheckJsonResponse
+    ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
 });
 
 // /health/api: dependencias HTTP da API (PG + Redis + config) — NAO inclui dispatcher.
@@ -730,7 +730,7 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
 app.MapHealthChecks("/health/api", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("api"),
-    ResponseWriter = WriteHealthCheckJsonResponse
+    ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
 });
 
 // /health/dispatcher: heartbeats dos 3 BackgroundServices do pipeline de notificacoes.
@@ -739,12 +739,12 @@ app.MapHealthChecks("/health/api", new Microsoft.AspNetCore.Diagnostics.HealthCh
 app.MapHealthChecks("/health/dispatcher", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("dispatcher"),
-    ResponseWriter = WriteHealthCheckJsonResponse
+    ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
 });
 
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
-    ResponseWriter = WriteHealthCheckJsonResponse
+    ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
 });
 
 // /health/version — endpoint do schema gate do PWA.
@@ -840,107 +840,5 @@ if (string.Equals(Environment.GetEnvironmentVariable("OPENAPI_EXPORT"), "true", 
 }
 
 app.Run();
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-static Task WriteHealthCheckJsonResponse(HttpContext context, HealthReport report)
-{
-    context.Response.ContentType = "application/json; charset=utf-8";
-    var result = new
-    {
-        status = report.Status.ToString(),
-        totalDuration = report.TotalDuration.TotalMilliseconds.ToString("0") + "ms",
-        checks = report.Entries.Select(e => new
-        {
-            name = e.Key,
-            status = e.Value.Status.ToString(),
-            description = e.Value.Description,
-            duration = e.Value.Duration.TotalMilliseconds.ToString("0") + "ms",
-            error = e.Value.Exception?.Message
-        })
-    };
-    return context.Response.WriteAsJsonAsync(result, new JsonSerializerOptions
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
-    });
-}
-
-static async Task<string> ResolveDatabaseProviderAsync(
-    string configuredProvider,
-    string? postgresConnectionString,
-    string? mongoConnectionString,
-    Serilog.ILogger logger)
-{
-    var normalized = configuredProvider.Trim().ToLowerInvariant();
-
-    // OPENAPI_EXPORT=true: Swashbuckle.AspNetCore.Cli precisa do builder DI registrado
-    // mas nao toca DB real. Aceita PostgreSQL "imaginario" — DbContext nao chega a abrir
-    // conexao (script retorna antes de app.Run() — ver bloco openapi-export ao final).
-    var isOpenApiExport = string.Equals(
-        Environment.GetEnvironmentVariable("OPENAPI_EXPORT"), "true", StringComparison.OrdinalIgnoreCase);
-
-    if (normalized is "postgres" or "postgresql")
-    {
-        if (isOpenApiExport) return "postgresql";
-
-        if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
-            await IsPostgresAvailableAsync(postgresConnectionString, logger))
-            return "postgresql";
-
-        throw new InvalidOperationException(
-            "PostgreSQL configurado mas indisponível. " +
-            "Verifique a connection string 'DefaultConnection' e a conectividade com o banco. " +
-            "Em dev, suba Postgres via Docker Compose ou aponte para o banco Render dev.");
-    }
-
-    if (normalized is "mongodb" or "mongo")
-    {
-        // B2: Mongo descontinuado como provedor transacional. Falha rápido para
-        // operador notar que precisa migrar para Postgres.
-        throw new NotSupportedException(
-            "MongoDB foi descontinuado como provedor transacional. " +
-            "Use Database:Provider=PostgreSQL. Detalhes: docs/adr/0001-mongo-discarded.md.");
-    }
-
-    if (normalized is "auto")
-    {
-        if (isOpenApiExport) return "postgresql";
-
-        if (!string.IsNullOrWhiteSpace(postgresConnectionString) &&
-            await IsPostgresAvailableAsync(postgresConnectionString, logger))
-        {
-            logger.Information("Auto-deteccao: usando PostgreSQL.");
-            return "postgresql";
-        }
-
-        // Sem fallback: PostgreSQL é o único provedor transacional suportado (#261).
-        throw new InvalidOperationException(
-            "Auto-deteccao: PostgreSQL indisponível e não há fallback. " +
-            "Verifique a connection string 'DefaultConnection' (suba Postgres via Docker Compose em dev).");
-    }
-
-    throw new InvalidOperationException($"Database:Provider '{configuredProvider}' não suportado.");
-}
-
-static async Task<bool> IsPostgresAvailableAsync(string connectionString, Serilog.ILogger logger)
-{
-    try
-    {
-        var csb = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
-        {
-            Timeout = 3,
-            CommandTimeout = 3
-        };
-        await using var conn = new Npgsql.NpgsqlConnection(csb.ToString());
-        await conn.OpenAsync();
-        return true;
-    }
-    catch (Exception ex)
-    {
-        logger.Debug(ex, "PostgreSQL indisponivel.");
-        return false;
-    }
-}
 
 public partial class Program { }
