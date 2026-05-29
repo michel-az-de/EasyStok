@@ -4,7 +4,6 @@ using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.Reporting;
-using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace EasyStock.Infra.Async.Reporting.Handlers.Fiscal;

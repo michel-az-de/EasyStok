@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums.Pagamentos;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Async.Pagamentos;

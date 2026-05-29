@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Text;
 using CsvHelper;
 using CsvHelper.Configuration;
-using CsvHelper.TypeConversion;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 
