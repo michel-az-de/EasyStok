@@ -1,8 +1,4 @@
-﻿using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-
-namespace EasyStock.Admin.Pages.Storefronts;
+﻿namespace EasyStock.Admin.Pages.Storefronts;
 
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log)
     : AdminPageBase(session)

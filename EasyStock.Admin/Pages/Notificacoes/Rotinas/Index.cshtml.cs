@@ -1,7 +1,3 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-
 namespace EasyStock.Admin.Pages.Notificacoes.Rotinas;
 
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> logger)

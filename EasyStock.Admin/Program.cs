@@ -1,6 +1,4 @@
 using System.IO.Compression;
-using System.Text.Json;
-using EasyStock.Admin.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.ResponseCompression;
 

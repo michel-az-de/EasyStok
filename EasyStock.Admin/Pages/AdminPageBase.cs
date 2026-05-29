@@ -1,9 +1,5 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using System.Text;
-using System.Text.Json;
 
 namespace EasyStock.Admin.Pages;
 

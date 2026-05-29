@@ -1,7 +1,3 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-
 namespace EasyStock.Admin.Pages.Configuracoes.ConfiguracaoFiscal;
 
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log)

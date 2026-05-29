@@ -1,6 +1,3 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-
 namespace EasyStock.Admin.Pages.Diagnostico;
 
 /// <summary>

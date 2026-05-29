@@ -1,7 +1,3 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-
 namespace EasyStock.Admin.Pages.Configuracoes;
 
 public class SlaMatrizModel(AdminApiClient api, AdminSessionService session, ILogger<SlaMatrizModel> log) : AdminPageBase(session)

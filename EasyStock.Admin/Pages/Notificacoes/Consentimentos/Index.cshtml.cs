@@ -1,6 +1,3 @@
-using EasyStock.Admin.Services;
-using System.Text.Json;
-
 namespace EasyStock.Admin.Pages.Notificacoes.Consentimentos;
 
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> logger)

@@ -1,7 +1,3 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-
 namespace EasyStock.Admin.Pages.Notificacoes.Templates;
 
 public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<EditModel> logger)

@@ -1,6 +1,3 @@
-using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace EasyStock.Admin.Pages.Admins;

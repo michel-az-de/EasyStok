@@ -1,7 +1,4 @@
-﻿using EasyStock.Admin.Services;
-using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
 namespace EasyStock.Admin.Pages.Storefronts;
