@@ -2,25 +2,17 @@
 using EasyStock.Api.Data;
 using EasyStock.Api.DependencyInjection;
 using EasyStock.Api.Hosting;
-using EasyStock.Api.Observability;
 using EasyStock.Api.Startup;
 using EasyStock.Application.DependencyInjection;
-using EasyStock.Infra.Notifications.Hosting;
-using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Infra.Integrations.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal;
-using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
-using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
 using System.Reflection;
-using EasyStock.Api.Observability.HealthChecks;
 
 // Handler global para exceções não tratadas que derrubam o processo
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -79,72 +71,8 @@ builder.Services.AddEasyStockFileStorage(builder.Configuration);
 var databaseProvider = builder.Configuration[ConfigurationKeys.DatabaseProvider] ?? "Auto";
 var postgresConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionDefault);
 var mongoConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionMongo);
-var mongoDatabaseName = builder.Configuration[ConfigurationKeys.DatabaseMongoDatabase] ?? "EasyStockDbMongo";
-
-// Em produção, pula a checagem de auto-detect (custa 3-5s no cold start)
-// quando o provider está explicitamente configurado.
-string resolvedProvider;
-if (builder.Environment.IsProduction() &&
-    !databaseProvider.Trim().Equals("Auto", StringComparison.OrdinalIgnoreCase))
-{
-    resolvedProvider = databaseProvider.Trim().ToLowerInvariant() switch
-    {
-        "postgres" or "postgresql" => "postgresql",
-        "mongodb" or "mongo" => "mongodb",
-        _ => "postgresql"
-    };
-}
-else
-{
-    resolvedProvider = await DatabaseProviderResolver.ResolveAsync(
-        databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
-}
-
-// PostgreSQL é o único provedor suportado (#261) — não há mais fallback runtime.
-var infraState = new ResolvedInfrastructureState
-{
-    DatabaseProvider = resolvedProvider,
-    ConfiguredProvider = databaseProvider,
-    IsFallback = false,
-    StartupTime = DateTimeOffset.UtcNow,
-    Environment = builder.Environment.EnvironmentName
-};
-builder.Services.AddSingleton(infraState);
-
-switch (resolvedProvider)
-{
-    case "mongodb":
-        // MongoDB foi descontinuado como provedor transacional (B2 do plano de a��o).
-        // Paridade incompleta com Postgres (sem Venda, ItemVenda, MovimentacaoEstoque,
-        // Caixa, Lote, Pedido) gerava risco de bug silencioso. Postgres � o �nico
-        // provedor transacional suportado. Rever ADR 0001-mongo-discarded.
-        throw new NotSupportedException(
-            "MongoDB foi descontinuado como provedor transacional. " +
-            "Use Database:Provider=PostgreSQL. Detalhes: docs/adr/0001-mongo-discarded.md.");
-
-    case "postgresql":
-        builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
-        builder.Services.AddHealthChecks()
-            .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready", "api"])
-            .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
-            .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
-            .AddNotificationsHosting();
-        // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapters Focus NFe + Mock + cert A1
-        builder.Services.AddEasyStockIntegrationResilience();
-        builder.Services.AddFocusNFeAdapter(builder.Configuration);
-        builder.Services.AddMockFiscalGateway();
-        // Scoped (não Singleton): a factory consome IEnumerable<IGatewayFiscal>, e os
-        // adapters (Focus/Mock) são Scoped (dependem de serviços scoped como
-        // INfeCertificadoA1Service). Como Singleton, capturava gateways scoped
-        // (captive dependency / lifetime mismatch) — só não explodia em prod porque
-        // ValidateOnBuild fica off lá. Os consumidores (use cases fiscais) são Scoped.
-        builder.Services.AddScoped<IGatewayFiscalFactory, GatewayFiscalFactory>();
-        builder.Services.AddDataProtection();
-        break;
-
-    default:
-        throw new InvalidOperationException($"Database:Provider '{databaseProvider}' não suportado.");
-}
+var (resolvedProvider, infraState) = await DatabaseModule.ConfigureAsync(
+    builder, databaseProvider, postgresConnectionString, mongoConnectionString);
 
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
