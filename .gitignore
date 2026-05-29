@@ -389,6 +389,10 @@ FodyWeavers.xsd
 .claire/
 builds/
 
+# Rascunhos locais de bodies/comentários de issues
+# (ex: .build/issue-XYZ-body.md, .build/comment-NNN-doing.md)
+.build/
+
 # Build artifacts
 publish-api/
 publish-web/
