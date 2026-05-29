@@ -1,4 +1,3 @@
-using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Shared;
 
 namespace EasyStock.Web.Models.ViewModels.Analytics;

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Microsoft.AspNetCore.Hosting;
 
 namespace EasyStock.Web.Services;
 

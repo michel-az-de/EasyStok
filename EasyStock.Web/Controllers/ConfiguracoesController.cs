@@ -1,4 +1,3 @@
-using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Configuracoes;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
