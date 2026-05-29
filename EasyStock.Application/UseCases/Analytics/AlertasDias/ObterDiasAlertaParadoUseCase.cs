@@ -1,6 +1,4 @@
 using EasyStock.Application.Configuration;
-using EasyStock.Application.Ports.Output.Persistence;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Analytics.AlertasDias;
 

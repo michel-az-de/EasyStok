@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EasyStock.Application.UseCases.Analytics.DashboardFull;
 
 public sealed record GetDashboardFullCommand(

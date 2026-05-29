@@ -1,6 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 

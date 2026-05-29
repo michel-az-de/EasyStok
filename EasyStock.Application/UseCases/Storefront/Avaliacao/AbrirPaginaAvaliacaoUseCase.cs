@@ -1,5 +1,4 @@
 ﻿using System.Security.Cryptography;
-using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Avaliacao;
 

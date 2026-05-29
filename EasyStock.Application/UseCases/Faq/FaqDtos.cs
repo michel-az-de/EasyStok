@@ -1,5 +1,3 @@
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.Faq
 {
     public sealed record FaqCategoriaDto(

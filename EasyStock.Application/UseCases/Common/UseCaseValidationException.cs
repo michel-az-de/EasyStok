@@ -1,5 +1,3 @@
-using System;
-
 namespace EasyStock.Application.UseCases.Common
 {
     /// <summary>

@@ -1,6 +1,4 @@
-﻿using EasyStock.Domain.Entities;
-
-namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
+﻿namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
 
 /// <summary>
 /// Repo especializado para operações de Pedido no contexto Storefront (ADR-0014).

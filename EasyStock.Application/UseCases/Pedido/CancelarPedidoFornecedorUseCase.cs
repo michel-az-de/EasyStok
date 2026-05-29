@@ -1,8 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
-
 namespace EasyStock.Application.UseCases.Pedido;
 
 public sealed record CancelarPedidoFornecedorCommand(Guid PedidoId, Guid EmpresaId);

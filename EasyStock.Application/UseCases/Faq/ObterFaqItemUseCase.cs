@@ -1,8 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
 
 namespace EasyStock.Application.UseCases.Faq
 {

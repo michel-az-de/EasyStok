@@ -1,5 +1,3 @@
-using EasyStock.Domain.Entities;
-
 namespace EasyStock.Application.Ports.Output.Ai
 {
     public interface IGeradorDescricaoAnuncioStreaming

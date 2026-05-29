@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EasyStock.Application.UseCases.Analytics.VendasPorCanal;
 
 public sealed record ObterVendasPorCanalCommand(

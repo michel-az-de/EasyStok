@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
 
 public sealed record ObterSugestaoReposicaoCommand(

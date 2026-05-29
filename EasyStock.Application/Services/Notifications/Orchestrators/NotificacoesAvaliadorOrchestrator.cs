@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Services.Notifications.Orchestrators;
 

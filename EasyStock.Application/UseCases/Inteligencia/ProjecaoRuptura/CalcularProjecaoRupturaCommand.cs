@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
 
 public sealed record CalcularProjecaoRupturaCommand(

@@ -1,13 +1,8 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Pedidos;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Sales;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.AtualizarStatusPedido;
 

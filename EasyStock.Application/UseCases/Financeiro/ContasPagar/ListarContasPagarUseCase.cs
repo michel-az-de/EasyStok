@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.Common;
 using EasyStock.Domain.Enums.Financeiro;
 

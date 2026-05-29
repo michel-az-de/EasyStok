@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Fiscal;
 
 namespace EasyStock.Application.UseCases.Fiscal.ConsultarNfe;

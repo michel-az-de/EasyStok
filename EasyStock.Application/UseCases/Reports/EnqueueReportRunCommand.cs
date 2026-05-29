@@ -1,11 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Dtos;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.UseCases.Reports;

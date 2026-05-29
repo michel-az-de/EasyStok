@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-
 namespace EasyStock.Application.UseCases.Analytics.Receita;
 
 public sealed record CalcularReceitaResult(

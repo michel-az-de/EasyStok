@@ -1,7 +1,5 @@
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Application.Services.Fiscal;
-using EasyStock.Application.UseCases.Common;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
 

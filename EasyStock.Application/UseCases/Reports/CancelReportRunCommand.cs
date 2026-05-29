@@ -1,6 +1,4 @@
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Reporting;
-using EasyStock.Application.UseCases.Common;
 
 namespace EasyStock.Application.UseCases.Reports;
 

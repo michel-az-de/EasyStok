@@ -1,8 +1,3 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
-
 namespace EasyStock.Application.UseCases.ExportarMeusDados;
 
 public sealed record ExportarMeusDadosResult(

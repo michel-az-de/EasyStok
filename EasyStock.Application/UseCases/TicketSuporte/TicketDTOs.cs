@@ -1,5 +1,3 @@
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.TicketSuporte
 {
     /// <summary>Request body de abertura de ticket pelo cliente.</summary>

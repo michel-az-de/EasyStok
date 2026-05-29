@@ -1,6 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Storefront.Menu;
 

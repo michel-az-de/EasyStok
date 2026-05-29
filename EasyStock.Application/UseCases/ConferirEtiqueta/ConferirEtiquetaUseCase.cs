@@ -1,8 +1,4 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Lotes;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.ConferirEtiqueta;
 

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using FluentValidation;
 
 namespace EasyStock.Application.Validators;

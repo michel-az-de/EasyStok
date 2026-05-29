@@ -1,4 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Loja;
 
 namespace EasyStock.Application.UseCases.ListarLojas;

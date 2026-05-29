@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-
 namespace EasyStock.Application.UseCases.ConfiguracoesLoja;
 
 public sealed record ObterConfiguracaoLojaQuery(Guid EmpresaId, Guid LojaId);

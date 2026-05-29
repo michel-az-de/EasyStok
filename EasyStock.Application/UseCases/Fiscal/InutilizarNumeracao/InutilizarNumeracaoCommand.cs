@@ -1,6 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.Fiscal.InutilizarNumeracao;
 
 /// <summary>

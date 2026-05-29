@@ -1,9 +1,4 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Loja;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
 using LojaEntity = EasyStock.Domain.Entities.Loja;
 
 namespace EasyStock.Application.UseCases.CriarLoja;

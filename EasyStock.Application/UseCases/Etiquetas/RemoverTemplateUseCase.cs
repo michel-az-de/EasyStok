@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 
 namespace EasyStock.Application.UseCases.Etiquetas;

@@ -1,10 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Cliente;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarCliente;
 using EasyStock.Domain.ValueObjects;
-using Microsoft.Extensions.Logging;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 using ClienteAlteracao = EasyStock.Domain.Entities.ClienteAlteracao;
 

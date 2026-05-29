@@ -1,7 +1,5 @@
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
-using EasyStock.Application.UseCases.Common;
 
 namespace EasyStock.Application.UseCases.ObterCaixaDia;
 

@@ -1,8 +1,5 @@
 using System.Diagnostics;
 using EasyStock.Application.Configuration;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
 

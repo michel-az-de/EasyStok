@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Faturas.Common;
 
 namespace EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;

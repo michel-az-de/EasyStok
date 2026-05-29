@@ -1,6 +1,3 @@
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.Ports.Output.Persistence
 {
     public sealed record KpisMovimentacao(decimal TotalUnidades, decimal ReceitaTotal, int TotalVendas, int TotalPerdas);

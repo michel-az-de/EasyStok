@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
-using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.UseCases.Reports;
 

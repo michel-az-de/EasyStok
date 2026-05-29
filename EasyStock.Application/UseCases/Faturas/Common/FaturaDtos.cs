@@ -1,5 +1,3 @@
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Faturas.Common;

@@ -1,9 +1,5 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Fornecedor;
 using EasyStock.Domain.ValueObjects;
-using Microsoft.Extensions.Logging;
 using FornecedorEntity = EasyStock.Domain.Entities.Fornecedor;
 
 namespace EasyStock.Application.UseCases.CriarFornecedor;

@@ -1,5 +1,3 @@
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.Fiscal.ReprocessarContingencia;
 
 /// <summary>

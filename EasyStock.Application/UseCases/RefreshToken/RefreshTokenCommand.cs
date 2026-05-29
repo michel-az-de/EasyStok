@@ -1,5 +1,3 @@
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.RefreshToken;
 
 public sealed record RefreshTokenCommand(string RefreshToken) : ICommand;

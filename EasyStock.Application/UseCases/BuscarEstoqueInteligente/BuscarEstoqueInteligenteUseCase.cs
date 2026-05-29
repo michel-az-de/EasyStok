@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-
 namespace EasyStock.Application.UseCases.BuscarEstoqueInteligente
 {
     public enum TipoResultadoBuscaInteligente

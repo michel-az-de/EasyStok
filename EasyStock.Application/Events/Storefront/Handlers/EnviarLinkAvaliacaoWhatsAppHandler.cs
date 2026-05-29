@@ -3,7 +3,6 @@ using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Events.Storefront;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Events.Storefront.Handlers;
 

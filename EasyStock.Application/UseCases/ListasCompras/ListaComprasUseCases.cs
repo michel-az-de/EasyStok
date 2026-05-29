@@ -1,8 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using Microsoft.Extensions.Logging;
 using ListaComprasEntity = EasyStock.Domain.Entities.ListaCompras;
 
 namespace EasyStock.Application.UseCases.ListasCompras;

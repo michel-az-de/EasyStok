@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.Financeiro.Dashboard;
 
 public sealed record ObterDashboardFinanceiroQuery(Guid EmpresaId, DateTime? ReferenceDateUtc = null);

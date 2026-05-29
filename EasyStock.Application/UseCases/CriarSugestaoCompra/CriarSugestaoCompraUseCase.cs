@@ -1,8 +1,4 @@
 using EasyStock.Application.Ports.Output.Integration;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Enums;
-using Microsoft.Extensions.Logging;
 using FornecedorEntity = EasyStock.Domain.Entities.Fornecedor;
 using PedidoFornecedorEntity = EasyStock.Domain.Entities.PedidoFornecedor;
 using PedidoFornecedorItemEntity = EasyStock.Domain.Entities.PedidoFornecedorItem;

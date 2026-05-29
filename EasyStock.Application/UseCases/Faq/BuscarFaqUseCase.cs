@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-
 namespace EasyStock.Application.UseCases.Faq
 {
     public sealed record BuscarFaqQuery(

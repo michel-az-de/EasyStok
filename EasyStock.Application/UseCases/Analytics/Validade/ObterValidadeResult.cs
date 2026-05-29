@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-
 namespace EasyStock.Application.UseCases.Analytics.Validade;
 
 public sealed record ObterValidadeResult(

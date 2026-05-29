@@ -1,9 +1,5 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
 using EasyStock.Application.UseCases.PreviewSugestaoCompra;
-using EasyStock.Domain.Enums;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.ListasCompras;
 

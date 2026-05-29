@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.Financeiro.CentrosCusto;
 
 public sealed record InativarCentroCustoCommand(Guid EmpresaId, Guid Id);

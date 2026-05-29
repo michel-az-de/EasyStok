@@ -1,9 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
-
 namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 {
     public sealed record AtribuirPerfilUsuarioCommand(Guid UsuarioId, Guid EmpresaId, Guid PerfilId, Guid? LojaId);

@@ -1,5 +1,3 @@
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.ObterUsuarioAtual;
 
 public sealed record ObterUsuarioAtualCommand : ICommand;

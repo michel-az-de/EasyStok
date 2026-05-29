@@ -1,10 +1,4 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.GerenciarProduto;

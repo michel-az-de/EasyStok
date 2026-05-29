@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using Microsoft.Extensions.Logging;
-
 namespace EasyStock.Application.UseCases.RemoverClienteEndereco;
 
 public sealed record RemoverClienteEnderecoCommand(Guid EmpresaId, Guid ClienteId, Guid EnderecoId);

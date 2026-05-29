@@ -1,5 +1,4 @@
 using System.Reflection;
-using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Reporting;
 using EasyStock.Domain.Reporting;
 using Microsoft.Extensions.DependencyInjection;

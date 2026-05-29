@@ -1,9 +1,4 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Pedidos;
-using EasyStock.Domain.Entities;
-using Microsoft.Extensions.Logging;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 

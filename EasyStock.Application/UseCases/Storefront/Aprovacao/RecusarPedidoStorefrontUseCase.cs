@@ -1,13 +1,10 @@
 using System.Diagnostics;
 using EasyStock.Application.Events.Storefront;
 using EasyStock.Application.Ports.Output.Integration;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
-using Microsoft.Extensions.Logging;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
 namespace EasyStock.Application.UseCases.Storefront.Aprovacao;

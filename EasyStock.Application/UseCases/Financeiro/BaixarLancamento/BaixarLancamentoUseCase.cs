@@ -1,10 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Events;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Financeiro;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 

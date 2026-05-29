@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Entities;
-
 namespace EasyStock.Application.UseCases.ListarFaturas;
 
 public sealed record FaturaResult(

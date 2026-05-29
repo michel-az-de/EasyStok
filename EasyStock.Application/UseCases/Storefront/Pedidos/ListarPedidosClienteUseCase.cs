@@ -3,7 +3,6 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
-using Microsoft.Extensions.Logging;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
 namespace EasyStock.Application.UseCases.Storefront.Pedidos;

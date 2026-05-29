@@ -1,5 +1,3 @@
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.Ports.Output.Helpdesk;
 
 public sealed record SlaResolvido(

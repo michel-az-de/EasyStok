@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.Text;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Enums;
 
 namespace EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 

@@ -1,17 +1,10 @@
 using EasyStock.Domain.Defaults;
-using System.ComponentModel.DataAnnotations;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Events;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Services;
 using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 {

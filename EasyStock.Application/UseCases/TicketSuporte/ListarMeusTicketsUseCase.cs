@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-
 namespace EasyStock.Application.UseCases.TicketSuporte
 {
     public sealed record ListarMeusTicketsCommand(

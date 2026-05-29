@@ -1,10 +1,7 @@
 using System.Text.RegularExpressions;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.Extensions.Logging;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
 namespace EasyStock.Application.UseCases.Storefront.Auth;

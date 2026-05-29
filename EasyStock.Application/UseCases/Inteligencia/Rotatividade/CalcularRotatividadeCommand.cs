@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EasyStock.Application.UseCases.Inteligencia.Rotatividade;
 
 public sealed record CalcularRotatividadeCommand(

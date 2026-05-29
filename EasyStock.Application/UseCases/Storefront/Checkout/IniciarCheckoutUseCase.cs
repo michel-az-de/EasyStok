@@ -3,12 +3,9 @@ using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
-using EasyStock.Domain.Entities;
 using DomainPedido = EasyStock.Domain.Entities.Pedido;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 

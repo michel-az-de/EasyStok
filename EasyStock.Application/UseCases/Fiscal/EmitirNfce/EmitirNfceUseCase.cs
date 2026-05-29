@@ -1,10 +1,7 @@
 using EasyStock.Application.Ports.Output.Fiscal;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Fiscal;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Fiscal;
 using EasyStock.Domain.ValueObjects;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Fiscal.EmitirNfce;
 

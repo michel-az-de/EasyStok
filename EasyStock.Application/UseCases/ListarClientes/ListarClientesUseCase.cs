@@ -1,6 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Cliente;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.CriarCliente;
 
 namespace EasyStock.Application.UseCases.ListarClientes;

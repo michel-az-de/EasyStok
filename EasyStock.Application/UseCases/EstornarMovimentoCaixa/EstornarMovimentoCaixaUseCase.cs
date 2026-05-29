@@ -1,9 +1,5 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
-using EasyStock.Application.UseCases.Common;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 

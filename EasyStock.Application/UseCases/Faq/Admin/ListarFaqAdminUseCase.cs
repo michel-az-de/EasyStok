@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.Faq.Admin
 {
     public sealed record ListarFaqAdminQuery(

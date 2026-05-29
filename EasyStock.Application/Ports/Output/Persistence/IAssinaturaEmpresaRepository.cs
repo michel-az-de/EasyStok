@@ -1,6 +1,3 @@
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.Ports.Output.Persistence;
 
 public interface IAssinaturaEmpresaRepository

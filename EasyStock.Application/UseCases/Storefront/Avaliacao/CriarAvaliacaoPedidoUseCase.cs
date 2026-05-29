@@ -2,7 +2,6 @@
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Storefront.Avaliacao;
 

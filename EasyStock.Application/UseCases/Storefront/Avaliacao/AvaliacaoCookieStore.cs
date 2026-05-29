@@ -1,6 +1,5 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using EasyStock.Application.Ports.Output;
 
 namespace EasyStock.Application.UseCases.Storefront.Avaliacao;
 

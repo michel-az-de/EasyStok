@@ -1,5 +1,3 @@
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.GerenciarComposicao;
 
 public sealed record ComposicaoResult(

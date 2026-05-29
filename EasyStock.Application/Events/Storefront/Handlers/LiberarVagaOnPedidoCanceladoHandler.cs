@@ -1,6 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Events.Storefront;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Events.Storefront.Handlers;
 

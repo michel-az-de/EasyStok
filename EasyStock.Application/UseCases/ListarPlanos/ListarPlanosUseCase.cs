@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-
 namespace EasyStock.Application.UseCases.ListarPlanos
 {
     public sealed record PlanoResult(Guid Id, string Nome, string? Descricao, int LimiteLojas, int LimiteUsuarios, int LimiteProdutos, decimal PrecoMensal);

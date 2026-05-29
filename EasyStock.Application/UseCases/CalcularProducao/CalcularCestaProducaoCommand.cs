@@ -1,5 +1,3 @@
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.CalcularProducao;
 
 /// <summary>

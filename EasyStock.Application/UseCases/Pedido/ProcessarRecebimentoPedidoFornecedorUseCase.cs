@@ -1,11 +1,6 @@
 using EasyStock.Application.Ports.Output.Events;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
-using EasyStock.Domain.Enums;
 using EasyStock.Domain.Events;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Pedido;
 

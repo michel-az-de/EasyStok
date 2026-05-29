@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
 
 /// <summary>Comando do dashboard financeiro.</summary>

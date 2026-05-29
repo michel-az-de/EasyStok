@@ -1,6 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.Analytics.Movimentacoes;
 
 public sealed record ObterMovimentacoesCommand(

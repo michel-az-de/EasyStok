@@ -1,5 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Etiquetas;

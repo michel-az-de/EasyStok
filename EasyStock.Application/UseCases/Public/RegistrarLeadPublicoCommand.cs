@@ -1,7 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Application.UseCases.Public;
 
 public sealed record RegistrarLeadPublicoCommand(

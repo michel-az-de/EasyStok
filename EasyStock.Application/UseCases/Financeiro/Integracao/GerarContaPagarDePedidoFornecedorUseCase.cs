@@ -1,10 +1,6 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.Common;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums.Financeiro;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Financeiro.Integracao;
 

@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.Etiquetas;
 
 public sealed record ListarTemplatesQuery(Guid EmpresaId);

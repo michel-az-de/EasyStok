@@ -1,7 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums.Notifications;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Notifications;
 

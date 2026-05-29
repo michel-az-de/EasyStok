@@ -1,6 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-
 namespace EasyStock.Application.UseCases.Fornecedor;
 
 public sealed record ObterHistoricoFornecedorQuery(Guid EmpresaId, Guid FornecedorId);

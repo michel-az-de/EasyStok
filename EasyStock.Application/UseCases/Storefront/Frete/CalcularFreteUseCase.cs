@@ -5,7 +5,6 @@ using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Storefront.Frete;
 

@@ -1,7 +1,3 @@
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using Microsoft.Extensions.Logging;
-
 namespace EasyStock.Application.UseCases.CancelarAssinatura;
 
 public sealed record CancelarAssinaturaCommand(Guid EmpresaId, bool ImediadaOuFimPeriodo = false);

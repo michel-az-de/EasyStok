@@ -1,6 +1,4 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
-using EasyStock.Application.UseCases.Common;
-using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Admin.Storefront.ListarStorefrontsAdmin;
 

@@ -1,10 +1,4 @@
 using System.Diagnostics;
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.AutenticarUsuario
 {

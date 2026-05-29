@@ -1,12 +1,5 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Application.UseCases.Financeiro.Common;
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
-using EasyStock.Domain.Exceptions;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.UseCases.Financeiro.Pagamentos;
 
