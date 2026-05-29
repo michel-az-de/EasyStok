@@ -2,7 +2,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Domain.Entities.Storefront;
 

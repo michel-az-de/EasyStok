@@ -1,6 +1,4 @@
-﻿using EasyStock.Domain.Exceptions;
-
-namespace EasyStock.Domain.Entities.Storefront;
+﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Canal alternativo ao WhatsApp para contato do cliente (público) com a Babá.

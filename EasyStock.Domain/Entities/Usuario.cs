@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Domain.Entities
 {
     public class Usuario

@@ -1,5 +1,3 @@
-using EasyStock.Domain.Entities;
-
 namespace EasyStock.Domain.Integration;
 
 /// <summary>

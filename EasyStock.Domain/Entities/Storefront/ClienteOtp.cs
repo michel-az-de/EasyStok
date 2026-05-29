@@ -1,6 +1,5 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Domain.Entities.Storefront;
 

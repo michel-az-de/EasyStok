@@ -1,6 +1,4 @@
-﻿using EasyStock.Domain.Exceptions;
-
-namespace EasyStock.Domain.Entities.Storefront;
+﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Bloqueio pontual de entrega — feriados, férias da Babá, dias específicos (ADR-0011).

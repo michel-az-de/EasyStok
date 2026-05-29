@@ -1,5 +1,4 @@
 using EasyStock.Domain.Enums.Pagamentos;
-using EasyStock.Domain.Exceptions;
 
 namespace EasyStock.Domain.Entities.Pagamentos;
 

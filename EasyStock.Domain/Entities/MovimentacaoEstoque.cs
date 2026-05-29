@@ -1,6 +1,4 @@
-using System;
 using EasyStock.Domain.ValueObjects;
-using EasyStock.Domain.Enums;
 
 namespace EasyStock.Domain.Entities
 {

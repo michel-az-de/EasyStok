@@ -1,6 +1,3 @@
-using System;
-using EasyStock.Domain.Exceptions;
-
 namespace EasyStock.Domain.Entities.Financeiro;
 
 /// <summary>

@@ -1,5 +1,3 @@
-using EasyStock.Domain.Exceptions;
-
 namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>

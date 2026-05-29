@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using EasyStock.Domain.Sales;
+﻿using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities

@@ -1,4 +1,3 @@
-using System;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Services

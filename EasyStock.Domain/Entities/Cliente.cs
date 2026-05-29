@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace EasyStock.Domain.Entities
+﻿namespace EasyStock.Domain.Entities
 {
     /// <summary>
     /// Cliente do ERP (Onda P1). Estrutura **expansível** semelhante a

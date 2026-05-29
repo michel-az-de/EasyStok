@@ -6,8 +6,6 @@ global using System.Collections.Generic;
 global using System.ComponentModel.DataAnnotations;
 global using System.ComponentModel.DataAnnotations.Schema;
 global using System.Linq;
-global using System.Threading;
-global using System.Threading.Tasks;
 global using EasyStock.Domain.Entities;
 global using EasyStock.Domain.Enums;
 global using EasyStock.Domain.Exceptions;

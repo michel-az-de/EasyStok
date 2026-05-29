@@ -1,5 +1,3 @@
-using System;
-
 namespace EasyStock.Domain.Exceptions
 {
     public class QuantidadeInvalidaException : RegraDeDominioVioladaException

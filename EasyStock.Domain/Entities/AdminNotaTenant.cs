@@ -1,5 +1,3 @@
-using System;
-
 namespace EasyStock.Domain.Entities;
 
 public enum TipoNotaTenant

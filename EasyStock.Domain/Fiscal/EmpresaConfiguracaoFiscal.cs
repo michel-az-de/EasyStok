@@ -1,5 +1,3 @@
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Integration;
 using EasyStock.Domain.ValueObjects;
 

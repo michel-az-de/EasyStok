@@ -1,6 +1,4 @@
-﻿using EasyStock.Domain.Exceptions;
-
-namespace EasyStock.Domain.Entities.Storefront;
+﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Template recorrente de janela de entrega por dia da semana (ADR-0011).

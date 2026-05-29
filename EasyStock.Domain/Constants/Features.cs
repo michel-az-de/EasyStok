@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace EasyStock.Domain.Constants
 {
     public static class Features

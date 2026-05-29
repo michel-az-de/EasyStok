@@ -1,7 +1,3 @@
-using System;
-using EasyStock.Domain.Enums;
-using EasyStock.Domain.Exceptions;
-
 namespace EasyStock.Domain.Entities
 {
     public class AssinaturaEmpresa

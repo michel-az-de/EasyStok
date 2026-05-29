@@ -1,6 +1,4 @@
-﻿using EasyStock.Domain.Exceptions;
-
-namespace EasyStock.Domain.Entities.Storefront;
+﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Sessão server-side do cliente storefront (ADR-0012).

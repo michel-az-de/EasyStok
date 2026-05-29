@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities

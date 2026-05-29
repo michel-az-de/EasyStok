@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace EasyStock.Domain.Entities
 {
     public class Categoria

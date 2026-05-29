@@ -1,6 +1,3 @@
-using EasyStock.Domain.Entities;
-using EasyStock.Domain.Enums;
-
 namespace EasyStock.Domain.Specifications;
 
 public class ItemEstoqueBloqueadoSpecification : IEspecificacao<ItemEstoque>

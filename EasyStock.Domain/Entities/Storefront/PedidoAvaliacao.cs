@@ -1,6 +1,4 @@
-﻿using EasyStock.Domain.Exceptions;
-
-namespace EasyStock.Domain.Entities.Storefront;
+﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Avaliação do cliente sobre um pedido entregue.

@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using EasyStock.Domain.Entities;
 
 namespace EasyStock.Domain.Integration;
 

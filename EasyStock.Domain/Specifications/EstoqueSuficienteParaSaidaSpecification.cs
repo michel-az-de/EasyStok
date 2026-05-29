@@ -1,4 +1,3 @@
-using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Specifications;

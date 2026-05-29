@@ -1,4 +1,3 @@
-using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Fiscal;
