@@ -66,4 +66,14 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- F6: Templates de email HTML extraidos de NotificacoesGlobaisSeed.cs (eram raw
+         strings inline). Loader em Data\EmailTemplateLoader.cs le via
+         GetManifestResourceStream("EmailTemplates.{codigo}.html"). %(Filename) e o nome
+         do arquivo sem extensao. -->
+    <EmbeddedResource Include="Data\Templates\Email\*.html">
+      <LogicalName>EmailTemplates.%(Filename).html</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,10 @@
+<html><body style="font-family:sans-serif;max-width:600px;margin:auto">
+<h2 style="color:#dc2626">EasyStock — Pagamento pendente</h2>
+<p>Olá, <strong>{{ nome }}</strong>!</p>
+<p><strong>{{ urgencia }}</strong></p>
+<p>Regularize o pagamento de <strong>{{ valor }}</strong> via Pix para restaurar o acesso ao EasyStock:</p>
+{{ if qr_code != "" }}<img src="data:image/png;base64,{{ qr_code }}" alt="QR Code Pix" style="width:200px;height:200px" />{{ end }}
+<p style="margin-top:16px"><strong>Pix Copia e Cola:</strong></p>
+<pre style="background:#f3f4f6;padding:12px;border-radius:6px;word-break:break-all;font-size:12px">{{ pix_copia_cola }}</pre>
+<p style="color:#6b7280;font-size:12px">Após o pagamento seu acesso será restaurado automaticamente em minutos.</p>
+</body></html>

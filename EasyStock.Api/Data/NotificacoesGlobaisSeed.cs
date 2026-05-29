@@ -106,18 +106,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.AssinaturaExpirando,
             assuntoTemplate: "Renovação da sua assinatura EasyStock",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#4f46e5">Renovação da sua assinatura EasyStock</h2>
-                <p>Olá, <strong>{{ nome }}</strong>!</p>
-                <p>Sua assinatura vence em <strong>{{ vencimento }}</strong>. Para continuar usando o EasyStock sem interrupções, realize o pagamento via Pix:</p>
-                <p><strong>Valor:</strong> {{ valor }}</p>
-                {{ if qr_code != "" }}<img src="data:image/png;base64,{{ qr_code }}" alt="QR Code Pix" style="width:200px;height:200px" />{{ end }}
-                <p style="margin-top:16px"><strong>Pix Copia e Cola:</strong></p>
-                <pre style="background:#f3f4f6;padding:12px;border-radius:6px;word-break:break-all;font-size:12px">{{ pix_copia_cola }}</pre>
-                <p style="color:#6b7280;font-size:12px">Após o pagamento, sua assinatura será renovada automaticamente por 30 dias.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("assinatura_expirando_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "assinatura_expirada_dunning_email_v1",
@@ -125,18 +114,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.AssinaturaExpirada,
             assuntoTemplate: "EasyStock — Pagamento pendente (aviso {{ numero_lembrete }}/3)",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#dc2626">EasyStock — Pagamento pendente</h2>
-                <p>Olá, <strong>{{ nome }}</strong>!</p>
-                <p><strong>{{ urgencia }}</strong></p>
-                <p>Regularize o pagamento de <strong>{{ valor }}</strong> via Pix para restaurar o acesso ao EasyStock:</p>
-                {{ if qr_code != "" }}<img src="data:image/png;base64,{{ qr_code }}" alt="QR Code Pix" style="width:200px;height:200px" />{{ end }}
-                <p style="margin-top:16px"><strong>Pix Copia e Cola:</strong></p>
-                <pre style="background:#f3f4f6;padding:12px;border-radius:6px;word-break:break-all;font-size:12px">{{ pix_copia_cola }}</pre>
-                <p style="color:#6b7280;font-size:12px">Após o pagamento seu acesso será restaurado automaticamente em minutos.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("assinatura_expirada_dunning_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "alerta_estoque_critico_email_v1",
@@ -144,14 +122,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.AlertaEstoqueCritico,
             assuntoTemplate: "EasyStock — Alerta de estoque crítico: {{ produto_nome }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#d97706">EasyStock — Alerta de estoque crítico</h2>
-                <p>O produto <strong>{{ produto_nome }}</strong> está abaixo do nível mínimo.</p>
-                <p>Estoque atual: <strong>{{ quantidade_atual }}</strong> | Mínimo: <strong>{{ quantidade_minima }}</strong></p>
-                <p>Acesse o EasyStock para reabastecer o estoque.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("alerta_estoque_critico_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "produto_vencendo_email_v1",
@@ -159,15 +130,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ProdutoVencendo,
             assuntoTemplate: "EasyStock — Produto vencendo em {{ dias_restantes }} dia(s): {{ produto_nome }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#d97706">EasyStock — Produto próximo ao vencimento</h2>
-                <p>O produto <strong>{{ produto_nome }}</strong> vence em <strong>{{ dias_restantes }} dia(s)</strong>.</p>
-                <p>Data de vencimento: <strong>{{ data_vencimento }}</strong> | Lote: <strong>{{ lote_numero }}</strong></p>
-                <p>Quantidade disponível: <strong>{{ quantidade }}</strong></p>
-                <p>Acesse o EasyStock para tomar uma ação antes que o produto expire.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("produto_vencendo_email_v1"));
 
         // ===== Templates do modulo Helpdesk =====
         yield return TemplateNotificacao.Criar(
@@ -192,13 +155,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.TicketRespondidoAdmin,
             assuntoTemplate: "EasyStock — Resposta no ticket: {{ titulo }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#0E2A6E">Sua solicitacao foi respondida</h2>
-                <p>Recebemos uma resposta no seu ticket <strong>{{ titulo }}</strong>.</p>
-                <p>Acesse o painel para visualizar a conversa completa.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_respondido_admin_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "ticket_status_alterado_inapp_v1",
@@ -246,14 +203,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.SlaViolado,
             assuntoTemplate: "EasyStock — SLA violado no ticket {{ titulo }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#dc2626">SLA violado</h2>
-                <p>O ticket <strong>{{ titulo }}</strong> excedeu o prazo de <strong>{{ tipoSla }}</strong>.</p>
-                <p>Empresa: {{ empresaNome }} | Prioridade: {{ prioridade }} | Nivel: {{ nivel }}</p>
-                <p>Acesse o painel para tomar acao imediata.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("sla_violado_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "bug_fix_criado_inapp_v1",
@@ -269,15 +219,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.BugFixCriado,
             assuntoTemplate: "EasyStock — Bug encaminhado: {{ titulo }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#0E2A6E">Bug encaminhado para desenvolvimento</h2>
-                <p><strong>{{ titulo }}</strong></p>
-                <p>Severidade: <strong>{{ severidade }}</strong> | Componente: <strong>{{ componente }}</strong></p>
-                <p>Origem: ticket {{ ticketOrigemId }}.</p>
-                <p>Acesse o painel para detalhes tecnicos.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("bug_fix_criado_email_v1"));
 
         // ===== Auth =====
         yield return TemplateNotificacao.Criar(
@@ -286,22 +228,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ResetSenha,
             assuntoTemplate: "EasyStok — Redefinicao de senha solicitada",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto;background:#f8fafd;padding:20px">
-                <div style="background:#0E2A6E;padding:20px;text-align:center;border-radius:8px 8px 0 0">
-                  <h1 style="color:#fff;margin:0;font-size:24px">Easy<span style="color:#F26B25">Stok</span></h1>
-                </div>
-                <div style="background:#fff;padding:24px;border-radius:0 0 8px 8px">
-                  <h2 style="color:#0E2A6E">Redefinicao de senha</h2>
-                  <p>Ola, <strong>{{ nome }}</strong>!</p>
-                  <p>Clique no botao abaixo para criar uma nova senha:</p>
-                  <p style="text-align:center;margin:24px 0">
-                    <a href="{{ link_redefinicao }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Redefinir senha</a>
-                  </p>
-                  <p style="color:#6b7280;font-size:12px">O link expira em {{ expira_em_minutos }} minutos. Se voce nao solicitou, ignore este email.</p>
-                </div>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("reset_senha_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "confirmacao_email_email_v1",
@@ -309,22 +236,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ConfirmacaoEmail,
             assuntoTemplate: "EasyStok — Confirme seu email",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto;background:#f8fafd;padding:20px">
-                <div style="background:#0E2A6E;padding:20px;text-align:center;border-radius:8px 8px 0 0">
-                  <h1 style="color:#fff;margin:0;font-size:24px">Easy<span style="color:#F26B25">Stok</span></h1>
-                </div>
-                <div style="background:#fff;padding:24px;border-radius:0 0 8px 8px">
-                  <h2 style="color:#0E2A6E">Confirme seu email</h2>
-                  <p>Ola, <strong>{{ nome }}</strong>!</p>
-                  <p>Falta pouco — confirme seu email para ativar sua conta:</p>
-                  <p style="text-align:center;margin:24px 0">
-                    <a href="{{ link_confirmacao }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Confirmar email</a>
-                  </p>
-                  <p style="color:#6b7280;font-size:12px">O link expira em {{ expira_em_horas }} horas.</p>
-                </div>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("confirmacao_email_email_v1"));
 
         // ===== Operacional faltante =====
         yield return TemplateNotificacao.Criar(
@@ -333,14 +245,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ProdutoVencido,
             assuntoTemplate: "EasyStok — Produto VENCIDO: {{ produto_nome }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#C03B2A">EasyStok — Produto vencido</h2>
-                <p>O produto <strong>{{ produto_nome }}</strong> venceu em <strong>{{ data_vencimento }}</strong>.</p>
-                <p>Lote: <strong>{{ lote_numero }}</strong> | Quantidade afetada: <strong>{{ quantidade }}</strong></p>
-                <p>Acesse o EasyStok para registrar a perda.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("produto_vencido_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "produto_vencido_inapp_v1",
@@ -365,14 +270,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.TicketCriado,
             assuntoTemplate: "EasyStok — Novo ticket: {{ titulo }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#0E2A6E">Novo ticket aberto</h2>
-                <p>A empresa <strong>{{ empresaNome }}</strong> abriu o ticket <strong>{{ titulo }}</strong>.</p>
-                <p>Prioridade: <strong>{{ prioridade }}</strong> | Nivel: <strong>{{ nivel }}</strong></p>
-                <p>Acesse o painel para responder.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_criado_email_v1"));
 
         // ===== Templates do modulo de Relatorios =====
         yield return TemplateNotificacao.Criar(
@@ -389,16 +287,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.RelatorioPronto,
             assuntoTemplate: "Seu relatorio esta pronto: {{ reportLabel }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#4f46e5">Seu relatorio esta pronto</h2>
-                <p>Ola, <strong>{{ primeiroNome }}</strong>.</p>
-                <p>O relatorio <strong>{{ reportLabel }}</strong> foi gerado com sucesso.</p>
-                <p>Formato: {{ format }} | Linhas: {{ rowCount }}</p>
-                <p>Acesse o EasyStock para baixar o arquivo.</p>
-                <p style="color:#6b7280;font-size:12px">O arquivo fica disponivel por 30 dias.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_pronto_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "relatorio_falhou_inapp_v1",
@@ -414,16 +303,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.RelatorioFalhou,
             assuntoTemplate: "Nao conseguimos gerar: {{ reportLabel }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#dc2626">Nao conseguimos gerar o relatorio</h2>
-                <p>Ola, <strong>{{ primeiroNome }}</strong>.</p>
-                <p>Tentamos gerar o relatorio <strong>{{ reportLabel }}</strong>, mas nao foi possivel.</p>
-                <p>{{ errorMensagem }}</p>
-                <p>Acesse o EasyStock para tentar novamente.</p>
-                <p style="color:#6b7280;font-size:12px">Codigo: {{ runId }}</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_falhou_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "ticket_respondido_cliente_inapp_v1",
@@ -439,12 +319,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.TicketAtribuido,
             assuntoTemplate: "EasyStok — Ticket atribuido a voce: {{ titulo }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#0E2A6E">Ticket atribuido a voce</h2>
-                <p>Voce foi designado para atender o ticket <strong>{{ titulo }}</strong>.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_atribuido_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "sla_proximo_vencer_email_v1",
@@ -452,13 +327,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.SlaProximoVencer,
             assuntoTemplate: "EasyStok — SLA proximo de vencer: {{ titulo }}",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#B57A00">SLA proximo de vencer</h2>
-                <p>Ticket <strong>{{ titulo }}</strong> esta a <strong>{{ percentual }}%</strong> do prazo de <strong>{{ tipoSla }}</strong>.</p>
-                <p>Tempo restante: <strong>{{ minutosRestantes }} minutos</strong>.</p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("sla_proximo_vencer_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "convite_csat_email_v1",
@@ -466,21 +335,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ConviteCsat,
             assuntoTemplate: "EasyStok — Como avaliaria o atendimento?",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto;background:#f8fafd;padding:20px">
-                <div style="background:#0E2A6E;padding:20px;text-align:center;border-radius:8px 8px 0 0">
-                  <h1 style="color:#fff;margin:0;font-size:24px">Easy<span style="color:#F26B25">Stok</span></h1>
-                </div>
-                <div style="background:#fff;padding:24px;border-radius:0 0 8px 8px">
-                  <h2 style="color:#0E2A6E">Como avaliaria o atendimento?</h2>
-                  <p>Ola, <strong>{{ nome }}</strong>!</p>
-                  <p>Acabamos de fechar seu ticket <strong>{{ titulo_ticket }}</strong>, atendido por {{ atendenteNome }}.</p>
-                  <p style="text-align:center;margin:24px 0">
-                    <a href="{{ link_pesquisa }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Avaliar atendimento</a>
-                  </p>
-                </div>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("convite_csat_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "convite_csat_inapp_v1",
@@ -497,17 +352,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaCriada,
             assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} disponivel",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#0E2A6E">Nova fatura disponivel</h2>
-                <p>Ola, <strong>{{ nome }}</strong>!</p>
-                <p>Sua fatura <strong>{{ numero_fatura }}</strong> no valor de <strong>{{ valor }}</strong> esta disponivel.</p>
-                <p>Vencimento: <strong>{{ vencimento }}</strong>.</p>
-                <p style="text-align:center;margin:24px 0">
-                  <a href="{{ link_pagamento }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Pagar fatura</a>
-                </p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_criada_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "fatura_criada_inapp_v1",
@@ -523,16 +368,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaVencendo,
             assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} vence em {{ dias_restantes }} dia(s)",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#B57A00">Sua fatura vence em breve</h2>
-                <p>Ola, <strong>{{ nome }}</strong>!</p>
-                <p>Fatura <strong>{{ numero_fatura }}</strong> de <strong>{{ valor }}</strong> vence em <strong>{{ dias_restantes }} dia(s)</strong> ({{ vencimento }}).</p>
-                <p style="text-align:center;margin:24px 0">
-                  <a href="{{ link_pagamento }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Pagar agora</a>
-                </p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_vencendo_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "fatura_vencendo_inapp_v1",
@@ -548,17 +384,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaPaga,
             assuntoTemplate: "EasyStok — Pagamento da fatura {{ numero_fatura }} confirmado",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#18874E">Pagamento confirmado</h2>
-                <p>Ola, <strong>{{ nome }}</strong>!</p>
-                <p>Recebemos seu pagamento da fatura <strong>{{ numero_fatura }}</strong>.</p>
-                <p>Valor: <strong>{{ valor }}</strong> em {{ data_pagamento }}.</p>
-                <p style="text-align:center;margin:24px 0">
-                  <a href="{{ link_recibo }}" style="display:inline-block;background:#0E2A6E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Ver recibo</a>
-                </p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_paga_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "fatura_vencida_email_v1",
@@ -566,16 +392,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaVencida,
             assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} em atraso",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#C03B2A">Fatura em atraso</h2>
-                <p>Ola, <strong>{{ nome }}</strong>!</p>
-                <p>Fatura <strong>{{ numero_fatura }}</strong> de <strong>{{ valor }}</strong> esta em atraso ha <strong>{{ dias_em_atraso }} dia(s)</strong>.</p>
-                <p style="text-align:center;margin:24px 0">
-                  <a href="{{ link_pagamento }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Regularizar agora</a>
-                </p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_vencida_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "pagamento_confirmado_inapp_v1",
@@ -591,17 +408,7 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.PagamentoFalhou,
             assuntoTemplate: "EasyStok — Falha no pagamento",
-            corpoTemplate: """
-                <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-                <h2 style="color:#C03B2A">Pagamento nao processado</h2>
-                <p>Ola, <strong>{{ nome }}</strong>!</p>
-                <p>Nao conseguimos processar o pagamento de <strong>{{ valor }}</strong> via {{ metodo }}.</p>
-                <p>Motivo: <em>{{ motivo }}</em></p>
-                <p style="text-align:center;margin:24px 0">
-                  <a href="{{ link_retry }}" style="display:inline-block;background:#E85814;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Tentar novamente</a>
-                </p>
-                </body></html>
-                """);
+            corpoTemplate: EmailTemplateLoader.LoadBody("pagamento_falhou_email_v1"));
 
         yield return TemplateNotificacao.Criar(
             codigo: "broadcast_super_admin_inapp_v1",

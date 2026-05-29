@@ -25,7 +25,7 @@ public class EmailTemplateDiscipline
     };
 
     [Fact]
-    [Trait("Category", "ArchitectureDebt")]
+    [Trait("Category", "Architecture")]
     public void NotificacoesGlobaisSeed_NaoDeveConter_TagHtml()
     {
         // Arrange
