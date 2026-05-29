@@ -1,10 +1,8 @@
-﻿using EasyStock.Api.BackgroundServices;
-using EasyStock.Api.Configuration;
+﻿using EasyStock.Api.Configuration;
 using EasyStock.Api.Data;
 using EasyStock.Api.DependencyInjection;
 using EasyStock.Api.Observability;
 using EasyStock.Application.DependencyInjection;
-using EasyStock.Application.Validators;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Infra.Integrations.DependencyInjection;
@@ -16,7 +14,6 @@ using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Async.DependencyInjection;
 using EasyStock.Infra.Async.Storage;
-using FluentValidation;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Serilog;
@@ -183,37 +180,8 @@ builder.Services.AddScoped<EasyStock.Application.Configuration.IEasyStockConfigu
 // ── Notifications: infra (canais + Scriban) + hosting (orchestrators) + signaler ──
 builder.Services.AddEasyStockNotificationsModule(builder.Configuration);
 
-// ── Background Services + misc ────────────────────────────────────────────────
-builder.Services.AddEasyStockBackgroundJobs(builder.Configuration);
-builder.Services.AddHttpClient(); // for DiagnosticoInfraController self-testing
-builder.Services.AddValidatorsFromAssemblyContaining<CadastrarProdutoCommandValidator>();
-
-// ── Mobile module services (Onda 2 parte 2: stock reconciliation) ────────────
-builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileStockReconciler>();
-// Onda 3: vendas mobile -> Venda ERP (Order entregue cria Venda + ItemVenda).
-builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSaleSyncService>();
-// F9-E: resolve Usuario "Sistema Mobile Sync" pra auditoria de produto/movimentacao
-// (tabelas com UsuarioId NOT NULL). Lookup-or-create idempotente por empresa.
-builder.Services.AddScoped<EasyStock.Api.Mobile.Services.MobileSystemUserResolver>();
-// Onda 5: SSE realtime entre devices da mesma loja.
-// Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
-// Em multi-instance, evoluir pra Redis pubsub.
-builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.MobileEventBroker>();
-// SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
-builder.Services.AddScoped<EasyStock.Api.Mobile.Services.SyncMutationDispatcher>();
-builder.Services.AddScoped<EasyStock.Api.Mobile.Services.SyncAutoLinker>();
-builder.Services.AddScoped<EasyStock.Api.Mobile.Services.SyncReversePullService>();
-// Onda 9: OTA do PWA — lê CACHE_VERSION do sw.js em runtime pra /version reportar
-// a versão real do bundle (sem depender de config drift-prone).
-builder.Services.AddSingleton<EasyStock.Api.Mobile.Services.IPwaVersionProvider,
-    EasyStock.Api.Mobile.Services.PwaVersionProvider>();
-
-// SeedProgressService: Singleton pra compartilhar estado de runs entre requests.
-// O background job e o polling endpoint falam com a mesma instância.
-builder.Services.AddSingleton<EasyStock.Api.Services.SeedProgressService>();
-
-// Storefront — expirar sessões de clientes (ADR-0012: sliding window 30d).
-builder.Services.AddHostedService<EasyStock.Api.Services.Storefront.ExpirarClienteSessionsBackgroundService>();
+// ── Background + Mobile + Misc ────────────────────────────────────────────────
+builder.Services.AddEasyStockApiServices(builder.Configuration);
 
 // DiagnosticoModeService: Singleton que controla LoggingLevelSwitch em tempo real.
 builder.Services.AddSingleton(diagLevelSwitch);
