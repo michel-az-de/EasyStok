@@ -1,4 +1,5 @@
 ﻿using EasyStock.Admin.DependencyInjection;
+using EasyStock.Admin.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,42 +14,8 @@ builder.AddEasyStockAdminServices();
 
 var app = builder.Build();
 
-// ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
-// X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
-app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
-{
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
-                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
-    KnownNetworks = { },
-    KnownProxies = { }
-});
-
-// â”€â”€ Middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-}
-
-app.UseResponseCompression();
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseRouting();
-app.UseSession();
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapRazorPages();
-
-// Aliases /Clientes â†’ /Tenants (sidebar label foi renomeada na slice de GestÃ£o de Cliente,
-// mas as rotas internas seguem `/Tenants`. Redirect mantÃ©m URLs digitadas funcionando).
-app.MapGet("/Clientes", () => Results.Redirect("/Tenants", permanent: false));
-app.MapGet("/Clientes/Detail/{id:guid}", (Guid id) => Results.Redirect($"/Tenants/Detail/{id}", permanent: false));
-
-// /Status absorvido em /Diagnostico (slice "DiagnÃ³stico de Erros + Seed VisÃ­vel").
-// Redirect 301 mantÃ©m bookmarks/links externos funcionando. Remover daqui a 1-2 releases.
-app.MapGet("/Status", () => Results.Redirect("/Diagnostico", permanent: true));
+// === Pipeline + redirects + Razor Pages (verbatim em Hosting/AdminPipelineExtensions.cs) ===
+app.UseEasyStockAdminPipeline();
 
 // Proxy endpoint para badges do sidebar (polling JS a cada 60s)
 app.MapGet("/api-proxy/dashboard-badges", async (
