@@ -1,0 +1,23 @@
+<Project>
+
+  <!--
+    Configuração compartilhada por todos os projetos da solution.
+    MSBuild importa este arquivo automaticamente em cada .csproj subindo a árvore.
+
+    EnforceCodeStyleInBuild=true faz com que regras configuradas no .editorconfig
+    com severidade error/warning apareçam no build (e não só no IDE).
+
+    GenerateDocumentationFile=true é necessário pra IDE0005 ("using directive is
+    unnecessary") funcionar em build — sem ele a regra fica latente.
+
+    CS1591 (membro público sem doc XML) é suprimido porque não exigimos doc XML
+    pública nesta base.
+  -->
+
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>
