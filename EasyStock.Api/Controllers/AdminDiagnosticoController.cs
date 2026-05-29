@@ -31,8 +31,9 @@ public class AdminDiagnosticoController(IEmailService emailService, MetaCloudWha
             ? $"EasyStok — teste de email ({DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC)"
             : req.Assunto.Trim();
         var corpo = string.IsNullOrWhiteSpace(req.Corpo)
-            ? $"<p>Email de teste enviado pelo diagnostico SuperAdmin em {DateTime.UtcNow:O}.</p>"
-                + "<p>Se voce esta lendo isso, o provedor de email esta funcionando.</p>"
+            ? string.Format(
+                EasyStock.Api.Data.EmailTemplateLoader.LoadBody("diagnostico_teste_email"),
+                DateTime.UtcNow.ToString("O"))
             : req.Corpo;
 
         var provedor = emailService.GetType().Name; // SmtpEmailService | SendGridEmailService | ConsoleEmailService

@@ -47,14 +47,10 @@ public sealed class CadastrarUsuarioUseCase(
             try
             {
                 var confirmLink = $"{command.BaseUrl.TrimEnd('/')}/auth/confirmar-email?token={Uri.EscapeDataString(confirmationToken)}";
-                var body = $@"<html><body style=""font-family:sans-serif;max-width:600px;margin:auto"">
-<h2 style=""color:#4f46e5"">Confirme seu email</h2>
-<p>Olá {System.Net.WebUtility.HtmlEncode(usuario.Nome)},</p>
-<p>Bem-vindo ao EasyStock! Clique no link abaixo para confirmar seu email:</p>
-<p><a href=""{confirmLink}"" style=""background:#4f46e5;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block"">Confirmar Email</a></p>
-<p>Este link expira em 24 horas.</p>
-<p>Se você não se registrou, ignore este email.</p>
-</body></html>";
+                var body = string.Format(
+                    EasyStock.Application.Resources.EmailTemplateLoader.LoadBody("cadastro_usuario_confirmacao"),
+                    System.Net.WebUtility.HtmlEncode(usuario.Nome),
+                    confirmLink);
 
                 await emailService.SendAsync(usuario.Email, "Confirme seu email - EasyStock", body, isHtml: true);
                 logger.LogInformation("Email de confirmação enviado para {Email}", usuario.Email);

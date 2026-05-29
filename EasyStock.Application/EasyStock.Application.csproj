@@ -11,6 +11,14 @@
  </ItemGroup>
 
  <ItemGroup>
+   <!-- F6b: Templates de email da camada Application (CadastrarUsuarioUseCase etc.).
+        Carregados via Resources/EmailTemplateLoader. %(Filename) = nome sem extensao. -->
+   <EmbeddedResource Include="Resources\Email\*.html">
+     <LogicalName>ApplicationEmailTemplates.%(Filename).html</LogicalName>
+   </EmbeddedResource>
+ </ItemGroup>
+
+ <ItemGroup>
    <PackageReference Include="Cronos" Version="0.8.4" />
    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.4" />
    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.4" />
