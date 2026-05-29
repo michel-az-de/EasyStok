@@ -1,5 +1,4 @@
 ﻿using EasyStok.Mobile.Services;
-using EasyStok.Mobile.Storage;
 
 namespace EasyStok.Mobile.Controls;
 

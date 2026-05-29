@@ -1,7 +1,6 @@
 using EasyStok.Mobile.Models;
 using EasyStok.Mobile.Storage;
 using Microsoft.Extensions.Logging;
-using System.IO;
 
 namespace EasyStok.Mobile.Services;
 
