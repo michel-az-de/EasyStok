@@ -1,5 +1,4 @@
 using EasyStock.Api.Utilities;
-using EasyStock.Infra.Postgre.Data;
 using System.Text;
 
 namespace EasyStock.Api.Controllers;
@@ -7,7 +6,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/admin/audit-logs")]
 [Authorize(Policy = "SuperAdmin")]
-public class AdminAuditLogsController(EasyStockDbContext db) : EasyStockControllerBase
+public class AdminAuditLogsController(IAdminAuditLogQueries auditLogs) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetLogs(
@@ -17,32 +16,17 @@ public class AdminAuditLogsController(EasyStockDbContext db) : EasyStockControll
         [FromQuery] DateTime? to,
         [FromQuery] string? export,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50)
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
     {
         (page, pageSize) = NormalisePage(page, pageSize);
 
-        var query = db.AdminAuditLogs.AsQueryable();
-
-        if (tenantId.HasValue)
-            query = query.Where(x => x.TenantId == tenantId.Value);
-
-        if (!string.IsNullOrWhiteSpace(acao))
-            query = query.Where(x => x.Acao.Contains(acao));
-
-        if (from.HasValue)
-            query = query.Where(x => x.CriadoEm >= from.Value.ToUniversalTime());
-
-        if (to.HasValue)
-            query = query.Where(x => x.CriadoEm <= to.Value.ToUniversalTime().AddDays(1));
-
-        query = query.OrderByDescending(x => x.CriadoEm);
+        var filtro = new AdminAuditLogFiltro(tenantId, acao, from, to, page, pageSize);
 
         // CSV export
         if (string.Equals(export, "csv", StringComparison.OrdinalIgnoreCase))
         {
-            var all = await query
-                .Select(x => new { x.AdminEmail, x.Acao, x.TenantId, x.Detalhes, x.Ip, x.CriadoEm })
-                .ToListAsync();
+            var all = await auditLogs.ExportarAsync(filtro, ct);
 
             var sb = new StringBuilder();
             sb.AppendLine("AdminEmail,Acao,TenantId,Detalhes,IP,CriadoEm");
@@ -56,24 +40,10 @@ public class AdminAuditLogsController(EasyStockDbContext db) : EasyStockControll
             return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "admin-audit-logs.csv");
         }
 
-        var total = await query.CountAsync();
-        var logRecords = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(x => new
-            {
-                x.Id,
-                x.AdminEmail,
-                x.Acao,
-                x.TenantId,
-                x.Detalhes,
-                x.Ip,
-                x.CriadoEm
-            })
-            .ToListAsync();
+        var (items, total) = await auditLogs.ListarAsync(filtro, ct);
 
         // Mask PII before returning
-        var logs = logRecords.Select(x => new
+        var logs = items.Select(x => new
         {
             x.Id,
             AdminEmail = PiiMaskingHelper.MaskEmail(x.AdminEmail),
