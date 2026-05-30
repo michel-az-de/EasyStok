@@ -9,30 +9,6 @@ internal static class DiagnosticoHtmlRenderer
 {
     public static string Render(DiagnosticoResult r, IReadOnlyList<HealthSnapshot> snapshots, EnhancedLogsResult? logs, string logsDir)
     {
-        static string Badge(string status) => status switch
-        {
-            "ok" => "<span class='badge ok'>OK</span>",
-            "degraded" => "<span class='badge warn'>DEGRADADO</span>",
-            "critical" => "<span class='badge crit'>CRITICO</span>",
-            "falha" => "<span class='badge crit'>FALHA</span>",
-            "nao_configurado" => "<span class='badge na'>N/C</span>",
-            _ => $"<span class='badge'>{status}</span>"
-        };
-
-        static string BoolBadge(bool? val) => val switch
-        {
-            true => "<span class='badge ok'>Sim</span>",
-            false => "<span class='badge crit'>Nao</span>",
-            null => "<span class='badge na'>N/A</span>"
-        };
-
-        static string SevBadge(string sev) => sev switch
-        {
-            "critical" => "<span class='badge crit'>CRITICO</span>",
-            "warning" => "<span class='badge warn'>ALERTA</span>",
-            _ => "<span class='badge ok'>INFO</span>"
-        };
-
         var causasHtml = r.CausasProvaveis.Count > 0
             ? "<div class='card alert-card'><h2>&#9888; Causas Provaveis</h2>" +
               string.Join("", r.CausasProvaveis.Select(c =>
@@ -191,279 +167,25 @@ internal static class DiagnosticoHtmlRenderer
                 "</div></div>";
         }
 
+        var statusColor = r.Status == "ok" ? "#16a34a" : r.Status == "degraded" ? "#d97706" : "#dc2626";
+
         return $$"""
         <!DOCTYPE html>
         <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>EasyStock - Central de Diagnostico</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-        <style>
-            *{box-sizing:border-box;margin:0;padding:0}
-            body{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-            .container{max-width:1200px;margin:0 auto;padding:1rem}
-            header{display:flex;align-items:center;justify-content:space-between;padding:1rem 0;border-bottom:1px solid #1e293b;margin-bottom:1.5rem;flex-wrap:wrap;gap:.5rem}
-            header h1{font-size:1.5rem;color:#f8fafc;display:flex;align-items:center;gap:.5rem}
-            header h1::before{content:'';display:inline-block;width:10px;height:10px;border-radius:50%;background:{{(r.Status == "ok" ? "#16a34a" : r.Status == "degraded" ? "#d97706" : "#dc2626")}};box-shadow:0 0 8px {{(r.Status == "ok" ? "#16a34a" : r.Status == "degraded" ? "#d97706" : "#dc2626")}}}
-            .meta{color:#94a3b8;font-size:.8rem}
-            .tabs{display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:2px solid #1e293b;overflow-x:auto}
-            .tab{padding:.6rem 1.2rem;cursor:pointer;color:#94a3b8;border:none;background:none;font-size:.85rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s}
-            .tab:hover{color:#e2e8f0}.tab.active{color:#38bdf8;border-bottom-color:#38bdf8}
-            .panel{display:none}.panel.active{display:block}
-            .card{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.25rem;margin-bottom:1rem}
-            .card h2{font-size:1rem;color:#f8fafc;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
-            .alert-card{border-color:#92400e;background:#1c1917}
-            .alert-item{padding:.5rem 0;border-bottom:1px solid #334155;font-size:.85rem}.alert-item:last-child{border:none}
-            .alert-item em{color:#94a3b8;font-size:.8rem}
-            table{width:100%;border-collapse:collapse;font-size:.875rem}
-            td{padding:.4rem .75rem;border-bottom:1px solid #334155}td:first-child{color:#94a3b8;width:40%}
-            .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-            .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
-            @media(max-width:768px){.grid-2,.grid-3{grid-template-columns:1fr} }
-            .badge{padding:.15rem .5rem;border-radius:.25rem;font-size:.75rem;font-weight:600;display:inline-block}
-            .badge.ok{background:#052e16;color:#22c55e}.badge.crit{background:#450a0a;color:#ef4444}
-            .badge.warn{background:#422006;color:#f59e0b}.badge.na{background:#1e293b;color:#64748b}
-            .chart-box{background:#0f172a;border-radius:.5rem;padding:1rem;position:relative;height:220px}
-            .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.75rem;margin-bottom:1rem}
-            @media(max-width:768px){.stats-grid{grid-template-columns:repeat(3,1fr)} }
-            .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.5rem;padding:.75rem;text-align:center}
-            .stat-box.err{border-color:#7f1d1d}.stat-box.warn{border-color:#78350f}
-            .stat-num{font-size:1.5rem;font-weight:700;color:#f8fafc}.stat-label{font-size:.7rem;color:#94a3b8;margin-top:.25rem}
-            .log-console{background:#020617;border:1px solid #1e293b;border-radius:.5rem;max-height:500px;overflow-y:auto;font-family:'Cascadia Code','Fira Code',monospace;font-size:.75rem}
-            .log-controls{display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;align-items:center}
-            .log-controls input{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:.4rem .75rem;border-radius:.375rem;font-size:.8rem;flex:1;min-width:200px}
-            .log-controls button{padding:.4rem .75rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.375rem;cursor:pointer;font-size:.75rem;white-space:nowrap}
-            .log-controls button.active{background:#1e40af;border-color:#3b82f6;color:#e2e8f0}
-            .log-row{padding:.3rem .75rem;border-bottom:1px solid #0f172a;display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}
-            .log-row:hover{background:#1e293b}
-            .log-error{border-left:3px solid #ef4444}.log-warn{border-left:3px solid #f59e0b}
-            .log-info{border-left:3px solid transparent}.log-debug{border-left:3px solid #6b7280;opacity:.7}
-            .log-time{color:#64748b;min-width:55px}.log-level{min-width:40px;font-weight:600}
-            .log-error .log-level{color:#ef4444}.log-warn .log-level{color:#f59e0b}.log-info .log-level{color:#38bdf8}
-            .log-cat{padding:.1rem .4rem;border-radius:.2rem;font-size:.65rem;font-weight:600}
-            .cat-http{background:#1e3a5f;color:#60a5fa}.cat-migration{background:#3b0764;color:#c084fc}
-            .cat-startup{background:#064e3b;color:#34d399}.cat-error{background:#450a0a;color:#f87171}
-            .cat-db{background:#422006;color:#fbbf24}
-            .log-elapsed{color:#94a3b8;font-size:.7rem}.log-msg{color:#cbd5e1;flex:1;word-break:break-word}
-            .log-exception{color:#fca5a5;font-size:.7rem;white-space:pre-wrap;word-break:break-all;width:100%;margin-top:.25rem;max-height:120px;overflow-y:auto;border-radius:.25rem;padding:.35rem .5rem;background:#1a0505;border:1px solid #450a0a;cursor:pointer}
-            .log-exception.collapsed{max-height:2.4rem;overflow:hidden;position:relative}
-            .log-exception.collapsed::after{content:'... clique para expandir';position:absolute;bottom:0;right:.5rem;background:#1a0505;color:#94a3b8;font-size:.6rem;padding:0 .25rem}
-            .log-ctx{display:inline-flex;gap:.3rem;margin-left:.25rem}
-            .log-ctx span{font-size:.6rem;padding:.1rem .35rem;border-radius:.2rem;background:#1e293b;color:#64748b;border:1px solid #334155}
-            .patterns-list{display:flex;flex-direction:column;gap:.75rem}
-            .pattern-item{padding:.75rem;background:#0f172a;border-radius:.5rem;font-size:.85rem;border:1px solid #334155}
-            .pattern-count{color:#94a3b8;font-size:.8rem}.pattern-desc{color:#cbd5e1}
-            .pattern-tip{color:#94a3b8;font-size:.8rem}
-            .links{display:flex;gap:1rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e293b;flex-wrap:wrap}
-            .links a{color:#38bdf8;text-decoration:none;font-size:.85rem}.links a:hover{text-decoration:underline}
-            .refresh-bar{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:#94a3b8}
-            .refresh-bar label{cursor:pointer;display:flex;align-items:center;gap:.25rem}
-            .section-empty{color:#64748b;text-align:center;padding:2rem;font-size:.85rem}
-            .toast-container{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:.5rem;z-index:9999;pointer-events:none}
-            .toast{padding:.65rem 1rem;border-radius:.5rem;font-size:.8rem;color:#f1f5f9;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;max-width:320px;word-break:break-word}
-            .toast.show{opacity:1;transform:translateY(0)}
-            .toast.success{background:#052e16;border:1px solid #16a34a;color:#4ade80}
-            .toast.error{background:#450a0a;border:1px solid #dc2626;color:#fca5a5}
-            .toast.info{background:#1e293b;border:1px solid #334155;color:#94a3b8}
-            .investigacao-panel .inv-log-entry{font-family:monospace;font-size:.7rem;color:#cbd5e1;padding:.2rem .3rem;border-bottom:1px solid #1e293b;word-break:break-all}
-            .investigacao-panel .inv-log-entry:last-child{border:none}
-            .pattern-item.resolved{opacity:.6;border-color:#052e16}
-            .pattern-item.investigating{border-color:#78350f;background:#1c1917}
-        </style></head><body>
+        {{RenderStyles(statusColor)}}
         <div class='toast-container' id='toastContainer'></div>
         <div class="container">
-        <header>
-            <h1>EasyStock - Central de Diagnostico</h1>
-            <div>
-                <div class="meta">{{r.Timestamp:yyyy-MM-dd HH:mm:ss}} UTC | Uptime: {{r.Uptime}} | {{r.Ambiente}} | v{{r.Versao}}</div>
-                <div class="refresh-bar" style="margin-top:.25rem;justify-content:flex-end">
-                    <label><input type="checkbox" id="autoRefresh"> Auto-refresh 30s</label>
-                    <button class="tab" onclick="location.reload()" style="padding:.2rem .5rem;font-size:.75rem">&#8635; Atualizar</button>
-                </div>
-            </div>
-        </header>
+        {{RenderHeaderAndTabs(r, logs)}}
 
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('overview')">Visao Geral</button>
-            <button class="tab" onclick="showTab('health')">Saude &amp; Graficos</button>
-            <button class="tab" onclick="showTab('logs')">Logs 24h</button>
-            <button class="tab" onclick="showTab('patterns')">Alertas &amp; Padroes{{(logs?.Padroes.Length > 0 ? $" <span style='background:#450a0a;color:#ef4444;border-radius:9999px;padding:.1rem .45rem;font-size:.65rem;font-weight:700'>{logs.Padroes.Length}</span>" : "")}}</button>
-        </div>
+        {{RenderOverviewTab(r, causasHtml, sloHtml)}}
 
-        <!-- OVERVIEW TAB -->
-        <div class="panel active" id="tab-overview">
-        <div class="overall" style="font-size:1.25rem;margin-bottom:1rem">Status geral: {{Badge(r.Status)}}</div>
-        {{causasHtml}}
-        {{sloHtml}}
-        <div class="grid-2">
-            <div class="card"><h2>&#128451; Banco de Dados</h2><table>
-                <tr><td>Provider</td><td>{{r.Banco.Provider}}</td></tr>
-                <tr><td>Configurado</td><td>{{r.Banco.ProviderConfigurado}}</td></tr>
-                <tr><td>Fallback</td><td>{{BoolBadge(r.Banco.Fallback)}}</td></tr>
-                <tr><td>Conexao</td><td>{{Badge(r.Banco.Conexao)}}</td></tr>
-                <tr><td>Latencia</td><td>{{r.Banco.LatenciaMs}}ms</td></tr>
-                <tr><td>Migrations</td><td>{{BoolBadge(r.Banco.MigrationsAplicadas)}}</td></tr>
-                {{(r.Banco.Erro != null ? $"<tr><td>Erro</td><td style='color:#fca5a5;font-size:.8rem'>{System.Net.WebUtility.HtmlEncode(r.Banco.Erro)}</td></tr>" : "")}}
-            </table></div>
-            <div class="card"><h2>&#9889; Redis</h2><table>
-                <tr><td>Configurado</td><td>{{BoolBadge(r.Redis.Configurado)}}</td></tr>
-                <tr><td>Conexao</td><td>{{Badge(r.Redis.Conexao)}}</td></tr>
-                <tr><td>Latencia</td><td>{{(r.Redis.Configurado ? r.Redis.LatenciaMs + "ms" : "N/A")}}</td></tr>
-            </table></div>
-            <div class="card"><h2>&#9993; SMTP / Email</h2><table>
-                <tr><td>Configurado</td><td>{{BoolBadge(r.Smtp.Configurado)}}</td></tr>
-                <tr><td>Tipo</td><td>{{r.Smtp.Tipo}}</td></tr>
-                <tr><td>Host</td><td>{{r.Smtp.Host ?? "N/A"}}</td></tr>
-            </table></div>
-            <div class="card"><h2>&#128193; Storage</h2><table>
-                <tr><td>Provider</td><td>{{r.Storage.Provider}}</td></tr>
-                <tr><td>Configurado</td><td>{{BoolBadge(r.Storage.Configurado)}}</td></tr>
-                <tr><td>{{(r.Storage.Provider == "Local" ? "Diretorio existe" : "Conexao")}}</td><td>{{BoolBadge(r.Storage.DiretorioExiste)}}</td></tr>
-            </table></div>
-            <div class="card"><h2>&#129302; IA (Anthropic)</h2><table>
-                <tr><td>Habilitado</td><td>{{BoolBadge(r.Ia.Habilitado)}}</td></tr>
-                <tr><td>API Key presente</td><td>{{BoolBadge(r.Ia.ApiKeyPresente)}}</td></tr>
-            </table></div>
-            <div class="card"><h2>&#128272; Configuracoes</h2><table>
-                <tr><td>JWT Secret</td><td>{{BoolBadge(r.Configuracoes.JwtSecretPresente)}} {{(r.Configuracoes.JwtSecretSeguro == true ? Badge("ok") : Badge("falha"))}}</td></tr>
-                <tr><td>Connection String</td><td>{{BoolBadge(r.Configuracoes.ConnectionStringPresente)}}</td></tr>
-                <tr><td>CORS Origins</td><td style="font-size:.8rem">{{string.Join(", ", r.Configuracoes.CorsOrigins)}}</td></tr>
-            </table></div>
-        </div>
-        <!-- Queries Lentas -->
-        <div class='card' style='margin-top:1rem'>
-            <h2>&#128269; Queries SQL Lentas (pg_stat_statements) <button onclick='loadQueriesLentas()' style='margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.3rem;cursor:pointer'>Carregar</button></h2>
-            <div id='queriesLentasResult'><span style='color:#475569;font-size:.85rem'>Clique em Carregar para buscar as queries mais lentas do PostgreSQL.</span></div>
-        </div>
-        <!-- Saude por Empresa -->
-        <div class='card' style='margin-top:1rem'>
-            <h2>&#128188; Saude por Empresa (sintetico) <button onclick='loadEmpresasHealth()' style='margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.3rem;cursor:pointer'>Verificar</button></h2>
-            <div id='empresasHealthResult'><span style='color:#475569;font-size:.85rem'>Clique em Verificar para testar conectividade por empresa.</span></div>
-        </div>
-        </div>
+        {{RenderHealthTab(snapshots, logs)}}
 
-        <!-- HEALTH TAB -->
-        <div class="panel" id="tab-health">
-        {{(snapshots.Count > 0 ? $@"
-        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem'>
-            <span style='font-size:.8rem;color:#94a3b8'>&#128200; Histórico de saúde — últimas 2h (snapshots a cada 60s)</span>
-            <button onclick='zerarMedidores()' style='padding:.35rem .8rem;font-size:.75rem;background:#1e3a2f;border:1px solid #166534;color:#4ade80;border-radius:.4rem;cursor:pointer'>&#9654; Zerar medidores</button>
-        </div>
-        <div class='stats-grid' style='grid-template-columns:repeat(4,1fr);margin-bottom:1rem'>
-            <div class='stat-box'><div class='stat-num' id='kpiDb'>{(snapshots.Count > 0 ? snapshots[^1].DbLatencyMs + "ms" : "—")}</div><div class='stat-label'>DB Latencia (ultimo)</div></div>
-            <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? "" : "")}'><div class='stat-num'>{(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? snapshots[^1].RedisLatencyMs + "ms" : "N/C")}</div><div class='stat-label'>Redis Latencia (ultimo)</div></div>
-            <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].ErrorCount > 0 ? "err" : "")}'><div class='stat-num' id='kpiErr'>{(snapshots.Count > 0 ? snapshots[^1].ErrorCount.ToString() : "—")}</div><div class='stat-label'>Erros (ultimo min)</div></div>
-            <div class='stat-box'><div class='stat-num' id='kpiSnap'>{snapshots.Count} snapshots</div><div class='stat-label'>Historico (max 120 = 2h)</div></div>
-        </div>
-        <div class='card'><h2>&#128200; Latencia do Banco de Dados</h2>
-            <div id='eventosLegenda' style='display:none;flex-wrap:wrap;gap:.25rem;margin-bottom:.5rem;padding:.4rem .5rem;background:#0f172a;border-radius:.3rem'></div>
-            <div class='chart-box'><canvas id='dbChart'></canvas></div>
-            <div style='font-size:.65rem;color:#475569;margin-top:.3rem'>🚀 Deploy &nbsp; ⚡ Error Spike &nbsp; (linhas aparecem quando eventos sao detectados nos logs)</div>
-        </div>
-        <div class='grid-2'>
-            <div class='card'><h2>&#128200; Latencia Redis</h2>
-                <div class='chart-box'><canvas id='redisChart'></canvas></div>
-            </div>
-            <div class='card'><h2>&#128200; Erros por Snapshot (por minuto)</h2>
-                <div class='chart-box'><canvas id='errChart'></canvas></div>
-            </div>
-        </div>
-        " : @"<div class='card'><div class='section-empty'>
-            Aguardando primeiros snapshots de saude (coletados a cada 60s)...<br>
-            <small style='color:#475569;margin-top:.5rem;display:block'>Os graficos aparecao automaticamente apos o primeiro minuto de uptime.</small>
-        </div></div>")}}
+        {{RenderLogsTab(logs, logStatsHtml, logEntriesHtml)}}
 
-        {{(logs?.Disponivel == true ? $@"
-        <div class='card'><h2>&#128200; Volume de Requests e Erros por Hora (48h)</h2>
-            <div class='chart-box' style='height:250px'><canvas id='volumeChart'></canvas></div>
-        </div>
-        " : "")}}
-        </div>
-
-        <!-- LOGS TAB -->
-        <div class="panel" id="tab-logs">
-        {{(logs?.Disponivel == true ? $@"
-        {logStatsHtml}
-        <!-- Timeline visual de erros -->
-        <div class='card' style='padding:.75rem 1rem;margin-bottom:.75rem'>
-            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem'>
-                <h3 style='font-size:.8rem;color:#94a3b8;font-weight:500'>&#128200; Timeline de Erros &amp; Requests — ultimas 48h (por hora)</h3>
-                <span style='font-size:.7rem;color:#475569'>Clique para filtrar por hora</span>
-            </div>
-            <div style='position:relative;height:80px'><canvas id='errorTimelineChart'></canvas></div>
-            <div id='timelineFilterInfo' style='font-size:.7rem;color:#f59e0b;margin-top:.3rem;min-height:1rem'></div>
-        </div>
-        <!-- Storage de logs -->
-        <div class='card' style='padding:.75rem 1rem;margin-bottom:.75rem'>
-            <div style='display:flex;align-items:center;gap:.75rem;flex-wrap:wrap'>
-                <span style='font-size:.8rem;color:#94a3b8;font-weight:500'>&#128230; Logs Arquivados (Storage)</span>
-                <button onclick='loadStorageFileList()' style='padding:.3rem .65rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.35rem;cursor:pointer'>Listar arquivos</button>
-                <select id='storageFileSelect' style='display:none;background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:.3rem .5rem;border-radius:.35rem;font-size:.75rem;max-width:260px' onchange='loadStorageFileContent()'><option value=''>-- selecione --</option></select>
-                <button id='clearStorageBtn' onclick='clearStorageView()' style='display:none;padding:.3rem .65rem;font-size:.75rem;background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5;border-radius:.35rem;cursor:pointer'>&#10005; Limpar</button>
-                <span id='storageStatusMsg' style='font-size:.75rem;color:#94a3b8'></span>
-            </div>
-            <div id='storageArchiveIndicator' style='display:none;margin-top:.4rem;font-size:.75rem;color:#f59e0b;background:#422006;border:1px solid #78350f;border-radius:.3rem;padding:.3rem .6rem'>
-                &#128197; Exibindo logs de arquivo arquivado no storage — dados historicos
-            </div>
-        </div>
-        <div class='card'>
-            <h2>&#128466; Console de Logs <span id='logSourceLabel' style='font-size:.75rem;font-weight:400;color:#94a3b8'>(ultimas 48h)</span>
-                <span id='liveDot' style='display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-left:6px;vertical-align:middle'></span>
-                <span id='liveTimestamp' style='font-size:.7rem;font-weight:400;color:#475569;margin-left:.5rem'></span>
-            </h2>
-            <div class='log-controls'>
-                <input type='text' id='logFilter' placeholder='Filtrar mensagens...' oninput='filterLogs()'>
-                <button class='active' onclick='toggleLevel(this,""all"")'>Todos</button>
-                <button onclick='toggleLevel(this,""ERROR"")'>Erros</button>
-                <button onclick='toggleLevel(this,""WARN"")'>Warnings</button>
-                <button onclick='toggleLevel(this,""INFO"")'>Info</button>
-                <a href='/api/diagnostico/logs/exportar' download style='padding:.4rem .75rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.375rem;font-size:.75rem;text-decoration:none;white-space:nowrap;cursor:pointer'>&#11015; Exportar</a>
-                <button onclick='moverParaLixeira()' style='margin-left:auto;background:#92400e;color:#fef3c7;border-color:#b45309'>&#128465; Mover p/ lixeira</button>
-                <button onclick='esvaziarLixeira()' style='background:#450a0a;color:#fca5a5;border-color:#7f1d1d'>&#128465; Esvaziar lixeira</button>
-                <button onclick='expurgarLogs()' style='background:#1e3a5f;color:#60a5fa;border-color:#2563eb'>&#128465; Expurgar antigos</button>
-                <span id='lixeiraBadge' style='font-size:.72rem;color:#94a3b8;white-space:nowrap'></span>
-            </div>
-            <div class='log-console' id='logConsole'>
-                {logEntriesHtml}
-            </div>
-            <div style='margin-top:.5rem;font-size:.75rem;color:#64748b' id='logCountInfo'>Mostrando ate 200 entradas mais recentes de {logs.TotalEntries} total</div>
-        </div>
-        " : "<div class='section-empty'>Logs nao disponiveis neste ambiente.</div>")}}
-        </div>
-
-        <!-- PATTERNS TAB -->
-        <div class="panel" id="tab-patterns">
-        {{(patternsHtmlAck.Length > 0 ? patternsHtmlAck : "<div class='card' style='border-color:#052e16'><div class='section-empty' style='color:#16a34a'>&#10003; Nenhum padrao anomalo detectado nas ultimas 48h.</div></div>")}}
-
-        {{(logs?.Disponivel == true ? $@"
-        <div class='grid-2'>
-        " + (logs.Resumo.ErrorsByEndpoint.Count > 0 ?
-            "<div class='card'><h2>&#128680; Top Endpoints com Erros</h2><table>" +
-            string.Join("", logs.Resumo.ErrorsByEndpoint.OrderByDescending(kv => kv.Value).Take(10).Select(kv =>
-                $"<tr><td style='font-family:monospace;font-size:.8rem'>{System.Net.WebUtility.HtmlEncode(kv.Key)}</td><td><span class='badge crit'>{kv.Value}x</span></td></tr>")) +
-            "</table></div>"
-            : "<div class='card'><h2>&#128680; Erros por Endpoint</h2><div class='section-empty'>Sem erros registrados nos endpoints.</div></div>")
-        + (logs.Resumo.TotalRequests > 0 && logs.Resumo.AvgResponseTimeMs > 0 ?
-            $"<div class='card'><h2>&#9201; Performance (48h)</h2><table>" +
-            $"<tr><td>Total Requests</td><td><strong>{logs.Resumo.TotalRequests}</strong></td></tr>" +
-            $"<tr><td>Tempo Medio Resposta</td><td><strong style='color:{(logs.Resumo.AvgResponseTimeMs < 200 ? "#22c55e" : logs.Resumo.AvgResponseTimeMs < 1000 ? "#f59e0b" : "#ef4444")}'>{logs.Resumo.AvgResponseTimeMs:F0}ms</strong></td></tr>" +
-            $"<tr><td>Taxa de Erro</td><td><strong style='color:{(logs.Resumo.TotalErrors == 0 ? "#22c55e" : "#ef4444")}'>{(logs.Resumo.TotalRequests > 0 ? (100.0 * logs.Resumo.TotalErrors / logs.Resumo.TotalRequests):0):F1}%</strong></td></tr>" +
-            $"<tr><td>Warnings</td><td><strong>{logs.Resumo.TotalWarnings}</strong></td></tr>" +
-            "</table></div>"
-            : "")
-        + @"</div>" : "")}}
-
-        <!-- Snapshot health summary -->
-        {{(snapshots.Count > 0 ? $@"
-        <div class='card'><h2>&#128308; Saude do Banco — Historico de Status</h2>
-        <div style='display:flex;flex-wrap:wrap;gap:3px;margin-top:.5rem'>
-        {string.Join("", snapshots.TakeLast(60).Select(s => {
-            var color = s.DbStatus == "ok" ? "#16a34a" : "#dc2626";
-            var title = $"{s.Timestamp:HH:mm} — DB:{s.DbStatus} {s.DbLatencyMs}ms Erros:{s.ErrorCount}";
-            return $"<span title='{System.Net.WebUtility.HtmlEncode(title)}' style='display:inline-block;width:10px;height:20px;border-radius:2px;background:{color};cursor:help'></span>";
-        }))}
-        </div>
-        <div style='font-size:.7rem;color:#64748b;margin-top:.4rem'>Cada bloco = 1 minuto. Verde=OK, Vermelho=Falha. Ultimos {Math.Min(snapshots.Count, 60)} minutos.</div>
-        </div>" : "")}}
-        </div>
+        {{RenderPatternsTab(logs, snapshots, patternsHtmlAck)}}
 
         <div class="links">
             <a href="/diagnostico">&#8635; Atualizar</a>
@@ -951,4 +673,308 @@ internal static class DiagnosticoHtmlRenderer
         </body></html>
         """;
     }
+
+    private static string Badge(string status) => status switch
+    {
+        "ok" => "<span class='badge ok'>OK</span>",
+        "degraded" => "<span class='badge warn'>DEGRADADO</span>",
+        "critical" => "<span class='badge crit'>CRITICO</span>",
+        "falha" => "<span class='badge crit'>FALHA</span>",
+        "nao_configurado" => "<span class='badge na'>N/C</span>",
+        _ => $"<span class='badge'>{status}</span>"
+    };
+
+    private static string BoolBadge(bool? val) => val switch
+    {
+        true => "<span class='badge ok'>Sim</span>",
+        false => "<span class='badge crit'>Nao</span>",
+        null => "<span class='badge na'>N/A</span>"
+    };
+
+    private static string SevBadge(string sev) => sev switch
+    {
+        "critical" => "<span class='badge crit'>CRITICO</span>",
+        "warning" => "<span class='badge warn'>ALERTA</span>",
+        _ => "<span class='badge ok'>INFO</span>"
+    };
+
+    private static string RenderStyles(string statusColor) => $$"""
+        <style>
+            *{box-sizing:border-box;margin:0;padding:0}
+            body{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+            .container{max-width:1200px;margin:0 auto;padding:1rem}
+            header{display:flex;align-items:center;justify-content:space-between;padding:1rem 0;border-bottom:1px solid #1e293b;margin-bottom:1.5rem;flex-wrap:wrap;gap:.5rem}
+            header h1{font-size:1.5rem;color:#f8fafc;display:flex;align-items:center;gap:.5rem}
+            header h1::before{content:'';display:inline-block;width:10px;height:10px;border-radius:50%;background:{{statusColor}};box-shadow:0 0 8px {{statusColor}}}
+            .meta{color:#94a3b8;font-size:.8rem}
+            .tabs{display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:2px solid #1e293b;overflow-x:auto}
+            .tab{padding:.6rem 1.2rem;cursor:pointer;color:#94a3b8;border:none;background:none;font-size:.85rem;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s}
+            .tab:hover{color:#e2e8f0}.tab.active{color:#38bdf8;border-bottom-color:#38bdf8}
+            .panel{display:none}.panel.active{display:block}
+            .card{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.25rem;margin-bottom:1rem}
+            .card h2{font-size:1rem;color:#f8fafc;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+            .alert-card{border-color:#92400e;background:#1c1917}
+            .alert-item{padding:.5rem 0;border-bottom:1px solid #334155;font-size:.85rem}.alert-item:last-child{border:none}
+            .alert-item em{color:#94a3b8;font-size:.8rem}
+            table{width:100%;border-collapse:collapse;font-size:.875rem}
+            td{padding:.4rem .75rem;border-bottom:1px solid #334155}td:first-child{color:#94a3b8;width:40%}
+            .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+            .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+            @media(max-width:768px){.grid-2,.grid-3{grid-template-columns:1fr} }
+            .badge{padding:.15rem .5rem;border-radius:.25rem;font-size:.75rem;font-weight:600;display:inline-block}
+            .badge.ok{background:#052e16;color:#22c55e}.badge.crit{background:#450a0a;color:#ef4444}
+            .badge.warn{background:#422006;color:#f59e0b}.badge.na{background:#1e293b;color:#64748b}
+            .chart-box{background:#0f172a;border-radius:.5rem;padding:1rem;position:relative;height:220px}
+            .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.75rem;margin-bottom:1rem}
+            @media(max-width:768px){.stats-grid{grid-template-columns:repeat(3,1fr)} }
+            .stat-box{background:#0f172a;border:1px solid #334155;border-radius:.5rem;padding:.75rem;text-align:center}
+            .stat-box.err{border-color:#7f1d1d}.stat-box.warn{border-color:#78350f}
+            .stat-num{font-size:1.5rem;font-weight:700;color:#f8fafc}.stat-label{font-size:.7rem;color:#94a3b8;margin-top:.25rem}
+            .log-console{background:#020617;border:1px solid #1e293b;border-radius:.5rem;max-height:500px;overflow-y:auto;font-family:'Cascadia Code','Fira Code',monospace;font-size:.75rem}
+            .log-controls{display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;align-items:center}
+            .log-controls input{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:.4rem .75rem;border-radius:.375rem;font-size:.8rem;flex:1;min-width:200px}
+            .log-controls button{padding:.4rem .75rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.375rem;cursor:pointer;font-size:.75rem;white-space:nowrap}
+            .log-controls button.active{background:#1e40af;border-color:#3b82f6;color:#e2e8f0}
+            .log-row{padding:.3rem .75rem;border-bottom:1px solid #0f172a;display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}
+            .log-row:hover{background:#1e293b}
+            .log-error{border-left:3px solid #ef4444}.log-warn{border-left:3px solid #f59e0b}
+            .log-info{border-left:3px solid transparent}.log-debug{border-left:3px solid #6b7280;opacity:.7}
+            .log-time{color:#64748b;min-width:55px}.log-level{min-width:40px;font-weight:600}
+            .log-error .log-level{color:#ef4444}.log-warn .log-level{color:#f59e0b}.log-info .log-level{color:#38bdf8}
+            .log-cat{padding:.1rem .4rem;border-radius:.2rem;font-size:.65rem;font-weight:600}
+            .cat-http{background:#1e3a5f;color:#60a5fa}.cat-migration{background:#3b0764;color:#c084fc}
+            .cat-startup{background:#064e3b;color:#34d399}.cat-error{background:#450a0a;color:#f87171}
+            .cat-db{background:#422006;color:#fbbf24}
+            .log-elapsed{color:#94a3b8;font-size:.7rem}.log-msg{color:#cbd5e1;flex:1;word-break:break-word}
+            .log-exception{color:#fca5a5;font-size:.7rem;white-space:pre-wrap;word-break:break-all;width:100%;margin-top:.25rem;max-height:120px;overflow-y:auto;border-radius:.25rem;padding:.35rem .5rem;background:#1a0505;border:1px solid #450a0a;cursor:pointer}
+            .log-exception.collapsed{max-height:2.4rem;overflow:hidden;position:relative}
+            .log-exception.collapsed::after{content:'... clique para expandir';position:absolute;bottom:0;right:.5rem;background:#1a0505;color:#94a3b8;font-size:.6rem;padding:0 .25rem}
+            .log-ctx{display:inline-flex;gap:.3rem;margin-left:.25rem}
+            .log-ctx span{font-size:.6rem;padding:.1rem .35rem;border-radius:.2rem;background:#1e293b;color:#64748b;border:1px solid #334155}
+            .patterns-list{display:flex;flex-direction:column;gap:.75rem}
+            .pattern-item{padding:.75rem;background:#0f172a;border-radius:.5rem;font-size:.85rem;border:1px solid #334155}
+            .pattern-count{color:#94a3b8;font-size:.8rem}.pattern-desc{color:#cbd5e1}
+            .pattern-tip{color:#94a3b8;font-size:.8rem}
+            .links{display:flex;gap:1rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e293b;flex-wrap:wrap}
+            .links a{color:#38bdf8;text-decoration:none;font-size:.85rem}.links a:hover{text-decoration:underline}
+            .refresh-bar{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:#94a3b8}
+            .refresh-bar label{cursor:pointer;display:flex;align-items:center;gap:.25rem}
+            .section-empty{color:#64748b;text-align:center;padding:2rem;font-size:.85rem}
+            .toast-container{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:.5rem;z-index:9999;pointer-events:none}
+            .toast{padding:.65rem 1rem;border-radius:.5rem;font-size:.8rem;color:#f1f5f9;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;max-width:320px;word-break:break-word}
+            .toast.show{opacity:1;transform:translateY(0)}
+            .toast.success{background:#052e16;border:1px solid #16a34a;color:#4ade80}
+            .toast.error{background:#450a0a;border:1px solid #dc2626;color:#fca5a5}
+            .toast.info{background:#1e293b;border:1px solid #334155;color:#94a3b8}
+            .investigacao-panel .inv-log-entry{font-family:monospace;font-size:.7rem;color:#cbd5e1;padding:.2rem .3rem;border-bottom:1px solid #1e293b;word-break:break-all}
+            .investigacao-panel .inv-log-entry:last-child{border:none}
+            .pattern-item.resolved{opacity:.6;border-color:#052e16}
+            .pattern-item.investigating{border-color:#78350f;background:#1c1917}
+        </style></head><body>
+        """;
+
+    private static string RenderHeaderAndTabs(DiagnosticoResult r, EnhancedLogsResult? logs) => $$"""
+        <header>
+            <h1>EasyStock - Central de Diagnostico</h1>
+            <div>
+                <div class="meta">{{r.Timestamp:yyyy-MM-dd HH:mm:ss}} UTC | Uptime: {{r.Uptime}} | {{r.Ambiente}} | v{{r.Versao}}</div>
+                <div class="refresh-bar" style="margin-top:.25rem;justify-content:flex-end">
+                    <label><input type="checkbox" id="autoRefresh"> Auto-refresh 30s</label>
+                    <button class="tab" onclick="location.reload()" style="padding:.2rem .5rem;font-size:.75rem">&#8635; Atualizar</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('overview')">Visao Geral</button>
+            <button class="tab" onclick="showTab('health')">Saude &amp; Graficos</button>
+            <button class="tab" onclick="showTab('logs')">Logs 24h</button>
+            <button class="tab" onclick="showTab('patterns')">Alertas &amp; Padroes{{(logs?.Padroes.Length > 0 ? $" <span style='background:#450a0a;color:#ef4444;border-radius:9999px;padding:.1rem .45rem;font-size:.65rem;font-weight:700'>{logs.Padroes.Length}</span>" : "")}}</button>
+        </div>
+        """;
+
+    private static string RenderOverviewTab(DiagnosticoResult r, string causasHtml, string sloHtml) => $$"""
+        <!-- OVERVIEW TAB -->
+        <div class="panel active" id="tab-overview">
+        <div class="overall" style="font-size:1.25rem;margin-bottom:1rem">Status geral: {{Badge(r.Status)}}</div>
+        {{causasHtml}}
+        {{sloHtml}}
+        <div class="grid-2">
+            <div class="card"><h2>&#128451; Banco de Dados</h2><table>
+                <tr><td>Provider</td><td>{{r.Banco.Provider}}</td></tr>
+                <tr><td>Configurado</td><td>{{r.Banco.ProviderConfigurado}}</td></tr>
+                <tr><td>Fallback</td><td>{{BoolBadge(r.Banco.Fallback)}}</td></tr>
+                <tr><td>Conexao</td><td>{{Badge(r.Banco.Conexao)}}</td></tr>
+                <tr><td>Latencia</td><td>{{r.Banco.LatenciaMs}}ms</td></tr>
+                <tr><td>Migrations</td><td>{{BoolBadge(r.Banco.MigrationsAplicadas)}}</td></tr>
+                {{(r.Banco.Erro != null ? $"<tr><td>Erro</td><td style='color:#fca5a5;font-size:.8rem'>{System.Net.WebUtility.HtmlEncode(r.Banco.Erro)}</td></tr>" : "")}}
+            </table></div>
+            <div class="card"><h2>&#9889; Redis</h2><table>
+                <tr><td>Configurado</td><td>{{BoolBadge(r.Redis.Configurado)}}</td></tr>
+                <tr><td>Conexao</td><td>{{Badge(r.Redis.Conexao)}}</td></tr>
+                <tr><td>Latencia</td><td>{{(r.Redis.Configurado ? r.Redis.LatenciaMs + "ms" : "N/A")}}</td></tr>
+            </table></div>
+            <div class="card"><h2>&#9993; SMTP / Email</h2><table>
+                <tr><td>Configurado</td><td>{{BoolBadge(r.Smtp.Configurado)}}</td></tr>
+                <tr><td>Tipo</td><td>{{r.Smtp.Tipo}}</td></tr>
+                <tr><td>Host</td><td>{{r.Smtp.Host ?? "N/A"}}</td></tr>
+            </table></div>
+            <div class="card"><h2>&#128193; Storage</h2><table>
+                <tr><td>Provider</td><td>{{r.Storage.Provider}}</td></tr>
+                <tr><td>Configurado</td><td>{{BoolBadge(r.Storage.Configurado)}}</td></tr>
+                <tr><td>{{(r.Storage.Provider == "Local" ? "Diretorio existe" : "Conexao")}}</td><td>{{BoolBadge(r.Storage.DiretorioExiste)}}</td></tr>
+            </table></div>
+            <div class="card"><h2>&#129302; IA (Anthropic)</h2><table>
+                <tr><td>Habilitado</td><td>{{BoolBadge(r.Ia.Habilitado)}}</td></tr>
+                <tr><td>API Key presente</td><td>{{BoolBadge(r.Ia.ApiKeyPresente)}}</td></tr>
+            </table></div>
+            <div class="card"><h2>&#128272; Configuracoes</h2><table>
+                <tr><td>JWT Secret</td><td>{{BoolBadge(r.Configuracoes.JwtSecretPresente)}} {{(r.Configuracoes.JwtSecretSeguro == true ? Badge("ok") : Badge("falha"))}}</td></tr>
+                <tr><td>Connection String</td><td>{{BoolBadge(r.Configuracoes.ConnectionStringPresente)}}</td></tr>
+                <tr><td>CORS Origins</td><td style="font-size:.8rem">{{string.Join(", ", r.Configuracoes.CorsOrigins)}}</td></tr>
+            </table></div>
+        </div>
+        <!-- Queries Lentas -->
+        <div class='card' style='margin-top:1rem'>
+            <h2>&#128269; Queries SQL Lentas (pg_stat_statements) <button onclick='loadQueriesLentas()' style='margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.3rem;cursor:pointer'>Carregar</button></h2>
+            <div id='queriesLentasResult'><span style='color:#475569;font-size:.85rem'>Clique em Carregar para buscar as queries mais lentas do PostgreSQL.</span></div>
+        </div>
+        <!-- Saude por Empresa -->
+        <div class='card' style='margin-top:1rem'>
+            <h2>&#128188; Saude por Empresa (sintetico) <button onclick='loadEmpresasHealth()' style='margin-left:.75rem;padding:.2rem .6rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.3rem;cursor:pointer'>Verificar</button></h2>
+            <div id='empresasHealthResult'><span style='color:#475569;font-size:.85rem'>Clique em Verificar para testar conectividade por empresa.</span></div>
+        </div>
+        </div>
+        """;
+
+    private static string RenderHealthTab(IReadOnlyList<HealthSnapshot> snapshots, EnhancedLogsResult? logs) => $$"""
+        <!-- HEALTH TAB -->
+        <div class="panel" id="tab-health">
+        {{(snapshots.Count > 0 ? $@"
+        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem'>
+            <span style='font-size:.8rem;color:#94a3b8'>&#128200; Histórico de saúde — últimas 2h (snapshots a cada 60s)</span>
+            <button onclick='zerarMedidores()' style='padding:.35rem .8rem;font-size:.75rem;background:#1e3a2f;border:1px solid #166534;color:#4ade80;border-radius:.4rem;cursor:pointer'>&#9654; Zerar medidores</button>
+        </div>
+        <div class='stats-grid' style='grid-template-columns:repeat(4,1fr);margin-bottom:1rem'>
+            <div class='stat-box'><div class='stat-num' id='kpiDb'>{(snapshots.Count > 0 ? snapshots[^1].DbLatencyMs + "ms" : "—")}</div><div class='stat-label'>DB Latencia (ultimo)</div></div>
+            <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? "" : "")}'><div class='stat-num'>{(snapshots.Count > 0 && snapshots[^1].RedisLatencyMs.HasValue ? snapshots[^1].RedisLatencyMs + "ms" : "N/C")}</div><div class='stat-label'>Redis Latencia (ultimo)</div></div>
+            <div class='stat-box {(snapshots.Count > 0 && snapshots[^1].ErrorCount > 0 ? "err" : "")}'><div class='stat-num' id='kpiErr'>{(snapshots.Count > 0 ? snapshots[^1].ErrorCount.ToString() : "—")}</div><div class='stat-label'>Erros (ultimo min)</div></div>
+            <div class='stat-box'><div class='stat-num' id='kpiSnap'>{snapshots.Count} snapshots</div><div class='stat-label'>Historico (max 120 = 2h)</div></div>
+        </div>
+        <div class='card'><h2>&#128200; Latencia do Banco de Dados</h2>
+            <div id='eventosLegenda' style='display:none;flex-wrap:wrap;gap:.25rem;margin-bottom:.5rem;padding:.4rem .5rem;background:#0f172a;border-radius:.3rem'></div>
+            <div class='chart-box'><canvas id='dbChart'></canvas></div>
+            <div style='font-size:.65rem;color:#475569;margin-top:.3rem'>🚀 Deploy &nbsp; ⚡ Error Spike &nbsp; (linhas aparecem quando eventos sao detectados nos logs)</div>
+        </div>
+        <div class='grid-2'>
+            <div class='card'><h2>&#128200; Latencia Redis</h2>
+                <div class='chart-box'><canvas id='redisChart'></canvas></div>
+            </div>
+            <div class='card'><h2>&#128200; Erros por Snapshot (por minuto)</h2>
+                <div class='chart-box'><canvas id='errChart'></canvas></div>
+            </div>
+        </div>
+        " : @"<div class='card'><div class='section-empty'>
+            Aguardando primeiros snapshots de saude (coletados a cada 60s)...<br>
+            <small style='color:#475569;margin-top:.5rem;display:block'>Os graficos aparecao automaticamente apos o primeiro minuto de uptime.</small>
+        </div></div>")}}
+
+        {{(logs?.Disponivel == true ? $@"
+        <div class='card'><h2>&#128200; Volume de Requests e Erros por Hora (48h)</h2>
+            <div class='chart-box' style='height:250px'><canvas id='volumeChart'></canvas></div>
+        </div>
+        " : "")}}
+        </div>
+        """;
+
+    private static string RenderLogsTab(EnhancedLogsResult? logs, string logStatsHtml, string logEntriesHtml) => $$"""
+        <!-- LOGS TAB -->
+        <div class="panel" id="tab-logs">
+        {{(logs?.Disponivel == true ? $@"
+        {logStatsHtml}
+        <!-- Timeline visual de erros -->
+        <div class='card' style='padding:.75rem 1rem;margin-bottom:.75rem'>
+            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem'>
+                <h3 style='font-size:.8rem;color:#94a3b8;font-weight:500'>&#128200; Timeline de Erros &amp; Requests — ultimas 48h (por hora)</h3>
+                <span style='font-size:.7rem;color:#475569'>Clique para filtrar por hora</span>
+            </div>
+            <div style='position:relative;height:80px'><canvas id='errorTimelineChart'></canvas></div>
+            <div id='timelineFilterInfo' style='font-size:.7rem;color:#f59e0b;margin-top:.3rem;min-height:1rem'></div>
+        </div>
+        <!-- Storage de logs -->
+        <div class='card' style='padding:.75rem 1rem;margin-bottom:.75rem'>
+            <div style='display:flex;align-items:center;gap:.75rem;flex-wrap:wrap'>
+                <span style='font-size:.8rem;color:#94a3b8;font-weight:500'>&#128230; Logs Arquivados (Storage)</span>
+                <button onclick='loadStorageFileList()' style='padding:.3rem .65rem;font-size:.75rem;background:#1e293b;border:1px solid #334155;color:#38bdf8;border-radius:.35rem;cursor:pointer'>Listar arquivos</button>
+                <select id='storageFileSelect' style='display:none;background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:.3rem .5rem;border-radius:.35rem;font-size:.75rem;max-width:260px' onchange='loadStorageFileContent()'><option value=''>-- selecione --</option></select>
+                <button id='clearStorageBtn' onclick='clearStorageView()' style='display:none;padding:.3rem .65rem;font-size:.75rem;background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5;border-radius:.35rem;cursor:pointer'>&#10005; Limpar</button>
+                <span id='storageStatusMsg' style='font-size:.75rem;color:#94a3b8'></span>
+            </div>
+            <div id='storageArchiveIndicator' style='display:none;margin-top:.4rem;font-size:.75rem;color:#f59e0b;background:#422006;border:1px solid #78350f;border-radius:.3rem;padding:.3rem .6rem'>
+                &#128197; Exibindo logs de arquivo arquivado no storage — dados historicos
+            </div>
+        </div>
+        <div class='card'>
+            <h2>&#128466; Console de Logs <span id='logSourceLabel' style='font-size:.75rem;font-weight:400;color:#94a3b8'>(ultimas 48h)</span>
+                <span id='liveDot' style='display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-left:6px;vertical-align:middle'></span>
+                <span id='liveTimestamp' style='font-size:.7rem;font-weight:400;color:#475569;margin-left:.5rem'></span>
+            </h2>
+            <div class='log-controls'>
+                <input type='text' id='logFilter' placeholder='Filtrar mensagens...' oninput='filterLogs()'>
+                <button class='active' onclick='toggleLevel(this,""all"")'>Todos</button>
+                <button onclick='toggleLevel(this,""ERROR"")'>Erros</button>
+                <button onclick='toggleLevel(this,""WARN"")'>Warnings</button>
+                <button onclick='toggleLevel(this,""INFO"")'>Info</button>
+                <a href='/api/diagnostico/logs/exportar' download style='padding:.4rem .75rem;border:1px solid #334155;background:#1e293b;color:#94a3b8;border-radius:.375rem;font-size:.75rem;text-decoration:none;white-space:nowrap;cursor:pointer'>&#11015; Exportar</a>
+                <button onclick='moverParaLixeira()' style='margin-left:auto;background:#92400e;color:#fef3c7;border-color:#b45309'>&#128465; Mover p/ lixeira</button>
+                <button onclick='esvaziarLixeira()' style='background:#450a0a;color:#fca5a5;border-color:#7f1d1d'>&#128465; Esvaziar lixeira</button>
+                <button onclick='expurgarLogs()' style='background:#1e3a5f;color:#60a5fa;border-color:#2563eb'>&#128465; Expurgar antigos</button>
+                <span id='lixeiraBadge' style='font-size:.72rem;color:#94a3b8;white-space:nowrap'></span>
+            </div>
+            <div class='log-console' id='logConsole'>
+                {logEntriesHtml}
+            </div>
+            <div style='margin-top:.5rem;font-size:.75rem;color:#64748b' id='logCountInfo'>Mostrando ate 200 entradas mais recentes de {logs.TotalEntries} total</div>
+        </div>
+        " : "<div class='section-empty'>Logs nao disponiveis neste ambiente.</div>")}}
+        </div>
+        """;
+
+    private static string RenderPatternsTab(EnhancedLogsResult? logs, IReadOnlyList<HealthSnapshot> snapshots, string patternsHtmlAck) => $$"""
+        <!-- PATTERNS TAB -->
+        <div class="panel" id="tab-patterns">
+        {{(patternsHtmlAck.Length > 0 ? patternsHtmlAck : "<div class='card' style='border-color:#052e16'><div class='section-empty' style='color:#16a34a'>&#10003; Nenhum padrao anomalo detectado nas ultimas 48h.</div></div>")}}
+
+        {{(logs?.Disponivel == true ? $@"
+        <div class='grid-2'>
+        " + (logs.Resumo.ErrorsByEndpoint.Count > 0 ?
+            "<div class='card'><h2>&#128680; Top Endpoints com Erros</h2><table>" +
+            string.Join("", logs.Resumo.ErrorsByEndpoint.OrderByDescending(kv => kv.Value).Take(10).Select(kv =>
+                $"<tr><td style='font-family:monospace;font-size:.8rem'>{System.Net.WebUtility.HtmlEncode(kv.Key)}</td><td><span class='badge crit'>{kv.Value}x</span></td></tr>")) +
+            "</table></div>"
+            : "<div class='card'><h2>&#128680; Erros por Endpoint</h2><div class='section-empty'>Sem erros registrados nos endpoints.</div></div>")
+        + (logs.Resumo.TotalRequests > 0 && logs.Resumo.AvgResponseTimeMs > 0 ?
+            $"<div class='card'><h2>&#9201; Performance (48h)</h2><table>" +
+            $"<tr><td>Total Requests</td><td><strong>{logs.Resumo.TotalRequests}</strong></td></tr>" +
+            $"<tr><td>Tempo Medio Resposta</td><td><strong style='color:{(logs.Resumo.AvgResponseTimeMs < 200 ? "#22c55e" : logs.Resumo.AvgResponseTimeMs < 1000 ? "#f59e0b" : "#ef4444")}'>{logs.Resumo.AvgResponseTimeMs:F0}ms</strong></td></tr>" +
+            $"<tr><td>Taxa de Erro</td><td><strong style='color:{(logs.Resumo.TotalErrors == 0 ? "#22c55e" : "#ef4444")}'>{(logs.Resumo.TotalRequests > 0 ? (100.0 * logs.Resumo.TotalErrors / logs.Resumo.TotalRequests):0):F1}%</strong></td></tr>" +
+            $"<tr><td>Warnings</td><td><strong>{logs.Resumo.TotalWarnings}</strong></td></tr>" +
+            "</table></div>"
+            : "")
+        + @"</div>" : "")}}
+
+        <!-- Snapshot health summary -->
+        {{(snapshots.Count > 0 ? $@"
+        <div class='card'><h2>&#128308; Saude do Banco — Historico de Status</h2>
+        <div style='display:flex;flex-wrap:wrap;gap:3px;margin-top:.5rem'>
+        {string.Join("", snapshots.TakeLast(60).Select(s => {
+            var color = s.DbStatus == "ok" ? "#16a34a" : "#dc2626";
+            var title = $"{s.Timestamp:HH:mm} — DB:{s.DbStatus} {s.DbLatencyMs}ms Erros:{s.ErrorCount}";
+            return $"<span title='{System.Net.WebUtility.HtmlEncode(title)}' style='display:inline-block;width:10px;height:20px;border-radius:2px;background:{color};cursor:help'></span>";
+        }))}
+        </div>
+        <div style='font-size:.7rem;color:#64748b;margin-top:.4rem'>Cada bloco = 1 minuto. Verde=OK, Vermelho=Falha. Ultimos {Math.Min(snapshots.Count, 60)} minutos.</div>
+        </div>" : "")}}
+        </div>
+        """;
 }
