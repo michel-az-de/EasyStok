@@ -129,6 +129,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IConfiguracaoSistemaRepository, ConfiguracaoSistemaRepository>();
             services.AddScoped<IPlanoAdminRepository, PlanoAdminRepository>();
             services.AddScoped<ICupomAdminRepository, CupomAdminRepository>();
+            services.AddScoped<IAdminDashboardQueries, AdminDashboardQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // Modulo Integration (F3) — credenciais cifradas por tenant + resolver AES-256-GCM
