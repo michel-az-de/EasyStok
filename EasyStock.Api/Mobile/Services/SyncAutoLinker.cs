@@ -21,7 +21,8 @@ public class SyncAutoLinker(
     MobileSystemUserResolver systemUserResolver,
     IConfiguration appConfig,
     ILogger<SyncAutoLinker> log,
-    Linkers.CashEntryLinker cashEntryLinker)
+    Linkers.CashEntryLinker cashEntryLinker,
+    Linkers.ClientLinker clientLinker)
 {
     private readonly EasyStockDbContext _db = db;
     private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
@@ -33,6 +34,7 @@ public class SyncAutoLinker(
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncAutoLinker> _log = log;
     private readonly Linkers.CashEntryLinker _cashEntryLinker = cashEntryLinker;
+    private readonly Linkers.ClientLinker _clientLinker = clientLinker;
 
     /// <summary>
     /// Runs auto-link for all entity types after a Push. Reads feature flags from
@@ -52,7 +54,7 @@ public class SyncAutoLinker(
         var autoLinkCash   = _appConfig.GetValue<bool>("MobileSync:AutoLink:CashEntry", true);
 
         if (autoLinkProd   && productIds.Count > 0) await TryAutoLinkProductsAsync(productIds, empresaId);
-        if (autoLinkClient && clientIds.Count  > 0) await TryAutoLinkClientsAsync(clientIds, empresaId);
+        if (autoLinkClient && clientIds.Count  > 0) await _clientLinker.ExecuteAsync(clientIds, empresaId);
         // F1/F2/F3 â€” promove orders/batches/cash DEPOIS de products/clients pra que
         // FKs (ErpProductId, ErpClienteId) jÃ¡ estejam preenchidas.
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
@@ -88,7 +90,7 @@ public class SyncAutoLinker(
             empresaId, productIds.Count, clientIds.Count, orderIds.Count, batchIds.Count, cashIds.Count);
 
         await TryAutoLinkProductsAsync(productIds, empresaId);
-        await TryAutoLinkClientsAsync(clientIds, empresaId);
+        await _clientLinker.ExecuteAsync(clientIds, empresaId);
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
         await TryAutoLinkOrdersAsync(orderIds, empresaId);
         await TryAutoLinkBatchesAsync(batchIds, empresaId);
@@ -203,95 +205,6 @@ public class SyncAutoLinker(
         }
         _log.LogInformation(
             "AutoLink Produto summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
-            empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
-    }
-
-    private async Task TryAutoLinkClientsAsync(IEnumerable<string> mobileClientIds, Guid? empresaId)
-    {
-        var idsList = mobileClientIds as ICollection<string> ?? mobileClientIds.ToList();
-        if (!empresaId.HasValue)
-        {
-            _log.LogWarning(
-                "AutoLink Cliente SKIPPED: device nao pareado (empresaId=null), {Count} clientes ficam orfaos em mobile_clients",
-                idsList.Count);
-            return;
-        }
-        var matched = 0;
-        var created = 0;
-        var idempotentSkip = 0;
-        var errorSkip = 0;
-        foreach (var cid in idsList)
-        {
-            try
-            {
-                var mobileC = await _db.Set<Client>()
-                    .FirstOrDefaultAsync(c => c.Id == cid && c.EmpresaId == empresaId);
-                if (mobileC == null || mobileC.ErpClienteId.HasValue) { idempotentSkip++; continue; }
-
-                var baseQuery = _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
-                    .Where(c => c.EmpresaId == empresaId && c.Ativo);
-
-                Cliente? match = await baseQuery
-                    .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Nome, mobileC.Name));
-
-                if (match == null && !string.IsNullOrWhiteSpace(mobileC.Phone))
-                {
-                    var phone = mobileC.Phone;
-                    match = await baseQuery.FirstOrDefaultAsync(c => c.Telefone == phone);
-                }
-
-                if (match != null)
-                {
-                    mobileC.ErpClienteId = match.Id;
-                    matched++;
-                    _log.LogInformation("AutoLink Cliente matched: mobile={MobileId} â†’ erp={ErpId}", cid, match.Id);
-                    _db.Add(new ClienteAlteracao
-                    {
-                        Id = Guid.NewGuid(),
-                        EmpresaId = empresaId.Value,
-                        ClienteId = match.Id,
-                        Campo = "vinculacao_mobile",
-                        ValorAntigo = null,
-                        ValorNovo = $"mobile_client={cid}",
-                        AlteradoEm = DateTime.UtcNow,
-                        Origem = "mobile"
-                    });
-                    continue;
-                }
-
-                var novoC = Cliente.Criar(empresaId.Value, mobileC.Name);
-                novoC.Apt      = mobileC.Apt;
-                novoC.Endereco = mobileC.Address;
-                novoC.Telefone = mobileC.Phone;
-                novoC.LastOrderAt = mobileC.LastOrder;
-                novoC.OrderCount  = mobileC.OrderCount;
-                _db.Add(novoC);
-                mobileC.ErpClienteId = novoC.Id;
-                _db.Add(new ClienteAlteracao
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = empresaId.Value,
-                    ClienteId = novoC.Id,
-                    Campo = "criado",
-                    ValorAntigo = null,
-                    ValorNovo = $"Nome={mobileC.Name}; Telefone={mobileC.Phone}; mobile_client={cid}",
-                    AlteradoEm = DateTime.UtcNow,
-                    Origem = "mobile"
-                });
-                created++;
-                _log.LogInformation("AutoLink Cliente CRIADO: mobile={MobileId} â†’ erp={ErpId} ({Nome})",
-                    cid, novoC.Id, mobileC.Name);
-            }
-            catch (Exception ex)
-            {
-                errorSkip++;
-                _log.LogError(ex,
-                    "AutoLink Cliente FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
-                    cid, empresaId, ex.GetType().Name, ex.Message);
-            }
-        }
-        _log.LogInformation(
-            "AutoLink Cliente summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
             empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
     }
 
