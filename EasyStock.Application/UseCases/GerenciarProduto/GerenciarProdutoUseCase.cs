@@ -153,6 +153,7 @@ public sealed class GerenciarProdutoUseCase(
     Comandos.RemoverProdutoUseCase removerUseCase,
     Comandos.RestaurarProdutoUseCase restaurarUseCase,
     Comandos.ReordenarFotosProdutoUseCase reordenarFotosUseCase,
+    Queries.ObterHistoricoProdutoUseCase obterHistoricoUseCase,
     ICacheService? cacheService = null,
     IProdutoAlteracaoRepository? alteracaoRepository = null,
     IUsuarioRepository? usuarioRepository = null,
@@ -516,28 +517,9 @@ public sealed class GerenciarProdutoUseCase(
         return result;
     }
 
-    public async Task<IReadOnlyCollection<ProdutoHistoricoItemResult>> ObterHistoricoAsync(Guid empresaId, Guid produtoId)
-    {
-        UseCaseGuards.EnsureEmpresaId(empresaId);
-        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
-
-        _ = await produtoRepository.GetByIdAsync(empresaId, produtoId)
-            ?? throw new UseCaseValidationException("Produto nao encontrado.");
-
-        var historico = await movimentacaoEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
-        return historico
-            .Select(m => new ProdutoHistoricoItemResult(
-                m.Id,
-                m.Tipo,
-                m.Natureza.ToString(),
-                m.Quantidade.Value,
-                m.ValorTotal?.Valor,
-                m.DataMovimentacao,
-                m.ItemEstoqueId,
-                m.DocumentoReferencia,
-                m.Descricao))
-            .ToArray();
-    }
+    // F9b facade: delega para Queries.ObterHistoricoProdutoUseCase.
+    public Task<IReadOnlyCollection<ProdutoHistoricoItemResult>> ObterHistoricoAsync(Guid empresaId, Guid produtoId)
+        => obterHistoricoUseCase.ExecuteAsync(empresaId, produtoId);
 
     public async Task<ProdutoEstatisticasResult> ObterEstatisticasAsync(Guid empresaId, Guid produtoId)
     {
