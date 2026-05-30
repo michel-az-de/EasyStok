@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Api.Services.Helpdesk;
-using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Controllers.Ci;
 
@@ -21,7 +20,7 @@ namespace EasyStock.Api.Controllers.Ci;
 [Route("api/ci/tickets")]
 [AllowAnonymous]
 public class AutoTicketController(
-    EasyStockDbContext db,
+    ICiAutoTicketRepository autoTickets,
     HelpdeskTicketService ticketService,
     IConfiguration configuration,
     ILogger<AutoTicketController> log) : ControllerBase
@@ -67,38 +66,25 @@ public class AutoTicketController(
         // Status terminais (Resolvido/Fechado) NAO entram no filtro — uma nova
         // ocorrencia depois do fechamento gera um novo ticket (esperado: regressao).
         var hoje = DateTime.UtcNow.Date;
-        var existente = await db.AdminTickets
-            .Where(t => t.EmpresaId == empresaId
-                     && t.Categoria == TicketCategoria.BugFixDev
-                     && t.CriadoEm >= hoje
-                     && t.Status != TicketStatus.Resolvido
-                     && t.Status != TicketStatus.Fechado
-                     && t.Titulo.StartsWith(titlePrefix))
-            .FirstOrDefaultAsync(ct);
+        var existenteId = await autoTickets.EncontrarAbertoHojeAsync(empresaId, titlePrefix, hoje, ct);
 
-        if (existente != null)
+        if (existenteId is not null)
         {
             // Anexa comentario interno sinalizando reincidencia
-            var historico = TicketHistorico.Criar(
-                existente.Id,
-                autorId: null,
-                TicketAcaoHistorico.Comentario,
-                metadadosJson: System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    reincidencia = true,
-                    origin = req.Origin,
-                    contexto = req.Contexto,
-                    em = DateTime.UtcNow
-                }));
-            db.TicketHistoricos.Add(historico);
-            existente.AlteradoEm = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            var metadadosJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                reincidencia = true,
+                origin = req.Origin,
+                contexto = req.Contexto,
+                em = DateTime.UtcNow
+            });
+            await autoTickets.AnexarReincidenciaAsync(existenteId.Value, metadadosJson, ct);
 
             log.LogInformation("Auto-ticket reincidente {TicketId} (signature {Signature}, origin {Origin})",
-                existente.Id, req.Signature, req.Origin);
+                existenteId.Value, req.Signature, req.Origin);
             return Ok(new
             {
-                ticketId = existente.Id,
+                ticketId = existenteId.Value,
                 created = false,
                 message = "ticket existente recebeu comentario de reincidencia"
             });
