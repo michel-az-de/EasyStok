@@ -1,5 +1,3 @@
-using EasyStock.Infra.Postgre.Data;
-
 namespace EasyStock.Api.Controllers;
 
 /// <summary>
@@ -11,7 +9,7 @@ namespace EasyStock.Api.Controllers;
 [Route("api/audit")]
 [Authorize]
 public class EntityAuditController(
-    EasyStockDbContext db,
+    IEntityAuditQueries entityAudit,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     /// <summary>
@@ -33,29 +31,7 @@ public class EntityAuditController(
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        var query = db.EntityAlteracoes.AsNoTracking()
-            .Where(a => a.EmpresaId == empresaId
-                     && a.TipoEntidade == tipoEntidade
-                     && a.EntidadeId == entidadeId)
-            .OrderByDescending(a => a.AlteradoEm);
-
-        var total = await query.CountAsync(ct);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(a => new
-            {
-                a.Id,
-                a.Acao,
-                a.Campo,
-                a.ValorAntigo,
-                a.ValorNovo,
-                a.AlteradoPorNome,
-                a.Origem,
-                a.AlteradoEm,
-                hasPii = a.PiiCriptografado != null
-            })
-            .ToListAsync(ct);
+        var (items, total) = await entityAudit.PorEntidadeAsync(empresaId, tipoEntidade, entidadeId, page, pageSize, ct);
 
         return DataOk(new { total, page, pageSize, items });
     }
@@ -78,43 +54,7 @@ public class EntityAuditController(
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        // Busca alteracoes do cliente + alteracoes de pedidos desse cliente
-        var clienteEntries = db.EntityAlteracoes.AsNoTracking()
-            .Where(a => a.EmpresaId == empresaId
-                     && a.TipoEntidade == "Cliente"
-                     && a.EntidadeId == clienteId);
-
-        // Pedidos do cliente — subquery no banco (sem materializar IDs em memória)
-        var pedidoIdsQuery = db.Pedidos.AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId && p.ClienteId == clienteId)
-            .Select(p => p.Id);
-
-        var pedidoEntries = db.EntityAlteracoes.AsNoTracking()
-            .Where(a => a.EmpresaId == empresaId
-                     && (a.TipoEntidade == "Pedido" || a.TipoEntidade == "PedidoItem" || a.TipoEntidade == "PedidoPagamento")
-                     && pedidoIdsQuery.Contains(a.EntidadeId));
-
-        var union = clienteEntries.Union(pedidoEntries)
-            .OrderByDescending(a => a.AlteradoEm);
-
-        var total = await union.CountAsync(ct);
-        var items = await union
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(a => new
-            {
-                a.Id,
-                a.TipoEntidade,
-                a.EntidadeId,
-                a.Acao,
-                a.Campo,
-                a.ValorAntigo,
-                a.ValorNovo,
-                a.AlteradoPorNome,
-                a.Origem,
-                a.AlteradoEm
-            })
-            .ToListAsync(ct);
+        var (items, total) = await entityAudit.TimelineClienteAsync(empresaId, clienteId, page, pageSize, ct);
 
         return DataOk(new { total, page, pageSize, items });
     }
@@ -130,13 +70,8 @@ public class EntityAuditController(
         if (empresaId == Guid.Empty)
             return Unauthorized();
 
-        var summary = await db.EntityAlteracoes.AsNoTracking()
-            .Where(a => a.EmpresaId == empresaId)
-            .GroupBy(a => a.TipoEntidade)
-            .Select(g => new { tipo = g.Key, count = g.Count() })
-            .ToListAsync(ct);
-
-        var total = summary.Sum(s => s.count);
+        var summary = await entityAudit.ResumoPorTipoAsync(empresaId, ct);
+        var total = summary.Sum(s => s.Count);
 
         return DataOk(new { total, byType = summary });
     }
