@@ -30,15 +30,13 @@ public class AdminClientesController(
     IHttpContextAccessor http,
     ILogger<AdminClientesController> logger) : EasyStockControllerBase
 {
-    private const int MotivoMinimo = 10;
-
     // ─────────────────────────── #10: Criar loja ───────────────────────────
 
     [HttpPost("{tenantId:guid}/lojas")]
     public async Task<IActionResult> CriarLoja(Guid tenantId, [FromBody] CriarLojaAdminRequest req)
     {
-        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
+        if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
         if (string.IsNullOrWhiteSpace(req?.Nome)) return DataBadRequest("Nome da loja é obrigatório.");
 
         try
@@ -81,7 +79,7 @@ public class AdminClientesController(
     public async Task<IActionResult> AtualizarLoja(Guid tenantId, Guid lojaId, [FromBody] AtualizarLojaAdminRequest req)
     {
         if (tenantId == Guid.Empty || lojaId == Guid.Empty) return DataBadRequest("Cliente ou loja inválidos.");
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
         if (string.IsNullOrWhiteSpace(req?.Nome)) return DataBadRequest("Nome da loja é obrigatório.");
 
         // Carrega antes pra calcular diff before/after.
@@ -134,7 +132,7 @@ public class AdminClientesController(
     public async Task<IActionResult> ToggleLoja(Guid tenantId, Guid lojaId, [FromBody] ToggleLojaRequest req)
     {
         if (tenantId == Guid.Empty || lojaId == Guid.Empty) return DataBadRequest("Cliente ou loja inválidos.");
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
 
         var loja = await lojaRepo.GetByIdAsync(tenantId, lojaId);
         if (loja is null) return DataNotFound("Loja não encontrada neste cliente.");
@@ -185,7 +183,7 @@ public class AdminClientesController(
         [FromQuery] Guid? usuarioId = null,
         [FromQuery] string? search = null)
     {
-        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
         (page, pageSize) = NormalisePage(page, pageSize, maxPageSize: 100);
 
         var fromUtc = from?.ToUniversalTime();
@@ -297,7 +295,7 @@ public class AdminClientesController(
     {
         if (tenantId == Guid.Empty || userId == Guid.Empty)
             return DataBadRequest("Cliente ou usuário inválidos.");
-        if (!ValidarMotivo(motivo, out var motivoT, out var erro))
+        if (!RequestGuards.TryValidarMotivo(motivo, out var motivoT, out var erro))
             return DataBadRequest(erro!);
 
         var campoNormalizado = (campo ?? "").Trim().ToLowerInvariant();
@@ -414,8 +412,8 @@ public class AdminClientesController(
     [HttpGet("{tenantId:guid}/exportar")]
     public async Task<IActionResult> ExportarDados(Guid tenantId, [FromQuery] string motivo)
     {
-        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
-        if (!ValidarMotivo(motivo, out var motivoT, out var erro)) return DataBadRequest(erro!);
+        if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
+        if (!RequestGuards.TryValidarMotivo(motivo, out var motivoT, out var erro)) return DataBadRequest(erro!);
 
         var empresa = await db.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.Id == tenantId);
         if (empresa is null) return DataNotFound("Cliente não encontrado.");
@@ -490,7 +488,7 @@ public class AdminClientesController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30)
     {
-        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
         (page, pageSize) = NormalisePage(page, pageSize, maxPageSize: 100);
 
         // Ações LGPD-relevantes que aparecem na timeline geral, mas precisam de
@@ -541,7 +539,7 @@ public class AdminClientesController(
     [HttpGet("{tenantId:guid}/notas")]
     public async Task<IActionResult> ListarNotas(Guid tenantId)
     {
-        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
 
         var notas = await db.AdminNotasTenant.AsNoTracking()
             .Where(n => n.TenantId == tenantId && n.ExcluidoEm == null)
@@ -570,7 +568,7 @@ public class AdminClientesController(
     [HttpPost("{tenantId:guid}/notas")]
     public async Task<IActionResult> CriarNota(Guid tenantId, [FromBody] NotaTenantRequest req)
     {
-        if (tenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
         if (!ValidarTextoNota(req?.Texto, out var textoT, out var erro)) return DataBadRequest(erro!);
         if (!Enum.TryParse<Domain.Entities.TipoNotaTenant>(req!.Tipo, out var tipo))
             return DataBadRequest("Tipo inválido. Use Info, Alerta ou Escalonamento.");
@@ -696,22 +694,6 @@ public class AdminClientesController(
         return email[0] + "***@" + email[(at + 1)..];
     }
 
-    private static bool ValidarMotivo(string? motivo, out string motivoNormalizado, out string? erro)
-    {
-        motivoNormalizado = (motivo ?? string.Empty).Trim();
-        if (motivoNormalizado.Length < MotivoMinimo)
-        {
-            erro = $"Justificativa obrigatória (mínimo {MotivoMinimo} caracteres) — fica registrada no audit log.";
-            return false;
-        }
-        if (motivoNormalizado.Length > 1000)
-        {
-            erro = "Justificativa muito longa (máx 1000 caracteres).";
-            return false;
-        }
-        erro = null;
-        return true;
-    }
 }
 
 public record CriarLojaAdminRequest(string Motivo, string Nome, string? Descricao, string? Documento, string? Endereco, string? Telefone);

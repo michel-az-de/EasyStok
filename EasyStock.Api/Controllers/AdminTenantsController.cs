@@ -25,7 +25,6 @@ public class AdminTenantsController(
     CriarTenantPorAdminUseCase criarTenantUseCase,
     ILogger<AdminTenantsController> logger) : EasyStockControllerBase
 {
-    private const int MotivoMinimo = 10;
     // ─────────────────── Cadastro manual de tenant pelo back-office ───────────────────
 
     /// <summary>
@@ -38,7 +37,7 @@ public class AdminTenantsController(
     [HttpPost]
     public async Task<IActionResult> CriarManual([FromBody] CriarTenantManualRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro)) return DataBadRequest(erro!);
 
         try
         {
@@ -433,22 +432,6 @@ public class AdminTenantsController(
         return DataOk(new { cupomCodigo = cupom.Codigo, descontoAplicado = cupom.Valor });
     }
 
-    private static bool ValidarMotivo(string? motivo, out string motivoNormalizado, out string? erro)
-    {
-        motivoNormalizado = (motivo ?? string.Empty).Trim();
-        if (motivoNormalizado.Length < MotivoMinimo)
-        {
-            erro = $"Justificativa obrigatória (mínimo {MotivoMinimo} caracteres) — fica registrada no audit log.";
-            return false;
-        }
-        if (motivoNormalizado.Length > 1000)
-        {
-            erro = "Justificativa muito longa (máx 1000 caracteres).";
-            return false;
-        }
-        erro = null;
-        return true;
-    }
 
     private static string MascararEmail(string? email)
     {

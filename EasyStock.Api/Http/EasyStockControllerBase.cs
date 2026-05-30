@@ -30,6 +30,29 @@ public abstract class EasyStockControllerBase : ControllerBase
     protected IActionResult DataNotFound(string message = "Recurso não encontrado.", string? detail = null) =>
         base.NotFound(new ApiErrorResponse(new ApiError("NOT_FOUND", message, detail, null)));
 
+    /// <summary>
+    /// Guarda HTTP-aware: se <paramref name="id"/> for <see cref="Guid.Empty"/>,
+    /// devolve 400 <see cref="DataBadRequest(string, string?)"/> com mensagem
+    /// "X inválido." Caller usa: <c>if (!TryEnsureNotEmpty(tenantId, "Cliente", out var err)) return err;</c>
+    ///
+    /// Espelha <see cref="EasyStock.Application.UseCases.Common.UseCaseGuards.EnsureNotEmpty"/>
+    /// mas envolve em <see cref="IActionResult"/> em vez de lancar
+    /// <c>UseCaseValidationException</c> — controllers ja estao no boundary HTTP.
+    ///
+    /// Apenas single-Guid. Validacoes compostas (ex: <c>id1 == Empty || id2 == Empty</c>
+    /// com mensagem como "Cliente ou loja inválidos.") ficam inline — KISS.
+    /// </summary>
+    protected bool TryEnsureNotEmpty(Guid id, string nomeRecurso, out IActionResult? error)
+    {
+        if (id == Guid.Empty)
+        {
+            error = DataBadRequest($"{nomeRecurso} inválido.");
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
     protected bool TryResolveEmpresaId(
         ICurrentUserAccessor currentUser,
         Guid? requestedEmpresaId,

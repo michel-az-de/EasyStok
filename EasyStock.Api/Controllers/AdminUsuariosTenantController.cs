@@ -24,8 +24,6 @@ public class AdminUsuariosTenantController(
     CriarUsuarioTenantPorAdminUseCase criarUsuarioUseCase,
     ILogger<AdminUsuariosTenantController> logger) : EasyStockControllerBase
 {
-    private const int MotivoMinimo = 10;
-
     // ─────────────────────────── Criar usuário em tenant existente ───────────────────────────
 
     /// <summary>
@@ -36,9 +34,9 @@ public class AdminUsuariosTenantController(
     [HttpPost]
     public async Task<IActionResult> Criar([FromBody] CriarUsuarioTenantRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro))
             return DataBadRequest(erro!);
-        if (req!.TenantId == Guid.Empty) return DataBadRequest("Cliente inválido.");
+        if (!TryEnsureNotEmpty(req!.TenantId, "Cliente", out var idErro)) return idErro!;
         if (!Enum.TryParse<NivelAcesso>(req.Nivel, ignoreCase: true, out var nivel))
             return DataBadRequest("Nível de acesso inválido. Use Admin, Gerente, Operador ou Visualizador.");
 
@@ -138,7 +136,7 @@ public class AdminUsuariosTenantController(
     [HttpPost("{userId:guid}/forcar-logout")]
     public async Task<IActionResult> ForcarLogout(Guid userId, [FromBody] MotivoRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro))
             return DataBadRequest(erro!);
 
         var usuario = await db.Usuarios.FindAsync(userId);
@@ -172,7 +170,7 @@ public class AdminUsuariosTenantController(
     [HttpPost("{userId:guid}/reset-senha")]
     public async Task<IActionResult> ResetarSenha(Guid userId, [FromBody] ResetSenhaRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro))
             return DataBadRequest(erro!);
 
         var usuario = await db.Usuarios.FindAsync(userId);
@@ -236,7 +234,7 @@ public class AdminUsuariosTenantController(
     [HttpPatch("{userId:guid}")]
     public async Task<IActionResult> Atualizar(Guid userId, [FromBody] AtualizarUsuarioRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro))
             return DataBadRequest(erro!);
 
         var nomeNovo = req?.Nome?.Trim();
@@ -323,7 +321,7 @@ public class AdminUsuariosTenantController(
     [HttpPost("{userId:guid}/desativar")]
     public async Task<IActionResult> Desativar(Guid userId, [FromBody] MotivoRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro))
             return DataBadRequest(erro!);
 
         var usuario = await db.Usuarios.FindAsync(userId);
@@ -355,7 +353,7 @@ public class AdminUsuariosTenantController(
     [HttpPost("{userId:guid}/reativar")]
     public async Task<IActionResult> Reativar(Guid userId, [FromBody] MotivoRequest req)
     {
-        if (!ValidarMotivo(req?.Motivo, out var motivo, out var erro))
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivo, out var erro))
             return DataBadRequest(erro!);
 
         var usuario = await db.Usuarios.FindAsync(userId);
@@ -418,22 +416,6 @@ public class AdminUsuariosTenantController(
     }
 
 
-    private bool ValidarMotivo(string? motivo, out string motivoNormalizado, out string? erro)
-    {
-        motivoNormalizado = (motivo ?? string.Empty).Trim();
-        if (motivoNormalizado.Length < MotivoMinimo)
-        {
-            erro = $"Justificativa obrigatória (mínimo {MotivoMinimo} caracteres) — fica registrada no audit log.";
-            return false;
-        }
-        if (motivoNormalizado.Length > 1000)
-        {
-            erro = "Justificativa muito longa (máx 1000 caracteres).";
-            return false;
-        }
-        erro = null;
-        return true;
-    }
 
     /// <summary>
     /// Resolve EmpresaId do usuário (primeira empresa vinculada). Null = sem tenant.
