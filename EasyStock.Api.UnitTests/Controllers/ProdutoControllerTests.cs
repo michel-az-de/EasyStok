@@ -6,6 +6,8 @@ using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto;
+using EasyStock.Application.UseCases.GerenciarProduto.Comandos;
+using EasyStock.Application.UseCases.GerenciarProduto.Queries;
 using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
@@ -56,7 +58,21 @@ public class ProdutoControllerTests
             _produtoEmbalagemRepository,
             _itemEstoqueRepository,
             _movimentacaoEstoqueRepository,
-            _unitOfWork);
+            _unitOfWork,
+            new AtualizarLimiaresProdutoUseCase(_produtoRepository, _unitOfWork),
+            new RemoverProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _unitOfWork),
+            new RestaurarProdutoUseCase(_produtoRepository, _unitOfWork),
+            new ReordenarFotosProdutoUseCase(_produtoRepository, _unitOfWork),
+            new ObterHistoricoProdutoUseCase(_produtoRepository, _movimentacaoEstoqueRepository),
+            new ObterEstatisticasProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _movimentacaoEstoqueRepository),
+            new ObterDetalheProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _produtoVariacaoRepository),
+            new AtualizarProdutoUseCase(
+                _produtoRepository,
+                _categoriaRepository,
+                _produtoVariacaoRepository,
+                _produtoCaracteristicaRepository,
+                _produtoEmbalagemRepository,
+                _unitOfWork));
 
         var gerenciarVariacaoProdutoUseCase = new GerenciarVariacaoProdutoUseCase(
             _produtoRepository,
