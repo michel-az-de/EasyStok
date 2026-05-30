@@ -1,11 +1,9 @@
-using EasyStock.Infra.Postgre.Data;
-
 namespace EasyStock.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/audit-admin")]
 [Authorize(Policy = "SuperAdmin")]
-public class AdminAuditController(EasyStockDbContext db) : EasyStockControllerBase
+public class AdminAuditController(IAdminAuditLogQueries auditLogs) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetLogs(
@@ -13,38 +11,12 @@ public class AdminAuditController(EasyStockDbContext db) : EasyStockControllerBa
         [FromQuery] int pageSize = 50,
         [FromQuery] string? acao = null,
         [FromQuery] DateTime? de = null,
-        [FromQuery] DateTime? ate = null)
+        [FromQuery] DateTime? ate = null,
+        CancellationToken ct = default)
     {
         (page, pageSize) = NormalisePage(page, pageSize, maxPageSize: 100);
 
-        var query = db.AdminAuditLogs.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(acao))
-            query = query.Where(l => l.Acao == acao);
-
-        if (de.HasValue)
-            query = query.Where(l => l.CriadoEm >= de.Value.ToUniversalTime());
-
-        if (ate.HasValue)
-            query = query.Where(l => l.CriadoEm < ate.Value.ToUniversalTime().AddDays(1));
-
-        var total = await query.CountAsync();
-
-        var logs = await query
-            .OrderByDescending(l => l.CriadoEm)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(l => new
-            {
-                l.Id,
-                l.AdminEmail,
-                l.Acao,
-                l.Detalhes,
-                l.TenantId,
-                l.Ip,
-                l.CriadoEm
-            })
-            .ToListAsync();
+        var (logs, total) = await auditLogs.ListarPorAcaoExataAsync(acao, de, ate, page, pageSize, ct);
 
         return DataPaged(logs, total, page, pageSize);
     }

@@ -30,6 +30,32 @@ public sealed class AdminAuditLogQueries(EasyStockDbContext db) : IAdminAuditLog
             .Select(x => new AdminAuditLogRow(x.Id, x.AdminEmail, x.Acao, x.TenantId, x.Detalhes, x.Ip, x.CriadoEm))
             .ToListAsync(ct);
 
+    public async Task<(IReadOnlyList<AdminAuditLogRow> Items, int Total)> ListarPorAcaoExataAsync(
+        string? acao, DateTime? de, DateTime? ate, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = db.AdminAuditLogs.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(acao))
+            query = query.Where(l => l.Acao == acao);
+
+        if (de.HasValue)
+            query = query.Where(l => l.CriadoEm >= de.Value.ToUniversalTime());
+
+        if (ate.HasValue)
+            query = query.Where(l => l.CriadoEm < ate.Value.ToUniversalTime().AddDays(1));
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(l => l.CriadoEm)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(l => new AdminAuditLogRow(l.Id, l.AdminEmail, l.Acao, l.TenantId, l.Detalhes, l.Ip, l.CriadoEm))
+            .ToListAsync(ct);
+
+        return (items, total);
+    }
+
     private IQueryable<AdminAuditLog> BuildQuery(AdminAuditLogFiltro filtro)
     {
         var query = db.AdminAuditLogs.AsNoTracking().AsQueryable();

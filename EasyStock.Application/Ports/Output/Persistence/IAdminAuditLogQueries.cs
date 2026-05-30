@@ -12,6 +12,13 @@ public interface IAdminAuditLogQueries
 
     Task<IReadOnlyList<AdminAuditLogRow>> ExportarAsync(
         AdminAuditLogFiltro filtro, CancellationToken ct = default);
+
+    /// <summary>
+    /// Variante do back-office /audit-admin: filtro por ação EXATA (igualdade) e
+    /// intervalo [de, ate) — distinto do ListarAsync (que usa Contains + tenant).
+    /// </summary>
+    Task<(IReadOnlyList<AdminAuditLogRow> Items, int Total)> ListarPorAcaoExataAsync(
+        string? acao, DateTime? de, DateTime? ate, int page, int pageSize, CancellationToken ct = default);
 }
 
 public sealed record AdminAuditLogFiltro(
