@@ -42,6 +42,8 @@ public static class ApiServicesExtensions
         // SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
         services.AddScoped<SyncMutationDispatcher>();
         services.AddScoped<SyncAutoLinker>();
+        // F8: linkers especializados extraidos do facade SyncAutoLinker.
+        services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.CashEntryLinker>();
         services.AddScoped<SyncReversePullService>();
         // Onda 9: OTA do PWA — lê CACHE_VERSION do sw.js em runtime pra /version reportar
         // a versão real do bundle (sem depender de config drift-prone).

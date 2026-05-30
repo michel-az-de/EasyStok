@@ -1,4 +1,4 @@
-using EasyStock.Api.Mobile.DTOs;
+﻿using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
@@ -20,7 +20,8 @@ public class SyncAutoLinker(
     CriarPedidoUseCase criarPedidoUseCase,
     MobileSystemUserResolver systemUserResolver,
     IConfiguration appConfig,
-    ILogger<SyncAutoLinker> log)
+    ILogger<SyncAutoLinker> log,
+    Linkers.CashEntryLinker cashEntryLinker)
 {
     private readonly EasyStockDbContext _db = db;
     private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
@@ -31,6 +32,7 @@ public class SyncAutoLinker(
     private readonly MobileSystemUserResolver _systemUserResolver = systemUserResolver;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncAutoLinker> _log = log;
+    private readonly Linkers.CashEntryLinker _cashEntryLinker = cashEntryLinker;
 
     /// <summary>
     /// Runs auto-link for all entity types after a Push. Reads feature flags from
@@ -51,16 +53,16 @@ public class SyncAutoLinker(
 
         if (autoLinkProd   && productIds.Count > 0) await TryAutoLinkProductsAsync(productIds, empresaId);
         if (autoLinkClient && clientIds.Count  > 0) await TryAutoLinkClientsAsync(clientIds, empresaId);
-        // F1/F2/F3 — promove orders/batches/cash DEPOIS de products/clients pra que
-        // FKs (ErpProductId, ErpClienteId) já estejam preenchidas.
+        // F1/F2/F3 â€” promove orders/batches/cash DEPOIS de products/clients pra que
+        // FKs (ErpProductId, ErpClienteId) jÃ¡ estejam preenchidas.
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
         if (autoLinkOrder  && orderIds.Count   > 0) await TryAutoLinkOrdersAsync(orderIds, empresaId);
         if (autoLinkBatch  && batchIds.Count   > 0) await TryAutoLinkBatchesAsync(batchIds, empresaId);
-        if (autoLinkCash   && cashIds.Count    > 0) await TryAutoLinkCashEntriesAsync(cashIds, empresaId);
+        if (autoLinkCash   && cashIds.Count    > 0) await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
     }
 
     /// <summary>
-    /// F5 — Backfill: iterates all unlinked entities for the empresa and runs
+    /// F5 â€” Backfill: iterates all unlinked entities for the empresa and runs
     /// the full auto-link pipeline. Idempotent.
     /// </summary>
     public async Task<BackfillCounts> BackfillAsync(Guid empresaId, CancellationToken ct)
@@ -71,7 +73,7 @@ public class SyncAutoLinker(
         var clientIds = await _db.Set<Client>().IgnoreQueryFilters()
             .Where(c => c.EmpresaId == empresaId && c.ErpClienteId == null)
             .Select(c => c.Id).ToListAsync(ct);
-        // F8: processa TODOS os orders (mesmo já promovidos) — idempotencia interna detecta.
+        // F8: processa TODOS os orders (mesmo jÃ¡ promovidos) â€” idempotencia interna detecta.
         var orderIds = await _db.Set<Order>().IgnoreQueryFilters()
             .Where(o => o.EmpresaId == empresaId)
             .Select(o => o.Id).ToListAsync(ct);
@@ -90,19 +92,19 @@ public class SyncAutoLinker(
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
         await TryAutoLinkOrdersAsync(orderIds, empresaId);
         await TryAutoLinkBatchesAsync(batchIds, empresaId);
-        await TryAutoLinkCashEntriesAsync(cashIds, empresaId);
+        await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
 
         return new BackfillCounts(productIds.Count, clientIds.Count, orderIds.Count, batchIds.Count, cashIds.Count);
     }
 
-    // ─── F0: auto-link Product ↔ Produto / Client ↔ Cliente ────────────────
+    // â”€â”€â”€ F0: auto-link Product â†” Produto / Client â†” Cliente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private async Task TryAutoLinkProductsAsync(IEnumerable<string> mobileProductIds, Guid? empresaId)
     {
         var idsList = mobileProductIds as ICollection<string> ?? mobileProductIds.ToList();
         if (!empresaId.HasValue)
         {
-            // Bug silencioso historico: device nao pareado → produtos do PWA ficavam
+            // Bug silencioso historico: device nao pareado â†’ produtos do PWA ficavam
             // orfaos em mobile_products SEM qualquer indicacao no log. Telas /produtos
             // do web vinham vazias e ninguem sabia onde olhar. Este warning torna
             // o estado explicito; rodar `POST /api/mobile/sync/backfill-erp-link`
@@ -136,7 +138,7 @@ public class SyncAutoLinker(
                 {
                     mobileP.ErpProductId = webP.Id;
                     matched++;
-                    _log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
+                    _log.LogInformation("AutoLink Produto matched: mobile={MobileId} â†’ erp={ErpId} via nome match", pid, webP.Id);
                     cachedSysUserId ??= await _systemUserResolver.GetOrCreateAsync(empresaId.Value);
                     _db.Add(new ProdutoAlteracao
                     {
@@ -185,7 +187,7 @@ public class SyncAutoLinker(
                     AlteradoEm = DateTime.UtcNow
                 });
                 created++;
-                _log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
+                _log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} â†’ erp={ErpId} ({Nome})",
                     pid, novoProd.Id, mobileP.Name);
             }
             catch (Exception ex)
@@ -242,7 +244,7 @@ public class SyncAutoLinker(
                 {
                     mobileC.ErpClienteId = match.Id;
                     matched++;
-                    _log.LogInformation("AutoLink Cliente matched: mobile={MobileId} → erp={ErpId}", cid, match.Id);
+                    _log.LogInformation("AutoLink Cliente matched: mobile={MobileId} â†’ erp={ErpId}", cid, match.Id);
                     _db.Add(new ClienteAlteracao
                     {
                         Id = Guid.NewGuid(),
@@ -277,7 +279,7 @@ public class SyncAutoLinker(
                     Origem = "mobile"
                 });
                 created++;
-                _log.LogInformation("AutoLink Cliente CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
+                _log.LogInformation("AutoLink Cliente CRIADO: mobile={MobileId} â†’ erp={ErpId} ({Nome})",
                     cid, novoC.Id, mobileC.Name);
             }
             catch (Exception ex)
@@ -293,7 +295,7 @@ public class SyncAutoLinker(
             empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
     }
 
-    // F1 — promove mobile_order → Pedido web. Idempotente via FindByMobileOrderIdAsync.
+    // F1 â€” promove mobile_order â†’ Pedido web. Idempotente via FindByMobileOrderIdAsync.
     private async Task TryAutoLinkOrdersAsync(IEnumerable<string> mobileOrderIds, Guid? empresaId)
     {
         var idsList = mobileOrderIds as ICollection<string> ?? mobileOrderIds.ToList();
@@ -330,9 +332,9 @@ public class SyncAutoLinker(
                         mobileO.ErpPedidoId = jaPromovido.Id;
                         mobileO.UpdatedAt = DateTime.UtcNow;
                         pedidoIdResolvido = jaPromovido.Id;
-                        _log.LogInformation("AutoLink Pedido (idempotente MobileOrderId): mobile={MobileId} → erp={ErpId}", oid, jaPromovido.Id);
+                        _log.LogInformation("AutoLink Pedido (idempotente MobileOrderId): mobile={MobileId} â†’ erp={ErpId}", oid, jaPromovido.Id);
                     }
-                    // F6 idempotencia: pull web→mobile retornou Pedido web com Guid,
+                    // F6 idempotencia: pull webâ†’mobile retornou Pedido web com Guid,
                     // APK reenfileirou de volta com mobile.Id=Guid.
                     else if (Guid.TryParse(mobileO.Id, out var pedidoIdAsGuid))
                     {
@@ -347,7 +349,7 @@ public class SyncAutoLinker(
                                 await _pedidoRepo.UpdateAsync(pedidoExistente);
                             }
                             pedidoIdResolvido = pedidoExistente.Id;
-                            _log.LogInformation("AutoLink Pedido (idempotente Guid eco): mobile={MobileId} ↔ erp={ErpId}",
+                            _log.LogInformation("AutoLink Pedido (idempotente Guid eco): mobile={MobileId} â†” erp={ErpId}",
                                 oid, pedidoExistente.Id);
                         }
                     }
@@ -437,7 +439,7 @@ public class SyncAutoLinker(
                         mobileO.UpdatedAt = DateTime.UtcNow;
                         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
                         pedidoIdResolvido = result.Id;
-                        _log.LogInformation("AutoLink Pedido CRIADO: mobile={MobileId} → erp={ErpId} status={Status}",
+                        _log.LogInformation("AutoLink Pedido CRIADO: mobile={MobileId} â†’ erp={ErpId} status={Status}",
                             oid, result.Id, mobileO.Status);
                     }
                 }
@@ -449,7 +451,7 @@ public class SyncAutoLinker(
                     await EnsureClienteLinkAsync(pedidoIdResolvido.Value, mobileO);
                 }
 
-                // F7-A — Pagamento auto quando mobileO.Status == "entregue".
+                // F7-A â€” Pagamento auto quando mobileO.Status == "entregue".
                 if (pedidoIdResolvido.HasValue
                     && string.Equals(mobileO.Status, "entregue", StringComparison.OrdinalIgnoreCase))
                 {
@@ -472,7 +474,7 @@ public class SyncAutoLinker(
     }
 
     /// <summary>
-    /// F8-F — sincroniza Status do Pedido web com mobileO.Status. Idempotente.
+    /// F8-F â€” sincroniza Status do Pedido web com mobileO.Status. Idempotente.
     /// </summary>
     private async Task EnsureStatusSyncAsync(Guid pedidoId, Order mobileO)
     {
@@ -492,7 +494,7 @@ public class SyncAutoLinker(
                     .SetProperty(p => p.CanceladoEm, p =>
                         alvo == "cancelado" ? (DateTime?)mobileO.UpdatedAt : p.CanceladoEm));
             if (rows > 0)
-                _log.LogInformation("F8-F Status sincronizado: pedido={ErpId} → {Status}", pedidoId, alvo);
+                _log.LogInformation("F8-F Status sincronizado: pedido={ErpId} â†’ {Status}", pedidoId, alvo);
         }
         catch (Exception ex)
         {
@@ -501,7 +503,7 @@ public class SyncAutoLinker(
     }
 
     /// <summary>
-    /// F8-G — cria Venda quando pedido entregue. Idempotente via mobileO.ErpVendaId.
+    /// F8-G â€” cria Venda quando pedido entregue. Idempotente via mobileO.ErpVendaId.
     /// </summary>
     private async Task EnsureVendaAsync(Order mobileO)
     {
@@ -575,7 +577,7 @@ public class SyncAutoLinker(
     }
 
     /// <summary>
-    /// F8-J — aplica saída de estoque para pedido entregue. Idempotente via DocumentoReferencia.
+    /// F8-J â€” aplica saÃ­da de estoque para pedido entregue. Idempotente via DocumentoReferencia.
     /// </summary>
     private async Task EnsureStockSaidaAsync(Order mobileO)
     {
@@ -638,7 +640,7 @@ public class SyncAutoLinker(
             Valor = pedido.Total.Valor,
             PagoEm = mobileO.UpdatedAt,
             RegistradoPorNome = mobileO.LastOperatorName,
-            Observacao = "Auto-registrado pelo F7-A (mobile→ERP). Refine método no admin se necessário."
+            Observacao = "Auto-registrado pelo F7-A (mobileâ†’ERP). Refine mÃ©todo no admin se necessÃ¡rio."
         });
 
         var refKey = "pedido-pagamento:" + pagamentoId;
@@ -649,7 +651,7 @@ public class SyncAutoLinker(
             var mov = MovimentoCaixa.Criar(pedido.EmpresaId, "entrada", pedido.Total.Valor,
                 dataMovimento: mobileO.UpdatedAt, lojaId: pedido.LojaId);
             mov.Descricao = "Pagamento pedido " + (pedido.Id.ToString().Substring(0, 8)) +
-                            (string.IsNullOrEmpty(pedido.ClienteNome) ? "" : " — " + pedido.ClienteNome);
+                            (string.IsNullOrEmpty(pedido.ClienteNome) ? "" : " â€” " + pedido.ClienteNome);
             mov.Metodo = "dinheiro";
             mov.Categoria = "pedido";
             mov.Origem = "mobile-payment";
@@ -664,7 +666,7 @@ public class SyncAutoLinker(
             pedido.Id, pedido.Total.Valor);
     }
 
-    // F2 — promove mobile_batch → Lote web. Idempotente via FindByMobileBatchIdAsync.
+    // F2 â€” promove mobile_batch â†’ Lote web. Idempotente via FindByMobileBatchIdAsync.
     private async Task TryAutoLinkBatchesAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
     {
         var idsList = mobileBatchIds as ICollection<string> ?? mobileBatchIds.ToList();
@@ -693,7 +695,7 @@ public class SyncAutoLinker(
                 {
                     mobileB.ErpLoteId = jaPromovido.Id;
                     idempotentSkip++;
-                    _log.LogInformation("AutoLink Lote (idempotente): mobile={MobileId} → erp={ErpId}", bid, jaPromovido.Id);
+                    _log.LogInformation("AutoLink Lote (idempotente): mobile={MobileId} â†’ erp={ErpId}", bid, jaPromovido.Id);
                     continue;
                 }
 
@@ -743,7 +745,7 @@ public class SyncAutoLinker(
                 mobileB.ErpLoteId = lote.Id;
                 if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
                 created++;
-                _log.LogInformation("F2 Lote CRIADO: mobile={MobileId} → erp={ErpId} itens={N}",
+                _log.LogInformation("F2 Lote CRIADO: mobile={MobileId} â†’ erp={ErpId} itens={N}",
                     bid, lote.Id, lote.Itens.Count);
 
                 await EnsureEntradaEstoqueDoLoteAsync(lote);
@@ -762,7 +764,7 @@ public class SyncAutoLinker(
     }
 
     /// <summary>
-    /// F8-A — Cria ItemEstoque + MovimentacaoEstoque (Entrada) para cada LoteItem.
+    /// F8-A â€” Cria ItemEstoque + MovimentacaoEstoque (Entrada) para cada LoteItem.
     /// Idempotente: CodigoInterno="lote:loteId:produtoId".
     /// </summary>
     private async Task EnsureEntradaEstoqueDoLoteAsync(Lote lote)
@@ -847,68 +849,7 @@ public class SyncAutoLinker(
         }
     }
 
-    // F3 — promove mobile_cash_entry → MovimentoCaixa web. Idempotente via Referencia="mobile:<id>".
-    private async Task TryAutoLinkCashEntriesAsync(IEnumerable<string> mobileCashIds, Guid? empresaId)
-    {
-        var idsList = mobileCashIds as ICollection<string> ?? mobileCashIds.ToList();
-        if (!empresaId.HasValue)
-        {
-            _log.LogWarning(
-                "AutoLink MovimentoCaixa SKIPPED: device nao pareado (empresaId=null), {Count} entradas ficam orfas em mobile_cash_entries",
-                idsList.Count);
-            return;
-        }
-        var created = 0;
-        var idempotentSkip = 0;
-        var errorSkip = 0;
-        foreach (var ceid in idsList)
-        {
-            try
-            {
-                var mobileCE = await _db.Set<CashEntry>().IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(c => c.Id == ceid && c.EmpresaId == empresaId);
-                if (mobileCE == null) { idempotentSkip++; continue; }
-                if (mobileCE.ErpMovimentoCaixaId.HasValue && mobileCE.ErpMovimentoCaixaId.Value != Guid.Empty) { idempotentSkip++; continue; }
-
-                var referencia = $"mobile:{mobileCE.Id}";
-                var jaPromovido = await _db.Set<MovimentoCaixa>().IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.Referencia == referencia);
-                if (jaPromovido != null)
-                {
-                    mobileCE.ErpMovimentoCaixaId = jaPromovido.Id;
-                    idempotentSkip++;
-                    _log.LogInformation("AutoLink MovimentoCaixa (idempotente): mobile={MobileId} → erp={ErpId}", ceid, jaPromovido.Id);
-                    continue;
-                }
-
-                var tipo = string.Equals(mobileCE.Type, "income", StringComparison.OrdinalIgnoreCase) ? "entrada" : "saida";
-                var mov = MovimentoCaixa.Criar(empresaId.Value, tipo, mobileCE.Amount, mobileCE.CreatedAt, mobileCE.LojaId);
-                mov.Descricao = mobileCE.Description;
-                mov.Metodo = "dinheiro";
-                mov.Origem = "mobile";
-                mov.RegistradoPorNome = mobileCE.LastOperatorName;
-                mov.Referencia = referencia;
-
-                _db.Add(mov);
-                mobileCE.ErpMovimentoCaixaId = mov.Id;
-                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-                created++;
-                _log.LogInformation("AutoLink MovimentoCaixa CRIADO: mobile={MobileId} → erp={ErpId} tipo={Tipo} valor={Valor}",
-                    ceid, mov.Id, tipo, mov.Valor);
-            }
-            catch (Exception ex)
-            {
-                errorSkip++;
-                _log.LogError(ex,
-                    "AutoLink MovimentoCaixa FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
-                    ceid, empresaId, ex.GetType().Name, ex.Message);
-            }
-        }
-        _log.LogInformation(
-            "AutoLink MovimentoCaixa summary empresaId={EmpresaId} total={Total} created={Created} idempotent={Idempotent} errors={Errors}",
-            empresaId, idsList.Count, created, idempotentSkip, errorSkip);
-    }
-
+    // F3 â€” promove mobile_cash_entry â†’ MovimentoCaixa web. Idempotente via Referencia="mobile:<id>".
     private async Task<Guid> GetOrCreateDefaultCategoriaAsync(Guid empresaId)
     {
         var existentes = await _db.Set<Categoria>().IgnoreQueryFilters().AsNoTracking()
@@ -929,7 +870,7 @@ public class SyncAutoLinker(
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             Nome = "Mobile",
-            Descricao = "Categoria default criada pelo auto-link mobile→ERP",
+            Descricao = "Categoria default criada pelo auto-link mobileâ†’ERP",
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };
