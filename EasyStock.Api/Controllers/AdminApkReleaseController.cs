@@ -1,6 +1,4 @@
 using System.Security.Cryptography;
-using EasyStock.Domain.Entities.Mobile;
-using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Controllers;
 
@@ -20,7 +18,7 @@ namespace EasyStock.Api.Controllers;
 [Route("api/admin/apk-release")]
 [Authorize(Policy = "SuperAdmin")]
 public class AdminApkReleaseController(
-    EasyStockDbContext db,
+    IApkReleaseRepository apkReleases,
     ILogger<AdminApkReleaseController> log) : ControllerBase
 {
     private const long MaxApkBytes = 50L * 1024 * 1024;
@@ -58,40 +56,21 @@ public class AdminApkReleaseController(
             sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         }
 
-        // Despromove releases anteriores do mesmo (AppId, IsCanaryOnly).
-        // Mantem registro historico — so vira IsActive=false.
-        await db.ApkReleases
-            .Where(r => r.AppId == appId && r.IsCanaryOnly == isCanaryOnly && r.IsActive)
-            .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsActive, false), ct);
-
-        var release = new ApkRelease
-        {
-            Id = Guid.NewGuid(),
-            AppId = appId,
-            Version = version.Trim(),
-            Sha256 = sha256,
-            ReleaseNotes = releaseNotes,
-            FileContent = content,
-            FileSizeBytes = content.LongLength,
-            IsCanaryOnly = isCanaryOnly,
-            IsActive = true,
-            CriadoEm = DateTime.UtcNow
-        };
-        db.ApkReleases.Add(release);
-        await db.SaveChangesAsync(ct);
+        var criada = await apkReleases.PublicarAsync(
+            new ApkReleaseNova(appId, version.Trim(), sha256, releaseNotes, content, isCanaryOnly), ct);
 
         log.LogInformation("APK release {Id} v{Version} ({Size} bytes, canary={Canary}) publicada",
-            release.Id, release.Version, release.FileSizeBytes, release.IsCanaryOnly);
+            criada.Id, criada.Version, criada.FileSizeBytes, criada.IsCanaryOnly);
 
         return StatusCode(201, new
         {
-            id = release.Id,
-            version = release.Version,
-            sha256 = release.Sha256,
-            sizeBytes = release.FileSizeBytes,
-            isCanaryOnly = release.IsCanaryOnly,
+            id = criada.Id,
+            version = criada.Version,
+            sha256 = criada.Sha256,
+            sizeBytes = criada.FileSizeBytes,
+            isCanaryOnly = criada.IsCanaryOnly,
             manifestUrl = $"/api/mobile/apk/manifest?appId={appId}",
-            downloadUrl = $"/api/mobile/apk/download/{release.Id}"
+            downloadUrl = $"/api/mobile/apk/download/{criada.Id}"
         });
     }
 
@@ -104,23 +83,7 @@ public class AdminApkReleaseController(
         appId ??= "casa-da-baba";
         var clamped = Math.Clamp(limit, 1, 100);
 
-        var releases = await db.ApkReleases
-            .AsNoTracking()
-            .Where(r => r.AppId == appId)
-            .OrderByDescending(r => r.CriadoEm)
-            .Take(clamped)
-            .Select(r => new
-            {
-                r.Id,
-                r.Version,
-                r.Sha256,
-                r.ReleaseNotes,
-                r.FileSizeBytes,
-                r.IsCanaryOnly,
-                r.IsActive,
-                r.CriadoEm
-            })
-            .ToListAsync(ct);
+        var releases = await apkReleases.ListarAsync(appId, clamped, ct);
 
         return Ok(releases);
     }
