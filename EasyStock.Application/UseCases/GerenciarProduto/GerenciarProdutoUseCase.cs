@@ -149,6 +149,7 @@ public sealed class GerenciarProdutoUseCase(
     IItemEstoqueRepository itemEstoqueRepository,
     IMovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
     IUnitOfWork unitOfWork,
+    Comandos.AtualizarLimiaresProdutoUseCase atualizarLimiaresUseCase,
     ICacheService? cacheService = null,
     IProdutoAlteracaoRepository? alteracaoRepository = null,
     IUsuarioRepository? usuarioRepository = null,
@@ -393,28 +394,9 @@ public sealed class GerenciarProdutoUseCase(
             await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(command.EmpresaId, command.ProdutoId));
     }
 
-    public async Task AtualizarLimiaresAsync(Guid empresaId, Guid produtoId, int? quantidadeMinima, int? quantidadeCritica)
-    {
-        UseCaseGuards.EnsureEmpresaId(empresaId);
-        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
-
-        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
-            ?? throw new UseCaseValidationException("Produto nao encontrado.");
-
-        if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)
-            throw new UseCaseValidationException("Quantidade minima nao pode ser negativa.");
-        if (quantidadeCritica.HasValue && quantidadeCritica.Value < 0)
-            throw new UseCaseValidationException("Quantidade critica nao pode ser negativa.");
-        if (quantidadeMinima.HasValue && quantidadeCritica.HasValue && quantidadeCritica.Value >= quantidadeMinima.Value)
-            throw new UseCaseValidationException("Quantidade critica precisa ser menor que a minima.");
-
-        produto.QuantidadeMinima = quantidadeMinima;
-        produto.QuantidadeCritica = quantidadeCritica;
-        produto.AlteradoEm = DateTime.UtcNow;
-
-        await produtoRepository.UpdateAsync(produto);
-        await unitOfWork.CommitAsync();
-    }
+    // F9 facade: delega para Comandos.AtualizarLimiaresProdutoUseCase.
+    public Task AtualizarLimiaresAsync(Guid empresaId, Guid produtoId, int? quantidadeMinima, int? quantidadeCritica)
+        => atualizarLimiaresUseCase.ExecuteAsync(empresaId, produtoId, quantidadeMinima, quantidadeCritica);
 
     public async Task RemoverAsync(Guid empresaId, Guid produtoId, Guid usuarioId = default)
     {

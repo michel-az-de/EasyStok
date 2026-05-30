@@ -138,6 +138,8 @@ public static partial class ServiceCollectionExtensions
 
         // Produtos e Categorias
         services.AddScoped<CadastrarProdutoUseCase>();
+        // F9: comandos especializados extraidos do facade GerenciarProdutoUseCase.
+        services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarLimiaresProdutoUseCase>();
         services.AddScoped<GerenciarProdutoUseCase>();
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();

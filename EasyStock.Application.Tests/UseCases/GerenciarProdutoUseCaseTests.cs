@@ -24,7 +24,8 @@ public class GerenciarProdutoUseCaseTests
         _embalagemRepository,
         _itemEstoqueRepository,
         _movimentacaoRepository,
-        _unitOfWork);
+        _unitOfWork,
+        new EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarLimiaresProdutoUseCase(_produtoRepository, _unitOfWork));
 
     [Fact]
     public async Task Deve_falhar_ao_remover_produto_com_estoque()
