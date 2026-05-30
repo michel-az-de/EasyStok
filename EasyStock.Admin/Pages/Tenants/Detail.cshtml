@@ -435,12 +435,11 @@ function mobileSyncHealth(tenantId) {
                         var ativo = u.TryGetProperty("ativo", out var uap) && uap.GetBoolean();
                         var ultimo = u.TryGetProperty("ultimoAcessoEm", out var uup) && uup.ValueKind != System.Text.Json.JsonValueKind.Null ? uup.GetString() : null;
                         DateTime.TryParse(ultimo, out var ultimoDt);
-                        // Escapa pra atributo JS — evita quebra se o nome tiver aspas/apóstrofo.
-                        var unomeJs = System.Text.Json.JsonSerializer.Serialize(unome);
-                        var uemailJs = System.Text.Json.JsonSerializer.Serialize(uemail);
-                        var unomeEscaped = (unome ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
-                        var uemailEscaped = (uemail ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
-                        <tr x-data="Object.assign({ open: false }, piiReveal('@uid', 'email', '@Html.Raw(uemailEscaped)'))">
+                        @* Nome/email do tenant são dados não-confiáveis: emitidos via data-* (o Razor
+                           HTML-encoda o atributo) e lidos como string pelo Alpine. Nunca interpolar
+                           direto em literal JS/atributo (era stored-XSS). *@
+                        <tr data-uid="@uid" data-unome="@unome" data-uemail="@uemail"
+                            x-data="Object.assign({ open: false, _uid: $el.dataset.uid, _unome: $el.dataset.unome, _uemail: $el.dataset.uemail }, piiReveal($el.dataset.uid, 'email', $el.dataset.uemail))">
                             <td class="text-es-ink font-medium whitespace-nowrap max-w-[220px] overflow-hidden text-ellipsis" title="@unome">@unome</td>
                             <td class="text-es-ink-dim font-mono text-xs">
                                 <span x-text="piiValor"></span>
@@ -466,8 +465,8 @@ function mobileSyncHealth(tenantId) {
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ResetSenhaUsuario&userId=@uid',
-                                                acao: 'Resetar senha de @Html.Raw(unomeEscaped)',
-                                                resumo: 'Uma senha temporária será gerada para @Html.Raw(uemailEscaped). As sessões ativas serão encerradas — o usuário vai precisar logar de novo.',
+                                                acao: 'Resetar senha de ' + _unome,
+                                                resumo: 'Uma senha temporária será gerada para ' + _uemail + '. As sessões ativas serão encerradas — o usuário vai precisar logar de novo.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Resetar senha (auditado)'
                                             })">
@@ -476,7 +475,7 @@ function mobileSyncHealth(tenantId) {
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
                                             @@click="open=false; $dispatch('open-justificar', {
                                                 endpoint: '/Tenants/Detail/@Model.Id?handler=ForcarLogoutUsuario&userId=@uid',
-                                                acao: 'Forçar logout de @Html.Raw(unomeEscaped)',
+                                                acao: 'Forçar logout de ' + _unome,
                                                 resumo: 'Todas as sessões ativas serão encerradas. O usuário vai precisar logar de novo em todos os dispositivos.',
                                                 variant: 'danger',
                                                 confirmLabel: 'Forçar logout (auditado)'
@@ -489,7 +488,7 @@ function mobileSyncHealth(tenantId) {
                                     </button>
                                     <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-ink-dim hover:bg-es-surface-2 hover:text-es-ink"
-                                            @@click="open=false; $dispatch('open-editar-usuario', { userId: '@uid', nome: '@Html.Raw(unomeEscaped)', email: '@Html.Raw(uemailEscaped)' })">
+                                            @@click="open=false; $dispatch('open-editar-usuario', { userId: _uid, nome: _unome, email: _uemail })">
                                         ✏️ Editar nome/email
                                     </button>
                                     @if (ativo)
@@ -497,7 +496,7 @@ function mobileSyncHealth(tenantId) {
                                         <button type="button" class="w-full text-left px-3 py-2 text-xs text-amber-300 hover:bg-es-surface-2"
                                                 @@click="open=false; $dispatch('open-justificar', {
                                                     endpoint: '/Tenants/Detail/@Model.Id?handler=DesativarUsuario&userId=@uid',
-                                                    acao: 'Desativar @Html.Raw(unomeEscaped)',
+                                                    acao: 'Desativar ' + _unome,
                                                     resumo: 'O usuário não conseguirá mais fazer login. Sessões ativas serão encerradas. Pode ser reativado depois.',
                                                     variant: 'danger',
                                                     confirmLabel: 'Desativar (auditado)'
@@ -510,7 +509,7 @@ function mobileSyncHealth(tenantId) {
                                         <button type="button" class="w-full text-left px-3 py-2 text-xs text-es-basil hover:bg-es-surface-2"
                                                 @@click="open=false; $dispatch('open-justificar', {
                                                     endpoint: '/Tenants/Detail/@Model.Id?handler=ReativarUsuario&userId=@uid',
-                                                    acao: 'Reativar @Html.Raw(unomeEscaped)',
+                                                    acao: 'Reativar ' + _unome,
                                                     resumo: 'O usuário voltará a conseguir fazer login. Tentativas de bloqueio serão zeradas.',
                                                     variant: 'primary',
                                                     confirmLabel: 'Reativar (auditado)'
@@ -520,7 +519,7 @@ function mobileSyncHealth(tenantId) {
                                     }
                                     <div class="border-t my-1" style="border-color:rgba(247,242,232,0.08)"></div>
                                     <button type="button" class="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10"
-                                            @@click="open=false; $dispatch('open-anonimizar', { userId: '@uid', nome: '@Html.Raw(unomeEscaped)', email: '@Html.Raw(uemailEscaped)' })">
+                                            @@click="open=false; $dispatch('open-anonimizar', { userId: _uid, nome: _unome, email: _uemail })">
                                         ⚠️ Anonimizar (LGPD)
                                     </button>
                                 </div>
@@ -965,13 +964,9 @@ function mobileSyncHealth(tenantId) {
                     var lend = l.TryGetProperty("endereco", out var lendp) && lendp.ValueKind != System.Text.Json.JsonValueKind.Null ? lendp.GetString() : "";
                     var ltel = l.TryGetProperty("telefone", out var ltelp) && ltelp.ValueKind != System.Text.Json.JsonValueKind.Null ? ltelp.GetString() : "";
                     var lativa = l.TryGetProperty("ativa", out var lap) && lap.GetBoolean();
-                    // Serializa JSON pra passar como contexto pro modal de edição (escape correto).
+                    // Contexto JSON pro modal de edição — emitido via data-loja (o Razor HTML-encoda
+                    // o atributo); o Alpine faz JSON.parse. Nome da loja é dado não-confiável → data-lnome.
                     var lojaJson = System.Text.Json.JsonSerializer.Serialize(new { id = lid, nome = lnome, descricao = ldesc, documento = ldoc, endereco = lend, telefone = ltel });
-                    // Nome serializado pra string JS literal — evita quebra com aspas no nome da loja.
-                    var lnomeJs = System.Text.Json.JsonSerializer.Serialize(lnome);
-                    // Versão safe pra uso em string JS com aspas simples / atributo HTML com aspas duplas.
-                    var lojaJsonAttr = lojaJson.Replace("\"", "&quot;");
-                    var lnomeEscaped = (lnome ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
                     <div class="card flex flex-col">
                         <div class="flex items-start justify-between mb-2">
                             <h4 class="text-es-ink font-semibold flex-1 truncate" title="@lnome">@lnome</h4>
@@ -987,13 +982,13 @@ function mobileSyncHealth(tenantId) {
                             @if (!string.IsNullOrWhiteSpace(ltel)) { <div><span class="text-es-ink-dim">Tel:</span> <span class="text-es-ink-dim font-mono">@ltel</span></div> }
                         </dl>
                         <div class="flex gap-2 mt-auto pt-2" style="border-top:1px solid rgba(247,242,232,0.06)">
-                            <button type="button" @@click="editandoLoja = @Html.Raw(lojaJsonAttr)" class="btn-secondary text-xs flex-1">✏️ Editar</button>
+                            <button type="button" data-loja="@lojaJson" @@click="editandoLoja = JSON.parse($el.dataset.loja)" class="btn-secondary text-xs flex-1">✏️ Editar</button>
                             @if (lativa)
                             {
-                                <button type="button"
+                                <button type="button" data-lnome="@lnome"
                                         @@click="$dispatch('open-justificar', {
                                             endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
-                                            acao: 'Desativar loja @Html.Raw(lnomeEscaped)',
+                                            acao: 'Desativar loja ' + $el.dataset.lnome,
                                             resumo: 'A loja não aparecerá mais para o cliente. Histórico (vendas, estoque) é preservado. Pode ser reativada.',
                                             variant: 'danger',
                                             confirmLabel: 'Desativar (auditado)',
@@ -1003,10 +998,10 @@ function mobileSyncHealth(tenantId) {
                             }
                             else
                             {
-                                <button type="button"
+                                <button type="button" data-lnome="@lnome"
                                         @@click="$dispatch('open-justificar', {
                                             endpoint: '/Tenants/Detail/@Model.Id?handler=ToggleLoja&lojaId=@lid',
-                                            acao: 'Reativar loja @Html.Raw(lnomeEscaped)',
+                                            acao: 'Reativar loja ' + $el.dataset.lnome,
                                             resumo: 'A loja voltará a aparecer para o cliente.',
                                             variant: 'primary',
                                             confirmLabel: 'Reativar (auditado)',

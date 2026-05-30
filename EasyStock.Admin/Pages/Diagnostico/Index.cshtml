@@ -1147,9 +1147,11 @@ function diagnosticoPage() {
 function resumoState() {
     const root = this;
     return {
-        data: @(Model.StatusData.ValueKind != JsonValueKind.Undefined
-            ? Html.Raw(Model.StatusData.GetRawText())
-            : Html.Raw("{}")),
+        @* StatusData vai pra dentro de <script>: serializa com o encoder default do System.Text.Json
+           (escapa < > & como \uXXXX) pra que um valor contendo </script> não quebre o bloco. *@
+        data: @Html.Raw(Model.StatusData.ValueKind != JsonValueKind.Undefined
+            ? System.Text.Json.JsonSerializer.Serialize(Model.StatusData)
+            : "{}"),
 
         init() {
             // Auto-refresh a cada 30s.
