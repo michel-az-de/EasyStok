@@ -142,6 +142,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarLimiaresProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.RemoverProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.RestaurarProdutoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.ReordenarFotosProdutoUseCase>();
         services.AddScoped<GerenciarProdutoUseCase>();
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();

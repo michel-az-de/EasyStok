@@ -33,7 +33,7 @@ public sealed class GerenciarUploadsUseCase(
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
-        var fotos = GerenciarProdutoUseCase.DesserializarFotos(produto.FotosJson).ToList();
+        var fotos = EasyStock.Application.UseCases.GerenciarProduto.Helpers.ProdutoFotosSerializer.Deserializar(produto.FotosJson).ToList();
         if (fotos.Count >= 5)
             throw new UseCaseValidationException("O produto ja possui o limite maximo de 5 fotos.");
 
@@ -52,7 +52,7 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         fotos.Add(new ProdutoFotoMetadata(fotoId, stored.Url, stored.StorageKey, DateTime.UtcNow));
-        produto.FotosJson = GerenciarProdutoUseCase.SerializarFotos(fotos);
+        produto.FotosJson = EasyStock.Application.UseCases.GerenciarProduto.Helpers.ProdutoFotosSerializer.Serializar(fotos);
         produto.AlteradoEm = DateTime.UtcNow;
 
         await produtoRepository.UpdateAsync(produto);
@@ -69,7 +69,7 @@ public sealed class GerenciarUploadsUseCase(
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
-        var fotos = GerenciarProdutoUseCase.DesserializarFotos(produto.FotosJson).ToList();
+        var fotos = EasyStock.Application.UseCases.GerenciarProduto.Helpers.ProdutoFotosSerializer.Deserializar(produto.FotosJson).ToList();
         var foto = fotos.FirstOrDefault(f => f.FotoId == fotoId)
             ?? throw new UseCaseValidationException("Foto nao encontrada.");
 
@@ -77,7 +77,7 @@ public sealed class GerenciarUploadsUseCase(
             await fileStorage.DeleteAsync(foto.StorageKey, cancellationToken);
 
         fotos.Remove(foto);
-        produto.FotosJson = GerenciarProdutoUseCase.SerializarFotos(fotos);
+        produto.FotosJson = EasyStock.Application.UseCases.GerenciarProduto.Helpers.ProdutoFotosSerializer.Serializar(fotos);
         produto.AlteradoEm = DateTime.UtcNow;
 
         await produtoRepository.UpdateAsync(produto);

@@ -152,6 +152,7 @@ public sealed class GerenciarProdutoUseCase(
     Comandos.AtualizarLimiaresProdutoUseCase atualizarLimiaresUseCase,
     Comandos.RemoverProdutoUseCase removerUseCase,
     Comandos.RestaurarProdutoUseCase restaurarUseCase,
+    Comandos.ReordenarFotosProdutoUseCase reordenarFotosUseCase,
     ICacheService? cacheService = null,
     IProdutoAlteracaoRepository? alteracaoRepository = null,
     IUsuarioRepository? usuarioRepository = null,
@@ -426,7 +427,7 @@ public sealed class GerenciarProdutoUseCase(
         // Task.WhenAll em paralelo causaria "A second operation was started on this context instance".
         var itens     = await itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId);
         var variacoes = await produtoVariacaoRepository.GetByProdutoAsync(empresaId, produtoId);
-        var fotos = DesserializarFotos(produto.FotosJson);
+        var fotos = Helpers.ProdutoFotosSerializer.Deserializar(produto.FotosJson);
 
         var variacoesResult = variacoes
             .Select(variacao =>
@@ -575,49 +576,9 @@ public sealed class GerenciarProdutoUseCase(
                 .ToArray());
     }
 
-    internal static IReadOnlyCollection<ProdutoFotoMetadata> DesserializarFotos(string? fotosJson)
-    {
-        if (string.IsNullOrWhiteSpace(fotosJson))
-            return [];
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<ProdutoFotoMetadata>>(fotosJson) ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
-
-    internal static string SerializarFotos(IEnumerable<ProdutoFotoMetadata> fotos) =>
-        JsonSerializer.Serialize(fotos);
-
-    public async Task ReordenarFotosAsync(Guid empresaId, Guid produtoId, Guid[] novaOrdem)
-    {
-        UseCaseGuards.EnsureEmpresaId(empresaId);
-        UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
-
-        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
-            ?? throw new UseCaseValidationException("Produto nao encontrado.");
-
-        var fotos = DesserializarFotos(produto.FotosJson).ToList();
-        var reordenadas = novaOrdem
-            .Select(id => fotos.FirstOrDefault(f => f.FotoId == id))
-            .Where(f => f is not null)
-            .Select(f => f!)
-            .ToList();
-        // Garante que fotos ausentes da lista não sejam perdidas
-        reordenadas.AddRange(fotos.Where(f => !novaOrdem.Contains(f.FotoId)));
-
-        produto.FotosJson = SerializarFotos(reordenadas);
-        produto.AlteradoEm = DateTime.UtcNow;
-        await produtoRepository.UpdateAsync(produto);
-        await unitOfWork.CommitAsync();
-
-        if (cacheService is not null)
-            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
-    }
+    // F9 facade: delega para Comandos.ReordenarFotosProdutoUseCase.
+    public Task ReordenarFotosAsync(Guid empresaId, Guid produtoId, Guid[] novaOrdem)
+        => reordenarFotosUseCase.ExecuteAsync(empresaId, produtoId, novaOrdem);
 
     private static string? Normalizar(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
