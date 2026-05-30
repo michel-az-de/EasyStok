@@ -31,7 +31,8 @@ public class GerenciarProdutoUseCaseTests
         new EasyStock.Application.UseCases.GerenciarProduto.Comandos.ReordenarFotosProdutoUseCase(_produtoRepository, _unitOfWork),
         new EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterHistoricoProdutoUseCase(_produtoRepository, _movimentacaoRepository),
         new EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterEstatisticasProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _movimentacaoRepository),
-        new EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterDetalheProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _variacaoRepository));
+        new EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterDetalheProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _variacaoRepository),
+        new EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarProdutoUseCase(_produtoRepository, _categoriaRepository, _variacaoRepository, _caracteristicaRepository, _embalagemRepository, _unitOfWork));
 
     [Fact]
     public async Task Deve_falhar_ao_remover_produto_com_estoque()

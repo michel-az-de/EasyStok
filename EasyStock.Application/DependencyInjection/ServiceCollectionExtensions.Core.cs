@@ -146,6 +146,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterHistoricoProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterEstatisticasProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterDetalheProdutoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarProdutoUseCase>();
         services.AddScoped<GerenciarProdutoUseCase>();
         services.AddScoped<GerenciarVariacaoProdutoUseCase>();
         services.AddScoped<GerenciarUploadsUseCase>();
