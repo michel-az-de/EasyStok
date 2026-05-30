@@ -1,7 +1,6 @@
 ﻿using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
-using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -23,7 +22,8 @@ public class SyncAutoLinker(
     ILogger<SyncAutoLinker> log,
     Linkers.CashEntryLinker cashEntryLinker,
     Linkers.ClientLinker clientLinker,
-    Linkers.ProductLinker productLinker)
+    Linkers.ProductLinker productLinker,
+    Linkers.BatchLinker batchLinker)
 {
     private readonly EasyStockDbContext _db = db;
     private readonly IPedidoRepository _pedidoRepo = pedidoRepo;
@@ -37,6 +37,7 @@ public class SyncAutoLinker(
     private readonly Linkers.CashEntryLinker _cashEntryLinker = cashEntryLinker;
     private readonly Linkers.ClientLinker _clientLinker = clientLinker;
     private readonly Linkers.ProductLinker _productLinker = productLinker;
+    private readonly Linkers.BatchLinker _batchLinker = batchLinker;
 
     /// <summary>
     /// Runs auto-link for all entity types after a Push. Reads feature flags from
@@ -61,7 +62,7 @@ public class SyncAutoLinker(
         // FKs (ErpProductId, ErpClienteId) jÃ¡ estejam preenchidas.
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
         if (autoLinkOrder  && orderIds.Count   > 0) await TryAutoLinkOrdersAsync(orderIds, empresaId);
-        if (autoLinkBatch  && batchIds.Count   > 0) await TryAutoLinkBatchesAsync(batchIds, empresaId);
+        if (autoLinkBatch  && batchIds.Count   > 0) await _batchLinker.ExecuteAsync(batchIds, empresaId);
         if (autoLinkCash   && cashIds.Count    > 0) await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
     }
 
@@ -95,7 +96,7 @@ public class SyncAutoLinker(
         await _clientLinker.ExecuteAsync(clientIds, empresaId);
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync(ct);
         await TryAutoLinkOrdersAsync(orderIds, empresaId);
-        await TryAutoLinkBatchesAsync(batchIds, empresaId);
+        await _batchLinker.ExecuteAsync(batchIds, empresaId);
         await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
 
         return new BackfillCounts(productIds.Count, clientIds.Count, orderIds.Count, batchIds.Count, cashIds.Count);
@@ -474,217 +475,6 @@ public class SyncAutoLinker(
     }
 
     // F2 â€” promove mobile_batch â†’ Lote web. Idempotente via FindByMobileBatchIdAsync.
-    private async Task TryAutoLinkBatchesAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
-    {
-        var idsList = mobileBatchIds as ICollection<string> ?? mobileBatchIds.ToList();
-        if (!empresaId.HasValue)
-        {
-            _log.LogWarning(
-                "AutoLink Lote SKIPPED: device nao pareado (empresaId=null), {Count} lotes ficam orfaos em mobile_batches",
-                idsList.Count);
-            return;
-        }
-        var created = 0;
-        var idempotentSkip = 0;
-        var errorSkip = 0;
-        foreach (var bid in idsList)
-        {
-            try
-            {
-                var mobileB = await _db.Set<Batch>().IgnoreQueryFilters()
-                    .Include(b => b.Items)
-                    .FirstOrDefaultAsync(b => b.Id == bid && b.EmpresaId == empresaId);
-                if (mobileB == null) { idempotentSkip++; continue; }
-                if (mobileB.ErpLoteId.HasValue && mobileB.ErpLoteId.Value != Guid.Empty) { idempotentSkip++; continue; }
-
-                var jaPromovido = await _loteRepo.FindByMobileBatchIdAsync(empresaId.Value, mobileB.Id);
-                if (jaPromovido != null)
-                {
-                    mobileB.ErpLoteId = jaPromovido.Id;
-                    idempotentSkip++;
-                    _log.LogInformation("AutoLink Lote (idempotente): mobile={MobileId} â†’ erp={ErpId}", bid, jaPromovido.Id);
-                    continue;
-                }
-
-                var codigoBase = !string.IsNullOrWhiteSpace(mobileB.Lote)
-                    ? mobileB.Lote!
-                    : !string.IsNullOrWhiteSpace(mobileB.Code)
-                        ? mobileB.Code!
-                        : $"LOT-{mobileB.CreatedAt:yyMMdd}";
-                var sufixo = mobileB.Id.Length >= 6
-                    ? mobileB.Id.Substring(mobileB.Id.Length - 6)
-                    : mobileB.Id;
-                sufixo = new string(sufixo.Where(c => char.IsLetterOrDigit(c)).ToArray());
-                var codigo = string.IsNullOrEmpty(sufixo) ? codigoBase : (codigoBase + "-" + sufixo);
-
-                var lote = Lote.Criar(empresaId.Value, codigo, mobileB.CreatedAt, mobileB.LojaId);
-                lote.MobileBatchId = mobileB.Id;
-                lote.OperadorNome  = mobileB.LastOperatorName;
-                lote.Origem        = "mobile";
-
-                foreach (var item in mobileB.Items)
-                {
-                    Guid? produtoIdResolved = null;
-                    if (!string.IsNullOrWhiteSpace(item.ProductId))
-                    {
-                        var mProd = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
-                            .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-                        produtoIdResolved = mProd?.ErpProductId;
-                    }
-                    lote.Itens.Add(new LoteItem
-                    {
-                        Id = Guid.NewGuid(),
-                        LoteId = lote.Id,
-                        ProdutoId = produtoIdResolved,
-                        Nome = item.Name,
-                        Emoji = item.Emoji,
-                        Unidade = item.Unit,
-                        Quantidade = item.Qty,
-                        PesoG = item.WeightG,
-                        ValidadeDias = item.ValidityDays,
-                        ExpiraEm = item.ExpiresAt,
-                        CriadoEm = DateTime.UtcNow
-                    });
-                }
-
-                lote.Finalizar();
-                await _loteRepo.AddAsync(lote);
-                mobileB.ErpLoteId = lote.Id;
-                if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();
-                created++;
-                _log.LogInformation("F2 Lote CRIADO: mobile={MobileId} â†’ erp={ErpId} itens={N}",
-                    bid, lote.Id, lote.Itens.Count);
-
-                await EnsureEntradaEstoqueDoLoteAsync(lote);
-            }
-            catch (Exception ex)
-            {
-                errorSkip++;
-                _log.LogError(ex,
-                    "F2 AutoLink Lote FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
-                    bid, empresaId, ex.GetType().Name, ex.Message);
-            }
-        }
-        _log.LogInformation(
-            "AutoLink Lote summary empresaId={EmpresaId} total={Total} created={Created} idempotent={Idempotent} errors={Errors}",
-            empresaId, idsList.Count, created, idempotentSkip, errorSkip);
-    }
-
-    /// <summary>
-    /// F8-A â€” Cria ItemEstoque + MovimentacaoEstoque (Entrada) para cada LoteItem.
-    /// Idempotente: CodigoInterno="lote:loteId:produtoId".
-    /// </summary>
-    private async Task EnsureEntradaEstoqueDoLoteAsync(Lote lote)
-    {
-        foreach (var item in lote.Itens.Where(i => i.ProdutoId.HasValue && i.Quantidade > 0))
-        {
-            try
-            {
-                var codigoInterno = $"lote:{lote.Id}:{item.ProdutoId}";
-                var jaTem = await _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
-                    .AnyAsync(ie => ie.EmpresaId == lote.EmpresaId && ie.CodigoInterno == codigoInterno);
-                if (jaTem)
-                {
-                    _log.LogInformation("F8-A skip (idempotente): lote={LoteId} produto={ProdutoId} codigoInterno={Codigo}",
-                        lote.Id, item.ProdutoId, codigoInterno);
-                    continue;
-                }
-
-                var produto = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId);
-                if (produto == null)
-                {
-                    _log.LogWarning("F8-A: produto {ProdutoId} nao existe; pulando entrada do lote {LoteId}",
-                        item.ProdutoId, lote.Id);
-                    continue;
-                }
-
-                var custoUnit = produto.CustoReferencia ?? Dinheiro.Zero;
-                var precoVenda = produto.PrecoReferencia;
-                Validade? validade = item.ExpiraEm.HasValue ? Validade.From(item.ExpiraEm.Value) : null;
-                var qtd = Quantidade.From(item.Quantidade);
-
-                var itemEstoque = ItemEstoque.CriarParaEntrada(
-                    id: Guid.NewGuid(),
-                    empresaId: lote.EmpresaId,
-                    produto: produto,
-                    variacao: null,
-                    quantidade: qtd,
-                    custoUnitario: custoUnit,
-                    precoVendaSugerido: precoVenda,
-                    dataEntrada: lote.DataProducao,
-                    codigoInterno: codigoInterno,
-                    codigoLote: null,
-                    codigoMarketplace: null,
-                    variacaoDescricao: null,
-                    cor: null,
-                    tamanho: null,
-                    descricaoAnuncio: null,
-                    dimensoesReais: null,
-                    fornecedorNome: null,
-                    validade: validade,
-                    observacoes: $"Auto-gerado pelo F8-A a partir do Lote {lote.Codigo}",
-                    criadoEm: DateTime.UtcNow);
-                if (lote.LojaId.HasValue) itemEstoque.LojaId = lote.LojaId;
-
-                _db.Add(itemEstoque);
-
-                var movimentacao = MovimentacaoEstoque.CriarEntrada(
-                    id: Guid.NewGuid(),
-                    empresaId: lote.EmpresaId,
-                    item: itemEstoque,
-                    natureza: NaturezaMovimentacaoEstoque.Producao,
-                    quantidade: qtd,
-                    valorUnitario: custoUnit,
-                    dataMovimentacao: lote.DataProducao,
-                    descricao: $"Producao lote {lote.Codigo}",
-                    documentoReferencia: $"lote:{lote.Id}",
-                    criadoEm: DateTime.UtcNow);
-                _db.Add(movimentacao);
-
-                await _db.SaveChangesAsync();
-                _log.LogInformation(
-                    "F8-A ItemEstoque + Movimentacao CRIADOS: lote={LoteId} produto={ProdutoId} qtd={Qtd}",
-                    lote.Id, item.ProdutoId, item.Quantidade);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex,
-                    "F8-A FALHOU pra lote={LoteId} produto={ProdutoId}: {Tipo}: {Mensagem}",
-                    lote.Id, item.ProdutoId, ex.GetType().Name, ex.Message);
-            }
-        }
-    }
-
-    // F3 â€” promove mobile_cash_entry â†’ MovimentoCaixa web. Idempotente via Referencia="mobile:<id>".
-    private async Task<Guid> GetOrCreateDefaultCategoriaAsync(Guid empresaId)
-    {
-        var existentes = await _db.Set<Categoria>().IgnoreQueryFilters().AsNoTracking()
-            .Where(c => c.EmpresaId == empresaId)
-            .Select(c => new { c.Id, c.Nome, c.CriadoEm })
-            .ToListAsync();
-        if (existentes.Count > 0)
-        {
-            var preferida = existentes
-                .OrderBy(c => c.Nome == "Mobile" ? 0 : (c.Nome == "Geral" ? 1 : 2))
-                .ThenBy(c => c.CriadoEm)
-                .First();
-            return preferida.Id;
-        }
-
-        var nova = new Categoria
-        {
-            Id = Guid.NewGuid(),
-            EmpresaId = empresaId,
-            Nome = "Mobile",
-            Descricao = "Categoria default criada pelo auto-link mobileâ†’ERP",
-            CriadoEm = DateTime.UtcNow,
-            AlteradoEm = DateTime.UtcNow
-        };
-        _db.Add(nova);
-        _log.LogInformation("AutoLink: criada Categoria 'Mobile' default empresa={EmpresaId}", empresaId);
-        return nova.Id;
-    }
 }
 
 /// <summary>Counts returned by BackfillAsync for the HTTP response.</summary>
