@@ -1,4 +1,3 @@
-using EasyStock.Infra.Postgre.Data;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -8,72 +7,27 @@ namespace EasyStock.Api.Controllers;
 [Route("api/admin/status")]
 [Authorize(Policy = "SuperAdmin")]
 [ResponseCache(Duration = 30)]
-public class AdminStatusController(EasyStockDbContext db, ILogger<AdminStatusController> logger) : EasyStockControllerBase
+public class AdminStatusController(IAdminStatusQueries statusQueries) : EasyStockControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetStatus()
+    public async Task<IActionResult> GetStatus(CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
 
-        // Database health
-        string dbStatus;
-        long dbLatencyMs = 0;
-        try
-        {
-            var sw = Stopwatch.StartNew();
-            await db.Database.ExecuteSqlRawAsync("SELECT 1");
-            sw.Stop();
-            dbLatencyMs = sw.ElapsedMilliseconds;
-            dbStatus = dbLatencyMs < 200 ? "ok" : "degraded";
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Health-check do banco falhou no AdminStatus");
-            dbStatus = "down";
-        }
+        var status = await statusQueries.GetStatusAsync(agora, ct);
 
-        // API uptime
+        // API uptime / version (runtime puro — sem banco)
         var startTime = Process.GetCurrentProcess().StartTime.ToUniversalTime();
         var uptimeSeconds = (long)(agora - startTime).TotalSeconds;
         var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
 
-        // Errors last 24h / last 1h
-        var cutoff24h = agora.AddHours(-24);
-        var cutoff1h = agora.AddHours(-1);
-        var erros24h = await db.AuditLogs.CountAsync(x => !x.Sucesso && x.DataHora >= cutoff24h);
-        var erros1h = await db.AuditLogs.CountAsync(x => !x.Sucesso && x.DataHora >= cutoff1h);
-
-        // Active users last 24h
-        var usuariosAtivos24h = await db.AuditLogs
-            .Where(x => x.DataHora >= cutoff24h)
-            .Select(x => x.UsuarioId)
-            .Distinct()
-            .CountAsync();
-
-        // IA usage this month
-        var iaGeracoesMes = await db.UsoIa
-            .Where(x => x.Ano == agora.Year && x.Mes == agora.Month)
-            .SumAsync(x => (int?)x.TotalGeracoes) ?? 0;
-
-        // Open tickets
-        var ticketsAbertos = await db.AdminTickets
-            .CountAsync(x => x.Status == TicketStatus.Aberto);
-
-        // Recent errors
-        var errosRecentes = await db.AuditLogs
-            .Where(x => !x.Sucesso)
-            .OrderByDescending(x => x.DataHora)
-            .Take(5)
-            .Select(x => new { x.Acao, x.Detalhes, x.DataHora })
-            .ToListAsync();
-
         return DataOk(new
         {
-            database = new { status = dbStatus, latencyMs = dbLatencyMs },
+            database = new { status = status.DbStatus, latencyMs = status.DbLatencyMs },
             api = new { status = "ok", uptimeSeconds, version },
-            erros24h = new { total = erros24h, ultimaHora = erros1h },
-            uso = new { usuariosAtivos24h, iaGeracoesMes, ticketsAbertos },
-            errosRecentes,
+            erros24h = new { total = status.Erros24h, ultimaHora = status.Erros1h },
+            uso = new { usuariosAtivos24h = status.UsuariosAtivos24h, iaGeracoesMes = status.IaGeracoesMes, ticketsAbertos = status.TicketsAbertos },
+            errosRecentes = status.ErrosRecentes,
             ultimaVerificacao = agora
         });
     }

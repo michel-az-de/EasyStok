@@ -123,6 +123,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
+            services.AddScoped<IAdminStatusQueries, AdminStatusQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // Modulo Integration (F3) — credenciais cifradas por tenant + resolver AES-256-GCM
