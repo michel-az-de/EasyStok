@@ -47,6 +47,7 @@ public static class ApiServicesExtensions
         services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.ClientLinker>();
         services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.ProductLinker>();
         services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.BatchLinker>();
+        services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.OrderLinker>();
         services.AddScoped<SyncReversePullService>();
         // Onda 9: OTA do PWA — lê CACHE_VERSION do sw.js em runtime pra /version reportar
         // a versão real do bundle (sem depender de config drift-prone).
