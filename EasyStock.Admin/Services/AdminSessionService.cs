@@ -23,8 +23,9 @@ public class AdminSessionService(IHttpContextAccessor httpContextAccessor)
         Session.SetString(RefreshTokenKey, refreshToken);
     }
 
-    public string? GetToken() => Session.GetString(TokenKey);
-    public string? GetRefreshToken() => Session.GetString(RefreshTokenKey);
+    // virtual: permite test double em EasyStock.Admin.UnitTests (sem semear sessão real).
+    public virtual string? GetToken() => Session.GetString(TokenKey);
+    public virtual string? GetRefreshToken() => Session.GetString(RefreshTokenKey);
     public string? GetNome() => Session.GetString(NomeKey);
     public string? GetEmail() => Session.GetString(EmailKey);
 

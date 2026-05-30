@@ -20,3 +20,6 @@ app.UseEasyStockAdminPipeline();
 // === 34 proxies /api-proxy/* (verbatim em Hosting/ApiProxyEndpoints.cs) ===
 app.MapAdminApiProxies();
 app.Run();
+
+// Torna Program acessivel para WebApplicationFactory<Program> em EasyStock.Admin.UnitTests.
+public partial class Program;
