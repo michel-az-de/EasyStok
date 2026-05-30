@@ -1,5 +1,3 @@
-using EasyStock.Infra.Postgre.Data;
-
 namespace EasyStock.Api.Controllers;
 
 /// <summary>
@@ -14,11 +12,11 @@ namespace EasyStock.Api.Controllers;
 [Route("api/admin/buscar-global")]
 [Authorize(Policy = "SuperAdmin")]
 public class AdminBuscaGlobalController(
-    EasyStockDbContext db,
+    IAdminBuscaGlobalQueries buscaQueries,
     AdminAuditService audit) : EasyStockControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Buscar([FromQuery] string q, [FromQuery] int limit = 8)
+    public async Task<IActionResult> Buscar([FromQuery] string q, [FromQuery] int limit = 8, CancellationToken ct = default)
     {
         var termo = (q ?? string.Empty).Trim();
         if (termo.Length < 2)
@@ -30,88 +28,45 @@ public class AdminBuscaGlobalController(
         // Pattern ILIKE — cobre prefixo/sufixo/middle do termo. Postgres faz seq scan
         // até as colunas mais usadas terem índice; em produção, considerar pg_trgm.
         var padrao = $"%{termo}%";
-        // CNPJ sem pontuação: também tenta match com o termo "formatado" mesmo nível.
-        // Match exato sem pontuação ficaria custoso em SQL puro — solução simples por
-        // ora: também aceitar padrão só-dígitos como pattern alternativo. Em produção
+        // CNPJ sem pontuação: também tenta match com o termo só-dígitos. Em produção
         // adicionaria coluna desnormalizada `documento_limpo` indexada.
         var termoSoDigitos = new string(termo.Where(char.IsDigit).ToArray());
         var padraoDigitos = string.IsNullOrEmpty(termoSoDigitos) ? null : $"%{termoSoDigitos}%";
 
-        // ─────────────────────────── Clientes (Empresa) ───────────────────────────
-        var clientesQuery = db.Empresas.AsNoTracking()
-            .Where(e => EF.Functions.ILike(e.Nome, padrao)
-                        || (e.Documento != null && EF.Functions.ILike(e.Documento, padrao))
-                        || (padraoDigitos != null && e.Documento != null && EF.Functions.ILike(e.Documento, padraoDigitos)));
-        var clientes = await clientesQuery
-            .OrderBy(e => e.Nome)
-            .Take(lim)
-            .Select(e => new
-            {
-                id = e.Id,
-                nome = e.Nome,
-                documento = MascararDoc(e.Documento),
-                tipo = "cliente",
-                url = "/Tenants/Detail/" + e.Id
-            })
-            .ToListAsync();
+        var resultado = await buscaQueries.BuscarAsync(padrao, padraoDigitos, lim, ct);
 
-        // ─────────────────────────── Lojas (cross-tenant) ───────────────────────────
-        var lojasQuery = db.Lojas.AsNoTracking()
-            .Where(l => EF.Functions.ILike(l.Nome, padrao));
-        var lojas = await lojasQuery
-            .OrderBy(l => l.Nome)
-            .Take(lim)
-            .Join(db.Empresas, l => l.EmpresaId, e => e.Id, (l, e) => new
-            {
-                id = l.Id,
-                nome = l.Nome,
-                empresaId = e.Id,
-                empresaNome = e.Nome,
-                ativa = l.Ativa,
-                tipo = "loja",
-                // Loja detail page ainda é P2 follow-up — por ora vai pra Cliente 360 tab Lojas.
-                url = "/Tenants/Detail/" + e.Id + "?tab=lojas"
-            })
-            .ToListAsync();
+        var clientes = resultado.Clientes.Select(c => new
+        {
+            id = c.Id,
+            nome = c.Nome,
+            documento = MascararDoc(c.Documento),
+            tipo = "cliente",
+            url = "/Tenants/Detail/" + c.Id
+        }).ToList();
 
-        // ─────────────────────────── Usuários (cross-tenant, mascarado) ───────────────────────────
-        var usuariosQuery = db.Usuarios.AsNoTracking()
-            .Where(u => EF.Functions.ILike(u.Nome, padrao) || EF.Functions.ILike(u.Email, padrao));
-        // Junta com a primeira empresa do usuário pra dar contexto (qual cliente).
-        var usuariosRaw = await usuariosQuery
-            .OrderBy(u => u.Nome)
-            .Take(lim)
-            .Select(u => new
-            {
-                u.Id,
-                u.Nome,
-                u.Email,
-                u.Ativo,
-                empresaId = db.UsuariosEmpresas
-                    .Where(ue => ue.UsuarioId == u.Id)
-                    .Select(ue => (Guid?)ue.EmpresaId)
-                    .FirstOrDefault()
-            })
-            .ToListAsync();
-        var empresaIds = usuariosRaw.Where(u => u.empresaId.HasValue).Select(u => u.empresaId!.Value).Distinct().ToList();
-        var empresaNomes = empresaIds.Count > 0
-            ? await db.Empresas.AsNoTracking()
-                .Where(e => empresaIds.Contains(e.Id))
-                .Select(e => new { e.Id, e.Nome })
-                .ToDictionaryAsync(e => e.Id, e => e.Nome)
-            : new();
+        var lojas = resultado.Lojas.Select(l => new
+        {
+            id = l.Id,
+            nome = l.Nome,
+            empresaId = l.EmpresaId,
+            empresaNome = l.EmpresaNome,
+            ativa = l.Ativa,
+            tipo = "loja",
+            // Loja detail page ainda é P2 follow-up — por ora vai pra Cliente 360 tab Lojas.
+            url = "/Tenants/Detail/" + l.EmpresaId + "?tab=lojas"
+        }).ToList();
 
-        var usuarios = usuariosRaw.Select(u => new
+        var usuarios = resultado.Usuarios.Select(u => new
         {
             id = u.Id,
             nome = u.Nome,
             emailMascarado = MascararEmail(u.Email),
-            empresaId = u.empresaId,
-            empresaNome = u.empresaId.HasValue && empresaNomes.TryGetValue(u.empresaId.Value, out var en) ? en : "(sem cliente)",
+            empresaId = u.EmpresaId,
+            empresaNome = u.EmpresaNome ?? "(sem cliente)",
             ativo = u.Ativo,
             tipo = "usuario",
-            url = u.empresaId.HasValue
-                ? $"/Tenants/Detail/{u.empresaId.Value}?tab=usuarios"
+            url = u.EmpresaId.HasValue
+                ? $"/Tenants/Detail/{u.EmpresaId.Value}?tab=usuarios"
                 : "#"
         }).ToList();
 
