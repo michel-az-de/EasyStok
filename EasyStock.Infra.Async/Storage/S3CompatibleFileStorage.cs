@@ -4,6 +4,8 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Infra.Async.Storage;
@@ -12,17 +14,22 @@ public sealed class S3CompatibleFileStorage : IFileStorage
 {
     private readonly FileStorageOptions _options;
     private readonly Func<IAmazonS3>? _clientFactory;
+    private readonly ILogger<S3CompatibleFileStorage> _logger;
     private IAmazonS3? _client;
 
-    public S3CompatibleFileStorage(IOptions<FileStorageOptions> options)
-        : this(options, clientFactory: null) { }
+    public S3CompatibleFileStorage(IOptions<FileStorageOptions> options, ILogger<S3CompatibleFileStorage> logger)
+        : this(options, clientFactory: null, logger) { }
 
     // Seam de teste (via InternalsVisibleTo): injeta um IAmazonS3 substituto.
     // Produção usa o ctor público; o client real é criado sob demanda em GetClient().
-    internal S3CompatibleFileStorage(IOptions<FileStorageOptions> options, Func<IAmazonS3>? clientFactory)
+    internal S3CompatibleFileStorage(
+        IOptions<FileStorageOptions> options,
+        Func<IAmazonS3>? clientFactory,
+        ILogger<S3CompatibleFileStorage>? logger = null)
     {
         _options = options.Value;
         _clientFactory = clientFactory;
+        _logger = logger ?? NullLogger<S3CompatibleFileStorage>.Instance;
     }
 
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
@@ -105,7 +112,7 @@ public sealed class S3CompatibleFileStorage : IFileStorage
         // Para S3: usamos upload multipart via MemoryStream intermediário.
         // Uma implementação completa usaria TransferUtility ou UploadPartAsync;
         // para o MVP retornamos um stream que, ao ser Dispose'd, faz o upload.
-        var ms = new S3UploadStream(GetClient(), _options.S3.BucketName, storageKey, contentType);
+        var ms = new S3UploadStream(GetClient(), _options.S3.BucketName, storageKey, contentType, _logger);
         return await Task.FromResult<Stream>(ms);
     }
 
@@ -154,26 +161,48 @@ public sealed class S3CompatibleFileStorage : IFileStorage
 
     // Stream helper: bufferiza em memória e faz PutObject ao fechar.
     // Para relatórios grandes, uma implementação multipart seria mais robusta (L2).
-    private sealed class S3UploadStream(IAmazonS3 client, string bucket, string key, string contentType)
+    private sealed class S3UploadStream(IAmazonS3 client, string bucket, string key, string contentType, ILogger logger)
         : MemoryStream
     {
         private bool _uploaded;
 
+        // Caminho preferencial: upload assíncrono, sem bloquear thread. Atinge produção via
+        // 'await using' (HashingCountingStream.DisposeAsync → _inner.DisposeAsync — #310).
+        public override async ValueTask DisposeAsync()
+        {
+            try { await UploadOnceAsync(); }
+            finally { await base.DisposeAsync(); }
+        }
+
+        // Fallback para 'using' síncrono (sem callers hoje). Preserva o upload-on-dispose,
+        // mas registra o uso bloqueante para tornar visível uma regressão futura (trocar
+        // 'await using' por 'using') em vez de degradar em silêncio. Falha real propaga.
         protected override void Dispose(bool disposing)
         {
-            if (!_uploaded)
+            if (disposing && !_uploaded)
             {
-                _uploaded = true;
-                Position  = 0;
-                client.PutObjectAsync(new PutObjectRequest
-                {
-                    BucketName  = bucket,
-                    Key         = key,
-                    InputStream = this,
-                    ContentType = contentType
-                }).GetAwaiter().GetResult();
+                logger.LogWarning(
+                    "S3UploadStream disposto sincronamente (key={Key}) — upload bloqueia a thread. Prefira 'await using'.",
+                    key);
+                UploadOnceAsync().GetAwaiter().GetResult();
             }
             base.Dispose(disposing);
+        }
+
+        // _uploaded é setado ANTES do await: a re-entrância via base.DisposeAsync()→Dispose(true)
+        // — e via AutoCloseStream do SDK (default true, ao passar InputStream = this) — vira no-op.
+        private async ValueTask UploadOnceAsync()
+        {
+            if (_uploaded) return;
+            _uploaded = true;
+            Position  = 0;
+            await client.PutObjectAsync(new PutObjectRequest
+            {
+                BucketName  = bucket,
+                Key         = key,
+                InputStream = this,
+                ContentType = contentType
+            });
         }
     }
 
