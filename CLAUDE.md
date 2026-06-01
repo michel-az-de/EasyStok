@@ -132,43 +132,32 @@ Passo 3: declarar escopo:
   "Vou trabalhar em X. Vou tocar arquivos Y. Plano: A, B, C."
 Aguardar confirmacao do Felipe antes de prosseguir.
 
-## 4. ESTADO CONHECIDO DO REPO (snapshot 2026-05-28 pos-policy-v3.0)
+## 4. ESTADO CONHECIDO DO REPO
 
-Master: sincronizado com origin (0/0 ahead/behind)
-HEAD master: 14852aa0 chore(policy): arquiva sistema ETK conforme ADR-0022
-Build: verde (Husky pre-commit hook roda arch tests automaticamente)
-Working tree: limpo
-Branches locais: apenas master
-Worktrees: apenas C:/easy/EasyStok
-Stashes: nenhum
+NOTA (#316): este bloco contem declaracoes ESTAVEIS (ADRs, decisoes irreversiveis,
+organizacao de modulos). Estado volatil — contagem de issues, HEAD, ahead/behind,
+working tree — NAO vive aqui: meça ao vivo no inicio de cada sessao (§0) e consulte
+o board (§4.5). O snapshot abaixo e historico de referencia (2026-05-28 pos-policy-v3.0),
+nao o estado atual.
+
+Snapshot historico 2026-05-28: HEAD 14852aa0 (chore(policy): arquiva sistema ETK
+conforme ADR-0022); master sincronizado; build verde (Husky roda arch tests);
+working tree limpo; so branch master; so worktree C:/easy/EasyStok; sem stashes.
 
 Sistema ETK (v2.1) arquivado em:
   - docs/tasks/_arquivo/2026-05-28-experimento-etk-superseded/
   - scripts/_arquivo/tasks-2026-05-28/
   - ADR-0020 marcado como Superseded por ADR-0022
 
-Pendencias arquiteturais EM ABERTO: rastreadas no board GitHub.
-Lista live: https://github.com/michel-az-de/EasyStok/issues
-
-Estado em 2026-05-28 final: 35 issues abertas (apos #261 resolvida)
-  - 5 P0 (bloqueadores): #263 checkout E2E, #274 test coverage <30%,
-                         #275 RLS audit prod, #289 EfiPix sem SELECT FOR UPDATE,
-                         #290 NFC-e duplicada SEFAZ
-  - 18 P1 (alta): features (Caixa #258, NFe #259, Rotulagem #260, marco-zero #256),
-                 hardening (#276 NFe cert decrypt, #277 rate limit, #278 idempotency,
-                 #279 backup retention, #280 Fly volume, #281 LGPD exclusao,
-                 #282 cache deadlock, #283 NuGet outdated),
-                 bugs (#268 OTP reuse, #273 web ConnectionClosed),
-                 outros (#262 CR epic, #264/265 Pedido x Pix, #272 OTel)
-  - 11 P2 (media): #201 IntegrationTests Mongo, #257 defesas,
-                  #266 SSE, #267 P2P, #269 refresh token, #270 flaky, #271 Swagger,
-                  #284 auth hardening, #285 audit log, #286 CSP, #287 async patterns
-  - 1 P3 (baixa): #288 quality cleanup (warnings + god class + DateTime.Now + etc)
-
-Filtros uteis:
-- gh issue list --label priority:p0
-- gh issue list --label priority:p1 --label caixa
-- gh issue list --search "bug in:title"
+Pendencias arquiteturais EM ABERTO: rastreadas no board GitHub (source-of-truth dinamico).
+NAO ha contagem fixa aqui de proposito — qualquer numero hardcodado envelhece em horas
+(ver #316). Consulte sempre ao vivo:
+- Lista: https://github.com/michel-az-de/EasyStok/issues
+- Board v2: https://github.com/users/michel-az-de/projects/1
+- Total aberto: `gh issue list --state open --limit 200 --json number --jq 'length'`
+- Por prioridade: `gh issue list --label priority:p0` (idem p1/p2/p3)
+- Por modulo: `gh issue list --label priority:p1 --label caixa`
+- Bugs: `gh issue list --search "bug in:title"`
 
 Decisao Nfe* vs NotaFiscal* RESOLVIDA: ADR-0018 (Aceito, 2026-05-17).
 
