@@ -72,6 +72,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null,
         IConfiguracaoLojaRepository? configuracaoLojaRepository = null)
     {
+        // #306: publicador opcional na assinatura (DI o registra); se um evento precisa
+        // ser publicado e ele esta null, falha explicito em vez de descartar em silencio.
+        private IPublicadorEventos PublicadorObrigatorio() =>
+            publicadorEventos ?? throw new InvalidOperationException(
+                "IPublicadorEventos nao injetado: eventos de RegistrarSaidaEstoque seriam perdidos silenciosamente (#306).");
+
         public async Task<RegistrarSaidaEstoqueResult> ExecuteAsync(RegistrarSaidaEstoqueCommand command)
         {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
@@ -261,14 +267,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 
             // Eventos publicam DENTRO da tx — caller (Outbox) ja persiste
             // atomicamente; rollback da tx aborta o evento junto.
-            if (publicadorEventos is not null)
-            {
-                await publicadorEventos.PublicarAsync(new VendaRegistrada(
-                    Guid.NewGuid(), agora, venda.Id, venda.EmpresaId, venda.ValorTotal.Valor));
-                foreach (var r in itensResult)
-                    await publicadorEventos.PublicarAsync(new SaidaEstoqueRegistrada(
-                        Guid.NewGuid(), agora, r.ItemEstoqueId, r.ProdutoId, command.EmpresaId, r.QuantidadeSaida, r.Motivo));
-            }
+            var publicador = PublicadorObrigatorio();
+            await publicador.PublicarAsync(new VendaRegistrada(
+                Guid.NewGuid(), agora, venda.Id, venda.EmpresaId, venda.ValorTotal.Valor));
+            foreach (var r in itensResult)
+                await publicador.PublicarAsync(new SaidaEstoqueRegistrada(
+                    Guid.NewGuid(), agora, r.ItemEstoqueId, r.ProdutoId, command.EmpresaId, r.QuantidadeSaida, r.Motivo));
 
             return new RegistrarSaidaEstoqueResult(venda.Id, itensResult, venda.ValorTotal.Valor);
             });

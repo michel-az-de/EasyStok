@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Domain.ValueObjects;
@@ -33,7 +34,7 @@ public class RegistrarSaidaEstoqueValidacoesTests
             movimentacaoRepository,
             unitOfWork,
             Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(),
-            null,
+            Substitute.For<IPublicadorEventos>(), // #306: publicador obrigatorio no caminho de publicacao
             currentUser,
             configuracaoLojaRepository);
     }

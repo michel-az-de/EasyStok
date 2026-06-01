@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using Microsoft.Extensions.Logging;
@@ -50,7 +51,7 @@ public class RegistrarEntradaEstoqueDocumentoReferenciaTests
             unitOfWork,
             logger,
             gerador,
-            null,
+            Substitute.For<IPublicadorEventos>(), // #306: publicador obrigatorio no caminho de publicacao
             null,
             null,
             currentUser);
@@ -331,7 +332,8 @@ public class RegistrarEntradaEstoqueDocumentoReferenciaTests
 
         var useCase = new RegistrarEntradaEstoqueUseCase(
             produtoRepository, variacaoRepository, itemRepository,
-            movimentacaoRepository, unitOfWork, logger, gerador);
+            movimentacaoRepository, unitOfWork, logger, gerador,
+            publicadorEventos: Substitute.For<IPublicadorEventos>()); // #306
 
         var command = CommandPadrao(empresaId, produto.Id, descricaoAnuncio: null);
 

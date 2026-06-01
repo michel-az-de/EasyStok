@@ -78,8 +78,14 @@ public sealed class BaixarLancamentoUseCase(
             var eventos = lancamento.EventosPendentes.ToArray();
             lancamento.LimparEventosPendentes();
 
-            if (publicadorEventos is not null)
+            // #306: se ha eventos para publicar mas o publicador nao foi injetado,
+            // FALHA explicita em vez de perder o evento em silencio (DI registra
+            // IPublicadorEventos; null aqui sinaliza misconfiguracao real).
+            if (eventos.Length > 0)
             {
+                if (publicadorEventos is null)
+                    throw new InvalidOperationException(
+                        "IPublicadorEventos nao injetado: eventos de dominio de BaixarLancamento seriam perdidos silenciosamente (#306).");
                 foreach (var evt in eventos)
                     await publicadorEventos.PublicarAsync(evt);
             }

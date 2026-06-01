@@ -51,6 +51,12 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
         IConfiguracaoLojaRepository? configuracaoLojaRepository = null,
         EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null)
     {
+        // #306: publicador opcional na assinatura (DI o registra); se um evento precisa
+        // ser publicado e ele esta null, falha explicito em vez de descartar em silencio.
+        private IPublicadorEventos PublicadorObrigatorio() =>
+            publicadorEventos ?? throw new InvalidOperationException(
+                "IPublicadorEventos nao injetado: eventos de RegistrarEntradaEstoque seriam perdidos silenciosamente (#306).");
+
         public virtual async Task<RegistrarEntradaEstoqueResult> ExecuteAsync(RegistrarEntradaEstoqueCommand command)
         {
             logger.LogInformation("Registrando entrada de estoque. ProdutoId: {ProdutoId}, Quantidade: {Quantidade}", command.ProdutoId, command.Quantidade);
@@ -154,10 +160,9 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 
             logger.LogInformation("Entrada de estoque registrada com sucesso. ItemEstoqueId: {ItemEstoqueId}, MovimentacaoId: {MovimentacaoId}", item.Id, movimentacao.Id);
 
-            if (publicadorEventos is not null)
-                await publicadorEventos.PublicarAsync(new EntradaEstoqueRegistrada(
-                    Guid.NewGuid(), agora, item.Id, item.ProdutoId, item.EmpresaId,
-                    item.QuantidadeAtual.Value, item.CodigoLote?.ToString()));
+            await PublicadorObrigatorio().PublicarAsync(new EntradaEstoqueRegistrada(
+                Guid.NewGuid(), agora, item.Id, item.ProdutoId, item.EmpresaId,
+                item.QuantidadeAtual.Value, item.CodigoLote?.ToString()));
 
             return new RegistrarEntradaEstoqueResult(item.Id, movimentacao.Id, descricaoAnuncio, item.ChavePesquisa ?? string.Empty);
         }

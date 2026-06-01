@@ -22,6 +22,13 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
     ILogger<ProcessarRecebimentoPedidoFornecedorUseCase> logger,
     IPublicadorEventos? publicadorEventos = null)
 {
+    // #306: o publicador e opcional na assinatura (DI o registra), mas se um evento
+    // precisa ser publicado e ele esta null, falhamos explicito em vez de descartar
+    // o evento em silencio. Retorna nao-null para o null-analysis do compilador.
+    private IPublicadorEventos PublicadorObrigatorio() =>
+        publicadorEventos ?? throw new InvalidOperationException(
+            "IPublicadorEventos nao injetado: eventos de ProcessarRecebimentoPedidoFornecedor seriam perdidos silenciosamente (#306).");
+
     public async Task<ProcessarRecebimentoPedidoFornecedorResult> ExecuteAsync(
         ProcessarRecebimentoPedidoFornecedorCommand command,
         CancellationToken ct = default)
@@ -142,20 +149,17 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                     // Publica evento item recebido — QuantidadeRecebida no evento
                     // e o DELTA aplicado nesta chamada (compativel com listeners
                     // existentes que esperam "qty desta entrada", nao total).
-                    if (publicadorEventos != null)
-                    {
-                        var eventoItem = new PedidoFornecedorItemRecebido(
-                            EventoId: Guid.NewGuid(),
-                            OcorridoEm: dataRecebimento,
-                            PedidoFornecedorId: command.PedidoId,
-                            ItemId: item.Id,
-                            ProdutoId: item.ProdutoId.Value,
-                            EmpresaId: command.EmpresaId,
-                            QuantidadeRecebida: delta,
-                            DataRecebimento: dataRecebimento);
+                    var eventoItem = new PedidoFornecedorItemRecebido(
+                        EventoId: Guid.NewGuid(),
+                        OcorridoEm: dataRecebimento,
+                        PedidoFornecedorId: command.PedidoId,
+                        ItemId: item.Id,
+                        ProdutoId: item.ProdutoId.Value,
+                        EmpresaId: command.EmpresaId,
+                        QuantidadeRecebida: delta,
+                        DataRecebimento: dataRecebimento);
 
-                        await publicadorEventos.PublicarAsync(eventoItem);
-                    }
+                    await PublicadorObrigatorio().PublicarAsync(eventoItem);
 
                     itensFinal++;
                 }
@@ -188,19 +192,16 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
             await unitOfWork.CommitAsync();
 
             // 5. PUBLICAR EVENTO PEDIDO RECEBIDO
-            if (publicadorEventos != null)
-            {
-                var eventoPedido = new PedidoFornecedorRecebido(
-                    EventoId: Guid.NewGuid(),
-                    OcorridoEm: dataRecebimento,
-                    PedidoId: command.PedidoId,
-                    EmpresaId: command.EmpresaId,
-                    FornecedorId: pedido.FornecedorId,
-                    TotalItensRecebidos: itensFinal,
-                    DataRecebimento: dataRecebimento);
+            var eventoPedido = new PedidoFornecedorRecebido(
+                EventoId: Guid.NewGuid(),
+                OcorridoEm: dataRecebimento,
+                PedidoId: command.PedidoId,
+                EmpresaId: command.EmpresaId,
+                FornecedorId: pedido.FornecedorId,
+                TotalItensRecebidos: itensFinal,
+                DataRecebimento: dataRecebimento);
 
-                await publicadorEventos.PublicarAsync(eventoPedido);
-            }
+            await PublicadorObrigatorio().PublicarAsync(eventoPedido);
 
             logger.LogInformation(
                 "Pedido {PedidoId} recebido com sucesso ({ItensRecebidos} itens)",

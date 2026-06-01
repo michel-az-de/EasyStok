@@ -42,7 +42,8 @@ public class RegistrarEntradaEstoqueUseCaseTests
             movimentacaoRepository,
             unitOfWork,
             logger,
-            gerador);
+            gerador,
+            publicadorEventos: Substitute.For<IPublicadorEventos>()); // #306
 
         var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
             empresaId,
@@ -445,7 +446,7 @@ public class RegistrarEntradaEstoqueUseCaseTests
             unitOfWork,
             logger,
             null,
-            null,
+            Substitute.For<IPublicadorEventos>(), // #306
             lojaRepository,
             configuracaoLojaRepository);
 

@@ -70,7 +70,8 @@ public class RegistrarSaidaEstoqueUseCaseTests
             itemVendaRepository,
             movimentacaoRepository,
             unitOfWork,
-            logger);
+            logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>()); // #306
 
         var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             produto.EmpresaId,
@@ -151,7 +152,8 @@ public class RegistrarSaidaEstoqueUseCaseTests
             itemVendaRepository,
             movimentacaoRepository,
             unitOfWork,
-            logger);
+            logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>()); // #306
 
         var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
             produto.EmpresaId,

@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
@@ -39,6 +40,7 @@ public class RegistrarSaidaEstoque_FefoTests
 
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepo, itemRepo, vendaRepo, itemVendaRepo, movRepo, uow, logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>(), // #306
             configuracaoLojaRepository: configRepo);
 
         return (useCase, itemRepo, configRepo);
