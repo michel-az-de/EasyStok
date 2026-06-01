@@ -247,3 +247,13 @@ select.form-input {
     max-height:   85vh;
     overflow-y:   auto;
 }
+
+/* Titulo de pagina padrao do Admin: substitui o <h2 style> inline repetido (~17x).
+   Replica o estilo anterior 1:1 (24px/700) -> ponto unico p/ futura migracao a escala .t-h*. */
+.admin-page-title {
+    margin:         6px 0 0;
+    font-size:      24px;
+    font-weight:    700;
+    color:          var(--text-primary);
+    letter-spacing: -0.01em;
+}

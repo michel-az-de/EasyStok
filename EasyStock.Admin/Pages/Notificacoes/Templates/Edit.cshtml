@@ -18,7 +18,7 @@
             <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Novo")</es-breadcrumb-item>
         </es-breadcrumb>
         <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
-            <h2 style="margin:0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">@ViewData["Title"]</h2>
+            <h2 class="admin-page-title" style="margin:0;">@ViewData["Title"]</h2>
             @if (Model.Id.HasValue)
             {
                 <es-badge variant="warn">Nova versão ao salvar</es-badge>

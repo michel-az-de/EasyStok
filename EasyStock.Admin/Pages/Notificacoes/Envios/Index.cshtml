@@ -11,7 +11,7 @@
             <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
             <es-breadcrumb-item>Envios</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 style="margin:6px 0 0; font-size:24px; font-weight:700; color:var(--text-primary); letter-spacing:-0.01em;">Log de envios</h2>
+        <h2 class="admin-page-title">Log de envios</h2>
         <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Histórico de tentativas de envio por canal — <strong style="color:var(--text-primary);">@Model.Total</strong> registro(s)</p>
     </div>
     <es-button variant="ghost" icon="download" href="?page=1&status=@Model.Status&canal=@Model.Canal&handler=Export">Exportar CSV</es-button>
