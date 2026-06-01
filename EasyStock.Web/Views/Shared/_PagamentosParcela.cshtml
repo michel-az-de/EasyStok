@@ -1,0 +1,36 @@
+@model List<EasyStock.Web.Models.ViewModels.Financeiro.PagamentoParcelaApi>
+@*
+    Histórico de pagamentos de uma parcela (read-only). Pagamento estornado aparece
+    riscado + motivo. Usado nas views de Detalhe de Contas a Pagar/Receber (B2).
+*@
+<div class="bg-gray-50 p-2 rounded">
+    <div class="text-xs font-medium text-gray-600 mb-1">Pagamentos desta parcela</div>
+    <table class="min-w-full text-xs">
+        <thead>
+            <tr class="text-left text-gray-500">
+                <th class="px-2 py-1">Data</th>
+                <th class="px-2 py-1">Metodo</th>
+                <th class="px-2 py-1 text-right">Valor</th>
+                <th class="px-2 py-1">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var pg in Model)
+            {
+                var estornado = pg.EstornadoEm.HasValue || pg.Status == "Estornado";
+                <tr class="@(estornado ? "text-gray-400 line-through" : "")">
+                    <td class="px-2 py-1">@pg.DataPagamento.ToLocalTime().AsDateTime()</td>
+                    <td class="px-2 py-1">@pg.Metodo</td>
+                    <td class="px-2 py-1 text-right">@pg.Valor.AsMoney()</td>
+                    <td class="px-2 py-1">
+                        @pg.Status
+                        @if (estornado && !string.IsNullOrWhiteSpace(pg.MotivoEstorno))
+                        {
+                            <span class="no-underline">— @pg.MotivoEstorno</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

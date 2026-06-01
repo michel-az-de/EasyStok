@@ -37,6 +37,23 @@ public class ParcelaApi
     public string? PixCopiaCola { get; set; }
     public string? QrCodeBase64 { get; set; }
     public DateTime? PixExpiraEm { get; set; }
+    public List<PagamentoParcelaApi> Pagamentos { get; set; } = [];
+}
+
+public class PagamentoParcelaApi
+{
+    public Guid Id { get; set; }
+    public string Lado { get; set; } = "";
+    public decimal Valor { get; set; }
+    public string Metodo { get; set; } = "";
+    public string Status { get; set; } = "";
+    public DateTime DataPagamento { get; set; }
+    public string? GatewayProvedor { get; set; }
+    public string? GatewayTransactionId { get; set; }
+    public Guid? MovimentoCaixaId { get; set; }
+    public DateTime? EstornadoEm { get; set; }
+    public string? MotivoEstorno { get; set; }
+    public string? Observacao { get; set; }
 }
 
 public class ContaPagarApi

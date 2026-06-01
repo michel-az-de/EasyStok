@@ -45,19 +45,22 @@ public sealed record ParcelaResult(
     string? EfiTxid,
     string? PixCopiaCola,
     string? QrCodeBase64,
-    DateTime? PixExpiraEm)
+    DateTime? PixExpiraEm,
+    IReadOnlyList<PagamentoParcelaResult> Pagamentos)
 {
     public static ParcelaResult De(ParcelaPagar p) => new(
         p.Id, p.Numero, p.Valor, p.ValorPago, p.Saldo,
         p.DataVencimento, p.DataPagamentoTotal,
         p.Status.ToString(), p.MetodoPlanejado,
-        EfiTxid: null, PixCopiaCola: null, QrCodeBase64: null, PixExpiraEm: null);
+        EfiTxid: null, PixCopiaCola: null, QrCodeBase64: null, PixExpiraEm: null,
+        Pagamentos: p.Pagamentos.OrderBy(x => x.DataPagamento).ThenBy(x => x.Id).Select(PagamentoParcelaResult.De).ToList());
 
     public static ParcelaResult De(ParcelaReceber p) => new(
         p.Id, p.Numero, p.Valor, p.ValorPago, p.Saldo,
         p.DataVencimento, p.DataPagamentoTotal,
         p.Status.ToString(), p.MetodoPlanejado,
-        p.EfiTxid, p.PixCopiaCola, p.QrCodeBase64, p.PixExpiraEm);
+        p.EfiTxid, p.PixCopiaCola, p.QrCodeBase64, p.PixExpiraEm,
+        Pagamentos: p.Pagamentos.OrderBy(x => x.DataPagamento).ThenBy(x => x.Id).Select(PagamentoParcelaResult.De).ToList());
 }
 
 public sealed record PagamentoParcelaResult(

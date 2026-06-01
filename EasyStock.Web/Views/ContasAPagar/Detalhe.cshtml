@@ -79,11 +79,20 @@
                 @foreach (var p in c.Parcelas.OrderBy(x => x.Numero))
                 {
                     var podePagar = c.Status != "Cancelada" && p.Status != "Paga" && p.Status != "Cancelada" && c.Status != "Rascunho";
-                    <tr x-data="{ open: false }">
+                    <tr x-data="{ open: false, pagOpen: false }">
                         <td class="px-3 py-2">@p.Numero</td>
                         <td class="px-3 py-2 text-sm">@p.DataVencimento.ToString("dd/MM/yyyy")</td>
                         <td class="px-3 py-2 text-right">@p.Valor.ToString("C")</td>
-                        <td class="px-3 py-2 text-right text-green-700">@p.ValorPago.ToString("C")</td>
+                        <td class="px-3 py-2 text-right text-green-700">
+                            @if (p.Pagamentos.Any())
+                            {
+                                <button type="button" @@click="pagOpen = !pagOpen" class="hover:underline" title="Ver pagamentos">@p.ValorPago.ToString("C") <span class="text-gray-400 text-xs">(@p.Pagamentos.Count)</span></button>
+                            }
+                            else
+                            {
+                                @p.ValorPago.ToString("C")
+                            }
+                        </td>
                         <td class="px-3 py-2 text-right">@p.Saldo.ToString("C")</td>
                         <td class="px-3 py-2 text-sm">@p.Status</td>
                         <td class="px-3 py-2">
@@ -121,6 +130,12 @@
                                         <button type="button" @@click="open = false" class="btn btn-ghost btn-sm">Cancelar</button>
                                     </div>
                                 </form>
+                            </td>
+                        }
+                        @if (p.Pagamentos.Any())
+                        {
+                            <td colspan="7" class="px-3 pb-3" x-show="pagOpen" x-cloak>
+                                @await Html.PartialAsync("_PagamentosParcela", p.Pagamentos)
                             </td>
                         }
                     </tr>
