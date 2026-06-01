@@ -28,7 +28,7 @@ public sealed class ExcelExporter : IReportExporter
         Action? onRowFlushed = null)
         where TRow : class
     {
-        // Adapta IAsyncEnumerable→IDataReader; bloqueia em MoveNextAsync (seguro no Worker)
+        // Adapta IAsyncEnumerable→IDataReader; bloqueia em MoveNextAsync (sync-over-async).
         // IDataReader.GetName(i) retorna os labels corretos do ReportSchema, então
         // MiniExcel usa esses nomes como cabeçalhos sem precisar de DynamicColumns.
         using var reader = new AsyncEnumerableDataReader<TRow>(
@@ -41,8 +41,19 @@ public sealed class ExcelExporter : IReportExporter
             FastMode    = true,
         };
 
-        // MiniExcel.SaveAsAsync aceita IDataReader
-        await MiniExcel.SaveAsAsync(output, reader, sheetName: schema.Title, configuration: config, cancellationToken: ct);
+        // #364: o MiniExcel exige um IDataReader SÍNCRONO (não há overload IAsyncEnumerable),
+        // então o Read() pontua async→sync (MoveNextAsync().GetResult()) e BLOQUEIA uma thread
+        // pela duração inteira da serialização. Rodamos a versão síncrona MiniExcel.SaveAs numa
+        // thread DEDICADA (LongRunning), fora do ThreadPool — assim N exports concorrentes no
+        // Worker não famintam o pool compartilhado (outros relatórios + hosted services). O
+        // cancelamento continua honrado: o enumerator foi criado com `ct` (GetAsyncEnumerator
+        // acima), então MoveNextAsync observa o token. SaveAs síncrono não recebe ct — por isso
+        // não usamos SaveAsAsync (cujas continuations voltariam ao pool, anulando o ganho).
+        await Task.Factory.StartNew(
+            () => MiniExcel.SaveAs(output, reader, sheetName: schema.Title, configuration: config),
+            ct,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
     }
 
 }
