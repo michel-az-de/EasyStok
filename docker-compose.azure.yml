@@ -7,6 +7,10 @@
 #   docker compose -f docker-compose.azure.yml up -d --build
 #
 # Variaveis sensiveis vem do arquivo .env (NAO commitar o .env real — so o .example).
+#
+# Nota healthcheck: as imagens aspnet:9.0 NAO trazem wget/curl (o HEALTHCHECK dos
+# Dockerfiles usa wget e falha aqui — no Fly nao importa pois o Fly usa health
+# check proprio). Por isso sobrescrevemos o healthcheck via bash + /dev/tcp.
 
 networks:
   easystock-net:
@@ -38,7 +42,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── API (.NET 9) — aplica as migrations no startup ───────────────────────────
+  # ── API (.NET 9) — aplica migrations + seeds no startup ──────────────────────
   api:
     build:
       context: .
@@ -52,6 +56,11 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Database__Provider: PostgreSql
+      # Sem passo de migrate separado (ao contrario do Render/Fly que rodam
+      # --migrate-only antes): a propria API aplica migrations + seeds no startup.
+      # Seguro com 1 replica (serializado via advisory lock no Postgres).
+      RunMigrationsOnStartup: "true"
+      MigrationsFailFast: "true"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable"
       Jwt__Issuer: ${Jwt__Issuer:-EasyStock}
       Jwt__Audience: ${Jwt__Audience:-EasyStock}
@@ -59,9 +68,19 @@ services:
       Jwt__ExpirationMinutes: "60"
       Anthropic__Enabled: "false"
       FileStorage__Provider: Local
+      # SuperAdmin do painel /admin — obrigatorio em Production (fail-fast se ausente).
+      SEED_SUPERADMIN_EMAIL: ${SEED_SUPERADMIN_EMAIL}
+      SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD}
+      SEED_SUPERADMIN_NOME: ${SEED_SUPERADMIN_NOME:-Super Admin}
     volumes:
       - uploads-data:/app/uploaded-files
     networks: [easystock-net]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
 
   # ── Web (MVC) — consome a API pela rede interna do compose ───────────────────
   web:
@@ -77,6 +96,12 @@ services:
       ApiSettings__BaseUrl: "http://api:8080/api"
       ApiSettings__TimeoutSeconds: "30"
     networks: [easystock-net]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8081"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   # ── Admin (Razor Pages) — consome a API pela rede interna ────────────────────
   admin:
@@ -92,6 +117,12 @@ services:
       ApiBaseUrl: "http://api:8080"
       EasyStockWebUrl: "https://${APP_HOST}"
     networks: [easystock-net]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   # ── Caddy — reverse proxy + HTTPS automatico (Let's Encrypt) ─────────────────
   # Roteia cada hostname (sslip.io) para o servico interno correspondente.
