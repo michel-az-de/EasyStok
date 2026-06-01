@@ -158,14 +158,10 @@ else
                         class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                     + Lançar entrada/saída
                 </button>
-                <form asp-action="Fechar" asp-controller="Caixa" method="post" class="flex gap-2 items-center"
-                      data-confirm='@($"{{\"titulo\":\"Fechar caixa do dia?\",\"mensagem\":\"Saldo final: {d.SaldoEsperado.ToString("C")}. Esta ação não pode ser desfeita.\",\"textoBotao\":\"Fechar caixa\",\"classBotao\":\"bg-amber-600 hover:bg-amber-700\"}}")'>
-                    @Html.AntiForgeryToken()
-                    <input type="text" name="observacoes" placeholder="Obs do fechamento (opcional)" aria-label="Observações do fechamento" class="ui-field text-sm" />
-                    <button type="submit" class="btn-warn-dark inline-flex items-center gap-2">
-                        <es-icon name="lock" class="es-icon--sm"></es-icon> Fechar caixa
-                    </button>
-                </form>
+                <button type="button" x-data @@click="$dispatch('open-modal', 'fechar-caixa')"
+                        class="btn-warn-dark inline-flex items-center gap-2">
+                    <es-icon name="lock" class="es-icon--sm"></es-icon> Fechar caixa
+                </button>
             }
             @if (d.Fechado && d.Fechamento != null)
             {
