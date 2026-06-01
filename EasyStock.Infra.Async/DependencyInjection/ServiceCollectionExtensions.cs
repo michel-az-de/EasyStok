@@ -101,7 +101,22 @@ public static class ServiceCollectionExtensions
 
         // Efí Bank Pix Gateway
         var efiClientId = configuration["Efi:ClientId"];
-        if (!string.IsNullOrWhiteSpace(efiClientId))
+        var efiUseStub = bool.TryParse(configuration["Efi:UseStub"], out var efiStub) && efiStub;
+        if (efiUseStub)
+        {
+            // B0 — Stub Pix DEV-ONLY. Gate em código + hard-fail fora de Development: o stub gera
+            // QR Pix falso que NUNCA reconcilia, então jamais pode rodar em produção.
+            var envName = configuration["ASPNETCORE_ENVIRONMENT"]
+                ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+                ?? "Production";
+            if (!string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"Efi:UseStub=true só é permitido em Development (ambiente atual: {envName}). " +
+                    "Remova a flag — StubEfiPixService gera QR Pix falso que não reconcilia (risco de receita perdida).");
+            services.AddSingleton<IEfiPixService, StubEfiPixService>();
+        }
+        else if (!string.IsNullOrWhiteSpace(efiClientId))
         {
             var isSandboxStr = configuration["Efi:Sandbox"];
             var isSandbox = !bool.TryParse(isSandboxStr, out var sb) || sb;
