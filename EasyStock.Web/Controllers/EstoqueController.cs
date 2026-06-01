@@ -93,7 +93,7 @@ public class EstoqueController(
         }
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-        return File(bytes, "text/csv", $"estoque-{DateTime.Now:yyyyMMdd}.csv");
+        return File(bytes, "text/csv", $"estoque-{BrazilTime.Now():yyyyMMdd}.csv");
     }
 
     private static string Csv(string? value) =>

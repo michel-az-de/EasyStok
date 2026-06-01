@@ -1,3 +1,4 @@
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.ListasCompras;
 using EasyStock.Web.Services;
@@ -38,7 +39,7 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
         ViewBag.Title = "Gerar lista de compras";
         ViewBag.ActiveMenuItem = "ListasCompras";
 
-        var vm = new GerarListaViewModel { NomeSugerido = $"Reposição {DateTime.Now:dd/MM}" };
+        var vm = new GerarListaViewModel { NomeSugerido = $"Reposição {BrazilTime.Now():dd/MM}" };
         var result = await inteligencia.SugestaoReposicaoListaAsync(50);
         if (result.Success && result.Data is not null) vm.Sugestoes = result.Data;
 
@@ -59,7 +60,7 @@ public class ListasComprasController(ListasComprasService svc, InteligenciaServi
             return RedirectToAction(nameof(Gerar));
         }
 
-        var nome = string.IsNullOrWhiteSpace(form.Nome) ? $"Reposição {DateTime.Now:dd/MM}" : form.Nome.Trim();
+        var nome = string.IsNullOrWhiteSpace(form.Nome) ? $"Reposição {BrazilTime.Now():dd/MM}" : form.Nome.Trim();
         var itens = selecionados.Select(i => (object)new
         {
             texto = i.Texto!.Trim(),

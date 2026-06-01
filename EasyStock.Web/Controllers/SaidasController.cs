@@ -1,5 +1,6 @@
 using System.Text;
 using EasyStock.Web.Constants;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Saidas;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -138,7 +139,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         }
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-        return File(bytes, "text/csv", $"saidas-{DateTime.Now:yyyyMMdd}.csv");
+        return File(bytes, "text/csv", $"saidas-{BrazilTime.Now():yyyyMMdd}.csv");
     }
 
     [HttpPost("/saidas/{id}/estornar")]

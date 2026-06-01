@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
@@ -203,7 +204,7 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         }
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-        return File(bytes, "text/csv", $"entradas-{DateTime.Now:yyyyMMdd}.csv");
+        return File(bytes, "text/csv", $"entradas-{BrazilTime.Now():yyyyMMdd}.csv");
     }
 
     private bool ValidarProdutoId(EntradaFormViewModel vm)
