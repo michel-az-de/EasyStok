@@ -8,10 +8,22 @@ using Microsoft.Extensions.Options;
 
 namespace EasyStock.Infra.Async.Storage;
 
-public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options) : IFileStorage
+public sealed class S3CompatibleFileStorage : IFileStorage
 {
-    private readonly FileStorageOptions _options = options.Value;
-    private AmazonS3Client? _client;
+    private readonly FileStorageOptions _options;
+    private readonly Func<IAmazonS3>? _clientFactory;
+    private IAmazonS3? _client;
+
+    public S3CompatibleFileStorage(IOptions<FileStorageOptions> options)
+        : this(options, clientFactory: null) { }
+
+    // Seam de teste (via InternalsVisibleTo): injeta um IAmazonS3 substituto.
+    // Produção usa o ctor público; o client real é criado sob demanda em GetClient().
+    internal S3CompatibleFileStorage(IOptions<FileStorageOptions> options, Func<IAmazonS3>? clientFactory)
+    {
+        _options = options.Value;
+        _clientFactory = clientFactory;
+    }
 
     public async Task<StoredFileResult> UploadAsync(FileUploadRequest request, CancellationToken cancellationToken = default)
     {
@@ -142,7 +154,7 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
 
     // Stream helper: bufferiza em memória e faz PutObject ao fechar.
     // Para relatórios grandes, uma implementação multipart seria mais robusta (L2).
-    private sealed class S3UploadStream(AmazonS3Client client, string bucket, string key, string contentType)
+    private sealed class S3UploadStream(IAmazonS3 client, string bucket, string key, string contentType)
         : MemoryStream
     {
         private bool _uploaded;
@@ -165,10 +177,14 @@ public sealed class S3CompatibleFileStorage(IOptions<FileStorageOptions> options
         }
     }
 
-    private AmazonS3Client GetClient()
+    private IAmazonS3 GetClient()
     {
         if (_client is not null)
             return _client;
+
+        // Seam de teste: client substituto injetado via ctor interno, cacheado (1x).
+        if (_clientFactory is not null)
+            return _client = _clientFactory();
 
         var credentials = new BasicAWSCredentials(_options.S3.AccessKey, _options.S3.SecretKey);
         var config = new AmazonS3Config

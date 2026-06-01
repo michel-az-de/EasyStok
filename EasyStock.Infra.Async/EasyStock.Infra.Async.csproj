@@ -46,4 +46,9 @@
     <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Seam de teste: expõe o ctor interno (injeção de IAmazonS3) para os unit tests. -->
+    <InternalsVisibleTo Include="EasyStock.Infra.Async.UnitTests" />
+  </ItemGroup>
+
 </Project>
