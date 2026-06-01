@@ -14,6 +14,9 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
     public async Task OnGetAsync()
     {
+        if (Page < 1) Page = 1;
+        if (Page > 10000) Page = 10000;
+
         try
         {
             var qs = $"api/admin/audit-admin?page={Page}&pageSize=50";
@@ -25,8 +28,8 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             Logs = raw.TryGetProperty("data", out var d) ? d.EnumerateArray().ToList() : Enumerable.Empty<JsonElement>();
             if (raw.TryGetProperty("meta", out var meta))
             {
-                Total = meta.TryGetProperty("total", out var t) ? t.GetInt32() : 0;
-                TotalPages = meta.TryGetProperty("pages", out var p) ? p.GetInt32() : 1;
+                Total = meta.TryGetProperty("total", out var t) && t.TryGetInt32(out var tv) ? tv : 0;
+                TotalPages = meta.TryGetProperty("pages", out var p) && p.TryGetInt32(out var pv) ? pv : 1;
             }
         }
         catch (Exception ex)

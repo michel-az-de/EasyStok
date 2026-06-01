@@ -11,6 +11,9 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
     public async Task OnGetAsync()
     {
+        if (Page < 1) Page = 1;
+        if (Page > 10000) Page = 10000;
+
         try
         {
             var qs = $"?page={Page}&pageSize=20";

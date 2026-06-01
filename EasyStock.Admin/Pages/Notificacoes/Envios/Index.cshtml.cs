@@ -17,21 +17,24 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
     public async Task OnGetAsync()
     {
+        if (Page < 1) Page = 1;
+        if (Page > 10000) Page = 10000;
+
         try
         {
             var qs = $"?page={Page}&pageSize=20";
             if (EmpresaId.HasValue) qs += $"&empresaId={EmpresaId}";
-            if (!string.IsNullOrWhiteSpace(Status)) qs += $"&status={Status}";
-            if (!string.IsNullOrWhiteSpace(Canal)) qs += $"&canal={Canal}";
-            if (!string.IsNullOrWhiteSpace(De)) qs += $"&de={De}";
-            if (!string.IsNullOrWhiteSpace(Ate)) qs += $"&ate={Ate}";
+            if (!string.IsNullOrWhiteSpace(Status)) qs += $"&status={Uri.EscapeDataString(Status)}";
+            if (!string.IsNullOrWhiteSpace(Canal)) qs += $"&canal={Uri.EscapeDataString(Canal)}";
+            if (!string.IsNullOrWhiteSpace(De)) qs += $"&de={Uri.EscapeDataString(De)}";
+            if (!string.IsNullOrWhiteSpace(Ate)) qs += $"&ate={Uri.EscapeDataString(Ate)}";
 
             var result = await api.GetRawAsync($"api/admin/notificacoes/envios{qs}");
             Data = result.GetProperty("data");
             if (result.TryGetProperty("meta", out var meta))
             {
-                Total = meta.GetProperty("total").GetInt32();
-                TotalPages = meta.GetProperty("pages").GetInt32();
+                Total = meta.TryGetProperty("total", out var t) && t.TryGetInt32(out var tv) ? tv : 0;
+                TotalPages = meta.TryGetProperty("pages", out var p) && p.TryGetInt32(out var pv) ? pv : 1;
             }
         }
         catch (SessionExpiredException) { throw; }
@@ -48,8 +51,8 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         {
             var qs = "?page=1&pageSize=1000";
             if (EmpresaId.HasValue) qs += $"&empresaId={EmpresaId}";
-            if (!string.IsNullOrWhiteSpace(Status)) qs += $"&status={Status}";
-            if (!string.IsNullOrWhiteSpace(Canal)) qs += $"&canal={Canal}";
+            if (!string.IsNullOrWhiteSpace(Status)) qs += $"&status={Uri.EscapeDataString(Status)}";
+            if (!string.IsNullOrWhiteSpace(Canal)) qs += $"&canal={Uri.EscapeDataString(Canal)}";
 
             var (bytes, ct) = await api.GetBytesAsync($"api/admin/notificacoes/envios/export{qs}");
             return File(bytes, ct, $"envios-{DateTime.UtcNow:yyyyMMdd}.csv");

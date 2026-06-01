@@ -19,20 +19,23 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
     public async Task OnGetAsync()
     {
+        if (Page < 1) Page = 1;
+        if (Page > 10000) Page = 10000;
+
         try
         {
             var pageSize = Modo == "grade" ? 200 : 20;
             var qs = $"?page={Page}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(Canal)) qs += $"&canal={Canal}";
-            if (!string.IsNullOrWhiteSpace(TipoEvento)) qs += $"&tipoEvento={TipoEvento}";
+            if (!string.IsNullOrWhiteSpace(Canal)) qs += $"&canal={Uri.EscapeDataString(Canal)}";
+            if (!string.IsNullOrWhiteSpace(TipoEvento)) qs += $"&tipoEvento={Uri.EscapeDataString(TipoEvento)}";
             if (Ativo.HasValue) qs += $"&ativo={Ativo.Value}";
 
             var result = await api.GetRawAsync($"api/admin/notificacoes/templates{qs}");
             Data = result.GetProperty("data");
             if (result.TryGetProperty("meta", out var meta))
             {
-                Total = meta.GetProperty("total").GetInt32();
-                TotalPages = meta.GetProperty("pages").GetInt32();
+                Total = meta.TryGetProperty("total", out var t) && t.TryGetInt32(out var tv) ? tv : 0;
+                TotalPages = meta.TryGetProperty("pages", out var p) && p.TryGetInt32(out var pv) ? pv : 1;
             }
             ConstruirCobertura();
             FiltrarPorBusca();
