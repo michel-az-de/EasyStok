@@ -19,6 +19,17 @@ public static class FormatHelper
     public static string AsMoney(this double value) =>
         ((decimal)value).AsMoney();
 
+    /// <summary>
+    /// Decimal para o atributo <c>value</c>/<c>max</c> de <c>&lt;input type="number"&gt;</c>: SEMPRE
+    /// InvariantCulture ("1234.56"). Sob pt-BR, <c>@valor</c> cru vira "1.234,56", que o input HTML
+    /// rejeita como número inválido (campo renderiza vazio). O binder de entrada já parseia invariante.
+    /// </summary>
+    public static string AsInputDecimal(this decimal value) =>
+        value.ToString("0.00", CultureInfo.InvariantCulture);
+
+    public static string AsInputDecimal(this decimal? value) =>
+        value.HasValue ? value.Value.AsInputDecimal() : "";
+
     public static string AsDate(this DateTime value) =>
         value.ToString("dd/MM/yyyy", PtBr);
 
