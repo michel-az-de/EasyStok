@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Infra.Integrations.Fiscal.FocusNFe;
 using FluentAssertions;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Infra.Integrations.UnitTests.Fiscal;
@@ -80,5 +82,34 @@ public class NfeCertificadoA1ServiceTests
         var act = () => Sut().ValidarUpload(pfx, "");
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*Senha*");
+    }
+
+    [Fact]
+    public async Task Cifrar_e_Decifrar_roundtrip_preserva_pfx_senha_e_validade()
+    {
+        // Round-trip end-to-end com data protection real (efêmero) — o teste que
+        // faltava (achado da auditoria): cifrar para armazenamento e decifrar deve
+        // devolver .pfx/senha/validade idênticos. Mesma instância do SUT = mesma
+        // chave efêmera, senão o Unprotect falharia.
+        var sut = new NfeCertificadoA1Service(
+            new EphemeralDataProtectionProvider(), NullLogger<NfeCertificadoA1Service>.Instance);
+        var notAfter = DateTimeOffset.UtcNow.AddYears(1);
+        var pfx = GerarPfx(DateTimeOffset.UtcNow.AddDays(-1), notAfter, "s3nha");
+
+        var payloadCifrado = await sut.CifrarParaArmazenamentoAsync(pfx, "s3nha");
+        var credencial = new CertificadoA1CredencialDto(
+            CredencialId: Guid.NewGuid(),
+            EmpresaId: Guid.NewGuid(),
+            KekId: "v1", // casa com o kekIdAtual usado por CifrarParaArmazenamentoAsync
+            PayloadCifrado: payloadCifrado,
+            Iv: Array.Empty<byte>(),
+            Tag: Array.Empty<byte>(),
+            ValidoAte: null);
+
+        var decifrado = await sut.DecifrarAsync(credencial);
+
+        decifrado.PfxBytes.Should().Equal(pfx);
+        decifrado.Senha.Should().Be("s3nha");
+        decifrado.ValidoAte.ToUniversalTime().Should().BeCloseTo(notAfter.UtcDateTime, TimeSpan.FromDays(1));
     }
 }
