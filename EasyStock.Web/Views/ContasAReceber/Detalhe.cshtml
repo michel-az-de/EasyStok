@@ -80,7 +80,7 @@
                 @foreach (var p in c.Parcelas.OrderBy(x => x.Numero))
                 {
                     var podeReceber = c.Status != "Cancelada" && p.Status != "Paga" && p.Status != "Cancelada" && c.Status != "Rascunho";
-                    <tr x-data="{ open: false }">
+                    <tr x-data="{ open: false, pixOpen: false }">
                         <td class="px-3 py-2">@p.Numero</td>
                         <td class="px-3 py-2 text-sm">@p.DataVencimento.ToString("dd/MM/yyyy")</td>
                         <td class="px-3 py-2 text-right">@p.Valor.ToString("C")</td>
@@ -88,9 +88,11 @@
                         <td class="px-3 py-2 text-right">@p.Saldo.ToString("C")</td>
                         <td class="px-3 py-2 text-sm">@p.Status</td>
                         <td class="px-3 py-2 text-sm text-gray-500">
-                            @if (!string.IsNullOrWhiteSpace(p.EfiTxid))
+                            @if (!string.IsNullOrWhiteSpace(p.QrCodeBase64) || !string.IsNullOrWhiteSpace(p.PixCopiaCola))
                             {
-                                <span class="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded" title="@p.PixCopiaCola">QR ativo</span>
+                                <button type="button" @@click="pixOpen = !pixOpen" class="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200">
+                                    <span x-show="!pixOpen">Ver QR</span><span x-show="pixOpen" x-cloak>Ocultar</span>
+                                </button>
                             }
                             else if (podeReceber)
                             {
@@ -135,6 +137,31 @@
                                         <button type="button" @@click="open = false" class="btn btn-ghost btn-sm">Cancelar</button>
                                     </div>
                                 </form>
+                            </td>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(p.QrCodeBase64) || !string.IsNullOrWhiteSpace(p.PixCopiaCola))
+                        {
+                            <td colspan="8" class="px-3 pb-3" x-show="pixOpen" x-cloak>
+                                <div class="bg-gray-50 p-3 rounded flex flex-col md:flex-row gap-4 items-start">
+                                    @if (!string.IsNullOrWhiteSpace(p.QrCodeBase64))
+                                    {
+                                        <img src="data:image/png;base64,@p.QrCodeBase64" alt="QR Code Pix da parcela @p.Numero" width="160" height="160" class="border border-gray-200 rounded bg-white shrink-0" />
+                                    }
+                                    <div class="flex-1 w-full min-w-0">
+                                        <label class="form-label text-xs">Pix copia-e-cola</label>
+                                        <textarea readonly onclick="this.select()" rows="3" class="form-input w-full text-xs font-mono break-all">@p.PixCopiaCola</textarea>
+                                        <div class="flex flex-wrap items-center gap-3 mt-2">
+                                            <button type="button" class="btn btn-secondary btn-sm"
+                                                    @@click="const ta = $el.closest('td').querySelector('textarea'); ta.select(); navigator.clipboard && navigator.clipboard.writeText(ta.value)">
+                                                Copiar codigo
+                                            </button>
+                                            @if (p.PixExpiraEm.HasValue)
+                                            {
+                                                <span class="text-xs text-gray-500">Validade: @p.PixExpiraEm.Value.ToLocalTime().AsDateTime() — pode estar expirada</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                         }
                     </tr>
