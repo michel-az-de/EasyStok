@@ -2,6 +2,7 @@ using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
@@ -48,7 +49,8 @@ public class ItemEstoqueControllerTests
             _itemEstoqueRepository,
             _movimentacaoEstoqueRepository,
             _unitOfWork,
-            _registrarEntradaLogger);
+            _registrarEntradaLogger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>());
         _registrarSaidaUseCase = new RegistrarSaidaEstoqueUseCase(
             _produtoRepository,
             _itemEstoqueRepository,
@@ -56,7 +58,8 @@ public class ItemEstoqueControllerTests
             _itemVendaRepository,
             _movimentacaoEstoqueRepository,
             _unitOfWork,
-            _registrarSaidaLogger);
+            _registrarSaidaLogger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>());
         _estornarSaidaUseCase = new EstornarSaidaUseCase(
             _movimentacaoEstoqueRepository,
             _itemEstoqueRepository,
