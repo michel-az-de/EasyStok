@@ -34,45 +34,55 @@ public class AdminTokenRefreshHandler(
 
         var response = await base.SendAsync(request, ct);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute)
+        try
         {
-            var refreshToken = session.GetRefreshToken();
-            if (string.IsNullOrEmpty(refreshToken))
+            if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute)
             {
-                MarkSessionExpired();
-                session.ClearSession();
-                return response;
-            }
-
-            await _refreshGate.WaitAsync(ct);
-            try
-            {
-                // Outra request concorrente pode ter renovado o token enquanto estávamos esperando.
-                var currentToken = session.GetToken();
-                string? newToken = currentToken != token && !string.IsNullOrEmpty(currentToken)
-                    ? currentToken
-                    : await TryRefreshAsync(refreshToken, ct);
-
-                if (newToken != null && retryRequest is not null)
+                var refreshToken = session.GetRefreshToken();
+                if (string.IsNullOrEmpty(refreshToken))
                 {
-                    retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
-                    response.Dispose();
-                    response = await base.SendAsync(retryRequest, ct);
-                }
-                else if (newToken == null)
-                {
-                    log.LogWarning("Token refresh falhou — limpando sessao admin");
                     MarkSessionExpired();
                     session.ClearSession();
+                    return response;
+                }
+
+                await _refreshGate.WaitAsync(ct);
+                try
+                {
+                    // Outra request concorrente pode ter renovado o token enquanto estávamos esperando.
+                    var currentToken = session.GetToken();
+                    string? newToken = currentToken != token && !string.IsNullOrEmpty(currentToken)
+                        ? currentToken
+                        : await TryRefreshAsync(refreshToken, ct);
+
+                    if (newToken != null && retryRequest is not null)
+                    {
+                        retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+                        response.Dispose();
+                        response = await base.SendAsync(retryRequest, ct);
+                    }
+                    else if (newToken == null)
+                    {
+                        log.LogWarning("Token refresh falhou — limpando sessao admin");
+                        MarkSessionExpired();
+                        session.ClearSession();
+                    }
+                }
+                finally
+                {
+                    _refreshGate.Release();
                 }
             }
-            finally
-            {
-                _refreshGate.Release();
-            }
-        }
 
-        return response;
+            return response;
+        }
+        finally
+        {
+            // retryRequest e um clone com o corpo bufferizado, criado p/ TODA request
+            // autenticada mas usado so no path de 401. No happy path nunca foi enviado —
+            // descarta em todos os caminhos (inclusive excecao) pra nao vazar a cada chamada.
+            retryRequest?.Dispose();
+        }
     }
 
     /// <summary>
