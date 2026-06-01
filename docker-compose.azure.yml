@@ -1,0 +1,115 @@
+# docker-compose.azure.yml — stack completa do EasyStok numa VM unica (Azure).
+# Sobe Web + Admin + API + Postgres + Caddy (HTTPS automatico) num so host.
+# Postgres roda em container (volume persistente) => zero custo de banco gerenciado.
+#
+# Uso na VM:
+#   cp .env.azure.example .env   # e preencher hosts (sslip.io) + senhas
+#   docker compose -f docker-compose.azure.yml up -d --build
+#
+# Variaveis sensiveis vem do arquivo .env (NAO commitar o .env real — so o .example).
+
+networks:
+  easystock-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  uploads-data:
+  caddy-data:
+  caddy-config:
+
+services:
+
+  # ── PostgreSQL (dados persistem no volume postgres-data) ──────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: easystok-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [easystock-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API (.NET 9) — aplica as migrations no startup ───────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: easystok-api:latest
+    container_name: easystok-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__Provider: PostgreSql
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable"
+      Jwt__Issuer: ${Jwt__Issuer:-EasyStock}
+      Jwt__Audience: ${Jwt__Audience:-EasyStock}
+      Jwt__SecretKey: ${Jwt__SecretKey}
+      Jwt__ExpirationMinutes: "60"
+      Anthropic__Enabled: "false"
+      FileStorage__Provider: Local
+    volumes:
+      - uploads-data:/app/uploaded-files
+    networks: [easystock-net]
+
+  # ── Web (MVC) — consome a API pela rede interna do compose ───────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.Web
+    image: easystok-web:latest
+    container_name: easystok-web
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ApiSettings__BaseUrl: "http://api:8080/api"
+      ApiSettings__TimeoutSeconds: "30"
+    networks: [easystock-net]
+
+  # ── Admin (Razor Pages) — consome a API pela rede interna ────────────────────
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun.admin
+    image: easystok-admin:latest
+    container_name: easystok-admin
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ApiBaseUrl: "http://api:8080"
+      EasyStockWebUrl: "https://${APP_HOST}"
+    networks: [easystock-net]
+
+  # ── Caddy — reverse proxy + HTTPS automatico (Let's Encrypt) ─────────────────
+  # Roteia cada hostname (sslip.io) para o servico interno correspondente.
+  caddy:
+    image: caddy:2-alpine
+    container_name: easystok-caddy
+    restart: unless-stopped
+    depends_on: [web, admin, api]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_HOST: ${APP_HOST}
+      ADMIN_HOST: ${ADMIN_HOST}
+      API_HOST: ${API_HOST}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [easystock-net]

@@ -12,6 +12,7 @@ appsettings.*.local.json
 .env
 .env.*
 !.env.example
+!.env.azure.example
 
 # Arquivos de sessao do Claude Code mal-encodados que vazaram em outros
 # checkouts. O nome real comeca com "C:Users..." sem separadores; manter

@@ -1,0 +1,22 @@
+# Caddyfile — reverse proxy com HTTPS automatico (Let's Encrypt).
+# Os hostnames vem do .env (sslip.io baseado no IP publico da VM).
+# Caddy emite e renova os certificados sozinho.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Web (MVC) — pagina publica/app
+{$APP_HOST} {
+	reverse_proxy web:8081
+}
+
+# Admin (Razor Pages)
+{$ADMIN_HOST} {
+	reverse_proxy admin:8080
+}
+
+# API (.NET) — backend + endpoints mobile/PWA
+{$API_HOST} {
+	reverse_proxy api:8080
+}
