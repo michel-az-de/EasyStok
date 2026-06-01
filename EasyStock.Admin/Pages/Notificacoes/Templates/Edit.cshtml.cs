@@ -122,7 +122,14 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         catch (Exception ex)
         {
             SetErroSeguro(ex, "Salvar template");
+            // Recarrega metadata (versao/aprovado/atualizadoEm) SEM descartar o que o
+            // operador acabou de digitar — OnGetAsync->CarregarTemplateAsync sobrescreveria
+            // Assunto/Corpo com os valores do banco, perdendo a edicao em falha de save.
+            var assuntoEditado = AssuntoTemplate;
+            var corpoEditado = CorpoTemplate;
             await OnGetAsync();
+            AssuntoTemplate = assuntoEditado;
+            CorpoTemplate = corpoEditado;
             return Page();
         }
     }
