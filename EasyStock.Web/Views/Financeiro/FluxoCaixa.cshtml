@@ -81,7 +81,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+@section Scripts {
 <script>
     (function () {
         const buckets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(b => new {
@@ -115,3 +115,4 @@
         });
     })();
 </script>
+}
