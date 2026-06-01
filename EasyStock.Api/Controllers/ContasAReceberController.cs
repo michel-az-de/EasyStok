@@ -179,6 +179,11 @@ public class ContasAReceberController(
             return ok ? NoContent() : DataNotFound();
         }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            // 2 estornos concorrentes da mesma parcela: o xmin (Versao) da parcela faz o 2o commit falhar.
+            return DataBadRequest("Estorno concorrente; recarregue a pagina e tente novamente.");
+        }
     }
 
     [HttpPost("parcelas/{parcelaId:guid}/pix")]

@@ -56,6 +56,9 @@ public class PagamentoParcelaApi
     public string? Observacao { get; set; }
 }
 
+/// <summary>Contexto para o partial _PagamentosParcela renderizar o histórico + o botão de estornar.</summary>
+public record PagamentosParcelaVm(string RotaBase, Guid ContaId, Guid ParcelaId, List<PagamentoParcelaApi> Pagamentos);
+
 public class ContaPagarApi
 {
     public Guid Id { get; set; }

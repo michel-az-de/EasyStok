@@ -129,6 +129,16 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
         return RedirectToAction(nameof(Detalhe), new { id });
     }
 
+    [HttpPost("/contas-a-pagar/{id:guid}/parcelas/{parcelaId:guid}/pagamentos/{pagId:guid}/estornar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Estornar(Guid id, Guid parcelaId, Guid pagId, string? motivo = null)
+    {
+        var r = await svc.EstornarPagamentoCpAsync(parcelaId, pagId, motivo);
+        if (HasError(r)) return RedirectToAction(nameof(Detalhe), new { id });
+        Toast("success", "Pagamento estornado.");
+        return RedirectToAction(nameof(Detalhe), new { id });
+    }
+
     [HttpPost("/contas-a-pagar/{id:guid}/cancelar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancelar(Guid id, string motivo)

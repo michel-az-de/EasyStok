@@ -1,7 +1,9 @@
-@model List<EasyStock.Web.Models.ViewModels.Financeiro.PagamentoParcelaApi>
+@model EasyStock.Web.Models.ViewModels.Financeiro.PagamentosParcelaVm
 @*
-    Histórico de pagamentos de uma parcela (read-only). Pagamento estornado aparece
-    riscado + motivo. Usado nas views de Detalhe de Contas a Pagar/Receber (B2).
+    Histórico de pagamentos de uma parcela (B2) + botão de estornar (B3). Pagamento estornado
+    aparece riscado + motivo. Estornar só p/ Confirmado não-estornado; a API impõe a permissão
+    Gerenciar (403 → toast) — a sessão web não carrega o dado de permissão, então o botão é
+    visível e o servidor decide.
 *@
 <div class="bg-gray-50 p-2 rounded">
     <div class="text-xs font-medium text-gray-600 mb-1">Pagamentos desta parcela</div>
@@ -12,21 +14,27 @@
                 <th class="px-2 py-1">Metodo</th>
                 <th class="px-2 py-1 text-right">Valor</th>
                 <th class="px-2 py-1">Status</th>
+                <th class="px-2 py-1"></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var pg in Model)
+            @foreach (var pg in Model.Pagamentos)
             {
                 var estornado = pg.EstornadoEm.HasValue || pg.Status == "Estornado";
+                var podeEstornar = pg.Status == "Confirmado" && !pg.EstornadoEm.HasValue;
                 <tr class="@(estornado ? "text-gray-400 line-through" : "")">
                     <td class="px-2 py-1">@pg.DataPagamento.ToLocalTime().AsDateTime()</td>
                     <td class="px-2 py-1">@pg.Metodo</td>
                     <td class="px-2 py-1 text-right">@pg.Valor.AsMoney()</td>
-                    <td class="px-2 py-1">
-                        @pg.Status
-                        @if (estornado && !string.IsNullOrWhiteSpace(pg.MotivoEstorno))
+                    <td class="px-2 py-1">@pg.Status@(estornado && !string.IsNullOrWhiteSpace(pg.MotivoEstorno) ? $" — {pg.MotivoEstorno}" : "")</td>
+                    <td class="px-2 py-1 text-right">
+                        @if (podeEstornar)
                         {
-                            <span class="no-underline">— @pg.MotivoEstorno</span>
+                            <form method="post" action="@Model.RotaBase/@Model.ContaId/parcelas/@Model.ParcelaId/pagamentos/@pg.Id/estornar" class="inline"
+                                  onsubmit="return confirm('Estornar este pagamento? A parcela e a conta voltam a ficar em aberto.');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="text-xs text-red-600 hover:underline">Estornar</button>
+                            </form>
                         }
                     </td>
                 </tr>

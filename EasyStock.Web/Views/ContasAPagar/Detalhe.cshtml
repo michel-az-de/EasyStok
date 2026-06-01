@@ -135,7 +135,7 @@
                         @if (p.Pagamentos.Any())
                         {
                             <td colspan="7" class="px-3 pb-3" x-show="pagOpen" x-cloak>
-                                @await Html.PartialAsync("_PagamentosParcela", p.Pagamentos)
+                                @await Html.PartialAsync("_PagamentosParcela", new EasyStock.Web.Models.ViewModels.Financeiro.PagamentosParcelaVm("/contas-a-pagar", c.Id, p.Id, p.Pagamentos))
                             </td>
                         }
                     </tr>

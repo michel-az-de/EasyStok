@@ -26,20 +26,28 @@ public class EstornarPagamentoParcelaPagarUseCase(
                     ?? throw new UseCaseValidationException("Parcela orfa.");
         var pag = parcela.Pagamentos.FirstOrDefault(p => p.Id == cmd.PagamentoId);
         if (pag is null) return false;
+        if (pag.Status == StatusPagamentoParcela.Estornado) return true; // idempotente (retry pos-sucesso)
 
         try
         {
             pag.Estornar(cmd.UserId, cmd.Motivo);
 
-            // Estornar MovimentoCaixa correspondente (mesma transacao)
+            // Caixa (so-contabil, round-8): se o movimento do pagamento esta num dia ABERTO, soft-marca
+            // in-place; se o dia ja foi FECHADO, NAO toca o periodo congelado — a reversao fica so no razao
+            // (conta/parcela/pagamento). Sem compensatorio, sem bloqueio.
             if (pag.MovimentoCaixaId.HasValue)
             {
                 var mov = await caixaRepo.GetMovimentoAsync(cmd.EmpresaId, pag.MovimentoCaixaId.Value);
                 if (mov is not null && mov.EstornadoEm is null)
                 {
-                    mov.Estornar(cmd.UserId, cmd.UserNome,
-                        cmd.Motivo ?? $"Estorno pagamento parcela {parcela.Numero}");
-                    await caixaRepo.UpdateMovimentoAsync(mov);
+                    var movDay = DateOnly.FromDateTime(mov.DataMovimento);
+                    var diaFechado = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, movDay, mov.LojaId) is not null;
+                    if (!diaFechado)
+                    {
+                        mov.Estornar(cmd.UserId, cmd.UserNome,
+                            cmd.Motivo ?? $"Estorno pagamento parcela {parcela.Numero}");
+                        await caixaRepo.UpdateMovimentoAsync(mov);
+                    }
                 }
             }
 
@@ -90,19 +98,27 @@ public class EstornarPagamentoParcelaReceberUseCase(
                     ?? throw new UseCaseValidationException("Parcela orfa.");
         var pag = parcela.Pagamentos.FirstOrDefault(p => p.Id == cmd.PagamentoId);
         if (pag is null) return false;
+        if (pag.Status == StatusPagamentoParcela.Estornado) return true; // idempotente (retry pos-sucesso)
 
         try
         {
             pag.Estornar(cmd.UserId, cmd.Motivo);
 
+            // Caixa (so-contabil, round-8): dia ABERTO soft-marca in-place; dia FECHADO NAO toca o
+            // periodo congelado (a reversao fica so no razao).
             if (pag.MovimentoCaixaId.HasValue)
             {
                 var mov = await caixaRepo.GetMovimentoAsync(cmd.EmpresaId, pag.MovimentoCaixaId.Value);
                 if (mov is not null && mov.EstornadoEm is null)
                 {
-                    mov.Estornar(cmd.UserId, cmd.UserNome,
-                        cmd.Motivo ?? $"Estorno recebimento parcela {parcela.Numero}");
-                    await caixaRepo.UpdateMovimentoAsync(mov);
+                    var movDay = DateOnly.FromDateTime(mov.DataMovimento);
+                    var diaFechado = await caixaRepo.GetFechamentoDoDiaAsync(cmd.EmpresaId, movDay, mov.LojaId) is not null;
+                    if (!diaFechado)
+                    {
+                        mov.Estornar(cmd.UserId, cmd.UserNome,
+                            cmd.Motivo ?? $"Estorno recebimento parcela {parcela.Numero}");
+                        await caixaRepo.UpdateMovimentoAsync(mov);
+                    }
                 }
             }
 
