@@ -8,7 +8,7 @@
 
 @if (!string.IsNullOrEmpty(Model.NovaSenhaTemporaria))
 {
-    <div style="background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.30); color:var(--warn-700); border-radius:var(--r-md); padding:12px 16px; font-size:13px; margin-bottom:16px;">
+    <div style="background:var(--warn-50); border:1px solid var(--warn-200); color:var(--warn-700); border-radius:var(--r-md); padding:12px 16px; font-size:13px; margin-bottom:16px;">
         <div style="font-weight:600; margin-bottom:4px;">
             Senha temporária do admin de <strong>@Model.NovoTenantNome</strong> — anote agora, não será reexibida:
         </div>
@@ -100,14 +100,14 @@
                         <a href="/Tenants/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@nome</a>
                     </div>
                 </td>
-                <td data-label="Documento" style="color:var(--text-muted); font-family:var(--font-mono); font-size:12px;">@(doc ?? "—")</td>
+                <td data-label="Documento" style="color:var(--text-secondary); font-family:var(--font-mono); font-size:12px;">@(doc ?? "—")</td>
                 <td data-label="Plano" style="color:var(--text-secondary); font-size:13px;">@(plano ?? "—")</td>
                 <td data-label="Status">
                     <es-badge variant="@statusVariant" with-dot="true">@(status ?? "—")</es-badge>
                 </td>
                 <td data-label="Usuários" class="es-data-table-td-numeric" style="font-weight:500;">@usuarios</td>
                 <td data-label="Lojas" class="es-data-table-td-numeric" style="font-weight:500;">@lojas</td>
-                <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+                <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-secondary); font-size:12px;">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
                 <td class="es-data-table-td-actions">
                     <div class="es-row-actions">
                         <es-button variant="ghost" size="xs" href="/Tenants/Detail/@id" icon="eye">Ver</es-button>
