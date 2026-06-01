@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Async;
 
@@ -14,8 +15,14 @@ namespace EasyStock.Infra.Async;
 /// global cross-instancia deve usar <see cref="RedisCacheService"/>.
 /// </para>
 /// </summary>
-public sealed class InMemoryCacheService(IMemoryCache cache) : ICacheService
+public sealed class InMemoryCacheService(IMemoryCache cache, ILogger<InMemoryCacheService> logger) : ICacheService
 {
+    // #282: timeout defensivo no lock de incremento. A seção crítica é puramente
+    // em-memória (microssegundos) e está sob try/finally, então na prática nunca
+    // estoura — mas um timeout explícito garante que um bug futuro não pendure a
+    // thread indefinidamente; o estouro propaga (não mascara).
+    private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(5);
+
     private static void ValidarChave(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
@@ -51,18 +58,25 @@ public sealed class InMemoryCacheService(IMemoryCache cache) : ICacheService
         return Task.FromResult(cache.TryGetValue(key, out _));
     }
 
-    public Task<long> IncrementAsync(string key, long value = 1)
+    public async Task<long> IncrementAsync(string key, long value = 1)
     {
         ValidarChave(key);
         // Serializa por chave — IMemoryCache nao tem incremento atomico nativo.
         var semaphore = GetLock(key);
-        semaphore.Wait();
+        if (!await semaphore.WaitAsync(LockTimeout))
+        {
+            logger.LogWarning(
+                "InMemoryCacheService: timeout de {Timeout}s aguardando lock de incremento da chave '{Key}'.",
+                LockTimeout.TotalSeconds, key);
+            throw new TimeoutException(
+                $"Timeout ao adquirir lock de incremento para a chave '{key}'.");
+        }
         try
         {
             var current = cache.TryGetValue<long>(key, out var v) ? v : 0L;
             var novo = checked(current + value);
             cache.Set(key, novo);
-            return Task.FromResult(novo);
+            return novo;
         }
         catch (OverflowException)
         {

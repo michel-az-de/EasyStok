@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
@@ -19,13 +20,18 @@ namespace EasyStock.Infra.Async;
 /// - <see cref="SetExpiryAsync"/> não é suportado nativamente pelo IDistributedCache
 ///   (re-serialização do valor atual como workaround — ver implementação).
 /// </summary>
-public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
+public sealed class RedisCacheService(IDistributedCache cache, ILogger<RedisCacheService> logger) : ICacheService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false
     };
+
+    // #282: timeout defensivo no lock de incremento. Aqui a seção crítica faz I/O
+    // real ao Redis (await Get/Set), então sob contenção o timeout pode de fato
+    // disparar; quando dispara, propaga (não mascara) em vez de pendurar a thread.
+    private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(5);
 
     // Locks por-chave para serialização do increment dentro do mesmo processo.
     // Evita pior caso de race condition sem introduzir dependência do StackExchange.Redis.
@@ -89,7 +95,14 @@ public sealed class RedisCacheService(IDistributedCache cache) : ICacheService
         // protege entre pods; substituir por StringIncrementAsync do
         // StackExchange.Redis se a aplicação for escalada horizontalmente.
         var semaphore = GetLock(key);
-        await semaphore.WaitAsync();
+        if (!await semaphore.WaitAsync(LockTimeout))
+        {
+            logger.LogWarning(
+                "RedisCacheService: timeout de {Timeout}s aguardando lock de incremento da chave '{Key}'.",
+                LockTimeout.TotalSeconds, key);
+            throw new TimeoutException(
+                $"Timeout ao adquirir lock de incremento para a chave '{key}'.");
+        }
         try
         {
             var current = (await GetAsync<long?>(key)) ?? 0L;
