@@ -1,3 +1,4 @@
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -95,7 +96,10 @@ public class FinanceiroController(FinanceiroService svc, SessionService session)
         ViewBag.ActiveMenuItem = "Financeiro";
         ViewBag.Periodicidade = periodicidade;
 
-        var iniDef = inicio ?? new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        // Servidor roda UTC (Render); perto da meia-noite BRT o DateTime.UtcNow pula de mês.
+        // Usar BrazilTime.Today() pro início do mês padrão (mesmo padrão do CaixaController).
+        var hojeBr = BrazilTime.Today();
+        var iniDef = inicio ?? new DateTime(hojeBr.Year, hojeBr.Month, 1);
         var fimDef = fim ?? iniDef.AddMonths(6).AddDays(-1);
         ViewBag.Inicio = iniDef.ToString("yyyy-MM-dd");
         ViewBag.Fim = fimDef.ToString("yyyy-MM-dd");
