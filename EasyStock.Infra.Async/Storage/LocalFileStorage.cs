@@ -156,6 +156,9 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
 
     // ── Inner stream: renomeia .tmp → final ao fechar ──────────────────────────
 
+    // #288 item 1 (CS9107): tmpPath ia para a base FileStream E era capturado pelo corpo
+    // (dupla captura). Usamos a propriedade FileStream.Name (= tmpPath passado a base) no
+    // Commit, então só finalPath é capturado pelo primary ctor.
     private sealed class LocalReportUploadStream(string tmpPath, string finalPath) : FileStream(
         tmpPath, FileMode.Create, FileAccess.Write, FileShare.None, 81_920, useAsync: true)
     {
@@ -177,8 +180,9 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         {
             if (_committed) return;
             _committed = true;
-            if (File.Exists(tmpPath))
-                File.Move(tmpPath, finalPath, overwrite: true);
+            // Name = tmpPath passado à base FileStream — evita capturar tmpPath de novo (CS9107).
+            if (File.Exists(Name))
+                File.Move(Name, finalPath, overwrite: true);
         }
     }
 }

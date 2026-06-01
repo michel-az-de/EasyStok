@@ -173,32 +173,37 @@ public static class ServiceCollectionExtensions
 }
 
 /// <summary>
-/// Implementacao de email que apenas loga no console.
-/// Util para desenvolvimento e testes.
+/// Implementacao de email que apenas loga (fallback dev/test quando SMTP nao
+/// configurado). O NOME desta classe e contrato: codigo de diagnostico checa
+/// <c>GetType().Name == "ConsoleEmailService"</c> / <c>nameof(...)</c> para detectar
+/// "SMTP nao configurado" — nao renomear sem atualizar esses call-sites.
 /// </summary>
-public sealed class ConsoleEmailService : IEmailService
+public sealed class ConsoleEmailService(ILogger<ConsoleEmailService> logger) : IEmailService
 {
+    // #288 item 4: era Console.WriteLine (sem nivel, sem estrutura). Agora ILogger em
+    // Debug. NAO loga o corpo do email — e PII potencial (ver #301); so destinatario +
+    // assunto, suficiente para o fallback de dev.
     public Task SendAsync(string to, string subject, string body, bool isHtml = false)
     {
-        Console.WriteLine($"[EMAIL] To: {to}, Subject: {subject}, Body: {body}");
+        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject}", to, subject);
         return Task.CompletedTask;
     }
 
     public Task SendAsync(string to, string subject, string body, IEnumerable<EmailAttachment> attachments, bool isHtml = false)
     {
-        Console.WriteLine($"[EMAIL] To: {to}, Subject: {subject}, Body: {body}, Attachments: {attachments.Count()}");
+        logger.LogDebug("[EMAIL] Para: {To} | Assunto: {Subject} | Anexos: {Count}", to, subject, attachments.Count());
         return Task.CompletedTask;
     }
 
     public Task SendAsync(IEnumerable<string> to, string subject, string body, bool isHtml = false)
     {
-        Console.WriteLine($"[EMAIL] To: {string.Join(", ", to)}, Subject: {subject}, Body: {body}");
+        logger.LogDebug("[EMAIL] Para: {Count} destinatario(s) | Assunto: {Subject}", to.Count(), subject);
         return Task.CompletedTask;
     }
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        Console.WriteLine($"[EMAIL TEMPLATE] To: {to}, Subject: {subject}, Template: {templateName}");
+        logger.LogDebug("[EMAIL TEMPLATE] Para: {To} | Assunto: {Subject} | Template: {Template}", to, subject, templateName);
         return Task.CompletedTask;
     }
 }
