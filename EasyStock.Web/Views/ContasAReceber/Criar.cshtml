@@ -11,7 +11,7 @@
     </div>
 
     <form method="post" action="/contas-a-receber/criar" class="card space-y-4"
-          x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal', parcelaPreview(i) { const n = this.parcelas; if (!n || n < 1) return (0).toFixed(2); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return ((i === n) ? ultima : base).toFixed(2); } }"
+          x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal', emissao: '@hoje', parcelaPreview(i) { const n = this.parcelas; if (!n || n < 1) return (0).toFixed(2); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return ((i === n) ? ultima : base).toFixed(2); } }"
           @@submit="if (!$el.querySelector('input[name=categoriaFinanceiraId]')?.value) { $event.preventDefault(); window.showToast?.('Selecione ou crie uma categoria.', 'error'); }">
         @Html.AntiForgeryToken()
 
@@ -47,7 +47,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="form-label">Data emissao *</label>
-                <input type="date" name="dataEmissao" required value="@hoje" class="form-input" />
+                <input type="date" name="dataEmissao" required value="@hoje" class="form-input" x-model="emissao" />
             </div>
             <div>
                 <label class="form-label">Valor total (R$) *</label>
@@ -62,7 +62,7 @@
             </div>
             <div>
                 <label class="form-label">1a vencimento *</label>
-                <input type="date" name="primeiraVencimento" required value="@amanha" class="form-input" x-model="primeira" />
+                <input type="date" name="primeiraVencimento" required value="@amanha" class="form-input" x-model="primeira" :min="emissao" />
             </div>
             <div>
                 <label class="form-label">Intervalo</label>

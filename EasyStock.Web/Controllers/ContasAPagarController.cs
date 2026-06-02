@@ -81,6 +81,11 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
             Toast("error", "Valor total deve ser positivo.");
             return RedirectToAction(nameof(Criar));
         }
+        if (primeiraVencimento.Date < dataEmissao.Date)
+        {
+            Toast("error", "A 1a vencimento nao pode ser anterior a data de emissao.");
+            return RedirectToAction(nameof(Criar));
+        }
 
         var parcelas = MontarParcelas(valorTotal, numeroParcelas, primeiraVencimento, intervaloTipo);
 
