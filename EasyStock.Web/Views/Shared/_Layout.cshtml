@@ -19,9 +19,10 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"
-            integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F"
-            crossorigin="anonymous"></script>
+    @* Alpine via CDN sem integrity/SRI: o hash estava errado (o mesmo arquivo core
+       tinha hash diferente no Web vs Admin) e o browser bloqueava a execucao ->
+       Alpine morto -> interatividade inerte em prod. Self-host fica como follow-up. *@
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
