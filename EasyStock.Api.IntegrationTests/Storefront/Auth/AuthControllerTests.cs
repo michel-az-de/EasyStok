@@ -125,7 +125,7 @@ public sealed class AuthControllerTests : IAsyncLifetime
             new { telefone = "+5511997573992" });
 
         resp.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        var body = await resp.Content.ReadFromJsonAsync<SolicitarOtpResponse>();
+        var body = await resp.Content.ReadFromJsonAsync<SolicitarOtpResponseDto>();
         body!.ExpiresInSeconds.Should().Be(300);
 
         // ClienteOtp persistido com hash do telefone
@@ -179,5 +179,5 @@ public sealed class AuthControllerTests : IAsyncLifetime
 
     // ── DTO espelho da resposta do Controller ──────────────────────────
 
-    private sealed record SolicitarOtpResponse(int ExpiresInSeconds);
+    private sealed record SolicitarOtpResponseDto(int ExpiresInSeconds);
 }
