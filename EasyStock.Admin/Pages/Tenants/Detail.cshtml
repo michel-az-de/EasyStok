@@ -81,18 +81,21 @@ function alertaBanner(tenantId) {
 // F4: card "Sincronização Mobile" no Detail. Fetch o counts via Razor handler.
 function mobileSyncHealth(tenantId) {
     return {
-        loaded: false, healthy: true, totalPending: 0,
+        loaded: false, erro: false, healthy: true, totalPending: 0,
         devices: 0, lastSyncAt: null, lastSyncFormatado: '',
         entregueSemVenda: 0,
         metricas: [],
         async carregar() {
+            this.erro = false;
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 8000);
             try {
                 const r = await fetch('/Tenants/Detail/' + tenantId + '?handler=MobileSyncHealth',
-                    { credentials: 'same-origin', cache: 'no-store' });
-                if (!r.ok) { this.loaded = true; return; }
+                    { credentials: 'same-origin', cache: 'no-store', signal: ctrl.signal });
+                if (!r.ok) { this.erro = true; this.loaded = true; return; }
                 const json = await r.json();
                 const d = json.data || json;
-                if (d.error) { this.loaded = true; return; }
+                if (d.error) { this.erro = true; this.loaded = true; return; }
                 this.healthy = !!d.healthy;
                 this.totalPending = d.totalPending ?? 0;
                 this.devices = d.devices ?? 0;
@@ -114,7 +117,8 @@ function mobileSyncHealth(tenantId) {
                     else this.lastSyncFormatado = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
                 }
                 this.loaded = true;
-            } catch (e) { this.loaded = true; }
+            } catch (e) { this.erro = true; this.loaded = true; }
+            finally { clearTimeout(timer); }
         }
     };
 }
@@ -359,7 +363,8 @@ function mobileSyncHealth(tenantId) {
                 <button type="button" @@click="carregar()" class="text-xs text-es-ink-dim hover:text-es-ink">↻ atualizar</button>
             </div>
             <div x-show="!loaded" class="text-xs text-es-ink-dim">carregando…</div>
-            <div x-show="loaded" x-cloak class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">Nao foi possivel carregar (timeout/erro). Tente ↻ atualizar.</div>
+            <div x-show="loaded && !erro" x-cloak class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <template x-for="m in metricas" :key="m.label">
                     <div class="rounded-lg p-3" style="background:#0f172a;border:1px solid rgba(247,242,232,0.08)">
                         <div class="text-[11px] uppercase tracking-wider text-es-ink-mute" x-text="m.label"></div>
