@@ -80,10 +80,14 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
 
         var qtdParcelasVencidasHoje = await db.ParcelasPagar.AsNoTracking()
             .CountAsync(p => p.EmpresaId == empresaId &&
-                             p.Status == StatusParcela.Vencida, ct)
+                             p.Status != StatusParcela.Paga &&
+                             p.Status != StatusParcela.Cancelada &&
+                             p.DataVencimento < hoje, ct)
             + await db.ParcelasReceber.AsNoTracking()
             .CountAsync(p => p.EmpresaId == empresaId &&
-                             p.Status == StatusParcela.Vencida, ct);
+                             p.Status != StatusParcela.Paga &&
+                             p.Status != StatusParcela.Cancelada &&
+                             p.DataVencimento < hoje, ct);
 
         return new DashboardFinanceiroDto(
             aVencerPagar, aVencerReceber,
