@@ -2,6 +2,12 @@
 @{
     var hoje   = DateTime.Today.ToString("yyyy-MM-dd");
     var amanha = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+    var inv        = System.Globalization.CultureInfo.InvariantCulture;
+    var vValor     = (Model.ValorTotal ?? 0m).ToString(inv);
+    var vParcelas  = Model.NumeroParcelas ?? 1;
+    var vEmissao   = Model.DataEmissao?.ToString("yyyy-MM-dd") ?? hoje;
+    var vPrimeira  = Model.PrimeiraVencimento?.ToString("yyyy-MM-dd") ?? amanha;
+    var vIntervalo = Model.IntervaloTipo ?? "mensal";
 }
 
 <div class="page-content max-w-3xl">
@@ -10,14 +16,19 @@
         <a href="/contas-a-pagar" class="btn btn-ghost">Voltar</a>
     </div>
 
+    @if (!string.IsNullOrEmpty(Model.Erro))
+    {
+        <div class="rounded border border-crit-200 bg-crit-50 text-crit-700 px-3 py-2 text-sm mb-4" role="alert">@Model.Erro</div>
+    }
+
     <form method="post" action="/contas-a-pagar/criar" class="card space-y-4"
-          x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal', emissao: '@hoje', parcelaPreview(i) { const n = this.parcelas; if (!n || n < 1) return (0).toFixed(2); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return ((i === n) ? ultima : base).toFixed(2); } }"
+          x-data="{ valor: @vValor, parcelas: @vParcelas, primeira: '@vPrimeira', intervalo: '@vIntervalo', emissao: '@vEmissao', parcelaPreview(i) { const n = this.parcelas; if (!n || n < 1) return (0).toFixed(2); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return ((i === n) ? ultima : base).toFixed(2); } }"
           @@submit="if (!$el.querySelector('input[name=categoriaFinanceiraId]')?.value) { $event.preventDefault(); window.showToast?.('Selecione ou crie uma categoria.', 'error'); }">
         @Html.AntiForgeryToken()
 
         <div>
             <label class="form-label">Descricao *</label>
-            <input type="text" name="descricao" required maxlength="200" class="form-input" placeholder="Ex: Aluguel novembro" />
+            <input type="text" name="descricao" required maxlength="200" class="form-input" placeholder="Ex: Aluguel novembro" value="@Model.Descricao" />
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -25,6 +36,7 @@
                 <label class="form-label">Categoria *</label>
                 <partial name="_CreatableCombobox" model='new {
                     Name         = "categoriaFinanceiraId",
+                    Value        = Model.CategoriaFinanceiraId?.ToString(),
                     Items        = Model.Categorias.Where(c => c.Ativa).Select(c => new { value = c.Id.ToString(), label = c.Nome }),
                     Placeholder  = "Buscar ou criar categoria...",
                     Required     = true,
@@ -36,6 +48,7 @@
                 <label class="form-label">Centro de Custo</label>
                 <partial name="_CreatableCombobox" model='new {
                     Name        = "centroCustoId",
+                    Value       = Model.CentroCustoId?.ToString(),
                     Items       = Model.CentrosCusto.Where(c => c.Ativo).Select(c => new { value = c.Id.ToString(), label = c.Codigo + " - " + c.Nome }),
                     Placeholder = "— Nenhum —",
                     AllowClear  = true,
@@ -86,11 +99,11 @@
 
         <div>
             <label class="form-label">Observacoes</label>
-            <textarea name="observacoes" maxlength="4000" rows="3" class="form-input"></textarea>
+            <textarea name="observacoes" maxlength="4000" rows="3" class="form-input">@Model.Observacoes</textarea>
         </div>
 
         <div class="flex items-center gap-2">
-            <input type="checkbox" id="emitir" name="emitirAposCriar" value="true" />
+            <input type="checkbox" id="emitir" name="emitirAposCriar" value="true" @(Model.EmitirAposCriar ? "checked" : "") />
             <label for="emitir" class="text-sm">Emitir imediatamente (pular Rascunho)</label>
         </div>
 

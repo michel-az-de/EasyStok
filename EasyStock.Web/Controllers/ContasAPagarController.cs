@@ -61,31 +61,42 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
         string? observacoes = null,
         bool emitirAposCriar = false)
     {
+        // Re-renderiza o form preservando o que o usuario digitou (W-005/6: nao perder dados no erro).
+        async Task<IActionResult> ReexibirComErro(string erro)
+        {
+            var vmErro = new CriarContaViewModel
+            {
+                Descricao = descricao,
+                CategoriaFinanceiraId = categoriaFinanceiraId == Guid.Empty ? null : categoriaFinanceiraId,
+                CentroCustoId = centroCustoId,
+                DataEmissao = dataEmissao,
+                ValorTotal = valorTotal,
+                NumeroParcelas = numeroParcelas,
+                PrimeiraVencimento = primeiraVencimento,
+                IntervaloTipo = intervaloTipo,
+                Observacoes = observacoes,
+                EmitirAposCriar = emitirAposCriar,
+                Erro = erro
+            };
+            var catsErro = await svc.ListarCategoriasAsync(ativa: true, tipo: "Despesa");
+            if (catsErro.Success && catsErro.Data is not null) vmErro.Categorias = catsErro.Data;
+            var centrosErro = await svc.ListarCentrosCustoAsync(ativo: true);
+            if (centrosErro.Success && centrosErro.Data is not null) vmErro.CentrosCusto = centrosErro.Data;
+            ViewBag.Title = "Nova Conta a Pagar";
+            ViewBag.ActiveMenuItem = "ContasAPagar";
+            return View("Criar", vmErro);
+        }
+
         if (string.IsNullOrWhiteSpace(descricao))
-        {
-            Toast("error", "Descricao e obrigatoria.");
-            return RedirectToAction(nameof(Criar));
-        }
+            return await ReexibirComErro("Descricao e obrigatoria.");
         if (categoriaFinanceiraId == Guid.Empty)
-        {
-            Toast("error", "Selecione ou crie uma categoria.");
-            return RedirectToAction(nameof(Criar));
-        }
+            return await ReexibirComErro("Selecione ou crie uma categoria.");
         if (numeroParcelas < 1 || numeroParcelas > 36)
-        {
-            Toast("error", "Numero de parcelas deve estar entre 1 e 36.");
-            return RedirectToAction(nameof(Criar));
-        }
+            return await ReexibirComErro("Numero de parcelas deve estar entre 1 e 36.");
         if (valorTotal <= 0m)
-        {
-            Toast("error", "Valor total deve ser positivo.");
-            return RedirectToAction(nameof(Criar));
-        }
+            return await ReexibirComErro("Valor total deve ser positivo.");
         if (primeiraVencimento.Date < dataEmissao.Date)
-        {
-            Toast("error", "A 1a vencimento nao pode ser anterior a data de emissao.");
-            return RedirectToAction(nameof(Criar));
-        }
+            return await ReexibirComErro("A 1a vencimento nao pode ser anterior a data de emissao.");
 
         var parcelas = MontarParcelas(valorTotal, numeroParcelas, primeiraVencimento, intervaloTipo);
 
@@ -93,7 +104,8 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
             descricao, categoriaFinanceiraId, dataEmissao, parcelas,
             fornecedorId, centroCustoId, observacoes, emitirAposCriar);
 
-        if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Criar));
+        if (HasError(result) || result.Data is null)
+            return await ReexibirComErro(result.ErrorMessage ?? "Nao foi possivel criar a conta. Tente novamente.");
 
         Toast("success", "Conta a pagar criada com sucesso.");
         return RedirectToAction(nameof(Detalhe), new { id = result.Data.Id });
