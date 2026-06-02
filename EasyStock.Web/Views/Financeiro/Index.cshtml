@@ -1,6 +1,13 @@
 @model EasyStock.Web.Services.DashboardFinanceiroApi
 @{
     var hojeIso = BrazilTime.Today().ToString("yyyy-MM-dd");
+    var em30Iso = BrazilTime.Today().AddDays(30).ToString("yyyy-MM-dd");
+    var saldoMes = Model.TotalRecebidoMes - Model.TotalPagoMes;
+    // Drill-in com janela movel 30d (controllers aceitam vencimentoDe/Ate). href montado
+    // como string p/ evitar ambiguidade de '&' no atributo Razor.
+    var hrefReceber  = $"/contas-a-receber?vencimentoDe={hojeIso}&vencimentoAte={em30Iso}";
+    var hrefPagar    = $"/contas-a-pagar?vencimentoDe={hojeIso}&vencimentoAte={em30Iso}";
+    var hrefVencidas = $"/contas-a-pagar?vencimentoAte={hojeIso}";
 }
 
 <div class="page-content">
@@ -12,31 +19,21 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <a href="/contas-a-receber" class="card block hover:shadow-md transition">
-            <div class="text-xs text-gray-500 uppercase">A Receber 30d</div>
-            <div class="text-2xl font-semibold text-blue-700 mt-1">@Model.TotalAVencer30dReceber.AsMoney()</div>
-            <div class="text-xs text-gray-500 mt-1">@Model.QtdContasReceberAbertas conta(s) em aberto</div>
-        </a>
-        <a href="/contas-a-pagar" class="card block hover:shadow-md transition">
-            <div class="text-xs text-gray-500 uppercase">A Pagar 30d</div>
-            <div class="text-2xl font-semibold text-orange-700 mt-1">@Model.TotalAVencer30dPagar.AsMoney()</div>
-            <div class="text-xs text-gray-500 mt-1">@Model.QtdContasPagarAbertas conta(s) em aberto</div>
-        </a>
-        <div class="card">
-            <div class="text-xs text-gray-500 uppercase">Vencidas hoje</div>
-            <div class="text-2xl font-semibold text-red-700 mt-1">
-                @((Model.TotalVencidoPagar + Model.TotalVencidoReceber).AsMoney())
-            </div>
-            <div class="text-xs text-gray-500 mt-1">@Model.QtdParcelasVencidasHoje parcela(s) atrasadas</div>
-        </div>
-        <div class="card">
-            <div class="text-xs text-gray-500 uppercase">No mês</div>
-            <div class="text-sm text-green-700 font-medium mt-2">+ @Model.TotalRecebidoMes.AsMoney() recebido</div>
-            <div class="text-sm text-red-700 font-medium">- @Model.TotalPagoMes.AsMoney() pago</div>
-            <div class="text-xs text-gray-500 mt-1">
-                Saldo: @((Model.TotalRecebidoMes - Model.TotalPagoMes).AsMoney())
-            </div>
-        </div>
+        <es-stat-card label="A Receber 30d"
+                      value="@Model.TotalAVencer30dReceber.AsMoney()"
+                      delta-meta="@(Model.QtdContasReceberAbertas) conta(s) em aberto"
+                      href="@hrefReceber" />
+        <es-stat-card label="A Pagar 30d"
+                      value="@Model.TotalAVencer30dPagar.AsMoney()"
+                      delta-meta="@(Model.QtdContasPagarAbertas) conta(s) em aberto"
+                      href="@hrefPagar" />
+        <es-stat-card label="Vencidas"
+                      value="@((Model.TotalVencidoPagar + Model.TotalVencidoReceber).AsMoney())"
+                      delta-meta="@(Model.QtdParcelasVencidasHoje) parcela(s) atrasadas"
+                      href="@hrefVencidas" />
+        <es-stat-card label="Saldo do mês"
+                      value="@saldoMes.AsMoney()"
+                      delta-meta="+@Model.TotalRecebidoMes.AsMoney() recebido · -@Model.TotalPagoMes.AsMoney() pago" />
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
