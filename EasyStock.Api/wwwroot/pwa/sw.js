@@ -221,11 +221,18 @@ function etqRenderWithTtl(req) {
   const now = Date.now();
   return caches.open(ETQ_RENDER_CACHE).then(cache =>
     cache.match(req).then(cached => {
-      const fetchAndStore = fetch(req).then(resp => {
+      const fetchAndStore = fetch(req).then(async resp => {
         if (resp.ok) {
-          const copy = resp.clone();
-          // Armazena com timestamp no header sintético via Response wrapping
-          cache.put(req, copy);
+          // #SW1: grava a resposta COM o header sintetico x-sw-cached-at. Antes
+          // o cache.put(copy) NAO carimbava -> o read de `age` lia '0' -> TTL
+          // morto (stale nunca servido dentro de 1h). Headers de uma Response de
+          // fetch sao imutaveis: reconstroi a Response carimbada e cacheia essa.
+          try {
+            const body = await resp.clone().blob();
+            const headers = new Headers(resp.headers);
+            headers.set('x-sw-cached-at', String(now));
+            await cache.put(req, new Response(body, { status: resp.status, statusText: resp.statusText, headers }));
+          } catch (e) { /* cache best-effort — nao quebra a resposta entregue */ }
         }
         return resp;
       }).catch(() => cached);
