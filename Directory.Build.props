@@ -17,7 +17,22 @@
   <PropertyGroup>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591 (membro publico sem doc XML): nao exigimos doc XML publica. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!--
+      Warnings de XML-doc sao COLATERAL do GenerateDocumentationFile (ligado so p/
+      IDE0005, nao como gate de qualidade de doc). Suprimimos pra nao quebrar o build
+      sob -warnaserror no CI (issue #397). Nao sao correcao:
+        CS1570 XML malformado · CS1573 param sem doc · CS1574/CS1584/CS1734 cref invalido
+        · CS1587 doc fora de elemento · CS1658 erro em doc · CS0081 cref {tipo concreto}.
+    -->
+    <NoWarn>$(NoWarn);CS1570;CS1573;CS1574;CS1584;CS1587;CS1658;CS1734;CS0081</NoWarn>
+    <!--
+      Code smells reais — NAO bloqueiam o build (-warnaserror), mas ficam VISIVEIS como
+      warning p/ burn-down futuro (issue #397): CS1998 (async sem await), CS9113 (param
+      de primary ctor nao usado). CS8602 (null-deref) fica como erro: corrigir, nao mascarar.
+    -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1998;CS9113</WarningsNotAsErrors>
   </PropertyGroup>
 
 </Project>

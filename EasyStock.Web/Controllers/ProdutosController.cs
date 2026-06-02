@@ -604,7 +604,7 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
             custoReferencia = p.CustoReferencia?.Valor,
             precoReferencia = p.PrecoReferencia?.Valor,
             // C2 (RDC 727/2022): usado pelo Lotes/Index.cshtml para validar peso.
-            tipoEmbalagem = p.TipoEmbalagem.ToString()
+            tipoEmbalagem = p.TipoEmbalagem?.ToString()
         });
         return Json(items);
     }
