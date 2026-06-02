@@ -3,7 +3,7 @@
 // Valida: init, save/get/remove, listPending, markUploaded, getStats
 'use strict';
 
-module.exports = function ({ test, sandbox, assert }) {
+module.exports = function ({ test, sandbox, assert, skip }) {
   const ps = () => sandbox.window && sandbox.window.cdbPhotoStore;
 
   test('F10-C-7: photo-store existe no window apos boot', () => {
@@ -28,7 +28,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('F10-C-7: cdbSync expoe computeStrippedBatch', () => {
     const sync = sandbox.window && sandbox.window.cdbSync;
-    if (!sync || !sync.computeStrippedBatch) return;
+    assert.ok(sync && sync.computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     // Testa strip de batch com foto pesada (>4KB data URL)
     var bigPhoto = 'data:image/jpeg;base64,' + 'A'.repeat(5000);
     var batch = {
@@ -53,7 +53,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('F10-C-7: getStats retorna estrutura valida', async () => {
-    if (!ps() || !ps().ready) return;
+    if (!ps() || !ps().ready) skip('photo-store IDB indisponivel no sandbox vm (sem IndexedDB)');
     var stats = await ps().getStats();
     assert.ok(typeof stats.total === 'number', 'total e numero');
     assert.ok(typeof stats.pending === 'number', 'pending e numero');

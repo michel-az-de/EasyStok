@@ -48,7 +48,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
   // silencioso cross-loja). Testes validam o contrato de entrada.
   test('A4: switchLoja rejeita lojaId vazio', async () => {
     const cdbSync = sandbox.window && sandbox.window.cdbSync;
-    if (!cdbSync || !cdbSync.switchLoja) return;
+    assert.ok(cdbSync && cdbSync.switchLoja, 'cdbSync.switchLoja deve existir apos boot');
     // Pairing valido + online pra chegar no check de lojaId (ordem: rede,
     // pareado, lojaId, fila, fetch).
     sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ apiKey: 'mk_test' }));
@@ -64,7 +64,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
 
   test('A4: switchLoja rejeita quando sem rede', async () => {
     const cdbSync = sandbox.window && sandbox.window.cdbSync;
-    if (!cdbSync || !cdbSync.switchLoja) return;
+    assert.ok(cdbSync && cdbSync.switchLoja, 'cdbSync.switchLoja deve existir apos boot');
     const origOnLine = sandbox.navigator.onLine;
     sandbox.navigator.onLine = false;
     try {
@@ -76,7 +76,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
 
   test('A4: switchLoja rejeita quando nao pareado', async () => {
     const cdbSync = sandbox.window && sandbox.window.cdbSync;
-    if (!cdbSync || !cdbSync.switchLoja) return;
+    assert.ok(cdbSync && cdbSync.switchLoja, 'cdbSync.switchLoja deve existir apos boot');
     sandbox.localStorage.removeItem('cdb-pairing');
     // navigator.onLine padrao do sandbox = true; entao chega no check de pairing.
     await assert.rejects(cdbSync.switchLoja('lj-x'), /pareado/);

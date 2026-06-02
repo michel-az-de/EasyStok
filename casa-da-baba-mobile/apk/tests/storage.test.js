@@ -15,7 +15,7 @@ module.exports = function ({ test, sandbox, assert }) {
   }
 
   test('A6: computeStrippedBatch remove batchPhoto base64 grande', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return; // boot ainda nao subiu
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     const batch = {
       id: 'b1',
       code: 'L-001',
@@ -32,7 +32,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A6: computeStrippedBatch remove items[].photo base64 grande', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return;
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     const batch = {
       id: 'b2',
       code: 'L-002',
@@ -52,7 +52,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A6: computeStrippedBatch NAO toca dataURLs pequenos (< 4KB)', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return;
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     // Icones inline SVG ou placeholders nao devem ser strippados — sao pequenos
     // e tem semantica de UI (nao saturam quota).
     const smallIcon = 'data:image/svg+xml;base64,' + 'A'.repeat(100);
@@ -69,7 +69,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A6: computeStrippedBatch e idempotente (re-aplicar mesmo resultado)', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return;
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     const batch = {
       id: 'b4',
       batchPhoto: makeDataUrl(20_000),
@@ -84,7 +84,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A6: hash bate pra mesmo conteudo, difere pra conteudos diferentes', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return;
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     const a = { id: 'a', batchPhoto: makeDataUrl(20_000) };
     const b = { id: 'b', batchPhoto: makeDataUrl(20_000) }; // mesmo conteudo
     const c = { id: 'c', batchPhoto: makeDataUrl(30_000) }; // diferente
@@ -96,14 +96,14 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A6: stripa nada se batch sem fotos', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return;
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     const batch = { id: 'plain', code: 'L-X', items: [{ productId: 'p', qty: 1 }] };
     const stripped = cdbSync().computeStrippedBatch(batch);
     assert.deepStrictEqual(stripped, batch);
   });
 
   test('A6: tolera batch null/undefined', () => {
-    if (!cdbSync() || !cdbSync().computeStrippedBatch) return;
+    assert.ok(cdbSync() && cdbSync().computeStrippedBatch, 'cdbSync.computeStrippedBatch deve existir apos boot');
     assert.strictEqual(cdbSync().computeStrippedBatch(null), null);
     assert.strictEqual(cdbSync().computeStrippedBatch(undefined), undefined);
   });

@@ -13,33 +13,53 @@ module.exports = function ({ test, sandbox, assert }) {
   const cdbSync = () => sandbox.window && sandbox.window.cdbSync;
 
   test('F10-C-1: mutation id usa prefixo mut_ e tem 32+ caracteres', () => {
-    if (!cdbSync() || !cdbSync().enqueue) return;
-    cdbSync().enqueue([{ type: 'product.upsert', payload: { id: 'p-test-1', nome: 'T' } }]);
-    const q = JSON.parse(sandbox.localStorage.getItem('cdb-sync-queue') || '[]');
-    assert.ok(q.length >= 1, 'pelo menos 1 mutation enfileirada');
-    const id = q[q.length - 1].id;
-    assert.ok(typeof id === 'string', 'id e string');
-    assert.ok(id.startsWith('mut_'), 'id usa prefixo mut_ (era m-)');
-    // UUID v4 tem 36 chars com hifens; com prefixo "mut_" total >= 32
-    assert.ok(id.length >= 32, 'id tem comprimento suficiente pra ser UUID v4');
+    // #390: `enqueue` e privado; o caminho publico e pushAll(), que le
+    // window.cdbApp.getState(). (Antes o teste chamava cdbSync().enqueue —
+    // inexistente — e PULAVA silencioso; nunca rodava de fato.)
+    assert.ok(cdbSync() && cdbSync().pushAll, 'cdbSync().pushAll deve existir apos boot');
+    sandbox.localStorage.removeItem('cdb-sync-queue');
+    sandbox.window.cdbApp = { getState: () => ({
+      products: [{ id: 'p-test-1', nome: 'T' }], clients: [], orders: [], cashEntries: [], batches: []
+    }), setPendingSync: () => {} };
+    try {
+      cdbSync().pushAll();
+      const q = JSON.parse(sandbox.localStorage.getItem('cdb-sync-queue') || '[]');
+      assert.ok(q.length >= 1, 'pelo menos 1 mutation enfileirada');
+      const id = q[q.length - 1].id;
+      assert.ok(typeof id === 'string', 'id e string');
+      assert.ok(id.startsWith('mut_'), 'id usa prefixo mut_ (era m-)');
+      // UUID v4 tem 36 chars com hifens; com prefixo "mut_" total >= 32
+      assert.ok(id.length >= 32, 'id tem comprimento suficiente pra ser UUID v4');
+    } finally {
+      delete sandbox.window.cdbApp;
+      sandbox.localStorage.removeItem('cdb-sync-queue');
+    }
   });
 
   test('F10-C-1: mutation ids sao unicos em chamadas seguidas (sem colisao por ms)', () => {
-    if (!cdbSync() || !cdbSync().enqueue) return;
-    // 100 enqueues no mesmo tick — geram ids unicos.
-    const muts = [];
-    for (let i = 0; i < 100; i++) {
-      muts.push({ type: 'product.upsert', payload: { id: 'p-uniq-' + i } });
+    assert.ok(cdbSync() && cdbSync().pushAll, 'cdbSync().pushAll deve existir apos boot');
+    // 100 produtos num unico pushAll() -> 100 mutations no mesmo tick; ids unicos.
+    sandbox.localStorage.removeItem('cdb-sync-queue');
+    const products = [];
+    for (let i = 0; i < 100; i++) products.push({ id: 'p-uniq-' + i, nome: 'P' + i });
+    sandbox.window.cdbApp = { getState: () => ({
+      products, clients: [], orders: [], cashEntries: [], batches: []
+    }), setPendingSync: () => {} };
+    try {
+      cdbSync().pushAll();
+      const q = JSON.parse(sandbox.localStorage.getItem('cdb-sync-queue') || '[]');
+      const ids = q.map(m => m.id);
+      const uniq = new Set(ids);
+      assert.ok(ids.length >= 100, '>= 100 mutations enfileiradas');
+      assert.strictEqual(uniq.size, ids.length, 'ids unicos (zero colisao por ms)');
+    } finally {
+      delete sandbox.window.cdbApp;
+      sandbox.localStorage.removeItem('cdb-sync-queue');
     }
-    cdbSync().enqueue(muts);
-    const q = JSON.parse(sandbox.localStorage.getItem('cdb-sync-queue') || '[]');
-    const ids = q.map(m => m.id);
-    const uniq = new Set(ids);
-    assert.strictEqual(uniq.size, ids.length, '100 mutations -> 100 ids unicos (zero colisao)');
   });
 
   test('F10-C-1: flush concorrente retorna a MESMA promise (mutex)', async () => {
-    if (!cdbSync() || !cdbSync().flush) return;
+    assert.ok(cdbSync() && cdbSync().flush, 'cdbSync().flush deve existir apos boot');
     // Limpa fila residual dos testes de enqueue acima para garantir isolamento.
     sandbox.localStorage.removeItem('cdb-sync-queue');
     // Sem nada na fila, flush retorna 'empty' rapido. Mas o mutex deve
@@ -54,7 +74,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('F10-C-1: 5 flushes seguidos com fila vazia nao geram lixo (empty pra todos)', async () => {
-    if (!cdbSync() || !cdbSync().flush) return;
+    assert.ok(cdbSync() && cdbSync().flush, 'cdbSync().flush deve existir apos boot');
     sandbox.localStorage.removeItem('cdb-sync-queue');
     const results = await Promise.all([
       cdbSync().flush(), cdbSync().flush(), cdbSync().flush(),

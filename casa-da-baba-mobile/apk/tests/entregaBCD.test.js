@@ -84,7 +84,7 @@ module.exports = function ({ test, sandbox, assert }) {
   // ---------- C2: scheduledDeliveryAt preservado em enqueue ----------
 
   test('C2: order com scheduledDeliveryAt mantem campo na fila', () => {
-    if (!cdbSync()) return;
+    assert.ok(cdbSync(), 'cdbSync deve existir apos boot (runner garante via poll)');
     // Setup: mock cdbApp.getState com 1 order tendo scheduledDeliveryAt.
     // Trigger cdbOnPersist passando state com a order — diff vs lastSnapshot
     // (vazio) deve enfileirar order.upsert intacta.
@@ -123,7 +123,7 @@ module.exports = function ({ test, sandbox, assert }) {
   // ---------- C3: handler onSyncConflict respeita winningPayload (smoke API) ----------
 
   test('C3: cdbApp.onSyncConflict aceita winningPayload (hook ponto)', () => {
-    if (!cdbSync()) return;
+    assert.ok(cdbSync(), 'cdbSync deve existir apos boot (runner garante via poll)');
     // Smoke: garantimos que o sync.js consulta window.cdbApp.onSyncConflict
     // pra entregar os conflicts. Sem rede pra disparar conflict real, soh
     // validamos que o app pode plugar a funcao sem quebrar nada.
@@ -148,7 +148,7 @@ module.exports = function ({ test, sandbox, assert }) {
   // ---------- C4: SSE order.ready custom event (smoke) ----------
 
   test('C4: window.dispatchEvent cdb-order-ready aceita detail estruturado', () => {
-    if (typeof sandbox.window.CustomEvent !== 'function' && typeof CustomEvent === 'undefined') return;
+    assert.strictEqual(typeof sandbox.window.CustomEvent, 'function', 'CustomEvent stub disponivel no sandbox (#390)');
     // Smoke: garantimos que o tipo de evento existe e detail pode carregar payload.
     // Sandbox stub dispatchEvent eh no-op, mas a chamada nao deve throw.
     try {

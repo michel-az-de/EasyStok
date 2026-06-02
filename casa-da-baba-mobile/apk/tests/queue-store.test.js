@@ -20,25 +20,35 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('F10-C-2: MAX_ATTEMPTS e DEADLETTER_CAP estao definidos', () => {
-    if (!qs()) return;
+    assert.ok(qs(), 'cdbQueueStore deve existir apos boot');
     assert.strictEqual(qs().MAX_ATTEMPTS, 50, 'MAX_ATTEMPTS = 50');
     assert.strictEqual(qs().DEADLETTER_CAP, 200, 'DEADLETTER_CAP = 200');
   });
 
   test('F10-C-2: cdbSync expoe getQueueStats', async () => {
     const sync = sandbox.window && sandbox.window.cdbSync;
-    if (!sync || !sync.getQueueStats) return;
+    assert.ok(sync && sync.getQueueStats, 'cdbSync.getQueueStats deve existir apos boot');
     const stats = await sync.getQueueStats();
     assert.ok(typeof stats.queueCount === 'number', 'queueCount e numero');
     assert.ok(typeof stats.storage === 'string', 'storage e string');
   });
 
-  test('F10-C-2: enqueue via cdbSync popula fila (compat)', () => {
+  test('F10-C-2: pushAll via cdbSync popula fila (compat)', () => {
     const sync = sandbox.window && sandbox.window.cdbSync;
-    if (!sync || !sync.enqueue) return;
-    // A fila deve funcionar mesmo em modo degraded (localStorage)
-    const before = sync.queueSize();
-    // Nao podemos garantir IDB no test runner, mas o compat deve funcionar
-    assert.ok(typeof before === 'number', 'queueSize retorna numero');
+    // #390: enqueue e privado; pushAll() e o caminho publico (le cdbApp.getState).
+    assert.ok(sync && sync.pushAll && sync.queueSize, 'cdbSync.pushAll/queueSize devem existir apos boot');
+    sandbox.localStorage.removeItem('cdb-sync-queue');
+    sandbox.window.cdbApp = { getState: () => ({
+      products: [{ id: 'p-compat-1', nome: 'C' }], clients: [], orders: [], cashEntries: [], batches: []
+    }), setPendingSync: () => {} };
+    try {
+      const before = sync.queueSize();
+      assert.ok(typeof before === 'number', 'queueSize retorna numero');
+      sync.pushAll();
+      assert.ok(sync.queueSize() > before, 'pushAll incrementou a fila (compat localStorage/IDB)');
+    } finally {
+      delete sandbox.window.cdbApp;
+      sandbox.localStorage.removeItem('cdb-sync-queue');
+    }
   });
 };

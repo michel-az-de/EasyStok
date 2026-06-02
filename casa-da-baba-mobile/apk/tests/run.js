@@ -132,6 +132,11 @@ const sandbox = {
   cancelAnimationFrame: id => clearTimeout(id),
   Image: class { constructor() { setTimeout(() => this.onerror && this.onerror(new Error('no img')), 0); } },
   HTMLElement: class {},
+  // #390: CustomEvent/Event stubs — antes ausentes, faziam C4 (entregaBCD)
+  // pular silenciosamente e os dispatch de sync.js (cdb-sync-success etc)
+  // caírem no catch. Stub minimo preserva type+detail; dispatchEvent e' no-op.
+  CustomEvent: class { constructor(type, opts) { this.type = type; this.detail = (opts && opts.detail) || null; } },
+  Event: class { constructor(type) { this.type = type; } },
   Capacitor: undefined,
   // Padrao Web — usados por escpos e outras conversoes binarias
   TextEncoder, TextDecoder, Uint8Array, Uint16Array, Int32Array, ArrayBuffer, DataView,

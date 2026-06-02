@@ -51,7 +51,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sw.js: CACHE_VERSION existe e tem prefixo cdb-', () => {
     const sw = loadSwSource();
-    if (!sw) return; // CI ainda não copiou — skip silencioso
+    assert.ok(sw, 'sw.js source deve carregar (fallback p/ wwwroot/pwa)'); // CI ainda não copiou — skip silencioso
     const m = sw.content.match(/const\s+CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/);
     assert.ok(m, 'CACHE_VERSION não encontrado em sw.js');
     assert.ok(m[1].startsWith('cdb-'),
@@ -62,7 +62,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sw.js: handler de SKIP_WAITING registrado (Onda 9)', () => {
     const sw = loadSwSource();
-    if (!sw) return;
+    assert.ok(sw, 'sw.js source deve carregar (fallback p/ wwwroot/pwa)');
     // PWA pode estar travado em "waiting" — sync.js manda postMessage
     // SKIP_WAITING; sw.js precisa chamar self.skipWaiting() em resposta.
     assert.ok(sw.content.includes("SKIP_WAITING"),
@@ -73,14 +73,14 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sw.js: handler de CHECK_UPDATE registrado (Onda 9)', () => {
     const sw = loadSwSource();
-    if (!sw) return;
+    assert.ok(sw, 'sw.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(sw.content.includes("CHECK_UPDATE"),
       'sw.js deve tratar mensagem CHECK_UPDATE pra forçar registration.update()');
   });
 
   test('sw.js: handler de CLEAR_CACHE limpa caches.keys() (Onda 9)', () => {
     const sw = loadSwSource();
-    if (!sw) return;
+    assert.ok(sw, 'sw.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(sw.content.includes("CLEAR_CACHE"),
       'sw.js deve tratar mensagem CLEAR_CACHE');
     // Validação semântica: handler deve chamar caches.keys e delete.
@@ -92,7 +92,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sw.js: install_listener tem skipWaiting() pra ativação imediata', () => {
     const sw = loadSwSource();
-    if (!sw) return;
+    assert.ok(sw, 'sw.js source deve carregar (fallback p/ wwwroot/pwa)');
     // Garantia adicional contra "novo SW preso em waiting" — sem isso,
     // o auto-update silencioso por controllerchange não dispara.
     const installMatch = sw.content.match(/addEventListener\(\s*['"]install['"][\s\S]*?skipWaiting/);
@@ -103,14 +103,14 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sync.js: PWA_INSTALLED_VERSION_KEY persiste em cdb-pwa-installed-version', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(sync.content.includes('cdb-pwa-installed-version'),
       'sync.js deve usar a chave cdb-pwa-installed-version pra rastrear bundle instalado');
   });
 
   test('sync.js: maybeApplyPwaUpdate compara Ota.PwaCacheVersion', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(sync.content.includes('PwaCacheVersion'),
       'sync.js deve ler Ota.PwaCacheVersion da resposta de /version');
     assert.ok(/maybeApplyPwaUpdate|triggerPwaUpdate/.test(sync.content),
@@ -119,7 +119,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sync.js: triggerPwaUpdate chama registration.update() + SKIP_WAITING', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(/reg\.update\s*\(/.test(sync.content),
       'sync.js deve chamar reg.update() pra forçar refetch do sw.js');
     assert.ok(sync.content.includes('SKIP_WAITING'),
@@ -128,7 +128,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sync.js: triggerPwaUpdate em modo force limpa caches', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     // Pra comando pwa_update vindo do backend, queremos limpar TUDO antes
     // de recarregar — caches.delete() na window é o caminho oficial.
     assert.ok(/caches\.keys|CLEAR_CACHE/.test(sync.content),
@@ -137,21 +137,21 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('sync.js: executor remoto suporta pwa_update', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(sync.content.includes("'pwa_update'") || sync.content.includes('"pwa_update"'),
       'executeRemoteCommand deve aceitar pwa_update');
   });
 
   test('sync.js: executor remoto suporta clear_cache', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(sync.content.includes("'clear_cache'") || sync.content.includes('"clear_cache"'),
       'executeRemoteCommand deve aceitar clear_cache');
   });
 
   test('sync.js: cdbSync expõe forceUpdate() pra debug', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
     assert.ok(/forceUpdate\s*[:=]/.test(sync.content),
       'cdbSync deve expor forceUpdate (botão manual / debug)');
     assert.ok(/installedPwaVersion\s*[:=]/.test(sync.content),
@@ -162,7 +162,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('contrato: comandos remotos batem entre PWA e backend', () => {
     const sync = loadSyncSource();
-    if (!sync) return;
+    assert.ok(sync, 'sync.js source deve carregar (fallback p/ wwwroot/pwa)');
 
     // Lista que o sync.js sabe executar — extraída do switch.
     const tiposSuportadosNoSync = [

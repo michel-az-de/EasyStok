@@ -9,7 +9,7 @@ module.exports = function ({ test, sandbox, assert }) {
   const cdbSync = () => sandbox.window && sandbox.window.cdbSync;
 
   test('A5: applyBackupSnapshot escreve chaves cdb-* no localStorage', () => {
-    if (!cdbSync() || !cdbSync().applyBackupSnapshot) return;
+    assert.ok(cdbSync() && cdbSync().applyBackupSnapshot, 'cdbSync.applyBackupSnapshot deve existir apos boot');
     sandbox.localStorage.clear();
     const backup = {
       schema: 'cdb-backup-v1',
@@ -29,7 +29,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A5: applyBackupSnapshot NAO sobrescreve cdb-pairing nem cdb-device-id', () => {
-    if (!cdbSync() || !cdbSync().applyBackupSnapshot) return;
+    assert.ok(cdbSync() && cdbSync().applyBackupSnapshot, 'cdbSync.applyBackupSnapshot deve existir apos boot');
     sandbox.localStorage.clear();
     // Cenario: device foi re-pareado apos backup. O pairing atual deve sobreviver.
     sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ apiKey: 'NOVO_KEY' }));
@@ -51,7 +51,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A5: applyBackupSnapshot ignora chaves nao-cdb', () => {
-    if (!cdbSync() || !cdbSync().applyBackupSnapshot) return;
+    assert.ok(cdbSync() && cdbSync().applyBackupSnapshot, 'cdbSync.applyBackupSnapshot deve existir apos boot');
     sandbox.localStorage.clear();
     const backup = {
       schema: 'cdb-backup-v1',
@@ -69,7 +69,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A5: applyBackupSnapshot rejeita backup invalido', () => {
-    if (!cdbSync() || !cdbSync().applyBackupSnapshot) return;
+    assert.ok(cdbSync() && cdbSync().applyBackupSnapshot, 'cdbSync.applyBackupSnapshot deve existir apos boot');
     assert.throws(() => cdbSync().applyBackupSnapshot(null), /invalido/);
     assert.throws(() => cdbSync().applyBackupSnapshot({}), /invalido/);
     assert.throws(() => cdbSync().applyBackupSnapshot({ data: null }), /invalido/);
@@ -77,7 +77,7 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('A5: maybeOfferRestoreOnReinstall existe na API publica', () => {
-    if (!cdbSync()) return;
+    assert.ok(cdbSync(), 'cdbSync deve existir apos boot');
     assert.strictEqual(typeof cdbSync().maybeOfferRestoreOnReinstall, 'function',
       'maybeOfferRestoreOnReinstall exposta no cdbSync');
     assert.strictEqual(typeof cdbSync().applyBackupSnapshot, 'function');
