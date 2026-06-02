@@ -233,6 +233,12 @@ button:focus-visible {
 /* Main content offset (acompanha sidebar) */
 .app-main {
   flex: 1;
+  /* #10: sem isto o flex item herda min-width:auto e NAO encolhe abaixo do
+     min-content do conteudo -> conteudo largo (ex.: tabela) empurra o .app-shell
+     alem do viewport e cria scroll horizontal na pagina (medido: scrollWidth
+     1223 vs clientWidth 1127). min-width:0 deixa encolher; o conteudo interno
+     (es-data-table) tem seu proprio overflow-x:auto. No-op em viewports largos. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
