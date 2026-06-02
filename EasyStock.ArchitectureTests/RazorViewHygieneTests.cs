@@ -14,6 +14,7 @@ namespace EasyStock.ArchitectureTests;
 /// no plano de refatoracao Fase 2/3/4/6. Ao migrar um arquivo da lista, remova-o.
 /// O teste tambem falha se um arquivo da allowlist nao tem mais hex, forcando limpeza.
 /// </summary>
+[Trait("Category", "Architecture")]
 public class RazorViewHygieneTests
 {
     private static readonly Regex HexColorRegex = new(
