@@ -5646,6 +5646,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("aprovado_por_usuario_id");
 
+                    b.Property<DateTime?>("AvaliacaoSolicitadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("avaliacao_solicitada_em");
+
                     b.Property<DateTime?>("CanceladoEm")
                         .HasColumnType("timestamp with time zone");
 

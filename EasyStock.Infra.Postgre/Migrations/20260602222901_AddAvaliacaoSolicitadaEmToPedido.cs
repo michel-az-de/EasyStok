@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace EasyStock.Infra.Postgre.Data.Migrations
+namespace EasyStock.Infra.Postgre.Migrations
 {
     /// <inheritdoc />
     public partial class AddAvaliacaoSolicitadaEmToPedido : Migration
