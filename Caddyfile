@@ -20,3 +20,11 @@
 {$API_HOST} {
 	reverse_proxy api:8080
 }
+
+# Casa da Baba — atalho dedicado: raiz abre o PWA; o resto proxia pra API
+# (mesma origem preservada => os fetch relativos /api/... continuam funcionando).
+{$CASA_HOST} {
+	@root path /
+	redir @root /pwa/
+	reverse_proxy api:8080
+}

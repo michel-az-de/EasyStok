@@ -138,6 +138,7 @@ services:
       APP_HOST: ${APP_HOST}
       ADMIN_HOST: ${ADMIN_HOST}
       API_HOST: ${API_HOST}
+      CASA_HOST: ${CASA_HOST}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
