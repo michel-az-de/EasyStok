@@ -149,6 +149,19 @@ public class CriarContaViewModel
 {
     public List<CategoriaFinanceiraApi> Categorias { get; set; } = [];
     public List<CentroCustoApi> CentrosCusto { get; set; } = [];
+
+    // Valores postados — repopulados no re-render apos erro (W-005/6: preserva o que foi digitado).
+    public string? Descricao { get; set; }
+    public Guid? CategoriaFinanceiraId { get; set; }
+    public Guid? CentroCustoId { get; set; }
+    public DateTime? DataEmissao { get; set; }
+    public decimal? ValorTotal { get; set; }
+    public int? NumeroParcelas { get; set; }
+    public DateTime? PrimeiraVencimento { get; set; }
+    public string? IntervaloTipo { get; set; }
+    public string? Observacoes { get; set; }
+    public bool EmitirAposCriar { get; set; }
+    public string? Erro { get; set; }
 }
 
 public class ContaPagarDetalheViewModel
