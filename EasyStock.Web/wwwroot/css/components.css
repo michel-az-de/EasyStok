@@ -1036,3 +1036,44 @@ a.card:focus-visible,
   justify-content: flex-end;
   gap: var(--s-2);
 }
+
+/* ============================================================
+   Empty state (es-empty-state) — port do EasyStock.Admin (convergencia DS).
+   Consumido por <es-empty-state> (icone via LucideIconResolver).
+   ============================================================ */
+.es-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-9) var(--s-6);
+  text-align: center;
+  gap: var(--s-3);
+  color: var(--text-secondary);
+}
+.es-empty-state-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-lg);
+  display: grid;
+  place-items: center;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  margin-bottom: var(--s-1);
+}
+.es-empty-state-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.es-empty-state-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  max-width: 360px;
+  line-height: 1.5;
+}
+.es-empty-state-actions {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
