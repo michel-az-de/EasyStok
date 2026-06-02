@@ -17,7 +17,7 @@
         configure cardápio (cardápio aqui mesmo), frete e Mercado Pago (ADMIN-002) — depois ative.
     </p>
 
-    <form method="post" novalidate
+    <form method="post"
           x-data="{ submitting: false, slugTouched: false }"
           x-on:submit="submitting = true">
         @Html.AntiForgeryToken()
