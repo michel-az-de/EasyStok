@@ -979,3 +979,17 @@ button:focus-visible {
 .es-sparkline.is-down .es-sparkline-line { stroke: var(--crit-600); }
 .es-sparkline.is-down .es-sparkline-area { fill: var(--crit-600); }
 .es-sparkline.is-down .es-sparkline-dot { fill: var(--crit-600); }
+
+/* ============================================================
+   A11y — foco visivel por teclado nos cards clicaveis (drill-in).
+   Vence o ":focus-visible { outline: none }" global do app.css:199 por
+   ESPECIFICIDADE (0,2+,x > 0,1,0) — sem !important, sem reordenar imports.
+   outline (nao box-shadow): o card tem overflow:hidden, que cortaria um ring
+   de box-shadow mas NAO corta o outline (pintado fora do border-box).
+   ============================================================ */
+.es-stat-card.is-link:focus-visible,
+a.card:focus-visible,
+.card-interactive:focus-visible {
+  outline: 2px solid var(--orange-500);
+  outline-offset: 2px;
+}
