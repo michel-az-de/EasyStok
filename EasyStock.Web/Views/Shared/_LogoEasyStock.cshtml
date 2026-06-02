@@ -10,7 +10,7 @@
                   - auth:     Easy=navy-900,  Stok=orange-600 (header de Auth com fundo claro)
         ShowMark = true|false                       (default true)
         ShowText = true|false                       (default true)
-        AriaLabel = string                          (default "EasyStock")
+        AriaLabel = string                          (default "EasyStok")
 *@
 @{
     int Resolve(string? sz, int dflt)
@@ -39,7 +39,7 @@
     string variant = Prop("Variant") as string ?? "default";
     bool showMark = Prop("ShowMark") as bool? ?? true;
     bool showText = Prop("ShowText") as bool? ?? true;
-    string ariaLabel = Prop("AriaLabel") as string ?? "EasyStock";
+    string ariaLabel = Prop("AriaLabel") as string ?? "EasyStok";
 
     int markPx = Resolve(size, 28);
     string textClass = variant switch

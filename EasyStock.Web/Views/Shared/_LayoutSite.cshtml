@@ -4,8 +4,8 @@
     var marketing = MarketingOpts.Value;
     var antiForgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var pageTitle = ViewBag.Title is string t && !string.IsNullOrWhiteSpace(t)
-        ? $"{t} — EasyStock"
-        : "EasyStock — Estoque vivo em 7 dias";
+        ? $"{t} — EasyStok"
+        : "EasyStok — Estoque vivo em 7 dias";
     var pageDescription = ViewBag.Description as string
         ?? "Controle de estoque, validade e movimentação para foodservice. Em 7 dias seu estoque vivo no celular. 14 dias grátis.";
     var canonical = ViewBag.Canonical as string
