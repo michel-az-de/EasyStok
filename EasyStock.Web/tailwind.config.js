@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const { navy, orange } = require('../design/tokens.colors');
+
 module.exports = {
   content: [
     './Views/**/*.cshtml',
@@ -23,23 +25,17 @@ module.exports = {
         'sidebar-text': 'rgba(255,255,255,.74)',
         'sidebar-active':'#F26B25',
 
-        // Paleta DS completa (navy)
-        navy: {
-          950: '#04102B', 900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E',
-          600: '#15388A', 500: '#1E48A8', 400: '#3B5BB8', 300: '#7B91D0',
-          200: '#BCC8E5', 100: '#DDE4F2', 50: '#EDF1F9',
-        },
-        // Override do `indigo` default para que classes existentes nas Views
-        // (bg-indigo-600, text-indigo-700, ring-indigo-500…) renderizem em navy,
-        // alinhando ao DS sem precisar reescrever cada cshtml.
-        indigo: {
-          950: '#04102B', 900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E',
-          600: '#15388A', 500: '#1E48A8', 400: '#3B5BB8', 300: '#7B91D0',
-          200: '#BCC8E5', 100: '#DDE4F2', 50: '#EDF1F9',
-        },
+        // Rampas navy/orange vem do modulo compartilhado design/tokens.colors.js
+        // (E2: fonte unica). Valores identicos aos de antes -> dist byte-estavel.
+        navy,
+        // indigo default -> navy: classes bg-indigo-*/text-indigo-* existentes nas
+        // Views renderizam em navy, alinhando ao DS sem reescrever cada cshtml.
+        indigo: navy,
+        // Web emite 7 shades de orange (sem 800/900/950/300). O safelist do Web
+        // forcaria 800/900 se presentes -> pick explicito preserva o dist atual.
         orange: {
-          700: '#BF4307', 600: '#E85814', 500: '#F26B25', 400: '#F8884A',
-          200: '#FAC8AB', 100: '#FCDCC8', 50: '#FEEFE3',
+          700: orange[700], 600: orange[600], 500: orange[500], 400: orange[400],
+          200: orange[200], 100: orange[100], 50: orange[50],
         },
         ink: {
           900: '#0A1530', 800: '#122042', 700: '#2A3556', 600: '#4A5470',

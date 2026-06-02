@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const { navy, orange } = require('../design/tokens.colors');
+
 module.exports = {
   content: [
     './Pages/**/*.cshtml',
@@ -16,18 +18,16 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // ── Brand: navy ──
+        // ── Brand: navy (do modulo compartilhado design/tokens.colors.js — E2) ──
+        // 8 shades que o Admin ja emitia; o safelist forcaria 950/400/300 se
+        // presentes, entao o pick explicito preserva o dist atual.
         navy: {
-          900: '#06143A', 800: '#0A1F52', 700: '#0E2A6E',
-          600: '#15388A', 500: '#1E48A8',
-          200: '#BCC8E5', 100: '#DDE4F2', 50: '#EDF1F9',
+          900: navy[900], 800: navy[800], 700: navy[700],
+          600: navy[600], 500: navy[500],
+          200: navy[200], 100: navy[100], 50: navy[50],
         },
-        // ── Brand: orange (escala completa 50→950) ──
-        orange: {
-          950: '#4A1A03', 900: '#7A2A05', 800: '#9F3706', 700: '#BF4307',
-          600: '#E85814', 500: '#F26B25', 400: '#F8884A', 300: '#FBA978',
-          200: '#FAC8AB', 100: '#FCDCC8', 50: '#FEEFE3',
-        },
+        // ── Brand: orange escala completa 50→950 (do modulo compartilhado) ──
+        orange,
         // ── Aliases legacy via CSS vars do tokens.css (theme-aware) ──
         'es-bg':        'var(--bg-app)',
         'es-surface':   'var(--bg-surface)',
