@@ -1,6 +1,8 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Infra.Async;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Api.IntegrationTests.Infrastructure;
 
@@ -144,9 +146,16 @@ public sealed class AsyncInfrastructureFixture : IDisposable
 
     public AsyncInfrastructureFixture()
     {
-        // Em testes, usar implementações em memória/simuladas
-        CacheService = new InMemoryCacheService();
+        // Cache: implementação REAL de produção (Infra.Async.InMemoryCacheService sobre
+        // IMemoryCache) — NÃO um shadow. Antes este arquivo redefinia uma classe
+        // InMemoryCacheService própria (Dictionary), sombrando a de produção: o "teste de
+        // integração" exercitava a reimplementação, não o código real (ver ADR-0023).
+        CacheService = new InMemoryCacheService(
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<InMemoryCacheService>.Instance);
         QueueService = new BackgroundQueueService();
+        // Email/Storage seguem como doubles em memória: não há implementação de produção
+        // in-memory para esses ports, e os nomes não colidem com tipos de produção.
         EmailService = new TestEmailService();
         StorageService = new InMemoryStorageService();
     }
@@ -155,65 +164,6 @@ public sealed class AsyncInfrastructureFixture : IDisposable
     {
         if (QueueService is IDisposable disposableQueue)
             disposableQueue.Dispose();
-    }
-}
-
-/// <summary>Implementação em memória do cache para testes.</summary>
-public sealed class InMemoryCacheService : ICacheService
-{
-    private readonly Dictionary<string, (object Value, DateTime Expiry)> _cache = new();
-
-    public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null)
-    {
-        var expiry = ttl.HasValue ? DateTime.UtcNow.Add(ttl.Value) : DateTime.MaxValue;
-        _cache[key] = (value!, expiry);
-        return Task.CompletedTask;
-    }
-
-    public Task<T?> GetAsync<T>(string key)
-    {
-        if (_cache.TryGetValue(key, out var entry))
-        {
-            if (DateTime.UtcNow < entry.Expiry)
-            {
-                return Task.FromResult((T?)entry.Value);
-            }
-            _cache.Remove(key);
-        }
-        return Task.FromResult<T?>(default);
-    }
-
-    public Task RemoveAsync(string key)
-    {
-        _cache.Remove(key);
-        return Task.CompletedTask;
-    }
-
-    public Task<bool> ExistsAsync(string key) =>
-        Task.FromResult(_cache.ContainsKey(key) && DateTime.UtcNow < _cache[key].Expiry);
-
-    public async Task<long> IncrementAsync(string key, long value = 1)
-    {
-        var current = await GetAsync<long>(key);
-        var newValue = current + value;
-        await SetAsync(key, newValue);
-        return newValue;
-    }
-
-    public Task SetExpiryAsync(string key, TimeSpan ttl)
-    {
-        if (_cache.TryGetValue(key, out var entry))
-        {
-            _cache[key] = (entry.Value, DateTime.UtcNow.Add(ttl));
-        }
-        return Task.CompletedTask;
-    }
-
-    public Task RemoveAsync(IEnumerable<string> keys)
-    {
-        foreach (var key in keys)
-            _cache.Remove(key);
-        return Task.CompletedTask;
     }
 }
 
