@@ -11,7 +11,7 @@
     </div>
 
     <form method="post" action="/contas-a-pagar/criar" class="card space-y-4"
-          x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal' }"
+          x-data="{ valor: 0, parcelas: 1, primeira: '@amanha', intervalo: 'mensal', parcelaPreview(i) { const n = this.parcelas; if (!n || n < 1) return (0).toFixed(2); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return ((i === n) ? ultima : base).toFixed(2); } }"
           @@submit="if (!$el.querySelector('input[name=categoriaFinanceiraId]')?.value) { $event.preventDefault(); window.showToast?.('Selecione ou crie uma categoria.', 'error'); }">
         @Html.AntiForgeryToken()
 
@@ -79,7 +79,7 @@
             <template x-for="i in parcelas" :key="i">
                 <div class="flex justify-between border-b border-gray-200 py-1">
                     <span x-text="`Parcela ${i}`"></span>
-                    <span x-text="`R$ ${(valor / parcelas).toFixed(2)}`"></span>
+                    <span x-text="`R$ ${parcelaPreview(i)}`"></span>
                 </div>
             </template>
         </div>
