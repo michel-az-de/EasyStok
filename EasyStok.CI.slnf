@@ -6,7 +6,6 @@
       "EasyStock.Application\\EasyStock.Application.csproj",
       "EasyStock.Contracts\\EasyStock.Contracts.csproj",
       "EasyStock.Infra.Postgre\\EasyStock.Infra.Postgre.csproj",
-      "EasyStock.Infra.MongoDb\\EasyStock.Infra.MongoDb.csproj",
       "EasyStock.Infra.Async\\EasyStock.Infra.Async.csproj",
       "EasyStock.Infra.Notifications\\EasyStock.Infra.Notifications.csproj",
       "EasyStock.Infra.Integrations\\EasyStock.Infra.Integrations.csproj",
