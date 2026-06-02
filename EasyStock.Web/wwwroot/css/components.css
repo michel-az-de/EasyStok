@@ -993,3 +993,46 @@ a.card:focus-visible,
   outline: 2px solid var(--orange-500);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   Card componentizado (es-card) — port do EasyStock.Admin (convergencia DS).
+   Consumido por <es-card> (+ es-card-footer / es-card-header-actions).
+   ============================================================ */
+.es-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.es-card-header {
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.es-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+.es-card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.es-card-body { padding: var(--s-5); flex: 1; }
+.es-card-body-flush { padding: 0; }
+.es-card-footer {
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
