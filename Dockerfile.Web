@@ -23,6 +23,9 @@ RUN --mount=type=cache,target=/root/.npm,id=npm \
 # Codigo fonte do Web apenas
 COPY EasyStock.Web/ EasyStock.Web/
 
+# Tokens de design compartilhados — tailwind.config.js faz require('../design/tokens.colors')
+COPY design/ design/
+
 WORKDIR /src/EasyStock.Web
 RUN npm run css:build
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
