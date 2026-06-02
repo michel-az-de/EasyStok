@@ -13,6 +13,7 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
 
     public async Task<IReadOnlyList<CardapioItem>> GetVisiveisDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
         await db.CardapioItens
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(c => c.Produto)
                 .ThenInclude(p => p!.Categoria)

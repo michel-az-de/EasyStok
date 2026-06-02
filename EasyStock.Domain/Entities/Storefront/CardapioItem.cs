@@ -99,7 +99,6 @@ public class CardapioItem
             FiltrosJson = "[]",
             CriadoEm = agora,
             AlteradoEm = agora,
-            Produto = produto,
         };
     }
 

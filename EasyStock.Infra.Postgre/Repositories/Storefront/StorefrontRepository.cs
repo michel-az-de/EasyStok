@@ -10,10 +10,10 @@ public sealed class StorefrontRepository(EasyStockDbContext db) : IStorefrontRep
         db.Storefronts.FirstOrDefaultAsync(s => s.Id == id, ct);
 
     public Task<StorefrontEntity?> GetBySlugAsync(string slug, CancellationToken ct = default) =>
-        db.Storefronts.AsNoTracking().FirstOrDefaultAsync(s => s.Slug == slug, ct);
+        db.Storefronts.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(s => s.Slug == slug, ct);
 
     public Task<StorefrontEntity?> GetByDominioCustomAsync(string dominioCustom, CancellationToken ct = default) =>
-        db.Storefronts.AsNoTracking().FirstOrDefaultAsync(s => s.DominioCustom == dominioCustom, ct);
+        db.Storefronts.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(s => s.DominioCustom == dominioCustom, ct);
 
     public Task<StorefrontEntity?> GetByEmpresaAsync(Guid empresaId, CancellationToken ct = default) =>
         db.Storefronts.FirstOrDefaultAsync(s => s.EmpresaId == empresaId, ct);
