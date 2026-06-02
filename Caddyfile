@@ -28,3 +28,14 @@
 	redir @root /pwa/
 	reverse_proxy api:8080
 }
+
+# casadababa.com (storefront Vite/Alpine) — site estatico + API na MESMA origem
+# (handle /api/* -> api; resto -> container storefront). Dispensa CORS/cookie cross-site.
+{$CASADABABA_HOST} {
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+	handle {
+		reverse_proxy storefront:8080
+	}
+}
