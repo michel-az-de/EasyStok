@@ -15,8 +15,9 @@ namespace EasyStock.ArchitectureTests;
 /// </summary>
 public class EmailTemplateDiscipline
 {
+    // Forward slash: Path.Combine resolve em Windows E Linux (CI roda em ubuntu).
     private const string SeedRelativePath =
-        @"EasyStock.Api\Data\NotificacoesGlobaisSeed.cs";
+        "EasyStock.Api/Data/NotificacoesGlobaisSeed.cs";
 
     private static readonly string[] HtmlTagPatterns =
     {

@@ -96,6 +96,10 @@ public class ListarCardapioPublicoUseCaseTests
         };
 
         var item = CardapioItem.CriarAPartirDeProduto(storefrontId, produto);
+        // O repo de produção (GetVisiveisDoStorefrontAsync) carrega a navegação Produto
+        // via Include; o use case lê i.Produto?.Nome / PrecoEfetivo(). O mock precisa
+        // popular a nav pra refletir produção — senão Nome sai "" e Preco 0 (test-fidelity).
+        item.Produto = produto;
         item.AtualizarMetadata(
             descricaoPublica: descricao,
             fotoUrl: fotoUrl,

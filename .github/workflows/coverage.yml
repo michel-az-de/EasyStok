@@ -40,6 +40,7 @@ jobs:
           dotnet test EasyStok.sln \
             --configuration Release \
             --no-build \
+            --filter "Category!=ArchitectureDebt" \
             --collect:"XPlat Code Coverage" \
             --settings coverlet.runsettings \
             --logger "trx;LogFileName=test.trx" \

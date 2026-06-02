@@ -4,7 +4,6 @@ using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
 using EasyStok.Mobile.ViewModels;
 using EasyStok.Mobile.Views;
-using Microsoft.Extensions.Logging;
 
 namespace EasyStok.Mobile;
 

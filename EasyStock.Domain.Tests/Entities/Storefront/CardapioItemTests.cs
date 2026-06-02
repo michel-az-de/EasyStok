@@ -44,9 +44,14 @@ public class CardapioItemTests
         Guid? storefrontId = null,
         Produto? produto = null)
     {
-        return CardapioItem.CriarAPartirDeProduto(
+        var prod = produto ?? NovoProdutoValido();
+        var item = CardapioItem.CriarAPartirDeProduto(
             storefrontId: storefrontId ?? Guid.NewGuid(),
-            produto: produto ?? NovoProdutoValido());
+            produto: prod);
+        // PrecoEfetivo()/Nome leem a navegacao Produto (carregada via Include em producao);
+        // popular a nav no teste reflete producao e exercita o fallback PrecoReferencia.
+        item.Produto = prod;
+        return item;
     }
 
     // ── Factory: happy path ────────────────────────────────────────────

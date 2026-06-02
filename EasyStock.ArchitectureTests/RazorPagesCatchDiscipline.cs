@@ -29,7 +29,8 @@ namespace EasyStock.ArchitectureTests;
 /// </summary>
 public class RazorPagesCatchDiscipline
 {
-    private const string PagesRelativePath = @"EasyStock.Admin\Pages";
+    // Forward slash: Path.Combine resolve em Windows E Linux (CI roda em ubuntu).
+    private const string PagesRelativePath = "EasyStock.Admin/Pages";
 
     private static readonly Regex CatchPattern = new(
         @"catch\s*\(\s*Exception\b",
