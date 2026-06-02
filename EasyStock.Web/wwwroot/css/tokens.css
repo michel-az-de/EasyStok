@@ -40,12 +40,15 @@
   --brand-100: var(--navy-100);
   --brand-50:  var(--navy-50);
 
-  /* ----- Color: brand accent (laranja vibrante) ----- */
+  /* ----- Color: brand accent (laranja vibrante) — escala 50→950 ----- */
+  --orange-950: #4A1A03;
   --orange-900: #7A2A05;
+  --orange-800: #9F3706;
   --orange-700: #BF4307;
   --orange-600: #E85814;          /* accent primary do logo */
   --orange-500: #F26B25;
   --orange-400: #F8884A;
+  --orange-300: #FBA978;
   --orange-200: #FAC8AB;
   --orange-100: #FCDCC8;
   --orange-50:  #FEEFE3;
@@ -131,6 +134,63 @@
   /* ----- Focus rings (keyboard navigation) ----- */
   --focus-ring-navy: 0 0 0 3px rgba(30, 72, 168, .25);
   --focus-ring-orange: 0 0 0 3px rgba(232, 88, 20, .25);
+  --focus-ring-danger: 0 0 0 3px rgba(192, 59, 42, .25);
+  --focus-ring-success: 0 0 0 3px rgba(24, 135, 78, .25);
+
+  /* ----- Motion: durations + easings (convergência Admin — Fase 0-core) -----
+     --motion-* (acima) e --duration-* coexistem (famílias distintas, ambas em uso).
+     --ease-spring/--ease-smooth já vivem em app.css (mesmo valor); --ease-in-out
+     mantém a curva atual do Web (não há refs a var(--ease-in-out) no Web — medido). */
+  --duration-instant: 80ms;
+  --duration-fast:    150ms;
+  --duration-base:    200ms;
+  --duration-slow:    320ms;
+  --duration-slower:  500ms;
+  --ease-in:     cubic-bezier(0.4, 0, 1, 1);
+
+  /* ----- Elevation scale (cool-toned shadows, hierarchical) ----- */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(10, 21, 48, .06), 0 1px 1px rgba(10, 21, 48, .04);
+  --elev-2: 0 4px 12px rgba(10, 21, 48, .08), 0 2px 4px rgba(10, 21, 48, .04);
+  --elev-3: 0 10px 28px rgba(10, 21, 48, .12), 0 4px 10px rgba(10, 21, 48, .06);
+  --elev-4: 0 20px 48px rgba(10, 21, 48, .18), 0 8px 16px rgba(10, 21, 48, .08);
+
+  /* ----- Surface semantic tokens (theme-aware via bloco dark) ----- */
+  --surface-app:      var(--bg-app);
+  --surface-elevated: var(--bg-elevated);
+  --surface-sunken:   var(--ink-50);
+  --surface-overlay:  rgba(10, 21, 48, .55);
+  --surface-inverted: var(--navy-900);
+
+  /* ----- Intent tokens (ações semânticas) ----- */
+  --intent-action:           var(--orange-600);
+  --intent-action-hover:     var(--orange-700);
+  --intent-action-active:    var(--orange-800);
+  --intent-action-fg:        var(--white);
+  --intent-destructive:      var(--crit-600);
+  --intent-destructive-hover:var(--crit-700);
+  --intent-destructive-fg:   var(--white);
+  --intent-success:          var(--ok-600);
+  --intent-success-hover:    var(--ok-700);
+  --intent-success-fg:       var(--white);
+  --intent-info:             var(--navy-600);
+  --intent-info-hover:       var(--navy-700);
+  --intent-info-fg:          var(--white);
+  --intent-warn:             var(--warn-600);
+  --intent-warn-hover:       var(--warn-700);
+  --intent-warn-fg:          var(--white);
+
+  /* ----- Data viz palette (10 cores qualitative, AA testadas) ----- */
+  --dv-1:  #E85814;   /* orange brand */
+  --dv-2:  #1E48A8;   /* navy mid */
+  --dv-3:  #18874E;   /* green */
+  --dv-4:  #B57A00;   /* amber */
+  --dv-5:  #6F42C1;   /* violet */
+  --dv-6:  #0E94A8;   /* teal */
+  --dv-7:  #C03B2A;   /* red */
+  --dv-8:  #4A5470;   /* slate */
+  --dv-9:  #DA3F87;   /* magenta */
+  --dv-10: #2E7D32;   /* deep green */
 }
 
 /* ----- Dark theme ----- */
@@ -160,6 +220,17 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 14px rgba(0,0,0,0.45);
   --shadow-lg: 0 18px 40px rgba(0,0,0,0.55);
+
+  /* Elevation re-mapped p/ superfícies dark (convergência Admin — Fase 0-core) */
+  --elev-1: 0 1px 2px rgba(0,0,0,.4);
+  --elev-2: 0 4px 14px rgba(0,0,0,.45);
+  --elev-3: 0 10px 28px rgba(0,0,0,.55);
+  --elev-4: 0 20px 48px rgba(0,0,0,.65);
+
+  /* Surface re-mapped p/ dark */
+  --surface-sunken:  rgba(255,255,255,.04);
+  --surface-overlay: rgba(0,0,0,.65);
+  --surface-inverted: var(--paper);
 }
 
 /* ----- Base ----- */
