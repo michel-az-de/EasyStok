@@ -26,6 +26,9 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Restore .NET workloads (maui-android p/ EasyStok.Mobile)
+        run: dotnet workload restore EasyStok.sln
+
       - name: Restore
         run: dotnet restore EasyStok.sln
 
