@@ -73,7 +73,7 @@
         <div class="es-stat-label">Suspensos</div>
         <div class="es-stat-value" :style="dash.tenantsSuspensos > 0 ? 'color: var(--warn-600);' : ''" x-text="dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
         <div class="es-stat-meta">
-            <span>+<strong style="color:var(--text-primary);" x-text="dash.tenantsNovos">@Model.TenantsNovos</strong> novos (30d)</span>
+            <span>de <strong style="color:var(--text-primary);" x-text="dash.totalTenants">@Model.TotalTenants</strong> total</span>
         </div>
     </a>
 

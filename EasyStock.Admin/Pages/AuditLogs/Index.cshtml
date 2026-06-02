@@ -1,7 +1,18 @@
 @page
 @model EasyStock.Admin.Pages.AuditLogs.IndexModel
 @{
-    ViewData["Title"] = "Audit Log Admin";
+    ViewData["Title"] = "Audit Logs";
+}
+
+@functions {
+    // Acao vem do backend em PascalCase (ex.: "AdminCriouStorefront"). Separa em palavras
+    // legiveis ("Admin Criou Storefront") inserindo espaco nos boundaries camelCase.
+    // (#9) O badge ainda aplica uppercase, mas agora com espacos -> legivel.
+    static string HumanizeAcao(string? acao)
+    {
+        if (string.IsNullOrWhiteSpace(acao)) return "—";
+        return System.Text.RegularExpressions.Regex.Replace(acao, "(?<=[a-z0-9])(?=[A-Z])", " ");
+    }
 }
 
 <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
@@ -62,7 +73,7 @@
         <tr>
             <td data-label="Data/Hora" style="white-space:nowrap; color:var(--text-muted); font-size:12px; font-family:var(--font-mono);">@criadoDt.ToLocalTime().ToString("dd/MM/yy HH:mm:ss")</td>
             <td data-label="Admin" style="font-size:13px; color:var(--text-secondary);">@adminEmail</td>
-            <td data-label="Ação"><es-badge variant="@acaoVariant">@acao</es-badge></td>
+            <td data-label="Ação"><es-badge variant="@acaoVariant">@HumanizeAcao(acao)</es-badge></td>
             <td data-label="Detalhes" style="color:var(--text-muted); font-size:12px; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="@detalhes">@detalhes</td>
             <td data-label="Tenant">
                 @if (tenantId != null)
