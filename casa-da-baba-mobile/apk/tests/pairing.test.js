@@ -20,7 +20,9 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     })()`);
     // Em sandbox sem timers reais, cdbSync pode não existir antes do timer
     // disparar. Nesse caso, marca como skip — o objeto se cria em runtime.
-    if (r === 'undefined') return; // skip silencioso
+    // #390: boot garantido pelo runner (poll-until-ready). cdbSync DEVE existir;
+    // se nao, e' falha de verdade — nao mais skip silencioso.
+    assert.notStrictEqual(r, 'undefined', 'window.cdbSync deve existir apos boot');
     assert.strictEqual(r, 'object');
   });
 
@@ -81,7 +83,9 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
   // device. Apagar a fila aqui = perder vendas em pendencia.
   test('A2: clearPairing preserva cdb-sync-queue e dados de negocio', () => {
     const cdbSync = sandbox.window && sandbox.window.cdbSync;
-    if (!cdbSync || !cdbSync.clearPairing) return;
+    // #390: boot garantido pelo runner. clearPairing e' API core — assert,
+    // nao skip silencioso (regressao da API deve ficar VERMELHA).
+    assert.ok(cdbSync && cdbSync.clearPairing, 'cdbSync.clearPairing deve existir apos boot');
 
     // Setup: pairing + fila + dados de negocio + outras chaves cdb-*
     sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ apiKey: 'mk_test' }));
