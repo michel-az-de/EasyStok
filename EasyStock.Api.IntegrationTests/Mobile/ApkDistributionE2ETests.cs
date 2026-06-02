@@ -13,10 +13,10 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 [Collection("MobileE2E")]
 public class ApkDistributionE2ETests(MobileE2EFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public async Task Manifest_sem_release_retorna_204()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         await CleanReleasesAsync("manifest-empty-app");
 
         using var client = fixture.CreateClient();
@@ -25,10 +25,10 @@ public class ApkDistributionE2ETests(MobileE2EFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Manifest_retorna_release_active_com_sha_e_url()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         const string appId = "test-stable";
         await CleanReleasesAsync(appId);
 
@@ -47,10 +47,10 @@ public class ApkDistributionE2ETests(MobileE2EFixture fixture)
         body.GetProperty("url").GetString().Should().Contain($"/api/mobile/apk/download/{releaseId}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Download_retorna_bytes_corretos_para_release_active()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         const string appId = "test-download";
         await CleanReleasesAsync(appId);
 
@@ -69,10 +69,10 @@ public class ApkDistributionE2ETests(MobileE2EFixture fixture)
         downloadedSha.Should().Be(sha);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Manifest_para_device_canary_retorna_release_canary_quando_disponivel()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         const string appId = "test-canary";
         await CleanReleasesAsync(appId);
 

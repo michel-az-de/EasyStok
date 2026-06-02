@@ -8,10 +8,10 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 [Collection("MobileE2E")]
 public class OtaCanaryE2ETests(MobileE2EFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public async Task Version_sem_device_id_retorna_stable()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
 
         using var client = fixture.CreateClient();
         var resp = await client.GetAsync("/api/mobile/version");
@@ -24,10 +24,10 @@ public class OtaCanaryE2ETests(MobileE2EFixture fixture)
         ota.GetProperty("otaEnabled").GetBoolean().Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Version_com_device_canary_retorna_versao_canary_do_sw()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
 
         var (empresaId, lojaId) = await fixture.SeedEmpresaELojaAsync();
         var creds = await fixture.SeedMobileDeviceAsync(empresaId, lojaId, isCanary: true);
@@ -51,10 +51,10 @@ public class OtaCanaryE2ETests(MobileE2EFixture fixture)
         canary.Should().NotBeNullOrEmpty();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Version_com_device_nao_canary_retorna_stable_mesmo_que_canary_disponivel()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
 
         var (empresaId, lojaId) = await fixture.SeedEmpresaELojaAsync();
         var creds = await fixture.SeedMobileDeviceAsync(empresaId, lojaId, isCanary: false);

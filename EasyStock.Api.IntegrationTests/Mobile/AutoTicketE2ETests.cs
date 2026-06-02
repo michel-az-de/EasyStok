@@ -12,10 +12,10 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 [Collection("MobileE2E")]
 public class AutoTicketE2ETests(MobileE2EFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public async Task POST_sem_X_Ci_Key_retorna_401()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         await fixture.SeedOwnerEmpresaAsync();
 
         using var client = fixture.CreateClient();
@@ -31,10 +31,10 @@ public class AutoTicketE2ETests(MobileE2EFixture fixture)
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task POST_cria_ticket_BugFixDev_com_X_Ci_Key()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         await fixture.SeedOwnerEmpresaAsync();
 
         using var client = fixture.CreateClient();
@@ -66,10 +66,10 @@ public class AutoTicketE2ETests(MobileE2EFixture fixture)
         ticket.Titulo.Should().StartWith("[CI test-sig-001]");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task POST_com_mesma_signature_no_mesmo_dia_anexa_comentario_sem_duplicar()
     {
-        if (!fixture.IsAvailable) return;
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         await fixture.SeedOwnerEmpresaAsync();
 
         using var client = fixture.CreateClient();
