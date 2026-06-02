@@ -872,3 +872,110 @@ button:focus-visible {
 [data-theme="dark"] .text-violet-700  { color: rgb(196, 181, 253) !important; }
 [data-theme="dark"] .text-red-700     { color: rgb(252, 165, 165) !important; }
 [data-theme="dark"] .text-indigo-700  { color: rgb(165, 180, 252) !important; }
+
+/* ============================================================
+   Stat card (KPI) + Sparkline — port do EasyStock.Admin (convergencia DS).
+   Consumido por <es-stat-card> e <es-sparkline> (EasyStock.Web.TagHelpers).
+   Usa tokens --duration-base/--ease-out/--elev-2/--dv-* adicionados na Fase 0-core.
+   ============================================================ */
+.es-stat-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 8px;
+  padding: var(--s-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--duration-base) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out),
+              border-color var(--duration-base) var(--ease-out);
+}
+.es-stat-card.is-link {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.es-stat-card.is-link:hover,
+.es-stat-card.is-link:focus-within {
+  transform: translateY(-2px);
+  box-shadow: var(--elev-2);
+  border-color: rgba(232, 88, 20, .30);
+}
+.es-stat-label {
+  font: 600 11px/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--text-muted);
+}
+.es-stat-value {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.es-stat-value-sm { font-size: 24px; }
+.es-stat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.es-stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  font-weight: 600;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.es-stat-delta-up   { color: var(--ok-700);   background: var(--ok-50);   }
+.es-stat-delta-down { color: var(--crit-700); background: var(--crit-50); }
+.es-stat-delta-flat { color: var(--text-muted); background: var(--ink-100); }
+[data-theme="dark"] .es-stat-delta-up   { background: rgba(24,135,78,.15); color: #6FCF97; }
+[data-theme="dark"] .es-stat-delta-down { background: rgba(192,59,42,.18); color: #F87171; }
+[data-theme="dark"] .es-stat-delta-flat { background: rgba(255,255,255,.06); }
+
+.es-stat-sparkline {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 60%;
+  height: 36px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.es-sparkline {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.es-sparkline-line {
+  fill: none;
+  stroke: var(--orange-500);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.es-sparkline-area {
+  fill: var(--orange-500);
+  opacity: 0.12;
+}
+.es-sparkline-dot {
+  fill: var(--orange-500);
+}
+.es-sparkline.is-up .es-sparkline-line { stroke: var(--ok-600); }
+.es-sparkline.is-up .es-sparkline-area { fill: var(--ok-600); }
+.es-sparkline.is-up .es-sparkline-dot { fill: var(--ok-600); }
+.es-sparkline.is-down .es-sparkline-line { stroke: var(--crit-600); }
+.es-sparkline.is-down .es-sparkline-area { fill: var(--crit-600); }
+.es-sparkline.is-down .es-sparkline-dot { fill: var(--crit-600); }
