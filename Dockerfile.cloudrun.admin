@@ -24,7 +24,7 @@ COPY design/ design/
 WORKDIR /src/EasyStock.Admin
 RUN npm run css:build
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false /p:SkipTailwind=true
+    dotnet publish -c Release -o /app/publish /p:UseAppHost=false /p:SkipTailwind=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
