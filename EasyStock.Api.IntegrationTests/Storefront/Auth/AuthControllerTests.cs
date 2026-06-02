@@ -110,10 +110,10 @@ public sealed class AuthControllerTests : IAsyncLifetime
 
     // ── Happy path ─────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task PostSolicitarOtp_StorefrontValido_Retorna202EPersisteClienteOtp()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -143,10 +143,10 @@ public sealed class AuthControllerTests : IAsyncLifetime
 
     // ── Telefone inválido ──────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task PostSolicitarOtp_TelefoneInvalido_Retorna400()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -162,10 +162,10 @@ public sealed class AuthControllerTests : IAsyncLifetime
 
     // ── Slug inexistente ───────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task PostSolicitarOtp_SlugInexistente_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();

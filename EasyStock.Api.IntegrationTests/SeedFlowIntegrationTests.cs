@@ -125,10 +125,10 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
 
     // ───────────────────────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task DbVazio_StartupCompleto_AplicaTodasMigrationsESeedSuperAdmin_E_NaoSeedaDemoEmProd()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactoryProduction(seedDemoData: false);
         // Forca startup
@@ -143,10 +143,10 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
         notifTemplates.Should().BeGreaterThan(0, "NotificacoesGlobaisSeed deve ter populado templates globais");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DbVazio_StartupTresVezesConsecutivas_NaoMudaContagem()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         // 1a passada
         await using (var f1 = CriarFactoryProduction())

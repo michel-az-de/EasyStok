@@ -146,10 +146,10 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
 
     // ── Testes ─────────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetJanelas_HappyPath_Retorna200ComVagasECacheControl()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -182,10 +182,10 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         resp.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromSeconds(60));
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetJanelas_CepForaDaZona_Retorna422()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -201,10 +201,10 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         resp.Headers.CacheControl!.NoStore.Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetJanelas_StorefrontInexistente_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();

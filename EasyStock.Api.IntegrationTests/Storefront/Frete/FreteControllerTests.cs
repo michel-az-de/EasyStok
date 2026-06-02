@@ -122,10 +122,10 @@ public sealed class FreteControllerTests : IAsyncLifetime
 
     // ── Happy path ─────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFrete_CepEmZonaAtiva_Retorna200ComValorECacheable()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -152,10 +152,10 @@ public sealed class FreteControllerTests : IAsyncLifetime
         resp.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromHours(24));
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFrete_CepSemMascara_TambemAceito()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -173,10 +173,10 @@ public sealed class FreteControllerTests : IAsyncLifetime
 
     // ── Sem cobertura → 422 ────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFrete_CepForaDaZona_Retorna422ENaoCacheia()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -196,10 +196,10 @@ public sealed class FreteControllerTests : IAsyncLifetime
 
     // ── CEP invalido → 400 ─────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFrete_CepInvalido_Retorna400ENaoCacheia()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -217,10 +217,10 @@ public sealed class FreteControllerTests : IAsyncLifetime
         resp.Headers.CacheControl!.NoStore.Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFrete_CepVazio_Retorna400()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -237,10 +237,10 @@ public sealed class FreteControllerTests : IAsyncLifetime
 
     // ── Storefront inexistente → 404 ───────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFrete_StorefrontInexistente_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();

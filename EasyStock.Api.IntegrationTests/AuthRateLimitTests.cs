@@ -72,10 +72,10 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
             });
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Login_apos_10_tentativas_invalidas_no_mesmo_IP_retorna_429()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -96,10 +96,10 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
         blocked.Headers.Should().ContainKey("Retry-After");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Register_apos_10_tentativas_no_mesmo_IP_retorna_429()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();

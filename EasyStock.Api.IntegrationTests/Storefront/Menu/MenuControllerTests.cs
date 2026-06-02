@@ -180,10 +180,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
     // ── Happy path ─────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMenu_StorefrontComItens_Retorna200ComCacheControlEEtag()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -212,10 +212,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
     // ── ETag / 304 ─────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMenu_IfNoneMatchBate_Retorna304()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -236,10 +236,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
         resp2.Headers.ETag!.Tag.Should().Be(etag);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMenu_IfNoneMatchDiferente_RetornaPayloadComEtagNovo()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -255,10 +255,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
     // ── 404 ────────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMenu_SlugInexistente_Retorna404ComProblemDetails()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -273,10 +273,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
         body.GetProperty("title").GetString().Should().Be("Storefront não encontrado");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMenu_StorefrontInativo_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -291,10 +291,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
     // ── Sem auth ───────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task GetMenu_SemHeaderAuthorization_Retorna200()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();

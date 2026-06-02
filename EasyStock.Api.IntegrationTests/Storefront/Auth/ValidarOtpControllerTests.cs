@@ -121,10 +121,10 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         await db.SaveChangesAsync();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ValidarOtp_CodigoCorreto_Retorna200_ComCookieDeSession()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         var codigoHash = BCrypt.Net.BCrypt.HashPassword(CodigoValido);
@@ -151,10 +151,10 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         body.PrimeiroNome.Should().NotBeNullOrEmpty();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ValidarOtp_CodigoErrado_Retorna401_SemCookie()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         var codigoHash = BCrypt.Net.BCrypt.HashPassword(CodigoValido);
@@ -170,10 +170,10 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         response.Headers.Contains("Set-Cookie").Should().BeFalse("cookie não deve ser setado em erro");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ValidarOtp_StorefrontInexistente_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
 
@@ -186,10 +186,10 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ValidarOtp_OtpInexistente_Retorna401()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
 

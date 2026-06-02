@@ -165,10 +165,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 
     // ── Testes ─────────────────────────────────────────────────────────────
 
-    [Fact]
+    [SkippableFact]
     public async Task PostAprovar_HappyPath_Retorna200ETransitaPedidoParaAprovadoBaba()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -195,10 +195,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
         pedido.AprovadoPorUsuarioId.Should().Be(UsuarioBabaId);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PostRecusar_HappyPath_Retorna200ECancelaPedido()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -231,10 +231,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
         pedido.MotivoRecusa.Should().Be("estoque_insuficiente");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PostAprovar_SemAuth_Retorna401()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory(autenticado: false);
         using var client = factory.CreateClient();
@@ -246,10 +246,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PostAprovar_PedidoInexistente_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -261,10 +261,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PostAprovar_TenantMismatch_Retorna404()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -281,10 +281,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             "tenant mismatch retorna 404 (não 403) para evitar oracle de existência cross-tenant");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PostAprovar_PedidoJaAprovado_Retorna409ComStatusAtual()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -300,10 +300,10 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
         body.GetProperty("statusAtual").GetString().Should().Be(StatusPedidoMapper.AprovadoBaba);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PostRecusar_MotivoInvalido_Retorna422()
     {
-        if (!_isAvailable) return;
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
