@@ -14,8 +14,7 @@ public static class StartupHardening
 {
     public static void Validate(
         WebApplicationBuilder builder,
-        string? postgresConnectionString,
-        string? mongoConnectionString)
+        string? postgresConnectionString)
     {
         var jwtSecret = builder.Configuration[ConfigurationKeys.JwtSecretKey];
         if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Contains("${JWT_SECRET_KEY}"))
@@ -29,9 +28,6 @@ public static class StartupHardening
         // Validar connection strings não têm placeholders
         if (postgresConnectionString?.Contains("${") == true)
             throw new InvalidOperationException("Database connection string contains placeholders. Set environment variables: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD.");
-
-        if (mongoConnectionString?.Contains("${") == true)
-            throw new InvalidOperationException("MongoDB connection string contains placeholders. Set MONGO_CONNECTION_STRING environment variable.");
 
         // Validar que database credentials não são defaults/placeholders
         if (postgresConnectionString?.Contains("Username=postgres") == true && postgresConnectionString?.Contains("Password=postgres") == true)

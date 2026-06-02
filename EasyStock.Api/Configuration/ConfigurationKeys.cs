@@ -8,11 +8,9 @@ public static class ConfigurationKeys
 {
     // ── Database ─────────────────────────────────────────────────────────────
     public const string DatabaseProvider        = "Database:Provider";
-    public const string DatabaseMongoDatabase   = "Database:MongoDatabase";
 
     // ── Connection Strings ───────────────────────────────────────────────────
     public const string ConnectionDefault       = "DefaultConnection";
-    public const string ConnectionMongo         = "MongoConnection";
     public const string ConnectionRedis         = "Redis";
 
     // ── JWT ──────────────────────────────────────────────────────────────────

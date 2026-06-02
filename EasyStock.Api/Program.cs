@@ -64,9 +64,8 @@ builder.Services.AddEasyStockFileStorage(builder.Configuration);
 // ── Database ──────────────────────────────────────────────────────────────────
 var databaseProvider = builder.Configuration[ConfigurationKeys.DatabaseProvider] ?? "Auto";
 var postgresConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionDefault);
-var mongoConnectionString = builder.Configuration.GetConnectionString(ConfigurationKeys.ConnectionMongo);
 var (resolvedProvider, infraState) = await DatabaseModule.ConfigureAsync(
-    builder, databaseProvider, postgresConnectionString, mongoConnectionString);
+    builder, databaseProvider, postgresConnectionString);
 
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
@@ -159,7 +158,7 @@ if (resolvedProvider is "postgresql")
 }
 
 // ── Startup hardening: JWT, connection strings, Mobile API key ────────────────
-StartupHardening.Validate(builder, postgresConnectionString, mongoConnectionString);
+StartupHardening.Validate(builder, postgresConnectionString);
 
 Log.Information("""
 

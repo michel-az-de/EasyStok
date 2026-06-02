@@ -17,7 +17,7 @@ namespace EasyStock.Api.Startup;
 /// Fiscal NFC-e (Polly + Focus NFe + Mock + Cert A1), DataProtection.
 ///
 /// Em produção com provider explicitamente "PostgreSQL", pula a checagem de auto-detect
-/// (custa 3-5s no cold start). MongoDB lança <see cref="NotSupportedException"/>.
+/// (custa 3-5s no cold start).
 ///
 /// Retorna o provider resolvido + <see cref="ResolvedInfrastructureState"/> (singleton
 /// já registrado no DI) — caller usa os dois pra logging, gates de seed/migration e
@@ -28,8 +28,7 @@ public static class DatabaseModule
     public static async Task<(string resolvedProvider, ResolvedInfrastructureState infraState)> ConfigureAsync(
         WebApplicationBuilder builder,
         string databaseProvider,
-        string? postgresConnectionString,
-        string? mongoConnectionString)
+        string? postgresConnectionString)
     {
         string resolvedProvider;
         if (builder.Environment.IsProduction() &&
@@ -38,14 +37,13 @@ public static class DatabaseModule
             resolvedProvider = databaseProvider.Trim().ToLowerInvariant() switch
             {
                 "postgres" or "postgresql" => "postgresql",
-                "mongodb" or "mongo" => "mongodb",
                 _ => "postgresql"
             };
         }
         else
         {
             resolvedProvider = await DatabaseProviderResolver.ResolveAsync(
-                databaseProvider, postgresConnectionString, mongoConnectionString, Log.Logger);
+                databaseProvider, postgresConnectionString, Log.Logger);
         }
 
         // PostgreSQL é o único provedor suportado (#261) — não há mais fallback runtime.
@@ -61,15 +59,6 @@ public static class DatabaseModule
 
         switch (resolvedProvider)
         {
-            case "mongodb":
-                // MongoDB foi descontinuado como provedor transacional (B2 do plano de a��o).
-                // Paridade incompleta com Postgres (sem Venda, ItemVenda, MovimentacaoEstoque,
-                // Caixa, Lote, Pedido) gerava risco de bug silencioso. Postgres � o �nico
-                // provedor transacional suportado. Rever ADR 0001-mongo-discarded.
-                throw new NotSupportedException(
-                    "MongoDB foi descontinuado como provedor transacional. " +
-                    "Use Database:Provider=PostgreSQL. Detalhes: docs/adr/0001-mongo-discarded.md.");
-
             case "postgresql":
                 builder.Services.AddEasyStockPostgreInfrastructure(postgresConnectionString!, builder.Configuration);
                 builder.Services.AddHealthChecks()

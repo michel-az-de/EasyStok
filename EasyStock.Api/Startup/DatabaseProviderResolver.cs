@@ -17,7 +17,6 @@ public static class DatabaseProviderResolver
     public static async Task<string> ResolveAsync(
         string configuredProvider,
         string? postgresConnectionString,
-        string? mongoConnectionString,
         Serilog.ILogger logger)
     {
         var normalized = configuredProvider.Trim().ToLowerInvariant();
@@ -40,15 +39,6 @@ public static class DatabaseProviderResolver
                 "PostgreSQL configurado mas indisponível. " +
                 "Verifique a connection string 'DefaultConnection' e a conectividade com o banco. " +
                 "Em dev, suba Postgres via Docker Compose ou aponte para o banco Render dev.");
-        }
-
-        if (normalized is "mongodb" or "mongo")
-        {
-            // B2: Mongo descontinuado como provedor transacional. Falha rápido para
-            // operador notar que precisa migrar para Postgres.
-            throw new NotSupportedException(
-                "MongoDB foi descontinuado como provedor transacional. " +
-                "Use Database:Provider=PostgreSQL. Detalhes: docs/adr/0001-mongo-discarded.md.");
         }
 
         if (normalized is "auto")
