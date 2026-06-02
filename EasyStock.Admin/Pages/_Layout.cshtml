@@ -18,12 +18,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    @* Alpine via CDN sem integrity/SRI: os hashes estavam errados (o mesmo arquivo core
-       tinha hash diferente no Web vs Admin) e o browser bloqueava a execucao -> Alpine
-       morto -> tabs/dashboards/Ctrl+K/sync mobile inertes em prod. Self-host como follow-up. *@
-    <script defer src="https://cdn.jsdelivr.net/npm/@@alpinejs/persist@@3.14.9/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/@@alpinejs/focus@@3.14.9/dist/cdn.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@@3.14.9/dist/cdn.min.js"></script>
+    @* Alpine self-hosted (mesma origem) — sem CDN/SRI. O jsDelivr era bloqueado pelo
+       firewall corporativo E os hashes SRI antigos estavam errados; ambos matavam o
+       Alpine -> tabs/dashboards/Ctrl+K/sync inertes. Vendored de alpinejs@@3.14.9
+       (core+persist+focus); ordem plugins-antes-do-core preservada. *@
+    <script defer src="~/js/vendor/alpine/persist.js" asp-append-version="true"></script>
+    <script defer src="~/js/vendor/alpine/focus.js" asp-append-version="true"></script>
+    <script defer src="~/js/vendor/alpine/alpine.js" asp-append-version="true"></script>
     <script defer src="~/js/masks.js" asp-append-version="true"></script>
     <script defer src="~/js/admin-components.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
