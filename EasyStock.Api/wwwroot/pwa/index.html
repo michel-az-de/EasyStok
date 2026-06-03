@@ -7342,6 +7342,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <span class="pd-count" id="prodDemandCount">0 pedidos</span>
         </div>
         <div class="pd-chips" id="prodDemandChips"></div>
+        <button type="button" class="cta-btn" onclick="openCestaCalcFromDemand()" style="margin-top:10px;font-size:13px;">🧮 Conferir insumos da demanda</button>
       </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
@@ -7893,6 +7894,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <div class="modal-ctas">
+        <button class="cta-btn primary" id="cestaCalcBtnCompras" onclick="cestaCalcAdicionarFaltantesCompras()" style="display:none;">🛒 Jogar faltantes em Compras</button>
         <button class="cta-btn" id="cestaCalcBtnFechar" onclick="cestaCalcFechar()">Fechar</button>
         <button class="cta-btn primary" id="cestaCalcBtnCalcular" onclick="cestaCalcCalcular()">Calcular</button>
       </div>
@@ -11701,7 +11703,7 @@ function aggregateProductionDemand() {
   open.forEach(o => {
     (o.items || []).forEach(i => {
       const key = i.productId || ('adhoc:' + (i.name || ''));
-      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', qty: 0 };
+      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', unit: i.unit || 'Un', qty: 0 };
       prev.qty += Number(i.qty) || 0;
       byProduct.set(key, prev);
     });
@@ -17203,11 +17205,14 @@ async function calcGerarCompra() {
 // /calcular) direto na tela Compras (cdb-shopping). Caminho simples e offline,
 // alternativo ao calcGerarCompra (que cria pedido de compra no ERP e exige
 // fornecedor preferido). Elimina o trabalho manual de "ver o que falta".
-function calcAdicionarFaltantesCompras() {
-  if (!calcUltimoResultado) return;
-  const faltantes = (calcUltimoResultado.insumos || [])
-    .filter(i => i.falta != null && Number(i.falta) > 0 && !i.conversaoFalhou);
-  if (faltantes.length === 0) { showToast('Sem insumos faltantes pra comprar.'); return; }
+// Helper compartilhado (#412): recebe a lista de insumos faltantes ja filtrada
+// (cada um com insumoNome, falta, unidadeReceita) e joga na lista de Compras
+// com dedup leve. Usado pela calc de 1 produto (#411) e pela cesta/demanda (#412).
+function adicionarFaltantesNaCompra(faltantes) {
+  if (!Array.isArray(faltantes) || faltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return 0;
+  }
   if (!Array.isArray(shoppingItems)) shoppingItems = [];
   const now = Date.now();
   let added = 0;
@@ -17229,13 +17234,31 @@ function calcAdicionarFaltantesCompras() {
     });
     added++;
   });
-  if (added === 0) { showToast('Faltantes ja estao na lista de Compras.'); return; }
+  if (added === 0) { showToast('Faltantes ja estao na lista de Compras.'); return 0; }
   persistAll();
   pendingSync++;
   updateSync();
   if (typeof renderShoppingList === 'function') renderShoppingList();
   if (typeof renderHomeShopping === 'function') renderHomeShopping();
   showToast(added + ' insumo(s) na lista de Compras.');
+  return added;
+}
+
+function calcAdicionarFaltantesCompras() {
+  if (!calcUltimoResultado) return;
+  const faltantes = (calcUltimoResultado.insumos || [])
+    .filter(i => i.falta != null && Number(i.falta) > 0 && !i.conversaoFalhou);
+  adicionarFaltantesNaCompra(faltantes);
+}
+
+// #412 — joga os faltantes do consolidado da cesta (demanda/pedido/draft) em
+// Compras. O consolidado expoe insumoNome/falta/unidadeReceita, o mesmo shape
+// que o helper espera.
+function cestaCalcAdicionarFaltantesCompras() {
+  if (!cestaCalcResultadoAtual) return;
+  const faltantes = (cestaCalcResultadoAtual.consolidado || [])
+    .filter(c => c.falta != null && Number(c.falta) > 0 && !c.conversaoFalhou);
+  adicionarFaltantesNaCompra(faltantes);
 }
 
 function calcAbrirAjusteReceita() {
@@ -17354,6 +17377,30 @@ async function openCestaCalcFromOrder(orderId) {
   cestaCalcAbrirModal();
 }
 
+// #412 — alimenta a cesta com a demanda agregada dos pedidos abertos (todos de
+// uma vez). Reusa /calcular-cesta, que consolida insumos e desconta o estoque
+// UMA vez no servidor (somar faltas de /calcular por produto double-contaria o
+// estoque compartilhado). So produtos do catalogo; itens ad-hoc sao ignorados.
+async function openCestaCalcFromDemand() {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  const { items: demanda } = aggregateProductionDemand();
+  const items = (demanda || []).filter(i => i.productId && products.some(p => p.id === i.productId));
+  if (items.length === 0) { showToast('Nenhum produto do catalogo na demanda'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  cestaCalcContexto = {
+    tipo: 'demanda',
+    orderId: null,
+    label: 'Demanda dos pedidos abertos',
+    items: items.map(i => ({
+      produtoId: i.productId,
+      nome: i.name || 'Item',
+      qty: Number(i.qty || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
 function cestaCalcAbrirModal() {
   const modal = document.getElementById('cestaCalcModal');
   const ctx = cestaCalcContexto;
@@ -17397,6 +17444,8 @@ function cestaCalcAbrirModal() {
   const btnCalcular = document.getElementById('cestaCalcBtnCalcular');
   btnCalcular.style.display = '';
   btnCalcular.disabled = ctx.items.length === 0;
+  const btnCompras = document.getElementById('cestaCalcBtnCompras');
+  if (btnCompras) btnCompras.style.display = 'none';
 
   modal.classList.add('show');
 }
@@ -17543,6 +17592,14 @@ function cestaCalcRender(data) {
     empty.style.cssText = 'font-size:12px;color:var(--ink-mute);text-align:center;padding:8px;';
     empty.textContent = 'Nenhum insumo a consolidar.';
     cons.appendChild(empty);
+  }
+
+  // #412 — botao "jogar faltantes em Compras" so aparece quando ha falta real
+  // (conversao incompativel nao entra: nao da pra quantificar a compra).
+  const btnCompras = document.getElementById('cestaCalcBtnCompras');
+  if (btnCompras) {
+    const temFalta = (data.consolidado || []).some(c => c.falta != null && Number(c.falta) > 0 && !c.conversaoFalhou);
+    btnCompras.style.display = temFalta ? '' : 'none';
   }
 }
 

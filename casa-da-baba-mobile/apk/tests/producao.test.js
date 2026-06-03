@@ -99,4 +99,22 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(ets[2].idxStr, '003');
     assert.match(ets[0].codigoBarras, /-001$/);
   });
+
+  // #412 — demanda agrega so pedidos abertos (aguardando+preparando), soma qty
+  // por produto e preserva unit (usado pra alimentar a cesta /calcular-cesta).
+  test('producao: aggregateProductionDemand soma qty por produto e preserva unit', () => {
+    const r = runInSandbox(`
+      orders = [
+        { status: 'aguardando', items: [{ productId: 'p1', name: 'Lasanha', emoji: '🍝', unit: 'Un', qty: 2 }] },
+        { status: 'preparando', items: [{ productId: 'p1', name: 'Lasanha', emoji: '🍝', unit: 'Un', qty: 3 }] },
+        { status: 'entregue',   items: [{ productId: 'p1', name: 'Lasanha', unit: 'Un', qty: 99 }] }
+      ];
+      JSON.stringify(aggregateProductionDemand());
+    `);
+    const out = JSON.parse(r);
+    assert.strictEqual(out.pedidos, 2, 'so aguardando+preparando');
+    assert.strictEqual(out.items.length, 1, 'agrega por productId');
+    assert.strictEqual(out.items[0].qty, 5, 'soma 2+3 (ignora entregue)');
+    assert.strictEqual(out.items[0].unit, 'Un', 'preserva unit pra cesta');
+  });
 };
