@@ -30,7 +30,7 @@ public class RemoverItemPedidoUseCase(
         var item = pedido.Itens.FirstOrDefault(i => i.Id == cmd.ItemId);
         if (item == null) return CriarPedidoUseCase.Map(pedido);
 
-        await repo.RemoveItemAsync(item.Id);
+        await repo.RemoveItemAsync(cmd.EmpresaId, item.Id);
         pedido.Itens.Remove(item);
         pedido.RecalcularTotal();
 

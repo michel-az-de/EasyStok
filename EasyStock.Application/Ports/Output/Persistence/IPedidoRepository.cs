@@ -29,11 +29,11 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         // ── Sub-recursos (1:N) ────────────────────────────────────
         Task AddItemAsync(PedidoItem item);
-        Task RemoveItemAsync(Guid itemId);
+        Task RemoveItemAsync(Guid empresaId, Guid itemId);
         Task AddEventoAsync(PedidoEvento evento);
         Task<IEnumerable<PedidoEvento>> GetEventosAsync(Guid pedidoId, int max = 200);
         Task AddPagamentoAsync(PedidoPagamento pagamento);
-        Task RemovePagamentoAsync(Guid pagamentoId);
+        Task RemovePagamentoAsync(Guid empresaId, Guid pagamentoId);
 
         /// <summary>
         /// Verifica se existe pedido aberto (status aguardando/preparando/pronto)

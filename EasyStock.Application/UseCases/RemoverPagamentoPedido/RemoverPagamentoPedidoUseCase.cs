@@ -28,7 +28,7 @@ public class RemoverPagamentoPedidoUseCase(
         var pag = pedido.Pagamentos.FirstOrDefault(p => p.Id == cmd.PagamentoId);
         if (pag == null) return CriarPedidoUseCase.Map(pedido);
 
-        await repo.RemovePagamentoAsync(pag.Id);
+        await repo.RemovePagamentoAsync(cmd.EmpresaId, pag.Id);
         pedido.Pagamentos.Remove(pag);
 
         await repo.AddEventoAsync(new PedidoEvento
