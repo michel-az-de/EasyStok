@@ -17,21 +17,34 @@
 (function(){
     var el = document.getElementById('trial-banner');
     if (!el) return;
+    function render(json){
+        if (!json || !json.data) return;
+        var d = json.data;
+        if (!d.trialAtivo) return;
+        if (d.dataFim && new Date(d.dataFim) >= new Date()) return; // ja tem plano pago vigente
+        var fim = d.trialFim ? new Date(d.trialFim) : null;
+        if (!fim) return;
+        var dias = Math.max(0, Math.ceil((fim - new Date()) / 86400000));
+        var msg = el.querySelector('[data-trial-msg]');
+        if (msg) msg.textContent = dias === 0
+            ? 'expira hoje. Faça upgrade para continuar.'
+            : 'restam ' + dias + ' dia' + (dias === 1 ? '' : 's') + '. Faça upgrade para ativar mais recursos.';
+        el.classList.remove('hidden');
+    }
+    // BUG-23: cacheia /api/assinatura por 10min em sessionStorage. Sem isso, cada
+    // navegacao (full-page MVC) refazia o fetch -> dezenas de chamadas identicas.
+    try {
+        var cached = sessionStorage.getItem('es_assinatura');
+        if (cached) {
+            var p = JSON.parse(cached);
+            if (p && p.t && (Date.now() - p.t) < 600000) { render(p.v); return; }
+        }
+    } catch (e) { /* sessionStorage indisponivel: segue pro fetch */ }
     fetch('/api/assinatura', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(json){
-            if (!json || !json.data) return;
-            var d = json.data;
-            if (!d.trialAtivo) return;
-            if (d.dataFim && new Date(d.dataFim) >= new Date()) return; // ja tem plano pago vigente
-            var fim = d.trialFim ? new Date(d.trialFim) : null;
-            if (!fim) return;
-            var dias = Math.max(0, Math.ceil((fim - new Date()) / 86400000));
-            var msg = el.querySelector('[data-trial-msg]');
-            if (msg) msg.textContent = dias === 0
-                ? 'expira hoje. Faca upgrade pra continuar.'
-                : 'restam ' + dias + ' dia' + (dias === 1 ? '' : 's') + '. Faca upgrade pra ativar mais recursos.';
-            el.classList.remove('hidden');
+            try { sessionStorage.setItem('es_assinatura', JSON.stringify({ t: Date.now(), v: json })); } catch (e) {}
+            render(json);
         })
         .catch(function(){ /* silencia */ });
 })();

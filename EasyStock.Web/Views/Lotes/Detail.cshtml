@@ -65,7 +65,7 @@
                 <div><dt class="text-slate-500">Itens</dt><dd>@l.ItensCount item(s) · @l.TotalUnidades unidades</dd></div>
                 <div><dt class="text-slate-500">Etiquetas</dt>
                      <dd>
-                        @if (l.TotalUnidades == 0) { <span class="text-slate-400">— (finalizar pra gerar)</span> }
+                        @if (l.TotalUnidades == 0) { <span class="text-slate-400">— (finalizar para gerar)</span> }
                         else { <span>@l.EtiquetasConferidas/@l.TotalUnidades conferidas</span> }
                         @if (l.EtiquetasDivergentes > 0) { <div class="text-xs text-red-600 mt-1">@l.EtiquetasDivergentes divergente(s)</div> }
                      </dd></div>
