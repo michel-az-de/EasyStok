@@ -5457,7 +5457,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   margin: 0 0 2px; overflow-wrap: anywhere; color: #000;
   border: none; padding: 0; border-radius: 0;
 }
-.etq-card .et-unit { font-size: 12px; font-weight: 500; color: #555; margin-bottom: 8px; }
+.etq-card .et-unit { font-size: 13px; font-weight: 700; color: #000; margin-bottom: 8px; } /* #437: destaque */
 .etq-card .et-photo-wrap {
   display: flex; justify-content: center; margin: 6px 0;
 }
@@ -8673,6 +8673,17 @@ body.ux-calm [data-screen="producao"] .section-label {
                placeholder="Observação na imagem (opcional)" maxlength="40" autocomplete="off"
                aria-label="Observação rápida para a etiqueta" title="Máximo 40 caracteres"
                oninput="onEtqNoteInput()">
+      </div>
+      <!-- #437 — seletor de copias e retry -->
+      <div style="display:flex;align-items:center;gap:8px;padding:0 0 8px 0;font-size:13px">
+        <span style="color:var(--ink-mute)">Cópias:</span>
+        <select id="etqCopiesSelect" style="background:var(--bg-elev);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:13px">
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="5">5×</option>
+          <option value="10">10×</option>
+        </select>
+        <button id="etqRetryBtn" style="display:none;font-size:13px;padding:4px 12px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer" onclick="etqRetry()">↻ Tentar de novo</button>
       </div>
       <div class="etq-actions">
         <button class="etq-btn etq-print"  onclick="etqAction('print')">Imprimir</button>
@@ -16993,6 +17004,18 @@ function batchCardHtml(batch) {
         <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>
         <div class="bc-progress">${escapeHtml(progress)}</div>
+        ${(function(){
+          // #437 — historico de impressoes: le do audit log as entradas 'etiqueta.print' do lote.
+          try {
+            const log = (typeof loadAuditLog === 'function' ? loadAuditLog() : []) || [];
+            const prints = log.filter(e => e.action === 'etiqueta.print' && e.entityId === batch.id).slice(0, 3);
+            if (!prints.length) return '';
+            return prints.map(p => {
+              const ts = p.ts ? new Date(p.ts).toLocaleTimeString('pt-BR').slice(0,5) : '';
+              return '<div style="font-size:11px;color:var(--ink-mute)">🖨 ' + escapeHtml(p.summary || '') + (p.operator ? ' · ' + escapeHtml(p.operator) : '') + (ts ? ' às ' + ts : '') + '</div>';
+            }).join('');
+          } catch(_) { return ''; }
+        })()}
       </div>
       <span class="bc-toggle">›</span>
     </div>
@@ -18572,7 +18595,25 @@ function printViaBluetooth(bytes, onFallback) {
       btStep('print:send-write retry=' + !canRetry);
       try {
         bs.write(bytes,
-          () => { btStep('print:write-ok'); showToast('Enviado pra impressora'); releasePrinting(); },
+          () => {
+            btStep('print:write-ok');
+            showToast('Enviado pra impressora');
+            releasePrinting();
+            // #437 — registra impressao no audit log pra historico por lote.
+            try {
+              const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+              const kind = currentEtiquetasKind;
+              const qtd = (currentEtiquetas && currentEtiquetas.length || 0) * copies;
+              const loteId = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].id) || null;
+              const lote  = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].lote) || null;
+              logAction({
+                action: 'etiqueta.print',
+                entityType: kind === 'order' ? 'order' : 'batch',
+                entityId: loteId,
+                summary: qtd + ' etiqueta' + (qtd === 1 ? '' : 's') + (lote ? ' · ' + lote : '') + ' impressa' + (qtd === 1 ? '' : 's')
+              });
+            } catch (_) {}
+          },
           (err) => {
             const msg = (err && err.message) || err;
             btStep('print:write-err ' + msg);
@@ -18779,7 +18820,8 @@ function etiquetaProducaoHtml(et, nota) {
     <img src="/etiqueta/assets/logo-easystok.svg" alt="">
     <span class="et-brand-name">Easy<b>Stok</b></span>
   </div>`;
-  const prodBlock = `<div class="et-prod">${escapeHtml(et.productName)}</div>
+  // #437: emoji antes do nome (dado já existe, nunca foi renderizado)
+  const prodBlock = `<div class="et-prod">${et.emoji ? escapeHtml(et.emoji) + ' ' : ''}${escapeHtml(et.productName)}</div>
     ${et.unit ? `<div class="et-unit">${escapeHtml(et.unit)}</div>` : ''}`;
   const infoBlock = `<div class="et-info">
     <div class="et-info-row"><span class="et-lbl">FAB:</span><span class="et-val">${fmtDateBR(et.productionDate)}</span></div>
@@ -18951,14 +18993,15 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
     ctx.fillText('EasyStok', lx + 30, y + 14);
     y += 34;
 
-    // Nome do produto
+    // Nome do produto + emoji (#437)
     ctx.fillStyle = '#000';
     ctx.font = '800 18px Inter, Arial, sans-serif';
     const maxChars = Math.max(8, Math.floor((mainW - lx - 8) / 10));
-    wordWrap(et.productName, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
+    const prodLineHoriz = (et.emoji ? et.emoji + ' ' : '') + et.productName;
+    wordWrap(prodLineHoriz, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
     if (et.unit) {
-      ctx.fillStyle = '#555';
-      ctx.font = '500 12px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#000';
+      ctx.font = '700 13px Inter, Arial, sans-serif';
       ctx.fillText(et.unit, lx, y); y += 16;
     }
 
@@ -19050,14 +19093,15 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
   ctx.font = '800 18px Inter, Arial, sans-serif';
   ctx.fillText('EasyStok', lx + 30, y + 16);
   y += 36;
-  // Product name
+  // Product name + emoji (#437)
   ctx.fillStyle = '#000';
   ctx.font = '800 22px Inter, Arial, sans-serif';
-  wordWrap(et.productName, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
+  const prodLineVert = (et.emoji ? et.emoji + ' ' : '') + et.productName;
+  wordWrap(prodLineVert, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
   if (et.unit) {
-    ctx.fillStyle = '#555';
-    ctx.font = '500 13px Inter, Arial, sans-serif';
-    ctx.fillText(et.unit, lx, y); y += 16;
+    ctx.fillStyle = '#000';
+    ctx.font = '700 14px Inter, Arial, sans-serif';
+    ctx.fillText(et.unit, lx, y); y += 18;
   }
   // Photo
   if (photoImg && photoImg.width && photoImg.height) {
@@ -19080,8 +19124,9 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
   ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 20;
   ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
   ctx.fillText('VAL:', lx, y);
-  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
-  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 20;
+  // #437: VAL em destaque (900 16px) — é a info mais consultada na geladeira
+  ctx.fillStyle = '#000'; ctx.font = '900 16px Inter, Arial, sans-serif';
+  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 22;
   ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
   ctx.fillText('LOTE:', lx, y);
   ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
@@ -19679,9 +19724,38 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
 function closeEtiquetasPreview() {
   document.getElementById('etiquetasPreview').classList.remove('show');
   try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+  try { document.getElementById('etqCopiesSelect').value = '1'; } catch (_) {}
+  try { document.getElementById('etqRetryBtn').style.display = 'none'; } catch (_) {}
   // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
   if (currentEtiquetasKind === 'producao') go('home');
   currentEtiquetas = [];
+}
+
+// #437 — guarda os ultimos bytes impressos para retry em caso de falha BT.
+let _etqLastPrintBytes = null;
+let _etqLastPrintKind  = null;
+
+function _etqShowRetry() {
+  const btn = document.getElementById('etqRetryBtn');
+  if (btn) btn.style.display = '';
+}
+function _etqHideRetry() {
+  const btn = document.getElementById('etqRetryBtn');
+  if (btn) btn.style.display = 'none';
+}
+function etqRetry() {
+  if (!_etqLastPrintBytes) { showToast('Nada para reimprimir'); return; }
+  _etqHideRetry();
+  printViaBluetooth(_etqLastPrintBytes, function () {
+    showToast('Sem conexão BT — use Salvar ou Compartilhar');
+    _etqShowRetry();
+  });
+}
+
+function getEtqCopies() {
+  const sel = document.getElementById('etqCopiesSelect');
+  const n = sel ? parseInt(sel.value, 10) : 1;
+  return (!isNaN(n) && n >= 1) ? n : 1;
 }
 
 /**
@@ -19864,30 +19938,48 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
+      // #437: cópias (1/2/5/10) e retry
+      const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+      _etqHideRetry();
       if (currentEtiquetasKind === 'order') {
         const et = currentEtiquetas[0];
         const printNota = getEtqNota() || null;
-        printViaBluetooth(escPosOrderLabel(et.order, printNota), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+        const oneShot = escPosOrderLabel(et.order, printNota);
+        // Repete os bytes N vezes para N cópias
+        const totalBytes = new Uint8Array(oneShot.length * copies);
+        for (let ci = 0; ci < copies; ci++) totalBytes.set(oneShot, ci * oneShot.length);
+        _etqLastPrintBytes = totalBytes;
+        printViaBluetooth(totalBytes, function () {
+          showToast('Sem conexão BT — use Salvar ou Compartilhar');
+          _etqShowRetry();
+        });
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
         // etiqueta, travando o app pra batches de 100+ unidades).
         const prodNota = getEtqNota() || null;
-        let totalLen = 0;
+        let singleLen = 0;
         const parts = currentEtiquetas.map(et => {
           if (prodNota) et._nota = prodNota;
           try {
             const b = escPosLabelProducao(et);
-            totalLen += b.length;
+            singleLen += b.length;
             return b;
           } finally {
             delete et._nota;
           }
         });
-        const totalBytes = new Uint8Array(totalLen);
+        const singleRun = new Uint8Array(singleLen);
         let off = 0;
-        for (const b of parts) { totalBytes.set(b, off); off += b.length; }
-        printViaBluetooth(totalBytes, () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+        for (const b of parts) { singleRun.set(b, off); off += b.length; }
+        // Repete N vezes para N cópias de cada etiqueta
+        const totalBytes = new Uint8Array(singleLen * copies);
+        for (let ci = 0; ci < copies; ci++) totalBytes.set(singleRun, ci * singleLen);
+        _etqLastPrintBytes = totalBytes;
+        printViaBluetooth(totalBytes, function () {
+          showToast('Sem conexão BT — use Salvar ou Compartilhar');
+          _etqShowRetry();
+        });
       }
       return;
     }
