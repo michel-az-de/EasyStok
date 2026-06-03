@@ -271,11 +271,11 @@
                     </div>
                     <div class="flex justify-between py-2 border-b border-slate-50">
                         <dt class="text-sm text-slate-500">Custo unitário</dt>
-                        <dd class="text-sm font-semibold" x-text="'R$ ' + (custo || 0).toFixed(2)"></dd>
+                        <dd class="text-sm font-semibold" x-text="'R$ ' + (custo || 0).toFixed(2).replace('.', ',')"></dd>
                     </div>
                     <div class="flex justify-between py-2 border-b border-slate-50">
                         <dt class="text-sm text-slate-500">Total</dt>
-                        <dd class="text-sm font-bold text-indigo-600" x-text="'R$ ' + total.toFixed(2)"></dd>
+                        <dd class="text-sm font-bold text-indigo-600" x-text="'R$ ' + total.toFixed(2).replace('.', ',')"></dd>
                     </div>
                     <div class="flex justify-between py-2 border-b border-slate-50">
                         <dt class="text-sm text-slate-500">Estoque atual → após entrada</dt>

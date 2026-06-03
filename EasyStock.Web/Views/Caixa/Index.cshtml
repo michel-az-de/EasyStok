@@ -241,7 +241,7 @@ else
          class="fm-overlay"
          role="dialog" aria-modal="true" aria-labelledby="fm-abrir-title">
         <form x-ref="panel" class="fm-panel" style="max-width: 540px"
-              method="post" action="/caixa/abrir"
+              method="post" action="/caixa/abrir" data-validate
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"
               x-transition:enter-end="opacity-100 scale-100">
@@ -262,6 +262,7 @@ else
                             </label>
                             <input id="abrir-saldo" type="number" name="saldoInicial" step="0.01" min="0" required
                                    placeholder="0,00"
+                                   data-error-message="Informe um saldo inicial igual ou maior que zero."
                                    class="ui-field w-full text-sm" />
                             <span class="fm-field__hint">Use 0 se não há caixa físico (só registros eletrônicos)</span>
                         </div>
