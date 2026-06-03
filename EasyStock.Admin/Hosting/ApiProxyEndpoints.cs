@@ -985,5 +985,25 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // Onda 2 (#438) — versao/build deployado (/health/version, anonimo): apiVersion, buildSha.
+        app.MapGet("/api-proxy/diag/version", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetJsonAsync<JsonElement>("health/version");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/version falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
     }
 }

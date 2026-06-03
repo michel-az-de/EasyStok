@@ -1196,10 +1196,15 @@
         <!-- Semáforo geral -->
         <div x-show="stack.data" x-cloak class="card mb-4 flex items-center gap-3">
             <span class="inline-block w-3 h-3 rounded-full shrink-0" :class="stack.dotClass(stack.data?.status)"></span>
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
                 <div class="text-es-ink font-semibold text-sm">Status geral: <span x-text="stack.label(stack.data?.status)"></span></div>
-                <div class="text-es-ink-mute text-[11px]" x-text="'Verificado ' + (stack.checkedAt ? new Date(stack.checkedAt).toLocaleTimeString('pt-BR') : '—') + (stack.data?.totalDuration ? ' · ' + stack.data.totalDuration : '')"></div>
+                <div class="text-es-ink-mute text-[11px]" x-text="'Verificado ' + (stack.checkedAt ? new Date(stack.checkedAt).toLocaleTimeString('pt-BR') : '—') + (stack.data?.totalDuration ? ' · ' + stack.data.totalDuration : '') + ' · atualiza a cada 30s'"></div>
+                <div x-show="stack.version" x-cloak class="text-es-ink-mute text-[11px] mt-0.5">
+                    API <span class="font-mono text-es-ink-dim" x-text="stack.version?.apiVersion || '—'"></span>
+                    · build <span class="font-mono text-es-ink-dim" x-text="(stack.version?.buildSha || '—').slice(0, 12)"></span>
+                </div>
             </div>
+            <span x-show="stack.loading" x-cloak class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse shrink-0" title="atualizando"></span>
         </div>
 
         <!-- Checks individuais -->
@@ -1250,7 +1255,7 @@ function diagnosticoPage() {
         logMode: { loaded: false, verbose: false },
         infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
         perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
-        stack: { _loadedOnce: false, loading: false, erro: '', data: null, checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
+        stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
 
         init() {
             this.resumo = resumoState.call(this);
@@ -1903,20 +1908,37 @@ function stackState() {
         loading: false,
         erro: '',
         data: null,
+        version: null,
         checkedAt: null,
+        _timer: null,
 
         async refresh() {
             this._loadedOnce = true;
             this.loading = true; this.erro = '';
             try {
-                const r = await fetch('/api-proxy/diag/health', { credentials: 'same-origin', cache: 'no-store' });
-                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
-                if (!r.ok) { this.erro = `HTTP ${r.status} ao consultar /health.`; return; }
-                this.data = await r.json();
+                const [rh, rv] = await Promise.all([
+                    fetch('/api-proxy/diag/health', { credentials: 'same-origin', cache: 'no-store' }),
+                    fetch('/api-proxy/diag/version', { credentials: 'same-origin', cache: 'no-store' })
+                ]);
+                if (rh.status === 401 || rv.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!rh.ok) { this.erro = `HTTP ${rh.status} ao consultar /health.`; }
+                else { this.data = await rh.json(); }
+                this.version = rv.ok ? await rv.json() : null;
                 this.checkedAt = Date.now();
             } catch (e) {
                 this.erro = 'Falha de rede: ' + (e.message || e);
-            } finally { this.loading = false; }
+            } finally {
+                this.loading = false;
+                this._ensurePolling();
+            }
+        },
+
+        // Mission control "ao vivo": atualiza a cada 30s, so com a aba visivel
+        // (mesma licao do BUG-014). Idempotente — timer e listener criados uma vez.
+        _ensurePolling() {
+            if (this._timer) return;
+            this._timer = setInterval(() => { if (!document.hidden) this.refresh(); }, 30000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden && this._loadedOnce) this.refresh(); });
         },
 
         dotClass(status) {
