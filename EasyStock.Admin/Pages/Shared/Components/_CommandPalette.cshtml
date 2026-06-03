@@ -257,10 +257,13 @@
                     this.erro = '';
                     this._remote = { clientes: [], lojas: [], usuarios: [] };
                     this._loadHistory();
-                    setTimeout(() => {
-                        this.entered = true;
-                        document.getElementById('cmdk-input')?.focus();
-                    }, 30);
+                    // BUG-016: foca assim que o x-show torna o input focavel (apos o paint),
+                    // sem esperar a animacao. requestAnimationFrame elimina a janela de ~30ms
+                    // em que digitar logo apos abrir perdia os primeiros caracteres; o reforco
+                    // em 60ms cobre o caso do rAF disparar antes do reflow.
+                    const focar = () => document.getElementById('cmdk-input')?.focus();
+                    requestAnimationFrame(() => { this.entered = true; focar(); });
+                    setTimeout(focar, 60);
                 },
 
                 close() {
