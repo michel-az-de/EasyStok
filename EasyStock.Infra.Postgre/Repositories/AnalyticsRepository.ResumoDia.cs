@@ -124,6 +124,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             var pixCount = pixHoje.Count;
             var pixValor = pixHoje.Sum(p => p.Valor);
 
+            // ── Onboarding checklist counts (1.1-B) ──────────────────────────
+            // Conta linhas reais do tenant (sem janela de data). A exclusao dos
+            // Ids do conjunto de demonstracao entra junto com a feature de demo (1.3).
+            var categoriasCount = await dbContext.Categorias.AsNoTracking()
+                .CountAsync(c => c.EmpresaId == empresaId);
+            var entradasCount = await dbContext.MovimentacoesEstoque.AsNoTracking()
+                .CountAsync(m => m.EmpresaId == empresaId
+                              && m.Tipo == TipoMovimentacaoEstoque.Entrada);
+
             var resumo = new ResumoDia(
                 pedidosEntreguesHoje,
                 faturamentoHoje,
@@ -135,7 +144,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 saldoCaixa,
                 pixCount,
                 pixValor,
-                onboardingCompleto);
+                onboardingCompleto,
+                categoriasCount,
+                entradasCount);
 
             await SetCachedAsync(cacheKey, resumo, ResumoDiaTtl);
             return resumo;

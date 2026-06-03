@@ -25,6 +25,8 @@ public class DashboardViewModel
     public int PixRecebidosHoje { get; set; }
     public decimal ValorPixHoje { get; set; }
     public bool OnboardingCompleto { get; set; } = true;
+    public int CategoriasCount { get; set; }
+    public int EntradasCount { get; set; }
 
     public List<MovimentacaoRecente> MovimentacoesRecentes { get; set; } = [];
     public List<string> GraficoLabels { get; set; } = [];

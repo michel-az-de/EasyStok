@@ -15,14 +15,18 @@ public sealed record ObterResumoDiaResult(
     decimal SaldoCaixaAtual,
     int PixRecebidosHoje,
     decimal ValorPixHoje,
-    bool OnboardingCompleto)
+    bool OnboardingCompleto,
+    int CategoriasCount,
+    int EntradasCount)
 {
     public static ObterResumoDiaResult FromDto(ResumoDia r) => new(
         r.PedidosEntreguesHoje, r.FaturamentoHoje, r.TicketMedioHoje,
         r.PedidosPendentes, r.ValorPedidosPendentes,
         r.CaixaAbertaHoje, r.CaixaFechadaHoje, r.SaldoCaixaAtual,
         r.PixRecebidosHoje, r.ValorPixHoje,
-        r.OnboardingCompleto);
+        r.OnboardingCompleto,
+        r.CategoriasCount,
+        r.EntradasCount);
 }
 
 public sealed class ObterResumoDiaUseCase(

@@ -13,4 +13,6 @@ public record ResumoDiaApi
     public int PixRecebidosHoje { get; init; }
     public decimal ValorPixHoje { get; init; }
     public bool OnboardingCompleto { get; init; }
+    public int CategoriasCount { get; init; }
+    public int EntradasCount { get; init; }
 }

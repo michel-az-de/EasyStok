@@ -171,7 +171,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal SaldoCaixaAtual,
         int PixRecebidosHoje,
         decimal ValorPixHoje,
-        bool OnboardingCompleto);
+        bool OnboardingCompleto,
+        int CategoriasCount,
+        int EntradasCount);
 
     // ── Receita x Custo DTOs ────────────────────────────────────────────
 

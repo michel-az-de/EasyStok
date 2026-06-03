@@ -57,6 +57,8 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             vm.PixRecebidosHoje = dia.PixRecebidosHoje;
             vm.ValorPixHoje = dia.ValorPixHoje;
             vm.OnboardingCompleto = dia.OnboardingCompleto;
+            vm.CategoriasCount = dia.CategoriasCount;
+            vm.EntradasCount = dia.EntradasCount;
         }
 
         if (reposResult.Success && reposResult.Data is { } repos)
