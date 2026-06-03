@@ -7369,6 +7369,9 @@ body.ux-calm [data-screen="producao"] .section-label {
       <!-- #423 — summary bar: faturamento + ticket medio + produto mais pedido -->
       <div id="homeSummaryBar" style="display:none;background:var(--bg-elev);border-radius:14px;padding:10px 14px;margin-bottom:10px;display:flex;gap:0;flex-wrap:wrap"></div>
 
+      <!-- #440 — expiry bar: vence hoje / amanha -->
+      <div id="homeExpiryBar" style="display:none"></div>
+
       <details class="home-ops-disclosure" id="homeOpsDisclosure">
         <summary>
           <span>
@@ -10557,6 +10560,7 @@ function renderHome() {
     renderHomeOpsDisclosure();
     renderHomeSummaryBar();  // #423
     renderHomeChecklist();   // #424
+    renderHomeExpiryBar();   // #440
   } finally {
     _derivBatching = false;
     _derivCache = Object.create(null);
@@ -11452,6 +11456,15 @@ function renderHomeInsights() {
   const conferNote = `${ready} pronto · ${preparing} preparo` +
     (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
 
+  // #440 — perda estimada de lotes expirados
+  const waste = typeof calcWasteLoss === 'function' ? calcWasteLoss() : { totalLoss: 0, itemCount: 0, semCusto: 0 };
+  const wasteCard = waste.itemCount > 0 || waste.semCusto > 0
+    ? `<div class="home-insight${waste.totalLoss > 0 ? ' warn' : ''}">
+        <div class="hi-label">Perda ~</div>
+        <div class="hi-value">${waste.totalLoss > 0 ? money(waste.totalLoss).replace(',00','') : '—'}</div>
+        <div class="hi-note">${waste.itemCount} un. expirada${waste.itemCount === 1 ? '' : 's'}${waste.semCusto > 0 ? ' · ' + waste.semCusto + ' sem custo' : ''}</div>
+      </div>`
+    : '';
   host.innerHTML = `
     <div class="home-insight${critical ? ' warn' : ''}">
       <div class="hi-label">Estoque crítico</div>
@@ -11473,6 +11486,7 @@ function renderHomeInsights() {
       <div class="hi-value">${money(soldToday).replace(',00', '')}</div>
       <div class="hi-note">pedidos entregues</div>
     </div>
+    ${wasteCard}
   `;
 }
 
@@ -11573,6 +11587,60 @@ function renderHomeShopping() {
 
 // #424 — checklist de operacao: 3 checkmarks derivados de estado existente.
 // Zero localStorage novo; tudo calculado em tempo real.
+// #440 — widget de validade: itens vencendo hoje ou amanha, visiveis sem expandir o details.
+function renderHomeExpiryBar() {
+  const bar = document.getElementById('homeExpiryBar');
+  if (!bar) return;
+  const now = Date.now();
+  const H24 = 24 * 3600 * 1000;
+  const H48 = 48 * 3600 * 1000;
+  const hoje = [], amanha = [];
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
+    (b.items || []).forEach(function (it) {
+      if (!it.expiresAt) return;
+      const diff = it.expiresAt - now;
+      if (diff <= 0) return; // ja venceu — vai pro indicador de perda, nao aqui
+      const entry = { name: it.name, qty: Number(it.qty) || 0, expires: it.expiresAt, lote: b.lote || b.code };
+      if (diff < H24) hoje.push(entry);
+      else if (diff < H48) amanha.push(entry);
+    });
+  });
+  if (hoje.length === 0 && amanha.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  const chips = [];
+  if (hoje.length > 0) {
+    const nomes = hoje.slice(0, 2).map(function (e) { return escapeHtml(e.name); }).join(', ');
+    chips.push('<span onclick="go(\'conferencia\'); setTimeout(function(){if(typeof setConferTab===\'function\')setConferTab(\'producao\');},50)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:rgba(231,104,69,0.12);color:var(--accent);border:1px solid rgba(231,104,69,0.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700">🔴 Vence hoje: ' + hoje.length + (hoje.length <= 2 ? ' · ' + nomes : '') + '</span>');
+  }
+  if (amanha.length > 0) {
+    const nomes = amanha.slice(0, 2).map(function (e) { return escapeHtml(e.name); }).join(', ');
+    chips.push('<span onclick="go(\'conferencia\'); setTimeout(function(){if(typeof setConferTab===\'function\')setConferTab(\'producao\');},50)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:rgba(240,184,74,0.12);color:var(--gold);border:1px solid rgba(240,184,74,0.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700">🟡 Vence amanhã: ' + amanha.length + (amanha.length <= 2 ? ' · ' + nomes : '') + '</span>');
+  }
+  bar.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">' + chips.join('') + '</div>';
+}
+
+// #440 — calcula perda estimada: lotes nao-deletados com itens expirados * product.cost.
+// "estimada" porque itens podem ter sido usados/doados sem registro. Sempre rotulamos como ~.
+function calcWasteLoss() {
+  const now = Date.now();
+  let totalLoss = 0, itemCount = 0, semCusto = 0;
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
+    (b.items || []).forEach(function (it) {
+      if (!it.expiresAt || it.expiresAt > now) return; // so expirados
+      const qty = Number(it.qty) || 0;
+      const p = (products || []).find(function (x) { return x.id === it.productId; });
+      const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
+      if (cost != null) {
+        totalLoss += qty * cost;
+        itemCount += qty;
+      } else {
+        semCusto += qty;
+      }
+    });
+  });
+  return { totalLoss: totalLoss, itemCount: itemCount, semCusto: semCusto };
+}
+
 let _homeChecklistAutoOpened = false; // flag: abre so uma vez por sessao.
 function renderHomeChecklist() {
   const host = document.getElementById('homeChecklist');
@@ -16969,6 +17037,15 @@ function batchCardHtml(batch) {
   const conferidos = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.CONFERIDO).length;
   const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
   const items = (batch.items || []).map(i => `${i.qty}× ${i.name}`).join(' · ');
+  // #440 — validade: badge de urgência por item
+  const now440 = Date.now(); const H24_440 = 24*3600*1000; const H7D_440 = 7*24*3600*1000;
+  const validadeHtml = (batch.items || []).filter(function(i){ return i.expiresAt; }).map(function(i) {
+    const diff = i.expiresAt - now440;
+    const label = diff <= 0 ? '⛔ vencido' : (diff < H24_440 ? '🔴 vence hoje' : (diff < H7D_440 ? '🟡 vence em ' + Math.ceil(diff/H24_440) + 'd' : null));
+    if (!label) return '';
+    const cor = diff <= 0 ? 'var(--accent)' : (diff < H24_440 ? 'var(--accent)' : 'var(--gold)');
+    return '<span style="font-size:11px;color:'+cor+';font-weight:700">'+label+' · '+escapeHtml(i.name)+'</span>';
+  }).filter(Boolean).join(' · ');
   const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
     new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
   const progress = `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
@@ -17003,6 +17080,7 @@ function batchCardHtml(batch) {
       <div class="bc-info">
         <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>
+        ${validadeHtml ? '<div class="bc-progress">' + validadeHtml + '</div>' : ''}
         <div class="bc-progress">${escapeHtml(progress)}</div>
         ${(function(){
           // #437 — historico de impressoes: le do audit log as entradas 'etiqueta.print' do lote.
