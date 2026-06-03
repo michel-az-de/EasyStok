@@ -1238,6 +1238,35 @@
             <div class="text-es-ink-mute text-[11px] mt-1" x-show="stack.worker?.disponivel !== false && stack.worker?.ultimaAtividade" x-text="(stack.worker?.totalMonitorados ?? 0) + ' endpoints monitorados · ' + (stack.worker?.comFalha ?? 0) + ' com falha'"></div>
             <div class="text-es-ink-mute text-[11px] mt-1" x-show="stack.worker?.motivo" x-text="stack.worker?.motivo"></div>
         </div>
+
+        <!-- Sync mobile (devices) cross-tenant -->
+        <div x-show="stack.syncMobile && stack.syncMobile.length" x-cloak class="mt-4">
+            <h3 class="text-es-ink font-semibold text-sm mb-2">📱 Sync mobile (devices)</h3>
+            <div class="card p-0 overflow-x-auto">
+                <div class="flex gap-4 px-4 py-2.5 text-xs text-es-ink-mute" style="background:rgba(247,242,232,.03);border-bottom:1px solid rgba(247,242,232,.06)">
+                    <span x-text="stack.syncMobile.length + ' empresas com device'"></span>
+                    <span>🟢 <b class="text-es-basil" x-text="stack.syncMobile.filter(e => e.status === 'green').length"></b></span>
+                    <span>🟡 <b class="text-amber-300" x-text="stack.syncMobile.filter(e => e.status === 'yellow').length"></b></span>
+                    <span>🔴 <b class="text-red-400" x-text="stack.syncMobile.filter(e => e.status === 'red').length"></b></span>
+                </div>
+                <table class="w-full text-xs">
+                    <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                        <tr><th class="px-3 py-2 text-left">Empresa</th><th class="px-3 py-2 text-center">Status</th><th class="px-3 py-2 text-right">Pendências</th><th class="px-3 py-2 text-right">Devices</th><th class="px-3 py-2 text-left">Último sync</th></tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(e, i) in stack.syncMobile" :key="i">
+                            <tr style="border-top:1px solid rgba(247,242,232,0.04)">
+                                <td class="px-3 py-2 text-es-ink" x-text="e.empresaNome || '—'"></td>
+                                <td class="px-3 py-2 text-center"><span class="inline-block w-2 h-2 rounded-full" :class="e.status === 'green' ? 'bg-es-basil' : e.status === 'yellow' ? 'bg-amber-400' : 'bg-red-500'"></span></td>
+                                <td class="px-3 py-2 text-right font-mono" :class="(e.totalPending ?? 0) > 0 ? 'text-amber-300' : 'text-es-ink-mute'" x-text="e.totalPending ?? 0"></td>
+                                <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="e.deviceCount ?? 0"></td>
+                                <td class="px-3 py-2 font-mono text-es-ink-mute whitespace-nowrap" x-text="e.lastSyncAt ? new Date(e.lastSyncAt).toLocaleString('pt-BR') : '—'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -1270,7 +1299,7 @@ function diagnosticoPage() {
         logMode: { loaded: false, verbose: false },
         infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
         perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
-        stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, worker: null, checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
+        stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, worker: null, syncMobile: [], checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
 
         init() {
             this.resumo = resumoState.call(this);
@@ -1925,6 +1954,7 @@ function stackState() {
         data: null,
         version: null,
         worker: null,
+        syncMobile: [],
         checkedAt: null,
         _timer: null,
 
@@ -1932,16 +1962,19 @@ function stackState() {
             this._loadedOnce = true;
             this.loading = true; this.erro = '';
             try {
-                const [rh, rv, rw] = await Promise.all([
+                const [rh, rv, rw, rs] = await Promise.all([
                     fetch('/api-proxy/diag/health', { credentials: 'same-origin', cache: 'no-store' }),
                     fetch('/api-proxy/diag/version', { credentials: 'same-origin', cache: 'no-store' }),
-                    fetch('/api-proxy/diag/worker-status', { credentials: 'same-origin', cache: 'no-store' })
+                    fetch('/api-proxy/diag/worker-status', { credentials: 'same-origin', cache: 'no-store' }),
+                    fetch('/api-proxy/diag/sync-mobile', { credentials: 'same-origin', cache: 'no-store' })
                 ]);
-                if (rh.status === 401 || rv.status === 401 || rw.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (rh.status === 401 || rv.status === 401 || rw.status === 401 || rs.status === 401) { window.location.href = '/Auth/Login'; return; }
                 if (!rh.ok) { this.erro = `HTTP ${rh.status} ao consultar /health.`; }
                 else { this.data = await rh.json(); }
                 this.version = rv.ok ? await rv.json() : null;
                 this.worker = rw.ok ? await rw.json() : null;
+                const sm = rs.ok ? await rs.json() : [];
+                this.syncMobile = Array.isArray(sm) ? sm : [];
                 this.checkedAt = Date.now();
             } catch (e) {
                 this.erro = 'Falha de rede: ' + (e.message || e);

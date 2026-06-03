@@ -1026,5 +1026,26 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // Onda 2 (#438) — saude de sync mobile cross-tenant (devices + pendencias por empresa).
+        // Bate em AdminTenantsController.mobile-sync-health-global (DataOk, envelopado), GetAsync.
+        app.MapGet("/api-proxy/diag/sync-mobile", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetAsync<JsonElement>("api/admin/tenants/mobile-sync-health-global");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/sync-mobile falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
     }
 }
