@@ -26,9 +26,18 @@
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Produto *</label>
                     <div class="relative">
-                        <input type="text" placeholder="Buscar produto..." x-model="busca"
-                               @@input="buscarProduto()" @@focus="showResults = true; if (busca.length >= 2 && resultados.length === 0) buscarProduto()"
-                               class="ui-field w-full text-sm" />
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="Buscar produto ou bipar o código..." x-model="busca"
+                                   @@input="buscarProduto()" @@focus="showResults = true; if (busca.length >= 2 && resultados.length === 0) buscarProduto()"
+                                   class="ui-field flex-1 text-sm" />
+                            <button type="button" @@click="abrirScanner()"
+                                    class="shrink-0 px-3 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                                    title="Ler código de barras com a câmera ou leitor USB" aria-label="Ler código de barras">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h2v14H4zM9 5h1v14H9zM13 5h2v14h-2zM17 5h1v14h-1zM20 5h0v14h0z" />
+                                </svg>
+                            </button>
+                        </div>
                         <input type="hidden" name="ProdutoId" x-model="produtoId" />
 
                         <div x-show="showResults && resultados.length > 0"
@@ -481,6 +490,29 @@ function saidaForm() {
                 this.estoqueAtual = 0;
                 this.varId = '';
             }
+        },
+
+        // Le codigo de barras (camera/USB) reusando o scanner global. Faz o fetch
+        // direto (buscarProduto tem debounce interno) e resolve: 1 resultado
+        // seleciona; varios mostram a lista; nenhum avisa.
+        abrirScanner() {
+            window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: async (code) => {
+                const termo = String(code || '').trim();
+                this.busca = termo;
+                try {
+                    const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(termo)}`);
+                    const lista = res.ok ? await res.json() : [];
+                    if (lista.length === 1) {
+                        this.selecionarProduto(lista[0]);
+                    } else {
+                        this.resultados = lista;
+                        this.showResults = true;
+                        if (lista.length === 0) window.showToast('Codigo ' + termo + ' nao encontrado. Busque pelo nome.', 'warning');
+                    }
+                } catch {
+                    window.showToast('Erro ao buscar o codigo. Tente novamente.', 'error');
+                }
+            } } }));
         },
 
         atualizarEstoqueVariacao() {
