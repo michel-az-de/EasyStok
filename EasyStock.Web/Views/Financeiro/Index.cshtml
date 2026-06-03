@@ -1,13 +1,45 @@
-@model EasyStock.Web.Services.DashboardFinanceiroApi
+@model EasyStock.Web.Models.ViewModels.Financeiro.FinanceiroIndexViewModel
 @{
+    var d = Model.Dashboard;
+    var deltas = Model.Deltas;
+
     var hojeIso = BrazilTime.Today().ToString("yyyy-MM-dd");
     var em30Iso = BrazilTime.Today().AddDays(30).ToString("yyyy-MM-dd");
-    var saldoMes = Model.TotalRecebidoMes - Model.TotalPagoMes;
+
+    var totalVencido = d.TotalVencidoPagar + d.TotalVencidoReceber;
+    var saldoMes = d.TotalRecebidoMes - d.TotalPagoMes;
+
     // Drill-in com janela movel 30d (controllers aceitam vencimentoDe/Ate). href montado
-    // como string p/ evitar ambiguidade de '&' no atributo Razor.
+    // como string p/ evitar ambiguidade de '&' no atributo Razor (Razor HTML-encoda o '&').
     var hrefReceber  = $"/contas-a-receber?vencimentoDe={hojeIso}&vencimentoAte={em30Iso}";
     var hrefPagar    = $"/contas-a-pagar?vencimentoDe={hojeIso}&vencimentoAte={em30Iso}";
     var hrefVencidas = $"/contas-a-pagar?vencimentoAte={hojeIso}";
+
+    // First-run: dashboard ainda sem nenhum lancamento. Os 4 KPIs continuam visiveis
+    // (R$ 0,00 via AsMoney) — mas mostramos um guia da 1a acao em vez de "vazio morto".
+    var semMovimento =
+        d.TotalAVencer30dPagar == 0m &&
+        d.TotalAVencer30dReceber == 0m &&
+        totalVencido == 0m &&
+        d.TotalPagoMes == 0m &&
+        d.TotalRecebidoMes == 0m &&
+        d.QtdContasPagarAbertas == 0 &&
+        d.QtdContasReceberAbertas == 0 &&
+        d.QtdParcelasVencidasHoje == 0;
+
+    // delta-meta: "N em aberto · vs 30d" so quando ha base de comparacao (deltas.*Delta != null);
+    // sem base, mostra so a contagem (nao inventa "vs 30d" sem delta por tras).
+    string MetaReceber = deltas.ReceberDelta is null
+        ? $"{d.QtdContasReceberAbertas} em aberto"
+        : $"{d.QtdContasReceberAbertas} em aberto · vs 30d";
+    string MetaPagar = deltas.PagarDelta is null
+        ? $"{d.QtdContasPagarAbertas} em aberto"
+        : $"{d.QtdContasPagarAbertas} em aberto · vs 30d";
+
+    // Nome acessivel por card: rotulo + valor lidos como um todo (o card vira <a>/<div>;
+    // sem aria-label o leitor de tela anunciaria texto solto). Tambem vai em title= p/ tooltip.
+    string Aria(string rotulo, string valor, string? sufixo = null) =>
+        sufixo is null ? $"{rotulo}: {valor}" : $"{rotulo}: {valor}. {sufixo}";
 }
 
 <div class="page-content">
@@ -16,42 +48,79 @@
             <h1 class="page-heading">Financeiro</h1>
             <p class="page-subheading">Visão geral do fluxo de caixa, contas a pagar e a receber.</p>
         </div>
+        <a href="/financeiro/fluxo-caixa" class="btn btn-ghost btn-sm">Fluxo de Caixa</a>
     </div>
+
+    @if (semMovimento)
+    {
+        <div class="alert-soft alert-soft--blue mb-6" role="status">
+            <div>
+                <p class="alert-soft__title">Comece seu controle financeiro</p>
+                <p class="alert-soft__body">
+                    Ainda não há lançamentos. Cadastre a primeira conta a receber ou a pagar
+                    para acompanhar saldo, vencimentos e fluxo de caixa aqui.
+                </p>
+            </div>
+            <a href="/contas-a-receber/criar" class="btn btn-primary btn-sm alert-soft__action">+ Primeira conta</a>
+        </div>
+    }
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <es-stat-card label="A Receber 30d"
-                      value="@Model.TotalAVencer30dReceber.AsMoney()"
-                      delta-meta="@(Model.QtdContasReceberAbertas) conta(s) em aberto"
-                      href="@hrefReceber" />
+                      value="@d.TotalAVencer30dReceber.AsMoney()"
+                      delta="@deltas.ReceberDelta"
+                      delta-trend="@deltas.ReceberTrend"
+                      delta-meta="@MetaReceber"
+                      sparkline="@deltas.ReceberSerie"
+                      href="@hrefReceber"
+                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{d.QtdContasReceberAbertas} conta(s) em aberto. Abrir recebíveis do período.")" />
+
         <es-stat-card label="A Pagar 30d"
-                      value="@Model.TotalAVencer30dPagar.AsMoney()"
-                      delta-meta="@(Model.QtdContasPagarAbertas) conta(s) em aberto"
-                      href="@hrefPagar" />
+                      value="@d.TotalAVencer30dPagar.AsMoney()"
+                      delta="@deltas.PagarDelta"
+                      delta-trend="@deltas.PagarTrend"
+                      delta-meta="@MetaPagar"
+                      sparkline="@deltas.PagarSerie"
+                      href="@hrefPagar"
+                      title="@Aria("A Pagar nos próximos 30 dias", d.TotalAVencer30dPagar.AsMoney(), $"{d.QtdContasPagarAbertas} conta(s) em aberto. Abrir pagáveis do período.")" />
+
         <es-stat-card label="Vencidas"
-                      value="@((Model.TotalVencidoPagar + Model.TotalVencidoReceber).AsMoney())"
-                      delta-meta="@(Model.QtdParcelasVencidasHoje) parcela(s) atrasadas"
-                      href="@hrefVencidas" />
+                      value="@totalVencido.AsMoney()"
+                      delta-meta="@(d.QtdParcelasVencidasHoje) atrasada(s)"
+                      href="@hrefVencidas"
+                      title="@Aria("Total vencido em aberto", totalVencido.AsMoney(), $"{d.QtdParcelasVencidasHoje} parcela(s) atrasada(s). Abrir contas vencidas.")" />
+
         <es-stat-card label="Saldo do mês"
                       value="@saldoMes.AsMoney()"
-                      delta-meta="+@Model.TotalRecebidoMes.AsMoney() recebido · -@Model.TotalPagoMes.AsMoney() pago" />
+                      delta="@deltas.SaldoDelta"
+                      delta-trend="@deltas.SaldoTrend"
+                      delta-meta="@(deltas.SaldoDelta is null ? null : "vs 30d")"
+                      sparkline="@deltas.SaldoSerie"
+                      title="@Aria("Saldo do mês", saldoMes.AsMoney(), $"Recebido {d.TotalRecebidoMes.AsMoney()}, pago {d.TotalPagoMes.AsMoney()}.")">
+            <span>+@d.TotalRecebidoMes.AsMoney() recebido · -@d.TotalPagoMes.AsMoney() pago</span>
+        </es-stat-card>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="card">
-            <h3 class="text-sm font-medium text-gray-700 mb-3">Vencido em aberto</h3>
+            <h3 class="text-sm font-medium mb-3" style="color: var(--text-primary);">Vencido em aberto</h3>
             <div class="space-y-2">
                 <a href="/contas-a-pagar?vencimentoAte=@hojeIso" class="flex justify-between text-sm hover:underline">
-                    <span class="text-gray-600">A Pagar vencido</span>
-                    <span class="text-red-700 font-medium">@Model.TotalVencidoPagar.AsMoney()</span>
+                    <span style="color: var(--text-secondary);">A Pagar vencido</span>
+                    <span class="font-medium" style="color: var(--crit-600);">@d.TotalVencidoPagar.AsMoney()</span>
                 </a>
                 <a href="/contas-a-receber?vencimentoAte=@hojeIso" class="flex justify-between text-sm hover:underline">
-                    <span class="text-gray-600">A Receber vencido</span>
-                    <span class="text-red-700 font-medium">@Model.TotalVencidoReceber.AsMoney()</span>
+                    <span style="color: var(--text-secondary);">A Receber vencido</span>
+                    <span class="font-medium" style="color: var(--crit-600);">@d.TotalVencidoReceber.AsMoney()</span>
                 </a>
             </div>
+            @if (totalVencido == 0m)
+            {
+                <p class="text-sm mt-2" style="color: var(--text-muted);">Nada vencido. Tudo em dia.</p>
+            }
         </div>
         <div class="card">
-            <h3 class="text-sm font-medium text-gray-700 mb-3">Atalhos</h3>
+            <h3 class="text-sm font-medium mb-3" style="color: var(--text-primary);">Atalhos</h3>
             <div class="flex flex-wrap gap-2">
                 <a href="/contas-a-receber/criar" class="btn btn-primary btn-sm">+ Nova Conta a Receber</a>
                 <a href="/contas-a-pagar/criar" class="btn btn-secondary btn-sm">+ Nova Conta a Pagar</a>
