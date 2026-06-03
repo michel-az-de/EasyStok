@@ -1047,5 +1047,62 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // Onda 3 (#439) — resultados do CI (GitHub Actions). Repo publico -> leitura
+        // anonima (sem token). Chamada server-side a api.github.com (egress do Admin),
+        // filtra o ultimo run de CI (ci.yml) e Coverage (coverage.yml) em master.
+        app.MapGet("/api-proxy/ci/runs", async (
+            System.Net.Http.IHttpClientFactory httpFactory,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var client = httpFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("EasyStok-Admin");
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+                var resp = await client.GetAsync(
+                    "https://api.github.com/repos/michel-az-de/EasyStok/actions/runs?branch=master&per_page=40");
+                if (!resp.IsSuccessStatusCode)
+                    return Results.Json(new { error = $"GitHub API HTTP {(int)resp.StatusCode}" },
+                        statusCode: StatusCodes.Status502BadGateway);
+
+                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+                var interesse = new[] { ".github/workflows/ci.yml", ".github/workflows/coverage.yml" };
+                var vistos = new HashSet<string>();
+                var runs = new List<object>();
+                if (doc.RootElement.TryGetProperty("workflow_runs", out var arr)
+                    && arr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var r in arr.EnumerateArray())
+                    {
+                        string? Str(string k) => r.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+                        var path = Str("path");
+                        if (path is null || !interesse.Contains(path) || !vistos.Add(path)) continue;
+                        var sha = Str("head_sha");
+                        runs.Add(new
+                        {
+                            name = Str("name") ?? path,
+                            path,
+                            status = Str("status"),
+                            conclusion = Str("conclusion"),
+                            sha = sha is { Length: >= 8 } ? sha[..8] : sha,
+                            branch = Str("head_branch"),
+                            createdAt = Str("created_at"),
+                            url = Str("html_url")
+                        });
+                        if (vistos.Count >= interesse.Length) break;
+                    }
+                }
+                return Results.Ok(new { runs, verificadoEm = DateTimeOffset.UtcNow });
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy ci/runs falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
     }
 }

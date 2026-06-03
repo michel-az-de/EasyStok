@@ -129,6 +129,11 @@
                 class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
             📡 Stack
         </button>
+        <button type="button" @@click="setTab('testes')"
+                :class="tab === 'testes' ? 'text-es-ink border-es-accent' : 'text-es-ink-mute border-transparent hover:text-es-ink'"
+                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
+            🧪 Testes
+        </button>
     </div>
 
     <!-- ════════════════════════════════════════════════════════════════════════ -->
@@ -1269,6 +1274,42 @@
         </div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB: TESTES — resultados do CI (GitHub Actions) (Onda 3, #439)           -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'testes'" x-cloak>
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-es-ink-mute text-sm">Resultados do CI (GitHub Actions) em master: testes e cobertura.</div>
+            <button type="button" @@click="testes.refresh()" class="btn-secondary text-sm">↻ Atualizar</button>
+        </div>
+
+        <template x-if="testes.erro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="testes.erro"></div>
+        </template>
+        <div x-show="testes.loading && !testes.runs.length" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-4">
+            <span class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse"></span> Consultando GitHub Actions…
+        </div>
+        <div x-show="!testes.loading && !testes.runs.length && !testes.erro" x-cloak class="card text-center py-6 text-es-ink-mute text-sm">Nenhum run de CI encontrado.</div>
+
+        <div x-show="testes.runs.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <template x-for="(run, i) in testes.runs" :key="i">
+                <a :href="run.url || '#'" target="_blank" rel="noopener" class="card hover:ring-1 hover:ring-es-accent/40 transition block">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" :class="testes.dotClass(run)"></span>
+                        <span class="text-es-ink font-semibold text-sm" x-text="run.name"></span>
+                        <span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded" :class="testes.badgeClass(run)" x-text="testes.label(run)"></span>
+                    </div>
+                    <div class="text-es-ink-mute text-[11px]">
+                        <span class="font-mono" x-text="run.sha || '—'"></span> · <span x-text="run.branch || '—'"></span>
+                        · <span x-text="run.createdAt ? new Date(run.createdAt).toLocaleString('pt-BR') : '—'"></span>
+                    </div>
+                    <div class="text-es-accent text-[11px] mt-1">abrir no GitHub →</div>
+                </a>
+            </template>
+        </div>
+        <p x-show="testes.verificadoEm" x-cloak class="text-es-ink-mute text-[10px] mt-3" x-text="'Verificado ' + (testes.verificadoEm ? new Date(testes.verificadoEm).toLocaleTimeString('pt-BR') : '')"></p>
+    </div>
+
 </div>
 
 @section Scripts {
@@ -1300,6 +1341,7 @@ function diagnosticoPage() {
         infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
         perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
         stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, worker: null, syncMobile: [], checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
+        testes: { _loadedOnce: false, loading: false, erro: '', runs: [], verificadoEm: null, dotClass: () => '', badgeClass: () => '', label: () => '—' },
 
         init() {
             this.resumo = resumoState.call(this);
@@ -1309,6 +1351,7 @@ function diagnosticoPage() {
             this.infra = infraState.call(this);
             this.perf = perfState.call(this);
             this.stack = stackState.call(this);
+            this.testes = testesState.call(this);
 
             this.resumo.init();
             this.logMode.init();
@@ -1325,6 +1368,7 @@ function diagnosticoPage() {
                 if (val === 'infra' && !this.infra._loadedOnce) this.infra.refresh();
                 if (val === 'performance' && !this.perf._loadedOnce) this.perf.refreshAll();
                 if (val === 'stack' && !this.stack._loadedOnce) this.stack.refresh();
+                if (val === 'testes' && !this.testes._loadedOnce) this.testes.refresh();
             });
 
             // Hidrata erros se entrou direto na tab.
@@ -2007,6 +2051,53 @@ function stackState() {
             if (status === 'Degraded') return 'degradado';
             if (status === 'Unhealthy') return 'com falha';
             return status || '—';
+        }
+    };
+}
+
+// ─── Factory: Tab Testes (resultados do CI via GitHub Actions — Onda 3 #439) ──
+function testesState() {
+    return {
+        _loadedOnce: false,
+        loading: false,
+        erro: '',
+        runs: [],
+        verificadoEm: null,
+
+        async refresh() {
+            this._loadedOnce = true;
+            this.loading = true; this.erro = '';
+            try {
+                const r = await fetch('/api-proxy/ci/runs', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.erro = `HTTP ${r.status} ao consultar o CI.`; return; }
+                const d = await r.json();
+                this.runs = Array.isArray(d?.runs) ? d.runs : [];
+                this.verificadoEm = d?.verificadoEm || null;
+            } catch (e) {
+                this.erro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.loading = false; }
+        },
+
+        _ok(run) { return run?.status === 'completed' && run?.conclusion === 'success'; },
+        _running(run) { return run?.status === 'in_progress' || run?.status === 'queued'; },
+        dotClass(run) {
+            if (this._running(run)) return 'bg-amber-400 animate-pulse';
+            if (this._ok(run)) return 'bg-es-basil';
+            if (run?.conclusion === 'failure') return 'bg-red-500';
+            return 'bg-es-ink-mute';
+        },
+        badgeClass(run) {
+            if (this._running(run)) return 'bg-amber-500/20 text-amber-300';
+            if (this._ok(run)) return 'bg-es-basil/20 text-es-basil';
+            if (run?.conclusion === 'failure') return 'bg-red-500/20 text-red-400';
+            return 'bg-es-surface-2 text-es-ink-mute';
+        },
+        label(run) {
+            if (this._running(run)) return 'rodando';
+            if (this._ok(run)) return 'passou';
+            if (run?.conclusion === 'failure') return 'falhou';
+            return run?.conclusion || run?.status || '—';
         }
     };
 }
