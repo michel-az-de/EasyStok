@@ -86,4 +86,26 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.match(txt, /Joao/);
     assert.match(txt, /Troco/);
   });
+
+  // #416 — mascara de moeda "de centavos" no lancamento de caixa.
+  test('caixa: maskMoneyInput formata centavos da direita pra esquerda', () => {
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:'4500'}; maskMoneyInput(el); return el.value; })()`), '45,00');
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:'4'}; maskMoneyInput(el); return el.value; })()`), '0,04');
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:'45'}; maskMoneyInput(el); return el.value; })()`), '0,45');
+  });
+
+  test('caixa: maskMoneyInput poe separador de milhar', () => {
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:'450000'}; maskMoneyInput(el); return el.value; })()`), '4.500,00');
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:'123456789'}; maskMoneyInput(el); return el.value; })()`), '1.234.567,89');
+  });
+
+  test('caixa: maskMoneyInput vazio fica vazio e ignora nao-digitos', () => {
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:''}; maskMoneyInput(el); return el.value; })()`), '');
+    assert.strictEqual(runInSandbox(`(function(){ var el={value:'R$ 4.5a0,0'}; maskMoneyInput(el); return el.value; })()`), '45,00');
+  });
+
+  test('caixa: parseMoneyInput le de volta o valor mascarado (compat)', () => {
+    assert.strictEqual(runInSandbox(`parseMoneyInput('45,00')`), 45);
+    assert.strictEqual(runInSandbox(`parseMoneyInput('4.500,00')`), 4500);
+  });
 };

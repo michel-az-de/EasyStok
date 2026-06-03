@@ -7949,7 +7949,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <label class="modal-label">Valor</label>
       <div class="price-row">
         <span class="currency">R$</span>
-        <div class="input-box"><input id="cashAmount" type="text" inputmode="decimal" placeholder="45,00" autocomplete="off" oninput="updateCashSaveState()"></div>
+        <div class="input-box"><input id="cashAmount" type="text" inputmode="numeric" placeholder="45,00" autocomplete="off" oninput="maskMoneyInput(this); updateCashSaveState()"></div>
       </div>
 
       <div class="modal-ctas">
@@ -21083,6 +21083,21 @@ function parseMoneyInput(raw) {
   }
   const n = parseFloat(s);
   return isNaN(n) ? NaN : n;
+}
+
+// #416 — mascara de moeda "de centavos": usuario digita digitos e o campo
+// formata da direita pra esquerda (4500 -> 45,00; 450000 -> 4.500,00). Sempre
+// produz formato pt-BR valido que parseMoneyInput le no salvar. Limite de 11
+// digitos (ate 999.999.999,99) evita overflow. Sem digito -> campo vazio.
+function maskMoneyInput(el) {
+  if (!el) return;
+  const digits = String(el.value || '').replace(/\D/g, '').slice(0, 11);
+  if (!digits) { el.value = ''; return; }
+  const cents = parseInt(digits, 10);
+  const intPart = Math.floor(cents / 100);
+  const centPart = String(cents % 100).padStart(2, '0');
+  const intStr = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  el.value = intStr + ',' + centPart;
 }
 
 function updateCashSaveState() {
