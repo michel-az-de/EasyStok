@@ -4,6 +4,7 @@ using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Middleware;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 
@@ -36,6 +37,18 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.ExpireTimeSpan = TimeSpan.FromMinutes(480);
         o.SlidingExpiration = true;
     });
+
+// 8b. DataProtection — persistir as chaves num volume em producao.
+// Sem isso as chaves ficam in-memory: todo restart/deploy as regenera, o cookie de
+// auth deixa de descriptografar, o SessionRestoreMiddleware ve IsAuthenticated=false
+// e nem chega a restaurar via _rt => logout geral a cada deploy (BUG-004 + cascata
+// 005/006/007/008). Com DataProtection:KeysPath apontando pra um volume montado, o
+// cookie sobrevive ao deploy e o "manter logado" funciona como projetado. Em dev
+// (sem KeysPath) cai no default efemero — sem impacto local.
+var dpKeysPath = config["DataProtection:KeysPath"];
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EasyStok.Web");
+if (!string.IsNullOrWhiteSpace(dpKeysPath))
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath));
 
 var app = builder.Build();
 
