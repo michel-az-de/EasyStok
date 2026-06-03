@@ -963,5 +963,27 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // Onda 2 (#438) — health consolidado da stack (Postgres, Redis, Config, Dispatcher/
+        // notificacoes). Alimenta o board "Stack" do /Diagnostico. /health nao usa envelope
+        // {data}, entao GetJsonAsync; injeta Bearer mas /health e anonimo no upstream.
+        app.MapGet("/api-proxy/diag/health", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetJsonAsync<JsonElement>("health");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/health falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
     }
 }

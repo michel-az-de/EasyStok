@@ -124,6 +124,11 @@
                 class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
             📊 Performance
         </button>
+        <button type="button" @@click="setTab('stack')"
+                :class="tab === 'stack' ? 'text-es-ink border-es-accent' : 'text-es-ink-mute border-transparent hover:text-es-ink'"
+                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors">
+            📡 Stack
+        </button>
     </div>
 
     <!-- ════════════════════════════════════════════════════════════════════════ -->
@@ -1171,6 +1176,50 @@
         </div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB: STACK — board de saude consolidado da stack (Onda 2, #438)          -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <div x-show="tab === 'stack'" x-cloak>
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-es-ink-mute text-sm">Saúde consolidada da stack via /health: banco, cache, configuração e filas de notificação.</div>
+            <button type="button" @@click="stack.refresh()" class="btn-secondary text-sm">↻ Atualizar</button>
+        </div>
+
+        <template x-if="stack.erro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="stack.erro"></div>
+        </template>
+
+        <div x-show="stack.loading && !stack.data" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-4">
+            <span class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse"></span> Consultando /health…
+        </div>
+
+        <!-- Semáforo geral -->
+        <div x-show="stack.data" x-cloak class="card mb-4 flex items-center gap-3">
+            <span class="inline-block w-3 h-3 rounded-full shrink-0" :class="stack.dotClass(stack.data?.status)"></span>
+            <div class="flex-1">
+                <div class="text-es-ink font-semibold text-sm">Status geral: <span x-text="stack.label(stack.data?.status)"></span></div>
+                <div class="text-es-ink-mute text-[11px]" x-text="'Verificado ' + (stack.checkedAt ? new Date(stack.checkedAt).toLocaleTimeString('pt-BR') : '—') + (stack.data?.totalDuration ? ' · ' + stack.data.totalDuration : '')"></div>
+            </div>
+        </div>
+
+        <!-- Checks individuais -->
+        <div x-show="stack.data" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <template x-for="(c, i) in (stack.data?.checks ?? [])" :key="i">
+                <div class="card">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" :class="stack.dotClass(c.status)"></span>
+                        <span class="text-es-ink font-semibold text-sm" x-text="c.name"></span>
+                        <span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded" :class="stack.badgeClass(c.status)" x-text="c.status"></span>
+                    </div>
+                    <div class="text-es-ink-dim text-xs" x-show="c.description" x-text="c.description"></div>
+                    <div class="text-red-400 text-[11px] mt-1" x-show="c.error" x-text="c.error"></div>
+                    <div class="text-es-ink-mute text-[10px] mt-1" x-text="'latência: ' + (c.duration || '—')"></div>
+                </div>
+            </template>
+        </div>
+        <div x-show="stack.data && (stack.data?.checks ?? []).length === 0" x-cloak class="card text-center py-6 text-es-ink-mute text-sm">/health não retornou checks individuais.</div>
+    </div>
+
 </div>
 
 @section Scripts {
@@ -1201,6 +1250,7 @@ function diagnosticoPage() {
         logMode: { loaded: false, verbose: false },
         infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
         perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
+        stack: { _loadedOnce: false, loading: false, erro: '', data: null, checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
 
         init() {
             this.resumo = resumoState.call(this);
@@ -1209,6 +1259,7 @@ function diagnosticoPage() {
             this.logMode = loggingModeState.call(this);
             this.infra = infraState.call(this);
             this.perf = perfState.call(this);
+            this.stack = stackState.call(this);
 
             this.resumo.init();
             this.logMode.init();
@@ -1224,6 +1275,7 @@ function diagnosticoPage() {
                 if (val === 'sistema' && !this.sysErros._loadedOnce) this.sysErros.refresh();
                 if (val === 'infra' && !this.infra._loadedOnce) this.infra.refresh();
                 if (val === 'performance' && !this.perf._loadedOnce) this.perf.refreshAll();
+                if (val === 'stack' && !this.stack._loadedOnce) this.stack.refresh();
             });
 
             // Hidrata erros se entrou direto na tab.
@@ -1840,6 +1892,48 @@ function perfState() {
         shortQuery(q) {
             if (!q) return '—';
             return q.length > 80 ? q.slice(0, 80) + '…' : q;
+        }
+    };
+}
+
+// ─── Factory: Tab Stack (board de saude consolidado da stack — Onda 2 #438) ──
+function stackState() {
+    return {
+        _loadedOnce: false,
+        loading: false,
+        erro: '',
+        data: null,
+        checkedAt: null,
+
+        async refresh() {
+            this._loadedOnce = true;
+            this.loading = true; this.erro = '';
+            try {
+                const r = await fetch('/api-proxy/diag/health', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.erro = `HTTP ${r.status} ao consultar /health.`; return; }
+                this.data = await r.json();
+                this.checkedAt = Date.now();
+            } catch (e) {
+                this.erro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.loading = false; }
+        },
+
+        dotClass(status) {
+            if (status === 'Healthy') return 'bg-es-basil';
+            if (status === 'Degraded') return 'bg-amber-400';
+            return 'bg-red-500';
+        },
+        badgeClass(status) {
+            if (status === 'Healthy') return 'bg-es-basil/20 text-es-basil';
+            if (status === 'Degraded') return 'bg-amber-500/20 text-amber-300';
+            return 'bg-red-500/20 text-red-400';
+        },
+        label(status) {
+            if (status === 'Healthy') return 'saudável';
+            if (status === 'Degraded') return 'degradado';
+            if (status === 'Unhealthy') return 'com falha';
+            return status || '—';
         }
     };
 }
