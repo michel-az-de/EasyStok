@@ -954,22 +954,31 @@ button:disabled {
   /* C1 (2026-05-16): fixed em vez de absolute - independe do scroll do parent.
      Antes podia ficar fora da viewport em telas estreitas e empilhar sobre UI. */
   position: fixed;
-  left: 14px;
-  right: 14px;
+  left: 12px;
+  right: 12px;
   bottom: calc(78px + env(safe-area-inset-bottom, 0px));
   z-index: 55;
   display: none;
   border: 1px solid var(--border-strong);
-  border-radius: 18px;
-  padding: 10px;
+  border-radius: 20px;
+  padding: 12px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.055), transparent 110px),
+    linear-gradient(180deg, rgba(255,255,255,0.07), transparent 128px),
     var(--bg-elev);
   box-shadow: 0 18px 48px rgba(0,0,0,0.34);
-  max-height: min(58vh, 440px);
+  max-height: min(68vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+}
+.more-menu::before {
+  content: '';
+  display: block;
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  margin: 0 auto 10px;
+  background: rgba(255,255,255,0.18);
 }
 .more-menu::-webkit-scrollbar { display: none; }
 .more-menu.show { display: block; animation: slideUp 0.18s ease-out; }
@@ -977,12 +986,22 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 4px 10px;
+  gap: 12px;
+  padding: 0 2px 12px;
+}
+.more-menu-title {
+  display: block;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+.more-menu-subtitle {
+  display: block;
+  margin-top: 2px;
   color: var(--ink-mute);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 12px;
+  line-height: 1.25;
 }
 .ux-density-toggle {
   min-height: 28px;
@@ -998,32 +1017,121 @@ button:disabled {
   text-transform: uppercase;
   cursor: pointer;
 }
-.more-menu-grid {
+.more-menu-search {
+  width: 100%;
+  min-height: 52px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(231,104,69,0.12);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+.more-menu-search b {
+  display: block;
+  font-size: 14px;
+  font-weight: 950;
+}
+.more-menu-search small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.25;
+}
+.more-menu-search-icon,
+.more-menu-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: rgba(255,255,255,0.075);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 950;
+  flex: 0 0 auto;
+}
+.more-menu-section {
+  margin-top: 12px;
+}
+.more-menu-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 7px;
+  color: var(--ink-mute);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.more-menu-section-title::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+.more-menu-list {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 .more-menu-item {
   min-width: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 12px;
+  padding: 10px 12px;
   background: rgba(255,255,255,0.035);
   color: var(--ink);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
 }
-.more-menu-item strong { display: block; font-size: 13px; font-weight: 900; }
-.more-menu-item span {
+.more-menu-item > span:not(.more-menu-icon) {
+  display: block;
+  min-width: 0;
+}
+.more-menu-item strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 950;
+}
+.more-menu-item > span:not(.more-menu-icon) > span {
   display: block;
   margin-top: 3px;
   color: var(--ink-mute);
   font-size: 11px;
   line-height: 1.3;
 }
+.more-menu-item:hover,
+.more-menu-search:hover {
+  border-color: rgba(231,104,69,0.42);
+  background: rgba(231,104,69,0.10);
+}
+.more-menu-admin {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 [data-theme="light"] .more-menu { background: #fff; border-color: #dbe2ec; box-shadow: 0 16px 36px rgba(21,31,49,0.15); }
 [data-theme="light"] .more-menu-item { background: #f8fafc; border-color: #dbe2ec; }
+[data-theme="light"] .more-menu::before { background: #cbd5e1; }
+[data-theme="light"] .more-menu-search { background: #fff7ed; border-color: #fed7aa; }
+[data-theme="light"] .more-menu-search-icon,
+[data-theme="light"] .more-menu-icon { background: #eef2ff; }
 
 .client-value-grid {
   display: grid;
@@ -3153,9 +3261,9 @@ button:disabled {
   letter-spacing: 0.02em;
   color: var(--ink-mute);
 }
-.doc-hint.valid { color: var(--basil); }
-.doc-hint.invalid { color: var(--accent); }
-.doc-hint.partial { color: var(--ink-mute); }
+.doc-hint.valid { color: var(--basil); text-decoration: none; }
+.doc-hint.invalid { color: var(--accent); text-decoration: none; }
+.doc-hint.partial { color: var(--ink-mute); text-decoration: none; }
 [data-theme="light"] .doc-hint.valid { color: var(--basil); }
 [data-theme="light"] .doc-hint.invalid { color: var(--accent); }
 
@@ -4386,6 +4494,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 [data-screen="producao"] .product-grid {
   gap: 8px;
+  padding-bottom: 140px; /* folga pro footer cta-row fixo (BUG #3) */
 }
 [data-screen="producao"] .grid-section {
   margin-top: 14px;
@@ -5197,7 +5306,15 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column;
   background: var(--bg);
   overflow: hidden;
+  min-height: 0; /* permite filhos com overflow-y:auto scrollarem (BUG #18) */
 }
+/* BUG #18: garante que a sheet "tall" no overlay coluna nao estoure viewport
+   e que filhos flex consigam shrink/scroll corretamente. */
+.etq-sheet--tall {
+  max-height: 100vh;
+  min-height: 0;
+}
+.etq-sheet > .etq-head { flex-shrink: 0; }
 .etq-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 18px 16px 12px; gap: 12px;
@@ -6794,8 +6911,10 @@ body.ux-calm .home-ops-disclosure {
   border-radius: 14px;
 }
 body.ux-calm .home-ops-sub,
-body.ux-calm .more-menu-head > span:last-child,
-body.ux-calm .more-menu-item span {
+body.ux-calm .more-menu-subtitle,
+body.ux-calm .more-menu-section-title,
+body.ux-calm .more-menu-item > span:not(.more-menu-icon) > span,
+body.ux-calm .more-menu-search small {
   display: none;
 }
 body.ux-calm .home-ops-disclosure > summary {
@@ -6804,15 +6923,28 @@ body.ux-calm .home-ops-disclosure > summary {
 body.ux-calm .more-menu {
   padding: 12px;
 }
-body.ux-calm .more-menu-grid {
+body.ux-calm .more-menu-search {
+  min-height: 46px;
+  margin-bottom: 8px;
+}
+body.ux-calm .more-menu-list {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
 }
 body.ux-calm .more-menu-item {
-  min-height: 44px;
+  min-height: 68px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
   padding: 10px 6px;
   border-radius: 12px;
   text-align: center;
+}
+body.ux-calm .more-menu-icon {
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
 }
 body.ux-calm .more-menu-item strong {
   font-size: 12px;
@@ -7333,6 +7465,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <span class="pd-count" id="prodDemandCount">0 pedidos</span>
         </div>
         <div class="pd-chips" id="prodDemandChips"></div>
+        <button type="button" class="cta-btn" onclick="openCestaCalcFromDemand()" style="margin-top:10px;font-size:13px;">🧮 Conferir insumos da demanda</button>
       </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
@@ -7390,6 +7523,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <div class="cta-row" style="margin-top:14px;">
             <button class="cta-btn" id="calcEditarReceitaBtn" onclick="calcAbrirAjusteReceita()" style="display:none;">Editar receita</button>
             <button class="cta-btn primary" id="calcGerarCompraBtn" onclick="calcGerarCompra()" style="display:none;">Gerar lista de compras</button>
+            <button class="cta-btn" id="calcAddComprasBtn" onclick="calcAdicionarFaltantesCompras()" style="display:none;">📋 Jogar faltantes em Compras</button>
           </div>
         </div>
 
@@ -7466,6 +7600,17 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="section-label">Observação (opcional)</div>
         <div class="input-box">
           <textarea id="orderNotes" rows="2" placeholder="ex: pra gratinar, retira 19h, sem cebola"></textarea>
+        </div>
+
+        <div class="section-label">Canal (opcional)</div>
+        <div class="input-box">
+          <select id="orderChannel" style="width:100%;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 12px;color:var(--ink);">
+            <option value="">Sem canal</option>
+            <option value="balcao">Balcão</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="ifood">iFood</option>
+            <option value="telefone">Telefone</option>
+          </select>
         </div>
 
         <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
@@ -7872,6 +8017,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <div class="modal-ctas">
+        <button class="cta-btn primary" id="cestaCalcBtnCompras" onclick="cestaCalcAdicionarFaltantesCompras()" style="display:none;">🛒 Jogar faltantes em Compras</button>
         <button class="cta-btn" id="cestaCalcBtnFechar" onclick="cestaCalcFechar()">Fechar</button>
         <button class="cta-btn primary" id="cestaCalcBtnCalcular" onclick="cestaCalcCalcular()">Calcular</button>
       </div>
@@ -8551,22 +8697,44 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
-  <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais paginas">
+  <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais páginas">
     <div class="more-menu-head">
-      <span>Mais ferramentas</span>
+      <span>
+        <span class="more-menu-title">Menu</span>
+        <span class="more-menu-subtitle">Escolha pelo tipo de tarefa.</span>
+      </span>
       <button class="ux-density-toggle" id="uxDensityToggle" onclick="toggleUxDensity(event)">Simples</button>
     </div>
-    <div class="more-menu-grid">
-<button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
-      <button class="more-menu-item" onclick="go('estoque')"><strong>Estoque</strong><span>Saldo, rastreabilidade e saídas.</span></button>
-      <button class="more-menu-item" onclick="go('clientes')"><strong>Clientes</strong><span>Recorrencia, ticket e retorno.</span></button>
-      <button class="more-menu-item" onclick="go('compras')"><strong>Compras</strong><span>Itens que faltam para produzir.</span></button>
-      <button class="more-menu-item" onclick="go('caixa')"><strong>Caixa</strong><span>Saldo, lancamentos e fechamento.</span></button>
-      <button class="more-menu-item" onclick="go('finalizados')"><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></button>
-      <button class="more-menu-item" onclick="go('suporte')"><strong>Suporte</strong><span>Chamado com diagnóstico.</span></button>
-      <button class="more-menu-item" onclick="closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()"><strong>Etiquetas</strong><span>Modelos de impressão e layout.</span></button>
-      <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><strong>Ajustes</strong><span>Loja, impressora, backup e demo.</span></button>
-      <button class="more-menu-item" onclick="closeMoreMenu(); openGlobalSearch()"><strong>Busca</strong><span>Cliente, pedido, produto ou lote.</span></button>
+    <button class="more-menu-search" onclick="closeMoreMenu(); openGlobalSearch()">
+      <span class="more-menu-search-icon" aria-hidden="true">⌕</span>
+      <span><b>Buscar qualquer coisa</b><small>Cliente, pedido, produto ou lote.</small></span>
+    </button>
+
+    <div class="more-menu-section" aria-labelledby="more-op-section">
+      <div class="more-menu-section-title" id="more-op-section">Operação</div>
+      <div class="more-menu-list">
+        <button class="more-menu-item" onclick="go('caixa')"><span class="more-menu-icon" aria-hidden="true">$</span><span><strong>Caixa</strong><span>Entradas, saídas e fechamento.</span></span></button>
+        <button class="more-menu-item" onclick="go('compras')"><span class="more-menu-icon" aria-hidden="true">+</span><span><strong>Compras</strong><span>Reposição para produzir.</span></span></button>
+        <button class="more-menu-item" onclick="go('finalizados')"><span class="more-menu-icon" aria-hidden="true">✓</span><span><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></span></button>
+      </div>
+    </div>
+
+    <div class="more-menu-section" aria-labelledby="more-gestao-section">
+      <div class="more-menu-section-title" id="more-gestao-section">Gestão</div>
+      <div class="more-menu-list">
+        <button class="more-menu-item" onclick="go('estoque')"><span class="more-menu-icon" aria-hidden="true">#</span><span><strong>Estoque</strong><span>Saldos, lotes e ajustes.</span></span></button>
+        <button class="more-menu-item" onclick="go('clientes')"><span class="more-menu-icon" aria-hidden="true">@</span><span><strong>Clientes</strong><span>Recorrência, ticket e retorno.</span></span></button>
+        <button class="more-menu-item" onclick="go('historico')"><span class="more-menu-icon" aria-hidden="true">↺</span><span><strong>Histórico</strong><span>Auditoria e movimentos.</span></span></button>
+      </div>
+    </div>
+
+    <div class="more-menu-section" aria-labelledby="more-admin-section">
+      <div class="more-menu-section-title" id="more-admin-section">Administração</div>
+      <div class="more-menu-list more-menu-admin">
+        <button class="more-menu-item" onclick="closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()"><span class="more-menu-icon" aria-hidden="true">▦</span><span><strong>Etiquetas</strong><span>Modelos e impressão.</span></span></button>
+        <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><span class="more-menu-icon" aria-hidden="true">⚙</span><span><strong>Ajustes</strong><span>Loja, impressora e backup.</span></span></button>
+        <button class="more-menu-item" onclick="go('suporte')"><span class="more-menu-icon" aria-hidden="true">?</span><span><strong>Suporte</strong><span>Diagnóstico e chamado.</span></span></button>
+      </div>
     </div>
   </div>
 
@@ -8632,6 +8800,98 @@ function load(key, fallback) {
 }
 function save(key, data) {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+}
+
+// ================================================================
+// DOMAIN UTILS (Onda 4) — saneamento e validacao centralizada
+// Pequeno por design. Cada caminho de escrita/display que precisar
+// das mesmas regras deve usar essas funcoes para evitar duplicatas
+// e bugs sutis (espacos duplos, acentos, CPF vazado, peso absurdo).
+// ================================================================
+
+function normalizeName(s) {
+  // "  Maria  Jose  " -> "Maria Jose"
+  // Tambem normaliza NFC para evitar variantes Unicode (compostas vs
+  // decompostas) gerarem duplicatas no CRM ("José" U+00E9 vs "José").
+  return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').normalize('NFC');
+}
+
+function normalizeSearch(s) {
+  // toLowerCase + remove acentos (NFD + strip combining marks).
+  // Busca tolerante: "maria jose" -> match em "Maria Jose"/"María José".
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function maskCpf(cpf) {
+  // "111.444.777-35" ou "11144477735" -> "***.444.777-**"
+  // Preserva digitos do meio (suficiente para conferencia visual em
+  // contextos opt-in como picker), oculta inicio e final.
+  if (!cpf) return '';
+  const digits = String(cpf).replace(/\D/g, '');
+  if (digits.length !== 11) return cpf;
+  return '***.' + digits.slice(3, 6) + '.' + digits.slice(6, 9) + '-**';
+}
+
+function isCpfOrCnpjLike(s) {
+  // Detecta strings no formato CPF (xxx.xxx.xxx-xx) ou CNPJ
+  // (xx.xxx.xxx/xxxx-xx). Usado para sanear snapshots antigos
+  // que vazaram CPF no campo "ref" do pedido (pre-fix LGPD).
+  if (!s) return false;
+  const t = String(s).trim();
+  return /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(t) || /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(t);
+}
+
+function safeRefDisplay(ref) {
+  // Backward-compat: snapshots antigos podem ter CPF/CNPJ em ref
+  // porque clientReference() retornava document como fallback.
+  // Agora o display omite (string vazia) e os call sites decidem
+  // se mostram "sem referência" ou nada.
+  if (!ref) return '';
+  return isCpfOrCnpjLike(ref) ? '' : ref;
+}
+
+function parseProductWeightG(unit) {
+  // "300g" / "1.5 kg" / "500 ml" / "1L" -> gramas/ml.
+  // Retorna null se nao identificavel (ex: "unidade", "kit", "caixa").
+  if (!unit) return null;
+  const m = String(unit).match(/^\s*([\d.,]+)\s*(g|kg|ml|l)\s*$/i);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(',', '.'));
+  if (!isFinite(num) || num <= 0) return null;
+  const u = m[2].toLowerCase();
+  if (u === 'g' || u === 'ml') return num;
+  if (u === 'kg' || u === 'l')  return num * 1000;
+  return null;
+}
+
+function isProductWeightInsane(product, batchWeightG) {
+  // Cross-check produto.unit ("300g") vs lote.weightG (999999).
+  // Insano se ratio > 2x ou < 0.5x. Retorna { insane, declared, ratio }
+  // para o call site decidir UX (confirm dialog com numeros).
+  if (!product || !batchWeightG) return { insane: false, declared: null, ratio: null };
+  const declared = parseProductWeightG(product.unit);
+  if (!declared) return { insane: false, declared: null, ratio: null };
+  const ratio = batchWeightG / declared;
+  return { insane: ratio > 2 || ratio < 0.5, declared, ratio };
+}
+
+function shortenName(name) {
+  // "Maria Jose da Silva" -> "Maria Silva"
+  // Mantem primeiro + ultimo sobrenome quando >1 palavra; preserva
+  // identidade do cliente em cards apertados sem cortar para so o
+  // primeiro nome (varias "Marias" viram indistinguiveis).
+  if (!name) return '';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || '';
+  return parts[0] + ' ' + parts[parts.length - 1];
+}
+
+function clientOrderCount(clientId) {
+  // Conta pedidos nao-cancelados de um cliente diretamente do array
+  // de orders (fonte da verdade). Evita o bug do contador c.orderCount
+  // que crescia em saveOrder mas podia divergir do estado real.
+  if (!clientId) return 0;
+  return (orders || []).filter(o => o.clientId === clientId && o.status !== STATUS.CANCELADO).length;
 }
 
 function isCalmUx() {
@@ -9380,15 +9640,24 @@ function showHealthBanner(level, msg, actionLabel) {
   var actBtn = document.getElementById('hbAction');
   actBtn.textContent = actionLabel || 'Resolver';
   el.hidden = false;
+  // #408: o banner e position:fixed top:0; sem reservar espaco, cobre o cabecalho
+  // ("Boa noite, ..."). Empurra o conteudo do frame .phone (box-sizing border-box:
+  // nao aumenta a altura do frame; o topo desce e o resto rola). Desfeito ao fechar.
+  try {
+    var ph = document.querySelector('.phone');
+    if (ph) ph.style.paddingTop = el.offsetHeight + 'px';
+  } catch (_) {}
 }
 function dismissHealthBanner() {
   var el = document.getElementById('healthBanner');
   if (el) el.hidden = true;
+  try { var ph = document.querySelector('.phone'); if (ph) ph.style.paddingTop = ''; } catch (_) {}
   _healthBannerDismissedAt = Date.now();
 }
 function hideHealthBanner() {
   var el = document.getElementById('healthBanner');
   if (el) el.hidden = true;
+  try { var ph = document.querySelector('.phone'); if (ph) ph.style.paddingTop = ''; } catch (_) {}
 }
 
 async function runHealthCheck() {
@@ -10058,9 +10327,20 @@ window.addEventListener('cdb-sync-success', function (ev) {
 // UTILS
 // =========================
 function money(v) {
-  return 'R$ ' + (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
+  // #405: separador de milhar (faltava: money(1000) dava "R$ 1000,00" em vez de
+  // "R$ 1.000,00"). Manual de proposito: Intl pt-BR poe NBSP entre R$ e o numero
+  // e quebra impressao termica (ESC/POS, DANFE 80mm). Nao-finito fica gritante.
+  var n = Math.round(v * 100) / 100;
+  if (!isFinite(n)) return 'R$ ' + n;
+  var abs = Math.abs(n).toFixed(2);
+  var dot = abs.indexOf('.');
+  var intSep = abs.slice(0, dot).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'R$ ' + (n < 0 ? '-' : '') + intSep + ',' + abs.slice(dot + 1);
 }
 function haptic() { if (navigator.vibrate) navigator.vibrate(8); }
+// #409: rotulos do canal/origem do pedido.
+const CHANNEL_LABELS = { balcao: 'Balcão', whatsapp: 'WhatsApp', ifood: 'iFood', telefone: 'Telefone' };
+function channelLabel(c) { return CHANNEL_LABELS[c] || c || ''; }
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
@@ -10451,6 +10731,12 @@ function _attentionFmtElapsed(ms) {
   return h + 'h' + (r ? ' ' + r : '');
 }
 
+// BUG #14: fonte unica pra "estoque critico" — centro de atencao e card
+// da home liam o mesmo filtro inline, abrindo brecha pra desync futuro.
+function getCriticalProducts() {
+  return (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+}
+
 function _buildAttentionItemsImpl() {
   const items = [];
   try {
@@ -10478,7 +10764,7 @@ function _buildAttentionItemsImpl() {
     }
 
     // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
-    const lowStock = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+    const lowStock = getCriticalProducts();
     if (lowStock.length) {
       // Top 3 mais criticos (stock=0 primeiro)
       const sortedLow = lowStock.slice().sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
@@ -10838,20 +11124,25 @@ function runGlobalSearch(q) {
   if (!host) return;
   const groups = buildSearchGroups(q);
   const nq = _normalizeSearch(String(q || '').trim());
-  const isShort = nq.length < 2;
+  const isEmpty = nq.length === 0;
+  const isShort = !isEmpty && nq.length < 2;
   const totalReal = groups.pedidos.length + groups.finalizados.length + groups.clientes.length
                   + groups.produtos.length + groups.lotes.length + groups.lancamentos.length;
-  // Empty state: sem busca = atalhos. Com busca mas 0 matches reais e sem
-  // shortcut match = mensagem amigavel.
-  if (!isShort && totalReal === 0 && groups.acoes.length === 0) {
+  // BUG #19: separa empty state inicial (sem texto) de "sem resultado" (com texto).
+  // Antes, qualquer input <2 chars mostrava "O que voce quer encontrar?" junto
+  // dos atalhos, deixando o operador confuso ao digitar nome de cliente.
+  if (!isEmpty && !isShort && totalReal === 0 && groups.acoes.length === 0) {
     host.innerHTML = '<div class="gs-empty"><strong>Nenhum resultado pra "' + escapeHtml(q) + '"</strong>Tente outro termo ou um nome parcial.</div>';
     return;
   }
   let html = '';
-  if (isShort) {
+  if (isEmpty) {
     html += '<div class="gs-empty"><strong>O que voce quer encontrar?</strong>Comece a digitar pra buscar pedidos, clientes, produtos ou lotes.</div>';
+  } else if (isShort) {
+    html += '<div class="gs-empty"><strong>Digite ao menos 2 caracteres</strong>pra ver resultados.</div>';
   }
-  if (groups.acoes.length) {
+  // Atalhos so aparecem com input vazio (foco no termo digitado).
+  if (isEmpty && groups.acoes.length) {
     html += '<div><div class="gs-group-title">Atalhos rápidos</div>';
     html += groups.acoes.map((s, i) => _gsRenderShortcut(s, i)).join('');
     html += '</div>';
@@ -11048,16 +11339,38 @@ function renderHomeInsights() {
   const open = openOrders();
   const ready = open.filter(o => o.status === 'pronto').length;
   const preparing = open.filter(o => o.status === 'preparando').length;
-  const critical = products.filter(p => !p.archived && (Number(p.stock) || 0) <= 2).length;
+  // BUG #14: usa fonte unica de "estoque critico" (compartilhada com centro
+  // de atencao) pra evitar contagens divergentes entre views.
+  const critical = getCriticalProducts().length;
   const pendingConfer = typeof getConferStatus === 'function'
     ? open.filter(o => getConferStatus(o) === 'pendente').length
     : 0;
+  // BUG #16+#10: agrega etiquetas pendentes ao card de conferência, pra
+  // diferenciar "conferência de pedido" de "conferência de etiqueta de lote".
+  let totalEtiquetas = 0, etiquetasConferidas = 0;
+  if (typeof etiquetasFromBatch === 'function' && typeof getUnitStatus === 'function') {
+    (batches || []).filter(b => !b.deleted).forEach(b => {
+      const ets = etiquetasFromBatch(b);
+      totalEtiquetas += ets.length;
+      ets.forEach(et => {
+        const st = getUnitStatus(b, et.idxStr);
+        if (typeof CONFER_STATUS !== 'undefined' ? st === CONFER_STATUS.CONFERIDO : st === 'conferido') {
+          etiquetasConferidas++;
+        }
+      });
+    });
+  }
+  const etiquetasPendentes = Math.max(0, totalEtiquetas - etiquetasConferidas);
   const producedUnits = batches
     .filter(b => !b.deleted && (b.createdAt || 0) >= todayStart.getTime())
     .reduce((sum, b) => sum + (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0), 0);
   const soldToday = orders
     .filter(o => o.status === 'entregue' && isToday(o.updatedAt))
     .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+  const conferWarn = pendingConfer > 0 || etiquetasPendentes > 0;
+  const conferNote = `${ready} pronto · ${preparing} preparo` +
+    (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
 
   host.innerHTML = `
     <div class="home-insight${critical ? ' warn' : ''}">
@@ -11070,10 +11383,10 @@ function renderHomeInsights() {
       <div class="hi-value">${producedUnits}</div>
       <div class="hi-note">unidades registradas</div>
     </div>
-    <div class="home-insight${pendingConfer ? ' warn' : ''}">
-      <div class="hi-label">Conferência</div>
+    <div class="home-insight${conferWarn ? ' warn' : ''}">
+      <div class="hi-label">Conferência pendente</div>
       <div class="hi-value">${pendingConfer}</div>
-      <div class="hi-note">${ready} pronto · ${preparing} preparo</div>
+      <div class="hi-note">${conferNote}</div>
     </div>
     <div class="home-insight">
       <div class="hi-label">Vendido hoje</div>
@@ -11306,7 +11619,7 @@ function renderOpenOrders() {
         <div class="home-order-top">
           <div class="home-order-who">
             ${escapeHtml(o.clientSnapshot.name)}
-            <span class="ref">${escapeHtml(o.clientSnapshot.ref || timeOf(o.createdAt))}</span>
+            <span class="ref">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref) || timeOf(o.createdAt))}</span>
           </div>
           <div class="home-order-total">${money(o.total)}</div>
         </div>
@@ -11535,7 +11848,7 @@ function aggregateProductionDemand() {
   open.forEach(o => {
     (o.items || []).forEach(i => {
       const key = i.productId || ('adhoc:' + (i.name || ''));
-      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', qty: 0 };
+      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', unit: i.unit || 'Un', qty: 0 };
       prev.qty += Number(i.qty) || 0;
       byProduct.set(key, prev);
     });
@@ -12151,7 +12464,7 @@ function buildMovimentos() {
     events.push({
       type: 'exit',
       at: o.updatedAt || o.createdAt,
-      label: (o.clientSnapshot?.name || 'Pedido') + (o.clientSnapshot?.ref ? ' — ' + o.clientSnapshot.ref : ''),
+      label: (o.clientSnapshot?.name || 'Pedido') + (safeRefDisplay(o.clientSnapshot?.ref) ? ' — ' + safeRefDisplay(o.clientSnapshot.ref) : ''),
       ref: '#' + (o.id || '').slice(-6),
       items: (o.items || []).map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
       status: o.status,
@@ -12695,7 +13008,8 @@ function renderFinalizadosScreen() {
     const ts = new Date(o.updatedAt || o.createdAt);
     const dateStr = ts.toLocaleDateString('pt-BR') + ' ' + String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0');
     const cliente = o.clientSnapshot?.name || 'Sem cliente';
-    const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+    const refClean = safeRefDisplay(o.clientSnapshot?.ref);
+    const ref = refClean ? ' · ' + refClean : '';
     const orderRef = (o.id || '').slice(-8);
     const statusBadge = o.status === STATUS.ENTREGUE
       ? '<span class="fin-badge entregue">Entregue</span>'
@@ -12761,17 +13075,41 @@ function clientRecencyLabel(ts) {
 function buildClientInsights() {
   const byId = new Map();
   (clients || []).forEach(c => {
-    byId.set(c.id, { client: c, orders: 0, total: 0, lastAt: Number(c.lastOrder) || 0, products: new Map() });
+    byId.set(c.id, {
+      client: c, orders: 0, total: 0,
+      ordersDelivered: 0, totalDelivered: 0,
+      lastAt: Number(c.lastOrder) || 0,
+      products: new Map(),
+      distinctDays: new Set()
+    });
   });
   (orders || []).forEach(o => {
     if (o.status === STATUS.CANCELADO) return;
     const key = o.clientId || ('snapshot:' + (o.clientSnapshot?.name || 'sem cliente'));
     if (!byId.has(key)) {
-      byId.set(key, { client: { id: key, name: o.clientSnapshot?.name || 'Cliente sem cadastro', ref: o.clientSnapshot?.ref || '' }, orders: 0, total: 0, lastAt: 0, products: new Map() });
+      byId.set(key, {
+        client: { id: key, name: o.clientSnapshot?.name || 'Cliente sem cadastro', ref: o.clientSnapshot?.ref || '' },
+        orders: 0, total: 0, ordersDelivered: 0, totalDelivered: 0,
+        lastAt: 0, products: new Map(), distinctDays: new Set()
+      });
     }
     const row = byId.get(key);
     row.orders += 1;
     row.total += Number(o.total) || 0;
+    // Bug 7 (Onda 4): ticket medio so conta entregues. Pedidos em
+    // "Pronto/Divergencia" ou aguardando nao representam receita realizada.
+    if (o.status === STATUS.ENTREGUE) {
+      row.ordersDelivered += 1;
+      row.totalDelivered += Number(o.total) || 0;
+    }
+    // Bug 6 (Onda 4): coleta dias distintos para usar como sinal de
+    // recorrencia real. 2 pedidos no mesmo dia (ou mesmo minuto) NAO
+    // configuram cliente recorrente — recorrencia exige retorno.
+    const orderTime = Number(o.factAt || o.createdAt) || 0;
+    if (orderTime) {
+      const dayKey = new Date(orderTime).toISOString().slice(0, 10); // YYYY-MM-DD
+      row.distinctDays.add(dayKey);
+    }
     row.lastAt = Math.max(row.lastAt || 0, Number(o.factAt || o.updatedAt || o.createdAt) || 0);
     (o.items || []).forEach(it => {
       const name = it.name || 'Produto';
@@ -12780,12 +13118,17 @@ function buildClientInsights() {
   });
   return Array.from(byId.values()).map(row => {
     const favorite = Array.from(row.products.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'sem favorito';
-    const avg = row.orders ? row.total / row.orders : 0;
+    // Bug 7: avg = ticket medio s/ pedidos entregues. Fallback: se ainda
+    // nao ha entregue, usa media geral pra nao zerar o card no comeco.
+    const avg = row.ordersDelivered > 0
+      ? row.totalDelivered / row.ordersDelivered
+      : (row.orders ? row.total / row.orders : 0);
     const days = row.lastAt ? Math.floor((Date.now() - row.lastAt) / (24 * 60 * 60 * 1000)) : 9999;
-    const score = clientScore(row.orders, avg, days);
-    const category = clientCategory(row.orders, days);
-    return { ...row, favorite, avg, days, score, category };
-  }).sort((a, b) => (b.score - a.score) || (b.total - a.total) || (b.lastAt - a.lastAt));
+    const distinctDayCount = row.distinctDays.size;
+    const score = clientScore(row.ordersDelivered || row.orders, avg, days);
+    const category = clientCategory(row.orders, days, distinctDayCount);
+    return { ...row, favorite, avg, days, distinctDayCount, score, category };
+  }).sort((a, b) => (b.score - a.score) || (b.totalDelivered - a.totalDelivered) || (b.total - a.total) || (b.lastAt - a.lastAt));
 }
 
 function buildClientReturnMessage(row) {
@@ -12800,19 +13143,27 @@ function copyClientReturnMessage(clientId) {
   copyToClipboard(buildClientReturnMessage(row), 'Mensagem de retorno copiada');
 }
 
-// Categoria de cliente — matriz orders × days. Recencia > 30d sobrescreve
-// frequencia: ex-top sumido vira "risco"/"inativo" porque o que importa no
-// card e estado atual ("perdemos esse cliente, mande mensagem"), nao trofeu
-// historico. Janelas baseadas em ciclo semanal tipico de massas frescas;
-// calibrar com SQL apos 2 semanas de uso real.
-function clientCategory(orders, days) {
+// Categoria de cliente — matriz orders × days × distinctDays.
+// Recencia > 30d sobrescreve frequencia: ex-top sumido vira "risco"/"inativo"
+// porque o que importa no card e estado atual ("perdemos esse cliente,
+// mande mensagem"), nao trofeu historico.
+//
+// Bug 6 (Onda 4): "recorrente" e "top" agora exigem janela temporal real
+// (dias distintos), nao apenas contagem de pedidos. 2 pedidos no mesmo
+// minuto NAO configuram cliente recorrente — fidelizacao implica retorno
+// em datas separadas. distinctDays=0 ou ausente cai pra "novo".
+//
+// Janelas baseadas em ciclo semanal tipico de massas frescas; calibrar
+// com SQL apos 2 semanas de uso real.
+function clientCategory(orders, days, distinctDays) {
   const o = Number(orders) || 0;
   const d = days == null ? 9999 : Number(days);
+  const dd = Number(distinctDays) || 0;
   if (o === 0) return null;
   if (d > 60) return 'inativo';
   if (d > 30) return 'risco';
-  if (o >= 5) return 'top';
-  if (o >= 2) return 'recorrente';
+  if (o >= 5 && dd >= 3) return 'top';
+  if (o >= 2 && dd >= 2) return 'recorrente';
   return 'novo';
 }
 
@@ -12847,7 +13198,7 @@ function renderClientesScreen() {
   summary.innerHTML = `
     <div class="client-value-card"><span class="k">Clientes</span><span class="v">${clients.length}</span></div>
     <div class="client-value-card"><span class="k">Recorrentes</span><span class="v">${recurring.length}</span></div>
-    <div class="client-value-card"><span class="k">Top cliente</span><span class="v">${top ? escapeHtml(top.client.name).split(' ')[0] : '—'}</span></div>
+    <div class="client-value-card"><span class="k">Top cliente</span><span class="v">${top ? escapeHtml(shortenName(top.client.name)) : '—'}</span></div>
   `;
   let filtered = rows;
   if (clientFilter === 'recorrentes') filtered = rows.filter(r => r.orders >= 2);
@@ -12900,8 +13251,8 @@ function renderClientesScreen() {
         <div class="client-rank">#${idx + 1}</div>
       </div>
       <div class="client-stats">
-        <div class="client-stat"><span>Ticket</span><strong>${money(row.avg)}</strong></div>
-        <div class="client-stat"><span>Total</span><strong>${money(row.total)}</strong></div>
+        <div class="client-stat" title="Ticket medio dos pedidos ENTREGUES"><span>Ticket médio</span><strong>${money(row.avg)}</strong></div>
+        <div class="client-stat" title="Soma de TODOS os pedidos do cliente (qualquer status)"><span>Total acumulado</span><strong>${money(row.total)}</strong></div>
         <div class="client-stat"><span>Favorito</span><strong>${escapeHtml(row.favorite)}</strong></div>
       </div>
       <div class="client-card-foot">
@@ -13318,9 +13669,19 @@ function jumpKanban(status) {
 
 function renderKanbanCard(o, col) {
   const isHighlight = highlightOrderId === o.id;
-  const itemsLine = (o.items || []).map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
+  // Bug 5 (Onda 4): filtra items com qty=0 (resultado de ajuste). Sem isso,
+  // o card mostrava "0× Talharim Fresco" ate o pedido ser cancelado.
+  const visibleItems = (o.items || []).filter(i => (Number(i.qty) || 0) > 0);
+  const itemsLine = visibleItems.length
+    ? visibleItems.map(i => `${i.qty}× ${escapeHtml(i.name)}${i.note ? ' ('+escapeHtml(i.note)+')' : ''}`).join(' · ')
+    : '<em style="color:var(--ink-mute)">sem itens (ajustado para 0)</em>';
   const notes = o.notes ? `<div class="k-note">${escapeHtml(o.notes)}</div>` : '';
-  const itemCount = (o.items || []).reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
+  // Bug 1 (Onda 4): banner persistente quando o pedido foi marcado pronto
+  // com estoque negativo. Substitui o toast efemero que sumia em 3s.
+  const negStockBanner = o.negativeStockNote
+    ? `<div class="k-warning-banner" style="margin-top:6px;padding:6px 8px;background:rgba(231,104,69,0.12);border-left:3px solid var(--accent);border-radius:6px;font-size:12px;color:var(--ink-dim);line-height:1.4">⚠️ Estoque negativo: ${escapeHtml(o.negativeStockNote)}</div>`
+    : '';
+  const itemCount = visibleItems.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
   // Selo de status de conferência ao lado do status do kanban
   const cs = getConferStatus(o);
   const badgeLabel = cs === CONFER_STATUS.PENDENTE ? 'Conf. pendente' : conferStatusLabel(cs);
@@ -13335,7 +13696,9 @@ function renderKanbanCard(o, col) {
   const waBtn = waPhone
     ? `<button type="button" class="k-quick-wa" onclick="event.stopPropagation(); openWhatsAppCliente(${jsString(o.clientId)}); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(o.clientSnapshot?.name || 'cliente')}" title="WhatsApp"><span aria-hidden="true">💬</span></button>`
     : '';
-  const refForMap = o.clientSnapshot?.ref || '';
+  // Bug 11 (Onda 4): impede que CPF antigo (em snapshots pre-fix) vire
+  // query string do Google Maps. safeRefDisplay filtra documentos.
+  const refForMap = safeRefDisplay(o.clientSnapshot?.ref);
   const mapValid = refForMap.trim().length >= 5 && /\d/.test(refForMap);
   const mapBtn = mapValid
     ? `<button type="button" class="k-quick-map" onclick="event.stopPropagation(); openMapsPedidoRef(${jsString(refForMap)}); return false;" aria-label="Abrir endereço do pedido no Google Maps" title="Mapa"><span aria-hidden="true">📍</span></button>`
@@ -13345,11 +13708,11 @@ function renderKanbanCard(o, col) {
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
-        <span class="k-status">${col.label}</span>${conferBadge}
+        <span class="k-status">${col.label}</span>${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
         <div class="k-time">${timeOf(o.createdAt)}</div>
       </div>
       <div class="k-head">
-        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(o.clientSnapshot?.ref || '')}</span></div>
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span></div>
         <span class="k-total">${money(o.total)}</span>
       </div>
       ${quickActions}
@@ -13359,13 +13722,14 @@ function renderKanbanCard(o, col) {
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>
       <div class="k-items">${itemsLine}</div>
+      ${negStockBanner}
       ${notes}
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
         <div class="k-actions">
           <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
           ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
-          <button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>
+          ${(Number(o.total) || 0) > 0 ? `<button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>` : ''}
           <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
           <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
         </div>
@@ -13571,10 +13935,15 @@ function getProductSku(product) {
 function buildCobrancaMessage(order, template) {
   template = template || currentCobrancaTemplate || 'cobranca';
   const nome = order.clientSnapshot?.name || 'Cliente';
-  const ref  = order.clientSnapshot?.ref ? ` (${order.clientSnapshot.ref})` : '';
+  // Bug 11 (Onda 4): mensagem WhatsApp NUNCA inclui CPF/CNPJ. Backward-compat
+  // sanea snapshots antigos (pre-fix) que tinham document em ref.
+  // Risco LGPD: o texto vai pro celular do cliente, backup da operadora,
+  // screenshots — manter document fora dele e mandatorio.
+  const refClean = safeRefDisplay(order.clientSnapshot?.ref);
+  const ref  = refClean ? ` (${refClean})` : '';
   const total = Number(order.total) || 0;
   const itensLinhas = (order.items || [])
-    .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}`)
+    .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}${i.note ? ' - ' + i.note : ''}`)
     .join('\n');
   const obsBloco = order.notes ? `\n📝 Obs: ${order.notes}\n` : '';
   const pixType    = getPixType();
@@ -13623,7 +13992,10 @@ function buildCobrancaMessage(order, template) {
  */
 function buildEtiqueta(order) {
   const nome = order.clientSnapshot?.name || 'Cliente';
-  const ref  = order.clientSnapshot?.ref || '';
+  // Bug 11 (Onda 4): etiqueta impressa colada na embalagem nao deve ter
+  // CPF do cliente — sai do fluxo operacional e poderia ser fotografado
+  // por terceiros. Backward-compat com snapshots antigos.
+  const ref  = safeRefDisplay(order.clientSnapshot?.ref);
   const itensLinhas = (order.items || [])
     .map(i => `${i.qty}× ${i.name}`)
     .join('\n');
@@ -15512,11 +15884,19 @@ function setRetroActive(active) {
   if (label) label.textContent = active ? RETRO_LABEL_ON : RETRO_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('retroDatetime');
-    if (dt && !dt.value) {
-      // default 1h atrás pra forçar o operador a confirmar data/hora
-      const now = new Date(Date.now() - 60*60*1000);
-      const off = now.getTimezoneOffset() * 60000;
-      dt.value = new Date(now - off).toISOString().slice(0,16);
+    if (dt) {
+      // BUG #20: limita range pra evitar "01/01/1900" e datas futuras.
+      // min: 365 dias atras  /  max: agora.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      const minDate = new Date(Date.now() - 365*24*60*60*1000);
+      const maxDate = new Date();
+      dt.min = new Date(minDate - tzOff).toISOString().slice(0,16);
+      dt.max = new Date(maxDate - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // default 1h atrás pra forçar o operador a confirmar data/hora
+        const now = new Date(Date.now() - 60*60*1000);
+        dt.value = new Date(now - tzOff).toISOString().slice(0,16);
+      }
     }
   } else {
     const dt = document.getElementById('retroDatetime');
@@ -15545,11 +15925,18 @@ function setAgendaActive(active) {
   if (label) label.textContent = active ? SCHED_LABEL_ON : SCHED_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('scheduleDatetime');
-    if (dt && !dt.value) {
-      // default 1h adiante pra forçar operador a confirmar quando
-      const future = new Date(Date.now() + 60*60*1000);
-      const off = future.getTimezoneOffset() * 60000;
-      dt.value = new Date(future - off).toISOString().slice(0,16);
+    if (dt) {
+      // #406: min = agora (entrega agendada nao pode ser no passado). Espelha o
+      // retroativo, que ja seta min/max. Antes o campo nao tinha min e aceitava
+      // data passada (ex 01/01/2020), so barrada depois no saveOrder.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      dt.min = new Date(Date.now() - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // default 1h adiante pra forçar operador a confirmar quando
+        const future = new Date(Date.now() + 60*60*1000);
+        const off = future.getTimezoneOffset() * 60000;
+        dt.value = new Date(future - off).toISOString().slice(0,16);
+      }
     }
   } else {
     const dt = document.getElementById('scheduleDatetime');
@@ -15599,7 +15986,10 @@ function openConfer(orderId) {
   pendingConferOrderId = orderId;
   const orderRef = (o.id || '').slice(-8);
   const cliente = o.clientSnapshot?.name || 'Sem cliente';
-  const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+  // Bug 10 (Onda 4): tela de conferencia nao mostra CPF — operadores de
+  // balcao nao tem motivo operacional pra ver documento do cliente.
+  const refConfer = safeRefDisplay(o.clientSnapshot?.ref);
+  const ref = refConfer ? ' · ' + refConfer : '';
   const data = new Date(o.factAt || o.createdAt).toLocaleString('pt-BR');
   // Bloco 1: identificação
   const status = getConferStatus(o);
@@ -15611,7 +16001,7 @@ function openConfer(orderId) {
   // Bloco 2: itens + obs
   document.getElementById('conferTotal').textContent = money(o.total);
   document.getElementById('conferItems').innerHTML = (o.items || []).map(it =>
-    `<div class="ci-row"><span class="ci-qty">${it.qty}×</span><span class="ci-name">${escapeHtml(it.name)}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
+    `<div class="ci-row"><span class="ci-qty">${it.qty}×</span><span class="ci-name">${escapeHtml(it.name)}${it.note ? ' ('+escapeHtml(it.note)+')' : ''}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
   ).join('');
   const notesEl = document.getElementById('conferNotes');
   if (o.notes) {
@@ -15714,7 +16104,7 @@ function saveAjustar() {
     const corrected = Math.max(0, parseInt(inp.value || '0', 10) || 0);
     if (corrected !== original) {
       const it = o.items[idx];
-      adjustments.push({ name: it.name, productId: it.productId, originalQty: original, correctedQty: corrected });
+      adjustments.push({ idx, name: it.name, productId: it.productId, originalQty: original, correctedQty: corrected });
     }
   });
   const notes = (document.getElementById('ajustarNotes').value || '').trim() || null;
@@ -15724,8 +16114,17 @@ function saveAjustar() {
   }
   closeAjustar();
   closeConfer();
+  // Bug 5 (Onda 4): aplica de fato as quantidades ajustadas em o.items e
+  // recalcula o total. Sem isso, o card seguia mostrando qty/valor antigos
+  // e o botao "Cobrar" gerava mensagem WhatsApp com valor desatualizado.
+  // A divergencia ficava registrada em o.confirmation.adjustments mas
+  // invisivel ao operador, criando duvida operacional.
+  adjustments.forEach(adj => {
+    if (o.items[adj.idx]) o.items[adj.idx].qty = adj.correctedQty;
+  });
+  o.total = (o.items || []).reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
   applyConfirmation(id, 'adjust', { adjustments, notes });
-  showToast('✏️ Ajuste registrado');
+  showToast('✏️ Ajuste aplicado · novo total ' + money(o.total));
 }
 
 // ===== REPORTAR PROBLEMA =====
@@ -16628,6 +17027,14 @@ function calcAuthHeaders() {
   return headers;
 }
 
+// #407: parse defensivo. Corpo vazio (200/204) fazia res.json() jogar
+// "Unexpected end of JSON input", poluindo o console e podendo derrubar a
+// calculadora. Le como texto e so parseia se houver corpo.
+async function calcParse(res) {
+  const t = await res.text();
+  return t ? JSON.parse(t) : {};
+}
+
 async function calcBuscarProdutos() {
   if (calcSearchTimer) clearTimeout(calcSearchTimer);
   calcSearchTimer = setTimeout(async () => {
@@ -16639,7 +17046,7 @@ async function calcBuscarProdutos() {
       const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
       const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
       const res = await fetch(url, { headers: calcAuthHeaders() });
-      const json = await res.json();
+      const json = await calcParse(res);
       const produtos = (json && json.data) || [];
       if (produtos.length === 0) {
         box.classList.add('show');
@@ -16670,7 +17077,11 @@ async function calcBuscarProdutos() {
         });
       });
     } catch (e) {
-      showToast('Erro ao buscar produtos');
+      // Reseta sugestoes para nao deixar estado "preso" do termo anterior.
+      box.classList.remove('show');
+      box.innerHTML = '';
+      try { console.error('[calculadora]', e); } catch (_) {}
+      showToast('Erro ao buscar produtos. Verifique sua conexao.');
     }
   }, 300);
 }
@@ -16761,7 +17172,7 @@ async function calcExecutar() {
         lojaId
       })
     });
-    const json = await res.json();
+    const json = await calcParse(res);
     if (!res.ok) {
       const code = (json && json.error && json.error.code) || 'ERROR';
       const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
@@ -16784,6 +17195,7 @@ function calcRenderResultado(r) {
   const badge = document.getElementById('calcResultadoBadge');
   const editarBtn = document.getElementById('calcEditarReceitaBtn');
   const gerarBtn = document.getElementById('calcGerarCompraBtn');
+  const addBtn = document.getElementById('calcAddComprasBtn');
 
   if (r.tudoDisponivel) {
     badge.innerHTML = '<span>✓ TUDO DISPONIVEL</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Voce pode produzir agora.</div>';
@@ -16792,6 +17204,7 @@ function calcRenderResultado(r) {
     badge.style.border = '1px solid var(--basil)';
     editarBtn.style.display = 'inline-block';
     gerarBtn.style.display = 'none';
+    if (addBtn) addBtn.style.display = 'none';
   } else {
     const faltantes = r.insumos.filter(i => i.falta != null && i.falta > 0).length;
     badge.innerHTML = `<span>⚠ FALTAM ${faltantes} INSUMO${faltantes > 1 ? 'S' : ''}</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Gere lista de compras pra repor.</div>`;
@@ -16800,6 +17213,7 @@ function calcRenderResultado(r) {
     badge.style.border = '1px solid #ef6b6b';
     editarBtn.style.display = 'inline-block';
     gerarBtn.style.display = 'inline-block';
+    if (addBtn) addBtn.style.display = 'inline-block';
   }
 
   if (r.custoEstimadoTotal != null) {
@@ -16876,7 +17290,7 @@ async function calcGerarCompra() {
       headers: calcAuthHeaders(),
       body: JSON.stringify({ empresaId: empresaId || null, lojaId, insumos: insumosFaltantes })
     });
-    const json = await res.json();
+    const json = await calcParse(res);
     if (!res.ok) {
       const code = (json && json.error && json.error.code) || 'ERROR';
       showToast(`${code}: ${json.error?.message || ''}`);
@@ -16920,7 +17334,7 @@ async function calcGerarCompra() {
         fornecedores
       })
     });
-    const json2 = await res2.json();
+    const json2 = await calcParse(res2);
     if (!res2.ok) {
       const code = (json2 && json2.error && json2.error.code) || 'ERROR';
       showToast(`${code}: ${json2.error?.message || ''}`);
@@ -16932,12 +17346,76 @@ async function calcGerarCompra() {
   }
 }
 
+// Fecha o ciclo no PWA: joga os insumos FALTANTES (ja calculados vs estoque pelo
+// /calcular) direto na tela Compras (cdb-shopping). Caminho simples e offline,
+// alternativo ao calcGerarCompra (que cria pedido de compra no ERP e exige
+// fornecedor preferido). Elimina o trabalho manual de "ver o que falta".
+// Helper compartilhado (#412): recebe a lista de insumos faltantes ja filtrada
+// (cada um com insumoNome, falta, unidadeReceita) e joga na lista de Compras
+// com dedup leve. Usado pela calc de 1 produto (#411) e pela cesta/demanda (#412).
+function adicionarFaltantesNaCompra(faltantes) {
+  if (!Array.isArray(faltantes) || faltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return 0;
+  }
+  if (!Array.isArray(shoppingItems)) shoppingItems = [];
+  const now = Date.now();
+  let added = 0;
+  faltantes.forEach((i, k) => {
+    const faltaNum = Number(i.falta);
+    const qtdTxt = isFinite(faltaNum)
+      ? (faltaNum % 1 === 0 ? String(faltaNum) : faltaNum.toFixed(2)).replace('.', ',')
+      : '';
+    const un = (i.unidadeReceita || '').trim();
+    const nome = i.insumoNome + (qtdTxt ? ` (faltam ${qtdTxt}${un ? ' ' + un : ''})` : '');
+    // dedup leve: nao repete item identico ainda nao comprado.
+    if (shoppingItems.some(s => !s.done && s.name === nome)) return;
+    shoppingItems.unshift({
+      id: 'shop-' + now + '-' + k + '-' + Math.random().toString(36).slice(2, 6),
+      name: nome,
+      done: false,
+      createdAt: now,
+      doneAt: 0
+    });
+    added++;
+  });
+  if (added === 0) { showToast('Faltantes ja estao na lista de Compras.'); return 0; }
+  persistAll();
+  pendingSync++;
+  updateSync();
+  if (typeof renderShoppingList === 'function') renderShoppingList();
+  if (typeof renderHomeShopping === 'function') renderHomeShopping();
+  showToast(added + ' insumo(s) na lista de Compras.');
+  return added;
+}
+
+function calcAdicionarFaltantesCompras() {
+  if (!calcUltimoResultado) return;
+  const faltantes = (calcUltimoResultado.insumos || [])
+    .filter(i => i.falta != null && Number(i.falta) > 0 && !i.conversaoFalhou);
+  adicionarFaltantesNaCompra(faltantes);
+}
+
+// #412 — joga os faltantes do consolidado da cesta (demanda/pedido/draft) em
+// Compras. O consolidado expoe insumoNome/falta/unidadeReceita, o mesmo shape
+// que o helper espera.
+function cestaCalcAdicionarFaltantesCompras() {
+  if (!cestaCalcResultadoAtual) return;
+  const faltantes = (cestaCalcResultadoAtual.consolidado || [])
+    .filter(c => c.falta != null && Number(c.falta) > 0 && !c.conversaoFalhou);
+  adicionarFaltantesNaCompra(faltantes);
+}
+
 function calcAbrirAjusteReceita() {
   // MVP: para versao 1 deixamos esse fluxo no admin web. Aqui apenas redireciona com toast.
   showToast('Edicao de receita: acesse o admin web por enquanto.');
 }
 
 function calcLimpar() {
+  // Confirm so se ja ha resultado ou produto selecionado (evita ruido
+  // quando ainda nao calculou nada).
+  const temTrabalho = !!calcProdutoSelecionado || !!calcUltimoResultado;
+  if (temTrabalho && !confirm('Limpar o produto e o resultado atual?')) return;
   calcProdutoSelecionado = null;
   calcUltimoResultado = null;
   document.getElementById('calcProdSearch').value = '';
@@ -16982,7 +17460,7 @@ async function cestaCalcCarregarCacheReceitas() {
     const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
     const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?limit=200${empresaId ? '&empresaId=' + empresaId : ''}`;
     const res = await fetch(url, { headers: calcAuthHeaders() });
-    const json = await res.json();
+    const json = await calcParse(res);
     const ids = ((json && json.data) || []).map(p => String(p.id));
     produtosComReceitaCacheSet = new Set(ids);
   } catch (_) {
@@ -17044,6 +17522,30 @@ async function openCestaCalcFromOrder(orderId) {
   cestaCalcAbrirModal();
 }
 
+// #412 — alimenta a cesta com a demanda agregada dos pedidos abertos (todos de
+// uma vez). Reusa /calcular-cesta, que consolida insumos e desconta o estoque
+// UMA vez no servidor (somar faltas de /calcular por produto double-contaria o
+// estoque compartilhado). So produtos do catalogo; itens ad-hoc sao ignorados.
+async function openCestaCalcFromDemand() {
+  if (!navigator.onLine) { showToast('Calculadora requer conexao'); return; }
+  const { items: demanda } = aggregateProductionDemand();
+  const items = (demanda || []).filter(i => i.productId && products.some(p => p.id === i.productId));
+  if (items.length === 0) { showToast('Nenhum produto do catalogo na demanda'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  cestaCalcContexto = {
+    tipo: 'demanda',
+    orderId: null,
+    label: 'Demanda dos pedidos abertos',
+    items: items.map(i => ({
+      produtoId: i.productId,
+      nome: i.name || 'Item',
+      qty: Number(i.qty || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
 function cestaCalcAbrirModal() {
   const modal = document.getElementById('cestaCalcModal');
   const ctx = cestaCalcContexto;
@@ -17087,6 +17589,8 @@ function cestaCalcAbrirModal() {
   const btnCalcular = document.getElementById('cestaCalcBtnCalcular');
   btnCalcular.style.display = '';
   btnCalcular.disabled = ctx.items.length === 0;
+  const btnCompras = document.getElementById('cestaCalcBtnCompras');
+  if (btnCompras) btnCompras.style.display = 'none';
 
   modal.classList.add('show');
 }
@@ -17127,7 +17631,7 @@ async function cestaCalcCalcular() {
         }))
       })
     });
-    const json = await res.json();
+    const json = await calcParse(res);
     if (!res.ok) {
       const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
       badge.textContent = msg;
@@ -17233,6 +17737,14 @@ function cestaCalcRender(data) {
     empty.style.cssText = 'font-size:12px;color:var(--ink-mute);text-align:center;padding:8px;';
     empty.textContent = 'Nenhum insumo a consolidar.';
     cons.appendChild(empty);
+  }
+
+  // #412 — botao "jogar faltantes em Compras" so aparece quando ha falta real
+  // (conversao incompativel nao entra: nao da pra quantificar a compra).
+  const btnCompras = document.getElementById('cestaCalcBtnCompras');
+  if (btnCompras) {
+    const temFalta = (data.consolidado || []).some(c => c.falta != null && Number(c.falta) > 0 && !c.conversaoFalhou);
+    btnCompras.style.display = temFalta ? '' : 'none';
   }
 }
 
@@ -17388,7 +17900,9 @@ function openBatchDetails(batchId) {
 function conferRowHtml(o) {
   const code = (o.id || '').slice(-8);
   const cliente = o.clientSnapshot?.name || 'Sem cliente';
-  const ref = o.clientSnapshot?.ref ? ' · ' + o.clientSnapshot.ref : '';
+  // Bug 10 (Onda 4): lista de conferencia nao mostra CPF (LGPD).
+  const refConfer = safeRefDisplay(o.clientSnapshot?.ref);
+  const ref = refConfer ? ' · ' + refConfer : '';
   const status = getConferStatus(o);
   const qty = (o.items || []).reduce((acc, i) => acc + (Number(i.qty)||0), 0);
   const cls = status === CONFER_STATUS.CONFERIDO ? 'done'
@@ -17438,28 +17952,43 @@ function doConferScreenSearch() {
 function applyAdvanceTransition(id, nextStatus) {
   const o = getOrderById(id);
   if (!o) return;
-  // Se vai descontar estoque (transicao pra PRONTO), verifica ANTES se
-  // teria estoque negativo — e pede confirmacao explicita ao operador.
-  // (Felipe quer permitir negativo porque na pratica vai produzir, mas o
-  // alerta passivo era ignoravel demais e gerava saldos errados.)
+  // Bug 1 (Onda 4): se vai descontar estoque (transicao pra PRONTO) e o
+  // resultado seria negativo, abre dialog explicito de 3 opcoes ao inves
+  // de um confirm() simples que era ignoravel demais. Estoque negativo
+  // significa que vendemos o que nao produzimos — operador precisa
+  // decidir conscientemente entre Produzir / Ajustar pedido / Continuar.
   if (nextStatus === STATUS.PRONTO) {
-    const wouldGoNegative = [];
+    const missing = [];
     o.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
       if (p) {
-        const newStock = (p.stock || 0) - it.qty;
-        if (newStock < 0) wouldGoNegative.push(`${p.name}: ${p.stock || 0} - ${it.qty} = ${newStock}`);
+        const currentStock = p.stock || 0;
+        if (currentStock < it.qty) {
+          missing.push({
+            productId: it.productId,
+            name: p.name,
+            currentStock,
+            requestedQty: it.qty,
+            gap: it.qty - currentStock
+          });
+        }
       }
     });
-    if (wouldGoNegative.length > 0) {
-      const proceed = confirm(
-        '⚠️ ESTOQUE INSUFICIENTE\n\n' +
-        wouldGoNegative.join('\n') +
-        '\n\nMarcar como PRONTO mesmo assim? (estoque ficara negativo)'
-      );
-      if (!proceed) { showToast('Avanco cancelado'); return; }
+    if (missing.length > 0) {
+      showStockNegativeDialog(id, missing);
+      return;
     }
   }
+  _proceedAdvance(id, nextStatus);
+}
+
+// Aplica a transicao de status de fato (decrementa estoque, registra
+// banner persistente em caso de negativo, persiste, re-renderiza).
+// Separado de applyAdvanceTransition para permitir o dialog de bug 1
+// chamar diretamente quando o operador escolhe "continuar mesmo assim".
+function _proceedAdvance(id, nextStatus) {
+  const o = getOrderById(id);
+  if (!o) return;
   let negatives = [];
   if (nextStatus === STATUS.PRONTO) {
     o.items.forEach(it => {
@@ -17469,6 +17998,16 @@ function applyAdvanceTransition(id, nextStatus) {
         if (p.stock < 0) negatives.push(`${p.name} (${p.stock})`);
       }
     });
+    // Banner persistente no card: enquanto o pedido existir com estoque
+    // negativo registrado, o operador ve o alerta toda vez que olha o card,
+    // nao apenas no toast efemero que sumia em 3s.
+    if (negatives.length > 0) {
+      o.negativeStockNote = negatives.join(', ');
+    } else if (o.negativeStockNote) {
+      // Cobre regularizacao: se algum motivo apos producao o estoque
+      // voltou positivo, limpa o banner (improvavel mas defensivo).
+      delete o.negativeStockNote;
+    }
   }
   const prev = o.status;
   o.status = nextStatus;
@@ -17485,6 +18024,67 @@ function applyAdvanceTransition(id, nextStatus) {
   else if (nextStatus === STATUS.PRONTO && negatives.length > 0) showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
   else if (nextStatus === STATUS.PRONTO) showToast('Marcado como pronto');
   else if (nextStatus === STATUS.PREPARANDO) showToast('Preparo iniciado');
+}
+
+// Bug 1: dialog modal de 3 opcoes para conflito de estoque.
+// Construido dinamicamente para evitar poluir o HTML inicial com
+// outro modal estatico. Usa as classes ja existentes (.modal, .show)
+// e tokens de design do tema.
+function showStockNegativeDialog(orderId, missing) {
+  const id = 'stockNegativeModal';
+  let modal = document.getElementById(id);
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = id;
+  modal.className = 'modal show';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'stockNegativeTitle');
+  const itemsHtml = missing.map(m =>
+    `<li style="margin:4px 0"><strong>${escapeHtml(m.name)}</strong>: estoque ${m.currentStock}, pedido ${m.requestedQty} <span style="color:var(--accent);font-weight:700">(faltam ${m.gap})</span></li>`
+  ).join('');
+  modal.innerHTML =
+    '<div class="modal-content" style="max-width:440px">' +
+      '<h3 id="stockNegativeTitle" style="margin:0 0 12px;font-size:17px;color:var(--accent);display:flex;align-items:center;gap:8px">' +
+        '<span aria-hidden="true">⚠️</span> Estoque insuficiente' +
+      '</h3>' +
+      '<p style="margin:0 0 10px;font-size:14px;color:var(--ink-dim)">Para marcar como pronto, falta:</p>' +
+      '<ul style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.5">' + itemsHtml + '</ul>' +
+      '<p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-mute)">Estoque negativo significa que voce esta vendendo o que ainda nao produziu. Escolha como prosseguir:</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<button class="btn-primary" data-act="produzir" style="width:100%;padding:12px;border-radius:10px;background:var(--accent);color:white;border:0;font-weight:700;font-size:14px;cursor:pointer">Produzir agora</button>' +
+        '<button data-act="ajustar" style="width:100%;padding:12px;border-radius:10px;background:var(--bg-elev-2);color:var(--ink);border:1px solid var(--border-strong);font-weight:600;font-size:14px;cursor:pointer">Ajustar pedido</button>' +
+        '<button data-act="continuar" style="width:100%;padding:10px;border-radius:10px;background:transparent;color:var(--ink-dim);border:1px solid var(--border);font-weight:500;font-size:13px;cursor:pointer">Continuar mesmo assim (estoque ficara negativo)</button>' +
+        '<button data-act="cancel" style="width:100%;padding:8px;border-radius:10px;background:transparent;color:var(--ink-mute);border:0;font-weight:500;font-size:12px;cursor:pointer">Cancelar</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector('[data-act="produzir"]').onclick = () => {
+    // Pre-preenche a quantidade faltante em cada produto e leva o
+    // operador pra tela de Producao. Ele pode ajustar antes de
+    // confirmar o lote; pedido fica esperando ele voltar pra marcar pronto.
+    missing.forEach(m => {
+      const p = products.find(x => x.id === m.productId);
+      if (p) p.count = (p.count || 0) + m.gap;
+    });
+    close();
+    go('producao');
+    showToast('Quantidade pre-preenchida para completar o pedido');
+  };
+  modal.querySelector('[data-act="ajustar"]').onclick = () => {
+    close();
+    pendingConferOrderId = orderId;
+    openAjustar();
+  };
+  modal.querySelector('[data-act="continuar"]').onclick = () => {
+    close();
+    _proceedAdvance(orderId, STATUS.PRONTO);
+  };
+  modal.querySelector('[data-act="cancel"]').onclick = () => {
+    close();
+    showToast('Avanco cancelado');
+  };
 }
 
 // ================================================================
@@ -17669,7 +18269,9 @@ function escPosOrderLabel(o, nota) {
   b.line(divider());
   // Dados do cliente — truncados se passarem da largura
   b.line(asciiNorm('Cliente: ' + cliente).slice(0, PRINT_COLS));
-  if (o.clientSnapshot?.ref) b.line(asciiNorm(o.clientSnapshot.ref).slice(0, PRINT_COLS));
+  // Bug 11 (Onda 4): cupom impresso nao deve conter CPF (LGPD).
+  const refPrint = safeRefDisplay(o.clientSnapshot?.ref);
+  if (refPrint) b.line(asciiNorm(refPrint).slice(0, PRINT_COLS));
   b.line(data);
   b.line(divider());
   // Itens (qty x nome | preco) com truncamento via padLine
@@ -18393,11 +18995,13 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
   ctx.fillStyle = '#000';
   ctx.font = '900 18px Arial, sans-serif';
   ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 24), 30, y + 24);
-  if (o.clientSnapshot?.ref) {
+  // Bug 11 (Onda 4): canvas etiqueta (photo print) sem CPF.
+  const refCanvas1 = safeRefDisplay(o.clientSnapshot?.ref);
+  if (refCanvas1) {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#4b5563';
     ctx.font = '700 12px Arial, sans-serif';
-    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 18), W - 30, y + 10);
+    ctx.fillText(refCanvas1.slice(0, 18), W - 30, y + 10);
     ctx.fillStyle = '#000';
     ctx.textAlign = 'left';
   }
@@ -18541,7 +19145,9 @@ function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showB
   ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), lx, y); y += 16;
 
   // Cliente — box com 3 linhas; fillText usa baseline, logo +10/+24/+38 dentro de 52px
-  const clientH = o.clientSnapshot?.ref ? 58 : 44;
+  // Bug 11 (Onda 4): segunda variante de canvas etiqueta — sem CPF tambem.
+  const refCanvas2 = safeRefDisplay(o.clientSnapshot?.ref);
+  const clientH = refCanvas2 ? 58 : 44;
   ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
   ctx.strokeRect(lx, y, mainW, clientH);
   ctx.fillStyle = '#4b5563';
@@ -18550,10 +19156,10 @@ function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showB
   ctx.fillStyle = '#000';
   ctx.font = '800 14px Arial, sans-serif';
   ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 32), lx + 8, y + 26);
-  if (o.clientSnapshot?.ref) {
+  if (refCanvas2) {
     ctx.fillStyle = '#4b5563';
     ctx.font = '500 11px Arial, sans-serif';
-    ctx.fillText(String(o.clientSnapshot.ref).slice(0, 36), lx + 8, y + 42);
+    ctx.fillText(refCanvas2.slice(0, 36), lx + 8, y + 42);
   }
   y += clientH + 12;
 
@@ -19149,7 +19755,7 @@ function orderLabelHtml(o, horizontal, nota) {
     <div class="pa-grid">
       <div class="pa-label">Cliente</div>
       <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
-      ${o.clientSnapshot?.ref ? `<div>${escapeHtml(o.clientSnapshot.ref)}</div>` : ''}
+      ${(() => { const r = safeRefDisplay(o.clientSnapshot?.ref); return r ? `<div>${escapeHtml(r)}</div>` : ''; })()}
     </div>`;
 
   const notaRapidaBlock = nota
@@ -19479,6 +20085,28 @@ function confirmProduction() {
     if (!isFinite(q) || q <= 0) { showToast('Quantidade inválida em ' + p.name); return; }
     p.count = q;
   }
+  // Bug 2 (Onda 4): valida peso/unid do lote contra o peso declarado na
+  // unidade do produto (ex: produto.unit = "300g"). Evita typos
+  // catastroficos como digitar 999999g/unid em produto declarado 300g
+  // (gerou etiqueta com "PESO: 1000kg" para 11 unidades = 11 toneladas).
+  for (const p of itemsRaw) {
+    const d = detail.perProduct.get(p.id) || {};
+    if (!d.weightG) continue;
+    const check = isProductWeightInsane(p, d.weightG);
+    if (check.insane) {
+      const ratioTxt = check.ratio > 2
+        ? `${check.ratio.toFixed(1)}x maior`
+        : `${(1 / check.ratio).toFixed(1)}x menor`;
+      const proceed = confirm(
+        'Verificar peso de ' + p.name + '?\n\n' +
+        'Produto declarado: ' + p.unit + ' por unidade\n' +
+        'Lote registrado: ' + d.weightG + 'g por unidade\n' +
+        '(' + ratioTxt + ' que o declarado)\n\n' +
+        'Confirmar mesmo assim?'
+      );
+      if (!proceed) return;
+    }
+  }
   _isSavingProduction = true;
 
   const nowMs = Date.now();
@@ -19645,11 +20273,15 @@ function updateClientSaveState() {
 }
 
 function clientReference(c) {
+  // Bug 10/11 (Onda 4): CPF/CNPJ NAO e referencia operacional.
+  // Antes, document era fallback quando address/phone faltavam — isso
+  // vazava CPF em telas operacionais (conferencia, kanban) e ate em
+  // mensagens WhatsApp (cobranca). LGPD: document e dado fiscal,
+  // sai do fluxo operacional. Para forms de edicao, ler c.document direto.
   if (!c) return 'sem referência';
   if (c.address) return c.address;
   if (c.apt)     return 'apto ' + c.apt;        // legado pra clientes pré-migration
   if (c.phone)   return c.phone;
-  if (c.document) return c.document;
   return 'sem referência';
 }
 
@@ -19705,7 +20337,14 @@ function renderSelectedClient() {
         <div class="cp-avatar">${escapeHtml(c.name.charAt(0).toUpperCase())}</div>
         <div class="cp-info">
           <div class="cp-name">${escapeHtml(c.name)}</div>
-          <div class="cp-ref">${escapeHtml(clientReference(c))}${c.orderCount ? ' · ' + c.orderCount + ' ' + (c.orderCount === 1 ? 'pedido' : 'pedidos') : ''}</div>
+          <div class="cp-ref">${escapeHtml(clientReference(c))}${(() => {
+            // Bug 22 (Onda 4): conta pedidos a partir do array global orders[]
+            // em vez de usar c.orderCount mutavel. Antes, o contador podia
+            // divergir do estado real (incrementado antes do pedido salvar
+            // de fato, ou nao incrementado em fluxos retroativos).
+            const n = clientOrderCount(c.id);
+            return n ? ' · ' + n + ' ' + (n === 1 ? 'pedido' : 'pedidos') : '';
+          })()}</div>
         </div>
         <button class="cp-edit" onclick="openClientModal({editId: '${c.id}'})" title="Editar cliente" aria-label="Editar">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
@@ -19726,14 +20365,18 @@ function clearClient() {
 
 function searchClient() {
   const raw = document.getElementById('clientSearch').value;
-  const q = raw.trim().toLowerCase();
-  const qDigits = q.replace(/\D/g, '');
+  // Bug 8 (Onda 4): normaliza com NFD + remove acentos + lowercase pra
+  // que "maria jose" ache "Maria José". Antes, o picker era case-insensitive
+  // mas accent-sensitive, gerando duplicatas no CRM (clientes nao encontrados
+  // viravam cadastros novos).
+  const nq = normalizeSearch(raw);
+  const qDigits = nq.replace(/\D/g, '');
   const box = document.getElementById('clientSuggestions');
-  if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+  if (!nq) { box.classList.remove('show'); box.innerHTML = ''; return; }
   const matches = clients.filter(c =>
-    c.name.toLowerCase().includes(q) ||
-    (c.address && c.address.toLowerCase().includes(q)) ||
-    (c.apt && c.apt.toLowerCase().includes(q)) ||
+    normalizeSearch(c.name || '').includes(nq) ||
+    normalizeSearch(c.address || '').includes(nq) ||
+    normalizeSearch(c.apt || '').includes(nq) ||
     (qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits)) ||
     (qDigits && c.phone && c.phone.replace(/\D/g, '').includes(qDigits))
   ).slice(0, 5);
@@ -19741,11 +20384,20 @@ function searchClient() {
   matches.forEach(c => {
     const item = document.createElement('button');
     item.className = 'sug-item';
-    item.innerHTML = `<div class="sn">${escapeHtml(c.name)}</div><div class="sr">${escapeHtml(clientReference(c))}</div>`;
+    // Bug 10 (Onda 4): clientReference nao retorna mais CPF.
+    // Se o operador buscou por digitos e o match veio do document,
+    // mostra CPF MASCARADO no secundario pra ele confirmar visualmente
+    // que e o cliente certo. Em outros casos, document nao aparece.
+    const matchedByDoc = !!(qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits));
+    const ref = clientReference(c);
+    const secondary = matchedByDoc
+      ? ref + ' · CPF ' + maskCpf(c.document)
+      : ref;
+    item.innerHTML = `<div class="sn">${escapeHtml(c.name)}</div><div class="sr">${escapeHtml(secondary)}</div>`;
     item.onclick = () => selectClient(c);
     box.appendChild(item);
   });
-  const exactMatch = clients.some(c => c.name.toLowerCase() === q);
+  const exactMatch = clients.some(c => normalizeSearch(c.name || '') === nq);
   if (!exactMatch) {
     const create = document.createElement('button');
     create.className = 'sug-item create';
@@ -19805,7 +20457,11 @@ function closeClientModal() {
   document.getElementById('newClientModal').classList.remove('show');
 }
 function saveNewClient() {
-  const name = document.getElementById('newClientName').value.trim();
+  // Bug 9 (Onda 4): normalizeName em vez de so trim() — colapsa espacos
+  // duplos internos ("  Maria  José  " vira "Maria José") e aplica
+  // normalize NFC. Antes, o input cosmetico escondia espacos extras
+  // que vazavam pra WhatsApp ("Oi *Maria  José*"), tela de edicao e busca.
+  const name = normalizeName(document.getElementById('newClientName').value);
   if (!name) {
     showToast('Nome é obrigatório');
     document.getElementById('newClientName').focus();
@@ -19938,7 +20594,10 @@ function addItemToOrder(product) {
     showToast(`"${product.name}" sem preço cadastrado — defina em Ajustes > Catálogo`);
     return;
   }
-  const existing = currentOrderItems.find(i => i.productId === product.id);
+  // #410: mescla so com a linha SEM observacao do mesmo produto. Assim 2x o mesmo
+  // item mescla (qty++), mas se ja existe uma linha COM obs (ex: "sem cebola"),
+  // um novo add cria linha nova sem obs — permitindo unidades distintas do produto.
+  const existing = currentOrderItems.find(i => i.productId === product.id && !(i.note || '').trim());
   if (existing) {
     existing.qty++;
   } else {
@@ -19948,7 +20607,8 @@ function addItemToOrder(product) {
       emoji: product.emoji,
       unit: product.unit,
       qty: 1,
-      unitPrice: price
+      unitPrice: price,
+      note: ''
     });
   }
   closeItemPicker();
@@ -19979,6 +20639,7 @@ function renderOrderItems() {
       <div class="item-info">
         <div class="item-name">${escapeHtml(it.name)}</div>
         <div class="item-price">${it.unitPrice ? money(it.unitPrice).replace(',00','') + ' un' : 'sem preço'}${it.unit ? ' · ' + escapeHtml(it.unit) : ''}</div>
+        <input class="item-note-input" type="text" placeholder="+ obs (ex: sem cebola)" value="${escapeHtml(it.note || '')}" onchange="setItemNote(${idx}, this.value)" style="margin-top:4px;width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--ink-dim);font-size:12px;padding:2px 0;" />
       </div>
       <div class="item-subtotal">${money(it.qty * it.unitPrice).replace(',00','')}</div>
       <div class="qty-stepper" role="group" aria-label="Ajustar quantidade de ${escapeHtml(it.name)}">
@@ -20012,6 +20673,15 @@ function removeItem(idx) {
   currentOrderItems.splice(idx, 1);
   renderOrderItems();
   updateSaveOrderBtn();
+}
+// #410: observacao por item. Nao re-renderiza a lista (evita perder o foco do
+// input enquanto digita); a obs nao muda qty/total. saveOrder copia o item
+// inteiro, entao a obs vai pro pedido (e pro sync quando o backend tiver a coluna).
+function setItemNote(idx, val) {
+  const it = currentOrderItems[idx];
+  if (!it) return;
+  it.note = (val || '').trim();
+  renderOrderDraftSummary();
 }
 
 function updateSaveOrderBtn() {
@@ -20060,7 +20730,10 @@ function saveOrder() {
   } else {
     snapshot = { name: selectedClient.name, ref: clientReference(selectedClient) };
     selectedClient.lastOrder = Date.now();
-    selectedClient.orderCount = (selectedClient.orderCount || 0) + 1;
+    // Bug 22 (Onda 4): nao mantemos mais orderCount manualmente — o picker
+    // agora deriva o numero direto de orders[] via clientOrderCount.
+    // Mantemos o campo nos clientes antigos por compat, mas nao escrevemos
+    // mais nele para evitar divergencia com o estado real.
   }
 
   // Retroativo: data/hora passada → pedido entra como 'entregue', desconta
@@ -20075,6 +20748,13 @@ function saveOrder() {
     const t = new Date(dtRaw).getTime();
     if (!isFinite(t) || isNaN(t)) { showToast('Data retroativa inválida'); return; }
     if (t > Date.now()) { showToast('Data retroativa não pode ser no futuro'); return; }
+    // BUG #20: bloqueio hard pra data >1 ano atras (evita 01/01/1900 quebrando
+    // relatorios temporais). UI ja restringe via min/max, mas defesa em profundidade.
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+    if (Date.now() - t > oneYear) {
+      showToast('Data retroativa muito antiga (mais de 1 ano). Use o admin web.');
+      return;
+    }
     // Aviso se data for muito antiga (> 90 dias) — passa, mas sinaliza
     const ninetyDays = 90 * 24 * 60 * 60 * 1000;
     if (Date.now() - t > ninetyDays) {
@@ -20108,6 +20788,9 @@ function saveOrder() {
     clientSnapshot: snapshot,
     items: currentOrderItems.map(i => ({...i})),
     notes,
+    // #409: canal/origem do pedido (balcao/whatsapp/ifood/telefone). Persiste no
+    // backend so quando a coluna mobile_orders.channel existir (fatia backend).
+    channel: document.getElementById('orderChannel')?.value || null,
     total,
     status: retroAtMs ? STATUS.ENTREGUE : STATUS.AGUARDANDO,
     createdAt: nowMs,
@@ -20147,6 +20830,7 @@ function saveOrder() {
 
   currentOrderItems = [];
   document.getElementById('orderNotes').value = '';
+  { const _ch = document.getElementById('orderChannel'); if (_ch) _ch.value = ''; }
   clearClient();
   renderOrderItems();
   updateSaveOrderBtn();
@@ -20277,7 +20961,10 @@ function updateMarginPreview() {
   previewEl.style.display = '';
 }
 function saveNewProduct() {
-  const name = document.getElementById('newProdName').value.trim();
+  // Bug 9 (Onda 4): normalizeName em vez de so trim() — mesma motivacao
+  // do saveNewClient, evita "  Talharim  Fresco  " virar duplicata
+  // de "Talharim Fresco" no catalogo de produtos.
+  const name = normalizeName(document.getElementById('newProdName').value);
   if (!name) { showToast('Nome do produto é obrigatório'); document.getElementById('newProdName').focus(); return; }
   const unit = document.getElementById('newProdUnit').value.trim();
   const priceStr = document.getElementById('newProdPrice').value.trim();
