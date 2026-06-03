@@ -22,6 +22,7 @@ volumes:
   caddy-data:
   caddy-config:
   dataprotection-web-keys:
+  dataprotection-admin-keys:
 
 services:
 
@@ -125,6 +126,13 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ApiBaseUrl: "http://api:8080"
       EasyStockWebUrl: "https://${APP_HOST}"
+      # Persistencia das chaves de DataProtection num volume (mesma motivacao do web).
+      # O AdminSessionRestoreMiddleware restaura a sessao via cookie _rt_admin; o DP
+      # persistido evita churn de antiforgery/cookie de sessao a cada deploy. O Admin
+      # roda como root no Dockerfile.cloudrun.admin, entao o volume e gravavel sem chown.
+      DataProtection__KeysPath: /app/dataprotection-keys
+    volumes:
+      - dataprotection-admin-keys:/app/dataprotection-keys
     networks: [easystock-net]
     healthcheck:
       test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
