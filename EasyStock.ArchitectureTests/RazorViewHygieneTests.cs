@@ -21,6 +21,13 @@ public class RazorViewHygieneTests
         @"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b",
         RegexOptions.Compiled);
 
+    // Comentarios Razor (@* *@) e HTML (<!-- -->) nao renderizam — hex neles, e
+    // referencias de issue tipo "#415" (que casam como hex de 3 digitos), sao
+    // falso-positivo. Removidos antes de escanear.
+    private static readonly Regex CommentRegex = new(
+        @"@\*.*?\*@|<!--.*?-->",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+
     /// <summary>
     /// Arquivos .cshtml com hex hardcoded ainda nao migrados, por fase do roadmap.
     /// Caminhos relativos a EasyStock.Web/Views/. Use forward slash '/'.
@@ -78,6 +85,7 @@ public class RazorViewHygieneTests
     private static bool FileContainsHexColor(string path)
     {
         var content = File.ReadAllText(path);
+        content = CommentRegex.Replace(content, " "); // hex em comentario nao renderiza
         foreach (Match match in HexColorRegex.Matches(content))
         {
             var idx = match.Index;

@@ -269,9 +269,13 @@
          gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo
          escuro. Removida — botao continua secundario branco (consistente com tema). -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
-        <es-button variant="navy" size="sm" icon="plus" class="app-primary-btn" @@click="open = !open">
+        @* es-button (TagHelper) nao repassa @@click pro <button> de saida -> clique
+           morto. Usa <button> plain (igual ao dropdown de usuario, que funciona). *@
+        <button type="button" class="btn btn-navy btn-sm app-primary-btn" @@click="open = !open"
+                aria-haspopup="menu" :aria-expanded="open ? 'true' : 'false'">
+            <es-icon name="plus" class="btn-icon-leading"></es-icon>
             <span class="hidden sm:inline">Ação rápida</span>
-        </es-button>
+        </button>
         <div x-show="open" x-cloak @@click.outside="open = false"
              role="menu"
              aria-label="Ações rápidas"
