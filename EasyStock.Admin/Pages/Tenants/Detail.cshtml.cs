@@ -184,7 +184,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         if (diasTrial is < 1 or > 90)
         {
             SetErro("Dias de trial deve estar entre 1 e 90.");
-            return RedirectToPage(new { Id });
+            return RedirectToPage(new { Id, tab = "visao" });
         }
         try
         {
@@ -197,7 +197,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             log.LogError(ex, "Falha ao conceder trial ({Dias}d) ao tenant {TenantId}", diasTrial, Id);
             SetErro($"Falha ao conceder trial: {ex.Message}");
         }
-        return RedirectToPage(new { Id });
+        return RedirectToPage(new { Id, tab = "visao" });
     }
 
     public async Task<IActionResult> OnPostAplicarCupomAsync(string codigo)
@@ -206,7 +206,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         if (codigoT.Length is < 3 or > 50)
         {
             SetErro("Código do cupom deve ter entre 3 e 50 caracteres.");
-            return RedirectToPage(new { Id });
+            return RedirectToPage(new { Id, tab = "visao" });
         }
         try
         {
@@ -219,7 +219,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             log.LogError(ex, "Falha ao aplicar cupom {Codigo} ao tenant {TenantId}", codigoT, Id);
             SetErro($"Falha ao aplicar cupom: {ex.Message}");
         }
-        return RedirectToPage(new { Id });
+        return RedirectToPage(new { Id, tab = "visao" });
     }
 
     public async Task<IActionResult> OnPostToggleFeatureAsync(string feature, bool ativo)
