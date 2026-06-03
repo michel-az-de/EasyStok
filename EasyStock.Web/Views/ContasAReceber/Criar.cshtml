@@ -22,7 +22,7 @@
     }
 
     <form method="post" action="/contas-a-receber/criar" class="card space-y-4"
-          x-data="{ valor: @vValor, parcelas: @vParcelas, primeira: '@vPrimeira', intervalo: '@vIntervalo', emissao: '@vEmissao', parcelaPreview(i) { const n = this.parcelas; if (!n || n < 1) return (0).toFixed(2); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return ((i === n) ? ultima : base).toFixed(2); } }"
+          x-data="{ valor: @vValor, parcelas: @vParcelas, primeira: '@vPrimeira', intervalo: '@vIntervalo', emissao: '@vEmissao', parcelaPreview(i) { const fmt = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); const n = this.parcelas; if (!n || n < 1) return fmt(0); const base = Math.round((this.valor / n) * 100) / 100; const ultima = Math.round((this.valor - base * (n - 1)) * 100) / 100; return fmt((i === n) ? ultima : base); } }"
           @@submit="if (!$el.querySelector('input[name=categoriaFinanceiraId]')?.value) { $event.preventDefault(); window.showToast?.('Selecione ou crie uma categoria.', 'error'); }">
         @Html.AntiForgeryToken()
 
