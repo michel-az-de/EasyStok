@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
     <style>
-        /* ─── Background: navy gradient + grid lines + glow orbs ────────────── */
+        /* ─── Background: admin dark clean ──────────────────────────────────── */
         :root {
             --neon-orange: #F47920;
             --neon-orange-soft: #FFA45C;
@@ -28,14 +28,13 @@
         }
         body {
             background:
-                radial-gradient(ellipse 80% 60% at 50% 0%, rgba(244,121,32,.18) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 80% at 100% 100%, rgba(14,42,110,.7) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 80% at 0% 100%, rgba(79,191,159,.08) 0%, transparent 60%),
+                linear-gradient(180deg, rgba(232,88,20,.10) 0%, transparent 34%),
+                linear-gradient(135deg, rgba(14,42,110,.35) 0%, transparent 46%),
                 linear-gradient(180deg, #06143A 0%, #02081f 100%);
             position: relative;
             overflow-x: hidden;
         }
-        /* Grid lines sci-fi sobreposto — perspectiva sutil pra dar profundidade */
+        /* Grid técnico bem sutil, sem competir com o formulário. */
         body::before {
             content: '';
             position: fixed;
@@ -48,25 +47,8 @@
             pointer-events: none;
             z-index: 0;
         }
-        /* Glow orbs orbitando devagar pra dar vida ao fundo */
         body::after {
-            content: '';
-            position: fixed;
-            top: -20%;
-            left: -10%;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(244,121,32,.12) 0%, transparent 60%);
-            border-radius: 50%;
-            filter: blur(40px);
-            animation: orb-drift 22s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 0;
-        }
-        @@keyframes orb-drift {
-            0%, 100% { transform: translate(0, 0); }
-            33% { transform: translate(30vw, 20vh); }
-            66% { transform: translate(50vw, -10vh); }
+            content: none;
         }
 
         /* ─── Status bar topo (toque sci-fi) ──────────────────────────────────── */
@@ -100,81 +82,45 @@
             50% { opacity: .5; transform: scale(.85); }
         }
 
-        /* ─── Logo orbital ────────────────────────────────────────────────────── */
+        /* ─── Logo ───────────────────────────────────────────────────────────── */
         .logo-orbit {
             position: relative;
-            width: 96px; height: 96px;
-            margin: 0 auto 28px;
+            width: 76px; height: 76px;
+            margin: 0 auto 24px;
+            border-radius: 18px;
+            background: rgba(247,242,232,.045);
+            border: 1px solid rgba(247,242,232,.10);
+            display: grid;
+            place-items: center;
         }
         .logo-orbit svg {
-            position: absolute;
-            inset: 0;
-            margin: auto;
-            width: 64px; height: 64px;
-            filter: drop-shadow(0 8px 24px rgba(244,121,32,.4));
-            animation: cube-float 4s ease-in-out infinite;
+            width: 50px; height: 50px;
+            filter: drop-shadow(0 8px 20px rgba(244,121,32,.28));
             z-index: 2;
         }
-        @@keyframes cube-float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
-        }
-        /* Anel rotativo */
         .logo-orbit::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border: 1px solid rgba(244,121,32,.5);
-            border-radius: 50%;
-            border-top-color: transparent;
-            border-right-color: transparent;
-            animation: spin 6s linear infinite;
-        }
-        .logo-orbit::after {
-            content: '';
-            position: absolute;
-            inset: 8px;
-            border: 1px dashed rgba(79,191,159,.3);
-            border-radius: 50%;
-            animation: spin 14s linear infinite reverse;
-        }
-        @@keyframes spin {
-            to { transform: rotate(360deg); }
+            content: none;
         }
 
-        /* ─── Card glassmorphism com border luminoso ──────────────────────────── */
+        /* ─── Card ───────────────────────────────────────────────────────────── */
         .auth-card {
             position: relative;
-            background: linear-gradient(135deg, rgba(10,31,82,.65) 0%, rgba(6,20,58,.85) 100%);
-            backdrop-filter: blur(16px) saturate(120%);
-            -webkit-backdrop-filter: blur(16px) saturate(120%);
-            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 110px), rgba(6,20,58,.92);
+            border: 1px solid rgba(247,242,232,.11);
+            border-radius: 16px;
             padding: 36px 32px;
-            box-shadow:
-                0 20px 60px rgba(0,0,0,.5),
-                0 0 0 1px rgba(247,242,232,.08),
-                inset 0 1px 0 rgba(247,242,232,.06);
+            box-shadow: 0 24px 70px rgba(0,0,0,.42);
             z-index: 1;
         }
-        /* Border luminoso animado em cima do card */
         .auth-card::before {
             content: '';
             position: absolute;
             top: 0; left: 16px; right: 16px;
             height: 1px;
-            background: linear-gradient(90deg,
-                transparent 0%,
-                rgba(244,121,32,.6) 30%,
-                rgba(244,121,32,.6) 70%,
-                transparent 100%);
-            animation: glow-line 3s ease-in-out infinite;
-        }
-        @@keyframes glow-line {
-            0%, 100% { opacity: .4; }
-            50% { opacity: 1; }
+            background: rgba(244,121,32,.55);
         }
 
-        /* ─── Inputs estilo HUD ───────────────────────────────────────────────── */
+        /* ─── Inputs ─────────────────────────────────────────────────────────── */
         .field-group {
             position: relative;
             margin-bottom: 18px;
@@ -217,7 +163,7 @@
                 0 0 0 3px rgba(244,121,32,.15),
                 inset 0 0 20px rgba(244,121,32,.04);
         }
-        /* Indicador HUD (linha + bracket) à esquerda do input quando focado */
+        /* Indicador discreto à esquerda do input quando focado */
         .field-group::before {
             content: '';
             position: absolute;
@@ -443,10 +389,10 @@
 </head>
 <body class="min-h-screen font-sans flex items-center justify-center" data-theme="dark">
 
-<!-- HUD: barra superior fina sci-fi -->
+<!-- Barra superior -->
 <div class="status-bar">
     <span><span class="dot"></span>SISTEMA ONLINE</span>
-    <span>EASYSTOCK / ADMIN PANEL / v2026</span>
+    <span>EASYSTOK ADMIN</span>
 </div>
 
 <div class="w-full max-w-sm mx-auto px-4" style="position:relative; z-index:1;">
@@ -466,8 +412,8 @@
             <span>Easy</span><span style="color:#F26B25">Stok</span>
             <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;font-weight:600;color:rgba(247,242,232,.4);margin-left:6px;vertical-align:6px;">[ ADMIN ]</span>
         </h1>
-        <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;color:rgba(247,242,232,.4);margin-top:8px;text-transform:uppercase;">
-            <span id="typedSubtitle"></span><span style="opacity:.7;animation:blink 1s steps(2) infinite;">_</span>
+        <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:rgba(247,242,232,.48);margin-top:8px;text-transform:uppercase;">
+            Painel de controle seguro
         </p>
     </div>
 
@@ -490,14 +436,14 @@
             @Html.AntiForgeryToken()
 
             <div class="field-group">
-                <label for="Email">> E-mail</label>
+                <label for="Email">E-mail</label>
                 <input asp-for="Email" id="Email" type="email" required autocomplete="username"
                        class="field-input"
                        placeholder="admin@easystock.com.br" />
             </div>
 
             <div class="field-group">
-                <label for="Senha">> Senha</label>
+                <label for="Senha">Senha</label>
                 <div class="relative">
                     <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
                            class="field-input pr-10"

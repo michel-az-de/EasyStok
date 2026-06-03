@@ -51,6 +51,122 @@
     padding:       1.5rem;
 }
 
+.es-card,
+.es-stat-card,
+.card {
+    box-shadow: 0 14px 32px rgba(0, 0, 0, .16);
+}
+
+.es-stat-card {
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.045), transparent 110px),
+        var(--es-card);
+    border-color: rgba(247, 242, 232, .10);
+}
+
+.es-stat-card.is-link:hover {
+    border-color: rgba(232, 88, 20, .38);
+    transform: translateY(-1px);
+}
+
+.admin-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 22px;
+    padding: 22px;
+    border: 1px solid rgba(247, 242, 232, .10);
+    border-radius: 18px;
+    background:
+        linear-gradient(135deg, rgba(232, 88, 20, .15), rgba(14, 42, 110, .10) 54%, rgba(255,255,255,.025)),
+        var(--es-card);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .18);
+}
+
+.admin-hero-main {
+    min-width: 0;
+}
+
+.admin-hero-main p {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.admin-eyebrow {
+    margin-bottom: 7px;
+    color: var(--orange-300);
+    font: 800 10px/1 var(--font-mono);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
+.admin-hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-live-pill {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: rgba(24, 135, 78, .12);
+    border: 1px solid rgba(24, 135, 78, .28);
+    color: var(--ok-300);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.admin-live-pill span:first-child {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+    border-radius: 999px;
+    background: var(--ok-500);
+    animation: dash-pulse 2s infinite;
+}
+
+.admin-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.admin-metric-grid-secondary {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    margin-bottom: 32px;
+}
+
+.admin-dashboard-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 16px;
+}
+
+@media (max-width: 760px) {
+    .admin-hero {
+        align-items: stretch;
+        flex-direction: column;
+        padding: 18px;
+    }
+    .admin-hero-actions {
+        justify-content: flex-start;
+    }
+    .admin-dashboard-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* p-0 override: admin.css carrega depois do Tailwind, então .card vence na cascata */
 .card.p-0 { padding: 0; }
 

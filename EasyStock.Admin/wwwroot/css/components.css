@@ -150,13 +150,18 @@ button:focus-visible {
 .app-shell {
   display: flex;
   min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(14, 42, 110, 0.10), transparent 220px),
+    var(--es-bg);
 }
 
 /* Sidebar (desktop expanded) */
 .sidebar {
   width: 256px;
-  background: var(--es-surface);
-  border-right: 1px solid rgba(247, 242, 232, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 180px),
+    #07132d;
+  border-right: 1px solid rgba(247, 242, 232, 0.10);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -165,6 +170,25 @@ button:focus-visible {
   transition: width var(--duration-base) var(--ease-out),
               transform var(--duration-base) var(--ease-out);
 }
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.125rem;
+  border-bottom: 1px solid rgba(247, 242, 232, 0.08);
+  flex: none;
+}
+.sidebar-brand-pill {
+  margin-left: auto;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(232, 88, 20, 0.16);
+  border: 1px solid rgba(232, 88, 20, 0.28);
+  color: var(--orange-300);
+  font: 800 9px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
 
 /* Sidebar — collapsed rail (64px com só ícones) */
 .sidebar.is-rail {
@@ -172,6 +196,7 @@ button:focus-visible {
 }
 .sidebar.is-rail .sidebar-label,
 .sidebar.is-rail .sidebar-section-title,
+.sidebar.is-rail .sidebar-group,
 .sidebar.is-rail .sidebar-recent,
 .sidebar.is-rail .sidebar-user-meta,
 .sidebar.is-rail .sidebar-search-text,
@@ -183,6 +208,15 @@ button:focus-visible {
   justify-content: center;
   padding-left: 0;
   padding-right: 0;
+}
+.sidebar.is-rail .sidebar-group {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.sidebar.is-rail .sidebar-external {
+  padding-top: 0.75rem;
 }
 
 /* Mobile (off-canvas drawer) */
@@ -200,6 +234,7 @@ button:focus-visible {
   }
   .sidebar.is-rail .sidebar-label,
   .sidebar.is-rail .sidebar-section-title,
+  .sidebar.is-rail .sidebar-group,
   .sidebar.is-rail .sidebar-recent,
   .sidebar.is-rail .sidebar-user-meta,
   .sidebar.is-rail .sidebar-search-text,
@@ -243,6 +278,9 @@ button:focus-visible {
   flex-direction: column;
   min-height: 100vh;
   margin-left: 256px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 150px),
+    var(--es-bg);
   transition: margin-left var(--duration-base) var(--ease-out);
 }
 .app-main.is-rail {
@@ -260,7 +298,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.625rem 1rem;
+  padding: 0.56rem 0.75rem;
   border-radius: 0.5rem;
   color: var(--text-muted);
   background: transparent;
@@ -269,7 +307,8 @@ button:focus-visible {
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out),
               color var(--duration-fast) var(--ease-out),
-              border-color var(--duration-fast) var(--ease-out);
+              border-color var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
   width: 100%;
   text-align: left;
   font: inherit;
@@ -277,12 +316,14 @@ button:focus-visible {
 .sidebar-link:hover,
 .sidebar-link:focus-visible {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(247, 242, 232, 0.055);
+  transform: translateX(1px);
 }
 .sidebar-link.is-active {
-  background: linear-gradient(135deg, rgba(232, 88, 20, 0.20), rgba(232, 88, 20, 0.10));
+  background: linear-gradient(135deg, rgba(232, 88, 20, 0.24), rgba(232, 88, 20, 0.08));
   color: var(--text-primary);
   border-color: rgba(232, 88, 20, 0.35);
+  box-shadow: inset 3px 0 0 var(--orange-500);
 }
 .sidebar-link.is-active .es-icon {
   color: var(--orange-500);
@@ -295,11 +336,25 @@ button:focus-visible {
   border-color: rgba(232, 88, 20, 0.35);
 }
 .sidebar-link.active .es-icon { color: var(--orange-500); }
+.sidebar-count {
+  margin-left: auto;
+  min-width: 1.65rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(247, 242, 232, 0.07);
+  color: var(--text-secondary);
+  font: 800 10px/1.35 var(--font-mono);
+  text-align: center;
+}
+.sidebar-count-danger {
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+}
 
 /* Sidebar — botão de busca/cmdk (sintaxe: dashed border + atalho) */
 .sidebar-search {
-  background: rgba(247, 242, 232, 0.04);
-  border: 1px dashed rgba(247, 242, 232, 0.12);
+  background: rgba(247, 242, 232, 0.055);
+  border: 1px solid rgba(247, 242, 232, 0.10);
   color: var(--text-muted);
 }
 .sidebar-search:hover {
@@ -317,16 +372,31 @@ button:focus-visible {
 /* Section title da sidebar */
 .sidebar-section-title {
   display: block;
-  padding: 0.75rem 0.75rem 0.25rem;
-  font: 600 10px/1 var(--font-mono);
+  padding: 0 0.25rem 0.4rem;
+  font: 800 9.5px/1 var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: rgba(226, 232, 240, 0.58);
+}
+.sidebar-group {
+  margin-top: 0.65rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(247, 242, 232, 0.06);
+}
+.sidebar-group:first-of-type {
+  margin-top: 0.2rem;
+  padding-top: 0;
+  border-top: 0;
+}
+.sidebar-external {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(247, 242, 232, 0.08);
 }
 
 /* Topbar (sticky) */
 .app-topbar {
-  background: var(--es-surface);
+  background: color-mix(in srgb, var(--es-surface) 92%, transparent);
   border-bottom: 1px solid rgba(247, 242, 232, 0.08);
   position: sticky;
   top: 0;
@@ -336,6 +406,15 @@ button:focus-visible {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.875rem 1.25rem;
+  backdrop-filter: blur(12px);
+}
+.admin-content {
+  flex: 1;
+  padding: 1.5rem;
+}
+.admin-content-inner {
+  width: min(100%, 1320px);
+  margin: 0 auto;
 }
 
 /* Theme toggle / sidebar toggle / hamburger (botões da topbar) */
