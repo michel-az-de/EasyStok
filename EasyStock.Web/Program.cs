@@ -48,7 +48,30 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 var dpKeysPath = config["DataProtection:KeysPath"];
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("EasyStok.Web");
 if (!string.IsNullOrWhiteSpace(dpKeysPath))
-    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath));
+{
+    // Guard: so persiste se o diretorio for de fato gravavel. O container roda como
+    // appuser (uid 1001); um volume root-owned daria 500 no 1o uso do cookie. Se nao
+    // der pra gravar, cai no default efemero (comportamento atual) e loga o aviso —
+    // degrada a sessao, mas NAO quebra a autenticacao.
+    var dpWritable = false;
+    try
+    {
+        Directory.CreateDirectory(dpKeysPath);
+        var probe = Path.Combine(dpKeysPath, ".write-probe");
+        File.WriteAllText(probe, "ok");
+        File.Delete(probe);
+        dpWritable = true;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[DataProtection] AVISO: '{dpKeysPath}' nao gravavel ({ex.GetType().Name}) — chaves ficarao efemeras (sessao nao sobrevive a deploy). Verifique o volume/permissao (chown 1001).");
+    }
+    if (dpWritable)
+    {
+        dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath));
+        Console.WriteLine($"[DataProtection] Persistindo chaves em '{dpKeysPath}'.");
+    }
+}
 
 var app = builder.Build();
 
