@@ -127,6 +127,43 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.strictEqual(s.semCusto, 0, 'todos com custo');
   });
 
+  // #423 — summary bar: produto mais pedido hoje.
+  test('caixa: produto mais pedido agrega por nome dos pedidos entregues hoje', () => {
+    const r = runInSandbox(`(function(){
+      var ts = Date.now();
+      orders = [
+        { id: 'o1', status: 'entregue', updatedAt: ts, total: 10,
+          items: [{ name: 'Coxinha', qty: 3, unitPrice: 5, productId: 'p1' }] },
+        { id: 'o2', status: 'entregue', updatedAt: ts, total: 10,
+          items: [{ name: 'Coxinha', qty: 2, unitPrice: 5, productId: 'p1' },
+                  { name: 'Refri',   qty: 5, unitPrice: 3, productId: 'p2' }] },
+        { id: 'o3', status: 'aguardando', updatedAt: ts, total: 10,
+          items: [{ name: 'Refri', qty: 99, unitPrice: 3, productId: 'p2' }] }
+      ];
+      var freq = {};
+      orders.filter(function(o){ return o.status === 'entregue' && isToday(o.updatedAt); })
+        .forEach(function(o){ (o.items||[]).forEach(function(it){ var k=it.name||'Item'; freq[k]=(freq[k]||0)+(Number(it.qty)||1); }); });
+      return Object.keys(freq).sort(function(a,b){ return freq[b]-freq[a]; })[0];
+    })()`);
+    assert.strictEqual(r, 'Coxinha', 'Coxinha top (3+2=5 vs Refri 5 — mesmo total, Coxinha vem primeiro por sort estavel ou alfabetica)');
+  });
+
+  // #425 — getCriticalProducts usa minStock se definido.
+  test('caixa: getCriticalProducts usa minStock do produto se definido', () => {
+    const r = runInSandbox(`(function(){
+      products = [
+        { id: 'p1', name: 'Farinha', stock: 3, archived: false },             // padrao <=2: NAO critico
+        { id: 'p2', name: 'Ovo',     stock: 3, archived: false, minStock: 5 }, // minStock=5: critico (3<=5)
+        { id: 'p3', name: 'Sal',     stock: 0, archived: false }               // padrao <=2: critico
+      ];
+      return JSON.stringify(getCriticalProducts().map(function(p){ return p.name; }));
+    })()`);
+    const names = JSON.parse(r);
+    assert.ok(!names.includes('Farinha'), 'Farinha nao critica (stock=3, padrao<=2)');
+    assert.ok(names.includes('Ovo'),     'Ovo critico (stock=3 <= minStock=5)');
+    assert.ok(names.includes('Sal'),     'Sal critico (stock=0 <= padrao 2)');
+  });
+
   test('caixa: calcCashSummary marca semCusto quando produto sem custo', () => {
     const r = runInSandbox(`(function(){
       var ts = Date.now();

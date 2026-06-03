@@ -7362,6 +7362,9 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="ccc-cta">Detalhes →</div>
       </button>
 
+      <!-- #423 — summary bar: faturamento + ticket medio + produto mais pedido -->
+      <div id="homeSummaryBar" style="display:none;background:var(--bg-elev);border-radius:14px;padding:10px 14px;margin-bottom:10px;display:flex;gap:0;flex-wrap:wrap"></div>
+
       <details class="home-ops-disclosure" id="homeOpsDisclosure">
         <summary>
           <span>
@@ -7371,6 +7374,8 @@ body.ux-calm [data-screen="producao"] .section-label {
           <span class="home-ops-chip" id="homeOpsChip">ver</span>
         </summary>
         <div class="home-ops-body">
+          <!-- #424 — checklist de operacao: 3 checkmarks derivados de estado -->
+          <div id="homeChecklist" style="display:none;background:var(--bg-elev);border-radius:14px;padding:10px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px"></div>
           <div class="trust-badges" id="trustBadges" aria-label="Confianca operacional"></div>
           <div class="premium-panel" id="premiumOpsPanel"></div>
 
@@ -7932,6 +7937,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <span class="currency">R$</span>
         <div class="input-box"><input id="newProdCost" type="text" inputmode="decimal" placeholder="9,50" autocomplete="off" oninput="updateMarginPreview()"></div>
       </div>
+      <!-- #425 — estoque minimo: threshold de alerta por produto (padrao: <=2) -->
+      <label class="modal-label">Estoque mínimo
+        <span class="ml-hint">alerta quando stock ≤ este valor (padrão: 2)</span>
+      </label>
+      <div class="input-box"><input id="newProdMinStock" type="text" inputmode="numeric" placeholder="2" autocomplete="off" style="max-width:80px"></div>
+
       <!-- Preview de margem: mostra lucro absoluto e % quando os 2 campos
            tem valor. Esconde por default. -->
       <div id="marginPreview" class="margin-preview" style="display:none">
@@ -10520,6 +10531,8 @@ function renderHome() {
     renderAttentionCenter();
     renderHomeShopping();
     renderHomeOpsDisclosure();
+    renderHomeSummaryBar();  // #423
+    renderHomeChecklist();   // #424
   } finally {
     _derivBatching = false;
     _derivCache = Object.create(null);
@@ -10734,7 +10747,48 @@ function _attentionFmtElapsed(ms) {
 // BUG #14: fonte unica pra "estoque critico" — centro de atencao e card
 // da home liam o mesmo filtro inline, abrindo brecha pra desync futuro.
 function getCriticalProducts() {
-  return (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+  // #425: usa product.minStock se definido, senao fallback para <=2.
+  return (products || []).filter(function (p) {
+    if (p.archived) return false;
+    const threshold = (p.minStock != null && isFinite(Number(p.minStock))) ? Number(p.minStock) : 2;
+    return (Number(p.stock) || 0) <= threshold;
+  });
+}
+
+// #423 — summary bar: faturamento + ticket medio + produto mais pedido hoje.
+// Visivel sem expandir o details. Aparece so quando ha pedidos entregues.
+function renderHomeSummaryBar() {
+  const bar = document.getElementById('homeSummaryBar');
+  if (!bar) return;
+  const sum = calcCashSummaryToday();
+  if (sum.ordersCount === 0) { bar.style.display = 'none'; return; }
+  const ticket = sum.ordersCount > 0 ? sum.sold / sum.ordersCount : 0;
+  // Produto mais pedido hoje: agrega itens dos pedidos entregues hoje por nome.
+  const freq = {};
+  (orders || []).filter(function (o) { return o.status === 'entregue' && isToday(o.updatedAt); })
+    .forEach(function (o) {
+      (o.items || []).forEach(function (it) {
+        const k = it.name || 'Item';
+        freq[k] = (freq[k] || 0) + (Number(it.qty) || 1);
+      });
+    });
+  const top = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; })[0] || null;
+  const metricCss = 'flex:1;min-width:80px;text-align:center;padding:4px 8px;border-right:1px solid var(--line)';
+  const lastCss  = 'flex:1;min-width:80px;text-align:center;padding:4px 8px';
+  bar.style.display = 'flex';
+  bar.innerHTML =
+    '<div style="' + metricCss + '">'
+      + '<div style="font-size:11px;color:var(--ink-mute)">Faturado hoje</div>'
+      + '<div style="font-size:15px;font-weight:800">' + money(sum.sold) + '</div>'
+    + '</div>'
+    + '<div style="' + metricCss + '">'
+      + '<div style="font-size:11px;color:var(--ink-mute)">Ticket médio</div>'
+      + '<div style="font-size:15px;font-weight:800">' + money(ticket) + '</div>'
+    + '</div>'
+    + '<div style="' + lastCss + '">'
+      + '<div style="font-size:11px;color:var(--ink-mute)">+ pedido</div>'
+      + '<div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(top || '—') + '</div>'
+    + '</div>';
 }
 
 function _buildAttentionItemsImpl() {
@@ -11491,6 +11545,44 @@ function renderHomeShopping() {
   `;
 }
 
+// #424 — checklist de operacao: 3 checkmarks derivados de estado existente.
+// Zero localStorage novo; tudo calculado em tempo real.
+let _homeChecklistAutoOpened = false; // flag: abre so uma vez por sessao.
+function renderHomeChecklist() {
+  const host = document.getElementById('homeChecklist');
+  if (!host) return;
+  const now = Date.now();
+  const open = (typeof openOrders === 'function') ? openOrders() : [];
+  // 1. Caixa do dia
+  const cashFechado = isCashClosedToday();
+  const temMovimento = (calcCashSummaryToday().ordersCount > 0 || (cashEntries || []).some(function (e) { return isToday(e.createdAt); }));
+  const cashOk = !temMovimento || cashFechado; // ok se nao tem movimento OU caixa fechado
+  // 2. Pedidos fluindo (nenhum em preparando ha >30min)
+  const stuck = open.filter(function (o) { return o.status === 'preparando' && (now - (o.updatedAt || o.createdAt || now)) > ATTENTION_TRAVADO_MS; });
+  const pedidosOk = stuck.length === 0;
+  // 3. Estoque
+  const estoqueOk = getCriticalProducts().length === 0;
+  const items = [
+    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: cashFechado ? null : function () { openCashCloseModal(); }, ctaLabel: 'Fechar' },
+    { ok: pedidosOk, icon: pedidosOk ? '✅' : '⏱',   label: 'Pedidos fluindo', sub: pedidosOk ? 'sem travados' : stuck.length + ' parado' + (stuck.length > 1 ? 's' : '') + ' >30min', cta: pedidosOk ? null : function () { go('pedidos'); }, ctaLabel: 'Ver' },
+    { ok: estoqueOk, icon: estoqueOk ? '📦' : '⚠',   label: 'Estoque',         sub: estoqueOk ? 'sem críticos' : getCriticalProducts().length + ' item(ns) crítico(s)', cta: estoqueOk ? null : function () { go('producao'); }, ctaLabel: 'Produção' }
+  ];
+  host.style.display = 'flex';
+  host.innerHTML = items.map(function (it) {
+    const ctaHtml = (!it.ok && it.cta)
+      ? '<button onclick="(function(){' + it.ctaLabel.toLowerCase().replace(/[^a-z]/g,'') + '})()" style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;margin-left:auto" onclick="void(0)">' + escapeHtml(it.ctaLabel) + '</button>'
+      : '';
+    return '<div style="display:flex;align-items:center;gap:8px;' + (it.ok ? '' : 'color:var(--accent)') + '">'
+      + '<span style="font-size:16px">' + it.icon + '</span>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:700">' + escapeHtml(it.label) + '</div>'
+        + '<div style="font-size:11px;color:var(--ink-mute)">' + escapeHtml(it.sub) + '</div>'
+      + '</div>'
+      + ((!it.ok && it.cta) ? '<button onclick="(' + it.cta.toString() + ')()" style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer">' + escapeHtml(it.ctaLabel) + '</button>' : '')
+    + '</div>';
+  }).join('');
+}
+
 function renderHomeOpsDisclosure() {
   const box = document.getElementById('homeOpsDisclosure');
   if (!box) return;
@@ -11501,6 +11593,11 @@ function renderHomeOpsDisclosure() {
   const shopping = getShoppingRows().filter(item => !item.done).length;
   const urgent = attention.filter(item => item.severity === 'err' || item.severity === 'warn').length;
   const shouldOpen = urgent > 0 || shopping > 0;
+  // #424: auto-expand quando ha pendencias urgentes (so uma vez por sessao).
+  if (shouldOpen && !_homeChecklistAutoOpened && !box.open) {
+    box.open = true;
+    _homeChecklistAutoOpened = true;
+  }
   box.ontoggle = function () {
     if (chip) chip.textContent = box.open ? 'ocultar' : (shouldOpen ? 'pendente' : 'ver');
   };
@@ -21038,6 +21135,10 @@ function saveNewProduct() {
   const costStr = (document.getElementById('newProdCost')?.value || '').trim();
   const costParsed = costStr ? parseMoneyInput(costStr) : NaN;
   const cost = isNaN(costParsed) ? null : costParsed;
+  // #425 — estoque minimo configuravel
+  const minStockStr = (document.getElementById('newProdMinStock')?.value || '').trim();
+  const minStockParsed = minStockStr ? parseInt(minStockStr, 10) : NaN;
+  const minStock = (!isNaN(minStockParsed) && minStockParsed >= 0) ? minStockParsed : null;
 
   // Modo edit: editingProductId setado por openProductModalForEdit
   if (editingProductId) {
@@ -21047,9 +21148,9 @@ function saveNewProduct() {
     products[idx] = {
       ...products[idx],
       name, emoji: selectedEmoji, category: selectedCat,
-      unit: unit || '', price, cost
+      unit: unit || '', price, cost, minStock
     };
-    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost']);
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock']);
     persistAll();
     renderProductGrid();
     if (typeof renderCatalogList === 'function') renderCatalogList();
@@ -21070,7 +21171,7 @@ function saveNewProduct() {
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
-    unit: unit || '', price, cost, count: 0, photo: null, stock: 0, custom: true
+    unit: unit || '', price, cost, minStock, count: 0, photo: null, stock: 0, custom: true
   };
   products.push(product);
   persistAll();
@@ -21108,6 +21209,8 @@ function openProductModalForEdit(productId) {
   document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
   const costEl = document.getElementById('newProdCost');
   if (costEl) costEl.value = (p.cost != null ? formatMoneyInput(p.cost) : '');
+  const minStockEl = document.getElementById('newProdMinStock');
+  if (minStockEl) minStockEl.value = (p.minStock != null ? String(p.minStock) : '');
   selectedCat = p.category || 'massa';
   selectedEmoji = p.emoji || '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(x => {
