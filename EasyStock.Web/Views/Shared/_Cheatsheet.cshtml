@@ -17,7 +17,7 @@
         <div class="flex items-center justify-between px-5 py-4"
              style="border-bottom: 1px solid var(--border-soft);">
             <h2 id="es-cheatsheet-title" class="text-base font-semibold" style="color: var(--text-primary);">Atalhos de teclado</h2>
-            <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="close()"></es-button>
+            <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="Fechar" @@click="close()"><es-icon name="x"></es-icon></button>
         </div>
         <div class="px-5 py-4 max-h-[70vh] overflow-y-auto" style="color: var(--text-primary);">
             <template x-for="grupo in grupos" :key="grupo.nome">

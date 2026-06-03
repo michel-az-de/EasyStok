@@ -20,7 +20,7 @@
         {
             <div class="modal-header">
                 <h3 :id="$id('modal-title')" class="text-base font-semibold m-0">@title</h3>
-                <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="open=false"></es-button>
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="Fechar" @@click="open=false"><es-icon name="x"></es-icon></button>
             </div>
         }
         <div class="modal-body">@Html.Raw(bodyHtml)</div>

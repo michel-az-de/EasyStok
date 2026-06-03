@@ -417,7 +417,7 @@
             <div class="modal-panel modal-md">
                 <div class="modal-header">
                     <h3 class="text-base font-semibold m-0">Confirmar ação?</h3>
-                    <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="modal = false"></es-button>
+                    <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="Fechar" @@click="modal = false"><es-icon name="x"></es-icon></button>
                 </div>
                 <div class="modal-body"><p class="text-sm m-0">Tem certeza que deseja continuar? Você ainda pode desfazer pelo toast nos próximos 5 segundos.</p></div>
                 <div class="modal-footer">
@@ -433,7 +433,7 @@
             <aside class="drawer-panel" role="dialog" aria-modal="true" @@keydown.escape.window="drawer = false">
                 <div class="drawer-header">
                     <h3 class="text-base font-semibold m-0">Edição rápida</h3>
-                    <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="drawer = false"></es-button>
+                    <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="Fechar" @@click="drawer = false"><es-icon name="x"></es-icon></button>
                 </div>
                 <div class="drawer-body">
                     <p class="text-sm">Drawer lateral para ações pontuais sem sair da página atual.</p>

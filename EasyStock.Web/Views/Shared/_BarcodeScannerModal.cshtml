@@ -21,7 +21,7 @@
                 <es-icon name="scan-line" class="es-icon--sm" style="color: var(--orange-600);"></es-icon>
                 Ler código de barras
             </h2>
-            <es-button variant="ghost" size="sm" icon-only icon="x" aria-label="Fechar" @@click="fechar()"></es-button>
+            <button type="button" class="btn btn-ghost btn-sm btn-icon" aria-label="Fechar" @@click="fechar()"><es-icon name="x"></es-icon></button>
         </div>
 
         <div class="p-4 space-y-3">
@@ -65,9 +65,9 @@
 
         <div class="px-4 py-3 flex gap-2 justify-end"
              style="border-top: 1px solid var(--border-soft);">
-            <es-button variant="ghost" size="sm" @@click="fechar()">Fechar</es-button>
+            <button type="button" class="btn btn-ghost btn-sm" @@click="fechar()">Fechar</button>
             <template x-if="modo === 'usb'">
-                <es-button variant="primary" size="sm" icon="check" @@click="confirmarUsb()">Usar codigo</es-button>
+                <button type="button" class="btn btn-primary btn-sm" @@click="confirmarUsb()"><es-icon name="check" class="btn-icon-leading"></es-icon>Usar codigo</button>
             </template>
         </div>
     </div>
