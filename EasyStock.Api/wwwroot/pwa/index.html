@@ -9481,15 +9481,24 @@ function showHealthBanner(level, msg, actionLabel) {
   var actBtn = document.getElementById('hbAction');
   actBtn.textContent = actionLabel || 'Resolver';
   el.hidden = false;
+  // #408: o banner e position:fixed top:0; sem reservar espaco, cobre o cabecalho
+  // ("Boa noite, ..."). Empurra o conteudo do frame .phone (box-sizing border-box:
+  // nao aumenta a altura do frame; o topo desce e o resto rola). Desfeito ao fechar.
+  try {
+    var ph = document.querySelector('.phone');
+    if (ph) ph.style.paddingTop = el.offsetHeight + 'px';
+  } catch (_) {}
 }
 function dismissHealthBanner() {
   var el = document.getElementById('healthBanner');
   if (el) el.hidden = true;
+  try { var ph = document.querySelector('.phone'); if (ph) ph.style.paddingTop = ''; } catch (_) {}
   _healthBannerDismissedAt = Date.now();
 }
 function hideHealthBanner() {
   var el = document.getElementById('healthBanner');
   if (el) el.hidden = true;
+  try { var ph = document.querySelector('.phone'); if (ph) ph.style.paddingTop = ''; } catch (_) {}
 }
 
 async function runHealthCheck() {
