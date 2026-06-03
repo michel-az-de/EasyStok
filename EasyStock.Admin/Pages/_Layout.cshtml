@@ -408,8 +408,12 @@
                     this.dash.ticketsBadge = (this.dash.ticketsComNovaMensagem ?? 0) + (this.dash.ticketsCriticos ?? 0);
                 }
                 await this.fetchDashBadges();
-                setInterval(() => this.fetchDashBadges(), 60000);
+                // BUG-014: so faz o poll quando a aba esta visivel. Evita requisicoes
+                // desnecessarias em abas ocultas/em segundo plano e deixa a pagina atingir
+                // "idle". Ao voltar a ficar visivel, atualiza na hora.
+                setInterval(() => { if (!document.hidden) this.fetchDashBadges(); }, 60000);
                 setInterval(() => { if (this._lastFetch) this.dashSecsAgo = Math.floor((Date.now() - this._lastFetch) / 1000); }, 5000);
+                document.addEventListener('visibilitychange', () => { if (!document.hidden) this.fetchDashBadges(); });
             },
 
             // ── Sidebar collapse ──
