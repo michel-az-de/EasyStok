@@ -676,10 +676,18 @@
                     </template>
                 </ul>
 
-                <button type="button" class="ped-add-item"
-                        @@click="adicionarItem()">
-                    + Adicionar item
-                </button>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" class="ped-add-item"
+                            @@click="adicionarItem()">
+                        + Adicionar item
+                    </button>
+                    <button type="button" class="ped-add-item"
+                            @@click="abrirScannerPedido()"
+                            title="Ler código de barras com a câmera ou leitor USB"
+                            aria-label="Bipar produto para o pedido">
+                        Bipar produto
+                    </button>
+                </div>
             </fieldset>
 
             <fieldset class="fm-section">
@@ -1062,6 +1070,44 @@ function novoPedidoModal() {
             it.produtoId = null;
             it.dropdownOpen = false;
             if (!it.categoriaId) it.categoriaId = categoriaPadrao || '';
+        },
+
+        // Bipar produto (camera/USB) reusa o scanner global: resolve o EAN via
+        // /produtos/buscar e adiciona ao carrinho (incrementa se a linha ja existe;
+        // 0/varios resultados abrem uma linha com a busca preenchida).
+        abrirScannerPedido() {
+            window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: async (code) => {
+                const termo = String(code || '').trim();
+                if (!termo) return;
+                const pegarLinha = () => {
+                    const ultima = this.form.itens[this.form.itens.length - 1];
+                    if (ultima && !ultima.produtoId && !(ultima.busca || '').trim()) return ultima;
+                    this.adicionarItem();
+                    return this.form.itens[this.form.itens.length - 1];
+                };
+                try {
+                    const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(termo) + '&limit=8');
+                    const lista = r.ok ? await r.json() : [];
+                    if (lista.length === 1) {
+                        const p = lista[0];
+                        const existente = this.form.itens.find(i => i.produtoId === p.id);
+                        if (existente) {
+                            existente.quantidade = (Number(existente.quantidade) || 0) + 1;
+                            window.showToast(p.nome + ': +1 (qtd ' + existente.quantidade + ')', 'success');
+                        } else {
+                            this.selecionarProduto(pegarLinha(), p);
+                            window.showToast(p.nome + ' adicionado.', 'success');
+                        }
+                    } else {
+                        const it = pegarLinha();
+                        it.busca = termo;
+                        this.buscarProdutos(it);
+                        if (lista.length === 0) window.showToast('Codigo ' + termo + ' nao encontrado. Busque pelo nome.', 'warning');
+                    }
+                } catch {
+                    window.showToast('Erro ao ler o codigo. Tente novamente.', 'error');
+                }
+            } } }));
         },
 
         // ── Totais e validação ────────────────────────────────────────────
