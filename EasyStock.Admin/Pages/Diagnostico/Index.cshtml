@@ -899,6 +899,46 @@
             </div>
         </div>
 
+        <!-- ── Tendências (gráficos SVG inline, sem libs) ── -->
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-es-ink font-semibold text-sm">📉 Tendências</h3>
+            <button type="button" @@click="perf.refreshCharts()" class="btn-secondary text-xs">↻</button>
+        </div>
+        <template x-if="perf.chartsErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="perf.chartsErro"></div>
+        </template>
+        <div x-show="perf.chartsLoading && !perf.chartsReady" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-4 mb-4">
+            <span class="inline-block w-2 h-2 rounded-full bg-es-accent animate-pulse"></span> Carregando gráficos…
+        </div>
+        <div x-show="perf.chartsReady" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            <!-- Health Timeline -->
+            <div class="card">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-2">Latência DB e erros (~2h)</div>
+                <div x-show="perf.htHas" x-html="perf.htSvg"></div>
+                <div x-show="perf.htHas" class="flex gap-3 text-[10px] text-es-ink-mute mt-1">
+                    <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:rgb(30,72,168)"></span> DB ms (máx <span x-text="perf.htMaxDb"></span>)</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:rgb(239,68,68)"></span> Erros/min (máx <span x-text="perf.htMaxErr"></span>)</span>
+                </div>
+                <div x-show="!perf.htHas" x-cloak class="text-es-ink-mute text-xs py-6 text-center">Sem snapshots ainda (coleta a cada 60s).</div>
+            </div>
+            <!-- Error Rate -->
+            <div class="card">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-2">Requests x Erros por hora</div>
+                <div x-show="perf.barsHas" x-html="perf.errSvg"></div>
+                <div x-show="perf.barsHas" class="flex gap-3 text-[10px] text-es-ink-mute mt-1">
+                    <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:rgba(30,72,168,0.6)"></span> Requests</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background:rgb(239,68,68)"></span> Erros</span>
+                </div>
+                <div x-show="!perf.barsHas" x-cloak class="text-es-ink-mute text-xs py-6 text-center">Sem dados de log no período.</div>
+            </div>
+            <!-- Log Volume -->
+            <div class="card">
+                <div class="text-[10px] uppercase tracking-wide text-es-ink-mute mb-2">Volume de logs por hora</div>
+                <div x-show="perf.barsHas" x-html="perf.volSvg"></div>
+                <div x-show="!perf.barsHas" x-cloak class="text-es-ink-mute text-xs py-6 text-center">Sem dados de log no período.</div>
+            </div>
+        </div>
+
         <!-- ── SLO ── -->
         <h3 class="text-es-ink font-semibold text-sm mb-3">📈 SLO</h3>
         <template x-if="perf.sloErro">
@@ -1515,11 +1555,88 @@ function perfState() {
         queriesLoading: false, queriesErro: '', queries: null,
         expandedQueries: {},
 
+        // Charts SVG inline (sem libs — Chart.js depende de CDN jsDelivr, bloqueado no Admin).
+        chartsLoading: false, chartsErro: '', chartsReady: false,
+        htSvg: '', errSvg: '', volSvg: '',
+        htHas: false, htMaxDb: 0, htMaxErr: 0, barsHas: false,
+
         async refreshAll() {
             this._loadedOnce = true;
             this.refreshSlo();
             this.refreshEndpoints();
             this.refreshQueries();
+            this.refreshCharts();
+        },
+
+        async refreshCharts() {
+            this.chartsLoading = true; this.chartsErro = '';
+            try {
+                const [rh, rs] = await Promise.all([
+                    fetch('/api-proxy/diag/historico', { credentials: 'same-origin', cache: 'no-store' }),
+                    fetch('/api-proxy/diag/summary?hours=24', { credentials: 'same-origin', cache: 'no-store' })
+                ]);
+                if (rh.status === 401 || rs.status === 401) { window.location.href = '/Auth/Login'; return; }
+                const hist = rh.ok ? await rh.json() : null;
+                const summ = rs.ok ? await rs.json() : null;
+                this._buildHealthTimeline(hist);
+                this._buildBars(summ);
+                this.chartsReady = true;
+            } catch (e) {
+                this.chartsErro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.chartsLoading = false; }
+        },
+
+        _svgWrap(inner, label) {
+            return `<svg viewBox="0 0 320 90" preserveAspectRatio="none" width="100%" height="90" role="img" aria-label="${label}">${inner}</svg>`;
+        },
+
+        _buildHealthTimeline(hist) {
+            const snaps = (hist && hist.snapshots) || [];
+            const W = 320, H = 90, pad = 4;
+            if (!snaps.length) { this.htHas = false; this.htSvg = ''; this.htMaxDb = 0; this.htMaxErr = 0; return; }
+            const db = snaps.map(s => Math.max(0, s.dbLatencyMs ?? 0));
+            const err = snaps.map(s => Math.max(0, s.errorCount ?? 0));
+            const maxDb = Math.max(1, ...db);
+            const maxErr = Math.max(1, ...err);
+            const n = snaps.length;
+            const xAt = i => pad + (n === 1 ? (W - 2 * pad) / 2 : i * (W - 2 * pad) / (n - 1));
+            const yAt = (v, mx) => H - pad - (v / mx) * (H - 2 * pad);
+            const pts = (arr, mx) => arr.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v, mx).toFixed(1)}`).join(' ');
+            const line = (p, c) => `<polyline points="${p}" fill="none" stroke="${c}" stroke-width="1.5" />`;
+            this.htMaxDb = maxDb; this.htMaxErr = maxErr; this.htHas = true;
+            this.htSvg = this._svgWrap(
+                line(pts(db, maxDb), 'rgb(30,72,168)') + line(pts(err, maxErr), 'rgb(239,68,68)'),
+                'Latencia do banco e erros nas ultimas 2h');
+        },
+
+        _buildBars(summ) {
+            const resumo = (summ && summ.resumo) || {};
+            const reqH = resumo.requestsByHour || {};
+            const errH = resumo.errorsByHour || {};
+            const hours = [...new Set([...Object.keys(reqH), ...Object.keys(errH)])].sort();
+            if (!hours.length) { this.barsHas = false; this.errSvg = ''; this.volSvg = ''; return; }
+            const W = 320, H = 90, pad = 4;
+            const maxReq = Math.max(1, ...hours.map(h => reqH[h] || 0));
+            const maxErr = Math.max(1, ...hours.map(h => errH[h] || 0));
+            const maxVol = Math.max(1, ...hours.map(h => (reqH[h] || 0) + (errH[h] || 0)));
+            const slot = (W - 2 * pad) / hours.length;
+            const bw = Math.max(1, slot * 0.7);
+            const off = (slot - bw) / 2;
+            let er = '', vr = '';
+            hours.forEach((h, i) => {
+                const x = (pad + i * slot + off).toFixed(1);
+                const w = bw.toFixed(1);
+                const rv = reqH[h] || 0, ev = errH[h] || 0;
+                const rPx = (rv / maxReq) * (H - 2 * pad);
+                const ePx = (ev / maxErr) * (H - 2 * pad);
+                const vPx = ((rv + ev) / maxVol) * (H - 2 * pad);
+                er += `<rect x="${x}" y="${(H - pad - rPx).toFixed(1)}" width="${w}" height="${rPx.toFixed(1)}" fill="rgba(30,72,168,0.35)" />`;
+                er += `<rect x="${x}" y="${(H - pad - ePx).toFixed(1)}" width="${w}" height="${ePx.toFixed(1)}" fill="rgba(239,68,68,0.75)" />`;
+                vr += `<rect x="${x}" y="${(H - pad - vPx).toFixed(1)}" width="${w}" height="${vPx.toFixed(1)}" fill="rgb(199,210,254)" />`;
+            });
+            this.barsHas = true;
+            this.errSvg = this._svgWrap(er, 'Requests e erros por hora');
+            this.volSvg = this._svgWrap(vr, 'Volume de logs por hora');
         },
 
         async refreshSlo() {
