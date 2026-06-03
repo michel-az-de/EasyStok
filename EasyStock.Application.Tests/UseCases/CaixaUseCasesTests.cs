@@ -218,6 +218,88 @@ public class CaixaUseCasesTests
         await _uow.Received(1).CommitAsync();
     }
 
+    // ─── FIN-003: caixa não pode ficar negativo + rastro de auditoria na saída ───
+
+    [Fact]
+    public async Task RegistrarMovimento_DeveBloquearSaida_QuandoMaiorQueSaldoDoDia()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        // Saldo do dia = abertura R$100 (sem vendas/entradas).
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        // Saída de R$500 num caixa com R$100 → bloqueia (FIN-003).
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 500m,
+                Descricao: "Sangria", Metodo: "dinheiro"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*saldo*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DevePermitirSaida_QuandoDentroDoSaldo()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        var result = await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m,
+                Descricao: "Sangria", Metodo: "dinheiro"));
+
+        result.Tipo.Should().Be("saida");
+        result.Valor.Should().Be(80m);
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_DeveExigirMetodoEDescricao_NaSaidaInterativa()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        // Saída web sem método/descrição → bloqueia (rastro de auditoria, FIN-003).
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 10m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_NaoBloqueiaSaidaMobile_AindaQueEstoureSaldo()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        // Mobile promove fato já registrado no device — não passa pela guarda de saldo (FIN-003).
+        var result = await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 500m, Origem: "mobile"));
+
+        result.Tipo.Should().Be("saida");
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // EstornarMovimentoCaixa
     // ════════════════════════════════════════════════════════════════════

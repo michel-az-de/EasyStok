@@ -343,8 +343,8 @@ else
                                    class="ui-field w-full text-sm text-right" />
                         </div>
                         <div class="fm-field">
-                            <label class="fm-field__label" for="mov-metodo">Método</label>
-                            <select id="mov-metodo" name="metodo" class="ui-select w-full text-sm">
+                            <label class="fm-field__label" for="mov-metodo">Método<span x-show="tipo === 'saida'" x-cloak class="fm-field__required" aria-hidden="true">*</span></label>
+                            <select id="mov-metodo" name="metodo" :required="tipo === 'saida'" class="ui-select w-full text-sm">
                                 <option value="">— Selecionar —</option>
                                 <option value="dinheiro">Dinheiro</option>
                                 <option value="pix">PIX</option>
@@ -355,8 +355,9 @@ else
                             </select>
                         </div>
                         <div class="fm-field fm-col-2">
-                            <label class="fm-field__label" for="mov-desc">Descrição</label>
+                            <label class="fm-field__label" for="mov-desc">Descrição<span x-show="tipo === 'saida'" x-cloak class="fm-field__required" aria-hidden="true">*</span></label>
                             <input id="mov-desc" type="text" name="descricao"
+                                   :required="tipo === 'saida'"
                                    :placeholder="tipo === 'entrada' ? 'Ex: venda balcão, recebimento de cliente' : 'Ex: pagamento embalagem, sangria, troco'"
                                    class="ui-field w-full text-sm" />
                         </div>

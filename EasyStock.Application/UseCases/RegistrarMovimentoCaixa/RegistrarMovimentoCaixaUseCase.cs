@@ -41,6 +41,27 @@ public class RegistrarMovimentoCaixaUseCase(
         if (fechamento != null)
             throw new UseCaseValidationException("Caixa do dia já foi fechado. Lance em outra data ou faça estorno.");
 
+        // FIN-003: saída interativa (não-mobile) exige rastro de auditoria e não pode estourar o
+        // saldo do dia — caixa físico não fica negativo. O mobile promove fatos já registrados no
+        // device (sync); não passa por estas guardas pra não bloquear lançamento legítimo.
+        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
+        if (tipo == "saida" && origem != "mobile")
+        {
+            if (string.IsNullOrWhiteSpace(cmd.Metodo))
+                throw new UseCaseValidationException("Saída exige método (dinheiro, pix, cartão, etc.).");
+            if (string.IsNullOrWhiteSpace(cmd.Descricao))
+                throw new UseCaseValidationException("Saída exige descrição (justificativa para auditoria).");
+
+            var saldoAtual = await CalcularSaldoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
+            if (cmd.Valor > saldoAtual)
+            {
+                var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+                throw new UseCaseValidationException(
+                    $"Saída de {cmd.Valor.ToString("C", ptBr)} é maior que o saldo disponível em caixa " +
+                    $"({saldoAtual.ToString("C", ptBr)}). O caixa não pode ficar negativo.");
+            }
+        }
+
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, tipo, cmd.Valor, dataMov, cmd.LojaId);
         mov.Descricao = cmd.Descricao;
         mov.Metodo = cmd.Metodo;
@@ -55,5 +76,18 @@ public class RegistrarMovimentoCaixaUseCase(
 
         logger.LogInformation("Movimento de caixa {Id} ({Tipo} {Valor}) registrado.", mov.Id, tipo, cmd.Valor);
         return AbrirCaixaUseCase.Map(mov);
+    }
+
+    // Saldo esperado do dia (mesma fórmula do ObterCaixaDiaUseCase): saldo inicial (abertura)
+    // + vendas + pagamentos de pedidos + entradas extras - saídas extras.
+    private async Task<decimal> CalcularSaldoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId)
+    {
+        var movs = (await repo.GetMovimentosDoDiaAsync(empresaId, data, lojaId)).ToList();
+        var saldoInicial = movs.Where(m => m.Tipo == "abertura").Sum(m => m.Valor);
+        var entradas = movs.Where(m => m.Tipo == "entrada").Sum(m => m.Valor);
+        var saidas = movs.Where(m => m.Tipo == "saida").Sum(m => m.Valor);
+        var vendas = await repo.GetTotalVendasDoDiaAsync(empresaId, data, lojaId);
+        var pagamentos = await repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, data, lojaId);
+        return saldoInicial + vendas + pagamentos + entradas - saidas;
     }
 }
