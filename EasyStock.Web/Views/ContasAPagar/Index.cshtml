@@ -19,7 +19,7 @@
                 <select name="status" class="form-input">
                     @foreach (var s in statusOptions)
                     {
-                        <option value="@s" selected="@(Model.FiltroStatus == s)">@(string.IsNullOrEmpty(s) ? "Todos" : s)</option>
+                        <option value="@s" selected="@(Model.FiltroStatus == s)">@(string.IsNullOrEmpty(s) ? "Todos" : Humanizar(s))</option>
                     }
                 </select>
             </div>
@@ -83,7 +83,7 @@
                                 <a href="/contas-a-pagar/@c.Id" class="text-blue-600 hover:underline">@c.Descricao</a>
                             </td>
                             <td class="px-4 py-3">
-                                <span class="inline-block px-2 py-0.5 text-xs rounded @badge">@c.Status</span>
+                                <span class="inline-block px-2 py-0.5 text-xs rounded @badge">@Humanizar(c.Status)</span>
                             </td>
                             <td class="px-4 py-3 text-right">@c.ValorTotal.ToString("C")</td>
                             <td class="px-4 py-3 text-right text-green-700">@c.TotalPago.ToString("C")</td>
@@ -105,3 +105,12 @@
         </div>
     }
 </div>
+
+@functions {
+    // Humaniza o enum de status: "ParcialmentePaga" -> "Parcialmente Paga".
+    // Demais (Rascunho/Aberta/Paga/Vencida/Cancelada) nao tem maiuscula interna => inalterados.
+    static string Humanizar(string? s) =>
+        string.IsNullOrEmpty(s)
+            ? string.Empty
+            : System.Text.RegularExpressions.Regex.Replace(s, "(?<=[a-z0-9])(?=[A-Z])", " ");
+}
