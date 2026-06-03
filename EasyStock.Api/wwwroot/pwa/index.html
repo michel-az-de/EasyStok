@@ -7399,6 +7399,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <div class="cta-row" style="margin-top:14px;">
             <button class="cta-btn" id="calcEditarReceitaBtn" onclick="calcAbrirAjusteReceita()" style="display:none;">Editar receita</button>
             <button class="cta-btn primary" id="calcGerarCompraBtn" onclick="calcGerarCompra()" style="display:none;">Gerar lista de compras</button>
+            <button class="cta-btn" id="calcAddComprasBtn" onclick="calcAdicionarFaltantesCompras()" style="display:none;">📋 Jogar faltantes em Compras</button>
           </div>
         </div>
 
@@ -17047,6 +17048,7 @@ function calcRenderResultado(r) {
   const badge = document.getElementById('calcResultadoBadge');
   const editarBtn = document.getElementById('calcEditarReceitaBtn');
   const gerarBtn = document.getElementById('calcGerarCompraBtn');
+  const addBtn = document.getElementById('calcAddComprasBtn');
 
   if (r.tudoDisponivel) {
     badge.innerHTML = '<span>✓ TUDO DISPONIVEL</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Voce pode produzir agora.</div>';
@@ -17055,6 +17057,7 @@ function calcRenderResultado(r) {
     badge.style.border = '1px solid var(--basil)';
     editarBtn.style.display = 'inline-block';
     gerarBtn.style.display = 'none';
+    if (addBtn) addBtn.style.display = 'none';
   } else {
     const faltantes = r.insumos.filter(i => i.falta != null && i.falta > 0).length;
     badge.innerHTML = `<span>⚠ FALTAM ${faltantes} INSUMO${faltantes > 1 ? 'S' : ''}</span><div style="font-size:11px;font-weight:400;margin-top:4px;">Gere lista de compras pra repor.</div>`;
@@ -17063,6 +17066,7 @@ function calcRenderResultado(r) {
     badge.style.border = '1px solid #ef6b6b';
     editarBtn.style.display = 'inline-block';
     gerarBtn.style.display = 'inline-block';
+    if (addBtn) addBtn.style.display = 'inline-block';
   }
 
   if (r.custoEstimadoTotal != null) {
@@ -17193,6 +17197,45 @@ async function calcGerarCompra() {
   } catch (e) {
     showToast('Erro de conexao');
   }
+}
+
+// Fecha o ciclo no PWA: joga os insumos FALTANTES (ja calculados vs estoque pelo
+// /calcular) direto na tela Compras (cdb-shopping). Caminho simples e offline,
+// alternativo ao calcGerarCompra (que cria pedido de compra no ERP e exige
+// fornecedor preferido). Elimina o trabalho manual de "ver o que falta".
+function calcAdicionarFaltantesCompras() {
+  if (!calcUltimoResultado) return;
+  const faltantes = (calcUltimoResultado.insumos || [])
+    .filter(i => i.falta != null && Number(i.falta) > 0 && !i.conversaoFalhou);
+  if (faltantes.length === 0) { showToast('Sem insumos faltantes pra comprar.'); return; }
+  if (!Array.isArray(shoppingItems)) shoppingItems = [];
+  const now = Date.now();
+  let added = 0;
+  faltantes.forEach((i, k) => {
+    const faltaNum = Number(i.falta);
+    const qtdTxt = isFinite(faltaNum)
+      ? (faltaNum % 1 === 0 ? String(faltaNum) : faltaNum.toFixed(2)).replace('.', ',')
+      : '';
+    const un = (i.unidadeReceita || '').trim();
+    const nome = i.insumoNome + (qtdTxt ? ` (faltam ${qtdTxt}${un ? ' ' + un : ''})` : '');
+    // dedup leve: nao repete item identico ainda nao comprado.
+    if (shoppingItems.some(s => !s.done && s.name === nome)) return;
+    shoppingItems.unshift({
+      id: 'shop-' + now + '-' + k + '-' + Math.random().toString(36).slice(2, 6),
+      name: nome,
+      done: false,
+      createdAt: now,
+      doneAt: 0
+    });
+    added++;
+  });
+  if (added === 0) { showToast('Faltantes ja estao na lista de Compras.'); return; }
+  persistAll();
+  pendingSync++;
+  updateSync();
+  if (typeof renderShoppingList === 'function') renderShoppingList();
+  if (typeof renderHomeShopping === 'function') renderHomeShopping();
+  showToast(added + ' insumo(s) na lista de Compras.');
 }
 
 function calcAbrirAjusteReceita() {
