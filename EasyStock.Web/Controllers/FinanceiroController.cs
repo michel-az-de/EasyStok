@@ -1,4 +1,6 @@
+using System.Globalization;
 using EasyStock.Web.Helpers;
+using EasyStock.Web.Models.ViewModels.Financeiro;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -81,12 +83,18 @@ public class FinanceiroController(FinanceiroService svc, SessionService session)
     {
         ViewBag.Title = "Financeiro";
         ViewBag.ActiveMenuItem = "Financeiro";
+
         var result = await svc.ObterDashboardAsync();
         DashboardFinanceiroApi dashboard = result.Success && result.Data is not null
             ? result.Data
             : new DashboardFinanceiroApi();
         if (!result.Success && result.ErrorMessage is not null) Toast("error", result.ErrorMessage);
-        return View(dashboard);
+
+        // A view consome FinanceiroIndexViewModel (KPIs escalares + deltas/series derivados).
+        // Os deltas alimentam os <es-stat-card> (seta de tendencia + sparkline); calculados no
+        // Web a partir do fluxo de caixa diario e degradam pra null sem quebrar a pagina.
+        var deltas = await CalcularDeltasAsync();
+        return View(new FinanceiroIndexViewModel { Dashboard = dashboard, Deltas = deltas });
     }
 
     [HttpGet("/financeiro/fluxo-caixa")]
@@ -108,6 +116,68 @@ public class FinanceiroController(FinanceiroService svc, SessionService session)
         var buckets = result.Success && result.Data is not null ? result.Data : new List<FluxoBucketApi>();
         if (!result.Success && result.ErrorMessage is not null) Toast("error", result.ErrorMessage);
         return View(buckets);
+    }
+
+    // ── Deltas + sparklines do dashboard (divisor de aguas) ───────────────────
+    // Calculados 100% no Web a partir do fluxo de caixa diario (ObterFluxoCaixaAsync),
+    // sem migrar o DTO de dominio. Janela movel 30d (decisao 8 do plano de DS):
+    //   Receber/Pagar 30d (o KPI olha pra frente): proximos 30d vs 30d anteriores.
+    //   Saldo do mes (realizado): ultimos 30d vs 30d anteriores.
+    // Sem base de comparacao (periodo anterior == 0) o delta vira null e a view nao
+    // desenha seta/sparkline — pagina continua funcionando.
+    private async Task<DashboardDeltasApi> CalcularDeltasAsync()
+    {
+        var deltas = new DashboardDeltasApi();
+        var hoje = BrazilTime.Today();
+        var inicio = hoje.AddDays(-59).ToDateTime(TimeOnly.MinValue);
+        var fim = hoje.AddDays(29).ToDateTime(TimeOnly.MinValue);
+
+        var fluxo = await svc.ObterFluxoCaixaAsync("Diario", inicio, fim);
+        if (!fluxo.Success || fluxo.Data is null || fluxo.Data.Count == 0) return deltas;
+        var buckets = fluxo.Data.OrderBy(b => b.InicioBucket).ToList();
+
+        (deltas.ReceberDelta, deltas.ReceberTrend, deltas.ReceberSerie) =
+            CalcularMetrica(buckets, hoje, b => b.PrevistoReceber, olhaPraFrente: true);
+        (deltas.PagarDelta, deltas.PagarTrend, deltas.PagarSerie) =
+            CalcularMetrica(buckets, hoje, b => b.PrevistoPagar, olhaPraFrente: true);
+        (deltas.SaldoDelta, deltas.SaldoTrend, deltas.SaldoSerie) =
+            CalcularMetrica(buckets, hoje, b => b.RealizadoReceber - b.RealizadoPagar, olhaPraFrente: false);
+
+        return deltas;
+    }
+
+    private static (string? delta, string trend, string? serie) CalcularMetrica(
+        List<FluxoBucketApi> buckets, DateOnly hoje, Func<FluxoBucketApi, decimal> metrica, bool olhaPraFrente)
+    {
+        DateOnly atualIni = olhaPraFrente ? hoje : hoje.AddDays(-29);
+        DateOnly atualFim = olhaPraFrente ? hoje.AddDays(29) : hoje;
+        DateOnly antIni = olhaPraFrente ? hoje.AddDays(-30) : hoje.AddDays(-59);
+        DateOnly antFim = olhaPraFrente ? hoje.AddDays(-1) : hoje.AddDays(-30);
+
+        static bool Entre(FluxoBucketApi b, DateOnly a, DateOnly z)
+        {
+            var d = DateOnly.FromDateTime(b.InicioBucket);
+            return d >= a && d <= z;
+        }
+
+        var atual = buckets.Where(b => Entre(b, atualIni, atualFim)).ToList();
+        var somaAtual = atual.Sum(metrica);
+        var somaAnterior = buckets.Where(b => Entre(b, antIni, antFim)).Sum(metrica);
+
+        // Sparkline: serie diaria (CSV InvariantCulture) da janela atual.
+        string? serie = atual.Count > 0
+            ? string.Join(",", atual.Select(b => metrica(b).ToString(CultureInfo.InvariantCulture)))
+            : null;
+
+        if (somaAnterior == 0m) return (null, "flat", serie);
+
+        var pct = (somaAtual - somaAnterior) / Math.Abs(somaAnterior) * 100m;
+        var pctAbsStr = Math.Abs(pct).ToString("0.#", CultureInfo.GetCultureInfo("pt-BR"));
+        if (pctAbsStr == "0") return ("0%", "flat", serie);
+
+        var trend = pct > 0 ? "up" : "down";
+        var delta = $"{(pct > 0 ? "+" : "-")}{pctAbsStr}%";
+        return (delta, trend, serie);
     }
 }
 
