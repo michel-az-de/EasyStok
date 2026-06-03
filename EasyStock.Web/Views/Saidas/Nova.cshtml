@@ -110,10 +110,14 @@
                         <input asp-for="Qty" type="number" min="1"
                                x-model.number="qty"
                                @@input="calcularTotal()"
+                               :class="produtoId && qty > estoqueAtual ? 'border-red-400 ring-1 ring-red-200' : ''"
                                class="ui-field w-full text-sm" />
                         <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
                         <p class="text-xs text-slate-500 mt-1" x-show="estoqueAtual > 0">
                             Estoque disponível: <span x-text="estoqueAtual" class="font-semibold"></span>
+                        </p>
+                        <p class="text-xs text-red-600 mt-1" x-show="produtoId && qty > estoqueAtual" x-cloak>
+                            Quantidade maior que o estoque disponível (<span x-text="estoqueAtual"></span>).
                         </p>
                     </div>
                 </div>
@@ -192,8 +196,8 @@
                         Descartar
                     </a>
                     <button type="submit"
-                            :disabled="loading || (produtoId && estoqueAtual === 0)"
-                            :class="{ 'opacity-50 cursor-not-allowed': loading || (produtoId && estoqueAtual === 0) }"
+                            :disabled="loading || !produtoId || qty > estoqueAtual"
+                            :class="{ 'opacity-50 cursor-not-allowed': loading || !produtoId || qty > estoqueAtual }"
                             class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                         <span x-show="!loading">Registrar Saída</span>
                         <span x-show="loading" x-cloak>Registrando...</span>
@@ -287,7 +291,7 @@
                         <span class="text-slate-400">Margem estimada</span>
                         <span class="font-semibold"
                               :class="margemEstimada < 10 ? 'text-red-500' : margemEstimada < 30 ? 'text-amber-500' : 'text-emerald-600'"
-                              x-text="margemEstimada.toFixed(1) + '%'"></span>
+                              x-text="(margemEstimada || 0).toFixed(1) + '%'"></span>
                     </div>
                 </div>
 
@@ -335,9 +339,14 @@ function saidaForm() {
         estoqueAtual: 0,
         qty: 1,
         valorUnit: 0,
-        total: 0,
         loading: false,
         _debounce: null,
+
+        // BUG-18: total e getter reativo (qty * valorUnit). Antes, calcularTotal() no handler de
+        // input rodava com o qty anterior (ordem de evento x-model vs handler) e o total travava em 1x o valor.
+        get total() {
+            return (this.qty || 0) * (this.valorUnit || 0);
+        },
 
         get variacaoNome() {
             if (!this.varId || this.variacoes.length === 0) return '';
@@ -526,7 +535,7 @@ function saidaForm() {
         },
 
         calcularTotal() {
-            this.total = (this.qty || 0) * (this.valorUnit || 0);
+            // no-op: total agora e getter reativo (BUG-18). Mantido por compat com selecionarProduto.
         }
     };
 }
