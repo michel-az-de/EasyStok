@@ -3,6 +3,8 @@ using System.Text;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Api.UnitTests.Pagamentos;
@@ -11,11 +13,17 @@ public class EfiPixSignatureValidatorTests
 {
     private const string Secret = "topsecret-test-key-32-chars-min!!";
 
-    private static EfiPixSignatureValidator BuildValidator(Dictionary<string, string?>? cfg = null)
+    private static EfiPixSignatureValidator BuildValidator(
+        Dictionary<string, string?>? cfg = null,
+        string environmentName = "Development",
+        ILogger<EfiPixSignatureValidator>? logger = null)
     {
         cfg ??= new Dictionary<string, string?> { ["Efi:WebhookSecret"] = Secret };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(cfg).Build();
-        return new EfiPixSignatureValidator(configuration, NullLogger<EfiPixSignatureValidator>.Instance);
+        return new EfiPixSignatureValidator(
+            configuration,
+            logger ?? NullLogger<EfiPixSignatureValidator>.Instance,
+            new FakeHostEnvironment(environmentName));
     }
 
     private static string ComputeHmac(string secret, string body)
@@ -98,5 +106,38 @@ public class EfiPixSignatureValidatorTests
             ["Efi:WebhookAllowUnsigned"] = "true"
         });
         v.Validar("{}", new Dictionary<string, string?>()).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validar_SemSecret_AllowUnsigned_EmProduction_RecusaELogaErro()
+    {
+        // Mesma config do teste acima (AllowUnsigned=true, sem secret), mas em
+        // Production o escape hatch e ignorado: recusa e loga Error (fail-secure).
+        var logger = new CapturingLogger<EfiPixSignatureValidator>();
+        var v = BuildValidator(
+            new Dictionary<string, string?> { ["Efi:WebhookAllowUnsigned"] = "true" },
+            environmentName: "Production",
+            logger: logger);
+
+        v.Validar("{}", new Dictionary<string, string?>()).Should().BeFalse();
+        logger.Entries.Should().Contain(e => e.Level == LogLevel.Error);
+    }
+
+    private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = environmentName;
+        public string ApplicationName { get; set; } = "EasyStock.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 }

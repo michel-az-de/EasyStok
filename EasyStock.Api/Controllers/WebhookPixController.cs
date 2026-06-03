@@ -15,7 +15,8 @@ public class WebhookPixController(
     IConfiguration configuration,
     RegistrarPagamentoFaturaUseCase registrarPagamentoFaturaUseCase,
     ReconciliarPixParcelaReceberUseCase reconciliarPixParcelaReceberUseCase,
-    ILogger<WebhookPixController> logger) : ControllerBase
+    ILogger<WebhookPixController> logger,
+    IWebHostEnvironment env) : ControllerBase
 {
     [HttpPost("pix")]
     [AllowAnonymous]
@@ -80,6 +81,17 @@ public class WebhookPixController(
             // Bool tipado: "true" string ou bool true caem em true; qualquer outra
             // coisa = false. Evita interpretacao frouxa de string.
             var allowUnsigned = configuration.GetValue<bool>("Efi:WebhookAllowUnsigned", false);
+
+            // Fail-secure: o escape hatch e so DEV/sandbox. Em Production, NUNCA
+            // aceitar webhook nao-assinado mesmo com a flag ligada por engano.
+            if (allowUnsigned && env.IsProduction())
+            {
+                logger.LogError(
+                    "Webhook Pix: WebhookAllowUnsigned=true IGNORADO em Production — " +
+                    "webhook nao-assinado recusado. Configure Efi:WebhookSecret.");
+                return false;
+            }
+
             if (allowUnsigned)
             {
                 logger.LogWarning(

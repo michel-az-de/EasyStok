@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
@@ -30,7 +31,8 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 /// </summary>
 public sealed class EfiPixSignatureValidator(
     IConfiguration configuration,
-    ILogger<EfiPixSignatureValidator> logger) : IWebhookSignatureValidator
+    ILogger<EfiPixSignatureValidator> logger,
+    IHostEnvironment hostEnvironment) : IWebhookSignatureValidator
 {
     public string Provedor => "EfiPix";
 
@@ -39,10 +41,23 @@ public sealed class EfiPixSignatureValidator(
         var secret = configuration["Efi:WebhookSecret"];
         if (string.IsNullOrWhiteSpace(secret))
         {
-            return string.Equals(
+            var allowUnsigned = string.Equals(
                 configuration["Efi:WebhookAllowUnsigned"],
                 "true",
                 StringComparison.OrdinalIgnoreCase);
+
+            // Fail-secure: o escape hatch e so DEV/sandbox. Em Production, NUNCA
+            // aceitar webhook nao-assinado, mesmo com a flag ligada por engano —
+            // senao pagamento/renovacao forjados passam. Configure Efi:WebhookSecret.
+            if (allowUnsigned && hostEnvironment.IsProduction())
+            {
+                logger.LogError(
+                    "Webhook Pix: Efi:WebhookAllowUnsigned=true IGNORADO em Production — " +
+                    "webhook nao-assinado recusado. Configure Efi:WebhookSecret.");
+                return false;
+            }
+
+            return allowUnsigned;
         }
 
         if (!headers.TryGetValue("X-Efi-Signature", out var headerSig)
