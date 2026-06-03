@@ -19,35 +19,33 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         var inicioMes = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var fimMes = inicioMes.AddMonths(1).AddSeconds(-1);
 
-        // Parcelas a vencer 30d (pagar)
-        var aVencerPagar = await db.ParcelasPagar.AsNoTracking()
+        // Parcelas "vivas" = nao paga, nao cancelada, E de conta COMMITADA (nao Rascunho).
+        // Rascunho tem parcelas mas nao e obrigacao real -> fora das projecoes (BUG-021).
+        var parcelasPagarVivas = db.ParcelasPagar.AsNoTracking()
             .Where(p => p.EmpresaId == empresaId &&
                         p.Status != StatusParcela.Paga &&
                         p.Status != StatusParcela.Cancelada &&
-                        p.DataVencimento >= hoje &&
-                        p.DataVencimento <= mais30)
+                        p.ContaPagar!.Status != StatusContaFinanceira.Rascunho);
+        var parcelasReceberVivas = db.ParcelasReceber.AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId &&
+                        p.Status != StatusParcela.Paga &&
+                        p.Status != StatusParcela.Cancelada &&
+                        p.ContaReceber!.Status != StatusContaFinanceira.Rascunho);
+
+        // A vencer nos proximos 30d
+        var aVencerPagar = await parcelasPagarVivas
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
+        var aVencerReceber = await parcelasReceberVivas
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
             .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
 
-        var aVencerReceber = await db.ParcelasReceber.AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId &&
-                        p.Status != StatusParcela.Paga &&
-                        p.Status != StatusParcela.Cancelada &&
-                        p.DataVencimento >= hoje &&
-                        p.DataVencimento <= mais30)
+        // Vencido = derivado por data (independe do status armazenado da parcela/conta)
+        var vencidoPagar = await parcelasPagarVivas
+            .Where(p => p.DataVencimento < hoje)
             .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
-
-        var vencidoPagar = await db.ParcelasPagar.AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId &&
-                        p.Status != StatusParcela.Paga &&
-                        p.Status != StatusParcela.Cancelada &&
-                        p.DataVencimento < hoje)
-            .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
-
-        var vencidoReceber = await db.ParcelasReceber.AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId &&
-                        p.Status != StatusParcela.Paga &&
-                        p.Status != StatusParcela.Cancelada &&
-                        p.DataVencimento < hoje)
+        var vencidoReceber = await parcelasReceberVivas
+            .Where(p => p.DataVencimento < hoje)
             .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
 
         var pagoMes = await db.PagamentosParcela.AsNoTracking()
@@ -78,16 +76,9 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
                               c.Status == StatusContaFinanceira.ParcialmentePaga ||
                               c.Status == StatusContaFinanceira.Vencida), ct);
 
-        var qtdParcelasVencidasHoje = await db.ParcelasPagar.AsNoTracking()
-            .CountAsync(p => p.EmpresaId == empresaId &&
-                             p.Status != StatusParcela.Paga &&
-                             p.Status != StatusParcela.Cancelada &&
-                             p.DataVencimento < hoje, ct)
-            + await db.ParcelasReceber.AsNoTracking()
-            .CountAsync(p => p.EmpresaId == empresaId &&
-                             p.Status != StatusParcela.Paga &&
-                             p.Status != StatusParcela.Cancelada &&
-                             p.DataVencimento < hoje, ct);
+        var qtdParcelasVencidasHoje =
+            await parcelasPagarVivas.CountAsync(p => p.DataVencimento < hoje, ct)
+            + await parcelasReceberVivas.CountAsync(p => p.DataVencimento < hoje, ct);
 
         return new DashboardFinanceiroDto(
             aVencerPagar, aVencerReceber,
@@ -112,12 +103,15 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         var buckets = GerarBuckets(inicio, fim, periodicidade);
         if (buckets.Count > 24) buckets = buckets.Take(24).ToList();
 
+        // Exclui Rascunho: previsao de fluxo so conta obrigacoes commitadas (BUG-021).
         var pagar = db.ParcelasPagar.AsNoTracking()
             .Where(p => p.EmpresaId == empresaId &&
-                        p.Status != StatusParcela.Cancelada);
+                        p.Status != StatusParcela.Cancelada &&
+                        p.ContaPagar!.Status != StatusContaFinanceira.Rascunho);
         var receber = db.ParcelasReceber.AsNoTracking()
             .Where(p => p.EmpresaId == empresaId &&
-                        p.Status != StatusParcela.Cancelada);
+                        p.Status != StatusParcela.Cancelada &&
+                        p.ContaReceber!.Status != StatusContaFinanceira.Rascunho);
         if (categoriaId.HasValue)
         {
             pagar = pagar.Where(p => p.ContaPagar!.CategoriaFinanceiraId == categoriaId.Value);

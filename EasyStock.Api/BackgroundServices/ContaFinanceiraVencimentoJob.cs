@@ -117,6 +117,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .IgnoreQueryFilters()
             .Include(p => p.ContaPagar)
             .Where(p =>
+                p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
                 (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
                 p.NotificadaD3Em == null)
@@ -134,6 +135,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .IgnoreQueryFilters()
             .Include(p => p.ContaReceber)
             .Where(p =>
+                p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
                 (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date >= d3Inicio && p.DataVencimento.Date < d3Fim &&
                 p.NotificadaD3Em == null)
@@ -151,6 +153,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .IgnoreQueryFilters()
             .Include(p => p.ContaPagar)
             .Where(p =>
+                p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
                 (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
                 p.NotificadaD1Em == null)
@@ -166,6 +169,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .IgnoreQueryFilters()
             .Include(p => p.ContaReceber)
             .Where(p =>
+                p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
                 (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date >= d1Inicio && p.DataVencimento.Date < d1Fim &&
                 p.NotificadaD1Em == null)
@@ -183,6 +187,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .IgnoreQueryFilters()
             .Include(p => p.ContaPagar)
             .Where(p =>
+                p.ContaPagar!.Status != StatusContaFinanceira.Rascunho &&
                 (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date < hoje)
             .Take(2000)
@@ -202,6 +207,7 @@ public sealed class ContaFinanceiraVencimentoJob(
             .IgnoreQueryFilters()
             .Include(p => p.ContaReceber)
             .Where(p =>
+                p.ContaReceber!.Status != StatusContaFinanceira.Rascunho &&
                 (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
                 p.DataVencimento.Date < hoje)
             .Take(2000)
