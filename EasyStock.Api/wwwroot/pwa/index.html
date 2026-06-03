@@ -10159,7 +10159,15 @@ window.addEventListener('cdb-sync-success', function (ev) {
 // UTILS
 // =========================
 function money(v) {
-  return 'R$ ' + (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
+  // #405: separador de milhar (faltava: money(1000) dava "R$ 1000,00" em vez de
+  // "R$ 1.000,00"). Manual de proposito: Intl pt-BR poe NBSP entre R$ e o numero
+  // e quebra impressao termica (ESC/POS, DANFE 80mm). Nao-finito fica gritante.
+  var n = Math.round(v * 100) / 100;
+  if (!isFinite(n)) return 'R$ ' + n;
+  var abs = Math.abs(n).toFixed(2);
+  var dot = abs.indexOf('.');
+  var intSep = abs.slice(0, dot).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'R$ ' + (n < 0 ? '-' : '') + intSep + ',' + abs.slice(dot + 1);
 }
 function haptic() { if (navigator.vibrate) navigator.vibrate(8); }
 function escapeHtml(str) {
