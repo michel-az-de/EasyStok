@@ -60,14 +60,14 @@
     <div class="sidebar-nav-wrap flex-1 min-h-0 relative">
     <nav class="sidebar-nav flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5">
 
-        <div class="nav-sep"><span>Gestão</span></div>
+        <div class="nav-sep"><span>Principal</span></div>
 
         <a href="/dashboard" class="ni @(activeItem == "Dashboard" ? "active" : "")">
             <es-icon name="layout-dashboard" class="w-4 h-4 flex-shrink-0"></es-icon>
             Dashboard
         </a>
 
-        <div class="nav-section">Cadastros</div>
+        <div class="nav-section">Cadastros e estoque</div>
 
         <a href="/produtos" class="ni @(activeItem == "Produtos" ? "active" : "")">
             <es-icon name="package" class="w-4 h-4 flex-shrink-0"></es-icon>
@@ -85,6 +85,9 @@
             <es-icon name="users" class="w-4 h-4 flex-shrink-0"></es-icon>
             Clientes
         </a>
+
+        <div class="nav-section">Vendas e caixa</div>
+
         <a href="/pedidos" class="ni @(activeItem is "Pedidos" or "PedidosMobile" ? "active" : "")">
             <es-icon name="shopping-cart" class="w-4 h-4 flex-shrink-0"></es-icon>
             Pedidos
@@ -93,6 +96,9 @@
             <es-icon name="wallet" class="w-4 h-4 flex-shrink-0"></es-icon>
             Caixa
         </a>
+
+        <div class="nav-section">Financeiro</div>
+
         <a href="/financeiro" class="ni @(activeItem == "Financeiro" ? "active" : "")">
             <es-icon name="bar-chart-3" class="w-4 h-4 flex-shrink-0"></es-icon>
             Financeiro
@@ -105,6 +111,9 @@
             <es-icon name="credit-card" class="w-4 h-4 flex-shrink-0"></es-icon>
             Contas a Pagar
         </a>
+
+        <div class="nav-section">Produção e compras</div>
+
         <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
             <es-icon name="layers" class="w-4 h-4 flex-shrink-0"></es-icon>
             Lotes
@@ -118,7 +127,7 @@
             Categorias
         </a>
 
-        <div class="nav-section">Operação</div>
+        <div class="nav-section">Movimentações e fiscal</div>
 
         <a href="/entradas/historico" class="ni @(activeItem is "Entradas" or "EntradasNova" or "EntradasHistorico" or "EntradasReposicao" ? "active" : "")">
             <es-icon name="arrow-down-to-line" class="w-4 h-4 flex-shrink-0"></es-icon>
@@ -142,18 +151,7 @@
             Configuração Fiscal
         </a>
 
-        <div class="nav-sep"></div>
-
-        <a href="/analytics" class="ni @(activeItem is "Analytics" or "Movimentacoes" or "Inteligencia" or "InteligenciaLojas" ? "active" : "")">
-            <es-icon name="bar-chart-3" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Análises &amp; IA
-        </a>
-        <a href="/anuncios" class="ni @(activeItem == "Anuncios" ? "active" : "")">
-            <es-icon name="sparkles" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Anúncios com IA
-        </a>
-
-        <div class="nav-section">Atendimento</div>
+        <div class="nav-section">App e atendimento</div>
 
         <a href="/kds" class="ni @(activeItem == "Kds" ? "active" : "")"
            title="Gerenciar configurações e filas do KDS">
@@ -188,7 +186,7 @@
             Anúncios
         </a>
 
-        <div class="nav-section">Configuração</div>
+        <div class="nav-section">Sistema</div>
 
         <a href="@kdsUrl" target="_blank" rel="noopener" class="ni"
            title="Abre o KDS num tablet/TV em nova aba. Precisa de device pareado nesse navegador.">
