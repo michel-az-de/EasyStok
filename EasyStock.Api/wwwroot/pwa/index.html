@@ -16046,14 +16046,19 @@ function setRetroActive(active) {
       dt.min = new Date(minDate - tzOff).toISOString().slice(0,16);
       dt.max = new Date(maxDate - tzOff).toISOString().slice(0,16);
       if (!dt.value) {
-        // default 1h atrás pra forçar o operador a confirmar data/hora
-        const now = new Date(Date.now() - 60*60*1000);
-        dt.value = new Date(now - tzOff).toISOString().slice(0,16);
+        // #435: preenche com o horario atual (nao mais 1h atras).
+        // O operador ve a hora certa e ajusta se necessario.
+        dt.value = new Date(Date.now() - tzOff).toISOString().slice(0,16);
       }
     }
   } else {
     const dt = document.getElementById('retroDatetime');
-    if (dt) dt.value = '';
+    if (dt) {
+      dt.value = '';
+      dt.min = '';
+      dt.max = '';
+    }
+    if (typeof updateSaveOrderBtn === 'function') updateSaveOrderBtn();
   }
 }
 function toggleRetroactive() {
@@ -16093,7 +16098,16 @@ function setAgendaActive(active) {
     }
   } else {
     const dt = document.getElementById('scheduleDatetime');
-    if (dt) dt.value = '';
+    if (dt) {
+      dt.value = '';
+      // #435: limpa min/max para nao deixar browser em estado invalido
+      // (min violado bloqueia silenciosamente em alguns mobiles mesmo com value='').
+      dt.min = '';
+      dt.max = '';
+    }
+    // #435: reavalia o botao salvar (pode ter ficado desabilitado por validacao
+    // de data invalida enquanto o toggle estava ativo).
+    if (typeof updateSaveOrderBtn === 'function') updateSaveOrderBtn();
   }
 }
 function toggleAgendamento() {
@@ -20910,9 +20924,10 @@ function renderOrderDraftSummary() {
 }
 
 function saveOrder() {
-  if (!selectedClient) return;
+  // #435: returns silenciosos viraram toasts para o operador saber o que falta.
+  if (!selectedClient) { showToast('Escolha o cliente antes de salvar'); return; }
   const notes = document.getElementById('orderNotes').value.trim();
-  if (currentOrderItems.length === 0 && !notes) return;
+  if (currentOrderItems.length === 0 && !notes) { showToast('Adicione pelo menos 1 item ao pedido'); return; }
 
   const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
