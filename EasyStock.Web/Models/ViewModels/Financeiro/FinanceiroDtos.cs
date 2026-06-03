@@ -173,3 +173,44 @@ public class ContaReceberDetalheViewModel
 {
     public ContaReceberApi Conta { get; set; } = new();
 }
+
+/// <summary>
+/// Deltas e series temporais derivados do fluxo de caixa, para alimentar os
+/// &lt;es-stat-card&gt; do dashboard financeiro (delta %, delta-trend, sparkline).
+/// Calculado 100% no Web a partir de <c>ObterFluxoCaixaAsync</c> — sem migrar o
+/// DTO de dominio (DashboardFinanceiroDto permanece escalar).
+///
+/// Convencao dos campos *Delta: string ja formatada pt-BR pronta pro atributo
+/// <c>delta=</c> ("+12,5%", "-3,2%", "0%") ou <c>null</c> quando nao ha base de
+/// comparacao (periodo anterior == 0). *Trend e "up"|"down"|"flat" pro atributo
+/// <c>delta-trend=</c>. *Serie e CSV InvariantCulture pronto pro atributo
+/// <c>sparkline=</c> (o EsStatCardTagHelper aceita CSV).
+/// </summary>
+public class DashboardDeltasApi
+{
+    // A Receber 30d (base: PrevistoReceber).
+    public string? ReceberDelta { get; set; }
+    public string ReceberTrend { get; set; } = "flat";
+    public string? ReceberSerie { get; set; }
+
+    // A Pagar 30d (base: PrevistoPagar).
+    public string? PagarDelta { get; set; }
+    public string PagarTrend { get; set; } = "flat";
+    public string? PagarSerie { get; set; }
+
+    // Saldo do mes (base: RealizadoReceber - RealizadoPagar).
+    public string? SaldoDelta { get; set; }
+    public string SaldoTrend { get; set; } = "flat";
+    public string? SaldoSerie { get; set; }
+}
+
+/// <summary>
+/// View model do dashboard Financeiro (/financeiro). Empacota os KPIs escalares
+/// (<see cref="DashboardFinanceiroApi"/>) e os deltas/series derivados
+/// (<see cref="DashboardDeltasApi"/>) sem acoplar um ao outro.
+/// </summary>
+public class FinanceiroIndexViewModel
+{
+    public EasyStock.Web.Services.DashboardFinanceiroApi Dashboard { get; set; } = new();
+    public DashboardDeltasApi Deltas { get; set; } = new();
+}
