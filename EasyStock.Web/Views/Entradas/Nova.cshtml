@@ -48,12 +48,21 @@
         <div x-show="step === 1">
             <div class="ws">
                 <h3 class="font-bold text-slate-800 mb-4">Selecione o produto</h3>
-                <div class="relative mb-4 z-10">
-                    <input type="text" x-model="buscaTerm"
-                           @@input.debounce.300ms="buscarProduto()"
-                           placeholder="Buscar por nome, marca ou SKU..."
-                           class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                    <div x-show="buscando" class="absolute right-3 top-3 text-slate-400 text-sm">Buscando...</div>
+                <div class="flex gap-2 mb-4">
+                    <div class="relative flex-1 z-10">
+                        <input type="text" x-model="buscaTerm"
+                               @@input.debounce.300ms="buscarProduto()"
+                               placeholder="Buscar por nome, marca, SKU ou bipar o código..."
+                               class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        <div x-show="buscando" class="absolute right-3 top-3 text-slate-400 text-sm">Buscando...</div>
+                    </div>
+                    <button type="button" @@click="abrirScanner()"
+                            class="shrink-0 px-4 py-3 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                            title="Ler código de barras com a câmera ou leitor USB" aria-label="Ler código de barras">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h2v14H4zM9 5h1v14H9zM13 5h2v14h-2zM17 5h1v14h-1zM20 5h0v14h0z" />
+                        </svg>
+                    </button>
                 </div>
 
                 <div class="dropdown-list space-y-2" x-show="resultados.length > 0">
@@ -432,6 +441,21 @@
                         window.showToast('Não foi possível conectar ao servidor.', 'error');
                     }
                     if (detailOk) this.step = 2;
+                },
+
+                // Le codigo de barras (camera/USB) reusando o scanner global e
+                // resolve via /produtos/buscar (casa codigoBarras). 1 resultado =
+                // auto-seleciona; varios = mostra a lista; nenhum = avisa.
+                abrirScanner() {
+                    window.dispatchEvent(new CustomEvent('barcode:open', { detail: { onScan: async (code) => {
+                        this.buscaTerm = String(code || '').trim();
+                        await this.buscarProduto();
+                        if (this.resultados.length === 1) {
+                            this.selecionarProduto(this.resultados[0]);
+                        } else if (this.resultados.length === 0) {
+                            window.showToast('Codigo ' + code + ' nao encontrado. Busque pelo nome ou cadastre o produto.', 'warning');
+                        }
+                    } } }));
                 },
 
                 calcularTotal() {
