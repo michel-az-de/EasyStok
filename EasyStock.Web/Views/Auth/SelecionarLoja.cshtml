@@ -9,7 +9,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Selecionar Loja - EasyStok</title>
+    <title>Selecionar Loja — EasyStok</title>
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
@@ -54,7 +54,7 @@
                             <span class="text-3xl">@(loja.Emoji ?? "🏪")</span>
                             <div>
                                 <div class="font-bold auth-card-title group-hover:text-indigo-500 transition-colors">@loja.Nome</div>
-                                <div class="auth-card-subtitle text-sm">@loja.Cidade · @loja.Plano</div>
+                                <div class="auth-card-subtitle text-sm">@string.Join(" · ", new[] { loja.Cidade, loja.Plano }.Where(s => !string.IsNullOrWhiteSpace(s)))</div>
                             </div>
                             <svg class="ml-auto w-5 h-5 auth-icon-muted group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
