@@ -116,6 +116,19 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             && !movsResult.Success
             && !receitaResult.Success;
 
+        // ── Checklist de ativacao "Comece por aqui" (issue #415) ──────────
+        // Passos derivados de dados que o dashboard ja buscou (sem round-trip
+        // extra). Some quando todos concluidos OU quando o usuario dispensa.
+        var checklistDispensado = Request.Cookies["es_onboarding_dismissed"] == "1";
+        vm.OnboardingPassos =
+        [
+            new("Criar primeira categoria", vm.CategoriasCount > 0, "/categorias", "Criar categoria"),
+            new("Cadastrar primeiro produto", vm.TotalProdutos > 0, "/produtos", "Cadastrar produto"),
+            new("Registrar primeira entrada", vm.EntradasCount > 0, "/entradas/nova", "Registrar entrada"),
+            new("Abrir o caixa", vm.CaixaAbertaHoje || vm.CaixaFechadaHoje, "/caixa", "Abrir o caixa"),
+        ];
+        vm.MostrarChecklist = vm.OnboardingPassos.Exists(p => !p.Concluido) && !checklistDispensado;
+
         return View(vm);
     }
 
@@ -180,5 +193,22 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             return StatusCode(502, new { message = result.ErrorMessage ?? "Pedido não encontrado." });
 
         return Json(result.Data);
+    }
+
+    // Dispensa o checklist de ativacao (issue #415). Cookie de 1 ano; auto-cura:
+    // o card some sozinho ao concluir os 4 passos, entao perder o cookie em outro
+    // device e inocuo.
+    [HttpPost("/dashboard/onboarding/dispensar")]
+    [ValidateAntiForgeryToken]
+    public IActionResult DispensarOnboarding()
+    {
+        Response.Cookies.Append("es_onboarding_dismissed", "1", new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            IsEssential = true,
+            Expires = DateTimeOffset.UtcNow.AddYears(1)
+        });
+        return RedirectToAction(nameof(Index));
     }
 }

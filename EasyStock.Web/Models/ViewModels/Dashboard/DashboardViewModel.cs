@@ -28,6 +28,13 @@ public class DashboardViewModel
     public int CategoriasCount { get; set; }
     public int EntradasCount { get; set; }
 
+    // Checklist de ativacao "Comece por aqui" (issue #415). Conta so dado real;
+    // a exclusao dos Ids de demonstracao entra junto com a loja-demo.
+    public List<PassoOnboarding> OnboardingPassos { get; set; } = [];
+    public bool MostrarChecklist { get; set; }
+    public int OnboardingConcluidos => OnboardingPassos.FindAll(p => p.Concluido).Count;
+    public int OnboardingTotal => OnboardingPassos.Count;
+
     public List<MovimentacaoRecente> MovimentacoesRecentes { get; set; } = [];
     public List<string> GraficoLabels { get; set; } = [];
     public List<decimal> GraficoDados { get; set; } = [];
@@ -64,3 +71,6 @@ public class MovimentacaoRecente
     public decimal? Valor { get; set; }
     public DateOnly Data { get; set; }
 }
+
+// Um passo do checklist de ativacao do dashboard (issue #415).
+public record PassoOnboarding(string Titulo, bool Concluido, string Href, string Acao);
