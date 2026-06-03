@@ -7477,6 +7477,17 @@ body.ux-calm [data-screen="producao"] .section-label {
           <textarea id="orderNotes" rows="2" placeholder="ex: pra gratinar, retira 19h, sem cebola"></textarea>
         </div>
 
+        <div class="section-label">Canal (opcional)</div>
+        <div class="input-box">
+          <select id="orderChannel" style="width:100%;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;padding:10px 12px;color:var(--ink);">
+            <option value="">Sem canal</option>
+            <option value="balcao">Balcão</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="ifood">iFood</option>
+            <option value="telefone">Telefone</option>
+          </select>
+        </div>
+
         <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
           🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
         </button>
@@ -10179,6 +10190,9 @@ function money(v) {
   return 'R$ ' + (n < 0 ? '-' : '') + intSep + ',' + abs.slice(dot + 1);
 }
 function haptic() { if (navigator.vibrate) navigator.vibrate(8); }
+// #409: rotulos do canal/origem do pedido.
+const CHANNEL_LABELS = { balcao: 'Balcão', whatsapp: 'WhatsApp', ifood: 'iFood', telefone: 'Telefone' };
+function channelLabel(c) { return CHANNEL_LABELS[c] || c || ''; }
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
@@ -13546,7 +13560,7 @@ function renderKanbanCard(o, col) {
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
-        <span class="k-status">${col.label}</span>${conferBadge}
+        <span class="k-status">${col.label}</span>${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
         <div class="k-time">${timeOf(o.createdAt)}</div>
       </div>
       <div class="k-head">
@@ -20515,6 +20529,9 @@ function saveOrder() {
     clientSnapshot: snapshot,
     items: currentOrderItems.map(i => ({...i})),
     notes,
+    // #409: canal/origem do pedido (balcao/whatsapp/ifood/telefone). Persiste no
+    // backend so quando a coluna mobile_orders.channel existir (fatia backend).
+    channel: document.getElementById('orderChannel')?.value || null,
     total,
     status: retroAtMs ? STATUS.ENTREGUE : STATUS.AGUARDANDO,
     createdAt: nowMs,
@@ -20554,6 +20571,7 @@ function saveOrder() {
 
   currentOrderItems = [];
   document.getElementById('orderNotes').value = '';
+  { const _ch = document.getElementById('orderChannel'); if (_ch) _ch.value = ''; }
   clearClient();
   renderOrderItems();
   updateSaveOrderBtn();
