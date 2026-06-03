@@ -8532,6 +8532,29 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
+  <!-- Modal de descarte de lote -->
+  <div class="modal-overlay" id="batchDiscardModal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Descartar lote</div>
+      <div class="modal-sub" id="batchDiscardSub">Informe o motivo do descarte</div>
+      <label class="modal-label">Motivo</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="batchDiscardChips">
+        <button type="button" class="cash-type-pill active" data-reason="vencido" onclick="selectDiscardReason(this)">Vencido</button>
+        <button type="button" class="cash-type-pill" data-reason="contaminado" onclick="selectDiscardReason(this)">Contaminado</button>
+        <button type="button" class="cash-type-pill" data-reason="acidente" onclick="selectDiscardReason(this)">Acidente</button>
+        <button type="button" class="cash-type-pill" data-reason="sobra" onclick="selectDiscardReason(this)">Sobra</button>
+        <button type="button" class="cash-type-pill" data-reason="outro" onclick="selectDiscardReason(this)">Outro</button>
+      </div>
+      <label class="modal-label">Observação (opcional)</label>
+      <div class="input-box"><input id="batchDiscardNote" placeholder="ex: contaminado com água" autocomplete="off"></div>
+      <div class="modal-ctas">
+        <button class="cta-btn" onclick="closeBatchDiscardModal()">Cancelar</button>
+        <button class="cta-btn primary" style="background:var(--accent)" onclick="confirmBatchDiscard()">Descartar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Diagnostico operacional — substitui o alert() antigo do printerDiagnostics.
        Modal scrollavel com seções: APP, SYNC, STORAGE, INTEGRIDADE, IMPRESSORA,
        CAMERA, ATALHOS. Util em campo quando algo nao esta bem. Conteudo
@@ -11456,14 +11479,27 @@ function renderHomeInsights() {
   const conferNote = `${ready} pronto · ${preparing} preparo` +
     (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
 
-  // #440 — perda estimada de lotes expirados
-  const waste = typeof calcWasteLoss === 'function' ? calcWasteLoss() : { totalLoss: 0, itemCount: 0, semCusto: 0 };
-  const wasteCard = waste.itemCount > 0 || waste.semCusto > 0
-    ? `<div class="home-insight${waste.totalLoss > 0 ? ' warn' : ''}">
-        <div class="hi-label">Perda ~</div>
-        <div class="hi-value">${waste.totalLoss > 0 ? money(waste.totalLoss).replace(',00','') : '—'}</div>
-        <div class="hi-note">${waste.itemCount} un. expirada${waste.itemCount === 1 ? '' : 's'}${waste.semCusto > 0 ? ' · ' + waste.semCusto + ' sem custo' : ''}</div>
-      </div>`
+  // #440/#441 — perda: confirmada (descartada pelo operador) + estimada (expirada sem descarte)
+  const waste = typeof calcWasteLoss === 'function'
+    ? calcWasteLoss()
+    : { confLoss: 0, confCount: 0, estLoss: 0, estCount: 0, semCusto: 0, totalLoss: 0, itemCount: 0 };
+  const hasWaste = waste.itemCount > 0 || waste.semCusto > 0;
+  const wasteCard = hasWaste
+    ? (function() {
+        const hasConf = waste.confCount > 0;
+        const hasEst  = waste.estCount > 0;
+        const label   = hasConf && !hasEst ? 'Perda' : 'Perda ~';
+        const value   = waste.totalLoss > 0 ? money(waste.totalLoss).replace(',00','') : '—';
+        const parts = [];
+        if (hasConf) parts.push(waste.confCount + ' un. descartada' + (waste.confCount === 1 ? '' : 's'));
+        if (hasEst)  parts.push(waste.estCount  + ' un. expirada'  + (waste.estCount  === 1 ? '' : 's') + ' ~');
+        if (waste.semCusto > 0) parts.push(waste.semCusto + ' sem custo');
+        return `<div class="home-insight${waste.totalLoss > 0 ? ' warn' : ''}">
+          <div class="hi-label">${label}</div>
+          <div class="hi-value">${value}</div>
+          <div class="hi-note">${parts.join(' · ')}</div>
+        </div>`;
+      })()
     : '';
   host.innerHTML = `
     <div class="home-insight${critical ? ' warn' : ''}">
@@ -11595,7 +11631,7 @@ function renderHomeExpiryBar() {
   const H24 = 24 * 3600 * 1000;
   const H48 = 48 * 3600 * 1000;
   const hoje = [], amanha = [];
-  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
+  (batches || []).filter(function (b) { return !b.deleted && !b.discarded; }).forEach(function (b) {
     (b.items || []).forEach(function (it) {
       if (!it.expiresAt) return;
       const diff = it.expiresAt - now;
@@ -11619,26 +11655,34 @@ function renderHomeExpiryBar() {
   bar.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">' + chips.join('') + '</div>';
 }
 
-// #440 — calcula perda estimada: lotes nao-deletados com itens expirados * product.cost.
-// "estimada" porque itens podem ter sido usados/doados sem registro. Sempre rotulamos como ~.
+// #440/#441 — calcula perda: separa confirmado (batch.discarded=true) de estimado (so expirado).
 function calcWasteLoss() {
   const now = Date.now();
-  let totalLoss = 0, itemCount = 0, semCusto = 0;
+  let confLoss = 0, confCount = 0;
+  let estLoss = 0, estCount = 0, semCusto = 0;
   (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
     (b.items || []).forEach(function (it) {
-      if (!it.expiresAt || it.expiresAt > now) return; // so expirados
       const qty = Number(it.qty) || 0;
       const p = (products || []).find(function (x) { return x.id === it.productId; });
       const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
-      if (cost != null) {
-        totalLoss += qty * cost;
-        itemCount += qty;
-      } else {
-        semCusto += qty;
+      if (b.discarded) {
+        // Confirmado pelo operador — independe de expiresAt
+        if (cost != null) { confLoss += qty * cost; confCount += qty; }
+        else { semCusto += qty; }
+      } else if (it.expiresAt && it.expiresAt <= now) {
+        // Estimado: expirou mas nao foi descartado manualmente
+        if (cost != null) { estLoss += qty * cost; estCount += qty; }
+        else { semCusto += qty; }
       }
     });
   });
-  return { totalLoss: totalLoss, itemCount: itemCount, semCusto: semCusto };
+  return {
+    confLoss: confLoss, confCount: confCount,
+    estLoss: estLoss, estCount: estCount,
+    semCusto: semCusto,
+    totalLoss: confLoss + estLoss,
+    itemCount: confCount + estCount
+  };
 }
 
 let _homeChecklistAutoOpened = false; // flag: abre so uma vez por sessao.
@@ -17061,19 +17105,32 @@ function batchCardHtml(batch) {
       <button class="u-action" onclick="event.stopPropagation();openConferProducao('${batch.id}','${et.idxStr}')">${actionLabel}</button>
     </div>`;
   }).join('');
-  const statusBadge = isClosed
-    ? `<span class="u-status divergencia">Fechado</span>`
-    : `<span class="u-status conferido">Aberto</span>`;
-  const actionsHtml = isClosed ? `
+  const isDiscarded = !!batch.discarded;
+  const statusBadge = isDiscarded
+    ? `<span class="u-status divergencia">⛔ Descartado</span>`
+    : isClosed
+      ? `<span class="u-status divergencia">Fechado</span>`
+      : `<span class="u-status conferido">Aberto</span>`;
+  // #441 — botao Descartar/Reverter em todas as acoes
+  const discardBtn = isDiscarded
+    ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard('${batch.id}')">↩ Reverter</button>`
+    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')">⛔ Descartar</button>`;
+  const actionsHtml = isDiscarded ? `
+    <div class="batch-actions closed-actions">
+      <span style="font-size:12px;color:var(--ink-mute);flex:1">${escapeHtml(batch.discardReason || 'descartado')}</span>
+      ${discardBtn}
+    </div>` : isClosed ? `
     <div class="batch-actions closed-actions">
       <button class="batch-action primary" onclick="event.stopPropagation();toggleBatchStatus('${batch.id}')">Reabrir</button>
       <button class="batch-action info" onclick="event.stopPropagation();openBatchHistory('${batch.id}')">Histórico</button>
       <button class="batch-action" onclick="event.stopPropagation();openBatchDetails('${batch.id}')">Detalhes</button>
+      ${discardBtn}
     </div>` : `
     <div class="batch-actions">
       <button class="batch-action primary" onclick="event.stopPropagation();appendProductionToBatch('${batch.id}')">+ Produção</button>
       <button class="batch-action info" onclick="event.stopPropagation();editBatchFlow('${batch.id}')">Editar</button>
       <button class="batch-action" onclick="event.stopPropagation();toggleBatchStatus('${batch.id}')">Fechar</button>
+      ${discardBtn}
     </div>`;
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
     <div class="batch-card-head" onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')">
@@ -18130,6 +18187,67 @@ function openBatchHistory(batchId) {
   openBatchDetails(batchId);
 }
 function closeBatchDetails() { toggleModal('batchDetailsModal', false); }
+
+// ===== DESCARTE DE LOTE =====================================================
+let _discardingBatchId = null;
+
+function openBatchDiscardModal(batchId) {
+  const batch = (batches || []).find(function (b) { return b.id === batchId; });
+  if (!batch) return;
+  _discardingBatchId = batchId;
+  const lote = batch.lote || batch.code || batchId.slice(-6);
+  const sub = document.getElementById('batchDiscardSub');
+  if (sub) sub.textContent = 'Lote ' + lote + ' · ' + (batch.items || []).map(function(i){ return i.qty + '× ' + i.name; }).join(', ');
+  document.querySelectorAll('#batchDiscardChips .cash-type-pill').forEach(function (b) { b.classList.remove('active'); });
+  const first = document.querySelector('#batchDiscardChips .cash-type-pill');
+  if (first) first.classList.add('active');
+  const note = document.getElementById('batchDiscardNote');
+  if (note) note.value = '';
+  toggleModal('batchDiscardModal', true);
+}
+function closeBatchDiscardModal() { toggleModal('batchDiscardModal', false); _discardingBatchId = null; }
+
+function selectDiscardReason(el) {
+  document.querySelectorAll('#batchDiscardChips .cash-type-pill').forEach(function (b) { b.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function confirmBatchDiscard() {
+  if (!_discardingBatchId) return;
+  const batch = (batches || []).find(function (b) { return b.id === _discardingBatchId; });
+  if (!batch) { closeBatchDiscardModal(); return; }
+  const activeChip = document.querySelector('#batchDiscardChips .cash-type-pill.active');
+  const reason = activeChip ? (activeChip.dataset.reason || 'outro') : 'outro';
+  const note = (document.getElementById('batchDiscardNote')?.value || '').trim();
+  batch.discarded = true;
+  batch.discardedAt = Date.now();
+  batch.discardedBy = operatorName || null;
+  batch.discardReason = reason + (note ? ' · ' + note : '');
+  const lote = batch.lote || batch.code || batch.id;
+  logAction({ action: 'batch.discard', entityType: 'batch', entityId: batch.id, summary: 'Descarte: lote ' + lote + ' · ' + reason + (note ? ' · ' + note : '') });
+  persistAll();
+  pendingSync++;
+  updateSync();
+  closeBatchDiscardModal();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+  showToast('Lote ' + lote + ' descartado');
+}
+
+function revertBatchDiscard(batchId) {
+  const batch = (batches || []).find(function (b) { return b.id === batchId; });
+  if (!batch) return;
+  delete batch.discarded; delete batch.discardedAt; delete batch.discardedBy; delete batch.discardReason;
+  logAction({ action: 'batch.discard_revert', entityType: 'batch', entityId: batch.id, summary: 'Descarte revertido: lote ' + (batch.lote || batch.code || batch.id) });
+  persistAll();
+  pendingSync++;
+  updateSync();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+  showToast('Descarte revertido');
+}
 function openBatchDetails(batchId) {
   const batch = getBatchById(batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
