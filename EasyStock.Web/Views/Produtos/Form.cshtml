@@ -479,8 +479,8 @@
                        (preco abaixo do custo): alerta de prejuizo, antes ficava silenciosa. *@
                     <template x-if="margem !== null && margem !== 0">
                         <span class="text-xs mt-1 block font-medium"
-                              :class="margem < 0 ? 'text-red-600 font-bold' : margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
-                              x-text="margem < 0 ? '⚠ Prejuízo: preço abaixo do custo (' + margem.toFixed(1).replace('.', ',') + '%)' : margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
+                              :class="margem >= 100 ? 'text-red-600 font-bold' : margem < 0 ? 'text-red-600 font-bold' : margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
+                              x-text="margem >= 100 ? '⚠ Margem inválida: deve ser menor que 100% (sobre preço de venda)' : margem < 0 ? '⚠ Prejuízo: preço abaixo do custo (' + margem.toFixed(1).replace('.', ',') + '%)' : margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
                     </template>
                     <div x-show="margemSugestoes.length > 0" class="flex gap-2 mt-1 flex-wrap">
                         <template x-for="s in margemSugestoes" :key="s.pct">
@@ -933,10 +933,10 @@
                             <span class="text-3xl font-black text-slate-900 tracking-tight"
                                   x-text="preco > 0 ? 'R$ ' + preco.toFixed(2).replace('.', ',') : 'Preço não definido'"
                                   :class="{ 'text-lg text-slate-300': preco <= 0 }"></span>
-                            <span x-show="margem !== null && margem !== 0" x-cloak
-                                  :class="margem < 0 ? 'bg-red-100 text-red-700 ring-red-200' : margem < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margem < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
+                            <span x-show="margemDerivada !== 0 && preco > 0" x-cloak
+                                  :class="margemDerivada < 0 ? 'bg-red-100 text-red-700 ring-red-200' : margemDerivada < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margemDerivada < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
                                   class="text-xs font-bold px-2.5 py-1 rounded-full ring-1 mb-1"
-                                  x-text="(margem < 0 ? '⚠ ' : '') + margem.toFixed(1).replace('.', ',') + '% margem'"></span>
+                                  x-text="(margemDerivada < 0 ? '⚠ ' : '') + margemDerivada.toFixed(1).replace('.', ',') + '% margem'"></span>
                         </div>
                         <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2).replace('.', ',')"></div>
                     </div>
@@ -1830,10 +1830,27 @@
                 },
                 onMargemInput() {
                     this.lastEdited = 'margem';
-                    if (this.custo > 0 && this.margem > 0 && this.margem < 100)
+                    // FIN-002: margem sobre PV nao pode atingir ou superar 100%
+                    // (custo / (1 - 1.0) = divisao por zero; > 100% = preco negativo).
+                    // Limpa o preco para sinalizar estado invalido e bloquear avanco/submit.
+                    if (this.margem >= 100) {
+                        this.preco = 0;
+                        return;
+                    }
+                    if (this.custo > 0 && this.margem > 0)
                         this.preco = +( this.custo / (1 - this.margem / 100) ).toFixed(2);
-                    else if (this.preco > 0 && this.margem > 0 && this.margem < 100)
+                    else if (this.preco > 0 && this.margem > 0)
                         this.custo = +( this.preco * (1 - this.margem / 100) ).toFixed(2);
+                },
+
+                // FIN-001: margem derivada de preco e custo — valor real calculado, nao o
+                // raw do input (quando usuario digita 150, o preco nao atualiza porem o
+                // input mostra 150%; a derivada recalcula a margem real do preco calculado).
+                // Usada na revisao para que o badge mostre 15% (real) e nao 150% (input).
+                get margemDerivada() {
+                    return (this.preco > 0 && this.custo > 0)
+                        ? +(((this.preco - this.custo) / this.preco) * 100).toFixed(1)
+                        : (this.margem ?? 0);
                 },
 
                 // ── Tipo sugerido baseado na categoria ──
