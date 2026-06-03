@@ -1538,13 +1538,10 @@
                         });
                     }
 
-                    // Auto-aplicar tipo "Alimento" quando categoria sugere
-                    this.$watch('categoriaId', () => {
-                        if (!this._tipoManuallySet && this.tipoSugerido !== null) {
-                            this.tipo = this.tipoSugerido;
-                            this.controlaValidade = (this.tipoSugerido === 1);
-                        }
-                    });
+                    // LOGIC-001: NAO auto-aplicar tipo/controla-validade ao mudar categoria —
+                    // sobrescrevia silenciosamente a escolha (ou o default) do usuario. A sugestao
+                    // de tipo agora e opt-in: o botao "Sugestao: usar tipo Alimento" (x-show acima)
+                    // aplica tipo + controlaValidade so quando o usuario clica.
 
                     // Inicializar FilePond (guard contra dupla inicialização)
                     this.$nextTick(() => {
