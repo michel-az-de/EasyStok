@@ -18277,6 +18277,9 @@ function escPosOrderLabel(o, nota) {
   // Itens (qty x nome | preco) com truncamento via padLine
   (o.items || []).forEach(it => {
     b.line(padLine(it.qty + 'x ' + it.name, money(it.qty * it.unitPrice)));
+    // #417 — observacao por item (ex "sem cebola"), indentada sob o item.
+    const inote = (it.note || '').trim();
+    if (inote) b.line(asciiNorm('  obs: ' + inote).slice(0, PRINT_COLS));
   });
   b.line(divider());
   // TOTAL em negrito (sem big — elegante, cabe na linha)
@@ -18681,7 +18684,7 @@ function etiquetasToPng(etiquetas, kind, note) {
   function calcRowH(et) {
     if (kind === 'order') {
       const o = et.order || {};
-      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24), 0);
+      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24) + ((it.note || '').trim() ? 16 : 0), 0); // #417: +16 por item com obs
       if (horizOrder) {
         // Horizontal: duas colunas. Altura = max(left, right).
         // Left: brand(30)+kicker(14)+title(24)+ref(18)+date(16)+cliente(70)+items+ITENS(12)+total(48)+notes+nota
@@ -19021,7 +19024,16 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
     ctx.font = '900 15px Arial, sans-serif';
     ctx.fillText(money(it.qty * it.unitPrice), W - 24, y);
     ctx.textAlign = 'left';
-    y += it.unit ? 34 : 24;
+    let adv = it.unit ? 34 : 24;
+    // #417 — observacao por item, abaixo do item (altura reservada em calcRowH).
+    const inote = (it.note || '').trim();
+    if (inote) {
+      ctx.fillStyle = '#c2410c';
+      ctx.font = 'italic 700 11px Arial, sans-serif';
+      ctx.fillText(('obs: ' + inote).slice(0, 40), 30, y + adv - 6);
+      adv += 16;
+    }
+    y += adv;
   });
   ctx.fillRect(24, y, W - 48, 2); y += 12;
   ctx.strokeStyle = '#000';
@@ -19180,7 +19192,17 @@ function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showB
       ctx.font = '400 10px Arial, sans-serif';
       ctx.fillText(String(it.unit).slice(0, 24), lx + 20, y + 13);
     }
-    y += it.unit ? 28 : 18;
+    let adv = it.unit ? 28 : 18;
+    // #417 — observacao por item (altura reservada em calcRowH via itemsH).
+    const inote = (it.note || '').trim();
+    if (inote) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#c2410c';
+      ctx.font = 'italic 700 9px Arial, sans-serif';
+      ctx.fillText(('obs: ' + inote).slice(0, 32), lx + 8, y + (it.unit ? 24 : 13));
+      adv += 16;
+    }
+    y += adv;
   });
   ctx.textAlign = 'left';
   ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
@@ -19728,6 +19750,7 @@ function orderLabelHtml(o, horizontal, nota) {
       <span class="pi-main">
         <span class="pi-name">${escapeHtml(it.name)}</span>
         ${it.unit ? `<span class="pi-unit">${escapeHtml(it.unit)}</span>` : ''}
+        ${(it.note || '').trim() ? `<span class="pi-note" style="display:block;font-size:0.82em;color:#c2410c;font-style:italic">obs: ${escapeHtml(it.note.trim())}</span>` : ''}
       </span>
       <span class="pi-price">${money(it.qty*it.unitPrice)}</span>
     </div>`

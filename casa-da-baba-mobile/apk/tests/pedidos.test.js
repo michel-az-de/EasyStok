@@ -9,6 +9,19 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     });
   });
 
+  // #417 — observacao por item deve aparecer no render de impressao do pedido.
+  test('pedidos: orderLabelHtml mostra obs por item', () => {
+    const html = runInSandbox(`(function(){
+      try { localStorage.setItem('cdb-prod-scan-mode', 'qr'); } catch(_) {}
+      var o = { id: 'oABC1234', total: 20, factAt: 0, createdAt: 0, clientSnapshot: { name: 'Ana' },
+        items: [{ qty: 2, name: 'Coxinha', unitPrice: 5, note: 'sem cebola' },
+                { qty: 1, name: 'Refri', unitPrice: 10 }] };
+      return orderLabelHtml(o, false, null);
+    })()`);
+    assert.match(html, /obs: sem cebola/, 'obs do item aparece no HTML');
+    assert.ok(html.indexOf('Coxinha') >= 0 && html.indexOf('Refri') >= 0, 'ambos os itens presentes');
+  });
+
   test('pedidos: getOrderById retorna pedido existente', () => {
     const r = runInSandbox(`
       orders = [{ id: 'order-abc', total: 100 }, { id: 'order-def', total: 50 }];
