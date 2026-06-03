@@ -954,22 +954,31 @@ button:disabled {
   /* C1 (2026-05-16): fixed em vez de absolute - independe do scroll do parent.
      Antes podia ficar fora da viewport em telas estreitas e empilhar sobre UI. */
   position: fixed;
-  left: 14px;
-  right: 14px;
+  left: 12px;
+  right: 12px;
   bottom: calc(78px + env(safe-area-inset-bottom, 0px));
   z-index: 55;
   display: none;
   border: 1px solid var(--border-strong);
-  border-radius: 18px;
-  padding: 10px;
+  border-radius: 20px;
+  padding: 12px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.055), transparent 110px),
+    linear-gradient(180deg, rgba(255,255,255,0.07), transparent 128px),
     var(--bg-elev);
   box-shadow: 0 18px 48px rgba(0,0,0,0.34);
-  max-height: min(58vh, 440px);
+  max-height: min(68vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+}
+.more-menu::before {
+  content: '';
+  display: block;
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  margin: 0 auto 10px;
+  background: rgba(255,255,255,0.18);
 }
 .more-menu::-webkit-scrollbar { display: none; }
 .more-menu.show { display: block; animation: slideUp 0.18s ease-out; }
@@ -977,12 +986,22 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 4px 10px;
+  gap: 12px;
+  padding: 0 2px 12px;
+}
+.more-menu-title {
+  display: block;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+.more-menu-subtitle {
+  display: block;
+  margin-top: 2px;
   color: var(--ink-mute);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 12px;
+  line-height: 1.25;
 }
 .ux-density-toggle {
   min-height: 28px;
@@ -998,32 +1017,121 @@ button:disabled {
   text-transform: uppercase;
   cursor: pointer;
 }
-.more-menu-grid {
+.more-menu-search {
+  width: 100%;
+  min-height: 52px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(231,104,69,0.12);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+.more-menu-search b {
+  display: block;
+  font-size: 14px;
+  font-weight: 950;
+}
+.more-menu-search small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.25;
+}
+.more-menu-search-icon,
+.more-menu-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: rgba(255,255,255,0.075);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 950;
+  flex: 0 0 auto;
+}
+.more-menu-section {
+  margin-top: 12px;
+}
+.more-menu-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 7px;
+  color: var(--ink-mute);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.more-menu-section-title::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+.more-menu-list {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 .more-menu-item {
   min-width: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 12px;
+  padding: 10px 12px;
   background: rgba(255,255,255,0.035);
   color: var(--ink);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
 }
-.more-menu-item strong { display: block; font-size: 13px; font-weight: 900; }
-.more-menu-item span {
+.more-menu-item > span:not(.more-menu-icon) {
+  display: block;
+  min-width: 0;
+}
+.more-menu-item strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 950;
+}
+.more-menu-item > span:not(.more-menu-icon) > span {
   display: block;
   margin-top: 3px;
   color: var(--ink-mute);
   font-size: 11px;
   line-height: 1.3;
 }
+.more-menu-item:hover,
+.more-menu-search:hover {
+  border-color: rgba(231,104,69,0.42);
+  background: rgba(231,104,69,0.10);
+}
+.more-menu-admin {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 [data-theme="light"] .more-menu { background: #fff; border-color: #dbe2ec; box-shadow: 0 16px 36px rgba(21,31,49,0.15); }
 [data-theme="light"] .more-menu-item { background: #f8fafc; border-color: #dbe2ec; }
+[data-theme="light"] .more-menu::before { background: #cbd5e1; }
+[data-theme="light"] .more-menu-search { background: #fff7ed; border-color: #fed7aa; }
+[data-theme="light"] .more-menu-search-icon,
+[data-theme="light"] .more-menu-icon { background: #eef2ff; }
 
 .client-value-grid {
   display: grid;
@@ -6803,8 +6911,10 @@ body.ux-calm .home-ops-disclosure {
   border-radius: 14px;
 }
 body.ux-calm .home-ops-sub,
-body.ux-calm .more-menu-head > span:last-child,
-body.ux-calm .more-menu-item span {
+body.ux-calm .more-menu-subtitle,
+body.ux-calm .more-menu-section-title,
+body.ux-calm .more-menu-item > span:not(.more-menu-icon) > span,
+body.ux-calm .more-menu-search small {
   display: none;
 }
 body.ux-calm .home-ops-disclosure > summary {
@@ -6813,15 +6923,28 @@ body.ux-calm .home-ops-disclosure > summary {
 body.ux-calm .more-menu {
   padding: 12px;
 }
-body.ux-calm .more-menu-grid {
+body.ux-calm .more-menu-search {
+  min-height: 46px;
+  margin-bottom: 8px;
+}
+body.ux-calm .more-menu-list {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
 }
 body.ux-calm .more-menu-item {
-  min-height: 44px;
+  min-height: 68px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
   padding: 10px 6px;
   border-radius: 12px;
   text-align: center;
+}
+body.ux-calm .more-menu-icon {
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
 }
 body.ux-calm .more-menu-item strong {
   font-size: 12px;
@@ -8574,22 +8697,44 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
-  <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais paginas">
+  <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais páginas">
     <div class="more-menu-head">
-      <span>Mais ferramentas</span>
+      <span>
+        <span class="more-menu-title">Menu</span>
+        <span class="more-menu-subtitle">Escolha pelo tipo de tarefa.</span>
+      </span>
       <button class="ux-density-toggle" id="uxDensityToggle" onclick="toggleUxDensity(event)">Simples</button>
     </div>
-    <div class="more-menu-grid">
-<button class="more-menu-item" onclick="go('historico')"><strong>Historico</strong><span>Auditoria, movimentos e registros.</span></button>
-      <button class="more-menu-item" onclick="go('estoque')"><strong>Estoque</strong><span>Saldo, rastreabilidade e saídas.</span></button>
-      <button class="more-menu-item" onclick="go('clientes')"><strong>Clientes</strong><span>Recorrencia, ticket e retorno.</span></button>
-      <button class="more-menu-item" onclick="go('compras')"><strong>Compras</strong><span>Itens que faltam para produzir.</span></button>
-      <button class="more-menu-item" onclick="go('caixa')"><strong>Caixa</strong><span>Saldo, lancamentos e fechamento.</span></button>
-      <button class="more-menu-item" onclick="go('finalizados')"><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></button>
-      <button class="more-menu-item" onclick="go('suporte')"><strong>Suporte</strong><span>Chamado com diagnóstico.</span></button>
-      <button class="more-menu-item" onclick="closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()"><strong>Etiquetas</strong><span>Modelos de impressão e layout.</span></button>
-      <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><strong>Ajustes</strong><span>Loja, impressora, backup e demo.</span></button>
-      <button class="more-menu-item" onclick="closeMoreMenu(); openGlobalSearch()"><strong>Busca</strong><span>Cliente, pedido, produto ou lote.</span></button>
+    <button class="more-menu-search" onclick="closeMoreMenu(); openGlobalSearch()">
+      <span class="more-menu-search-icon" aria-hidden="true">⌕</span>
+      <span><b>Buscar qualquer coisa</b><small>Cliente, pedido, produto ou lote.</small></span>
+    </button>
+
+    <div class="more-menu-section" aria-labelledby="more-op-section">
+      <div class="more-menu-section-title" id="more-op-section">Operação</div>
+      <div class="more-menu-list">
+        <button class="more-menu-item" onclick="go('caixa')"><span class="more-menu-icon" aria-hidden="true">$</span><span><strong>Caixa</strong><span>Entradas, saídas e fechamento.</span></span></button>
+        <button class="more-menu-item" onclick="go('compras')"><span class="more-menu-icon" aria-hidden="true">+</span><span><strong>Compras</strong><span>Reposição para produzir.</span></span></button>
+        <button class="more-menu-item" onclick="go('finalizados')"><span class="more-menu-icon" aria-hidden="true">✓</span><span><strong>Finalizados</strong><span>Entregues, cancelados e recibos.</span></span></button>
+      </div>
+    </div>
+
+    <div class="more-menu-section" aria-labelledby="more-gestao-section">
+      <div class="more-menu-section-title" id="more-gestao-section">Gestão</div>
+      <div class="more-menu-list">
+        <button class="more-menu-item" onclick="go('estoque')"><span class="more-menu-icon" aria-hidden="true">#</span><span><strong>Estoque</strong><span>Saldos, lotes e ajustes.</span></span></button>
+        <button class="more-menu-item" onclick="go('clientes')"><span class="more-menu-icon" aria-hidden="true">@</span><span><strong>Clientes</strong><span>Recorrência, ticket e retorno.</span></span></button>
+        <button class="more-menu-item" onclick="go('historico')"><span class="more-menu-icon" aria-hidden="true">↺</span><span><strong>Histórico</strong><span>Auditoria e movimentos.</span></span></button>
+      </div>
+    </div>
+
+    <div class="more-menu-section" aria-labelledby="more-admin-section">
+      <div class="more-menu-section-title" id="more-admin-section">Administração</div>
+      <div class="more-menu-list more-menu-admin">
+        <button class="more-menu-item" onclick="closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()"><span class="more-menu-icon" aria-hidden="true">▦</span><span><strong>Etiquetas</strong><span>Modelos e impressão.</span></span></button>
+        <button class="more-menu-item" onclick="closeMoreMenu(); openAjustes()"><span class="more-menu-icon" aria-hidden="true">⚙</span><span><strong>Ajustes</strong><span>Loja, impressora e backup.</span></span></button>
+        <button class="more-menu-item" onclick="go('suporte')"><span class="more-menu-icon" aria-hidden="true">?</span><span><strong>Suporte</strong><span>Diagnóstico e chamado.</span></span></button>
+      </div>
     </div>
   </div>
 
