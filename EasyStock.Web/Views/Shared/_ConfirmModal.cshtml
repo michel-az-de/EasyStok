@@ -10,7 +10,7 @@
      @@keydown.escape.window="fechar()">
 
     <template x-if="open">
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: var(--backdrop-color); backdrop-filter: blur(var(--backdrop-blur)); -webkit-backdrop-filter: blur(var(--backdrop-blur));"
              @@click.self="fechar()" x-transition.opacity>
             <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl" @@click.stop>
                 <div class="flex items-start gap-3 mb-4">

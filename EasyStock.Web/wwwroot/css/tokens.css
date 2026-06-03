@@ -669,6 +669,8 @@ html, body {
      loading overlay   80
 */
 :root {
+  --backdrop-color:    rgba(8, 15, 40, 0.5);
+  --backdrop-blur:     4px;
   --z-dropdown:        20;
   --z-sticky:          30;
   --z-bottom-nav:      35;

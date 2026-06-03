@@ -440,8 +440,8 @@ button:focus-visible {
 
 /* ---------- Modal (sizes — T2.13) ---------- */
 .modal-backdrop {
-  position: fixed; inset: 0; background: rgba(5, 11, 27, 0.6);
-  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  position: fixed; inset: 0; background: var(--backdrop-color);
+  backdrop-filter: blur(var(--backdrop-blur)); -webkit-backdrop-filter: blur(var(--backdrop-blur));
   z-index: 100; display: grid; place-items: center;
   padding: 16px;
   animation: anim-backdropFade var(--motion-base) var(--ease-out) both;
@@ -491,7 +491,7 @@ button:focus-visible {
 
 /* ---------- Drawer (T2.6) ---------- */
 .drawer-backdrop {
-  position: fixed; inset: 0; background: rgba(8,15,40,0.45); z-index: 95;
+  position: fixed; inset: 0; background: var(--backdrop-color); z-index: 95;
 }
 .drawer-panel {
   position: fixed; top: 0; right: 0; height: 100vh; width: min(420px, 100vw);
