@@ -826,5 +826,142 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // ────────────────────────────────────────────────────────────────────────
+        // Onda 1 (#431) — proxies diag/* de paridade com a antiga UI da Web.
+        // Alimentam os charts (historico/eventos), o painel de padrões/alertas
+        // (alertas/ack + alertas/acks) e o card de saúde por empresa do /Diagnostico
+        // do Admin. Todos batem em DiagnosticoInfraController da API (Policy=Admin).
+        // ────────────────────────────────────────────────────────────────────────
+
+        // Histórico de health snapshots (~2h) — alimenta o chart Health Timeline.
+        app.MapGet("/api-proxy/diag/historico", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetAsync<JsonElement>("api/diagnostico/historico");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/historico falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Zera o histórico de snapshots (linha de base limpa após deploy/correção).
+        app.MapPost("/api-proxy/diag/historico/zerar", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.PostAsync<JsonElement>("api/diagnostico/historico/zerar", new { });
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/historico/zerar falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Timeline de eventos (error spikes, deploys) — overlay do Health Timeline.
+        app.MapGet("/api-proxy/diag/eventos", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            HttpContext ctx,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+                var data = await api.GetAsync<JsonElement>($"api/diagnostico/eventos?{qs}");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/eventos falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Marca/atualiza o ack de um padrão/alerta (visto, em_investigacao, resolvido).
+        app.MapPost("/api-proxy/diag/alertas/{alertaId}/ack", async (
+            string alertaId,
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            HttpContext ctx,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                using var reader = new StreamReader(ctx.Request.Body);
+                var body = await reader.ReadToEndAsync();
+                var payload = JsonSerializer.Deserialize<JsonElement>(body);
+                var data = await api.PostAsync<JsonElement>(
+                    $"api/diagnostico/alertas/{Uri.EscapeDataString(alertaId)}/ack", payload);
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/alertas/{AlertaId}/ack falhou", alertaId);
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Lê os acks atuais de uma lista de alertaIds (?ids=a,b,c).
+        app.MapGet("/api-proxy/diag/alertas/acks", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            HttpContext ctx,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var qs = ctx.Request.QueryString.Value?.TrimStart('?') ?? "";
+                var data = await api.GetAsync<JsonElement>($"api/diagnostico/alertas/acks?{qs}");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/alertas/acks falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Saúde por empresa (latência de queries por tenant) — card do /Diagnostico.
+        app.MapGet("/api-proxy/diag/health-empresas", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetAsync<JsonElement>("api/diagnostico/health/empresas");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/health-empresas falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
     }
 }
