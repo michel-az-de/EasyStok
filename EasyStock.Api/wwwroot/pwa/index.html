@@ -18839,7 +18839,11 @@ function etiquetaProducaoHtml(et, nota) {
     : '';
 
   if (horiz) {
-    return `${brand}<div class="et-main">${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
+    // #438: brand DENTRO do et-main (nao irmao flex) — sem isso o brand
+    // ocupa ~104px de largura horizontal e et-main fica com ~105px, fazendo
+    // overflow-wrap:anywhere quebrar "Talharim" caractere a caractere.
+    // Espelha o canvas horizontal onde logo fica na mesma coluna que o nome.
+    return `<div class="et-main">${brand}${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
   }
   return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
 }
