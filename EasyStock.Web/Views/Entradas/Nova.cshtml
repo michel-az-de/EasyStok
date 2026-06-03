@@ -165,7 +165,7 @@
                                 class="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
                             ← Voltar
                         </button>
-                        <button type="button" @@click="step = 3" :disabled="!qty || !custo || !data"
+                        <button type="button" @@click="step = 3" :disabled="!qty || !custo || !data || (controlaValidade && !validade)"
                                 class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors disabled:opacity-50">
                             Revisar →
                         </button>
