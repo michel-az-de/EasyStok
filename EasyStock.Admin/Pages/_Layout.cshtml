@@ -55,7 +55,7 @@
            aria-label="Navegação principal">
 
         <!-- Logo -->
-        <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid rgba(247,242,232,0.08); flex: none;">
+        <div class="sidebar-brand">
             <svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EasyStock" style="flex-shrink:0">
                 <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814"/>
                 <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E"/>
@@ -67,6 +67,7 @@
                 </div>
                 <div class="text-xs font-medium" style="color:var(--es-ink-mute)">Admin Panel</div>
             </div>
+            <span class="sidebar-brand-pill sidebar-label">ops</span>
         </div>
 
         <!-- Navegação -->
@@ -99,80 +100,91 @@
                 </div>
             </template>
 
-            <a href="/" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/Index" ? "is-active" : "")">
-                <es-icon name="layout-dashboard" size="18" />
-                <span class="text-sm font-medium sidebar-label">Dashboard</span>
-            </a>
-            <a href="/Tenants" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Tenants") == true ? "is-active" : "")">
-                <es-icon name="building-2" size="18" />
-                <span class="text-sm font-medium sidebar-label">Clientes</span>
-                <span x-show="dash.totalTenants > 0 && !sidebarCollapsed"
-                      x-text="dash.totalTenants"
-                      class="ml-auto bg-es-surface-2 text-es-ink-dim text-xs rounded-full px-2 py-0.5 sidebar-label"
-                      x-cloak></span>
-            </a>
-            <a href="/Storefronts" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Storefronts") == true ? "is-active" : "")">
-                <es-icon name="shopping-bag" size="18" />
-                <span class="text-sm font-medium sidebar-label">Storefronts</span>
-            </a>
-            <a href="/Tickets" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Tickets") == true ? "is-active" : "")">
-                <es-icon name="ticket" size="18" />
-                <span class="text-sm font-medium sidebar-label">Tickets</span>
-                <span x-show="dash.ticketsBadge > 0 && !sidebarCollapsed"
-                      x-text="dash.ticketsBadge"
-                      class="ml-auto bg-red-600 text-white text-xs rounded-full px-2 py-0.5 font-bold sidebar-label"
-                      x-cloak></span>
-            </a>
-            <a href="/Planos" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Planos") == true ? "is-active" : "")">
-                <es-icon name="list-checks" size="18" />
-                <span class="text-sm font-medium sidebar-label">Planos</span>
-            </a>
-            <a href="/Cupons" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Cupons") == true ? "is-active" : "")">
-                <es-icon name="tag" size="18" />
-                <span class="text-sm font-medium sidebar-label">Cupons</span>
-            </a>
-            <a href="/Faturas" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Faturas") == true ? "is-active" : "")">
-                <es-icon name="receipt" size="18" />
-                <span class="text-sm font-medium sidebar-label">Faturas</span>
-            </a>
-            <a href="/AuditLogs" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/AuditLogs") == true ? "is-active" : "")">
-                <es-icon name="search" size="18" />
-                <span class="text-sm font-medium sidebar-label">Audit Logs</span>
-            </a>
-            <a href="/Diagnostico" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Diagnostico") == true ? "is-active" : "")">
-                <es-icon name="stethoscope" size="18" />
-                <span class="text-sm font-medium sidebar-label">Diagnóstico</span>
-            </a>
-            <a href="/Notificacoes/Templates" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Notificacoes") == true ? "is-active" : "")">
-                <es-icon name="bell" size="18" />
-                <span class="text-sm font-medium sidebar-label">Notificações</span>
-            </a>
-            <a href="/Operacao" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Operacao") == true ? "is-active" : "")">
-                <es-icon name="trending-up" size="18" />
-                <span class="text-sm font-medium sidebar-label">Operação</span>
-            </a>
-            <a href="/Dispositivos" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Dispositivos") == true ? "is-active" : "")">
-                <es-icon name="smartphone" size="18" />
-                <span class="text-sm font-medium sidebar-label">Dispositivos</span>
-            </a>
-
-            <div class="pt-4 mt-2" style="border-top:1px solid rgba(247,242,232,0.08)">
-                <div class="sidebar-section-title">Governança</div>
+            <div class="sidebar-group">
+                <div class="sidebar-section-title">Operação</div>
+                <a href="/" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/Index" ? "is-active" : "")">
+                    <es-icon name="layout-dashboard" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Dashboard</span>
+                </a>
+                <a href="/Tenants" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Tenants") == true ? "is-active" : "")">
+                    <es-icon name="building-2" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Clientes</span>
+                    <span x-show="dash.totalTenants > 0 && !sidebarCollapsed"
+                          x-text="dash.totalTenants"
+                          class="sidebar-count sidebar-label"
+                          x-cloak></span>
+                </a>
+                <a href="/Tickets" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Tickets") == true ? "is-active" : "")">
+                    <es-icon name="ticket" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Tickets</span>
+                    <span x-show="dash.ticketsBadge > 0 && !sidebarCollapsed"
+                          x-text="dash.ticketsBadge"
+                          class="sidebar-count sidebar-count-danger sidebar-label"
+                          x-cloak></span>
+                </a>
+                <a href="/Operacao" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Operacao") == true ? "is-active" : "")">
+                    <es-icon name="trending-up" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Operação</span>
+                </a>
             </div>
-            <a href="/Admins" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Admins") == true ? "is-active" : "")">
-                <es-icon name="users" size="18" />
-                <span class="text-sm font-medium sidebar-label">Admins</span>
-            </a>
-            <a href="/Configuracoes" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Configuracoes") == true ? "is-active" : "")">
-                <es-icon name="settings" size="18" />
-                <span class="text-sm font-medium sidebar-label">Configurações</span>
-            </a>
-            <a href="/Configuracoes/ConfiguracaoFiscal" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.Contains("ConfiguracaoFiscal") == true ? "is-active" : "")">
-                <es-icon name="file-text" size="18" />
-                <span class="text-sm font-medium sidebar-label">Config. Fiscal</span>
-            </a>
 
-            <div class="pt-4 mt-4 space-y-1" style="border-top:1px solid rgba(247,242,232,0.08)">
+            <div class="sidebar-group">
+                <div class="sidebar-section-title">Comercial</div>
+                <a href="/Storefronts" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Storefronts") == true ? "is-active" : "")">
+                    <es-icon name="shopping-bag" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Storefronts</span>
+                </a>
+                <a href="/Planos" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Planos") == true ? "is-active" : "")">
+                    <es-icon name="list-checks" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Planos</span>
+                </a>
+                <a href="/Cupons" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Cupons") == true ? "is-active" : "")">
+                    <es-icon name="tag" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Cupons</span>
+                </a>
+                <a href="/Faturas" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Faturas") == true ? "is-active" : "")">
+                    <es-icon name="receipt" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Faturas</span>
+                </a>
+            </div>
+
+            <div class="sidebar-group">
+                <div class="sidebar-section-title">Plataforma</div>
+                <a href="/Dispositivos" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Dispositivos") == true ? "is-active" : "")">
+                    <es-icon name="smartphone" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Dispositivos</span>
+                </a>
+                <a href="/Notificacoes/Templates" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Notificacoes") == true ? "is-active" : "")">
+                    <es-icon name="bell" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Notificações</span>
+                </a>
+                <a href="/Diagnostico" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Diagnostico") == true ? "is-active" : "")">
+                    <es-icon name="stethoscope" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Diagnóstico</span>
+                </a>
+                <a href="/AuditLogs" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/AuditLogs") == true ? "is-active" : "")">
+                    <es-icon name="search" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Audit Logs</span>
+                </a>
+            </div>
+
+            <div class="sidebar-group">
+                <div class="sidebar-section-title">Governança</div>
+                <a href="/Admins" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Admins") == true ? "is-active" : "")">
+                    <es-icon name="users" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Admins</span>
+                </a>
+                <a href="/Configuracoes" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.StartsWith("/Configuracoes") == true ? "is-active" : "")">
+                    <es-icon name="settings" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Configurações</span>
+                </a>
+                <a href="/Configuracoes/ConfiguracaoFiscal" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.Contains("ConfiguracaoFiscal") == true ? "is-active" : "")">
+                    <es-icon name="file-text" size="18" />
+                    <span class="text-sm font-medium sidebar-label">Config. Fiscal</span>
+                </a>
+            </div>
+
+            <div class="sidebar-external">
                 <a href="@(_cfg["EasyStockWebUrl"]?.TrimEnd('/') ?? "http://localhost:5000")" target="_blank" rel="noopener noreferrer" class="sidebar-link">
                     <es-icon name="external-link" size="18" />
                     <span class="text-sm font-medium sidebar-label">Abrir EasyStock</span>
@@ -262,8 +274,10 @@
             </div>
         </header>
 
-        <main id="main" class="flex-1 p-6" tabindex="-1" aria-label="@(ViewData["Title"] ?? "Conteúdo principal")">
-            @RenderBody()
+        <main id="main" class="admin-content" tabindex="-1" aria-label="@(ViewData["Title"] ?? "Conteúdo principal")">
+            <div class="admin-content-inner">
+                @RenderBody()
+            </div>
         </main>
     </div>
 </div>

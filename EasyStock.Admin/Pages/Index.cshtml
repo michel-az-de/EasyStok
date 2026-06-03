@@ -31,16 +31,21 @@
 </script>
 
 <!-- Header com indicador de polling -->
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
-        <h2 class="admin-page-title" style="margin:0;">Visão geral</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Métricas em tempo real · atualiza a cada 60s</p>
+<section class="admin-hero">
+    <div class="admin-hero-main">
+        <div class="admin-eyebrow">Central de controle</div>
+        <h2 class="admin-page-title">Visão geral</h2>
+        <p>Clientes, tickets, receita e saúde operacional em tempo real.</p>
     </div>
-    <div style="display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:12px;">
-        <span style="display:inline-block; width:8px; height:8px; border-radius:999px; background:var(--ok-600); animation:dash-pulse 2s infinite;"></span>
-        <span x-text="dashSecsAgo > 0 ? 'Atualizado há ' + dashSecsAgo + 's' : 'Atualizando…'"></span>
+    <div class="admin-hero-actions">
+        <div class="admin-live-pill">
+            <span aria-hidden="true"></span>
+            <span x-text="dashSecsAgo > 0 ? 'Atualizado há ' + dashSecsAgo + 's' : 'Atualizando…'"></span>
+        </div>
+        <es-button variant="ghost" href="/Tenants" icon="building-2">Clientes</es-button>
+        <es-button variant="ghost" href="/Tickets" icon="ticket">Tickets</es-button>
     </div>
-</div>
+</section>
 
 <!-- Card de seed quando ambiente está vazio -->
 <div x-show="dash.totalTenants === 0" x-cloak
@@ -59,7 +64,7 @@
 </div>
 
 <!-- Métricas principais (4 cards com drill-down) -->
-<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:20px;">
+<div class="admin-metric-grid">
 
     <a href="/Tenants?status=Ativa" class="es-stat-card is-link card-interactive">
         <div class="es-stat-label">Tenants ativos</div>
@@ -101,7 +106,7 @@
 </div>
 
 <!-- Métricas secundárias -->
-<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-bottom:32px;">
+<div class="admin-metric-grid admin-metric-grid-secondary">
     <div class="es-stat-card">
         <div class="es-stat-label">Usuários ativos</div>
         <div class="es-stat-value es-stat-value-sm" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</div>
@@ -122,7 +127,7 @@
 </div>
 
 <!-- Tabelas lado a lado -->
-<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px;">
+<div class="admin-dashboard-panels">
 
     <es-card padding="none">
         <es-card-header-actions>
