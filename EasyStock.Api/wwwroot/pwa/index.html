@@ -12773,8 +12773,25 @@ function calcCashSummary(dateKey) {
   const sold = dayOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const inX = dayEntries.filter(e => e.type === 'income').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const out = dayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  // #421 — custo dos produtos vendidos (COGS): qty * product.cost por item.
+  // Itens sem custo cadastrado nao entram no calculo mas sao contados em semCusto.
+  let cogs = 0;
+  let semCusto = 0;
+  dayOrders.forEach(function (o) {
+    (o.items || []).forEach(function (it) {
+      const p = (typeof products !== 'undefined' && products) ? products.find(function (x) { return x.id === it.productId; }) : null;
+      const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
+      if (cost != null) {
+        cogs += (Number(it.qty) || 0) * cost;
+      } else {
+        semCusto++;
+      }
+    });
+  });
+  const margem = sold - cogs - out;
   return {
     sold, in: inX, out, balance: sold + inX - out,
+    cogs, margem, semCusto,
     ordersCount: dayOrders.length,
     entriesCount: dayEntries.length
   };
@@ -12828,11 +12845,21 @@ function openCashCloseModal(dateKey) {
   if (titleEl) {
     titleEl.textContent = k === dateKeyOf() ? 'Fechar caixa do dia' : `Fechar caixa de ${fmtDateKey(k)}`;
   }
+  // #421 — linha de margem: so aparece quando ha pedidos no dia.
+  const margemLabel = sum.ordersCount > 0
+    ? (() => {
+        const approx = sum.semCusto > 0;
+        const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
+        const suf = approx ? ` <span style="font-size:10px;color:var(--ink-mute)">(${sum.semCusto} item${sum.semCusto > 1 ? 'ns' : ''} sem custo)</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
+      })()
+    : '';
   document.getElementById('cashCloseSummary').innerHTML = `
     <div style="display:flex;justify-content:space-between"><span>Vendas</span><span style="font-weight:800">${money(sum.sold)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span>${money(sum.in)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
     <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px"><span>Saldo</span><span style="font-weight:800;color:var(--gold)">${money(sum.balance)}</span></div>
+    ${margemLabel}
   `;
   document.getElementById('cashCloseConferred').value = '';
   document.getElementById('cashCloseDiff').textContent = '';
@@ -12923,11 +12950,21 @@ function openCashDetails() { go('caixa'); }
 function closeCashDetails() { /* no-op: navegacao pela back button */ }
 function renderCashDetails() {
   const sum = calcCashSummaryToday();
+  // #421 — mesma logica do fechamento; mostra margem quando ha pedidos.
+  const margemDetailLabel = sum.ordersCount > 0
+    ? (() => {
+        const approx = sum.semCusto > 0;
+        const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
+        const suf = approx ? ` <span style="font-size:10px;color:var(--ink-mute)">(${sum.semCusto} sem custo)</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
+      })()
+    : '';
   document.getElementById('cashDetailsSummary').innerHTML = `
     <div style="display:flex;justify-content:space-between"><span>Vendas (${sum.ordersCount})</span><span style="font-weight:800">${money(sum.sold)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span style="color:var(--basil)">+${money(sum.in)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
     <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px;font-weight:800"><span>Saldo</span><span style="color:var(--gold)">${money(sum.balance)}</span></div>
+    ${margemDetailLabel}
   `;
   const closed = isCashClosedToday();
   document.getElementById('cashDetailsClosedBanner').style.display = closed ? 'block' : 'none';
@@ -19897,6 +19934,11 @@ function cashClosingPlainText(dateKey) {
   lines.push(`Entradas extras: +${money(sum.in)}`);
   lines.push(`Saidas: -${money(sum.out)}`);
   lines.push(`SALDO: ${money(sum.balance)}`);
+  // #421 — margem so quando ha pedidos no dia.
+  if (sum.ordersCount > 0) {
+    const approx = sum.semCusto > 0 ? ' (aprox - ' + sum.semCusto + ' item(ns) sem custo)' : '';
+    lines.push(`Margem${sum.semCusto > 0 ? ' ~' : ''}: ${money(sum.margem)}${approx}`);
+  }
   const conf = closing && closing.summary && closing.summary.conferredBalance;
   if (typeof conf === 'number' && !isNaN(conf)) {
     const diff = conf - sum.balance;

@@ -108,4 +108,37 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.strictEqual(runInSandbox(`parseMoneyInput('45,00')`), 45);
     assert.strictEqual(runInSandbox(`parseMoneyInput('4.500,00')`), 4500);
   });
+
+  // #421 — margem real por dia: calcCashSummary retorna cogs + margem + semCusto.
+  test('caixa: calcCashSummary calcula cogs e margem com custo cadastrado', () => {
+    const r = runInSandbox(`(function(){
+      var ts = Date.now();
+      products = [{ id: 'p1', name: 'Coxinha', cost: 3 }];
+      orders = [{ id: 'o1', status: STATUS.ENTREGUE, updatedAt: ts, total: 20,
+        items: [{ productId: 'p1', qty: 2, name: 'Coxinha', unitPrice: 10 }] }];
+      cashEntries = [{ type: 'expense', amount: 5, createdAt: ts }];
+      return JSON.stringify(calcCashSummary(dateKeyOf()));
+    })()`);
+    const s = JSON.parse(r);
+    assert.strictEqual(s.sold, 20, 'vendas');
+    assert.strictEqual(s.cogs, 6,  'custo: 2 * 3');
+    assert.strictEqual(s.out, 5,   'saidas');
+    assert.strictEqual(s.margem, 9, 'margem: 20 - 6 - 5');
+    assert.strictEqual(s.semCusto, 0, 'todos com custo');
+  });
+
+  test('caixa: calcCashSummary marca semCusto quando produto sem custo', () => {
+    const r = runInSandbox(`(function(){
+      var ts = Date.now();
+      products = [{ id: 'p1', name: 'Coxinha' }]; // sem cost
+      orders = [{ id: 'o1', status: STATUS.ENTREGUE, updatedAt: ts, total: 20,
+        items: [{ productId: 'p1', qty: 2, name: 'Coxinha', unitPrice: 10 }] }];
+      cashEntries = [];
+      return JSON.stringify(calcCashSummary(dateKeyOf()));
+    })()`);
+    const s = JSON.parse(r);
+    assert.strictEqual(s.cogs, 0,    'cogs zero (sem custo)');
+    assert.strictEqual(s.semCusto, 1, '1 linha de item sem custo (semCusto conta linhas, nao unidades)');
+    assert.strictEqual(s.margem, 20 - 0 - 0, 'margem so com o que se tem');
+  });
 };
