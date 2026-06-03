@@ -8712,6 +8712,9 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
+  <!-- #434 — backdrop do menu Mais: cobre a tela atras do menu (z-index 54, abaixo do menu 55) -->
+  <div id="moreMenuBackdrop" onclick="closeMoreMenu()" style="display:none;position:fixed;inset:0;z-index:54;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)"></div>
+
   <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais páginas">
     <div class="more-menu-head">
       <span>
@@ -10169,6 +10172,9 @@ function closeMoreMenu() {
   menu?.classList.remove('show');
   menu?.setAttribute('aria-hidden', 'true');
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.remove('active');
+  // #434 — esconde o backdrop junto com o menu.
+  const bd = document.getElementById('moreMenuBackdrop');
+  if (bd) bd.style.display = 'none';
   if (typeof updateNavA11y === 'function') updateNavA11y();
 }
 
@@ -10179,6 +10185,9 @@ function toggleMoreMenu() {
   const willOpen = !menu.classList.contains('show');
   menu.classList.toggle('show', willOpen);
   menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
+  // #434 — mostra/esconde o backdrop junto com o menu.
+  const bd = document.getElementById('moreMenuBackdrop');
+  if (bd) bd.style.display = willOpen ? 'block' : 'none';
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.toggle('active', willOpen);
   if (typeof updateNavA11y === 'function') updateNavA11y();
@@ -16898,25 +16907,34 @@ function renderConferenciaScreen() {
 function renderConferProPanel() {
   const el = document.getElementById('conferProPanel');
   if (!el) return;
-  const pendingOrders = (orders || []).filter(o =>
-    o.status !== STATUS.CANCELADO &&
-    typeof getConferStatus === 'function' &&
-    getConferStatus(o) === CONFER_STATUS.PENDENTE
-  ).length;
+  const allOrders = orders || [];
+  const pendingOrders = allOrders.filter(function (o) {
+    return o.status !== STATUS.CANCELADO &&
+      typeof getConferStatus === 'function' &&
+      getConferStatus(o) === CONFER_STATUS.PENDENTE;
+  }).length;
   let totalUnits = 0, doneUnits = 0, problemUnits = 0;
-  (batches || []).filter(b => !b.deleted).forEach(b => {
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
     const ets = etiquetasFromBatch(b);
     totalUnits += ets.length;
-    ets.forEach(et => {
+    ets.forEach(function (et) {
       const st = getUnitStatus(b, et.idxStr);
-      if (st === CONFER_STATUS.CONFERIDO) doneUnits++;
+      if (st === CONFER_STATUS.CONFERIDO)   doneUnits++;
       if (st === CONFER_STATUS.DIVERGENCIA) problemUnits++;
     });
   });
-  el.innerHTML = `
-    <div class="confer-pro-stat"><span class="v">${pendingOrders}</span><span class="k">Pedidos pendentes</span></div>
-    <div class="confer-pro-stat"><span class="v">${totalUnits ? (doneUnits + '/' + totalUnits) : '—'}</span><span class="k">Etiquetas conferidas</span></div>
-    <div class="confer-pro-stat"><span class="v">${problemUnits}</span><span class="k">Divergências</span></div>`;
+  // #433 — quando sem lotes (totalUnits=0), mostra pedidos conferidos hoje em vez de '—'.
+  // Sem lotes, 'Etiquetas conferidas' e sempre vazio e confunde quem confere so pedidos.
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const conferidosHoje = totalUnits === 0
+    ? allOrders.filter(function (o) { return o.confirmation && (o.confirmation.at || 0) >= today0.getTime(); }).length
+    : 0;
+  const etqValue = totalUnits ? (doneUnits + '/' + totalUnits) : String(conferidosHoje);
+  const etqLabel = totalUnits ? 'Etiquetas conferidas' : 'Conferidos hoje';
+  el.innerHTML =
+    '<div class="confer-pro-stat"><span class="v">' + pendingOrders + '</span><span class="k">Pedidos pendentes</span></div>' +
+    '<div class="confer-pro-stat"><span class="v">' + etqValue + '</span><span class="k">' + etqLabel + '</span></div>' +
+    '<div class="confer-pro-stat"><span class="v">' + problemUnits + '</span><span class="k">Divergências</span></div>';
 }
 
 function batchCardHtml(batch) {
