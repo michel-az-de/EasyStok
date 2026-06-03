@@ -1425,12 +1425,15 @@
                     } catch (e) { console.error('[EasyStock]', e); }
                 },
                 gerarCodigoBarras() {
-                    const ts = Date.now().toString().slice(-12).padStart(12, '0');
-                    const digits = ts.split('').map(Number);
+                    // EAN-001: prefixo "2" = faixa GS1 reservada a uso interno da loja (restricted
+                    // distribution). Um codigo gerado aqui NAO e um GTIN registrado; usar 789/790 (BR)
+                    // daria falsa impressao de registro oficial, e o timestamp cru caia em "780" (Chile).
+                    const base = ('2' + Date.now().toString().slice(-11)).slice(0, 12).padStart(12, '0');
+                    const digits = base.split('').map(Number);
                     let checksum = 0;
                     for (let i = 0; i < 12; i++) checksum += digits[i] * (i % 2 === 0 ? 1 : 3);
                     const check = (10 - (checksum % 10)) % 10;
-                    this.codigoBarras = ts + check;
+                    this.codigoBarras = base + check;
                     this.eanAviso = '';
                 },
                 _buildSkuCandidate() {
