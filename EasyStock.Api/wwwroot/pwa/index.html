@@ -15754,11 +15754,18 @@ function setAgendaActive(active) {
   if (label) label.textContent = active ? SCHED_LABEL_ON : SCHED_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('scheduleDatetime');
-    if (dt && !dt.value) {
-      // default 1h adiante pra forçar operador a confirmar quando
-      const future = new Date(Date.now() + 60*60*1000);
-      const off = future.getTimezoneOffset() * 60000;
-      dt.value = new Date(future - off).toISOString().slice(0,16);
+    if (dt) {
+      // #406: min = agora (entrega agendada nao pode ser no passado). Espelha o
+      // retroativo, que ja seta min/max. Antes o campo nao tinha min e aceitava
+      // data passada (ex 01/01/2020), so barrada depois no saveOrder.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      dt.min = new Date(Date.now() - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // default 1h adiante pra forçar operador a confirmar quando
+        const future = new Date(Date.now() + 60*60*1000);
+        const off = future.getTimezoneOffset() * 60000;
+        dt.value = new Date(future - off).toISOString().slice(0,16);
+      }
     }
   } else {
     const dt = document.getElementById('scheduleDatetime');
@@ -16849,6 +16856,14 @@ function calcAuthHeaders() {
   return headers;
 }
 
+// #407: parse defensivo. Corpo vazio (200/204) fazia res.json() jogar
+// "Unexpected end of JSON input", poluindo o console e podendo derrubar a
+// calculadora. Le como texto e so parseia se houver corpo.
+async function calcParse(res) {
+  const t = await res.text();
+  return t ? JSON.parse(t) : {};
+}
+
 async function calcBuscarProdutos() {
   if (calcSearchTimer) clearTimeout(calcSearchTimer);
   calcSearchTimer = setTimeout(async () => {
@@ -16860,7 +16875,7 @@ async function calcBuscarProdutos() {
       const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
       const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
       const res = await fetch(url, { headers: calcAuthHeaders() });
-      const json = await res.json();
+      const json = await calcParse(res);
       const produtos = (json && json.data) || [];
       if (produtos.length === 0) {
         box.classList.add('show');
@@ -16986,7 +17001,7 @@ async function calcExecutar() {
         lojaId
       })
     });
-    const json = await res.json();
+    const json = await calcParse(res);
     if (!res.ok) {
       const code = (json && json.error && json.error.code) || 'ERROR';
       const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
@@ -17101,7 +17116,7 @@ async function calcGerarCompra() {
       headers: calcAuthHeaders(),
       body: JSON.stringify({ empresaId: empresaId || null, lojaId, insumos: insumosFaltantes })
     });
-    const json = await res.json();
+    const json = await calcParse(res);
     if (!res.ok) {
       const code = (json && json.error && json.error.code) || 'ERROR';
       showToast(`${code}: ${json.error?.message || ''}`);
@@ -17145,7 +17160,7 @@ async function calcGerarCompra() {
         fornecedores
       })
     });
-    const json2 = await res2.json();
+    const json2 = await calcParse(res2);
     if (!res2.ok) {
       const code = (json2 && json2.error && json2.error.code) || 'ERROR';
       showToast(`${code}: ${json2.error?.message || ''}`);
@@ -17211,7 +17226,7 @@ async function cestaCalcCarregarCacheReceitas() {
     const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
     const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?limit=200${empresaId ? '&empresaId=' + empresaId : ''}`;
     const res = await fetch(url, { headers: calcAuthHeaders() });
-    const json = await res.json();
+    const json = await calcParse(res);
     const ids = ((json && json.data) || []).map(p => String(p.id));
     produtosComReceitaCacheSet = new Set(ids);
   } catch (_) {
@@ -17356,7 +17371,7 @@ async function cestaCalcCalcular() {
         }))
       })
     });
-    const json = await res.json();
+    const json = await calcParse(res);
     if (!res.ok) {
       const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
       badge.textContent = msg;
