@@ -26,6 +26,7 @@ public class LogoutModel(
         }
 
         session.ClearSession();
+        Response.Cookies.Delete("_rt_admin");
         return RedirectToPage("/Auth/Login");
     }
 }

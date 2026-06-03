@@ -1,3 +1,4 @@
+using EasyStock.Admin.Middleware;
 using Microsoft.AspNetCore.HttpOverrides;
 
 namespace EasyStock.Admin.Hosting;
@@ -46,6 +47,11 @@ public static class AdminPipelineExtensions
         app.UseSession();
         app.UseAuthentication();
         app.UseAuthorization();
+
+        // Restaura a sessao via cookie _rt_admin quando a sessao in-memory foi zerada
+        // por deploy/restart — roda antes do AdminPageBase (que redireciona pro login
+        // se a sessao estiver vazia). Safe-by-construction: ver AdminSessionRestoreMiddleware.
+        app.UseMiddleware<AdminSessionRestoreMiddleware>();
 
         app.MapRazorPages();
 

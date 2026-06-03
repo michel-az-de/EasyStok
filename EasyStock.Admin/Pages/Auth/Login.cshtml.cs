@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EasyStock.Admin.Pages.Auth;
 
-public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger<LoginModel> logger) : PageModel
+public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger<LoginModel> logger, IWebHostEnvironment env) : PageModel
 {
     [BindProperty]
     [Required(ErrorMessage = "Informe o e-mail.")]
@@ -77,6 +77,17 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
 
             var nome = usuario.TryGetProperty("nome", out var nomeProp) ? nomeProp.GetString() ?? Email : Email;
             session.SetSession(token, refreshToken, nome, Email);
+
+            // Persiste o refresh token num cookie HttpOnly p/ a sessao sobreviver a
+            // deploy/restart (a sessao in-memory e zerada; o AdminSessionRestoreMiddleware
+            // restaura a partir daqui). Espelha o cookie _rt do EasyStock.Web.
+            Response.Cookies.Append("_rt_admin", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !env.IsDevelopment(),
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(30)
+            });
 
             return RedirectToPage("/Index");
         }

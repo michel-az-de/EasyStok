@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.ResponseCompression;
 
 namespace EasyStock.Admin.DependencyInjection;
@@ -67,6 +68,36 @@ public static class AdminServicesExtensions
             });
 
         services.AddAuthorization();
+
+        // DataProtection: persiste as chaves num volume em producao (mesma motivacao do
+        // EasyStock.Web). Sem isso as chaves de assinatura do cookie de sessao + antiforgery
+        // sao regeneradas a cada restart. KeysPath vem do ambiente (volume montado); em dev
+        // (sem KeysPath) cai no default efemero. Guard de gravabilidade evita 500 se o volume
+        // nascer root-owned (container roda como appuser uid 1001). A persistencia da SESSAO
+        // em si (token) e resolvida pelo AdminSessionRestoreMiddleware (cookie _rt_admin).
+        var dpKeysPath = builder.Configuration["DataProtection:KeysPath"];
+        var dp = services.AddDataProtection().SetApplicationName("EasyStok.Admin");
+        if (!string.IsNullOrWhiteSpace(dpKeysPath))
+        {
+            var dpWritable = false;
+            try
+            {
+                Directory.CreateDirectory(dpKeysPath);
+                var probe = Path.Combine(dpKeysPath, ".write-probe");
+                File.WriteAllText(probe, "ok");
+                File.Delete(probe);
+                dpWritable = true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[DataProtection] AVISO: '{dpKeysPath}' nao gravavel ({ex.GetType().Name}) — chaves ficarao efemeras. Verifique o volume/permissao (chown 1001).");
+            }
+            if (dpWritable)
+            {
+                dp.PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath));
+                Console.WriteLine($"[DataProtection] Persistindo chaves em '{dpKeysPath}'.");
+            }
+        }
 
         // Response compression — Brotli/Gzip pra Razor Pages + JSON dos /api-proxy/*.
         // Render cobra bandwidth; CPU overhead marginal.
