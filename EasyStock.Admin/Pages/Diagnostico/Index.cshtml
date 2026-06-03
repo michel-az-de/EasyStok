@@ -1308,6 +1308,44 @@
             </template>
         </div>
         <p x-show="testes.verificadoEm" x-cloak class="text-es-ink-mute text-[10px] mt-3" x-text="'Verificado ' + (testes.verificadoEm ? new Date(testes.verificadoEm).toLocaleTimeString('pt-BR') : '')"></p>
+
+        <!-- Smoke ao vivo (probe HTTP dos endpoints-chave) -->
+        <div class="flex items-center justify-between mb-2 mt-6">
+            <h3 class="text-es-ink font-semibold text-sm">🔥 Smoke ao vivo</h3>
+            <button type="button" @@click="testes.runSmoke()" :disabled="testes.smokeLoading" class="btn-primary text-sm disabled:opacity-50">
+                <span x-show="!testes.smokeLoading">▶ Rodar smoke</span>
+                <span x-show="testes.smokeLoading" x-cloak>Rodando…</span>
+            </button>
+        </div>
+        <div class="text-es-ink-mute text-xs mb-3">Dispara chamadas HTTP reais aos endpoints-chave da API e mostra verde/vermelho. Não roda o projeto de testes; é probe ao vivo.</div>
+        <template x-if="testes.smokeErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="testes.smokeErro"></div>
+        </template>
+        <div x-show="testes.smoke" x-cloak class="card p-0 overflow-x-auto">
+            <div class="flex gap-4 px-4 py-2.5 text-xs text-es-ink-mute" style="background:rgba(247,242,232,.03);border-bottom:1px solid rgba(247,242,232,.06)">
+                <span>✅ <b class="text-es-basil" x-text="testes.smoke?.saudaveis ?? 0"></b></span>
+                <span>🐢 <b class="text-amber-300" x-text="testes.smoke?.lentos ?? 0"></b></span>
+                <span title="Auth-protegidos — testados sem credenciais.">🔒 <b class="text-amber-300" x-text="testes.smoke?.degradados ?? 0"></b></span>
+                <span>❌ <b class="text-red-400" x-text="testes.smoke?.falhas ?? 0"></b></span>
+                <span class="ml-auto font-mono text-[10px]" x-show="testes.smoke?.testadoEm" x-text="new Date(testes.smoke.testadoEm).toLocaleTimeString('pt-BR')"></span>
+            </div>
+            <table class="w-full text-xs">
+                <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                    <tr><th class="px-3 py-2 text-left">Método</th><th class="px-3 py-2 text-left">Rota</th><th class="px-3 py-2 text-right">HTTP</th><th class="px-3 py-2 text-right">ms</th><th class="px-3 py-2 text-left">Status</th></tr>
+                </thead>
+                <tbody>
+                    <template x-for="(ep, i) in (testes.smoke?.resultados ?? [])" :key="i">
+                        <tr style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td class="px-3 py-2 font-mono text-es-ink-mute" x-text="ep.metodo ?? '—'"></td>
+                            <td class="px-3 py-2 font-mono text-es-ink" x-text="ep.rota ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="ep.statusCode ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono" :class="(ep.latenciaMs ?? 0) > 1000 ? 'text-amber-400' : 'text-es-ink-mute'" x-text="ep.latenciaMs != null ? Math.round(ep.latenciaMs) : '—'"></td>
+                            <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="ep.status === 'ok' ? 'bg-es-basil/20 text-es-basil' : (ep.status === 'slow' || ep.status === 'degraded') ? 'bg-amber-500/20 text-amber-300' : ep.status === 'very_slow' ? 'bg-orange-500/20 text-orange-300' : 'bg-red-500/20 text-red-400'" x-text="ep.status === 'degraded' ? 'auth-protegido' : (ep.status ?? '—')"></span></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
@@ -1341,7 +1379,7 @@ function diagnosticoPage() {
         infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
         perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
         stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, worker: null, syncMobile: [], checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
-        testes: { _loadedOnce: false, loading: false, erro: '', runs: [], verificadoEm: null, dotClass: () => '', badgeClass: () => '', label: () => '—' },
+        testes: { _loadedOnce: false, loading: false, erro: '', runs: [], verificadoEm: null, smoke: null, smokeLoading: false, smokeErro: '', dotClass: () => '', badgeClass: () => '', label: () => '—' },
 
         init() {
             this.resumo = resumoState.call(this);
@@ -2063,6 +2101,9 @@ function testesState() {
         erro: '',
         runs: [],
         verificadoEm: null,
+        smoke: null,
+        smokeLoading: false,
+        smokeErro: '',
 
         async refresh() {
             this._loadedOnce = true;
@@ -2098,6 +2139,19 @@ function testesState() {
             if (this._ok(run)) return 'passou';
             if (run?.conclusion === 'failure') return 'falhou';
             return run?.conclusion || run?.status || '—';
+        },
+
+        // Smoke ao vivo: probe HTTP dos endpoints-chave (reusa /api/diagnostico/endpoints).
+        async runSmoke() {
+            this.smokeLoading = true; this.smokeErro = '';
+            try {
+                const r = await fetch('/api-proxy/diag/endpoints', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.smokeErro = `HTTP ${r.status} ao rodar o smoke.`; return; }
+                this.smoke = await r.json();
+            } catch (e) {
+                this.smokeErro = 'Falha de rede: ' + (e.message || e);
+            } finally { this.smokeLoading = false; }
         }
     };
 }
