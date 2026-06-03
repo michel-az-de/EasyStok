@@ -21,6 +21,7 @@ volumes:
   uploads-data:
   caddy-data:
   caddy-config:
+  dataprotection-web-keys:
 
 services:
 
@@ -98,6 +99,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ApiSettings__BaseUrl: "http://api:8080/api"
       ApiSettings__TimeoutSeconds: "30"
+      # Persistencia das chaves de DataProtection num volume — sem isso o cookie de
+      # auth morre a cada deploy (logout geral). Ver EasyStock.Web/Program.cs (8b).
+      DataProtection__KeysPath: /app/dataprotection-keys
+    volumes:
+      - dataprotection-web-keys:/app/dataprotection-keys
     networks: [easystock-net]
     healthcheck:
       test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8081"]

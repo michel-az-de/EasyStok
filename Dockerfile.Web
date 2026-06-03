@@ -40,6 +40,12 @@ RUN addgroup --system --gid 1001 appgroup \
 
 COPY --from=build /app/publish .
 
+# Mountpoint do volume de chaves do DataProtection. Criado aqui pra herdar o dono
+# appuser no chown abaixo: assim o volume nomeado montado neste path nasce gravavel
+# pelo appuser (uid 1001). Sem isso o volume seria root-owned, o appuser nao gravaria
+# as chaves e a sessao nao sobreviveria a deploy. Ver EasyStock.Web/Program.cs (8b).
+RUN mkdir -p /app/dataprotection-keys
+
 RUN chown -R appuser:appgroup /app
 USER appuser
 
