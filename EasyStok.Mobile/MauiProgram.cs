@@ -4,6 +4,13 @@ using EasyStok.Mobile.Services;
 using EasyStok.Mobile.Storage;
 using EasyStok.Mobile.ViewModels;
 using EasyStok.Mobile.Views;
+#if DEBUG
+// AddDebug() (MauiProgram ~L146) so compila em DEBUG. using condicional evita o
+// IDE0005 "using nao usado" no build Release (EnforceCodeStyleInBuild=error) sem
+// quebrar o build Debug com CS1061. Ver commit 141a9190 (que removeu este using
+// pro coverage Release passar e, sem querer, quebrou o build Debug local).
+using Microsoft.Extensions.Logging;
+#endif
 
 namespace EasyStok.Mobile;
 
