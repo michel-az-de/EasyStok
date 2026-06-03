@@ -2,7 +2,6 @@
 using EasyStock.Web.DependencyInjection;
 using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Middleware;
-using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
@@ -98,8 +97,19 @@ _ = Task.Run(async () =>
     {
         logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
         using var scope = app.Services.CreateScope();
-        var diag = scope.ServiceProvider.GetRequiredService<DiagnosticoWebService>();
-        var reachable = await diag.PingApiAsync();
+        // Ping leve e anonimo na API (health/live) — antes usava DiagnosticoWebService,
+        // removido junto com a UI /diagnostico da Web (centralizada no Admin).
+        var httpFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+        var pingClient = httpFactory.CreateClient();
+        pingClient.Timeout = TimeSpan.FromSeconds(10);
+        var reachable = false;
+        try
+        {
+            var pingBase = (baseUrl ?? "").TrimEnd('/');
+            var pingResp = await pingClient.GetAsync($"{pingBase}/health/live");
+            reachable = pingResp.IsSuccessStatusCode;
+        }
+        catch { reachable = false; }
         if (reachable)
             logger.LogInformation("API conectada com sucesso — BaseUrl: {BaseUrl}", baseUrl);
         else

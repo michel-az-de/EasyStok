@@ -68,18 +68,6 @@ public static class WebHttpServicesExtensions
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }).AddHttpMessageHandler<TokenRefreshHandler>();
 
-        // 5b. HttpClient for diagnostics — agora exige auth (controllers da API DiagnosticoController/InfraController/LogsController
-        // estao com [Authorize(Policy="Admin")] no nivel da classe). Sem o handler, todas as chamadas voltam 401
-        // e a aba Endpoints / o card principal renderizam vazio mesmo pro SuperAdmin logado.
-        services.AddHttpClient<DiagnosticoWebService>(client =>
-        {
-            var baseUrl = config["ApiSettings:BaseUrl"]!;
-            // Ensure base URL ends with /
-            if (!baseUrl.EndsWith('/')) baseUrl += "/";
-            client.BaseAddress = new Uri(baseUrl);
-            client.Timeout = TimeSpan.FromSeconds(10);
-        }).AddHttpMessageHandler<TokenRefreshHandler>();
-
         // 6. Domain services
         services.AddScoped<ProdutosService>();
         services.AddScoped<EstoqueService>();
