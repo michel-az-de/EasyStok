@@ -31,7 +31,13 @@ public class AdminAuditService(EasyStockDbContext db, IHttpContextAccessor http)
                     ?? ctx.User?.FindFirstValue("email")
                     ?? "anonymous";
         }
-        var ip = ctx?.Connection.RemoteIpAddress?.ToString();
+        // Honra X-Forwarded-For: atras do Caddy/Docker o RemoteIpAddress e a bridge interna
+        // (::ffff:172.x), nao o cliente real. Mesmo padrao de CurrentUserAccessor.Ip: o 1o IP
+        // da cadeia e o cliente original.
+        var fwd = ctx?.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var ip = !string.IsNullOrWhiteSpace(fwd)
+            ? fwd.Split(',')[0].Trim()
+            : ctx?.Connection.RemoteIpAddress?.ToString();
         db.AdminAuditLogs.Add(AdminAuditLog.Criar(email, acao, detalhes, tenantId, ip, motivo, entidadeAfetadaId));
         await db.CommitAsync();
     }
