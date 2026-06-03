@@ -269,6 +269,14 @@
                     <span style="font-weight:700; font-size:14px; line-height:1;">?</span>
                 </button>
 
+                <!-- Onda 2 (#438): indicador global de saude da stack -->
+                <a href="/Diagnostico?tab=stack" x-show="stackStatus" x-cloak
+                   class="topbar-icon-btn flex items-center justify-center"
+                   :title="'Saúde da stack: ' + (stackStatus === 'Healthy' ? 'saudável' : stackStatus === 'Degraded' ? 'degradada' : 'com falha') + ' — abrir board'"
+                   :aria-label="'Saúde da stack: ' + (stackStatus === 'Healthy' ? 'saudável' : stackStatus === 'Degraded' ? 'degradada' : 'com falha')">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full"
+                          :class="stackStatus === 'Healthy' ? 'bg-es-basil' : stackStatus === 'Degraded' ? 'bg-amber-400 animate-pulse' : 'bg-red-500 animate-pulse'"></span>
+                </a>
                 <span class="bg-es-accent text-es-ink text-xs font-bold px-2.5 py-1 rounded-full tracking-wide hidden sm:inline-flex">ADMIN</span>
                 <span class="text-es-ink-dim text-sm hidden lg:inline truncate" style="max-width: 200px;">@Context.Session.GetString("admin_nome")</span>
             </div>
@@ -387,6 +395,7 @@
             cheatOpen: false,
             _gPressed: false,
             _gTimer: null,
+            stackStatus: null,
 
             async init() {
                 this._loadSidebarState();
@@ -414,6 +423,12 @@
                 setInterval(() => { if (!document.hidden) this.fetchDashBadges(); }, 60000);
                 setInterval(() => { if (this._lastFetch) this.dashSecsAgo = Math.floor((Date.now() - this._lastFetch) / 1000); }, 5000);
                 document.addEventListener('visibilitychange', () => { if (!document.hidden) this.fetchDashBadges(); });
+
+                // Onda 2 (#438): indicador global de saude da stack no topbar.
+                // Mesma cadencia/pausa do BUG-014 (so com aba visivel).
+                this.fetchStackHealth();
+                setInterval(() => { if (!document.hidden) this.fetchStackHealth(); }, 60000);
+                document.addEventListener('visibilitychange', () => { if (!document.hidden) this.fetchStackHealth(); });
             },
 
             // ── Sidebar collapse ──
@@ -462,6 +477,17 @@
                     this.dashSecsAgo = 0;
                 } catch (e) {
                     console.error('[admin] fetchDashBadges falhou:', e);
+                }
+            },
+
+            async fetchStackHealth() {
+                try {
+                    const r = await fetch('/api-proxy/diag/health', { credentials: 'same-origin', cache: 'no-store' });
+                    if (!r.ok) { this.stackStatus = null; return; }
+                    const d = await r.json();
+                    this.stackStatus = d?.status || null;
+                } catch (e) {
+                    this.stackStatus = null;
                 }
             },
 
