@@ -1073,6 +1073,102 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- ── Padrões detectados (com ack) ── -->
+        <div class="flex items-center justify-between mb-3 mt-6">
+            <h3 class="text-es-ink font-semibold text-sm">🔎 Padrões detectados</h3>
+        </div>
+        <div x-show="!perf.padroes.length" x-cloak class="card text-center py-6 text-es-ink-mute text-sm">Nenhum padrão suspeito detectado no período.</div>
+        <div x-show="perf.padroes.length" class="space-y-2 mb-6">
+            <template x-for="(p, i) in perf.padroes" :key="p.alertaId || i">
+                <div class="card">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                      :class="(p.severidade === 'critical' || p.severidade === 'error') ? 'bg-red-500/20 text-red-400' : p.severidade === 'warning' ? 'bg-amber-500/20 text-amber-300' : 'bg-es-surface-2 text-es-ink-mute'"
+                                      x-text="p.severidade || 'info'"></span>
+                                <span class="text-es-ink text-sm font-medium" x-text="p.tipo"></span>
+                                <span class="text-es-ink-mute text-[10px]" x-show="p.ocorrencias" x-text="(p.ocorrencias || 0) + 'x'"></span>
+                            </div>
+                            <div class="text-es-ink-dim text-xs" x-text="p.descricao"></div>
+                            <div class="text-es-ink-mute text-[11px] mt-1" x-show="p.sugestao" x-text="'💡 ' + p.sugestao"></div>
+                        </div>
+                        <div class="flex flex-col items-end gap-1 shrink-0">
+                            <span x-show="perf.acks[p.alertaId]" x-cloak class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-es-basil/20 text-es-basil" x-text="perf.acks[p.alertaId]?.status"></span>
+                            <div class="flex gap-1">
+                                <button type="button" @@click="perf.ackAlerta(p.alertaId, 'visto')" :disabled="!p.alertaId" class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute hover:text-es-ink disabled:opacity-40">visto</button>
+                                <button type="button" @@click="perf.ackAlerta(p.alertaId, 'em_investigacao')" :disabled="!p.alertaId" class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute hover:text-es-ink disabled:opacity-40">investigando</button>
+                                <button type="button" @@click="perf.ackAlerta(p.alertaId, 'resolvido')" :disabled="!p.alertaId" class="text-[10px] px-1.5 py-0.5 rounded bg-es-surface-2 text-es-ink-mute hover:text-es-ink disabled:opacity-40">resolvido</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ── Eventos recentes ── -->
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-es-ink font-semibold text-sm">🗓 Eventos recentes (48h)</h3>
+            <button type="button" @@click="perf.refreshEventos()" class="btn-secondary text-xs">↻</button>
+        </div>
+        <template x-if="perf.eventosErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="perf.eventosErro"></div>
+        </template>
+        <div x-show="!perf.eventos.length && !perf.eventosErro" x-cloak class="card text-center py-6 text-es-ink-mute text-sm">Nenhum evento no período.</div>
+        <div x-show="perf.eventos.length" class="card p-0 overflow-hidden mb-6">
+            <table class="w-full text-xs">
+                <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                    <tr><th class="px-3 py-2 text-left">Quando</th><th class="px-3 py-2 text-left">Tipo</th><th class="px-3 py-2 text-left">Detalhe</th></tr>
+                </thead>
+                <tbody>
+                    <template x-for="(ev, i) in perf.eventos" :key="i">
+                        <tr style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td class="px-3 py-2 font-mono text-es-ink-mute whitespace-nowrap" x-text="new Date(ev.timestamp).toLocaleString('pt-BR')"></td>
+                            <td class="px-3 py-2">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="(ev.severidade === 'error' || ev.tipo === 'error_spike') ? 'bg-red-500/20 text-red-400' : 'bg-es-surface-2 text-es-ink-mute'" x-text="ev.tipo"></span>
+                            </td>
+                            <td class="px-3 py-2 text-es-ink-dim" x-text="ev.label"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── Saúde por empresa ── -->
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-es-ink font-semibold text-sm">🏢 Saúde por empresa</h3>
+            <button type="button" @@click="perf.refreshHealthEmpresas()" class="btn-secondary text-xs">↻</button>
+        </div>
+        <template x-if="perf.healthEmpErro">
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-4" x-text="perf.healthEmpErro"></div>
+        </template>
+        <template x-if="perf.healthEmpresas && perf.healthEmpresas.disponivel === false">
+            <div class="card text-sm text-es-ink-mute" x-text="perf.healthEmpresas.motivo || 'Indisponível.'"></div>
+        </template>
+        <div x-show="perf.healthEmpresas?.disponivel" x-cloak class="card p-0 overflow-hidden">
+            <div class="flex gap-4 px-4 py-2.5 text-xs text-es-ink-mute" style="background:rgba(247,242,232,.03);border-bottom:1px solid rgba(247,242,232,.06)">
+                <span>✅ OK: <b class="text-es-basil" x-text="perf.healthEmpresas?.ok ?? 0"></b></span>
+                <span>⚠ Degradadas: <b class="text-amber-300" x-text="perf.healthEmpresas?.degraded ?? 0"></b></span>
+                <span class="ml-auto" x-text="(perf.healthEmpresas?.totalAnalisadas ?? 0) + ' analisadas'"></span>
+            </div>
+            <table class="w-full text-xs">
+                <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
+                    <tr><th class="px-3 py-2 text-left">Empresa</th><th class="px-3 py-2 text-left">Status</th><th class="px-3 py-2 text-right">ms</th><th class="px-3 py-2 text-right">Produtos</th><th class="px-3 py-2 text-right">Vendas 24h</th></tr>
+                </thead>
+                <tbody>
+                    <template x-for="(emp, i) in (perf.healthEmpresas?.empresas ?? [])" :key="i">
+                        <tr style="border-top:1px solid rgba(247,242,232,0.04)">
+                            <td class="px-3 py-2 text-es-ink" x-text="emp.nome || '—'"></td>
+                            <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="emp.status === 'ok' ? 'bg-es-basil/20 text-es-basil' : emp.status === 'degraded' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-400'" x-text="emp.status"></span></td>
+                            <td class="px-3 py-2 text-right font-mono" :class="(emp.latenciaMs ?? 0) > 2000 ? 'text-amber-400' : 'text-es-ink-mute'" x-text="emp.latenciaMs ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="emp.produtos ?? '—'"></td>
+                            <td class="px-3 py-2 text-right font-mono text-es-ink-mute" x-text="emp.vendasUltimas24h ?? '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
@@ -1560,12 +1656,19 @@ function perfState() {
         htSvg: '', errSvg: '', volSvg: '',
         htHas: false, htMaxDb: 0, htMaxErr: 0, barsHas: false,
 
+        // Insights de paridade (#431): padrões detectados + ack, eventos, saúde por empresa.
+        padroes: [], acks: {},
+        eventos: [], eventosErro: '',
+        healthEmpresas: null, healthEmpErro: '',
+
         async refreshAll() {
             this._loadedOnce = true;
             this.refreshSlo();
             this.refreshEndpoints();
             this.refreshQueries();
             this.refreshCharts();
+            this.refreshEventos();
+            this.refreshHealthEmpresas();
         },
 
         async refreshCharts() {
@@ -1580,6 +1683,8 @@ function perfState() {
                 const summ = rs.ok ? await rs.json() : null;
                 this._buildHealthTimeline(hist);
                 this._buildBars(summ);
+                this.padroes = (summ && summ.padroes) || [];
+                this._loadAcks();
                 this.chartsReady = true;
             } catch (e) {
                 this.chartsErro = 'Falha de rede: ' + (e.message || e);
@@ -1637,6 +1742,60 @@ function perfState() {
             this.barsHas = true;
             this.errSvg = this._svgWrap(er, 'Requests e erros por hora');
             this.volSvg = this._svgWrap(vr, 'Volume de logs por hora');
+        },
+
+        async refreshEventos() {
+            this.eventosErro = '';
+            try {
+                const r = await fetch('/api-proxy/diag/eventos?hours=48', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.eventosErro = `HTTP ${r.status} ao carregar eventos.`; return; }
+                const d = await r.json();
+                this.eventos = (d && d.eventos) || [];
+            } catch (e) {
+                this.eventosErro = 'Falha de rede: ' + (e.message || e);
+            }
+        },
+
+        async refreshHealthEmpresas() {
+            this.healthEmpErro = '';
+            try {
+                const r = await fetch('/api-proxy/diag/health-empresas', { credentials: 'same-origin', cache: 'no-store' });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) { this.healthEmpErro = `HTTP ${r.status} ao verificar empresas.`; return; }
+                this.healthEmpresas = await r.json();
+            } catch (e) {
+                this.healthEmpErro = 'Falha de rede: ' + (e.message || e);
+            }
+        },
+
+        async _loadAcks() {
+            const ids = this.padroes.map(p => p.alertaId).filter(Boolean);
+            if (!ids.length) { this.acks = {}; return; }
+            try {
+                const r = await fetch('/api-proxy/diag/alertas/acks?ids=' + encodeURIComponent(ids.join(',')), { credentials: 'same-origin', cache: 'no-store' });
+                if (!r.ok) return;
+                const data = await r.json();
+                const map = {};
+                (data.acks || []).forEach(a => { if (a && a.alertaId) map[a.alertaId] = a; });
+                this.acks = map;
+            } catch (e) { /* acks não são críticos */ }
+        },
+
+        async ackAlerta(alertaId, status) {
+            if (!alertaId) return;
+            try {
+                const r = await fetch('/api-proxy/diag/alertas/' + encodeURIComponent(alertaId) + '/ack', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (!r.ok) return;
+                const ack = await r.json();
+                this.acks = { ...this.acks, [alertaId]: ack };
+            } catch (e) { /* falha de ack não quebra a UI */ }
         },
 
         async refreshSlo() {

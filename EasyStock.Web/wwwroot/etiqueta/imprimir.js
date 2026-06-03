@@ -332,8 +332,20 @@ ${labelHtmls}
 <script src="/etiqueta/vendor/jsbarcode.min.js"><\/script>
 <script type="module">
   import { renderCodes } from '/etiqueta/codes.js';
-  (async () => { for (const r of document.querySelectorAll('.etq-label')) { try { await renderCodes(r); } catch(e) { console.warn('[etq] renderCodes:', e); } } })();
-  window.addEventListener('load', () => setTimeout(() => window.print(), 500));
+  // #ETQ1: imprime SO apos (a) recursos carregados (load) e (b) TODOS os QR/barcode
+  // renderizados. Antes o loop era fire-and-forget e o print disparava em load+500ms,
+  // entao etiqueta regulada (RDC 727) saia SEM codigo se o render passasse de 500ms
+  // (muitas etiquetas ou device lento). Agora o print espera o loop terminar.
+  const _whenLoaded = document.readyState === 'complete'
+    ? Promise.resolve()
+    : new Promise(function (res) { window.addEventListener('load', res, { once: true }); });
+  (async () => {
+    await _whenLoaded;
+    for (const r of document.querySelectorAll('.etq-label')) {
+      try { await renderCodes(r); } catch (e) { console.warn('[etq] renderCodes:', e); }
+    }
+    window.print();
+  })();
 <\/script>
 </body></html>`;
 }
