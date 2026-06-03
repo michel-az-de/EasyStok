@@ -298,14 +298,17 @@ function mobileSyncHealth(tenantId) {
                 <button type="button" @@click="showTrial = !showTrial" class="btn-secondary text-xs w-full">
                     Conceder Trial
                 </button>
-                <div x-show="showTrial" x-cloak class="mt-3">
+                <div x-show="showTrial" x-cloak class="mt-3" x-data="{ dias: 30 }">
                     <form method="post" asp-page-handler="ConcederTrial" class="flex gap-2 items-end">
                         @Html.AntiForgeryToken()
                         <div class="flex-1">
                             <label class="form-label">Dias</label>
-                            <input type="number" name="diasTrial" value="30" min="1" max="90" class="form-input" required />
+                            <input type="number" name="diasTrial" x-model.number="dias" min="1" max="90" class="form-input" required />
+                            <p x-show="dias < 1 || dias > 90" x-cloak class="text-xs mt-1" style="color:var(--crit-600);">
+                                Informe de 1 a 90 dias.
+                            </p>
                         </div>
-                        <button type="submit" class="btn-primary text-sm">Conceder</button>
+                        <button type="submit" :disabled="dias < 1 || dias > 90" class="btn-primary text-sm">Conceder</button>
                     </form>
                 </div>
             </div>
@@ -363,7 +366,7 @@ function mobileSyncHealth(tenantId) {
                 <button type="button" @@click="carregar()" class="text-xs text-es-ink-dim hover:text-es-ink">↻ atualizar</button>
             </div>
             <div x-show="!loaded" class="text-xs text-es-ink-dim">carregando…</div>
-            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">Nao foi possivel carregar (timeout/erro). Tente ↻ atualizar.</div>
+            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">Não foi possível carregar (timeout/erro). Tente ↻ atualizar.</div>
             <div x-show="loaded && !erro" x-cloak class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <template x-for="m in metricas" :key="m.label">
                     <div class="rounded-lg p-3" style="background:#0f172a;border:1px solid rgba(247,242,232,0.08)">

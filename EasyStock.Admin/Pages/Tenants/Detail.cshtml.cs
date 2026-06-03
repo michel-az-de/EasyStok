@@ -181,9 +181,9 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
 
     public async Task<IActionResult> OnPostConcederTrialAsync(int diasTrial)
     {
-        if (diasTrial is < 1 or > 365)
+        if (diasTrial is < 1 or > 90)
         {
-            SetErro("Dias de trial deve estar entre 1 e 365.");
+            SetErro("Dias de trial deve estar entre 1 e 90.");
             return RedirectToPage(new { Id });
         }
         try
