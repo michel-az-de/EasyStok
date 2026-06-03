@@ -1005,5 +1005,26 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // Onda 2 (#438) — status inferido do Worker (via endpoint_health_state, read-only).
+        // Bate em DiagnosticoInfraController (envelopado em {data}), entao GetAsync.
+        app.MapGet("/api-proxy/diag/worker-status", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken())) return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetAsync<JsonElement>("api/diagnostico/worker-status");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy diag/worker-status falhou");
+                return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
     }
 }

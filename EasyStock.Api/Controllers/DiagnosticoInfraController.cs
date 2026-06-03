@@ -442,6 +442,67 @@ public sealed class DiagnosticoInfraController(
         }
     }
 
+    /// <summary>
+    /// Status inferido do Worker (processo separado, sem HTTP proprio). Le
+    /// endpoint_health_state, que o EndpointHealthMonitorService do Worker atualiza
+    /// a cada ~60s — se a ultima verificacao foi ha menos de 3min, o Worker esta vivo.
+    /// Read-only, sem tocar o Worker.
+    /// </summary>
+    [HttpGet("worker-status")]
+    public async Task<IActionResult> WorkerStatus(CancellationToken ct)
+    {
+        try
+        {
+            using var scope = HttpContext.RequestServices.CreateScope();
+            var db = scope.ServiceProvider.GetService<EasyStockDbContext>();
+            if (db is null)
+                return Ok(new { disponivel = false, motivo = "DbContext indisponivel." });
+
+            var estados = await db.EndpointHealthStates
+                .AsNoTracking()
+                .OrderByDescending(e => e.LastCheckAt)
+                .Take(20)
+                .ToListAsync(ct);
+
+            if (estados.Count == 0)
+                return Ok(new
+                {
+                    disponivel = true,
+                    workerAtivo = (bool?)null,
+                    motivo = "Sem registros de monitoramento ainda (o Worker grava a cada ~60s).",
+                    ultimaAtividade = (DateTime?)null,
+                    endpoints = Array.Empty<object>()
+                });
+
+            var ultima = estados.Max(e => e.LastCheckAt);
+            bool? ativo = ultima.HasValue
+                ? (DateTime.UtcNow - ultima.Value) < TimeSpan.FromMinutes(3)
+                : null;
+
+            return Ok(new
+            {
+                disponivel = true,
+                workerAtivo = ativo,
+                ultimaAtividade = ultima,
+                totalMonitorados = estados.Count,
+                comFalha = estados.Count(e => e.ConsecutiveFailures > 0),
+                endpoints = estados.Select(e => new
+                {
+                    nome = e.EndpointName,
+                    falhasConsecutivas = e.ConsecutiveFailures,
+                    ultimaVerificacao = e.LastCheckAt,
+                    ultimaFalha = e.LastFailureAt,
+                    mensagemFalha = e.LastFailureMessage
+                })
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Erro ao consultar worker-status.");
+            return Ok(new { disponivel = false, motivo = ex.Message });
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // Helpers privados
     // ──────────────────────────────────────────────────────────────────────

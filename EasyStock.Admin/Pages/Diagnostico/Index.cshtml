@@ -1223,6 +1223,21 @@
             </template>
         </div>
         <div x-show="stack.data && (stack.data?.checks ?? []).length === 0" x-cloak class="card text-center py-6 text-es-ink-mute text-sm">/health não retornou checks individuais.</div>
+
+        <!-- Worker (processo separado, inferido via endpoint_health_state) -->
+        <div x-show="stack.worker" x-cloak class="card mt-3">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                      :class="stack.worker?.disponivel === false ? 'bg-es-ink-mute' : (stack.worker?.workerAtivo === true ? 'bg-es-basil' : stack.worker?.workerAtivo === false ? 'bg-red-500' : 'bg-amber-400')"></span>
+                <span class="text-es-ink font-semibold text-sm">Worker (notificações, SLA, fiscal)</span>
+                <span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded"
+                      :class="stack.worker?.disponivel === false ? 'bg-es-surface-2 text-es-ink-mute' : (stack.worker?.workerAtivo === true ? 'bg-es-basil/20 text-es-basil' : stack.worker?.workerAtivo === false ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-300')"
+                      x-text="stack.worker?.disponivel === false ? 'indisponível' : (stack.worker?.workerAtivo === true ? 'ativo' : stack.worker?.workerAtivo === false ? 'sem sinal' : 'desconhecido')"></span>
+            </div>
+            <div class="text-es-ink-dim text-xs" x-show="stack.worker?.ultimaAtividade" x-text="'Última atividade: ' + (stack.worker?.ultimaAtividade ? new Date(stack.worker.ultimaAtividade).toLocaleString('pt-BR') : '—')"></div>
+            <div class="text-es-ink-mute text-[11px] mt-1" x-show="stack.worker?.disponivel !== false && stack.worker?.ultimaAtividade" x-text="(stack.worker?.totalMonitorados ?? 0) + ' endpoints monitorados · ' + (stack.worker?.comFalha ?? 0) + ' com falha'"></div>
+            <div class="text-es-ink-mute text-[11px] mt-1" x-show="stack.worker?.motivo" x-text="stack.worker?.motivo"></div>
+        </div>
     </div>
 
 </div>
@@ -1255,7 +1270,7 @@ function diagnosticoPage() {
         logMode: { loaded: false, verbose: false },
         infra: { _loadedOnce: false, data: {}, lastUpdated: null, erro: '' },
         perf: { _loadedOnce: false, slo: null, endpoints: null, queries: null },
-        stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
+        stack: { _loadedOnce: false, loading: false, erro: '', data: null, version: null, worker: null, checkedAt: null, dotClass: () => '', badgeClass: () => '', label: (s) => s || '—' },
 
         init() {
             this.resumo = resumoState.call(this);
@@ -1909,6 +1924,7 @@ function stackState() {
         erro: '',
         data: null,
         version: null,
+        worker: null,
         checkedAt: null,
         _timer: null,
 
@@ -1916,14 +1932,16 @@ function stackState() {
             this._loadedOnce = true;
             this.loading = true; this.erro = '';
             try {
-                const [rh, rv] = await Promise.all([
+                const [rh, rv, rw] = await Promise.all([
                     fetch('/api-proxy/diag/health', { credentials: 'same-origin', cache: 'no-store' }),
-                    fetch('/api-proxy/diag/version', { credentials: 'same-origin', cache: 'no-store' })
+                    fetch('/api-proxy/diag/version', { credentials: 'same-origin', cache: 'no-store' }),
+                    fetch('/api-proxy/diag/worker-status', { credentials: 'same-origin', cache: 'no-store' })
                 ]);
-                if (rh.status === 401 || rv.status === 401) { window.location.href = '/Auth/Login'; return; }
+                if (rh.status === 401 || rv.status === 401 || rw.status === 401) { window.location.href = '/Auth/Login'; return; }
                 if (!rh.ok) { this.erro = `HTTP ${rh.status} ao consultar /health.`; }
                 else { this.data = await rh.json(); }
                 this.version = rv.ok ? await rv.json() : null;
+                this.worker = rw.ok ? await rw.json() : null;
                 this.checkedAt = Date.now();
             } catch (e) {
                 this.erro = 'Falha de rede: ' + (e.message || e);
