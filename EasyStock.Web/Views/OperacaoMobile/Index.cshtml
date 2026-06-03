@@ -1,4 +1,5 @@
 @using EasyStock.Web.Services
+@using System.Globalization
 @inject IConfiguration Configuration
 @model OperationDashboardApi?
 @{
@@ -8,6 +9,7 @@
     var ativos = devices.Where(d => !d.Revoked).ToList();
     var apiBase = (Configuration["ApiSettings:BaseUrl"] ?? "").TrimEnd('/');
     var kdsUrl = string.IsNullOrEmpty(apiBase) ? "/pwa/#kds" : $"{apiBase}/pwa/#kds";
+    var ptBR = new CultureInfo("pt-BR");
 }
 
 <div class="flex items-center justify-between mb-6">
@@ -49,13 +51,13 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
     <div class="ws p-4">
         <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Vendas hoje</div>
-        <div class="text-2xl font-bold text-slate-900">R$ @Model.VendasHojeValor.ToString("0.00")</div>
+        <div class="text-2xl font-bold text-slate-900">@Model.VendasHojeValor.ToString("C", ptBR)</div>
         <div class="text-xs text-slate-400 mt-1">@Model.VendasHojeCount pedido@(Model.VendasHojeCount == 1 ? "" : "s") entregue@(Model.VendasHojeCount == 1 ? "" : "s")</div>
     </div>
     <div class="ws p-4">
         <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Saldo do caixa</div>
-        <div class="text-2xl font-bold text-slate-900">R$ @Model.CaixaSaldoHoje.ToString("0.00")</div>
-        <div class="text-xs text-slate-400 mt-1">+@Model.CaixaEntradasExtras.ToString("0.00") · -@Model.CaixaSaidas.ToString("0.00")</div>
+        <div class="text-2xl font-bold text-slate-900">@Model.CaixaSaldoHoje.ToString("C", ptBR)</div>
+        <div class="text-xs text-slate-400 mt-1">+@Model.CaixaEntradasExtras.ToString("C", ptBR) · -@Model.CaixaSaidas.ToString("C", ptBR)</div>
     </div>
     <div class="ws p-4 @(Model.PedidosAbertos > 0 ? "" : "opacity-70")">
         <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">Pedidos abertos</div>
