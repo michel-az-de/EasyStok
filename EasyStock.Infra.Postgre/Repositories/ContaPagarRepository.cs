@@ -65,7 +65,27 @@ public sealed class ContaPagarRepository(EasyStockDbContext db) : IContaPagarRep
         var query = db.ContasPagar.AsNoTracking()
             .Where(c => c.EmpresaId == empresaId);
 
-        if (status.HasValue) query = query.Where(c => c.Status == status.Value);
+        if (status.HasValue)
+        {
+            // Filtro consistente com o badge derivado (BUG-022): Vencida = armazenada
+            // Vencida OU Aberta/Parcial com parcela vencida por data; Aberta/Parcial
+            // excluem as ja vencidas. Demais status: match direto no armazenado.
+            var hojeFiltro = DateTime.UtcNow.Date;
+            query = status.Value switch
+            {
+                StatusContaFinanceira.Vencida => query.Where(c =>
+                    c.Status == StatusContaFinanceira.Vencida ||
+                    ((c.Status == StatusContaFinanceira.Aberta || c.Status == StatusContaFinanceira.ParcialmentePaga) &&
+                     c.Parcelas.Any(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada && p.DataVencimento < hojeFiltro))),
+                StatusContaFinanceira.Aberta => query.Where(c =>
+                    c.Status == StatusContaFinanceira.Aberta &&
+                    !c.Parcelas.Any(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada && p.DataVencimento < hojeFiltro)),
+                StatusContaFinanceira.ParcialmentePaga => query.Where(c =>
+                    c.Status == StatusContaFinanceira.ParcialmentePaga &&
+                    !c.Parcelas.Any(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada && p.DataVencimento < hojeFiltro)),
+                _ => query.Where(c => c.Status == status.Value),
+            };
+        }
         if (fornecedorId.HasValue) query = query.Where(c => c.FornecedorId == fornecedorId.Value);
         if (categoriaId.HasValue) query = query.Where(c => c.CategoriaFinanceiraId == categoriaId.Value);
         if (centroCustoId.HasValue) query = query.Where(c => c.CentroCustoId == centroCustoId.Value);
