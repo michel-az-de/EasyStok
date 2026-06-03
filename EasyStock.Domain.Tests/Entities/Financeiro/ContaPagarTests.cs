@@ -124,6 +124,35 @@ public class ContaPagarTests
     }
 
     [Fact]
+    public void StatusEfetivo_deriva_Vencida_sem_mutar_o_Status_armazenado()
+    {
+        var c = NovaRascunho();
+        c.AdicionarParcela(1, 100m, DateTime.UtcNow.AddDays(-5));
+        c.Emitir(); // Status armazenado = Aberta
+
+        // Deriva Vencida por data (BUG-022) MAS nao persiste — quem persiste e o job diario.
+        c.StatusEfetivo(DateTime.UtcNow).Should().Be(StatusContaFinanceira.Vencida);
+        c.Status.Should().Be(StatusContaFinanceira.Aberta);
+    }
+
+    [Fact]
+    public void StatusEfetivo_mantem_Aberta_quando_nada_vencido()
+    {
+        var c = NovaRascunho();
+        c.AdicionarParcela(1, 100m, DateTime.UtcNow.AddDays(15));
+        c.Emitir();
+        c.StatusEfetivo(DateTime.UtcNow).Should().Be(StatusContaFinanceira.Aberta);
+    }
+
+    [Fact]
+    public void StatusEfetivo_nao_mostra_Rascunho_como_Vencida()
+    {
+        var c = NovaRascunho();
+        c.AdicionarParcela(1, 100m, DateTime.UtcNow.AddDays(-5)); // vencida, mas conta e rascunho
+        c.StatusEfetivo(DateTime.UtcNow).Should().Be(StatusContaFinanceira.Rascunho);
+    }
+
+    [Fact]
     public void AtualizarStatusPorParcelas_define_parcial_quando_uma_paga_e_outras_abertas()
     {
         var c = NovaRascunho();

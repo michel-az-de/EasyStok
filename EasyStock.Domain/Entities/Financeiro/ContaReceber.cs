@@ -211,6 +211,23 @@ public class ContaReceber
         }
     }
 
+    /// <summary>
+    /// Status para EXIBICAO em listagens/badges: deriva Vencida por data (parcela nao
+    /// paga/cancelada com vencimento &lt; hoje) SEM persistir — rede sobre o job diario de
+    /// vencimento, pro badge ficar correto na janela ate o job rodar (BUG-022, decisao
+    /// "ambos"). Exige Parcelas carregadas; sem elas degrada pro Status armazenado.
+    /// </summary>
+    public StatusContaFinanceira StatusEfetivo(DateTime hojeUtc)
+    {
+        if (Status != StatusContaFinanceira.Aberta && Status != StatusContaFinanceira.ParcialmentePaga)
+            return Status;
+        var temVencida = Parcelas.Any(p =>
+            p.Status != StatusParcela.Paga &&
+            p.Status != StatusParcela.Cancelada &&
+            p.DataVencimento.Date < hojeUtc.Date);
+        return temVencida ? StatusContaFinanceira.Vencida : Status;
+    }
+
     public decimal TotalRecebido => Parcelas.Where(p => p.Status != StatusParcela.Cancelada).Sum(p => p.ValorPago);
     public decimal Pendente
     {
