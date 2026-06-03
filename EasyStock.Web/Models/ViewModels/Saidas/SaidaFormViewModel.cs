@@ -19,6 +19,10 @@ public class SaidaFormViewModel
     [Range(1, int.MaxValue, ErrorMessage = "Quantidade deve ser maior que zero")]
     public int Qty { get; set; }
 
+    // Valor unitário é opcional (null = sem valor informado), mas quando informado
+    // não pode ser negativo. A regra "Venda exige > 0" vive no use case da API
+    // (RegistrarSaidaEstoque); aqui barramos o negativo em qualquer natureza.
+    [Range(0, double.MaxValue, ErrorMessage = "Valor unitário não pode ser negativo.")]
     public decimal? Valor { get; set; }
 
     // BrazilTime.Today em vez de DateTime.Today — server roda UTC; na janela
