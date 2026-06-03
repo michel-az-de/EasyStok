@@ -3624,6 +3624,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: none; z-index: 9200;
   align-items: flex-end; justify-content: center;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .cobranca-overlay.show { display: flex; }
 .cobranca-sheet {
@@ -3739,6 +3740,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: none; z-index: 9300;
   align-items: flex-end; justify-content: center;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .ajustes-overlay.show { display: flex; }
 .ajustes-sheet {
@@ -4021,6 +4023,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   align-items: center; justify-content: center;
   padding: 24px;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .confer-overlay.show { display: flex; }
 .confer-sheet {
@@ -4716,6 +4719,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: none; z-index: 9350;
   align-items: flex-end; justify-content: center;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .historico-overlay.show { display: flex; }
 .historico-sheet {
@@ -10558,7 +10562,9 @@ function renderHomeFocusCard() {
   el.style.display = open.length ? 'none' : '';
   const ready = open.filter(o => o.status === STATUS.PRONTO);
   const preparing = open.filter(o => o.status === STATUS.PREPARANDO);
-  const waiting = open.filter(o => o.status === STATUS.AGUARDANDO);
+  // #429 — exclui conferidos do contador de aguardando (as 2 dimensoes sao separadas).
+  const waiting = open.filter(o => o.status === STATUS.AGUARDANDO &&
+    (typeof getConferStatus !== 'function' || getConferStatus(o) !== CONFER_STATUS.CONFERIDO));
   const pendingConfer = open.filter(o => typeof getConferStatus === 'function' && getConferStatus(o) === CONFER_STATUS.PENDENTE);
   const shopping = typeof getShoppingRows === 'function' ? getShoppingRows().filter(x => !x.done) : [];
   const sum = typeof calcCashSummaryToday === 'function' ? calcCashSummaryToday() : { sold: 0, balance: 0 };
@@ -11689,7 +11695,11 @@ function renderOpenOrders() {
     const laneEl = document.createElement('section');
     laneEl.className = 'home-lane';
     laneEl.dataset.status = lane.key;
-    laneEl.innerHTML = `<div class="home-lane-head"><span>${lane.label}</span><span class="count">${items.length}</span></div>`;
+    // #429 — badge de aguardando exclui conferidos (sem esconder os cards, so o numero).
+    const laneCount = lane.key === STATUS.AGUARDANDO
+      ? items.filter(o => typeof getConferStatus !== 'function' || getConferStatus(o) !== CONFER_STATUS.CONFERIDO).length
+      : items.length;
+    laneEl.innerHTML = `<div class="home-lane-head"><span>${lane.label}</span><span class="count">${laneCount}</span></div>`;
     const body = document.createElement('div');
     body.className = 'home-lane-body';
     if (!items.length) {
@@ -17827,9 +17837,11 @@ function cestaCalcRender(data) {
       tag.textContent = 'sem receita';
       head.appendChild(tag);
       card.appendChild(head);
-      const note = document.createElement('div');
-      note.style.cssText = 'font-size:12px;color:var(--ink-mute);';
-      note.textContent = 'Cadastre a composição em Produção > Catálogo.';
+      // #428 — botao acionavel em vez de texto plano.
+      const note = document.createElement('button');
+      note.style.cssText = 'font-size:12px;color:var(--accent);background:none;border:none;padding:2px 0;cursor:pointer;text-decoration:underline;text-align:left;';
+      note.textContent = 'Cadastrar receita →';
+      note.onclick = function () { cestaCalcFechar(); go('producao'); };
       card.appendChild(note);
     } else if (statusStr === 'erro' || statusStr === '2') {
       const tag = document.createElement('span');
