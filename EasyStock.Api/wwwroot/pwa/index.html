@@ -13525,7 +13525,7 @@ function renderKanbanCard(o, col) {
   // o card mostrava "0× Talharim Fresco" ate o pedido ser cancelado.
   const visibleItems = (o.items || []).filter(i => (Number(i.qty) || 0) > 0);
   const itemsLine = visibleItems.length
-    ? visibleItems.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ')
+    ? visibleItems.map(i => `${i.qty}× ${escapeHtml(i.name)}${i.note ? ' ('+escapeHtml(i.note)+')' : ''}`).join(' · ')
     : '<em style="color:var(--ink-mute)">sem itens (ajustado para 0)</em>';
   const notes = o.notes ? `<div class="k-note">${escapeHtml(o.notes)}</div>` : '';
   // Bug 1 (Onda 4): banner persistente quando o pedido foi marcado pronto
@@ -13795,7 +13795,7 @@ function buildCobrancaMessage(order, template) {
   const ref  = refClean ? ` (${refClean})` : '';
   const total = Number(order.total) || 0;
   const itensLinhas = (order.items || [])
-    .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}`)
+    .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}${i.note ? ' - ' + i.note : ''}`)
     .join('\n');
   const obsBloco = order.notes ? `\n📝 Obs: ${order.notes}\n` : '';
   const pixType    = getPixType();
@@ -15853,7 +15853,7 @@ function openConfer(orderId) {
   // Bloco 2: itens + obs
   document.getElementById('conferTotal').textContent = money(o.total);
   document.getElementById('conferItems').innerHTML = (o.items || []).map(it =>
-    `<div class="ci-row"><span class="ci-qty">${it.qty}×</span><span class="ci-name">${escapeHtml(it.name)}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
+    `<div class="ci-row"><span class="ci-qty">${it.qty}×</span><span class="ci-name">${escapeHtml(it.name)}${it.note ? ' ('+escapeHtml(it.note)+')' : ''}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
   ).join('');
   const notesEl = document.getElementById('conferNotes');
   if (o.notes) {
@@ -20349,7 +20349,10 @@ function addItemToOrder(product) {
     showToast(`"${product.name}" sem preço cadastrado — defina em Ajustes > Catálogo`);
     return;
   }
-  const existing = currentOrderItems.find(i => i.productId === product.id);
+  // #410: mescla so com a linha SEM observacao do mesmo produto. Assim 2x o mesmo
+  // item mescla (qty++), mas se ja existe uma linha COM obs (ex: "sem cebola"),
+  // um novo add cria linha nova sem obs — permitindo unidades distintas do produto.
+  const existing = currentOrderItems.find(i => i.productId === product.id && !(i.note || '').trim());
   if (existing) {
     existing.qty++;
   } else {
@@ -20359,7 +20362,8 @@ function addItemToOrder(product) {
       emoji: product.emoji,
       unit: product.unit,
       qty: 1,
-      unitPrice: price
+      unitPrice: price,
+      note: ''
     });
   }
   closeItemPicker();
@@ -20390,6 +20394,7 @@ function renderOrderItems() {
       <div class="item-info">
         <div class="item-name">${escapeHtml(it.name)}</div>
         <div class="item-price">${it.unitPrice ? money(it.unitPrice).replace(',00','') + ' un' : 'sem preço'}${it.unit ? ' · ' + escapeHtml(it.unit) : ''}</div>
+        <input class="item-note-input" type="text" placeholder="+ obs (ex: sem cebola)" value="${escapeHtml(it.note || '')}" onchange="setItemNote(${idx}, this.value)" style="margin-top:4px;width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--ink-dim);font-size:12px;padding:2px 0;" />
       </div>
       <div class="item-subtotal">${money(it.qty * it.unitPrice).replace(',00','')}</div>
       <div class="qty-stepper" role="group" aria-label="Ajustar quantidade de ${escapeHtml(it.name)}">
@@ -20423,6 +20428,15 @@ function removeItem(idx) {
   currentOrderItems.splice(idx, 1);
   renderOrderItems();
   updateSaveOrderBtn();
+}
+// #410: observacao por item. Nao re-renderiza a lista (evita perder o foco do
+// input enquanto digita); a obs nao muda qty/total. saveOrder copia o item
+// inteiro, entao a obs vai pro pedido (e pro sync quando o backend tiver a coluna).
+function setItemNote(idx, val) {
+  const it = currentOrderItems[idx];
+  if (!it) return;
+  it.note = (val || '').trim();
+  renderOrderDraftSummary();
 }
 
 function updateSaveOrderBtn() {
