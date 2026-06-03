@@ -291,10 +291,18 @@
     document.addEventListener('DOMContentLoaded', function () {
         var toastData = document.body.dataset && document.body.dataset.toast;
         if (toastData) {
+            // BUG-22: separa o CorrelationId (formato "type|msg||cid") para o showToast
+            // renderizar o CID copiavel, em vez de deixar "||cid" colado na mensagem (ou some-lo).
+            var cid = null;
+            var cidSep = toastData.indexOf('||');
+            if (cidSep >= 0) {
+                cid = toastData.slice(cidSep + 2) || null;
+                toastData = toastData.slice(0, cidSep);
+            }
             var sep  = toastData.indexOf('|');
             var type = sep >= 0 ? toastData.slice(0, sep) : toastData;
             var msg  = sep >= 0 ? toastData.slice(sep + 1) : toastData;
-            window.showToast(msg, type);
+            window.showToast(msg, type, cid ? { correlationId: cid } : undefined);
         }
 
         // Cross-page toasts via sessionStorage (for fetch-based form submissions)
