@@ -20,6 +20,10 @@ public static partial class SeedData
         }
 
         plano.Descricao = descricao;
+        // INV-002 (#463): por decisao de produto (2026-06-04), TODOS os planos
+        // semeados sao ilimitados, inclusive geracoes de IA. E intencional nesta
+        // fase (demo/piloto); o teto de IA (custo de LLM) e risco aceito e fica
+        // registrado na #463. Nao "corrigir" para limite finito sem nova decisao.
         plano.LimiteLojas = Plano.SemLimite;
         plano.LimiteUsuarios = Plano.SemLimite;
         plano.LimiteProdutos = Plano.SemLimite;
