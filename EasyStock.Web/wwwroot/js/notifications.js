@@ -42,6 +42,18 @@
         }
         return;
       }
+      // BUG-65: status 200 com corpo HTML (ex: redirect pra tela de login quando a
+      // sessao expira) fazia r.json() estourar 'Unexpected token <'. Trata nao-JSON
+      // como falha (pausa apos 3) em vez de poluir o console a cada 45s.
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 3) {
+          console.warn('[notifications] resposta nao-JSON 3x (sessao?), pausando polling.');
+          stopPolling();
+        }
+        return;
+      }
       consecutiveFailures = 0;
       const data = await r.json();
       const count    = data.totalNaoLidas ?? 0;
