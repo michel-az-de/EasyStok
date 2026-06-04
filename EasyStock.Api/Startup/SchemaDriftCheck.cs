@@ -18,6 +18,17 @@ namespace EasyStock.Api.Startup;
 public static class SchemaDriftCheck
 {
     /// <summary>
+    /// Colunas de sistema do PostgreSQL. O modelo EF as mapeia (ex.: <c>xmin</c> como
+    /// concurrency token via <c>HasColumnName("xmin")</c>), mas elas NÃO aparecem em
+    /// <c>information_schema.columns</c> — existem implicitamente em toda tabela. Ignorá-las
+    /// evita falso-positivo de "drift" (do contrário todo boot acusaria 1 xmin por entidade).
+    /// </summary>
+    private static readonly HashSet<string> PostgresSystemColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "xmin", "xmax", "cmin", "cmax", "ctid", "tableoid", "oid"
+    };
+
+    /// <summary>
     /// Retorna a lista de <c>tabela.coluna</c> (schema public) que o modelo espera mas
     /// que faltam no banco. Vazia = sem drift.
     /// </summary>
@@ -63,6 +74,7 @@ public static class SchemaDriftCheck
             {
                 var column = prop.GetColumnName(storeObject);
                 if (string.IsNullOrEmpty(column)) continue; // table splitting: não mapeia nesta tabela
+                if (PostgresSystemColumns.Contains(column)) continue; // xmin & cia: invisíveis ao information_schema
 
                 var key = $"{tableName}.{column}";
                 if (!actual.Contains(key))
