@@ -94,7 +94,7 @@
             <!-- Resultados agrupados -->
             <template x-for="grupo in groups" :key="grupo.titulo">
                 <div>
-                    <div class="cmdk-group-title" x-text="grupo.titulo"></div>
+                    <div class="cmdk-group-title" x-show="grupo.titulo" x-text="grupo.titulo"></div>
                     <template x-for="item in grupo.items" :key="grupo.titulo + ':' + item._key">
                         <a :href="item.url || '#'"
                            :class="['cmdk-item', flatList[sel] && flatList[sel]._key === item._key ? 'is-selected' : '']"
@@ -303,55 +303,48 @@
                     }
                 },
 
-                // Constrói os grupos de resultados.
+                // Ranking global achatado (BUG-005): paginas, acoes, clientes, lojas e
+                // usuarios competem num unico score, sem ordem fixa de grupo. Antes os
+                // grupos eram empilhados (estaticos sempre antes dos remotos) e os
+                // remotos nem recebiam score, entao um tenant com match de prefixo
+                // ("Casa da Baba") caia abaixo de paginas estaticas com match fraco.
                 get groups() {
                     const q = this.q.trim();
                     if (!q) return [];
 
-                    const out = [];
+                    // Estaticos (paginas + acoes rapidas) com score local.
+                    const estaticos = STATIC_INDEX
+                        .map(it => Object.assign({ _key: it.id, _score: scoreItem(q, it) }, it))
+                        .filter(x => x._score > 0);
 
-                    // Grupo "Vai para" — fuzzy match local
-                    const navItems = STATIC_INDEX
-                        .filter(it => it.group === 'Vai para')
-                        .map(it => ({ it, score: scoreItem(q, it) }))
-                        .filter(x => x.score > 0)
-                        .sort((a, b) => b.score - a.score)
-                        .slice(0, 6)
-                        .map(x => Object.assign({ _key: x.it.id }, x.it));
+                    // Remotos agora COM score sobre nome + meta. Mantidos mesmo com score
+                    // baixo: o servidor ja os considerou relevantes (ex.: match por CNPJ).
+                    const remoteMap = (arr, group, icon) => arr.map(r => {
+                        const item = {
+                            _key: group + ':' + (r.id || r.url || r.nome),
+                            id: r.id,
+                            title: r.nome || r.title || r.email || '(sem nome)',
+                            url: r.url || '#',
+                            icon: icon,
+                            group: group,
+                            meta: this._buildRemoteMeta(r, group)
+                        };
+                        item._score = scoreItem(q, { title: item.title, keywords: item.meta });
+                        return item;
+                    });
 
-                    // Grupo "Ações rápidas"
-                    const actItems = STATIC_INDEX
-                        .filter(it => it.group === 'Ações rápidas')
-                        .map(it => ({ it, score: scoreItem(q, it) }))
-                        .filter(x => x.score > 0)
-                        .sort((a, b) => b.score - a.score)
-                        .map(x => Object.assign({ _key: x.it.id }, x.it));
+                    const remotos = [
+                        ...remoteMap(this._remote.clientes, 'Cliente', 'building-2'),
+                        ...remoteMap(this._remote.lojas, 'Loja', 'store'),
+                        ...remoteMap(this._remote.usuarios, 'Usuário', 'user')
+                    ];
 
-                    if (navItems.length) out.push({ titulo: 'Vai para', items: navItems });
-                    if (actItems.length) out.push({ titulo: 'Ações rápidas', items: actItems });
+                    const itens = [...estaticos, ...remotos]
+                        .sort((a, b) => b._score - a._score)
+                        .slice(0, 20);
 
-                    // Resultados remotos
-                    const remoteMap = (arr, group, icon) => arr.map(r => ({
-                        _key: group + ':' + (r.id || r.url || r.nome),
-                        id: r.id,
-                        title: r.nome || r.title || r.email || '(sem nome)',
-                        url: r.url || '#',
-                        icon: icon,
-                        group: group,
-                        meta: this._buildRemoteMeta(r, group)
-                    }));
-
-                    if (this._remote.clientes.length) {
-                        out.push({ titulo: 'Clientes', items: remoteMap(this._remote.clientes, 'Cliente', 'building-2') });
-                    }
-                    if (this._remote.lojas.length) {
-                        out.push({ titulo: 'Lojas', items: remoteMap(this._remote.lojas, 'Loja', 'store') });
-                    }
-                    if (this._remote.usuarios.length) {
-                        out.push({ titulo: 'Usuários', items: remoteMap(this._remote.usuarios, 'Usuário', 'user') });
-                    }
-
-                    return out;
+                    // Um unico grupo sem titulo: a render esconde o cabecalho (titulo null).
+                    return itens.length ? [{ titulo: null, items: itens }] : [];
                 },
 
                 _buildRemoteMeta(r, group) {
