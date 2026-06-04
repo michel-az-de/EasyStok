@@ -9,6 +9,9 @@
 #
 # Logs: .build/local-env/<svc>.out.log   |   Encerrar: scripts/local-env/down.ps1
 
-echo "[pre-push] garantindo ambiente local (API+PWA, Web, Admin)..."
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-env/up.ps1 -Ensure || true
+echo "[pre-push] subindo ambiente local (API+PWA, Web, Admin)..."
+# Streams em /dev/null: senao os processos lancados pelo up.ps1 herdam o pipe do
+# git push (Start-Process usa bInheritHandles=true) e o push fica pendurado ate
+# os watch morrerem. Com /dev/null + </dev/null, o push retorna na hora.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-env/up.ps1 -Ensure >/dev/null 2>&1 </dev/null || true
 exit 0
