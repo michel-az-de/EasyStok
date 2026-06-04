@@ -1,6 +1,6 @@
 # ADR-0025 — Estratégia de teste do frontend Admin (Alpine.js inline)
 
-**Status:** Proposto
+**Status:** Aceito
 **Data:** 2026-06-04
 **Relacionados:** ADR-0023 (estratégia e padrões de teste — base); issue #467 (tracking deste ADR), #463 (auditoria QA Admin — origem), #296/#297 (tiers de teste Azure), #274 (cobertura), #394 (umbrella de teste)
 
