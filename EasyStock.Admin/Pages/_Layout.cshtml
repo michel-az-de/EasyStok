@@ -21,12 +21,21 @@
     @* Alpine self-hosted (mesma origem) — sem CDN/SRI. O jsDelivr era bloqueado pelo
        firewall corporativo E os hashes SRI antigos estavam errados; ambos matavam o
        Alpine -> tabs/dashboards/Ctrl+K/sync inertes. Vendored de alpinejs@@3.14.9
-       (core+persist+focus); ordem plugins-antes-do-core preservada. *@
+       (core+persist+focus).
+
+       ORDEM CRITICA (#469): o core Alpine (defer) auto-inicia ao executar com
+       document.readyState=interactive e avalia os x-data NA HORA. Logo, tudo que
+       define factory/global usada em x-data tem de carregar ANTES do core:
+         - persist/focus: plugins (registram via alpine:init);
+         - masks.js: registra via alpine:init;
+         - admin-components.js: define window.esTabs/esDataTable/esCountUp.
+       Com o core por ULTIMO, esTabs/isActive ja existem quando o <es-tabs> de
+       /Configuracoes e avaliado (antes quebrava com "esTabs is not defined"). *@
     <script defer src="~/js/vendor/alpine/persist.js" asp-append-version="true"></script>
     <script defer src="~/js/vendor/alpine/focus.js" asp-append-version="true"></script>
-    <script defer src="~/js/vendor/alpine/alpine.js" asp-append-version="true"></script>
     <script defer src="~/js/masks.js" asp-append-version="true"></script>
     <script defer src="~/js/admin-components.js" asp-append-version="true"></script>
+    <script defer src="~/js/vendor/alpine/alpine.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app-shell.css" asp-append-version="true" />
