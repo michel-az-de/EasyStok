@@ -158,6 +158,20 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
             return View("Form", vm);
         }
 
+        // BUG-006 (#456): valida a regra de limiares tambem ao CRIAR (antes so o update
+        // de limiares validava). Critica precisa ser menor que minima.
+        if (vm.QuantidadeMinima.HasValue && vm.QuantidadeCritica.HasValue
+            && vm.QuantidadeCritica.Value >= vm.QuantidadeMinima.Value)
+        {
+            const string erroLimiar = "Quantidade crítica precisa ser menor que a mínima.";
+            if (isFetch) return BadRequest(new { erro = erroLimiar });
+            ModelState.AddModelError(nameof(vm.QuantidadeCritica), erroLimiar);
+            ViewBag.Title = "Novo Produto";
+            ViewBag.ActiveMenuItem = "Produtos";
+            await LoadCategoriasAsync();
+            return View("Form", vm);
+        }
+
         var result = await svc.CriarAsync(vm);
 
         if (!result.Success)
