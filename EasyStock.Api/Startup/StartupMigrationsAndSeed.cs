@@ -174,6 +174,34 @@ public static class StartupMigrationsAndSeed
                 app.Logger.LogError(ex, "[SeedSchema] Bootstrap falhou no startup — seed via UI vai tentar de novo no próprio run.");
             }
 
+            // Drift guard: o __EFMigrationsHistory pode dizer "aplicada" sem o DDL ter
+            // rodado (volume Postgres reaproveitado / schema raw reconciliado), gerando
+            // 42703 "column X does not exist" silencioso em runtime — que parece bug de
+            // feature e custou rodadas de investigacao as cegas. Aqui comparamos o modelo
+            // EF com o schema real e LOGAMOS ERRO ALTO se faltar coluna. Read-only e
+            // nao-fatal (nao derruba readiness por falso-positivo).
+            try
+            {
+                using var driftScope = app.Services.CreateScope();
+                var driftDb = driftScope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                using var _ = driftDb.UseRowLevelSecurityBypass();
+                var missing = await SchemaDriftCheck.FindMissingColumnsAsync(driftDb);
+                if (missing.Count > 0)
+                {
+                    app.Logger.LogError(
+                        "[Migrations] !!! DRIFT DE SCHEMA: {Count} coluna(s) esperada(s) pelo modelo NAO existem no banco (apesar do __EFMigrationsHistory dizer aplicada). Recriar/reparar o schema do ambiente. Faltando: {Missing}",
+                        missing.Count, string.Join(", ", missing.Take(40)));
+                }
+                else
+                {
+                    app.Logger.LogInformation("[Migrations] Drift check OK: modelo bate com o schema do banco.");
+                }
+            }
+            catch (Exception ex)
+            {
+                app.Logger.LogWarning(ex, "[Migrations] Drift check falhou (nao-fatal).");
+            }
+
             // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
             // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
             // de empresa). Idempotente: no-op se ja existe.
