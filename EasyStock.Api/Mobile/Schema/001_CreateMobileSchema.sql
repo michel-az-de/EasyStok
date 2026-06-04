@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS mobile_orders (
     updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_device_id        VARCHAR(64)
 );
-CREATE INDEX IF NOT EXISTS ix_mobile_orders_status ON mobile_orders(status);
+CREATE INDEX IF NOT EXISTS ix_mobile_orders_status ON mobile_orders("Status");  -- #466: coluna real e Pascal (sem [Column] na entidade Order)
 CREATE INDEX IF NOT EXISTS ix_mobile_orders_updated_at ON mobile_orders(updated_at);
 CREATE INDEX IF NOT EXISTS ix_mobile_orders_created_at ON mobile_orders(created_at DESC);
 
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS mobile_batches (
     last_device_id  VARCHAR(64)
 );
 CREATE INDEX IF NOT EXISTS ix_mobile_batches_created_at ON mobile_batches(created_at DESC);
-CREATE INDEX IF NOT EXISTS ix_mobile_batches_code ON mobile_batches(code);
+CREATE INDEX IF NOT EXISTS ix_mobile_batches_code ON mobile_batches("Code");  -- #466: coluna real e Pascal (sem [Column] na entidade Batch)
 
 CREATE TABLE IF NOT EXISTS mobile_batch_items (
     id          BIGSERIAL PRIMARY KEY,
@@ -101,18 +101,13 @@ CREATE TABLE IF NOT EXISTS mobile_cash_entries (
 );
 CREATE INDEX IF NOT EXISTS ix_mobile_cash_entries_created_at ON mobile_cash_entries(created_at DESC);
 
--- ===== Seed: catalogo inicial do Casa da Baba =====
--- Nao insere se ja existirem produtos (evita sobrescrever estoque atual)
-INSERT INTO mobile_products (id, name, emoji, category, unit, price, stock, is_custom)
-VALUES
-    ('talharim',  'Talharim Fresco',            '🍝', 'massa', '300g',  12.00, 0, FALSE),
-    ('lasanha',   'Lasanha Bolonhesa',          '🍲', 'massa', '300g',  30.00, 0, FALSE),
-    ('rav-muss',  'Ravioli Mussarela & Limão',  '🍋', 'massa', '300g',  28.00, 0, FALSE),
-    ('rav-esp',   'Ravioli Espinafre & Ricota', '🥬', 'massa', '300g',  28.00, 0, FALSE),
-    ('pomodoro',  'Molho Pomodoro',             '🍅', 'molho', '250ml', 15.00, 0, FALSE),
-    ('bechamel',  'Molho Bechamel',             '🥛', 'molho', '250ml', 15.00, 0, FALSE),
-    ('bolonhesa', 'Molho Bolonhesa',            '🥩', 'molho', '250ml', 18.00, 0, FALSE)
-ON CONFLICT (id) DO NOTHING;
+-- ===== Seed do catalogo inicial: REMOVIDO (#466) =====
+-- Era um INSERT hardcoded dos 7 produtos da Casa da Baba, legado de quando o
+-- mobile era backend standalone (single-tenant). Em multi-tenant os produtos
+-- vem por empresa via sync do app; inserir aqui criaria registros orfaos
+-- (empresa_id NULL). Alem disso estava morto: usava nomes snake (id, name...)
+-- que nao existem na tabela real criada pelo EF (Id, Name...), entao sempre
+-- estourava 42703 e era pulado.
 
 -- ===== Auditoria: LastOperatorName (adicionado em versão posterior) =====
 -- Idempotente: só adiciona se a coluna ainda não existe. Preserva dados.

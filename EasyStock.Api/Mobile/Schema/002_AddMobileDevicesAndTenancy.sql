@@ -15,7 +15,7 @@
 -- 1) Tabela de devices pareados.
 CREATE TABLE IF NOT EXISTS mobile_devices (
     "Id"                    varchar(64)  PRIMARY KEY,
-    api_key                 varchar(64)  NOT NULL,
+    api_key_hash            varchar(64)  NOT NULL,  -- #466: coluna real (entidade MobileDevice.ApiKeyHash)
     empresa_id              uuid         NOT NULL,
     loja_id                 uuid         NOT NULL,
     paired_by_user_id       uuid         NULL,
@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS mobile_devices (
     updated_at              timestamp    NOT NULL DEFAULT (now() AT TIME ZONE 'utc')
 );
 
--- Lookup pelo api_key (hot path do middleware MobileApiKey)
-CREATE UNIQUE INDEX IF NOT EXISTS ix_mobile_devices_api_key
-    ON mobile_devices(api_key);
+-- Lookup pelo api_key_hash (hot path do middleware MobileApiKey): o indice
+-- unique ja e criado pelo EF como ux_mobile_devices_api_key_hash
+-- (MobileModelRegistrar). Nao recriar aqui pra evitar indice duplicado. (#466)
 
 -- Lookup pelo pairing_code (POST /api/mobile/devices/pair)
 CREATE INDEX IF NOT EXISTS ix_mobile_devices_pairing_code
