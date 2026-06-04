@@ -47,12 +47,11 @@
                             <option value="InApp">In-App</option>
                         </es-select>
                         <es-select asp-for="TipoEvento" label="Tipo de evento">
-                            <option value="ProdutoVencendo">Produto Vencendo</option>
-                            <option value="ProdutoVencido">Produto Vencido</option>
-                            <option value="AssinaturaExpirando">Assinatura Expirando</option>
-                            <option value="ResetSenha">Reset de Senha</option>
-                            <option value="AlertaEstoqueCritico">Alerta Estoque</option>
-                            <option value="BroadcastSuperAdmin">Broadcast</option>
+                            @* BUG-008: opcoes geradas do enum (36 eventos), antes listava so 6. *@
+                            @foreach (var ev in TipoEventoNotificacaoLabels.Opcoes)
+                            {
+                                <option value="@ev.Valor">@ev.Rotulo</option>
+                            }
                         </es-select>
                     </div>
                 </div>

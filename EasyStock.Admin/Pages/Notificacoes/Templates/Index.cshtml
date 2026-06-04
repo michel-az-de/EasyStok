@@ -26,16 +26,12 @@
             <option value="InApp" selected="@(Model.Canal == "InApp")">In-App</option>
         </es-select>
         <es-select name="tipoEvento" label="Evento">
+            @* BUG-008: opcoes geradas do enum TipoEventoNotificacao (36 eventos), nao hardcoded. *@
             <option value="">Todos</option>
-            <option value="ProdutoVencendo">Produto Vencendo</option>
-            <option value="ProdutoVencido">Produto Vencido</option>
-            <option value="AssinaturaExpirando">Assinatura Expirando</option>
-            <option value="AssinaturaExpirada">Assinatura Expirada</option>
-            <option value="TarefaPendente">Tarefa Pendente</option>
-            <option value="ResetSenha">Reset de Senha</option>
-            <option value="ConfirmacaoEmail">Confirmação de Email</option>
-            <option value="AlertaEstoqueCritico">Alerta Estoque</option>
-            <option value="BroadcastSuperAdmin">Broadcast</option>
+            @foreach (var ev in EasyStock.Admin.Pages.Notificacoes.TipoEventoNotificacaoLabels.Opcoes)
+            {
+                <option value="@ev.Valor" selected="@(Model.TipoEvento == ev.Valor)">@ev.Rotulo</option>
+            }
         </es-select>
         <es-select name="ativo" label="Status">
             <option value="">Todos</option>
