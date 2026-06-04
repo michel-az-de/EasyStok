@@ -32,7 +32,12 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         });
     }
 
-    private static readonly TimeSpan DashboardTtl = TimeSpan.FromMinutes(5);
+    // BUG-007 (#457): TTL reduzido de 5min -> 60s para minimizar a janela em que o
+    // dashboard fica defasado apos uma entrada/saida de estoque (auditoria viu 50 un.
+    // no dashboard apos +5). Mitigacao de baixo risco; a invalidacao por evento
+    // (publicar na entrada e um handler limpar a chave analytics:dashboard:*) fica
+    // como follow-up por exigir acoplamento cache<->use case.
+    private static readonly TimeSpan DashboardTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MovimentacaoTtl = TimeSpan.FromMinutes(5);
 
     public async Task<DashboardResumo> GetDashboardResumoAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
