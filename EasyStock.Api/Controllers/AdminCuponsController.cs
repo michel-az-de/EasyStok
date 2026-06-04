@@ -19,6 +19,12 @@ public class AdminCuponsController(ICupomAdminRepository cupons, AdminAuditServi
             return DataBadRequest("TipoDesconto inválido. Valores: Percentual, ValorFixo, MesesGratis");
 
         var codigo = req.Codigo.ToUpperInvariant();
+
+        if (ValidarCodigoCupom(codigo) is { } erroCodigo)
+            return DataBadRequest(erroCodigo);
+        if (ValidarValorCupom(tipo, req.Valor) is { } erroValor)
+            return DataBadRequest(erroValor);
+
         if (await cupons.ExisteCodigoAsync(codigo, ct))
             return Conflict(new { error = new { code = "CODIGO_DUPLICADO", message = "Já existe um cupom com este código." } });
 
@@ -32,6 +38,15 @@ public class AdminCuponsController(ICupomAdminRepository cupons, AdminAuditServi
     [HttpPatch("{id:guid}")]
     public async Task<IActionResult> PatchCupom(Guid id, [FromBody] PatchCupomRequest req, CancellationToken ct = default)
     {
+        if (req.Codigo is not null && ValidarCodigoCupom(req.Codigo.ToUpperInvariant()) is { } erroCodigo)
+            return DataBadRequest(erroCodigo);
+        if (req.Valor is not null)
+        {
+            TipoDesconto? tipoPatch = Enum.TryParse<TipoDesconto>(req.TipoDesconto, out var tp) ? tp : null;
+            if (ValidarValorCupom(tipoPatch, req.Valor.Value) is { } erroValor)
+                return DataBadRequest(erroValor);
+        }
+
         var r = await cupons.AtualizarAsync(id,
             new PatchCupom(req.Codigo, req.TipoDesconto, req.Valor, req.LimiteUsos, req.ValidoAte, req.PlanoId), ct);
 
@@ -64,6 +79,28 @@ public class AdminCuponsController(ICupomAdminRepository cupons, AdminAuditServi
 
         await audit.LogAsync("CupomExcluido", $"Codigo={r.Codigo}");
         return DataOk(new { id });
+    }
+
+    // INV-001 (#463): validacao na fronteira da API. Antes so havia checagem de
+    // codigo-vazio + enum, entao chamada direta criava cupom com percentual > 100
+    // ou codigo com caracteres que viram vetor em atributo Alpine no Admin.
+    private static string? ValidarCodigoCupom(string codigoUpper)
+    {
+        if (codigoUpper.Length is < 3 or > 50)
+            return "Codigo do cupom deve ter entre 3 e 50 caracteres.";
+        foreach (var c in codigoUpper)
+            if (c is not (>= 'A' and <= 'Z' or >= '0' and <= '9' or '-' or '_'))
+                return "Codigo do cupom so pode conter letras, numeros, hifen e underscore.";
+        return null;
+    }
+
+    private static string? ValidarValorCupom(TipoDesconto? tipo, decimal valor)
+    {
+        if (valor <= 0)
+            return "Valor do desconto deve ser maior que zero.";
+        if (tipo == TipoDesconto.Percentual && valor > 100)
+            return "Desconto percentual nao pode passar de 100%.";
+        return null;
     }
 }
 

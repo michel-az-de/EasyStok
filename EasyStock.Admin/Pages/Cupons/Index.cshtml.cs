@@ -6,7 +6,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     public IEnumerable<JsonElement> Planos { get; private set; } = Enumerable.Empty<JsonElement>();
 
     private static readonly HashSet<string> TiposValidos = new(StringComparer.OrdinalIgnoreCase)
-        { "Percentual", "ValorFixo" };
+        { "Percentual", "ValorFixo", "MesesGratis" };
 
     public async Task OnGetAsync()
     {
@@ -152,9 +152,17 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             erro = "Código do cupom deve ter entre 3 e 50 caracteres.";
             return false;
         }
+        foreach (var ch in codigoT)
+        {
+            if (ch is not (>= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_'))
+            {
+                erro = "Código do cupom só pode conter letras, números, hífen e underscore.";
+                return false;
+            }
+        }
         if (!TiposValidos.Contains(tipoT))
         {
-            erro = "Tipo de desconto deve ser \"Percentual\" ou \"ValorFixo\".";
+            erro = "Tipo de desconto deve ser \"Percentual\", \"ValorFixo\" ou \"MesesGratis\".";
             return false;
         }
         if (valor <= 0)

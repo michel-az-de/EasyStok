@@ -101,7 +101,7 @@ else
                     <form method="post" asp-page-handler="Editar" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; align-items:end;">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@cid" />
-                        <es-input name="codigo" label="Código" value="@codigo" required="true" />
+                        <es-input name="codigo" label="Código" value="@codigo" required="true" pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="50" />
                         <es-select name="tipoDesconto" label="Tipo">
                             <option value="Percentual" selected="@(tipo == "Percentual")">Percentual (%)</option>
                             <option value="ValorFixo" selected="@(tipo == "ValorFixo")">Valor fixo (R$)</option>
@@ -155,7 +155,8 @@ else
           x-data="{ loading: false }" x-on:submit="loading = true">
         @Html.AntiForgeryToken()
         <es-input name="codigo" label="Código" placeholder="PROMO10" required="true"
-                  helper="Geralmente em maiúsculas, sem espaços." input-class="uppercase" />
+                  pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="50"
+                  helper="3 a 50 caracteres: letras, números, hífen e underscore." input-class="uppercase" />
 
         <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
             <es-select name="tipoDesconto" label="Tipo de desconto" required="true">
