@@ -4,6 +4,7 @@ using EasyStock.Api.Hosting;
 using EasyStock.Api.Startup;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
+using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Async.DependencyInjection;
 using Serilog;
@@ -70,6 +71,10 @@ var (resolvedProvider, infraState) = await DatabaseModule.ConfigureAsync(
 // ── Application + Async Infra ─────────────────────────────────────────────────
 builder.Services.AddEasyStockApplication();
 builder.Services.AddEasyStockStorefrontUseCases();
+// #449: registra IMercadoPagoClient (StubMercadoPagoClient em Development via
+// MercadoPago:UseStub; cliente real em producao). Sem isto, IniciarCheckoutUseCase
+// nao resolve e o boot da API falha em Development (ValidateOnBuild).
+builder.Services.AddMercadoPagoClient(builder.Configuration);
 builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
