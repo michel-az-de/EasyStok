@@ -395,7 +395,7 @@
                             </div>
                             <div class="flex items-center gap-3 mt-0.5">
                                 <span class="text-xs @(v.QuantidadeEmEstoque == 0 ? "text-red-500 font-semibold" : v.QuantidadeEmEstoque < 5 ? "text-amber-600 font-semibold" : "text-slate-500")">
-                                    @v.QuantidadeEmEstoque un.
+                                    @v.QuantidadeEmEstoque.AsQuantity("un.")
                                 </span>
                                 @if (v.UltimaEntradaEm.HasValue)
                                 {
@@ -573,7 +573,7 @@
                                     <td class="font-mono text-xs text-slate-500">@(v.Sku ?? "-")</td>
                                     <td class="text-center">
                                         <span class="text-lg font-extrabold @(v.QuantidadeEmEstoque == 0 ? "text-red-600" : v.QuantidadeEmEstoque < 5 ? "text-amber-600" : "text-slate-900")">
-                                            @v.QuantidadeEmEstoque
+                                            @v.QuantidadeEmEstoque.AsQuantity("")
                                         </span>
                                     </td>
                                     <td class="text-center">
