@@ -23,7 +23,9 @@ public class ProdutoDetailViewModel
                 (p.CustoReferencia is > 0,                    "Custo",       15),
                 (p.PrecoReferencia is > 0,                    "Preço",       15),
                 (!string.IsNullOrWhiteSpace(p.CodigoBarras),  "Cód.Barras",  10),
-                (p.Variacoes.Any(),                           "Variações",   10),
+                // BUG-61/62 (#450): variação é opcional; ausência não é lacuna. Sempre
+                // satisfeito para o produto simples poder atingir 100% (score é soma crua).
+                (true,                                         "Variações",   10),
                 (!string.IsNullOrWhiteSpace(p.Marca),         "Marca",        5),
                 (p.Dimensoes != null,                         "Dimensões",    5),
                 (true,                                        "Nome",         3),
@@ -43,7 +45,7 @@ public class ProdutoDetailViewModel
     public static readonly Dictionary<string, int> IntegrityMissingStepMap = new()
     {
         ["Foto"] = 2, ["Preço"] = 2, ["Custo"] = 2,
-        ["Variações"] = 3, ["Dimensões"] = 3,
+        ["Dimensões"] = 3,
         ["Descrição"] = 1, ["Cód.Barras"] = 1, ["Marca"] = 1, ["Nome"] = 1, ["Categoria"] = 1,
         ["Nutricional"] = 0,
     };
