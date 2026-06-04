@@ -293,7 +293,7 @@
                     </div>
                     <div class="flex justify-between py-2" x-show="validade">
                         <dt class="text-sm text-slate-500">Validade</dt>
-                        <dd class="text-sm font-semibold" x-text="validade"></dd>
+                        <dd class="text-sm font-semibold" x-text="validade ? new Date(validade + 'T00:00:00').toLocaleDateString('pt-BR') : ''"></dd>
                     </div>
                 </dl>
 
