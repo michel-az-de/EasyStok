@@ -185,6 +185,58 @@ button:focus-visible {
   font-feature-settings: "tnum" 1;
 }
 
+/* ---------- Tabela financeira (UX-005 / issue #474) ----------
+   Escopada em .fin-table (ContasAReceber/ContasAPagar). NAO afeta .tbl/.tbl-full
+   nem tabelas de dashboard. Valores monetarios (celulas .text-right) nao quebram
+   em telas estreitas: "R$ 1.234,56" permanece em 1 linha em vez de "R$" / "1.234,56". */
+.fin-table td.text-right,
+.fin-table th.text-right {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Mobile (<=760px): listagens financeiras viram cards (rotulo : valor) em vez de
+   comprimir colunas. So .fin-table--cards (Index/listagem); o Detalhe/parcelas tem
+   linhas expansiveis (colspan) e segue com scroll horizontal. Rotulo vem de data-label. */
+@media (max-width: 760px) {
+  .fin-table--cards thead { display: none; }
+  .fin-table--cards,
+  .fin-table--cards tbody,
+  .fin-table--cards tr,
+  .fin-table--cards td { display: block; width: auto; }
+  .fin-table--cards tr {
+    border: 1px solid var(--border-soft, #e2e8f0);
+    border-radius: 12px;
+    padding: 8px 14px;
+    margin-bottom: 10px;
+  }
+  .fin-table--cards td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 5px 0 !important;
+    text-align: right;
+    border: 0 !important;
+  }
+  .fin-table--cards td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted, #64748b);
+    text-align: left;
+    white-space: nowrap;
+  }
+  /* Celulas sem rotulo: titulo (1a) e acao (ultima) ocupam a linha inteira. */
+  .fin-table--cards td:not([data-label]) { justify-content: flex-start; text-align: left; }
+  .fin-table--cards td:not([data-label])::before { display: none; }
+  .fin-table--cards td:first-child { font-weight: 600; font-size: 14px; padding-bottom: 8px !important; }
+  .fin-table--cards td:empty { display: none; }
+}
+
 /* ---------- Soft alerts (pente fino onda 1 item 20) ----------
    Alternativa de "soft style" pros banners de status, com fundo translucido
    e barra colorida. Substitui banners com fundo saturado que agridem. */

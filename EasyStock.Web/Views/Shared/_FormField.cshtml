@@ -15,12 +15,17 @@
 *@
 @model dynamic
 @{
-    var label = (string?)Model.Label;
-    var forId = (string?)(Model.For ?? Model.Id);
-    var required = Model.Required != null && (bool)Model.Required;
-    var helperText = (string?)Model.Helper;
-    var error = (string?)Model.Error;
-    var inputHtml = (string?)Model.InputHtml;
+    // Acesso defensivo a um modelo anonimo dinamico: chamadores podem omitir
+    // qualquer propriedade. Sem try/catch, Model.<ausente> lanca RuntimeBinderException
+    // e derruba a view inteira (o storybook /dev/components quebrava em Model.Error).
+    // Mesmo padrao defensivo do _Modal.cshtml.
+    string? label = null;      try { label = Model.Label as string; } catch { }
+    string? forId = null;      try { forId = Model.For as string; } catch { }
+    if (string.IsNullOrEmpty(forId)) { try { forId = Model.Id as string; } catch { } }
+    bool required = false;     try { required = Model.Required != null && (bool)Model.Required; } catch { }
+    string? helperText = null; try { helperText = Model.Helper as string; } catch { }
+    string? error = null;      try { error = Model.Error as string; } catch { }
+    string? inputHtml = null;  try { inputHtml = Model.InputHtml as string; } catch { }
     var hasError = !string.IsNullOrEmpty(error);
 }
 <div class="ui-form-field@(hasError ? " ui-form-field--error" : "")">
