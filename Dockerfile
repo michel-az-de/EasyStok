@@ -47,7 +47,7 @@ RUN if [ -f EasyStock.Api/wwwroot/pwa/sw.js ]; then \
 
 WORKDIR /src/EasyStock.Api
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish -c Release -o /app/publish --no-restore
+    dotnet publish -c Release -o /app/publish
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 # Migrations sao aplicadas pelo proprio app no startup (Program.cs com logging

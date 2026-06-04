@@ -29,7 +29,7 @@ COPY design/ design/
 WORKDIR /src/EasyStock.Web
 RUN npm run css:build
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish -c Release -o /app/publish --no-restore /p:SkipTailwind=true
+    dotnet publish -c Release -o /app/publish /p:SkipTailwind=true
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime

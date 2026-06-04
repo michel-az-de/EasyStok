@@ -28,7 +28,7 @@ COPY EasyStock.Infra.Async/         EasyStock.Infra.Async/
 # Publish direto (publish ja faz build — etapa intermediaria removida)
 WORKDIR "/src/EasyStock.Worker"
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
-    dotnet publish "EasyStock.Worker.csproj" -c Release -o /app/publish --no-restore /p:UseAppHost=false
+    dotnet publish "EasyStock.Worker.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
