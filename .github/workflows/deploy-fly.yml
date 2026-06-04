@@ -69,7 +69,7 @@ jobs:
       - name: Deploy Web
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --config fly.web.toml -a easystok-web --remote-only
+        run: flyctl deploy --config fly.web.toml -a easystok-web --remote-only --build-arg GIT_SHA=${{ github.sha }}
 
       - name: Smoke test /
         run: |

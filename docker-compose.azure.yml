@@ -92,6 +92,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.Web
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     image: easystok-web:latest
     container_name: easystok-web
     restart: unless-stopped

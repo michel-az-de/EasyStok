@@ -180,8 +180,19 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Site}/{action=Index}/{id?}");
 
-// Health check — exigido pelo Dockerfile.Web e pelo Azure App Service
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+// Health check — exigido pelo Dockerfile.Web e pelo Azure App Service.
+// Expõe version (da assembly, origem única do csproj) + commit (ARG GIT_SHA do build)
+// para rastreabilidade: qual commit está no ar em 1 request, sem auditar às cegas (#453).
+var healthVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+var healthCommit = Environment.GetEnvironmentVariable("GIT_SHA");
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "healthy",
+    version = healthVersion is not null
+        ? $"{healthVersion.Major}.{healthVersion.Minor}.{healthVersion.Build}"
+        : "unknown",
+    commit = string.IsNullOrWhiteSpace(healthCommit) ? "unknown" : healthCommit
+}))
    .AllowAnonymous()
    .ExcludeFromDescription();
 

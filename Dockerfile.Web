@@ -53,6 +53,11 @@ EXPOSE 8081
 ENV ASPNETCORE_URLS=http://+:8081
 ENV ASPNETCORE_ENVIRONMENT=Production
 
+# GIT_SHA do commit (passado via --build-arg). Declarado so no runtime para nao
+# invalidar o cache das camadas de build/publish a cada commit. Exposto em /health.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:8081/health || exit 1
 
