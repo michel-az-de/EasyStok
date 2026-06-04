@@ -76,3 +76,5 @@
 *.editorconfig text eol=lf working-tree-encoding=UTF-8
 # Shell scripts: SEMPRE LF (não importa SO local) — quebra entrypoint Linux se virar CRLF
 *.sh        text eol=lf   working-tree-encoding=UTF-8
+# Git hooks do Husky (sem extensão): SEMPRE LF, senão o shebang quebra no Git Bash (/bin/sh^M)
+.husky/*    text eol=lf   working-tree-encoding=UTF-8

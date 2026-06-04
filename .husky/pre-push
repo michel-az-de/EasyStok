@@ -1,0 +1,14 @@
+#!/bin/sh
+# EasyStok — sobe/garante o ambiente local automatico a cada push.
+#   API+PWA https://localhost:7039 | Web https://localhost:7010 | Admin https://localhost:7002
+#   (dotnet watch + Postgres em Docker)
+#
+# Non-blocking e non-fatal: o up.ps1 -Ensure lanca os processos destacados e
+# retorna na hora. NUNCA aborta o push — falha em subir o ambiente local de
+# conveniencia nao deve travar o git push (o gate de qualidade e o pre-commit).
+#
+# Logs: .build/local-env/<svc>.out.log   |   Encerrar: scripts/local-env/down.ps1
+
+echo "[pre-push] garantindo ambiente local (API+PWA, Web, Admin)..."
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-env/up.ps1 -Ensure || true
+exit 0
