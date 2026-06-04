@@ -1,3 +1,4 @@
+using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Services;
 
 namespace EasyStock.Web.Middleware;
@@ -37,6 +38,14 @@ public sealed class LojaRequiredMiddleware(RequestDelegate next)
             && string.IsNullOrEmpty(session.GetLojaId())
             && !IsExempt(path))
         {
+            // BUG-65 (#452): AJAX recebe 409 + header no-store em vez de redirect HTML;
+            // o esFetch no cliente leva pra selecionar-loja. Navegação segue no redirect.
+            if (AjaxRequest.WantsJson(context.Request))
+            {
+                context.Response.StatusCode = StatusCodes.Status409Conflict;
+                context.Response.Headers["X-EasyStok-Auth"] = "no-store";
+                return;
+            }
             context.Response.Redirect("/auth/selecionar-loja");
             return;
         }

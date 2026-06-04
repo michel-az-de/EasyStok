@@ -35,6 +35,30 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.LogoutPath = "/auth/logout";
         o.ExpireTimeSpan = TimeSpan.FromMinutes(480);
         o.SlidingExpiration = true;
+
+        // BUG-65 (#452): chamadas AJAX (X-Requested-With/Accept: application/json) recebem
+        // 401/403 JSON em vez do 302 -> página de login HTML (que o fetch seguiria e
+        // quebraria em r.json()). Navegação de documento continua redirecionando.
+        o.Events.OnRedirectToLogin = ctx =>
+        {
+            if (AjaxRequest.WantsJson(ctx.Request))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            }
+            ctx.Response.Redirect(ctx.RedirectUri);
+            return Task.CompletedTask;
+        };
+        o.Events.OnRedirectToAccessDenied = ctx =>
+        {
+            if (AjaxRequest.WantsJson(ctx.Request))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            }
+            ctx.Response.Redirect(ctx.RedirectUri);
+            return Task.CompletedTask;
+        };
     });
 
 // 8b. DataProtection — persistir as chaves num volume em producao.
@@ -197,3 +221,14 @@ app.MapGet("/health", () => Results.Ok(new
    .ExcludeFromDescription();
 
 app.Run();
+
+namespace EasyStock.Web
+{
+    /// <summary>
+    /// Marcador de assembly para <c>WebApplicationFactory</c> nos testes de pipeline
+    /// (#452). O <c>Program</c> dos top-level statements é global e colide com o
+    /// <c>Program</c> do EasyStock.Admin no projeto de testes (que referencia ambos);
+    /// este marcador namespaced resolve a ambiguidade.
+    /// </summary>
+    public sealed class WebTestEntryPoint { }
+}

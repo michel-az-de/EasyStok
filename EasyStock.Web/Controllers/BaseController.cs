@@ -1,4 +1,5 @@
 using System.Reflection;
+using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -121,6 +122,13 @@ public abstract class BaseController(SessionService session) : Controller
         var token = session.GetToken();
         if (string.IsNullOrEmpty(token))
         {
+            // BUG-65 (#452): AJAX recebe 401 JSON em vez de redirect HTML de login.
+            if (AjaxRequest.WantsJson(context.HttpContext.Request))
+            {
+                context.Result = new JsonResult(new { ok = false, erro = "Sessão expirada." })
+                { StatusCode = StatusCodes.Status401Unauthorized };
+                return;
+            }
             TempData["Toast"] = "warning|Sessão expirada. Faça login novamente.";
             context.Result = RedirectToAction("Login", "Auth");
             return;
@@ -135,6 +143,14 @@ public abstract class BaseController(SessionService session) : Controller
             var controllerName = context.RouteData.Values["controller"]?.ToString() ?? string.Empty;
             if (!ControllersAllowedWithoutLoja.Contains(controllerName))
             {
+                // BUG-65 (#452): AJAX recebe 409 + header no-store em vez de redirect HTML.
+                if (AjaxRequest.WantsJson(context.HttpContext.Request))
+                {
+                    context.HttpContext.Response.Headers["X-EasyStok-Auth"] = "no-store";
+                    context.Result = new JsonResult(new { ok = false, code = "NO_STORE" })
+                    { StatusCode = StatusCodes.Status409Conflict };
+                    return;
+                }
                 TempData["Toast"] = "warning|Selecione ou cadastre uma loja para continuar.";
                 context.Result = RedirectToAction("SelecionarLoja", "Auth");
                 return;
