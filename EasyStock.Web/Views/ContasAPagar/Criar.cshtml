@@ -59,7 +59,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="form-label">Data emissao *</label>
+                <label class="form-label">Data emissão *</label>
                 <input type="date" name="dataEmissao" required value="@hoje" class="form-input" x-model="emissao" />
             </div>
             <div>
@@ -74,7 +74,7 @@
                 <input type="number" name="numeroParcelas" required min="1" max="36" value="1" class="form-input" x-model.number="parcelas" />
             </div>
             <div>
-                <label class="form-label">1a vencimento *</label>
+                <label class="form-label">1º vencimento *</label>
                 <input type="date" name="primeiraVencimento" required value="@amanha" class="form-input" x-model="primeira" :min="emissao" />
             </div>
             <div>
@@ -98,7 +98,7 @@
         </div>
 
         <div>
-            <label class="form-label">Observacoes</label>
+            <label class="form-label">Observações</label>
             <textarea name="observacoes" maxlength="4000" rows="3" class="form-input">@Model.Observacoes</textarea>
         </div>
 
