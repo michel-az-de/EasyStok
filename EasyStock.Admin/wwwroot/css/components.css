@@ -170,6 +170,16 @@ button:focus-visible {
   transition: width var(--duration-base) var(--ease-out),
               transform var(--duration-base) var(--ease-out);
 }
+/* BUG-006: a sidebar tem fundo fixo escuro (#07132d) nos dois temas, mas o texto
+   da marca ("Easy") e do usuario usa os tokens de tema (--es-ink / --text-primary),
+   que ficam escuros no tema claro e somem sobre o fundo escuro. Fixa os tokens de
+   texto em tom claro DENTRO da sidebar; no tema escuro ja sao claros (no-op). */
+.sidebar {
+  --text-primary: #F2F4F9;
+  --text-muted: rgba(226, 232, 240, 0.62);
+  --es-ink: #F2F4F9;
+  --es-ink-mute: rgba(226, 232, 240, 0.62);
+}
 .sidebar-brand {
   display: flex;
   align-items: center;
