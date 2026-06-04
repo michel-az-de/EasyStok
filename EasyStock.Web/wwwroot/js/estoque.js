@@ -28,7 +28,7 @@ async function fetchCategorias() {
     } catch { /* cache corrompido, buscar do servidor */ }
 
     try {
-        const r = await fetch('/categorias/listar');
+        const r = await esFetch('/categorias/listar');
         if (!r.ok) return;
         const categorias = await r.json();
 

@@ -332,7 +332,7 @@
                     if (this.buscaTerm.length < 2) { this.resultados = []; return; }
                     this.buscando = true;
                     try {
-                        const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm));
+                        const r = await esFetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm));
                         if (r.ok) this.resultados = await r.json();
                     } finally {
                         this.buscando = false;
@@ -348,7 +348,7 @@
                     this.step = 2;
 
                     try {
-                        const r = await fetch('/estoque/itens-por-produto/' + p.id);
+                        const r = await esFetch('/estoque/itens-por-produto/' + p.id);
                         if (r.ok) {
                             this.lotes = await r.json();
                             // Se so tem 1 lote, auto-selecionar

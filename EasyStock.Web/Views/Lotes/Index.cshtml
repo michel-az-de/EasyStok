@@ -264,7 +264,7 @@ function novoLoteModal() {
         async buscarProduto(i, termo) {
             if (!termo || termo.length < 2) { this.sugestoes[i] = null; return; }
             try {
-                const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(termo)}&limit=8`);
+                const res = await esFetch(`/produtos/buscar?q=${encodeURIComponent(termo)}&limit=8`);
                 if (!res.ok) { this.sugestoes[i] = null; return; }
                 const items = await res.json();
                 this.sugestoes[i] = items;
@@ -326,7 +326,7 @@ function novoLoteModal() {
                         validadeDias: i.validadeDias
                     }))
                 };
-                const res = await fetch('/lotes/json', {
+                const res = await esFetch('/lotes/json', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                     body: JSON.stringify(payload)

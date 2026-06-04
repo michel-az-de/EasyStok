@@ -363,7 +363,7 @@ function saidaForm() {
             const preId = '@(ViewBag.PreSelProdutoId ?? "")';
             if (preId) {
                 try {
-                    const r = await fetch('/estoque/produto-detalhe/' + preId);
+                    const r = await esFetch('/estoque/produto-detalhe/' + preId);
                     if (r.ok) {
                         const d = await r.json();
                         this.produtoId = d.id;
@@ -427,7 +427,7 @@ function saidaForm() {
             const abortTimeout = setTimeout(() => abortCtrl.abort(), 30000);
 
             try {
-                const r = await fetch(form.action, {
+                const r = await esFetch(form.action, {
                     method: 'POST',
                     body: fd,
                     redirect: 'follow',
@@ -469,7 +469,7 @@ function saidaForm() {
             this._debounce = setTimeout(async () => {
                 if (this.busca.length < 2) { this.resultados = []; return; }
                 try {
-                    const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
+                    const res = await esFetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
                     this.resultados = res.ok ? await res.json() : [];
                 } catch {
                     this.resultados = [];
@@ -490,7 +490,7 @@ function saidaForm() {
             this.varId = '';
             this.margemEstimada = null;
             try {
-                const dr = await fetch('/estoque/produto-detalhe/' + p.id);
+                const dr = await esFetch('/estoque/produto-detalhe/' + p.id);
                 if (dr.ok) {
                     this._setProdutoDetalhe(await dr.json());
                 }
@@ -509,7 +509,7 @@ function saidaForm() {
                 const termo = String(code || '').trim();
                 this.busca = termo;
                 try {
-                    const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(termo)}`);
+                    const res = await esFetch(`/produtos/buscar?q=${encodeURIComponent(termo)}`);
                     const lista = res.ok ? await res.json() : [];
                     if (lista.length === 1) {
                         this.selecionarProduto(lista[0]);

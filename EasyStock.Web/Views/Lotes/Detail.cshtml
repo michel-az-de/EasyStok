@@ -232,7 +232,7 @@ function itemPesoRow({ itemId, loteId, pesoAtual, podeEditar }) {
             this.salvando = true;
             try {
                 const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
-                const res = await fetch(`/lotes/${loteId}/itens/${itemId}/peso`, {
+                const res = await esFetch(`/lotes/${loteId}/itens/${itemId}/peso`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',

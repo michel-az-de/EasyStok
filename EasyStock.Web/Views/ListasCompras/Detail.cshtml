@@ -268,7 +268,7 @@
                 const q = this.texto.trim();
                 if (q.length < 2) { this.resultados = []; return; }
                 try {
-                    const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(q) + '&limit=8',
+                    const r = await esFetch('/produtos/buscar?q=' + encodeURIComponent(q) + '&limit=8',
                         { headers: { 'X-Requested-With': 'fetch' } });
                     this.resultados = r.ok ? (await r.json()) : [];
                 } catch (_) { this.resultados = []; }
@@ -321,7 +321,7 @@
             setDone(form, willDone);
             recalc();
             try {
-                var resp = await fetch(form.action, { method: 'POST', body: body, headers: { 'X-Requested-With': 'fetch' } });
+                var resp = await esFetch(form.action, { method: 'POST', body: body, headers: { 'X-Requested-With': 'fetch' } });
                 if (resp.status >= 400) throw new Error('http ' + resp.status);
             } catch (_) {
                 setDone(form, !willDone);

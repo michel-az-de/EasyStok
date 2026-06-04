@@ -106,7 +106,7 @@ window.combobox = function (config) {
                     .closest('form')
                     ?.querySelector('input[name=__RequestVerificationToken]')
                     ?.value;
-                const resp = await fetch(this.createUrl, {
+                const resp = await esFetch(this.createUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

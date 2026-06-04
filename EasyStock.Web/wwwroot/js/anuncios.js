@@ -23,7 +23,7 @@ function anuncioForm() {
             this._debounce = setTimeout(async () => {
                 if (this.busca.length < 2) { this.resultados = []; return; }
                 try {
-                    const res = await fetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
+                    const res = await esFetch(`/produtos/buscar?q=${encodeURIComponent(this.busca)}`);
                     this.resultados = res.ok ? await res.json() : [];
                 } catch (e) {
                     this.resultados = [];
@@ -92,7 +92,7 @@ function anuncioResultado() {
                 ...(contexto ? { contexto } : {})
             });
 
-            fetch(`/anuncios/gerar?${params}`)
+            esFetch(`/anuncios/gerar?${params}`)
                 .then(res => {
                     if (!res.ok) {
                         this.resultado = 'Erro ao gerar anúncio. Tente novamente.';
@@ -162,7 +162,7 @@ function anuncioResultado() {
             const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
             const titulo = this.resultado.substring(0, 80).replace(/\n/g, ' ').trim();
             try {
-                const res = await fetch('/anuncios/salvar', {
+                const res = await esFetch('/anuncios/salvar', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -212,7 +212,7 @@ function anunciosSalvos() {
             if (!this.produtoId) return;
             this.carregando = true;
             try {
-                const res = await fetch(`/anuncios/salvos?produtoId=${this.produtoId}`);
+                const res = await esFetch(`/anuncios/salvos?produtoId=${this.produtoId}`);
                 this.itens = res.ok ? await res.json() : [];
             } catch {
                 this.itens = [];
@@ -231,7 +231,7 @@ function anunciosSalvos() {
             if (!confirm('Tem certeza que deseja excluir este anúncio?')) return;
             const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
             try {
-                const res = await fetch(`/anuncios/${id}/deletar`, {
+                const res = await esFetch(`/anuncios/${id}/deletar`, {
                     method: 'POST',
                     headers: { 'RequestVerificationToken': token }
                 });

@@ -468,7 +468,7 @@
                     this.erroMsg = '';
                     const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
                     try {
-                        const r = await fetch('/estoque/saida', {
+                        const r = await esFetch('/estoque/saida', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',

@@ -25,7 +25,7 @@ function debounce(fn, ms) {
 async function buscarProduto(q) {
     if (!q || q.length < 2) return [];
     try {
-        const r = await fetch(`/produtos/buscar?q=${encodeURIComponent(q)}`);
+        const r = await esFetch(`/produtos/buscar?q=${encodeURIComponent(q)}`);
         if (!r.ok) return [];
         return await r.json();
     } catch {

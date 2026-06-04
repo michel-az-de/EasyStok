@@ -386,7 +386,7 @@
                     const preId = '@(ViewBag.PreSelProdutoId ?? "")';
                     if (!preId) return;
                     try {
-                        const r = await fetch('/estoque/produto-detalhe/' + preId);
+                        const r = await esFetch('/estoque/produto-detalhe/' + preId);
                         if (!r.ok) return;
                         const d = await r.json();
                         this.produtoId = d.id;
@@ -404,7 +404,7 @@
                     this.jaFezBusca = false;
                     this.buscando = true;
                     try {
-                        const r = await fetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm), { signal: this._searchAbort.signal });
+                        const r = await esFetch('/produtos/buscar?q=' + encodeURIComponent(this.buscaTerm), { signal: this._searchAbort.signal });
                         if (r.ok) {
                             this.resultados = await r.json();
                         } else {
@@ -433,7 +433,7 @@
                     this.preco = p.precoReferencia || null;
                     let detailOk = false;
                     try {
-                        const dr = await fetch('/estoque/produto-detalhe/' + p.id);
+                        const dr = await esFetch('/estoque/produto-detalhe/' + p.id);
                         if (dr.ok) {
                             const d = await dr.json();
                             this._setProdutoDetalhe(d);
@@ -485,7 +485,7 @@
                             observacoes: this.observacoes || null,
                             data: this.data
                         };
-                        const res = await fetch('/entradas/nova/json', {
+                        const res = await esFetch('/entradas/nova/json', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                             body: JSON.stringify(body)
