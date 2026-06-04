@@ -1001,7 +1001,7 @@
                 <span>🐢 Lentos: <b class="text-amber-300" x-text="perf.endpoints?.lentos ?? 0"></b></span>
                 <span title="Endpoints autenticados — testados sem credenciais, só verificamos que a auth está protegida.">🔒 Auth-protegidos: <b class="text-amber-300" x-text="perf.endpoints?.degradados ?? 0"></b></span>
                 <span>❌ Falhas: <b class="text-red-400" x-text="perf.endpoints?.falhas ?? 0"></b></span>
-                <span class="ml-auto font-mono text-[10px]" x-show="perf.endpoints?.testadoEm" x-text="new Date(perf.endpoints.testadoEm).toLocaleTimeString('pt-BR')"></span>
+                <span class="ml-auto font-mono text-[10px]" x-show="perf.endpoints?.testadoEm" x-text="perf.endpoints?.testadoEm ? new Date(perf.endpoints.testadoEm).toLocaleTimeString('pt-BR') : ''"></span>
             </div>
             <table class="w-full text-xs">
                 <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
@@ -1327,7 +1327,7 @@
                 <span>🐢 <b class="text-amber-300" x-text="testes.smoke?.lentos ?? 0"></b></span>
                 <span title="Auth-protegidos — testados sem credenciais.">🔒 <b class="text-amber-300" x-text="testes.smoke?.degradados ?? 0"></b></span>
                 <span>❌ <b class="text-red-400" x-text="testes.smoke?.falhas ?? 0"></b></span>
-                <span class="ml-auto font-mono text-[10px]" x-show="testes.smoke?.testadoEm" x-text="new Date(testes.smoke.testadoEm).toLocaleTimeString('pt-BR')"></span>
+                <span class="ml-auto font-mono text-[10px]" x-show="testes.smoke?.testadoEm" x-text="testes.smoke?.testadoEm ? new Date(testes.smoke.testadoEm).toLocaleTimeString('pt-BR') : ''"></span>
             </div>
             <table class="w-full text-xs">
                 <thead class="bg-es-surface-2 text-es-ink-mute uppercase tracking-wide">
