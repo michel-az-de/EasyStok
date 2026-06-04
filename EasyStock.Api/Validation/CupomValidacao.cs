@@ -1,0 +1,29 @@
+namespace EasyStock.Api.Validation;
+
+/// <summary>
+/// Regras de validacao de cupom na fronteira da API (INV-001 / #463), extraidas do
+/// AdminCuponsController para ficarem testaveis em isolamento. Retornam a mensagem
+/// de erro (pt-BR) ou null quando valido. O charset do codigo tambem fecha o vetor
+/// DOM-XSS no Admin (codigo interpolado em atributo Alpine), mesma classe do #352.
+/// </summary>
+public static class CupomValidacao
+{
+    public static string? ValidarCodigo(string codigoUpper)
+    {
+        if (codigoUpper.Length is < 3 or > 50)
+            return "Codigo do cupom deve ter entre 3 e 50 caracteres.";
+        foreach (var c in codigoUpper)
+            if (c is not (>= 'A' and <= 'Z' or >= '0' and <= '9' or '-' or '_'))
+                return "Codigo do cupom so pode conter letras, numeros, hifen e underscore.";
+        return null;
+    }
+
+    public static string? ValidarValor(TipoDesconto? tipo, decimal valor)
+    {
+        if (valor <= 0)
+            return "Valor do desconto deve ser maior que zero.";
+        if (tipo == TipoDesconto.Percentual && valor > 100)
+            return "Desconto percentual nao pode passar de 100%.";
+        return null;
+    }
+}
