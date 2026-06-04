@@ -198,7 +198,7 @@
                 this.erroMsg = '';
                 try {
                     var token = document.querySelector('[name=__RequestVerificationToken]')?.value;
-                    var res = await fetch(config.endpoint, {
+                    var res = await esFetch(config.endpoint, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
