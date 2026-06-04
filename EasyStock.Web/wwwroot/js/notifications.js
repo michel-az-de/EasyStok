@@ -33,7 +33,7 @@
   async function poll() {
     if (document.hidden) return;
     try {
-      const r = await fetch('/notificacoes/resumo', { credentials: 'same-origin' });
+      const r = await esFetch('/notificacoes/resumo', { credentials: 'same-origin' });
       if (!r.ok) {
         consecutiveFailures++;
         if (consecutiveFailures >= 3) {
