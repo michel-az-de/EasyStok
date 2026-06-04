@@ -67,8 +67,11 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         // Alertas de validade (30 dias)
         var cutoffValidade = DateTime.UtcNow.AddDays(30);
+        // BUG-010 (#459): "vence em ate 30 dias" nao deve incluir lotes JA vencidos.
+        // Exclui Status==Vencido (consistente com a query de estoque acima, linha ~50).
         var validadeQuery = dbContext.ItensEstoque.AsNoTracking()
-            .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade);
+            .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido
+                && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade);
         if (lojaId.HasValue)
             validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
         var alertasValidade = await validadeQuery.CountAsync();
