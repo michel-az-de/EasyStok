@@ -1186,7 +1186,7 @@
                                || document.querySelector('[name=__RequestVerificationToken]')?.value
                                || '';
                     try {
-                        const r = await fetch('/produtos/' + prodId + '/fotos/reordenar', {
+                        const r = await esFetch('/produtos/' + prodId + '/fotos/reordenar', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
                             body: JSON.stringify(novaOrdem)
@@ -1215,7 +1215,7 @@
                     const fd = new FormData();
                     fd.append('__RequestVerificationToken', token);
                     try {
-                        const r = await fetch('/produtos/' + prodId + '/fotos/' + fotoId + '/remover', { method: 'POST', body: fd });
+                        const r = await esFetch('/produtos/' + prodId + '/fotos/' + fotoId + '/remover', { method: 'POST', body: fd });
                         const d = await r.json();
                         if (!d.ok) throw new Error(d.erro ?? 'Erro');
                         this.photos = this.photos.filter(x => x.fotoId !== fotoId);
@@ -1235,7 +1235,7 @@
                     if (this._hlLoaded) return;
                     this._hlLoaded = true;
                     try {
-                        const r = await fetch('/produtos/' + prodId + '/historico-json');
+                        const r = await esFetch('/produtos/' + prodId + '/historico-json');
                         this.historico = r.ok ? await r.json() : [];
                     } catch { this.historico = []; }
                 },
@@ -1247,7 +1247,7 @@
                     if (this._altLoaded) return;
                     this._altLoaded = true;
                     try {
-                        const r = await fetch('/produtos/' + prodId + '/alteracoes-json');
+                        const r = await esFetch('/produtos/' + prodId + '/alteracoes-json');
                         this.alteracoes = r.ok ? await r.json() : [];
                     } catch { this.alteracoes = []; }
                 },

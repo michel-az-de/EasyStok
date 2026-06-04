@@ -154,7 +154,7 @@ function fichaTecnicaForm(produtoId, initialAtributosJson) {
                 alergenosOutros: this.alergenosOutros?.trim() || null
             };
             try {
-                const res = await fetch(`/produtos/${this.produtoId}/ficha-tecnica`, {
+                const res = await esFetch(`/produtos/${this.produtoId}/ficha-tecnica`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -40,7 +40,7 @@
             if (p && p.t && (Date.now() - p.t) < 600000) { render(p.v); return; }
         }
     } catch (e) { /* sessionStorage indisponivel: segue pro fetch */ }
-    fetch('/api/assinatura', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+    esFetch('/api/assinatura', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(json){
             try { sessionStorage.setItem('es_assinatura', JSON.stringify({ t: Date.now(), v: json })); } catch (e) {}

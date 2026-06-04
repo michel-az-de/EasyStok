@@ -534,7 +534,7 @@ function caixaAutoRetry(enabled) {
             try {
                 // HEAD na própria URL — se o servidor responder OK, recarrega de vez.
                 // Se ainda falhar, agenda próxima tentativa.
-                const r = await fetch(window.location.pathname + window.location.search, {
+                const r = await esFetch(window.location.pathname + window.location.search, {
                     method: 'GET',
                     headers: { 'X-Probe': '1' },
                     credentials: 'same-origin',

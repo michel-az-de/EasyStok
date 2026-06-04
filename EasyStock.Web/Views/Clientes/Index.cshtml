@@ -194,7 +194,7 @@
                                    const tel = (form.telefone || '').replace(/\D/g,'');
                                    if (tel.length < 10) return;
                                    try {
-                                       const r = await fetch('/clientes/buscar-json?q=' + encodeURIComponent(form.telefone) + '&limit=1');
+                                       const r = await esFetch('/clientes/buscar-json?q=' + encodeURIComponent(form.telefone) + '&limit=1');
                                        if (!r.ok) return;
                                        const d = await r.json();
                                        if (d && d.length > 0) avisoTel = 'Já existe um cliente com este telefone (' + d[0].nome + '). Verifique antes de continuar.';

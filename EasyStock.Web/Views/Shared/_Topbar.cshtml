@@ -188,7 +188,7 @@
                     if (q.length < 2) { this.results = []; this.semResultados = false; return; }
                     this.carregando = true;
                     try {
-                        const r = await fetch('/busca?q=' + encodeURIComponent(q) + '&limit=15');
+                        const r = await esFetch('/busca?q=' + encodeURIComponent(q) + '&limit=15');
                         if (!r.ok) { this.semResultados = true; return; }
                         const data = await r.json();
                         this.results = Array.isArray(data) ? data : [];
@@ -562,7 +562,7 @@
                 form.append('theme', normalized);
 
                 try {
-                    await fetch('/auth/theme', {
+                    await esFetch('/auth/theme', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',

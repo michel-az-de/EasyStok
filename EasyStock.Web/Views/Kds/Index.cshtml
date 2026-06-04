@@ -252,7 +252,7 @@ function kdsAutoRefresh() {
             if (this.loading) return;
             this.loading = true;
             try {
-                const r = await fetch('/kds/json', {
+                const r = await esFetch('/kds/json', {
                     credentials: 'same-origin',
                     cache: 'no-store',
                     headers: { 'Accept': 'application/json' }
@@ -288,7 +288,7 @@ function kdsAutoRefresh() {
                 const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
                 const fd = new FormData();
                 fd.append('status', status);
-                const r = await fetch('/kds/' + id + '/avancar', {
+                const r = await esFetch('/kds/' + id + '/avancar', {
                     method: 'POST',
                     headers: { 'RequestVerificationToken': token },
                     body: fd

@@ -265,7 +265,7 @@ function catModal() {
                 : '/categorias/' + this.currentId + '/editar-json';
             try {
                 var tokenEl = document.querySelector('[name=__RequestVerificationToken]');
-                var res = await fetch(ep, {
+                var res = await esFetch(ep, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

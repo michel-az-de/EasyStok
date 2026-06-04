@@ -262,7 +262,7 @@
                                                 :class="{ 'opacity-50 cursor-not-allowed': precoSaving || !precoVal || precoVal <= 0 }"
                                                 @@click.stop="
                                                     precoSaving = true;
-                                                    fetch('/produtos/@p.Id/preco-rapido', {
+                                                    esFetch('/produtos/@p.Id/preco-rapido', {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'RequestVerificationToken': document.querySelector('[name=__RequestVerificationToken]')?.value ?? '' },
                                                         body: 'preco=' + encodeURIComponent(precoVal)
