@@ -31,6 +31,10 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     {
         if (Page < 1) Page = 1;
         if (Page > MaxPage) Page = MaxPage;
+        // Status invalido na URL (ex.: ?status=XYZINVALID) vira null: nao vai pra API
+        // (ja era ignorado) e nao renderiza mais o chip/seletor com valor fantasma (BUG-008).
+        if (!string.IsNullOrWhiteSpace(Status) && !StatusValidos.Contains(Status))
+            Status = null;
         try
         {
             var qs = $"api/admin/tenants?page={Page}&pageSize={PageSize}";

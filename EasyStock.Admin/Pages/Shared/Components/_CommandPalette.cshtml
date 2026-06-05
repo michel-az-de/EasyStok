@@ -92,7 +92,10 @@
             </template>
 
             <!-- Resultados agrupados -->
-            <template x-for="grupo in groups" :key="grupo.titulo">
+            @* :key precisa ser string/int. O ranking achatado retorna um unico grupo com
+               titulo:null, e :key="grupo.titulo" virava null (typeof null === 'object') ->
+               warning do Alpine "x-for key cannot be an object" (BUG-011). *@
+            <template x-for="grupo in groups" :key="grupo.titulo || 'resultados'">
                 <div>
                     <div class="cmdk-group-title" x-show="grupo.titulo" x-text="grupo.titulo"></div>
                     <template x-for="item in grupo.items" :key="grupo.titulo + ':' + item._key">
