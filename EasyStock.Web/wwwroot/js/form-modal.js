@@ -112,6 +112,16 @@
             _previousFocus: null,
 
             init() {
+                // O <form> do modal passa pelo FormTagHelper do Razor, que descarta
+                // o atributo `@submit.prevent="submit()"` na renderizacao (mesmo
+                // padrao do es-button que nao repassa @click). Sem o handler, o botao
+                // type=submit dispara submit NATIVO via GET e o cadastro nao persiste
+                // (BUG-01/02 do QA 2026-06-04, confirmado no HTML servido). Ligamos o
+                // submit programaticamente aqui -> vale para TODOS os modais formModal.
+                const formEl = this.$el.querySelector('form');
+                if (formEl) {
+                    formEl.addEventListener('submit', (e) => { e.preventDefault(); this.submit(); });
+                }
                 window.addEventListener('open-modal', (e) => {
                     if (e.detail === config.id) {
                         this._previousFocus = document.activeElement;
