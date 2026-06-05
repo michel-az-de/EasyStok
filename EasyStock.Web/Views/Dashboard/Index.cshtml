@@ -3,10 +3,15 @@
 @using System.Text.Json
 @{
     var ptBR = new CultureInfo("pt-BR");
-    var hora = DateTime.Now.Hour;
+    // Saudacao e data no fuso de Brasilia: o container roda em UTC, entao
+    // DateTime.Now adiantava ~3h e trocava a saudacao (e a data perto da
+    // meia-noite). Mesmo padrao de ListarJanelasDisponiveisUseCase.
+    var agoraBrasil = TimeZoneInfo.ConvertTimeFromUtc(
+        DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+    var hora = agoraBrasil.Hour;
     var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
-    var dataHoje = DateTime.Now.ToString("dd 'de' MMMM 'de' yyyy", ptBR);
+    var dataHoje = agoraBrasil.ToString("dd 'de' MMMM 'de' yyyy", ptBR);
 
     // Mensagem de status -- prioriza o que exige acao
     string statusMsg;
