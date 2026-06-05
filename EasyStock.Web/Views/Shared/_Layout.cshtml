@@ -34,6 +34,11 @@
     <link rel="stylesheet" href="~/css/form-validation.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/print.css" media="print" asp-append-version="true" />
+    @* es-fetch.js carregado cedo (sincrono, no head) porque scripts inline do corpo
+       — _TrialBanner e varias views migradas de fetch->esFetch em ec0168ad — chamam
+       esFetch() no load, ANTES do bundle de scripts no fim do <body>. Sem isto da
+       ReferenceError: esFetch is not defined em toda pagina (BUG-03 do QA 2026-06-04). *@
+    <script src="~/js/es-fetch.js" asp-append-version="true"></script>
     @* NAO re-adicionar `.app-dropdown { display: none }` aqui. O anti-flash dos
        dropdowns ja e feito por `[x-cloak] { display: none !important }` (app.css),
        que o Alpine remove ao iniciar. A classe `.app-dropdown` persiste no elemento;
@@ -92,7 +97,7 @@
     <script src="~/js/nav-progress.js" asp-append-version="true"></script>
     <script src="~/js/format.js" asp-append-version="true"></script>
     <script src="~/js/toast.js" asp-append-version="true"></script>
-    <script src="~/js/es-fetch.js" asp-append-version="true"></script>
+    @* es-fetch.js movido para o <head> (carrega antes dos scripts inline do corpo). *@
     <script src="~/js/api.js" asp-append-version="true"></script>
     <script src="~/js/locale.js" asp-append-version="true"></script>
     <script src="~/js/masks.js" asp-append-version="true"></script>
