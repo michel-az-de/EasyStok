@@ -97,12 +97,12 @@ else
                         <es-input name="nome" label="Nome" value="@nome" required="true" />
                         <es-input name="descricao" label="Descrição" value="@descricao" label-optional="true" />
                         <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
-                            <es-input name="limiteLojas" type="number" label="Limite Lojas" value="@limLojas" required="true" helper="-1 = ∞" />
-                            <es-input name="limiteUsuarios" type="number" label="Limite Usuários" value="@limUsuarios" required="true" />
-                            <es-input name="limiteProdutos" type="number" label="Limite Produtos" value="@limProdutos" required="true" />
-                            <es-input name="limiteGeracoesIaMensais" type="number" label="Limite IA/mês" value="@limIa" required="true" />
+                            <es-input name="limiteLojas" type="number" min="-1" label="Limite Lojas" value="@limLojas" required="true" helper="-1 = ∞" />
+                            <es-input name="limiteUsuarios" type="number" min="-1" label="Limite Usuários" value="@limUsuarios" required="true" />
+                            <es-input name="limiteProdutos" type="number" min="-1" label="Limite Produtos" value="@limProdutos" required="true" />
+                            <es-input name="limiteGeracoesIaMensais" type="number" min="-1" label="Limite IA/mês" value="@limIa" required="true" />
                         </div>
-                        <es-input name="precoMensal" type="number" label="Preço mensal" value="@preco" step="0.01" prefix="R$" required="true" />
+                        <es-input name="precoMensal" type="number" min="0" label="Preço mensal" value="@preco" step="0.01" prefix="R$" required="true" />
                         <es-button type="submit" variant="primary" icon="check" block="true">Salvar alterações</es-button>
                     </form>
                 </div>
@@ -119,13 +119,13 @@ else
         <es-input name="descricao" label="Descrição" label-optional="true" placeholder="Para empresas em crescimento" />
 
         <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
-            <es-input name="limiteLojas" type="number" label="Limite Lojas" value="1" required="true" helper="-1 = ∞" />
-            <es-input name="limiteUsuarios" type="number" label="Limite Usuários" value="5" required="true" />
-            <es-input name="limiteProdutos" type="number" label="Limite Produtos" value="500" required="true" />
-            <es-input name="limiteGeracoesIaMensais" type="number" label="Limite IA/mês" value="10" required="true" />
+            <es-input name="limiteLojas" type="number" min="-1" label="Limite Lojas" value="1" required="true" helper="-1 = ∞" />
+            <es-input name="limiteUsuarios" type="number" min="-1" label="Limite Usuários" value="5" required="true" />
+            <es-input name="limiteProdutos" type="number" min="-1" label="Limite Produtos" value="500" required="true" />
+            <es-input name="limiteGeracoesIaMensais" type="number" min="-1" label="Limite IA/mês" value="10" required="true" />
         </div>
 
-        <es-input name="precoMensal" type="number" label="Preço mensal" value="0" step="0.01" prefix="R$" required="true" />
+        <es-input name="precoMensal" type="number" min="0" label="Preço mensal" value="0" step="0.01" prefix="R$" required="true" />
 
         <es-modal-footer>
             <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>

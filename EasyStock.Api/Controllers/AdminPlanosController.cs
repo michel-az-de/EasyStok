@@ -1,3 +1,5 @@
+using EasyStock.Api.Validation;
+
 namespace EasyStock.Api.Controllers;
 
 [ApiController]
@@ -12,6 +14,19 @@ public class AdminPlanosController(IPlanoAdminRepository planos, AdminAuditServi
     [HttpPost]
     public async Task<IActionResult> CreatePlano([FromBody] CreatePlanoRequest req, CancellationToken ct = default)
     {
+        if (PlanoValidacao.ValidarNome(req.Nome) is { } erroNome)
+            return DataBadRequest(erroNome);
+        if (PlanoValidacao.ValidarLimite(req.LimiteLojas, "Limite de lojas") is { } erroLojas)
+            return DataBadRequest(erroLojas);
+        if (PlanoValidacao.ValidarLimite(req.LimiteUsuarios, "Limite de usuarios") is { } erroUsuarios)
+            return DataBadRequest(erroUsuarios);
+        if (PlanoValidacao.ValidarLimite(req.LimiteProdutos, "Limite de produtos") is { } erroProdutos)
+            return DataBadRequest(erroProdutos);
+        if (PlanoValidacao.ValidarLimite(req.LimiteGeracoesIaMensais, "Limite de IA/mes") is { } erroIa)
+            return DataBadRequest(erroIa);
+        if (PlanoValidacao.ValidarPreco(req.PrecoMensal) is { } erroPreco)
+            return DataBadRequest(erroPreco);
+
         var resumo = await planos.CriarAsync(
             new NovoPlano(req.Nome, req.Descricao, req.LimiteLojas, req.LimiteUsuarios,
                 req.LimiteProdutos, req.LimiteGeracoesIaMensais, req.PrecoMensal), ct);
@@ -24,6 +39,19 @@ public class AdminPlanosController(IPlanoAdminRepository planos, AdminAuditServi
     [HttpPatch("{id:guid}")]
     public async Task<IActionResult> PatchPlano(Guid id, [FromBody] PatchPlanoAdminRequest req, CancellationToken ct = default)
     {
+        if (req.Nome is not null && PlanoValidacao.ValidarNome(req.Nome) is { } erroNome)
+            return DataBadRequest(erroNome);
+        if (req.LimiteLojas is { } limLojas && PlanoValidacao.ValidarLimite(limLojas, "Limite de lojas") is { } erroLojas)
+            return DataBadRequest(erroLojas);
+        if (req.LimiteUsuarios is { } limUsuarios && PlanoValidacao.ValidarLimite(limUsuarios, "Limite de usuarios") is { } erroUsuarios)
+            return DataBadRequest(erroUsuarios);
+        if (req.LimiteProdutos is { } limProdutos && PlanoValidacao.ValidarLimite(limProdutos, "Limite de produtos") is { } erroProdutos)
+            return DataBadRequest(erroProdutos);
+        if (req.LimiteGeracoesIaMensais is { } limIa && PlanoValidacao.ValidarLimite(limIa, "Limite de IA/mes") is { } erroIa)
+            return DataBadRequest(erroIa);
+        if (req.PrecoMensal is { } preco && PlanoValidacao.ValidarPreco(preco) is { } erroPreco)
+            return DataBadRequest(erroPreco);
+
         var resumo = await planos.AtualizarAsync(id,
             new PatchPlano(req.Nome, req.Descricao, req.LimiteLojas, req.LimiteUsuarios,
                 req.LimiteProdutos, req.LimiteGeracoesIaMensais, req.PrecoMensal), ct);
