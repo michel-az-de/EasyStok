@@ -33,8 +33,8 @@ public class RegistrarMovimentoCaixaUseCase(
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor deve ser maior que zero.");
 
-        var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;
-        var data = DateOnly.FromDateTime(dataMov);
+        var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
+        var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
         var fechamento = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);

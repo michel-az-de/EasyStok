@@ -24,7 +24,7 @@ public class FecharCaixaUseCase(
     public async Task<FechamentoCaixaResult> ExecuteAsync(FecharCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
-        var data = cmd.Data ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var data = cmd.Data ?? HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
         var existente = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);
         if (existente != null) return Map(existente);

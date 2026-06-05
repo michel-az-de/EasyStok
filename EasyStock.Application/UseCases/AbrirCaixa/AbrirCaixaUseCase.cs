@@ -23,8 +23,8 @@ public class AbrirCaixaUseCase(
         if (cmd.SaldoInicial < 0)
             throw new UseCaseValidationException("Saldo inicial não pode ser negativo.");
 
-        var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;
-        var data = DateOnly.FromDateTime(dataMov);
+        var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
+        var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
 
         // Não permitir abrir caixa do mesmo dia se já foi fechado.
         var fechamento = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId);

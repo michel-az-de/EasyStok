@@ -7,6 +7,7 @@ global using System.ComponentModel.DataAnnotations;
 global using System.Linq;
 global using System.Threading;
 global using System.Threading.Tasks;
+global using EasyStock.Application.Common;
 global using EasyStock.Application.Ports.Output;
 global using EasyStock.Application.Ports.Output.Persistence;
 global using EasyStock.Application.UseCases.Common;
