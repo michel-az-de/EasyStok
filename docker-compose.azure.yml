@@ -102,6 +102,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ApiSettings__BaseUrl: "http://api:8080/api"
       ApiSettings__TimeoutSeconds: "30"
+      # URL PUBLICA da API (browser) p/ o link do KDS/PWA no _Sidebar (BUG-13).
+      # ${API_HOST} vem do .env (api.<ip>.sslip.io). NAO confundir com ApiSettings__BaseUrl
+      # (interno, http://api:8080, usado nas chamadas server-side da Web).
+      PublicApiUrl: "https://${API_HOST}"
       # Persistencia das chaves de DataProtection num volume — sem isso o cookie de
       # auth morre a cada deploy (logout geral). Ver EasyStock.Web/Program.cs (8b).
       DataProtection__KeysPath: /app/dataprotection-keys

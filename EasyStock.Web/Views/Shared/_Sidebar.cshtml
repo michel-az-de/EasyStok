@@ -4,8 +4,12 @@
     var lojaNome = ViewBag.LojaAtualNome as string ?? "Selecionar loja";
     var lojaEmoji = ViewBag.LojaAtualEmoji as string;
     var hasLojaEmoji = !string.IsNullOrWhiteSpace(lojaEmoji);
-    var apiBase = (Configuration["ApiSettings:BaseUrl"] ?? "").TrimEnd('/');
-    var kdsUrl = string.IsNullOrEmpty(apiBase) ? "/pwa/#kds" : $"{apiBase}/pwa/#kds";
+    // O link do KDS abre o PWA no BROWSER do usuario -> precisa da URL PUBLICA da API,
+    // nao da interna (ApiSettings:BaseUrl = http://api:8080/api no docker, que vaza
+    // hostname interno e ainda monta /api/pwa -> 404). PublicApiUrl vem do
+    // docker-compose.azure (https://${API_HOST}); o PWA fica em /pwa/ (sem /api). BUG-13.
+    var publicApi = (Configuration["PublicApiUrl"] ?? "").TrimEnd('/');
+    var kdsUrl = string.IsNullOrEmpty(publicApi) ? "/pwa/#kds" : $"{publicApi}/pwa/#kds";
 }
 
 <aside class="app-sidebar fixed inset-y-0 left-0 z-50 w-60 flex flex-col flex-shrink-0
