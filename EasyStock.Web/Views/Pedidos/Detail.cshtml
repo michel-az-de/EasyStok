@@ -138,7 +138,7 @@ else
             <div class="font-semibold">Pedido cancelado</div>
             @if (p.CanceladoEm.HasValue)
             {
-                <div class="text-xs opacity-80">em @p.CanceladoEm.Value.ToLocalTime().AsDateTime()</div>
+                <div class="text-xs opacity-80">em @p.CanceladoEm.Value.ParaBrasilia().AsDateTime()</div>
             }
         </div>
     </div>
@@ -236,7 +236,7 @@ else
                 @if (!string.IsNullOrEmpty(p.ClienteApt))      { <div><dt class="text-slate-500">Apt / Mesa</dt><dd>@p.ClienteApt</dd></div> }
                 @if (!string.IsNullOrEmpty(p.ClienteTelefone)) { <div><dt class="text-slate-500">Telefone</dt><dd>@p.ClienteTelefone</dd></div> }
                 <div class="pt-2 border-t"><dt class="text-slate-500">Origem</dt><dd>@(p.Origem ?? "—")</dd></div>
-                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ToLocalTime().AsDateTime()</dd></div>
+                <div><dt class="text-slate-500">Criado</dt><dd>@p.CriadoEm.ParaBrasilia().AsDateTime()</dd></div>
                 @if (p.AgendadoParaEm.HasValue)
                 {
                     var agBadge = p.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
@@ -245,12 +245,12 @@ else
                         <dt class="text-slate-500">Agendado para</dt>
                         <dd>
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium @agBadge">
-                                @agPrefix @p.AgendadoParaEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                @agPrefix @p.AgendadoParaEm.Value.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")
                             </span>
                         </dd>
                     </div>
                 }
-                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ToLocalTime().AsDateTime()</dd></div> }
+                @if (p.EntreguEm.HasValue)  { <div><dt class="text-slate-500">Entregue</dt><dd>@p.EntreguEm.Value.ParaBrasilia().AsDateTime()</dd></div> }
                 @if (!string.IsNullOrEmpty(p.MobileOrderId))
                 {
                     <div><dt class="text-slate-500">ID externo (app)</dt><dd class="font-mono text-xs">@p.MobileOrderId</dd></div>
@@ -369,7 +369,7 @@ else
                         <li class="py-3 flex items-center justify-between gap-2">
                             <div class="text-sm">
                                 <div class="font-semibold text-slate-900 tabular-nums">@pg.Valor.AsMoney() <span class="text-[10px] font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded uppercase tracking-wider ml-1">@pg.Metodo</span></div>
-                                <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ToLocalTime().AsDateTime()@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
+                                <div class="text-xs text-slate-500 mt-0.5">@pg.PagoEm.ParaBrasilia().AsDateTime()@(string.IsNullOrEmpty(pg.RegistradoPorNome) ? "" : " · por " + pg.RegistradoPorNome)@(string.IsNullOrEmpty(pg.Referencia) ? "" : " · ref: " + pg.Referencia)</div>
                                 @if (!string.IsNullOrEmpty(pg.Observacao)) { <div class="text-xs text-slate-400 mt-1">@pg.Observacao</div> }
                             </div>
                             <form asp-action="RemovePagamento" asp-controller="Pedidos" asp-route-id="@p.Id" asp-route-pagamentoId="@pg.Id" method="post" data-confirm='{"titulo":"Remover pagamento?","mensagem":"O pagamento será estornado do pedido.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
@@ -445,7 +445,7 @@ else
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ToLocalTime().AsDateTime()</span>
+                                <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ParaBrasilia().AsDateTime()</span>
                                 <span class="font-medium text-slate-900">@e.Tipo</span>
                                 @if (!string.IsNullOrEmpty(e.StatusAntigo) && !string.IsNullOrEmpty(e.StatusNovo))
                                 {

@@ -1,3 +1,4 @@
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Pedidos;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -118,7 +119,7 @@ public class PedidosController(
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
         var msg = agendadoParaEm.HasValue
-            ? $"Pedido agendado para {agendadoParaEm.Value.ToLocalTime():dd/MM/yyyy HH:mm}."
+            ? $"Pedido agendado para {agendadoParaEm.Value.ParaBrasilia():dd/MM/yyyy HH:mm}."
             : "Agendamento removido.";
         Toast("success", msg);
         return RedirectToAction(nameof(Detail), new { id });

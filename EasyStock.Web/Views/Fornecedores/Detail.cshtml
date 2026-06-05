@@ -277,7 +277,7 @@
                     var a = Model.Alteracoes[idx];
                     <li class="py-2 text-sm" @(idx >= 10 ? "x-show=\"expanded\" x-cloak" : "")>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                            <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ParaBrasilia().ToString("dd/MM HH:mm")</span>
                             <span class="font-medium text-slate-900">@a.Campo</span>
                             <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@(a.Origem ?? "?")</span>
                         </div>

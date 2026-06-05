@@ -83,7 +83,7 @@
                     {
                         <tr>
                             <td class="font-mono text-sm">@p.Codigo</td>
-                            <td class="text-xs text-slate-500">@p.DataProducao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="text-xs text-slate-500">@p.DataProducao.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</td>
                             <td>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
                                     @p.ItensPendentes item(ns) sem peso
@@ -126,7 +126,7 @@
                             @statusInfo.Label
                         </span>
                     </td>
-                    <td class="text-xs text-slate-500">@l.DataProducao.ToLocalTime().AsDateTime()</td>
+                    <td class="text-xs text-slate-500">@l.DataProducao.ParaBrasilia().AsDateTime()</td>
                     <td class="text-sm text-slate-600">@(l.OperadorNome ?? "—")</td>
                     <td class="text-slate-600 text-sm col-num">
                         @if (l.TotalUnidades == 0)

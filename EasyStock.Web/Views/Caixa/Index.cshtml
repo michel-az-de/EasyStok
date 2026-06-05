@@ -166,7 +166,7 @@ else
             @if (d.Fechado && d.Fechamento != null)
             {
                 <span class="text-sm text-slate-600">
-                    Fechado em @d.Fechamento.FechadoEm.ToLocalTime().AsDateTime()
+                    Fechado em @d.Fechamento.FechadoEm.ParaBrasilia().AsDateTime()
                     @if (!string.IsNullOrEmpty(d.Fechamento.FechadoPorNome)) { <span class="text-slate-400">por @d.Fechamento.FechadoPorNome</span> }
                     · Saldo final: <strong class="tabular-nums">@d.Fechamento.SaldoFinal.AsMoney()</strong>
                 </span>
@@ -198,7 +198,7 @@ else
                         _            => "bg-slate-100 text-slate-600"
                     };
                     <tr>
-                        <td class="text-xs text-slate-500">@m.DataMovimento.ToLocalTime().ToString("HH:mm")</td>
+                        <td class="text-xs text-slate-500">@m.DataMovimento.ParaBrasilia().ToString("HH:mm")</td>
                         <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @tipoBadge">@m.Tipo</span></td>
                         <td class="font-medium @(m.Tipo == "saida" ? "text-red-700" : "text-slate-900")">
                             @(m.Tipo == "saida" ? "−" : "+")@m.Valor.AsMoney()

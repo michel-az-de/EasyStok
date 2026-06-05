@@ -23,7 +23,7 @@
                 var estornado = pg.EstornadoEm.HasValue || pg.Status == "Estornado";
                 var podeEstornar = pg.Status == "Confirmado" && !pg.EstornadoEm.HasValue;
                 <tr class="@(estornado ? "text-gray-400 line-through" : "")">
-                    <td class="px-2 py-1">@pg.DataPagamento.ToLocalTime().AsDateTime()</td>
+                    <td class="px-2 py-1">@pg.DataPagamento.ParaBrasilia().AsDateTime()</td>
                     <td class="px-2 py-1">@pg.Metodo</td>
                     <td class="px-2 py-1 text-right">@pg.Valor.AsMoney()</td>
                     <td class="px-2 py-1">@pg.Status@(estornado && !string.IsNullOrWhiteSpace(pg.MotivoEstorno) ? $" — {pg.MotivoEstorno}" : "")</td>

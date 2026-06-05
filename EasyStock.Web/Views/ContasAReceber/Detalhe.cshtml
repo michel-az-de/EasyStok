@@ -166,7 +166,7 @@
                                             </button>
                                             @if (p.PixExpiraEm.HasValue)
                                             {
-                                                <span class="text-xs text-gray-500">Validade: @p.PixExpiraEm.Value.ToLocalTime().AsDateTime() — pode estar expirada</span>
+                                                <span class="text-xs text-gray-500">Validade: @p.PixExpiraEm.Value.ParaBrasilia().AsDateTime() — pode estar expirada</span>
                                             }
                                         </div>
                                     </div>

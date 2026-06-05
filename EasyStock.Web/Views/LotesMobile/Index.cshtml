@@ -46,7 +46,7 @@
                 <tr>
                     <td class="font-mono text-sm">@m.Code</td>
                     <td class="text-xs text-slate-500">@(m.Lote ?? "—")</td>
-                    <td class="text-xs text-slate-500">@m.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                    <td class="text-xs text-slate-500">@m.CreatedAt.ParaBrasilia().ToString("dd/MM HH:mm")</td>
                     <td class="text-xs text-slate-500">
                         @(m.LastOperatorName ?? "—")
                         @if (!string.IsNullOrEmpty(m.LastDeviceId)) { <div class="text-slate-400">@m.LastDeviceId</div> }
@@ -77,7 +77,7 @@
                                         <label class="block text-xs text-slate-600 mb-1">Linkar a Lote ERP existente:</label>
                                         <select name="erpLoteId" required class="ui-select w-full text-sm mb-2">
                                             <option value="">— escolha —</option>
-                                            @foreach (var ep in Model.ErpLotes) { <option value="@ep.Id">@ep.Codigo · @ep.DataProducao.ToLocalTime().ToString("dd/MM")</option> }
+                                            @foreach (var ep in Model.ErpLotes) { <option value="@ep.Id">@ep.Codigo · @ep.DataProducao.ParaBrasilia().ToString("dd/MM")</option> }
                                         </select>
                                         <button type="submit" class="btn-outline-dark w-full justify-center">🔗 Linkar</button>
                                     </form>

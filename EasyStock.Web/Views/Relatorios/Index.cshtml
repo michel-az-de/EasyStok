@@ -223,7 +223,7 @@
                                 @FormatSize(run.ArtifactSizeBytes)
                             </td>
                             <td class="px-4 py-3 text-slate-400 text-xs tabular-nums">
-                                @run.EnqueuedAt.ToLocalTime().ToString("dd/MM HH:mm")
+                                @run.EnqueuedAt.ParaBrasilia().ToString("dd/MM HH:mm")
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex items-center justify-center gap-1.5">

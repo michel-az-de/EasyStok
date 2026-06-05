@@ -176,7 +176,7 @@
                             </div>
                             @if (it.Done && it.DoneEm.HasValue)
                             {
-                                <div class="text-xs text-slate-400">comprado @it.DoneEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(it.DonePorNome) ? "" : "· " + it.DonePorNome)</div>
+                                <div class="text-xs text-slate-400">comprado @it.DoneEm.Value.ParaBrasilia().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(it.DonePorNome) ? "" : "· " + it.DonePorNome)</div>
                             }
                         </div>
                         <form asp-action="RemoveItem" asp-controller="ListasCompras" asp-route-id="@l.Id" asp-route-itemId="@it.Id" method="post" class="flex-shrink-0" data-confirm='{"titulo":"Remover item da lista?","mensagem":"Esta ação não pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>

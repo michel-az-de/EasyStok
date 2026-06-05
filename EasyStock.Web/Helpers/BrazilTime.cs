@@ -22,4 +22,30 @@ public static class BrazilTime
 
     public static DateTime Now() => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZone);
     public static DateOnly Today() => DateOnly.FromDateTime(Now());
+
+    /// <summary>
+    /// Converte um instante UTC (vindo do banco/API) para Brasilia, para exibicao nas telas.
+    /// Substitui <c>.ToLocalTime()</c>, que dependia do TZ do servidor (container = UTC) e
+    /// renderizava UTC (BUG-10). Robusto p/ Kind Utc/Unspecified (ambos representam UTC).
+    /// Espelha EasyStock.Admin.Helpers.BrazilTime.ParaBrasilia (BUG-007).
+    /// </summary>
+    public static DateTime ParaBrasilia(this DateTime utc)
+    {
+        // default(DateTime) costuma vir de um TryParse que falhou; converter para um fuso
+        // atras de UTC estouraria (underflow), entao devolve como esta.
+        if (utc == default) return utc;
+        var asUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        return TimeZoneInfo.ConvertTimeFromUtc(asUtc, TimeZone);
+    }
+
+    public static DateTime? ParaBrasilia(this DateTime? utc)
+        => utc.HasValue ? utc.Value.ParaBrasilia() : null;
+
+    /// <summary>Overload p/ DateTimeOffset (alguns models vindos da API): converte o
+    /// instante para Brasilia e devolve DateTime (sem offset) pronto p/ formatar.</summary>
+    public static DateTime ParaBrasilia(this DateTimeOffset utc)
+        => TimeZoneInfo.ConvertTime(utc, TimeZone).DateTime;
+
+    public static DateTime? ParaBrasilia(this DateTimeOffset? utc)
+        => utc.HasValue ? utc.Value.ParaBrasilia() : null;
 }

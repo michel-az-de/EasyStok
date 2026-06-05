@@ -24,8 +24,8 @@
                 </span>
             </div>
             @{
-                var lastOrderLocal = c.LastOrderAt?.ToLocalTime();
-                var criadoLocal = c.CriadoEm.ToLocalTime();
+                var lastOrderLocal = c.LastOrderAt?.ParaBrasilia();
+                var criadoLocal = c.CriadoEm.ParaBrasilia();
                 var pedidoAntesDoCadastro = lastOrderLocal.HasValue && lastOrderLocal.Value < criadoLocal;
             }
             <p class="text-sm text-slate-500 mt-1">
@@ -248,8 +248,8 @@
                                 </div>
                                 <div class="text-xs text-slate-500">
                                     @(d.Emissor ?? "—")
-                                    @if (d.EmitidoEm.HasValue) { <text> · emitido @d.EmitidoEm.Value.ToLocalTime():dd/MM/yyyy</text> }
-                                    @if (d.ValidoAte.HasValue) { <text> · válido até @d.ValidoAte.Value.ToLocalTime():dd/MM/yyyy</text> }
+                                    @if (d.EmitidoEm.HasValue) { <text> · emitido @d.EmitidoEm.Value.ParaBrasilia():dd/MM/yyyy</text> }
+                                    @if (d.ValidoAte.HasValue) { <text> · válido até @d.ValidoAte.Value.ParaBrasilia():dd/MM/yyyy</text> }
                                 </div>
                             </div>
                             <form asp-action="RemoveDocumento" asp-controller="Clientes" asp-route-id="@c.Id" asp-route-documentoId="@d.Id" method="post" data-confirm='{"titulo":"Remover documento?","mensagem":"Esta ação não pode ser desfeita.","textoBotao":"Remover","classBotao":"bg-red-600 hover:bg-red-700"}'>
@@ -295,7 +295,7 @@
                     {
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                                <span class="text-xs text-slate-400 font-mono">@a.AlteradoEm.ParaBrasilia().ToString("dd/MM HH:mm")</span>
                                 <span class="font-medium text-slate-900">@a.Campo</span>
                                 <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@(string.IsNullOrEmpty(a.Origem) ? "—" : a.Origem)</span>
                             </div>

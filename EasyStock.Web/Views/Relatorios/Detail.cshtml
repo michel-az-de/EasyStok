@@ -75,20 +75,20 @@
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-xs">
         <div>
             <div class="text-slate-500 mb-0.5">Enfileirado</div>
-            <div class="text-slate-300 tabular-nums">@run.EnqueuedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+            <div class="text-slate-300 tabular-nums">@run.EnqueuedAt.ParaBrasilia().ToString("dd/MM/yyyy HH:mm:ss")</div>
         </div>
         @if (run.StartedAt.HasValue)
         {
             <div>
                 <div class="text-slate-500 mb-0.5">Iniciado</div>
-                <div class="text-slate-300 tabular-nums">@run.StartedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+                <div class="text-slate-300 tabular-nums">@run.StartedAt.Value.ParaBrasilia().ToString("dd/MM/yyyy HH:mm:ss")</div>
             </div>
         }
         @if (run.FinishedAt.HasValue)
         {
             <div>
                 <div class="text-slate-500 mb-0.5">Finalizado</div>
-                <div class="text-slate-300 tabular-nums">@run.FinishedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+                <div class="text-slate-300 tabular-nums">@run.FinishedAt.Value.ParaBrasilia().ToString("dd/MM/yyyy HH:mm:ss")</div>
             </div>
         }
     </div>
@@ -123,7 +123,7 @@
             @if (run.DownloadExpiresAt.HasValue)
             {
                 <span class="text-[11px] text-slate-500">
-                    Link expira em @run.DownloadExpiresAt.Value.ToLocalTime().ToString("dd/MM HH:mm")
+                    Link expira em @run.DownloadExpiresAt.Value.ParaBrasilia().ToString("dd/MM HH:mm")
                 </span>
             }
         }

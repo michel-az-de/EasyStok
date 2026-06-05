@@ -52,7 +52,7 @@
                     <h3 class="font-semibold text-slate-900 truncate">@l.Nome</h3>
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium @(l.Status == "aberta" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")">@l.Status</span>
                 </div>
-                <div class="text-xs text-slate-500 mb-2">@l.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy") @(string.IsNullOrEmpty(l.CriadaPorNome) ? "" : "· " + l.CriadaPorNome)</div>
+                <div class="text-xs text-slate-500 mb-2">@l.CriadoEm.ParaBrasilia().ToString("dd/MM/yyyy") @(string.IsNullOrEmpty(l.CriadaPorNome) ? "" : "· " + l.CriadaPorNome)</div>
                 <div class="text-sm text-slate-700 mb-2">@l.ItensFeitos / @l.TotalItens itens</div>
                 <div class="w-full bg-slate-100 rounded-full h-2">
                     <div class="bg-indigo-600 h-2 rounded-full" style="width: @pct%"></div>

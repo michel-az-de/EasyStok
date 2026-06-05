@@ -189,11 +189,11 @@
             <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-400 mt-1">
                 @if (!string.IsNullOrEmpty(p.CriadoPorNome))
                 {
-                    <span>Cadastrado por <span class="font-medium text-slate-600">@p.CriadoPorNome</span> em @(p.CriadoEm?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</span>
+                    <span>Cadastrado por <span class="font-medium text-slate-600">@p.CriadoPorNome</span> em @(p.CriadoEm?.ParaBrasilia().ToString("dd/MM/yyyy") ?? "-")</span>
                 }
                 @if (!string.IsNullOrEmpty(p.AlteradoPorNome))
                 {
-                    <span>Alterado por <span class="font-medium text-slate-600">@p.AlteradoPorNome</span> em @(p.AlteradoEm?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</span>
+                    <span>Alterado por <span class="font-medium text-slate-600">@p.AlteradoPorNome</span> em @(p.AlteradoEm?.ParaBrasilia().ToString("dd/MM/yyyy") ?? "-")</span>
                 }
             </div>
 

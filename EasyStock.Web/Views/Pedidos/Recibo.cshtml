@@ -37,7 +37,7 @@
             {
                 <div class="label">Telefone:</div><div>@p.ClienteTelefone</div>
             }
-            <div class="label">Data:</div><div>@p.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+            <div class="label">Data:</div><div>@p.CriadoEm.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</div>
             <div class="label">Status:</div><div>@p.Status</div>
         </div>
 
@@ -66,7 +66,7 @@
                 @foreach (var pg in Model.Detalhe.Pagamentos)
                 {
                     <div class="pag-row">
-                        <span>@pg.PagoEm.ToLocalTime().ToString("dd/MM HH:mm") - @pg.Metodo</span>
+                        <span>@pg.PagoEm.ParaBrasilia().ToString("dd/MM HH:mm") - @pg.Metodo</span>
                         <span>@pg.Valor.ToString("C")</span>
                     </div>
                 }

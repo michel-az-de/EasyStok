@@ -36,7 +36,7 @@
         if (diff.TotalMinutes < 60) return $"há {(int)diff.TotalMinutes}min";
         if (diff.TotalHours < 24) return $"há {(int)diff.TotalHours}h";
         if (diff.TotalDays < 7) return $"há {(int)diff.TotalDays}d";
-        return dt.ToLocalTime().ToString("dd/MM/yyyy");
+        return dt.ParaBrasilia().ToString("dd/MM/yyyy");
     }
 
     var tiposFiltro = new[] {

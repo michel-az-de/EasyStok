@@ -92,8 +92,8 @@
                             {
                                 var classe = m.IsAtrasado ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700";
                                 var prefix = m.IsAtrasado ? "⚠ atrasado:" : "📅";
-                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @classe" title="@m.ScheduledDeliveryAt?.ToLocalTime():dd/MM HH:mm">
-                                    @prefix @(m.ScheduledDeliveryAt?.ToLocalTime().ToString("dd/MM HH:mm"))
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium @classe" title="@m.ScheduledDeliveryAt?.ParaBrasilia():dd/MM HH:mm">
+                                    @prefix @(m.ScheduledDeliveryAt?.ParaBrasilia().ToString("dd/MM HH:mm"))
                                 </span>
                             }
                             else
@@ -136,7 +136,7 @@
                                                 <option value="">— escolha —</option>
                                                 @foreach (var ep in Model.ErpPedidos)
                                                 {
-                                                    <option value="@ep.Id">@(ep.ClienteNome ?? "—") · @ep.Total.ToString("C") · @ep.CriadoEm.ToLocalTime():dd/MM</option>
+                                                    <option value="@ep.Id">@(ep.ClienteNome ?? "—") · @ep.Total.ToString("C") · @ep.CriadoEm.ParaBrasilia():dd/MM</option>
                                                 }
                                             </select>
                                             <button type="submit" class="btn-outline-dark w-full justify-center">

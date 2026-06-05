@@ -33,7 +33,7 @@
                     <td class="text-right">+@f.TotalEntradasExtras.ToString("C")</td>
                     <td class="text-right text-red-700">-@f.TotalSaidasExtras.ToString("C")</td>
                     <td class="text-right font-bold text-slate-900">@f.SaldoFinal.ToString("C")</td>
-                    <td class="text-xs text-slate-500">@(f.FechadoPorNome ?? "—") <div class="text-slate-400">@f.FechadoEm.ToLocalTime().ToString("HH:mm")</div></td>
+                    <td class="text-xs text-slate-500">@(f.FechadoPorNome ?? "—") <div class="text-slate-400">@f.FechadoEm.ParaBrasilia().ToString("HH:mm")</div></td>
                 </tr>
             }
             </tbody>

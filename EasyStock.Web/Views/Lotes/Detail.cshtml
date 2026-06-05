@@ -60,7 +60,7 @@
         <div class="ws">
             <h2 class="font-semibold text-slate-900 mb-3">Resumo</h2>
             <dl class="space-y-2 text-sm">
-                <div><dt class="text-slate-500">Data produção</dt><dd>@l.DataProducao.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
+                <div><dt class="text-slate-500">Data produção</dt><dd>@l.DataProducao.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</dd></div>
                 @if (!string.IsNullOrEmpty(l.OperadorNome)) { <div><dt class="text-slate-500">Operador</dt><dd>@l.OperadorNome</dd></div> }
                 <div><dt class="text-slate-500">Itens</dt><dd>@l.ItensCount item(s) · @l.TotalUnidades unidades</dd></div>
                 <div><dt class="text-slate-500">Etiquetas</dt>
@@ -69,7 +69,7 @@
                         else { <span>@l.EtiquetasConferidas/@l.TotalUnidades conferidas</span> }
                         @if (l.EtiquetasDivergentes > 0) { <div class="text-xs text-red-600 mt-1">@l.EtiquetasDivergentes divergente(s)</div> }
                      </dd></div>
-                @if (l.FinalizadoEm.HasValue) { <div><dt class="text-slate-500">Finalizado</dt><dd>@l.FinalizadoEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div> }
+                @if (l.FinalizadoEm.HasValue) { <div><dt class="text-slate-500">Finalizado</dt><dd>@l.FinalizadoEm.Value.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</dd></div> }
                 @if (!string.IsNullOrEmpty(l.Observacoes)) { <div class="pt-2 border-t"><dt class="text-slate-500">Observações</dt><dd class="whitespace-pre-line">@l.Observacoes</dd></div> }
                 @if (!string.IsNullOrEmpty(l.MobileBatchId)) { <div class="pt-2 border-t"><dt class="text-slate-500">Mobile batch</dt><dd class="font-mono text-xs">@l.MobileBatchId</dd></div> }
             </dl>
@@ -145,7 +145,7 @@
                                     </div>
                                     <p x-show="erro" x-cloak class="text-[10px] text-red-600 mt-0.5" x-text="erro"></p>
                                 </td>
-                                <td class="text-right text-xs">@(it.ExpiraEm.HasValue ? it.ExpiraEm.Value.ToLocalTime().ToString("dd/MM/yy") : "—")</td>
+                                <td class="text-right text-xs">@(it.ExpiraEm.HasValue ? it.ExpiraEm.Value.ParaBrasilia().ToString("dd/MM/yy") : "—")</td>
                                 <td class="text-right">
                                     @if (l.Status == "em_producao")
                                     {
@@ -191,7 +191,7 @@
                             </div>
                             @if (e.ConferidaEm.HasValue)
                             {
-                                <div class="text-[10px] text-slate-400 mt-1">@e.ConferidaEm.Value.ToLocalTime().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(e.ConferidaPorNome) ? "" : "· " + e.ConferidaPorNome)</div>
+                                <div class="text-[10px] text-slate-400 mt-1">@e.ConferidaEm.Value.ParaBrasilia().ToString("dd/MM HH:mm") @(string.IsNullOrEmpty(e.ConferidaPorNome) ? "" : "· " + e.ConferidaPorNome)</div>
                             }
                             @if (!string.IsNullOrEmpty(e.ObservacaoConferencia))
                             {
