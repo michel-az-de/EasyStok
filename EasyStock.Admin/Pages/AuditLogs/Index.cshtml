@@ -71,7 +71,7 @@
             : "neutral";
 
         <tr>
-            <td data-label="Data/Hora" style="white-space:nowrap; color:var(--text-muted); font-size:12px; font-family:var(--font-mono);">@criadoDt.ToLocalTime().ToString("dd/MM/yy HH:mm:ss")</td>
+            <td data-label="Data/Hora" style="white-space:nowrap; color:var(--text-muted); font-size:12px; font-family:var(--font-mono);">@criadoDt.ParaBrasilia().ToString("dd/MM/yy HH:mm:ss")</td>
             <td data-label="Admin" style="font-size:13px; color:var(--text-secondary);">@adminEmail</td>
             <td data-label="Ação"><es-badge variant="@acaoVariant">@HumanizeAcao(acao)</es-badge></td>
             <td data-label="Detalhes" style="color:var(--text-muted); font-size:12px; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="@detalhes">@detalhes</td>

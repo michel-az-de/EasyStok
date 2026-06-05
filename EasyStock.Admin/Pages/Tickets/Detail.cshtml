@@ -132,7 +132,7 @@
                     {
                         <div class="flex justify-center">
                             <div class="max-w-2xl w-full">
-                                <div class="text-center text-xs text-yellow-400 mb-1">🔒 INTERNO · @autor · @quando.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                <div class="text-center text-xs text-yellow-400 mb-1">🔒 INTERNO · @autor · @quando.ParaBrasilia().ToString("dd/MM HH:mm")</div>
                                 <div class="rounded-xl px-4 py-3 text-sm text-es-ink-dim" style="background:rgba(234,179,8,.08); border:1px dashed rgba(234,179,8,.40)">@conteudo</div>
                             </div>
                         </div>
@@ -141,7 +141,7 @@
                     {
                         <div class="flex justify-end">
                             <div class="max-w-lg">
-                                <div class="text-right text-xs text-es-ink-mute mb-1">@autor · @quando.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                <div class="text-right text-xs text-es-ink-mute mb-1">@autor · @quando.ParaBrasilia().ToString("dd/MM HH:mm")</div>
                                 <div class="rounded-xl rounded-tr-sm px-4 py-3 text-sm text-es-ink" style="background:rgba(244,121,32,.16); border:1px solid rgba(244,121,32,.28)">@conteudo</div>
                             </div>
                         </div>
@@ -150,7 +150,7 @@
                     {
                         <div class="flex justify-start">
                             <div class="max-w-lg">
-                                <div class="text-left text-xs text-es-ink-mute mb-1">@autor · @quando.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                <div class="text-left text-xs text-es-ink-mute mb-1">@autor · @quando.ParaBrasilia().ToString("dd/MM HH:mm")</div>
                                 <div class="rounded-xl rounded-tl-sm px-4 py-3 text-sm text-es-ink-dim" style="background:#202b42; border:1px solid rgba(247,242,232,.12)">@conteudo</div>
                             </div>
                         </div>
@@ -176,7 +176,7 @@
                         _ => acao ?? ""
                     };
                     <div class="flex justify-center">
-                        <div class="text-xs text-es-ink-mute">— @label · @quando.ToLocalTime().ToString("dd/MM HH:mm") —</div>
+                        <div class="text-xs text-es-ink-mute">— @label · @quando.ParaBrasilia().ToString("dd/MM HH:mm") —</div>
                     </div>
                 }
             }
@@ -279,7 +279,7 @@
                 </div>
                 @if (Model.PrazoResposta.HasValue)
                 {
-                    <div class="text-xs text-es-ink-mute">Prazo: @Model.PrazoResposta.Value.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                    <div class="text-xs text-es-ink-mute">Prazo: @Model.PrazoResposta.Value.ParaBrasilia().ToString("dd/MM HH:mm")</div>
                 }
                 <div class="flex justify-between mt-2">
                     <span class="text-es-ink-mute">Resolução</span>
@@ -287,7 +287,7 @@
                 </div>
                 @if (Model.PrazoResolucao.HasValue)
                 {
-                    <div class="text-xs text-es-ink-mute">Prazo: @Model.PrazoResolucao.Value.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                    <div class="text-xs text-es-ink-mute">Prazo: @Model.PrazoResolucao.Value.ParaBrasilia().ToString("dd/MM HH:mm")</div>
                 }
             </div>
         </div>

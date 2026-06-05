@@ -47,7 +47,7 @@
                 <td data-label="Estado">
                     <es-badge variant="@(optIn ? "ok" : "neutral")" with-dot="true">@(optIn ? "OPT-IN" : "OPT-OUT")</es-badge>
                 </td>
-                <td data-label="Atualizado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@atualizadoDt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
+                <td data-label="Atualizado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@atualizadoDt.ParaBrasilia().ToString("dd/MM/yy HH:mm")</td>
                 <td data-label="IP" style="font-family:var(--font-mono); color:var(--text-muted); font-size:11px;">@ip</td>
                 <td data-label="Motivo" style="color:var(--text-muted); font-size:12px;">@motivo</td>
             </tr>

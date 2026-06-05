@@ -235,11 +235,11 @@
             </div>
             <div class="text-xs text-es-ink-mute mt-3 space-y-1">
                 <div>Origem: <span class="text-es-ink-dim">@Model.Origem</span></div>
-                <div>Emissao: <span class="text-es-ink-dim">@Model.DataEmissao?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
-                <div>Vencimento: <span class="@(Model.Status == "Vencida" ? "text-red-400" : "text-es-ink-dim")">@Model.DataVencimento?.ToLocalTime().ToString("dd/MM/yyyy")</span></div>
+                <div>Emissao: <span class="text-es-ink-dim">@Model.DataEmissao?.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</span></div>
+                <div>Vencimento: <span class="@(Model.Status == "Vencida" ? "text-red-400" : "text-es-ink-dim")">@Model.DataVencimento?.ParaBrasilia().ToString("dd/MM/yyyy")</span></div>
                 @if (Model.DataPagamentoTotal.HasValue)
                 {
-                    <div>Pago em: <span class="text-green-400">@Model.DataPagamentoTotal?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+                    <div>Pago em: <span class="text-green-400">@Model.DataPagamentoTotal?.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</span></div>
                 }
             </div>
         </div>
@@ -295,7 +295,7 @@
                             var st = p.TryGetProperty("status", out var ss) ? ss.GetString() : "";
                             var valor = p.TryGetProperty("valor", out var vx) ? vx.GetDecimal() : 0m;
                             <tr>
-                                <td class="text-es-ink-dim text-sm">@dataDt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-es-ink-dim text-sm">@dataDt.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</td>
                                 <td class="text-es-ink">@metodo</td>
                                 <td class="text-es-ink-dim text-sm">@prov</td>
                                 <td class="text-es-ink-dim text-xs font-mono">@txId</td>
@@ -350,7 +350,7 @@
                             {
                                 <div class="text-es-ink-dim text-xs">@valorDepois</div>
                             }
-                            <div class="text-es-ink-mute text-xs mt-1">@ocDt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")@if (!string.IsNullOrWhiteSpace(quem)) { <text> · @quem</text> }</div>
+                            <div class="text-es-ink-mute text-xs mt-1">@ocDt.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")@if (!string.IsNullOrWhiteSpace(quem)) { <text> · @quem</text> }</div>
                         </div>
                     </li>
                 }

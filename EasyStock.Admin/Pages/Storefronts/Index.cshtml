@@ -82,7 +82,7 @@
                     <a href="/Storefronts/@id/Cardapio" style="color:var(--text-primary); font-weight:500;">@cardapio</a>
                 </td>
                 <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">
-                    @criadoDt.ToLocalTime().ToString("dd/MM/yy")
+                    @criadoDt.ParaBrasilia().ToString("dd/MM/yy")
                 </td>
                 <td class="es-data-table-td-actions">
                     <div class="es-row-actions">

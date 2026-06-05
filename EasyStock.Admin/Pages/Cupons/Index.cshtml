@@ -58,7 +58,7 @@ else
                             <span>Usos: <strong style="color:var(--text-primary);">@totalUsos@(limiteUsos.HasValue ? $"/{limiteUsos}" : "")</strong></span>
                             @if (validoAte != null)
                             {
-                                <span>Válido até: <strong style="color:var(--text-primary);">@validoAteDt.ToLocalTime().ToString("dd/MM/yyyy")</strong></span>
+                                <span>Válido até: <strong style="color:var(--text-primary);">@validoAteDt.ParaBrasilia().ToString("dd/MM/yyyy")</strong></span>
                             }
                             else
                             {

@@ -107,7 +107,7 @@
                 </td>
                 <td data-label="Usuários" class="es-data-table-td-numeric" style="font-weight:500;">@usuarios</td>
                 <td data-label="Lojas" class="es-data-table-td-numeric" style="font-weight:500;">@lojas</td>
-                <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-secondary); font-size:12px;">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+                <td data-label="Criado em" class="es-data-table-td-numeric" style="color:var(--text-secondary); font-size:12px;">@criadoDt.ParaBrasilia().ToString("dd/MM/yy")</td>
                 <td class="es-data-table-td-actions">
                     <div class="es-row-actions">
                         <es-button variant="ghost" size="xs" href="/Tenants/Detail/@id" icon="eye">Ver</es-button>

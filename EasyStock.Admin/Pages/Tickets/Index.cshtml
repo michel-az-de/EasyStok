@@ -151,7 +151,7 @@
             <td data-label="Nível" style="font-weight:700; font-family:var(--font-mono); color:var(--text-secondary);">@nivel</td>
             <td data-label="Status"><es-badge variant="@stVariant">@status</es-badge></td>
             <td data-label="Atendente" style="color:var(--text-muted); font-size:13px;">@atendente</td>
-            <td data-label="Criado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ToLocalTime().ToString("dd/MM/yy")</td>
+            <td data-label="Criado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ParaBrasilia().ToString("dd/MM/yy")</td>
         </tr>
     }
 
