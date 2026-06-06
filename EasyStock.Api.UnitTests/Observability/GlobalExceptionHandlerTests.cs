@@ -34,6 +34,26 @@ public class GlobalExceptionHandlerTests
     }
 
     [Fact]
+    public async Task Deve_remover_sufixo_Parameter_de_ArgumentException()
+    {
+        var handler = CriarHandler();
+        var context = CriarHttpContext("/api/produtos", "corr-arg");
+
+        var handled = await handler.TryHandleAsync(
+            context,
+            new ArgumentOutOfRangeException("valor", "Valor monetário não pode ser negativo."),
+            CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+
+        var payload = await LerRespostaAsync(context);
+        var detail = payload.RootElement.GetProperty("error").GetProperty("detail").GetString();
+        detail.Should().Be("Valor monetário não pode ser negativo.");
+        detail.Should().NotContain("Parameter");
+    }
+
+    [Fact]
     public async Task Deve_retornar_409_para_conflito_de_concorrencia()
     {
         var handler = CriarHandler();

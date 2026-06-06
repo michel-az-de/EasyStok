@@ -92,6 +92,11 @@ public static class UserFacingErrors
         ",
         RegexOptions.Compiled);
 
+    // .NET anexa " (Parameter 'x')" a ArgumentException.Message; sufixo tecnico que nao deve
+    // chegar ao usuario (BUG-08). Removido preservando a mensagem de negocio.
+    private static readonly Regex ParameterSuffixPattern =
+        new(@"\s*\(Parameter '[^']*'\)\s*$", RegexOptions.Compiled);
+
     /// <summary>
     /// True se a mensagem parecer técnica (stack trace, nome de exception, ProblemDetails cru, etc.).
     /// Mensagens técnicas devem ser substituídas pelo fallback amigável antes de virarem toast.
@@ -124,6 +129,11 @@ public static class UserFacingErrors
     /// </summary>
     public static string Sanitize(string? code, string? message, int httpStatus)
     {
+        // Defesa em profundidade (BUG-08): a API ja limpa o sufixo "(Parameter 'x')" na origem,
+        // mas garantimos aqui para qualquer rota que ainda repasse ex.Message cru ao usuario.
+        if (!string.IsNullOrEmpty(message))
+            message = ParameterSuffixPattern.Replace(message, string.Empty);
+
         if (!string.IsNullOrWhiteSpace(message) && !IsTechnical(message))
             return message.Trim();
 

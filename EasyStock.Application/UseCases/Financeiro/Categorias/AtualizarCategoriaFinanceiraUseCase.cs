@@ -20,6 +20,7 @@ public class AtualizarCategoriaFinanceiraUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.Id, nameof(cmd.Id));
         if (string.IsNullOrWhiteSpace(cmd.Nome))
             throw new UseCaseValidationException("Nome e obrigatorio.");
+        UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome da categoria");
 
         var categoria = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (categoria is null) return null;

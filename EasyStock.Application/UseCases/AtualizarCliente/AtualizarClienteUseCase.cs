@@ -28,6 +28,7 @@ public class AtualizarClienteUseCase(
     public async Task<ClienteResult?> ExecuteAsync(AtualizarClienteCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome do cliente");
 
         var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id);
         if (cliente == null) return null;

@@ -2,24 +2,28 @@ namespace EasyStock.Application.Tests.UseCases.Common;
 
 public class UseCaseGuardsTests
 {
-    // BUG-05 (#486): nomes de produto com tags HTML eram aceitos no input (XSS armazenado
-    // potencial em contextos sem escape, ex.: PDF/etiqueta). EnsureSemTagsHtml bloqueia
-    // os caracteres < e > na entrada.
+    // BUG-05: nomes com tags HTML eram aceitos no input (XSS armazenado potencial em
+    // contextos sem escape, ex.: PDF/etiqueta). EnsureSemTagsHtml bloqueia padroes de tag
+    // (<tag), liberando < e > isolados para nao rejeitar nomes legitimos ("Tamanho > M").
     [Theory]
     [InlineData("<script>alert(1)</script>Bolo")]
     [InlineData("Camiseta <b>nova</b>")]
-    [InlineData("Preço > custo")]
-    public void EnsureSemTagsHtml_rejeita_caracteres_de_tag(string nome)
+    [InlineData("<img src=x onerror=alert(1)>")]
+    public void EnsureSemTagsHtml_rejeita_tags_html(string nome)
     {
         Action act = () => UseCaseGuards.EnsureSemTagsHtml(nome, "Nome do produto");
 
         act.Should().Throw<UseCaseValidationException>()
-            .WithMessage("*não pode conter os caracteres*");
+            .WithMessage("*não pode conter tags HTML*");
     }
 
     [Theory]
     [InlineData("Bolo de cenoura")]
     [InlineData("Massa fresca 500g")]
+    [InlineData("Preço > custo")]
+    [InlineData("Tamanho > M")]
+    [InlineData("Loja <3")]
+    [InlineData("2 < 3 unidades")]
     [InlineData(null)]
     [InlineData("")]
     public void EnsureSemTagsHtml_aceita_texto_sem_tags(string? nome)

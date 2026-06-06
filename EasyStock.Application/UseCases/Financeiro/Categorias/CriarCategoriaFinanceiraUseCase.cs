@@ -23,6 +23,7 @@ public class CriarCategoriaFinanceiraUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (string.IsNullOrWhiteSpace(cmd.Nome))
             throw new UseCaseValidationException("Nome e obrigatorio.");
+        UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome da categoria");
 
         CategoriaFinanceira? parent = null;
         if (cmd.ParentId.HasValue)

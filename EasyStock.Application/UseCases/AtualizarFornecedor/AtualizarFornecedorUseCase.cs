@@ -32,6 +32,7 @@ public class AtualizarFornecedorUseCase(
         UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
         if (string.IsNullOrWhiteSpace(command.Nome))
             throw new UseCaseValidationException("Nome do fornecedor é obrigatório.");
+        UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do fornecedor");
         if (!string.IsNullOrWhiteSpace(command.Email))
             EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
 

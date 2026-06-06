@@ -29,6 +29,7 @@ public class CriarFornecedorUseCase(
     {
         _ = assinaturaRepository;
         UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+        UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do fornecedor");
         if (!string.IsNullOrWhiteSpace(command.Email))
             EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
 

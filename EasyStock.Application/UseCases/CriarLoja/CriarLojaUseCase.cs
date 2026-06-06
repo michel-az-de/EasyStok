@@ -19,6 +19,8 @@ public class CriarLojaUseCase(
 {
     public async Task<LojaResult> ExecuteAsync(CriarLojaCommand command)
     {
+        UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome da loja");
+
         var assinatura = await assinaturaRepository.GetAtivaAsync(command.EmpresaId);
 
         if (assinatura is not null && !assinatura.Plano!.LojasSaoIlimitadas)

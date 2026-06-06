@@ -18,6 +18,7 @@ public class AtualizarLojaUseCase(
     {
         if (string.IsNullOrWhiteSpace(command.Nome))
             throw new UseCaseValidationException("Nome da loja é obrigatório.");
+        UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome da loja");
 
         var loja = await lojaRepository.GetByIdAsync(command.LojaId);
         if (loja is null || loja.EmpresaId != command.EmpresaId)
