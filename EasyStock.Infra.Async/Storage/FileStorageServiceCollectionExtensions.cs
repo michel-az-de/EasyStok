@@ -15,7 +15,7 @@ public static class FileStorageServiceCollectionExtensions
 
     /// <summary>
     /// Registra <see cref="IFileStorage"/> pelo provider configurado em "FileStorage:Provider"
-    /// (Local | S3 | AzureFileShare). Compartilhado entre API e Worker — antes só a API
+    /// (Local | S3). Compartilhado entre API e Worker — antes só a API
     /// registrava, o que deixava o motor de relatórios do Worker sem resolver IFileStorage
     /// (falha em runtime ao gerar relatório). Lifetime Singleton, idêntico ao registro original.
     /// </summary>
@@ -27,9 +27,7 @@ public static class FileStorageServiceCollectionExtensions
             .GetSection(SectionFileStorage)
             .Get<FileStorageOptions>() ?? new FileStorageOptions();
 
-        if (string.Equals(fileStorageOptions.Provider, "AzureFileShare", StringComparison.OrdinalIgnoreCase))
-            services.AddSingleton<IFileStorage, AzureFileShareStorage>();
-        else if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(fileStorageOptions.Provider, "S3", StringComparison.OrdinalIgnoreCase))
             services.AddSingleton<IFileStorage, S3CompatibleFileStorage>();
         else
             services.AddSingleton<IFileStorage, LocalFileStorage>();

@@ -14,6 +14,13 @@ echo "  RunMigrationsOnStartup = ${RunMigrationsOnStartup:-(unset)}"
 echo "  MigrationsFailFast     = ${MigrationsFailFast:-(unset)}"
 echo "================================================================================"
 
+# Garante que o diretorio de uploads (volume montado) seja gravavel pelo usuario nao-root.
+# Roda como root aqui; o processo .NET e iniciado via gosu como appuser mais abaixo. No Fly
+# o volume monta root-owned; na VM (named volume) o chown e no-op (ja appuser).
+UPLOAD_DIR="/app/uploaded-files"
+mkdir -p "$UPLOAD_DIR"
+chown -R appuser:appgroup "$UPLOAD_DIR" 2>/dev/null || true
+
 if [ -z "$ConnectionStrings__DefaultConnection" ]; then
   echo "[entrypoint] ERRO: ConnectionStrings__DefaultConnection nao definida -- abortando."
   exit 1
@@ -23,8 +30,8 @@ fi
 # sem subir o servidor. Se falhar, o deploy e abortado (versao antiga continua).
 if [ "$1" = "--migrate-only" ]; then
   echo "[entrypoint] >>> Modo migrate-only: aplicando migrations e encerrando..."
-  exec dotnet EasyStock.Api.dll --migrate-only
+  exec gosu appuser dotnet EasyStock.Api.dll --migrate-only
 fi
 
 echo "[entrypoint] >>> Iniciando API (migrations rodam no startup do app)..."
-exec dotnet EasyStock.Api.dll
+exec gosu appuser dotnet EasyStock.Api.dll

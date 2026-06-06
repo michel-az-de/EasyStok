@@ -199,10 +199,20 @@ public static class PipelineExtensions
             {
                 var rootPath = localStorage.GetRootPath();
                 Directory.CreateDirectory(rootPath);
+
+                // PublicBaseUrl pode ser absoluta (ex: https://api.host/files) para que as URLs
+                // salvas no banco resolvam cross-host: a imagem e exibida na Web/Admin/PWA, que
+                // rodam em outra origem e nao servem /files. O RequestPath do static-files exige
+                // apenas o caminho, entao extraimos o path quando a base e uma URL absoluta.
+                var servePath = fileStorageOptions.PublicBaseUrl;
+                if (Uri.TryCreate(servePath, UriKind.Absolute, out var absBase))
+                    servePath = absBase.AbsolutePath;
+                servePath = "/" + servePath.Trim('/');
+
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PhysicalFileProvider(rootPath),
-                    RequestPath = fileStorageOptions.PublicBaseUrl
+                    RequestPath = servePath
                 });
             }
         }

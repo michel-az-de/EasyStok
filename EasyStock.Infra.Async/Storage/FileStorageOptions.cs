@@ -6,13 +6,6 @@ public sealed class FileStorageOptions
     public string LocalRootPath { get; set; } = "uploaded-files";
     public string PublicBaseUrl { get; set; } = "/files";
     public S3StorageOptions S3 { get; set; } = new();
-    public AzureFileShareStorageOptions AzureFileShare { get; set; } = new();
-}
-
-public sealed class AzureFileShareStorageOptions
-{
-    public string ConnectionString { get; set; } = string.Empty;
-    public string ShareName { get; set; } = "product-images";
 }
 
 public sealed class S3StorageOptions

@@ -79,8 +79,8 @@
 - **Idempotency**: `IdempotencyMiddleware` (`EasyStock.Api/Middleware/IdempotencyMiddleware.cs:21-251`).
   Header `Idempotency-Key`, 24h TTL, cache em DB com response JSON até 64KB.
   Whitelist por path prefix via `IdempotencyOptions.Add()`.
-- **Storage**: `IFileStorage` com 3 implementações: `LocalFileStorage`
-  (Fly volume), `S3CompatibleFileStorage`, `AzureFileShareStorage`. Suporta
+- **Storage**: `IFileStorage` com 2 implementações: `LocalFileStorage`
+  (Fly/VM volume) e `S3CompatibleFileStorage` (R2/MinIO self-hosted). Suporta
   upload, download, pre-signed URLs.
 - **Email**: `IEmailService` com `SmtpEmailService` (retry 3x backoff 2s) e
   `SendGridEmailService` (sandbox mode). Switch por config `Email:Provider`.
