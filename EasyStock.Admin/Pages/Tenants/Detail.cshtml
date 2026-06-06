@@ -141,7 +141,7 @@ function mobileSyncHealth(tenantId) {
                     && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
             }
             <div class="text-es-ink-dim text-sm" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span>@(doc ?? "—")</span>
+                <span data-fmt="doc">@(doc ?? "—")</span>
                 @if (!string.IsNullOrEmpty(doc))
                 {
                     <es-copy value="@doc" label="CNPJ" icon-only="true" />

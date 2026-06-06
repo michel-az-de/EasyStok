@@ -108,7 +108,7 @@
                         <a href="/Tenants/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@nome</a>
                     </div>
                 </td>
-                <td data-label="Documento" style="color:var(--text-secondary); font-family:var(--font-mono); font-size:12px;">@(doc ?? "—")</td>
+                <td data-label="Documento" style="color:var(--text-secondary); font-family:var(--font-mono); font-size:12px;"><span data-fmt="doc">@(doc ?? "—")</span></td>
                 <td data-label="Plano" style="color:var(--text-secondary); font-size:13px;">@(plano ?? "—")</td>
                 <td data-label="Status">
                     <es-badge variant="@statusVariant" with-dot="true">@(status ?? "—")</es-badge>

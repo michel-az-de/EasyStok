@@ -96,9 +96,26 @@
         });
     }
 
+    // Formatação de EXIBIÇÃO (#F4): <span data-fmt="doc">12345678000190</span> formata o
+    // texto cru in-place. Reusa os formatters; para listas/detalhes server-rendered
+    // (NÃO usar em elementos com x-text do Alpine — o Alpine sobrescreveria).
+    function formatDisplay(el) {
+        if (!el || !el.dataset || el.dataset.fmtApplied === '1') return;
+        const fmt = formatters[el.dataset.fmt];
+        if (!fmt) return;
+        const raw = (el.textContent || '').trim();
+        if (!raw || !onlyDigits(raw)) return; // sem dígitos (ex.: "—") -> deixa como está
+        el.textContent = fmt(raw);
+        el.dataset.fmtApplied = '1';
+    }
+    function scanFmt(root) {
+        (root || document).querySelectorAll('[data-fmt]').forEach(formatDisplay);
+    }
+
     // Plain attribute fallback: <input data-mask="cpf">
     document.addEventListener('DOMContentLoaded', () => {
         scanAndApply();
+        scanFmt();
         // Observa mudanças no DOM para captar inputs renderizados dinamicamente
         // (modais Alpine, partials carregados sob demanda, x-show com x-cloak, etc.).
         try {
@@ -109,8 +126,12 @@
                         if (node.matches && node.matches('[data-mask]')) {
                             applyMask(node, node.dataset.mask);
                         }
+                        if (node.matches && node.matches('[data-fmt]')) {
+                            formatDisplay(node);
+                        }
                         if (node.querySelectorAll) {
                             scanAndApply(node);
+                            scanFmt(node);
                         }
                     });
                 }
