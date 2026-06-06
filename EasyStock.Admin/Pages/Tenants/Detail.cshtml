@@ -140,7 +140,7 @@ function mobileSyncHealth(tenantId) {
                     && Model.Assinatura.TryGetProperty("plano", out var pp) && pp.ValueKind != System.Text.Json.JsonValueKind.Null
                     && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
             }
-            <div class="text-es-ink-dim text-sm">@(doc ?? "Sem documento") · Criado em @criadoDt.ParaBrasilia().ToString("dd/MM/yyyy")</div>
+            <div class="text-es-ink-dim text-sm">@(doc ?? "—") · Criado em @criadoDt.ParaBrasilia().ToString("dd/MM/yy")</div>
             <div class="text-es-ink-dim text-sm mt-1">Plano: <span class="text-es-ink font-medium">@planoNome</span></div>
         </div>
 
@@ -296,7 +296,7 @@ function mobileSyncHealth(tenantId) {
                     <h3 class="text-es-ink font-semibold text-sm">Trial</h3>
                     @if (trialAtivo)
                     {
-                        <span class="status-badge badge-ativa">Ativo até @trialFimDt.ParaBrasilia().ToString("dd/MM/yyyy")</span>
+                        <span class="status-badge badge-ativa">Ativo até @trialFimDt.ParaBrasilia().ToString("dd/MM/yy")</span>
                     }
                     else if (trialFim != null)
                     {

@@ -16,6 +16,20 @@ primary_region = "iad"
 [build]
   dockerfile = "Dockerfile"
 
+# Storage local de arquivos persistente. Sem [mounts] o filesystem do container e
+# efemero: cada `fly deploy` apaga os uploads (bug "arquivo some depois"). O volume
+# precisa ser criado UMA vez antes do proximo deploy:
+#   fly volumes create uploaded_files --size 3 --region iad -a easystok
+[mounts]
+  source = "uploaded_files"
+  destination = "/app/uploaded-files"
+
+[env]
+  # URL publica absoluta da API para compor os links dos arquivos (estrategia B): a
+  # imagem e exibida na Web/Admin (outra origem) e precisa apontar pra API, nao pro
+  # proprio host. Equivalente ao FileStorage__PublicBaseUrl da VM (docker-compose).
+  FileStorage__PublicBaseUrl = "https://easystok.fly.dev/files"
+
 # Antes de promover a versao nova, o Fly roda as migrations numa maquina
 # temporaria (entrypoint recebe --migrate-only → app migra e encerra). Se a
 # migration falhar, o deploy e abortado e a versao antiga continua servindo —

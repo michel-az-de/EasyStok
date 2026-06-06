@@ -22,10 +22,9 @@
          Selecionado via Email:Provider=sendgrid em runtime. -->
     <PackageReference Include="SendGrid" Version="9.29.3" />
     <!-- File storage (IFileStorage) movido da API para cá: a API e o Worker compartilham
-         o mesmo backend de storage. SDKs de cloud antes só na API, o que deixava o motor de
-         relatórios do Worker sem resolver IFileStorage (falha em runtime). -->
+         o mesmo backend de storage. O SDK S3 (R2/MinIO self-hosted) antes só na API, o que
+         deixava o motor de relatórios do Worker sem resolver IFileStorage (falha em runtime). -->
     <PackageReference Include="AWSSDK.S3" Version="3.7.415.3" />
-    <PackageReference Include="Azure.Storage.Files.Shares" Version="12.20.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.5" />

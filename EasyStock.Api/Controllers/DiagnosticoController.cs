@@ -4,7 +4,6 @@ using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Observability;
 using EasyStock.Infra.Postgre.Data;
-using Azure.Storage.Files.Shares;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace EasyStock.Api.Controllers;
@@ -241,8 +240,9 @@ public sealed class DiagnosticoController(
         };
     }
 
-    private async Task<StorageStatus> GetStorageStatusAsync(CancellationToken ct)
+    private Task<StorageStatus> GetStorageStatusAsync(CancellationToken ct)
     {
+        _ = ct;
         var provider = configuration["FileStorage:Provider"] ?? "Local";
         var status = new StorageStatus { Provider = provider };
 
@@ -251,38 +251,6 @@ public sealed class DiagnosticoController(
             var rootPath = configuration["FileStorage:LocalRootPath"] ?? "uploaded-files";
             status.DiretorioExiste = Directory.Exists(rootPath);
             status.Configurado = true;
-        }
-        else if (string.Equals(provider, "AzureFileShare", StringComparison.OrdinalIgnoreCase))
-        {
-            var connStr = configuration["FileStorage:AzureFileShare:ConnectionString"];
-            var shareName = configuration["FileStorage:AzureFileShare:ShareName"];
-            status.Configurado = !string.IsNullOrWhiteSpace(connStr)
-                              && !connStr.Contains("<")
-                              && !string.IsNullOrWhiteSpace(shareName);
-            if (status.Configurado)
-            {
-                try
-                {
-                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    cts.CancelAfter(TimeSpan.FromSeconds(5));
-                    var serviceClient = new ShareServiceClient(connStr);
-                    var shareClient = serviceClient.GetShareClient(shareName);
-                    await shareClient.GetPropertiesAsync(cts.Token);
-                    status.DiretorioExiste = true;
-                }
-                catch (Azure.RequestFailedException ex)
-                {
-                    status.DiretorioExiste = false;
-                    status.Configurado = false;
-                    status.Erro = $"Azure error {ex.ErrorCode}: {ex.Message}";
-                }
-                catch (Exception ex)
-                {
-                    status.DiretorioExiste = false;
-                    status.Configurado = false;
-                    status.Erro = ex.Message;
-                }
-            }
         }
         else if (string.Equals(provider, "S3", StringComparison.OrdinalIgnoreCase))
         {
@@ -299,7 +267,7 @@ public sealed class DiagnosticoController(
             status.Configurado = true;
         }
 
-        return status;
+        return Task.FromResult(status);
     }
 
     private IaStatus GetIaStatus()

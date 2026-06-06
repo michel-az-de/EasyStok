@@ -424,7 +424,7 @@ public static class ApiServiceCollectionExtensions
 
     public static IServiceCollection AddEasyStockFileStorage(this IServiceCollection services, IConfiguration configuration)
     {
-        // IFileStorage (provider switch Local/S3/AzureFileShare) vive em Infra.Async.Storage,
+        // IFileStorage (provider switch Local/S3) vive em Infra.Async.Storage,
         // compartilhado com o Worker — que também precisa dele para o motor de relatórios.
         services.AddEasyStockFileStorageCore(configuration);
 

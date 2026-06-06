@@ -55,6 +55,13 @@ RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
+# gosu: o entrypoint inicia como root para dar chown no volume de uploads (no Fly o
+# volume monta root-owned por padrao) e depois dropa privilegios para appuser. gosu
+# preserva o cwd (/app), entao o ContentRootPath continua /app.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/*
+
 # Criar usuario nao-root
 RUN addgroup --system --gid 1001 appgroup \
  && adduser  --system --uid 1001 --ingroup appgroup appuser
@@ -63,9 +70,10 @@ COPY --from=build /app/publish .
 COPY scripts/docker/api-entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Volume para armazenamento local de arquivos
+# Volume para armazenamento local de arquivos. A ownership FINAL e garantida em runtime
+# pelo entrypoint: o volume montado pode vir root-owned (Fly). Por isso nao fixamos USER
+# aqui — o entrypoint inicia como root, ajusta o volume e dropa para appuser via gosu.
 RUN mkdir -p /app/uploaded-files && chown -R appuser:appgroup /app
-USER appuser
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
