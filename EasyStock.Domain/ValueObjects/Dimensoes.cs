@@ -21,10 +21,14 @@ namespace EasyStock.Domain.ValueObjects
 
         public static Dimensoes From(decimal peso, decimal largura, decimal altura, decimal comprimento)
         {
-            if (peso < 0) throw new ArgumentOutOfRangeException(nameof(peso), "Peso nao pode ser negativa.");
-            if (largura < 0) throw new ArgumentOutOfRangeException(nameof(largura), "Largura nao pode ser negativa.");
-            if (altura < 0) throw new ArgumentOutOfRangeException(nameof(altura), "Altura nao pode ser negativa.");
-            if (comprimento < 0) throw new ArgumentOutOfRangeException(nameof(comprimento), "Comprimento nao pode ser negativa.");
+            // RegraDeDominioVioladaException (nao ArgumentOutOfRangeException): valida regra de
+            // negocio e expoe mensagem LIMPA ao usuario via GlobalExceptionHandler. O
+            // ArgumentOutOfRangeException anexava "(Parameter 'peso')" ao texto (BUG-08 do QA).
+            // Concordancia: peso/comprimento sao masculinos; largura/altura, femininos.
+            if (peso < 0) throw new RegraDeDominioVioladaException("Peso não pode ser negativo.");
+            if (largura < 0) throw new RegraDeDominioVioladaException("Largura não pode ser negativa.");
+            if (altura < 0) throw new RegraDeDominioVioladaException("Altura não pode ser negativa.");
+            if (comprimento < 0) throw new RegraDeDominioVioladaException("Comprimento não pode ser negativo.");
 
             return new Dimensoes(peso, largura, altura, comprimento);
         }

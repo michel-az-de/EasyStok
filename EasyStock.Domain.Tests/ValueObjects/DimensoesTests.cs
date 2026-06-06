@@ -1,3 +1,4 @@
+using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 
@@ -50,8 +51,8 @@ public class DimensoesTests
     {
         Action act = () => Dimensoes.From(peso, largura, altura, comprimento);
 
-        act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithMessage($"*{campo} nao pode ser negativa.*");
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .WithMessage($"*{campo} não pode ser negativ*");
     }
 
     [Fact]
