@@ -224,6 +224,18 @@
 .btn-secondary:hover  { background: var(--es-surface); }
 .btn-secondary:active { transform: scale(0.97); }
 
+/* Tema claro (F1, coord. #376): no claro, btn-secondary nao deve herdar o navy
+   de --es-surface-2 (que nao e theme-aware). Override SO no claro, com tokens
+   theme-aware; o dark fica identico. Dormente enquanto o toggle esta off. */
+:root:not([data-theme="dark"]) .btn-secondary {
+    background:   var(--bg-surface);
+    color:        var(--text-secondary);
+    border-color: var(--border-soft);
+}
+:root:not([data-theme="dark"]) .btn-secondary:hover {
+    background: var(--surface-sunken);
+}
+
 .btn-danger {
     background:    rgba(239, 68, 68, .12);
     color:         #f87171;
