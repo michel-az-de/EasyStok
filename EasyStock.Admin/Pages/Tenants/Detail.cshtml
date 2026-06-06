@@ -1046,7 +1046,7 @@ function mobileSyncHealth(tenantId) {
         <div x-show="novaOpen" x-cloak class="modal-overlay" @@click.self="novaOpen = false" @@keydown.escape.window="novaOpen = false">
             <div class="modal-box max-w-md" @@click.stop>
                 <h3 class="text-es-ink font-semibold mb-4">Nova loja</h3>
-                <form method="post" action="/Tenants/Detail/@Model.Id?handler=CriarLoja">
+                <form method="post" action="/Tenants/Detail/@Model.Id?handler=CriarLoja" x-data="esField({ required: true, minLength: 10 })">
                     <input type="hidden" name="__RequestVerificationToken" value="@afLojas" />
                     <div class="mb-3"><label class="form-label">Nome *</label>
                         <input type="text" name="nome" required maxlength="150" class="form-input w-full text-sm" /></div>
@@ -1062,11 +1062,14 @@ function mobileSyncHealth(tenantId) {
                         <input type="text" name="endereco" maxlength="300" class="form-input w-full text-sm" /></div>
                     <div class="mb-4"><label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
                         <textarea name="motivo" rows="2" minlength="10" maxlength="1000" required
+                                  x-model="value" @@blur="blur()"
                                   placeholder="Ex.: cliente solicitou via chamado #1234"
-                                  class="form-input w-full text-sm font-mono"></textarea></div>
+                                  class="form-input w-full text-sm font-mono"></textarea>
+                        <span class="es-form-helper">Mínimo de 10 caracteres (vai pro audit log).</span>
+                        <span class="es-form-error" x-show="error" x-cloak x-text="error"></span></div>
                     <div class="flex gap-3 justify-end">
                         <button type="button" @@click="novaOpen = false" class="btn-secondary text-sm">Cancelar</button>
-                        <button type="submit" class="btn-primary text-sm">Criar (auditado)</button>
+                        <button type="submit" class="btn-primary text-sm" :disabled="!valid" :class="!valid ? 'opacity-50 pointer-events-none' : ''">Criar (auditado)</button>
                     </div>
                 </form>
             </div>
@@ -1078,7 +1081,7 @@ function mobileSyncHealth(tenantId) {
                 <template x-if="editandoLoja">
                     <div>
                         <h3 class="text-es-ink font-semibold mb-4">Editar loja: <span x-text="editandoLoja.nome"></span></h3>
-                        <form method="post" :action="'/Tenants/Detail/@Model.Id?handler=AtualizarLoja&lojaId=' + editandoLoja.id">
+                        <form method="post" :action="'/Tenants/Detail/@Model.Id?handler=AtualizarLoja&lojaId=' + editandoLoja.id" x-data="esField({ required: true, minLength: 10 })">
                             <input type="hidden" name="__RequestVerificationToken" value="@afLojas" />
                             <div class="mb-3"><label class="form-label">Nome *</label>
                                 <input type="text" name="nome" required maxlength="150" :value="editandoLoja.nome" class="form-input w-full text-sm" /></div>
@@ -1094,11 +1097,14 @@ function mobileSyncHealth(tenantId) {
                                 <input type="text" name="endereco" maxlength="300" :value="editandoLoja.endereco" class="form-input w-full text-sm" /></div>
                             <div class="mb-4"><label class="form-label">Justificativa <span class="text-es-ink-mute">(audit log)</span></label>
                                 <textarea name="motivo" rows="2" minlength="10" maxlength="1000" required
+                                          x-model="value" @@blur="blur()"
                                           placeholder="Ex.: cliente solicitou alteração de telefone"
-                                          class="form-input w-full text-sm font-mono"></textarea></div>
+                                          class="form-input w-full text-sm font-mono"></textarea>
+                                <span class="es-form-helper">Mínimo de 10 caracteres (vai pro audit log).</span>
+                                <span class="es-form-error" x-show="error" x-cloak x-text="error"></span></div>
                             <div class="flex gap-3 justify-end">
                                 <button type="button" @@click="editandoLoja = null" class="btn-secondary text-sm">Cancelar</button>
-                                <button type="submit" class="btn-primary text-sm">Salvar (auditado)</button>
+                                <button type="submit" class="btn-primary text-sm" :disabled="!valid" :class="!valid ? 'opacity-50 pointer-events-none' : ''">Salvar (auditado)</button>
                             </div>
                         </form>
                     </div>
