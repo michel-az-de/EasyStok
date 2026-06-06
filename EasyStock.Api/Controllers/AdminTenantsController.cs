@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
+using EasyStock.Application.UseCases.Admin.ExportarTenantsCsv;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.IdentityModel.Tokens;
@@ -23,8 +24,22 @@ public class AdminTenantsController(
     IConfiguration configuration,
     AdminAuditService audit,
     CriarTenantPorAdminUseCase criarTenantUseCase,
+    ExportarTenantsCsvUseCase exportarTenantsCsvUseCase,
     ILogger<AdminTenantsController> logger) : EasyStockControllerBase
 {
+    /// <summary>Exporta clientes filtrados (ou os <c>ids</c> selecionados) como CSV.</summary>
+    [HttpGet("export.csv")]
+    public async Task<IActionResult> ExportarCsv(
+        [FromQuery] string? search,
+        [FromQuery] StatusAssinatura? status,
+        [FromQuery] List<Guid>? ids,
+        CancellationToken ct = default)
+    {
+        var bytes = await exportarTenantsCsvUseCase.ExecuteAsync(
+            new ExportarTenantsCsvCommand(search, status, ids), ct);
+        var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        return File(bytes, "text/csv; charset=utf-8", $"clientes-{ts}.csv");
+    }
     // ─────────────────── Cadastro manual de tenant pelo back-office ───────────────────
 
     /// <summary>
@@ -432,6 +447,123 @@ public class AdminTenantsController(
         return DataOk(new { cupomCodigo = cupom.Codigo, descontoAplicado = cupom.Valor });
     }
 
+    // ─────────────────── Acoes em massa (selecao por pagina, ate ~20 ids) ───────────────────
+
+    /// <summary>
+    /// Suspende ou reativa varios tenants (best-effort, commit por id). Status aceitos no
+    /// lote: Suspensa, Ativa. Cada id replica o caminho de PatchStatus (2 trilhas de auditoria).
+    /// </summary>
+    [HttpPost("bulk/status")]
+    public async Task<IActionResult> BulkStatus([FromBody] BulkTenantStatusRequest req)
+    {
+        if (req.Ids is null || req.Ids.Count == 0)
+            return DataBadRequest("Nenhum cliente selecionado.");
+        if (!Enum.TryParse<StatusAssinatura>(req.Status, out var alvo) ||
+            (alvo != StatusAssinatura.Suspensa && alvo != StatusAssinatura.Ativa))
+            return DataBadRequest("Status invalido.", "Aceitos no lote: Suspensa, Ativa.");
+        var motivo = (req.Motivo ?? "").Trim();
+        if (motivo.Length < 10)
+            return DataBadRequest("Motivo obrigatorio (minimo 10 caracteres).");
+
+        var ids = req.Ids.Distinct().ToList();
+        var falhas = new List<BulkFalha>();
+        int sucesso = 0, jaNoEstado = 0;
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                var assinatura = await assinaturaRepo.GetMaisRecenteAsync(id);
+                if (assinatura is null) { falhas.Add(new BulkFalha(id, "Assinatura nao encontrada.")); continue; }
+                if (assinatura.Status == alvo) { jaNoEstado++; continue; }
+
+                if (alvo == StatusAssinatura.Suspensa) assinatura.Suspender();
+                else assinatura.Reativar();
+
+                await assinaturaRepo.UpdateAsync(assinatura);
+                await auditLogRepo.AddAsync(AuditLog.Criar(
+                    currentUser.UsuarioId,
+                    $"AdminAlterarStatusTenantLote:{alvo}",
+                    true,
+                    $"EmpresaId={id}. Motivo: {motivo}",
+                    HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    null));
+                await unitOfWork.CommitAsync();
+
+                // Trilha 2 (AdminAuditLog) — falha aqui NAO desfaz a mutacao ja commitada:
+                // o id continua Sucesso, so registra warning.
+                try { await audit.LogAsync("TenantStatusAlterado", $"Status={alvo}, Motivo={motivo}", id); }
+                catch (Exception exAudit) { logger.LogWarning(exAudit, "Auditoria trilha 2 falhou no tenant {TenantId} (lote status)", id); }
+
+                sucesso++;
+            }
+            catch (EasyStock.Domain.Exceptions.RegraDeDominioVioladaException ex)
+            {
+                falhas.Add(new BulkFalha(id, ex.Message));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Falha inesperada no lote de status do tenant {TenantId}", id);
+                falhas.Add(new BulkFalha(id, "Erro inesperado."));
+            }
+            finally
+            {
+                // Isola cada id: descarta mutacao rastreada nao-commitada (ex.: erro de banco
+                // no meio) para nao vazar no commit do proximo id.
+                db.ChangeTracker.Clear();
+            }
+        }
+
+        return DataOk(new BulkResult(ids.Count, sucesso, jaNoEstado, falhas));
+    }
+
+    /// <summary>Troca o plano de varios tenants (best-effort, commit por id).</summary>
+    [HttpPost("bulk/plano")]
+    public async Task<IActionResult> BulkPlano([FromBody] BulkTenantPlanoRequest req)
+    {
+        if (req.Ids is null || req.Ids.Count == 0)
+            return DataBadRequest("Nenhum cliente selecionado.");
+        if (req.PlanoId == Guid.Empty)
+            return DataBadRequest("Selecione um plano valido.");
+
+        var plano = await planoRepo.GetByIdAsync(req.PlanoId);
+        if (plano is null) return DataNotFound("Plano nao encontrado.");
+
+        var ids = req.Ids.Distinct().ToList();
+        var falhas = new List<BulkFalha>();
+        int sucesso = 0;
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                var assinatura = await assinaturaRepo.GetAtivaMaisRecenteAsync(id);
+                if (assinatura is null) { falhas.Add(new BulkFalha(id, "Assinatura ativa nao encontrada.")); continue; }
+
+                assinatura.PlanoId = req.PlanoId;
+                assinatura.AlteradoEm = DateTime.UtcNow;
+                await assinaturaRepo.UpdateAsync(assinatura);
+                await unitOfWork.CommitAsync();
+
+                try { await audit.LogAsync("TenantPlanoAlterado", $"PlanoId={req.PlanoId}, PlanoNome={plano.Nome}", id); }
+                catch (Exception exAudit) { logger.LogWarning(exAudit, "Auditoria trilha 2 falhou no tenant {TenantId} (lote plano)", id); }
+
+                sucesso++;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Falha inesperada no lote de plano do tenant {TenantId}", id);
+                falhas.Add(new BulkFalha(id, "Erro inesperado."));
+            }
+            finally
+            {
+                db.ChangeTracker.Clear();
+            }
+        }
+
+        return DataOk(new BulkResult(ids.Count, sucesso, 0, falhas));
+    }
+
 
     private static string MascararEmail(string? email)
     {
@@ -446,6 +578,12 @@ public record PatchTenantStatusRequest(string Status, string? Motivo);
 public record PatchTenantPlanoRequest(Guid PlanoId);
 public record GrantTrialRequest(int DiasTrial);
 public record AplicarCupomRequest(string Codigo);
+
+// Acoes em massa (compartilhado: BulkResult/BulkFalha reusados pelo AdminTicketsController).
+public record BulkTenantStatusRequest(List<Guid> Ids, string Status, string? Motivo);
+public record BulkTenantPlanoRequest(List<Guid> Ids, Guid PlanoId);
+public record BulkResult(int Total, int Sucesso, int JaNoEstado, IReadOnlyList<BulkFalha> Falhas);
+public record BulkFalha(Guid Id, string Erro);
 public record CriarTenantManualRequest(
     string Motivo,
     string? NomeEmpresa,

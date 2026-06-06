@@ -10,6 +10,9 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     public int Total { get; private set; }
     public int TotalPages { get; private set; }
 
+    /// <summary>Planos disponíveis para o modal "Trocar plano em lote".</summary>
+    public IEnumerable<JsonElement> PlanosList { get; private set; } = Enumerable.Empty<JsonElement>();
+
     private const int PageSize = 20;
     private const int MaxPage = 10000;
 
@@ -56,6 +59,52 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         {
             log.LogError(ex, "Falha ao listar tenants");
             SetErro("Não foi possível carregar a lista de tenants. Tente recarregar a página.");
+        }
+
+        // Planos para o modal "Trocar plano em lote" — degradação parcial: não bloqueia a lista.
+        try
+        {
+            var planosRaw = await api.GetAsync<JsonElement>("api/admin/planos");
+            PlanosList = planosRaw.ValueKind == JsonValueKind.Array
+                ? planosRaw.EnumerateArray().ToList()
+                : Enumerable.Empty<JsonElement>();
+        }
+        catch (Exception ex) { log.LogWarning(ex, "Falha ao carregar planos para o modal de lote"); }
+    }
+
+    /// <summary>
+    /// Exporta clientes como CSV. Com <paramref name="ids"/> (linhas selecionadas)
+    /// exporta só esses; senão respeita os filtros atuais (Search/Status). Espelha Faturas.
+    /// </summary>
+    public async Task<IActionResult> OnGetExportCsvAsync(Guid[]? ids, CancellationToken ct)
+    {
+        try
+        {
+            string query;
+            if (ids is { Length: > 0 })
+            {
+                query = "?" + string.Join("&", ids.Select(id => $"ids={id}"));
+            }
+            else
+            {
+                var qs = new List<string>();
+                if (!string.IsNullOrWhiteSpace(Search))
+                    qs.Add($"search={Uri.EscapeDataString(Search)}");
+                if (!string.IsNullOrWhiteSpace(Status) && StatusValidos.Contains(Status))
+                    qs.Add($"status={Uri.EscapeDataString(Status)}");
+                query = qs.Count > 0 ? "?" + string.Join("&", qs) : "";
+            }
+
+            var (bytes, contentType) = await api.GetBytesAsync($"api/admin/tenants/export.csv{query}");
+            var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            return File(bytes, contentType ?? "text/csv", $"clientes-{ts}.csv");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao exportar CSV de clientes");
+            SetErroSeguro(ex, "Exportar CSV de clientes");
+            return RedirectToPage(new { Page, Search, Status });
         }
     }
 
@@ -192,6 +241,81 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
             SetErroSeguro(ex, "Reativar tenant");
         }
         return RedirectToPage(new { Page, Search, Status });
+    }
+
+    // ─────────────────── Ações em massa (seleção por página) ───────────────────
+
+    public async Task<IActionResult> OnPostSuspenderEmLoteAsync(Guid[] ids, string motivo)
+        => await AlterarStatusEmLoteAsync(ids, "Suspensa", motivo, "suspenso(s)");
+
+    public async Task<IActionResult> OnPostReativarEmLoteAsync(Guid[] ids, string motivo)
+        => await AlterarStatusEmLoteAsync(ids, "Ativa", motivo, "reativado(s)");
+
+    private async Task<IActionResult> AlterarStatusEmLoteAsync(Guid[] ids, string status, string motivo, string acaoLabel)
+    {
+        if (ids is null || ids.Length == 0)
+        {
+            SetErro("Nenhum cliente selecionado.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        var motivoT = (motivo ?? "").Trim();
+        if (motivoT.Length < 10)
+        {
+            SetErro("Informe um motivo com pelo menos 10 caracteres — fica registrado no audit log.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>("api/admin/tenants/bulk/status",
+                new { ids, status, motivo = motivoT });
+            SetSucesso(ResumoBulk(resp, acaoLabel));
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha na ação em massa de status ({Status})", status);
+            SetErroSeguro(ex, "Ação em massa de clientes");
+        }
+        return RedirectToPage(new { Page, Search, Status });
+    }
+
+    public async Task<IActionResult> OnPostTrocarPlanoEmLoteAsync(Guid[] ids, Guid planoId)
+    {
+        if (ids is null || ids.Length == 0)
+        {
+            SetErro("Nenhum cliente selecionado.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        if (planoId == Guid.Empty)
+        {
+            SetErro("Selecione um plano válido.");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>("api/admin/tenants/bulk/plano", new { ids, planoId });
+            SetSucesso(ResumoBulk(resp, "com plano alterado"));
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha na ação em massa de troca de plano");
+            SetErroSeguro(ex, "Trocar plano em massa");
+        }
+        return RedirectToPage(new { Page, Search, Status });
+    }
+
+    /// <summary>Resumo amigável a partir do BulkResult (já desembrulhado por PostAsync).</summary>
+    private static string ResumoBulk(JsonElement resp, string acaoLabel)
+    {
+        int Get(string p) => resp.TryGetProperty(p, out var v) && v.TryGetInt32(out var n) ? n : 0;
+        var sucesso = Get("sucesso");
+        var jaNoEstado = Get("jaNoEstado");
+        var falhas = resp.TryGetProperty("falhas", out var f) && f.ValueKind == JsonValueKind.Array ? f.GetArrayLength() : 0;
+        var partes = new List<string> { $"{sucesso} {acaoLabel}" };
+        if (jaNoEstado > 0) partes.Add($"{jaNoEstado} já estava(m) no estado");
+        if (falhas > 0) partes.Add($"{falhas} falhou(ram)");
+        return string.Join(", ", partes) + ".";
     }
 
     public async Task<IActionResult> OnPostImpersonarAsync(Guid id)

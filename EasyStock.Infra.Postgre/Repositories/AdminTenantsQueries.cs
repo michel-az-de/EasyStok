@@ -51,6 +51,65 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
         return (items, total);
     }
 
+    public async Task<IReadOnlyList<TenantExportRow>> ListarParaExportarAsync(
+        TenantExportFiltro filtro, CancellationToken ct = default)
+    {
+        var query = db.Empresas.AsNoTracking().AsQueryable();
+
+        // Ids (selecionados na tela) tem precedencia sobre os filtros de busca.
+        if (filtro.Ids is { Count: > 0 })
+        {
+            var ids = filtro.Ids;
+            query = query.Where(e => ids.Contains(e.Id));
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(filtro.Search))
+                query = query.Where(e =>
+                    EF.Functions.ILike(e.Nome, $"%{filtro.Search}%") ||
+                    (e.Documento != null && EF.Functions.ILike(e.Documento, $"%{filtro.Search}%")));
+
+            if (filtro.Status.HasValue)
+                query = query.Where(e => db.AssinaturasEmpresa.Any(a => a.EmpresaId == e.Id && a.Status == filtro.Status.Value));
+        }
+
+        var limite = Math.Clamp(filtro.Limite, 1, 10000);
+
+        // Ordenacao deterministica (igual a listagem + Id de desempate) — sem isso o
+        // Take(10k) e "exportar selecionados" voltariam em ordem arbitraria do banco.
+        return await query
+            .OrderByDescending(e => e.CriadoEm)
+            .ThenBy(e => e.Id)
+            .Take(limite)
+            .Select(e => new TenantExportRow(
+                e.Nome,
+                e.Documento,
+                db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => a.Plano != null ? a.Plano.Nome : null)
+                    .FirstOrDefault(),
+                db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => a.Plano != null ? (decimal?)a.Plano.PrecoMensal : null)
+                    .FirstOrDefault(),
+                db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => (StatusAssinatura?)a.Status)
+                    .FirstOrDefault(),
+                db.UsuariosEmpresas.Count(ue => ue.EmpresaId == e.Id),
+                db.Lojas.Count(l => l.EmpresaId == e.Id),
+                e.CriadoEm,
+                db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => a.DataFim)
+                    .FirstOrDefault()))
+            .ToListAsync(ct);
+    }
+
     public async Task<TenantDetail?> ObterDetalheAsync(Guid empresaId)
     {
         var empresa = await db.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.Id == empresaId);

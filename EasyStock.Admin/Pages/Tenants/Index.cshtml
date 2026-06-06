@@ -19,6 +19,12 @@
     </div>
 }
 
+@{
+    var qsExport = new List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.Search)) qsExport.Add($"search={Uri.EscapeDataString(Model.Search)}");
+    if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
+    var exportHref = "/Tenants?handler=ExportCsv" + (qsExport.Count > 0 ? "&" + string.Join("&", qsExport) : "");
+}
 <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
     <div>
         <es-breadcrumb>
@@ -29,6 +35,7 @@
             <strong style="color:var(--text-primary);">@Model.Total</strong> resultado(s)
         </div>
     </div>
+    <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
 </div>
 
 <es-card padding="md" card-class="mb-4" >
@@ -64,7 +71,7 @@
 </es-filter-bar>
 
 <div x-data="{ confirmId: null, confirmAcao: null, confirmNome: '' }">
-    <es-data-table sort-key="@orderBy" sort-dir="@dir" is-empty="@(!Model.Tenants.Any())">
+    <es-data-table sort-key="@orderBy" sort-dir="@dir" bulk-name="ids" is-empty="@(!Model.Tenants.Any())">
         <es-data-table-column key="nome" label="Nome" sortable="true" />
         <es-data-table-column key="documento" label="Documento" />
         <es-data-table-column key="planoNome" label="Plano" />
@@ -94,6 +101,7 @@
             var initial = !string.IsNullOrEmpty(nome) ? nome.Substring(0, 1).ToUpper() : "?";
 
             <tr>
+                <td onclick="event.stopPropagation()"><input type="checkbox" name="ids" value="@id" data-bulk-row aria-label="Selecionar @nome" /></td>
                 <td data-label="Nome">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span class="es-avatar es-avatar-sm" aria-hidden="true">@initial</span>
@@ -134,6 +142,17 @@
                 </td>
             </tr>
         }
+
+        <es-data-table-bulk-actions>
+            <es-button variant="ghost" size="sm" icon="alert-triangle"
+                       x-on:click="esStampIds('bulkSuspendForm', ids()); $dispatch('open-modal-bulk-suspender')">Suspender</es-button>
+            <es-button variant="ghost" size="sm" icon="check"
+                       x-on:click="esStampIds('bulkReativarForm', ids()); $dispatch('open-modal-bulk-reativar')">Reativar</es-button>
+            <es-button variant="ghost" size="sm" icon="refresh-cw"
+                       x-on:click="esStampIds('bulkPlanoForm', ids()); $dispatch('open-modal-bulk-plano')">Trocar plano</es-button>
+            <es-button variant="ghost" size="sm" icon="download"
+                       x-on:click="esStampAndSubmit('bulkExportForm', ids())">Exportar selecionados</es-button>
+        </es-data-table-bulk-actions>
 
         <es-data-table-empty>
             @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Status))
@@ -196,4 +215,90 @@
             </es-modal-footer>
         </form>
     </es-modal>
+
+    <!-- Modal: suspender em lote -->
+    <es-modal id="bulk-suspender" size="sm">
+        <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Suspender clientes selecionados?</h2>
+        <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+            Os clientes marcados não conseguirão usar o sistema até a reativação. Cada cliente é auditado.
+        </p>
+        <form id="bulkSuspendForm" method="post" asp-page-handler="SuspenderEmLote"
+              x-data="{ loading: false }" x-on:submit="loading = true">
+            @Html.AntiForgeryToken()
+            <div data-ids-slot></div>
+            <div style="margin-bottom:14px;">
+                <es-input name="motivo" label="Motivo da suspensão"
+                          placeholder="Ex.: inadimplência, fraude, solicitação..." required="true" minlength="10" />
+            </div>
+            <es-modal-footer>
+                <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+                <button type="submit" class="btn btn-danger btn-md" :disabled="loading">
+                    <span x-show="!loading">Suspender selecionados</span>
+                    <span x-show="loading" x-cloak>Salvando…</span>
+                </button>
+            </es-modal-footer>
+        </form>
+    </es-modal>
+
+    <!-- Modal: reativar em lote -->
+    <es-modal id="bulk-reativar" size="sm">
+        <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Reativar clientes selecionados?</h2>
+        <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+            Os clientes marcados voltarão a ter acesso normal ao sistema. Cada cliente é auditado.
+        </p>
+        <form id="bulkReativarForm" method="post" asp-page-handler="ReativarEmLote"
+              x-data="{ loading: false }" x-on:submit="loading = true">
+            @Html.AntiForgeryToken()
+            <div data-ids-slot></div>
+            <div style="margin-bottom:14px;">
+                <es-input name="motivo" label="Motivo da reativação"
+                          placeholder="Ex.: pagamento regularizado, solicitação do cliente..." required="true" minlength="10" />
+            </div>
+            <es-modal-footer>
+                <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+                <button type="submit" class="btn btn-primary btn-md" :disabled="loading">
+                    <span x-show="!loading">Reativar selecionados</span>
+                    <span x-show="loading" x-cloak>Salvando…</span>
+                </button>
+            </es-modal-footer>
+        </form>
+    </es-modal>
+
+    <!-- Modal: trocar plano em lote -->
+    <es-modal id="bulk-plano" size="sm">
+        <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Trocar plano dos selecionados?</h2>
+        <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+            Todos os clientes marcados passarão para o plano escolhido.
+        </p>
+        <form id="bulkPlanoForm" method="post" asp-page-handler="TrocarPlanoEmLote"
+              x-data="{ loading: false }" x-on:submit="loading = true">
+            @Html.AntiForgeryToken()
+            <div data-ids-slot></div>
+            <div style="margin-bottom:14px;">
+                <label class="es-form-label es-form-label-required">Novo plano</label>
+                <select name="planoId" class="es-form-input" required>
+                    <option value="">Selecione um plano…</option>
+                    @foreach (var p in Model.PlanosList)
+                    {
+                        var pid = p.TryGetProperty("id", out var pidP) ? pidP.GetString() : "";
+                        var pnome = p.TryGetProperty("nome", out var pnP) ? pnP.GetString() : "";
+                        <option value="@pid">@pnome</option>
+                    }
+                </select>
+            </div>
+            <es-modal-footer>
+                <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+                <button type="submit" class="btn btn-primary btn-md" :disabled="loading">
+                    <span x-show="!loading">Trocar plano</span>
+                    <span x-show="loading" x-cloak>Salvando…</span>
+                </button>
+            </es-modal-footer>
+        </form>
+    </es-modal>
+
+    <!-- Form oculto: exportar selecionados (GET, baixa o CSV) -->
+    <form id="bulkExportForm" method="get" action="/Tenants" style="display:none;">
+        <input type="hidden" name="handler" value="ExportCsv" />
+        <div data-ids-slot></div>
+    </form>
 </div>
