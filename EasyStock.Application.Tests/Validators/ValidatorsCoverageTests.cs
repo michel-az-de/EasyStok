@@ -254,4 +254,34 @@ public class CadastrarProdutoCommandValidatorTests
         var cmd = CmdValido() with { PrecoReferencia = null };
         _v.Validate(cmd).IsValid.Should().BeTrue();
     }
+
+    [Fact]
+    public void Falha_quando_PrecoReferencia_excede_teto()
+    {
+        var cmd = CmdValido() with { PrecoReferencia = LimitesProduto.ValorMaximo + 1m };
+        _v.Validate(cmd).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Falha_quando_CustoReferencia_negativo()
+    {
+        var cmd = CmdValido() with { CustoReferencia = -1m };
+        var r = _v.Validate(cmd);
+        r.IsValid.Should().BeFalse();
+        r.Errors.Should().Contain(e => e.PropertyName == "CustoReferencia");
+    }
+
+    [Fact]
+    public void Falha_quando_CustoReferencia_excede_teto()
+    {
+        var cmd = CmdValido() with { CustoReferencia = LimitesProduto.ValorMaximo + 1m };
+        _v.Validate(cmd).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsValid_quando_CustoReferencia_no_limite()
+    {
+        var cmd = CmdValido() with { CustoReferencia = LimitesProduto.ValorMaximo };
+        _v.Validate(cmd).IsValid.Should().BeTrue();
+    }
 }

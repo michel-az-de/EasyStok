@@ -22,6 +22,12 @@ public class CadastrarProdutoCommandValidator : AbstractValidator<CadastrarProdu
             .IsInEnum().WithMessage("Tipo deve ser um valor válido.");
 
         RuleFor(x => x.PrecoReferencia)
-            .GreaterThan(0).When(x => x.PrecoReferencia.HasValue).WithMessage("Preço de referência deve ser maior que zero.");
+            .GreaterThan(0).When(x => x.PrecoReferencia.HasValue).WithMessage("Preço de referência deve ser maior que zero.")
+            .LessThanOrEqualTo(LimitesProduto.ValorMaximo).When(x => x.PrecoReferencia.HasValue).WithMessage("Preço de referência deve ser no máximo R$ 99.999.999,99.");
+
+        // BUG-04: piso (nao-negativo) que faltava + teto de sanidade anti-typo (igual ao preco).
+        RuleFor(x => x.CustoReferencia)
+            .GreaterThanOrEqualTo(0).When(x => x.CustoReferencia.HasValue).WithMessage("Custo de referência não pode ser negativo.")
+            .LessThanOrEqualTo(LimitesProduto.ValorMaximo).When(x => x.CustoReferencia.HasValue).WithMessage("Custo de referência deve ser no máximo R$ 99.999.999,99.");
     }
 }
