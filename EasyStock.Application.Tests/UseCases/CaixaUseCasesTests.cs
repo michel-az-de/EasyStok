@@ -48,7 +48,9 @@ public class CaixaUseCasesTests
     public async Task AbrirCaixa_DeveLancarValidation_QuandoCaixaJaFechadoNoMesmoDia()
     {
         var empresaId = Guid.NewGuid();
-        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Dia operacional em Brasilia: alinha com a producao (HorarioBrasil pos BUG-09).
+        // Sem isto, na janela 00h-03h UTC o dia UTC != dia BRT e o mock nao casa (flaky).
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
         _repo.GetFechamentoDoDiaAsync(empresaId, data, null)
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
 
@@ -183,7 +185,8 @@ public class CaixaUseCasesTests
     public async Task RegistrarMovimento_DeveLancarValidation_QuandoCaixaJaFechado()
     {
         var empresaId = Guid.NewGuid();
-        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Dia operacional em Brasilia: alinha com a producao (HorarioBrasil pos BUG-09).
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
         _repo.GetFechamentoDoDiaAsync(empresaId, data, null)
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
 
