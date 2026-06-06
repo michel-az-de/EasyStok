@@ -140,7 +140,14 @@ function mobileSyncHealth(tenantId) {
                     && Model.Assinatura.TryGetProperty("plano", out var pp) && pp.ValueKind != System.Text.Json.JsonValueKind.Null
                     && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
             }
-            <div class="text-es-ink-dim text-sm">@(doc ?? "—") · Criado em @criadoDt.ParaBrasilia().ToString("dd/MM/yy")</div>
+            <div class="text-es-ink-dim text-sm" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span>@(doc ?? "—")</span>
+                @if (!string.IsNullOrEmpty(doc))
+                {
+                    <es-copy value="@doc" label="CNPJ" icon-only="true" />
+                }
+                <span>· Criado em @criadoDt.ParaBrasilia().ToString("dd/MM/yy")</span>
+            </div>
             <div class="text-es-ink-dim text-sm mt-1">Plano: <span class="text-es-ink font-medium">@planoNome</span></div>
         </div>
 
