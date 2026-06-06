@@ -1,0 +1,69 @@
+@page
+@model EasyStock.Admin.Pages.ErrorModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full" data-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.Code · @Model.Titulo · EasyStock Admin</title>
+    <script>
+        // Respeita o tema salvo (mesma chave do _Layout) para o erro não destoar.
+        (function () {
+            try {
+                var saved = localStorage.getItem('easystok-admin-theme');
+                if (saved === 'light') document.documentElement.removeAttribute('data-theme');
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/app-shell.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <style>
+        body {
+            margin: 0; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--bg-app); color: var(--text-primary);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; padding: 24px;
+        }
+        .err-card {
+            width: 100%; max-width: 440px; text-align: center;
+            background: var(--bg-surface); border: 1px solid var(--border-soft);
+            border-radius: var(--r-lg, 14px); padding: 40px 32px;
+            box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, .18));
+        }
+        .err-code {
+            font-family: 'Fraunces', Georgia, serif; font-size: 64px; font-weight: 700;
+            line-height: 1; color: var(--orange-500); margin: 18px 0 8px;
+        }
+        .err-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+        .err-msg { font-size: 14px; color: var(--text-secondary); margin: 0 0 24px; line-height: 1.5; }
+        .err-cid {
+            margin-top: 22px; font: 500 11px/1.4 var(--font-mono, ui-monospace, monospace);
+            color: var(--text-muted); word-break: break-all;
+        }
+    </style>
+</head>
+<body class="h-full">
+    <div class="err-card">
+        <svg width="44" height="44" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="EasyStock">
+            <path d="M32 6 L56 18 L32 30 L8 18 Z" fill="#E85814" />
+            <path d="M8 18 L32 30 L32 58 L8 46 Z" fill="#0E2A6E" />
+            <path d="M56 18 L32 30 L32 58 L56 46 Z" fill="#06143A" />
+        </svg>
+        <div class="err-code">@Model.Code</div>
+        <h1 class="err-title">@Model.Titulo</h1>
+        <p class="err-msg">@Model.Mensagem</p>
+        <a href="/" class="btn btn-primary btn-md">Voltar ao painel</a>
+        @if (!string.IsNullOrEmpty(Model.CorrelationId))
+        {
+            <div class="err-cid">ID de rastreio: @Model.CorrelationId</div>
+        }
+    </div>
+</body>
+</html>

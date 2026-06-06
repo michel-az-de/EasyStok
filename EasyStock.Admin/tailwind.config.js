@@ -31,7 +31,7 @@ module.exports = {
         // ── Aliases legacy via CSS vars do tokens.css (theme-aware) ──
         'es-bg':        'var(--bg-app)',
         'es-surface':   'var(--bg-surface)',
-        'es-surface-2': '#202b42',
+        'es-surface-2': 'var(--es-surface-2)',
         'es-card':      'var(--bg-elevated)',
         'es-accent':    '#F26B25',
         'es-accent-h':  '#E85814',

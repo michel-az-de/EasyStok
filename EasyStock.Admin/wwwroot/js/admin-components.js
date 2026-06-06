@@ -141,4 +141,78 @@
         };
     };
 
+    // ── Copy-to-clipboard com feedback via toast (#F5) ──
+    // Uso (Alpine):  <button x-data="esCopy()" @click="copy(valor, 'CNPJ')">…</button>
+    // ou o TagHelper <es-copy value="..." label="CNPJ" />. Reusa o store global window.toast.
+    // Fallback p/ contexto inseguro (http/IP, sem Clipboard API) via textarea + execCommand.
+    window.esCopy = function () {
+        return {
+            copied: false,
+            async copy(text, label) {
+                const value = (text === null || text === undefined) ? '' : String(text);
+                if (!value) return;
+                let ok = false;
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(value);
+                        ok = true;
+                    } else {
+                        const ta = document.createElement('textarea');
+                        ta.value = value;
+                        ta.setAttribute('readonly', '');
+                        ta.style.position = 'fixed';
+                        ta.style.top = '-9999px';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        ok = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                } catch (e) {
+                    ok = false;
+                }
+                if (ok) {
+                    this.copied = true;
+                    setTimeout(() => { this.copied = false; }, 1500);
+                    if (window.toast) window.toast.success(label ? label + ' copiado' : 'Copiado');
+                } else if (window.toast) {
+                    window.toast.error('Não foi possível copiar');
+                }
+            }
+        };
+    };
+
+    // ── Validação inline com regra explícita (#F3) ──
+    // Generaliza o padrão do card LGPD: regra sempre visível (helper), erro só após blur,
+    // e `valid` reflete a regra desde o início (gate do botão, mesmo sem o usuário ter tocado).
+    // Uso:
+    //   <form x-data="esField({ required:true, minLength:10 })">
+    //     <textarea x-model="value" @blur="blur()"></textarea>
+    //     <span class="es-form-helper">Mínimo de 10 caracteres.</span>
+    //     <span class="es-form-error" x-show="error" x-cloak x-text="error"></span>
+    //     <button :disabled="!valid">Salvar</button>
+    //   </form>
+    // validate: (v) => true | 'mensagem' — ex.: v => window.EasyMasks.validarDoc(v) || 'CPF/CNPJ inválido'.
+    window.esField = function (cfg) {
+        cfg = cfg || {};
+        return {
+            value: cfg.value || '',
+            touched: false,
+            _check() {
+                var v = (this.value == null ? '' : String(this.value)).trim();
+                if (cfg.required && !v) return 'Campo obrigatório.';
+                if (cfg.minLength && v.length < cfg.minLength) return 'Mínimo de ' + cfg.minLength + ' caracteres.';
+                if (cfg.maxLength && v.length > cfg.maxLength) return 'Máximo de ' + cfg.maxLength + ' caracteres.';
+                if (cfg.pattern && v && !(new RegExp(cfg.pattern)).test(v)) return cfg.patternMsg || 'Formato inválido.';
+                if (typeof cfg.validate === 'function') {
+                    var r = cfg.validate(v);
+                    if (r !== true) return (typeof r === 'string' ? r : 'Valor inválido.');
+                }
+                return '';
+            },
+            get valid() { return this._check() === ''; },
+            get error() { return this.touched ? this._check() : ''; },
+            blur() { this.touched = true; }
+        };
+    };
+
 })();

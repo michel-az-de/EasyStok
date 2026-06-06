@@ -1194,7 +1194,24 @@
                 // auditor reportou nao perceber).
                 step1AttemptedAdvance: false,
 
+                // Blindagem: o x-model so atualiza no evento input/change. Valores preenchidos
+                // programaticamente (autofill, colar/paste, automacao de QA) setam el.value SEM
+                // disparar esses eventos, deixando nome/categoria/custo vazios no estado Alpine —
+                // o wizard "trava" na etapa 1 (BUG-15 do QA). Sincroniza antes de validar/enviar.
+                // Pula SkuBase para nao re-disparar a verificacao assincrona de disponibilidade;
+                // sincroniza a categoria direto para nao acionar o @@change que limparia a subcategoria.
+                _syncCamposProgramaticos() {
+                    const root = document.getElementById('produto-form');
+                    if (!root) return;
+                    root.querySelectorAll('input:not([name="SkuBase"]), textarea').forEach((el) => {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                    const catEl = root.querySelector('select[name="CategoriaId"]');
+                    if (catEl && catEl.value !== this.categoriaId) this.categoriaId = catEl.value;
+                },
+
                 nextStep() {
+                    this._syncCamposProgramaticos();
                     if (this.step === 1 && !this.step1Valid) {
                         this.step1AttemptedAdvance = true;
                         console.warn('[Produto] nextStep bloqueado em step 1: nome="' + (this.nome || '') + '" categoriaId="' + (this.categoriaId || '') + '"');
@@ -1229,6 +1246,7 @@
                 uploadPhase: false,
                 uploadQueue: [],
                 async submitForm() {
+                    this._syncCamposProgramaticos();
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (this.nome.trim().length < 3) { this.step = 1; window.showToast('O nome deve ter pelo menos 3 caracteres.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }

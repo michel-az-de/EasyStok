@@ -96,9 +96,26 @@
         });
     }
 
+    // Formatação de EXIBIÇÃO (#F4): <span data-fmt="doc">12345678000190</span> formata o
+    // texto cru in-place. Reusa os formatters; para listas/detalhes server-rendered
+    // (NÃO usar em elementos com x-text do Alpine — o Alpine sobrescreveria).
+    function formatDisplay(el) {
+        if (!el || !el.dataset || el.dataset.fmtApplied === '1') return;
+        const fmt = formatters[el.dataset.fmt];
+        if (!fmt) return;
+        const raw = (el.textContent || '').trim();
+        if (!raw || !onlyDigits(raw)) return; // sem dígitos (ex.: "—") -> deixa como está
+        el.textContent = fmt(raw);
+        el.dataset.fmtApplied = '1';
+    }
+    function scanFmt(root) {
+        (root || document).querySelectorAll('[data-fmt]').forEach(formatDisplay);
+    }
+
     // Plain attribute fallback: <input data-mask="cpf">
     document.addEventListener('DOMContentLoaded', () => {
         scanAndApply();
+        scanFmt();
         // Observa mudanças no DOM para captar inputs renderizados dinamicamente
         // (modais Alpine, partials carregados sob demanda, x-show com x-cloak, etc.).
         try {
@@ -109,8 +126,12 @@
                         if (node.matches && node.matches('[data-mask]')) {
                             applyMask(node, node.dataset.mask);
                         }
+                        if (node.matches && node.matches('[data-fmt]')) {
+                            formatDisplay(node);
+                        }
                         if (node.querySelectorAll) {
                             scanAndApply(node);
+                            scanFmt(node);
                         }
                     });
                 }
@@ -127,6 +148,62 @@
         });
     });
 
+    // ── Normalização no submit (#F4): envia o valor CRU (dataset.raw) ao servidor. ──
+    // Captura + DOM nativo (respeita o gotcha do FormTagHelper: não usa @submit.prevent).
+    // Seguro: o domínio (Cnpj.From) já normaliza tirando formatação, e campos sem data-raw
+    // mantêm o value atual — então não há regressão para forms que hoje mandam mascarado/cru.
+    document.addEventListener('submit', function (e) {
+        try {
+            var form = e.target;
+            if (!form || !form.querySelectorAll) return;
+            form.querySelectorAll('[data-mask-applied="1"]').forEach(function (el) {
+                if (el.dataset && el.dataset.raw != null && el.dataset.raw !== '') {
+                    el.value = el.dataset.raw;
+                }
+            });
+        } catch (_) { /* máscara nunca deve bloquear o submit */ }
+    }, true);
+
+    // ── Validação de dígito verificador CPF/CNPJ (feedback inline, #F4). ──
+    // Disponível via window.EasyMasks; o servidor (Cnpj.From) valida só o comprimento.
+    function validarCpf(v) {
+        var c = onlyDigits(v);
+        if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+        function dig(len) {
+            var sum = 0;
+            for (var i = 0; i < len; i++) sum += parseInt(c[i], 10) * (len + 1 - i);
+            var r = (sum * 10) % 11;
+            return r === 10 ? 0 : r;
+        }
+        return dig(9) === parseInt(c[9], 10) && dig(10) === parseInt(c[10], 10);
+    }
+    function validarCnpj(v) {
+        var c = onlyDigits(v);
+        if (c.length !== 14 || /^(\d)\1{13}$/.test(c)) return false;
+        function dig(len) {
+            var w = len === 12
+                ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+                : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+            var sum = 0;
+            for (var i = 0; i < len; i++) sum += parseInt(c[i], 10) * w[i];
+            var r = sum % 11;
+            return r < 2 ? 0 : 11 - r;
+        }
+        return dig(12) === parseInt(c[12], 10) && dig(13) === parseInt(c[13], 10);
+    }
+    // Campo único aceita CPF ou CNPJ (como o Cnpj.From do domínio): decide pelo tamanho.
+    function validarDoc(v) {
+        var c = onlyDigits(v);
+        return c.length <= 11 ? validarCpf(c) : validarCnpj(c);
+    }
+
     // Public API
-    window.EasyMasks = { apply: applyMask, format: formatters, onlyDigits };
+    window.EasyMasks = {
+        apply: applyMask,
+        format: formatters,
+        onlyDigits: onlyDigits,
+        validarCpf: validarCpf,
+        validarCnpj: validarCnpj,
+        validarDoc: validarDoc
+    };
 })();
