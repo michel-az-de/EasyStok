@@ -20,10 +20,12 @@ public class EstoqueService(ApiClient api, SessionService session)
 
             var searchItems = buscarResult.Data ?? [];
 
-            // Aplicar filtro de status sobre os resultados de busca (client-side)
+            // Aplicar filtro de status sobre os resultados de busca (client-side).
+            // Reusa MatchesStatusFilter pra cobrir "vencendo" (filtro por validade, nao
+            // por Status) e as variantes de cada status, igual a listagem paginada.
             if (!string.IsNullOrEmpty(status))
                 searchItems = searchItems
-                    .Where(i => string.Equals(i.Status, status, StringComparison.OrdinalIgnoreCase))
+                    .Where(i => MatchesStatusFilter(i, status))
                     .ToList();
 
             return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
@@ -69,10 +71,23 @@ public class EstoqueService(ApiClient api, SessionService session)
     // override para "esgotado" — mesmo se Status no banco veio outra coisa.
     private static bool MatchesStatusFilter(EstoqueSku item, string filterStatus)
     {
+        var filter = filterStatus.ToLowerInvariant();
+
+        // "Vencendo" e filtro por DATA de validade, nao por StatusItemEstoque (o lote
+        // fica Ok/Warn/etc ate vencer). Espelha o predicado canonico do backend
+        // (ItemEstoqueRepository.AplicarFiltroVencendo / OperacionalDefaults.DiasVencimentoProximo,
+        // hoje = 7): dentro da janela, ainda nao vencido, com saldo. Mantem filtro e
+        // badge da coluna Validade concordando.
+        if (filter == "vencendo")
+        {
+            if (!item.Validade.HasValue || item.Qty <= 0) return false;
+            var dias = (item.Validade.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
+            return dias >= 0 && dias <= 7;
+        }
+
         var effective = item.Qty == 0
             ? "esgotado"
             : (item.Status ?? string.Empty).ToLowerInvariant();
-        var filter = filterStatus.ToLowerInvariant();
 
         return filter switch
         {

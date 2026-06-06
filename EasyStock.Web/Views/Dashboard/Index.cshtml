@@ -205,9 +205,9 @@ else if (Model.ResumoApiFalhou)
             }
             @if (Model.ProximosVencimento > 0)
             {
-                var lbl = Model.ProximosVencimento == 1 ? "produto vence em 7 dias" : "produtos vencem em 7 dias";
+                var lbl = Model.ProximosVencimento == 1 ? "lote vence em 7 dias" : "lotes vencem em 7 dias";
                 <li>
-                    <a href="/estoque?status=atencao" class="ds-alert ds-alert--warning"
+                    <a href="/estoque?status=vencendo" class="ds-alert ds-alert--warning"
                        aria-label="@(Model.ProximosVencimento) @lbl. Ir para os lotes.">
                         <span class="ds-alert-dot" aria-hidden="true"></span>
                         <span class="ds-alert-count">@Model.ProximosVencimento</span>
