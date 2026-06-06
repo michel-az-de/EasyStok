@@ -31,6 +31,12 @@
     <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="SkiaSharp" Version="3.116.1" />
+    <!-- Native assets do SkiaSharp para Linux (container). Sem isto, libSkiaSharp.so
+         nao entra no publish linux-x64 e o SkiaImageProcessor cai no catch -> fallback
+         sem otimizar (imagens sobem em tamanho original, mais custo de storage). Variante
+         NoDependencies: decode/resize/encode WebP sem exigir libfontconfig (nao renderizamos
+         texto). Medido ausente em prod (#493 A0). -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <!-- AWSSDK.S3 movido para Infra.Async (storage compartilhado entre API e Worker).
