@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Diagnostics;
@@ -161,14 +162,14 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 StatusCodes.Status400BadRequest,
                 "BAD_REQUEST",
                 "Argumento invalido",
-                ex.Message,
+                LimparSufixoParametro(ex),
                 false),
 
             ArgumentException ex => (
                 StatusCodes.Status400BadRequest,
                 "BAD_REQUEST",
                 "Argumento invalido",
-                ex.Message,
+                LimparSufixoParametro(ex),
                 false),
 
             FormatException ex => (
@@ -199,6 +200,15 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 "Ocorreu um erro inesperado. Tente novamente mais tarde.",
                 true)
         };
+
+    // ArgumentException.Message anexa " (Parameter 'x')" automaticamente (.NET). Esse sufixo
+    // tecnico vaza o nome do parametro para o usuario (BUG-08 do QA). Removemos na borda,
+    // preservando a mensagem de negocio e o status 400 — cobre todos os ArgumentException
+    // user-facing (Dinheiro, Gtin, Telefone, etc.) sem alterar o dominio.
+    private static string LimparSufixoParametro(ArgumentException ex) =>
+        string.IsNullOrEmpty(ex.ParamName)
+            ? ex.Message
+            : Regex.Replace(ex.Message, @"\s*\(Parameter '[^']*'\)\s*$", string.Empty);
 
     private static bool IsUniqueViolation(DbUpdateException ex)
     {

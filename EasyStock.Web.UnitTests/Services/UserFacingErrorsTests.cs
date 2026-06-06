@@ -20,6 +20,15 @@ public class UserFacingErrorsTests
         UserFacingErrors.Sanitize("BUSINESS_RULE_VIOLATION", msg, 409).Should().Be(msg);
     }
 
+    [Fact]
+    public void Sanitize_RemoveSufixoParameter_PreservandoMensagem()
+    {
+        // BUG-08: ArgumentException.Message vem com " (Parameter 'x')"; o usuario nao deve ve-lo,
+        // mas a mensagem de negocio precisa ser preservada.
+        UserFacingErrors.Sanitize(null, "Valor monetário não pode ser negativo. (Parameter 'valor')", 400)
+            .Should().Be("Valor monetário não pode ser negativo.");
+    }
+
     [Theory]
     [InlineData("System.NullReferenceException: Object reference not set")]
     [InlineData("at EasyStock.Api.Foo.Bar(Baz x)")]
