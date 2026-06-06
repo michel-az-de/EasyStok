@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
+using EasyStock.Application.UseCases.Admin.ExportarTenantsCsv;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.IdentityModel.Tokens;
@@ -23,8 +24,22 @@ public class AdminTenantsController(
     IConfiguration configuration,
     AdminAuditService audit,
     CriarTenantPorAdminUseCase criarTenantUseCase,
+    ExportarTenantsCsvUseCase exportarTenantsCsvUseCase,
     ILogger<AdminTenantsController> logger) : EasyStockControllerBase
 {
+    /// <summary>Exporta clientes filtrados (ou os <c>ids</c> selecionados) como CSV.</summary>
+    [HttpGet("export.csv")]
+    public async Task<IActionResult> ExportarCsv(
+        [FromQuery] string? search,
+        [FromQuery] StatusAssinatura? status,
+        [FromQuery] List<Guid>? ids,
+        CancellationToken ct = default)
+    {
+        var bytes = await exportarTenantsCsvUseCase.ExecuteAsync(
+            new ExportarTenantsCsvCommand(search, status, ids), ct);
+        var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        return File(bytes, "text/csv; charset=utf-8", $"clientes-{ts}.csv");
+    }
     // ─────────────────── Cadastro manual de tenant pelo back-office ───────────────────
 
     /// <summary>

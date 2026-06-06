@@ -60,6 +60,42 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
     }
 
     /// <summary>
+    /// Exporta clientes como CSV. Com <paramref name="ids"/> (linhas selecionadas)
+    /// exporta só esses; senão respeita os filtros atuais (Search/Status). Espelha Faturas.
+    /// </summary>
+    public async Task<IActionResult> OnGetExportCsvAsync(Guid[]? ids, CancellationToken ct)
+    {
+        try
+        {
+            string query;
+            if (ids is { Length: > 0 })
+            {
+                query = "?" + string.Join("&", ids.Select(id => $"ids={id}"));
+            }
+            else
+            {
+                var qs = new List<string>();
+                if (!string.IsNullOrWhiteSpace(Search))
+                    qs.Add($"search={Uri.EscapeDataString(Search)}");
+                if (!string.IsNullOrWhiteSpace(Status) && StatusValidos.Contains(Status))
+                    qs.Add($"status={Uri.EscapeDataString(Status)}");
+                query = qs.Count > 0 ? "?" + string.Join("&", qs) : "";
+            }
+
+            var (bytes, contentType) = await api.GetBytesAsync($"api/admin/tenants/export.csv{query}");
+            var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            return File(bytes, contentType ?? "text/csv", $"clientes-{ts}.csv");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao exportar CSV de clientes");
+            SetErroSeguro(ex, "Exportar CSV de clientes");
+            return RedirectToPage(new { Page, Search, Status });
+        }
+    }
+
+    /// <summary>
     /// Cadastra um cliente manualmente (empresa + usuário admin + trial 14d).
     /// A senha temporária retorna 1 vez no TempData — banner exibe e limpa em seguida.
     /// </summary>

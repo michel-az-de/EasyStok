@@ -19,6 +19,12 @@
     </div>
 }
 
+@{
+    var qsExport = new List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.Search)) qsExport.Add($"search={Uri.EscapeDataString(Model.Search)}");
+    if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
+    var exportHref = "/Tenants?handler=ExportCsv" + (qsExport.Count > 0 ? "&" + string.Join("&", qsExport) : "");
+}
 <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
     <div>
         <es-breadcrumb>
@@ -29,6 +35,7 @@
             <strong style="color:var(--text-primary);">@Model.Total</strong> resultado(s)
         </div>
     </div>
+    <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
 </div>
 
 <es-card padding="md" card-class="mb-4" >

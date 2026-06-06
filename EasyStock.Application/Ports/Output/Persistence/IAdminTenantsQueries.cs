@@ -10,6 +10,14 @@ public interface IAdminTenantsQueries
     Task<(IReadOnlyList<TenantListItem> Items, int Total)> ListarAsync(
         int page, int pageSize, string? search, StatusAssinatura? status);
 
+    /// <summary>
+    /// Projeção otimizada para exportação CSV (até 10k linhas, AsNoTracking).
+    /// <paramref name="filtro"/>.Ids (quando não nulo e não vazio) tem precedência
+    /// sobre Search/Status. Ordenação determinística: CriadoEm desc, Id.
+    /// </summary>
+    Task<IReadOnlyList<TenantExportRow>> ListarParaExportarAsync(
+        TenantExportFiltro filtro, CancellationToken ct = default);
+
     Task<TenantDetail?> ObterDetalheAsync(Guid empresaId);
 
     Task<(IReadOnlyList<TenantAuditLogInfo> Items, int Total)> GetAuditLogsPagedAsync(
@@ -25,6 +33,25 @@ public sealed record TenantListItem(
     int TotalLojas,
     string? PlanoNome,
     StatusAssinatura? StatusAssinatura,
+    DateTime? DataRenovacao);
+
+/// <summary>Filtro da exportação de tenants. Ids não vazio &gt; Search/Status.</summary>
+public sealed record TenantExportFiltro(
+    string? Search = null,
+    StatusAssinatura? Status = null,
+    IReadOnlyList<Guid>? Ids = null,
+    int Limite = 10000);
+
+/// <summary>Linha do CSV de tenants. Colunas alinhadas com a listagem + PrecoMensal.</summary>
+public sealed record TenantExportRow(
+    string Nome,
+    string? Documento,
+    string? PlanoNome,
+    decimal? PrecoMensal,
+    StatusAssinatura? Status,
+    int TotalUsuarios,
+    int TotalLojas,
+    DateTime CriadoEm,
     DateTime? DataRenovacao);
 
 public sealed record TenantDetail(

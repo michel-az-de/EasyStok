@@ -192,6 +192,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GerarPdfFaturaUseCase>();
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Admin.ExportarTenantsCsv.ExportarTenantsCsvUseCase>();
 
         // Modulo Fiscal NFC-e (F1) — 6 use cases sobre Nfe*
         services.AddScoped<EmitirNfceUseCase>();
