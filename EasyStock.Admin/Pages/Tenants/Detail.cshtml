@@ -246,7 +246,7 @@ function mobileSyncHealth(tenantId) {
             window.history.replaceState({}, '', u);
         }
      }" class="space-y-4">
-    <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:#151f31; border:1px solid rgba(247,242,232,0.12)">
+    <div class="flex gap-1 rounded-lg p-1 w-fit" style="background:var(--surface-sunken); border:1px solid var(--border-soft)">
         @foreach (var (t, l) in new[] { ("visao","Visão Geral"), ("usuarios","Usuários"), ("lojas","Lojas"), ("atividade","Atividade"), ("notas","Notas"), ("features","Features"), ("lgpd","LGPD") })
         {
             <button type="button"
