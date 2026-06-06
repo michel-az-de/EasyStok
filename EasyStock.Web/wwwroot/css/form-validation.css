@@ -9,6 +9,15 @@ select:invalid:not(:placeholder-shown) {
   border-color: var(--crit-600);
 }
 
+/* BUG-07 (issue 485): feedback inline (borda + realce) p/ peso/dimensoes do produto quando
+   negativos. Estes inputs (type=number min=0) nao tem placeholder, entao a regra global
+   acima nem sempre e visivel; esta garante o destaque durante a digitacao, sem depender
+   do submit/tooltip nativo. Escopado por name p/ nao afetar outros campos. */
+input[name^="Dimensoes"]:invalid {
+  border-color: var(--crit-500) !important;
+  box-shadow: 0 0 0 2px var(--crit-100);
+}
+
 input:invalid:focus,
 textarea:invalid:focus,
 select:invalid:focus {

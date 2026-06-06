@@ -110,7 +110,7 @@
                         <input asp-for="Qty" type="number" min="1"
                                x-model.number="qty"
                                @@input="calcularTotal()"
-                               :class="produtoId && qty > estoqueAtual ? 'border-red-400 ring-1 ring-red-200' : ''"
+                               :class="(produtoId && qty > estoqueAtual) || (qty !== null && qty < 1) ? 'border-red-400 ring-1 ring-red-200' : ''"
                                class="ui-field w-full text-sm" />
                         <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
                         <p class="text-xs text-slate-500 mt-1" x-show="estoqueAtual > 0">
@@ -118,6 +118,9 @@
                         </p>
                         <p class="text-xs text-red-600 mt-1" x-show="produtoId && qty > estoqueAtual" x-cloak>
                             Quantidade maior que o estoque disponível (<span x-text="estoqueAtual"></span>).
+                        </p>
+                        <p class="text-xs text-red-600 mt-1" x-show="qty !== null && qty < 1" x-cloak>
+                            A quantidade deve ser pelo menos 1.
                         </p>
                     </div>
                 </div>
