@@ -25,9 +25,9 @@
     <template x-if="!empresaId">
         <es-card>
             <es-empty-state icon="building-2"
-                            title="Selecione uma empresa"
-                            description="Para listar dispositivos, abra o detalhe de um cliente em /Tenants ou informe ?empresaId=<guid> na URL.">
-                <es-button variant="primary" href="/Tenants" icon="building-2">Ir para clientes</es-button>
+                            title="Selecione um cliente"
+                            description="Os dispositivos são pareados por cliente. Escolha um cliente para ver e gerenciar os aparelhos dele.">
+                <es-button variant="primary" href="/Tenants" icon="building-2">Escolher cliente</es-button>
             </es-empty-state>
         </es-card>
     </template>
