@@ -22,10 +22,35 @@ public record ProdutoResumo
     /// </summary>
     public string? TipoEmbalagem { get; init; }
 
+    /// <summary>TipoProduto: 0 Fisico, 1 Alimento, 2 Servico. A API serializa enums como string
+    /// (string-enums); o converter mapeia o nome para o int ordinal.</summary>
+    [JsonConverter(typeof(EnumStringOrIntConverter))]
+    public int Tipo { get; init; }
+
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 
     /// <summary>URL da primeira foto do produto, ou null se não tiver.</summary>
     public string? PrimeiraFotoUrl => FotoJsonHelper.PrimeiraUrl(FotosJson);
+
+    /// <summary>
+    /// Completude DERIVADA (nunca persistida, ADR-0027): o produto tem o minimo para vender bem.
+    /// Preco de venda &gt; 0 e, para itens fisicos/alimento, foto. Servico (Tipo 2) nao exige foto.
+    /// Recomputa a cada leitura, entao nunca diverge do estado real.
+    /// </summary>
+    public bool EstaCompleto =>
+        PrecoReferencia?.Valor is > 0 && (PrimeiraFotoUrl is not null || Tipo == 2);
+
+    /// <summary>O que falta para o cadastro ficar pronto (vazia se completo). Alimenta o chip "Incompleto".</summary>
+    public IReadOnlyList<string> Pendencias
+    {
+        get
+        {
+            var faltas = new List<string>(2);
+            if (PrecoReferencia?.Valor is not > 0) faltas.Add("preço");
+            if (PrimeiraFotoUrl is null && Tipo != 2) faltas.Add("foto");
+            return faltas;
+        }
+    }
 }
 
 /// <summary>Utilitário para extrair dados de <c>FotosJson</c> sem duplicar lógica de parsing.</summary>
