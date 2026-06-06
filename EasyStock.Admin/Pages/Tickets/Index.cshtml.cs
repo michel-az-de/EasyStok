@@ -160,4 +160,43 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         }
         return RedirectToPage(new { Page, Status, Prioridade, Search });
     }
+
+    // ─────────────────── Ações em massa de tickets ───────────────────
+
+    public async Task<IActionResult> OnPostFecharEmLoteAsync(Guid[] ids)
+        => await TicketsEmLoteAsync(ids, "api/admin/tickets/bulk/status", new { ids, status = "Fechado" }, "fechado(s)");
+
+    public async Task<IActionResult> OnPostAssumirEmLoteAsync(Guid[] ids)
+        => await TicketsEmLoteAsync(ids, "api/admin/tickets/bulk/assumir", new { ids }, "assumido(s)");
+
+    private async Task<IActionResult> TicketsEmLoteAsync(Guid[] ids, string path, object payload, string acaoLabel)
+    {
+        if (ids is null || ids.Length == 0)
+        {
+            SetErro("Nenhum ticket selecionado.");
+            return RedirectToPage(new { Page, Status, Prioridade, Nivel, SlaStatus, Categoria, Search });
+        }
+        try
+        {
+            var resp = await api.PostAsync<JsonElement>(path, payload);
+            SetSucesso(ResumoBulk(resp, acaoLabel));
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha na ação em massa de tickets ({Path})", path);
+            SetErroSeguro(ex, "Ação em massa de tickets");
+        }
+        return RedirectToPage(new { Page, Status, Prioridade, Nivel, SlaStatus, Categoria, Search });
+    }
+
+    private static string ResumoBulk(JsonElement resp, string acaoLabel)
+    {
+        int Get(string p) => resp.TryGetProperty(p, out var v) && v.TryGetInt32(out var n) ? n : 0;
+        var sucesso = Get("sucesso");
+        var falhas = resp.TryGetProperty("falhas", out var f) && f.ValueKind == JsonValueKind.Array ? f.GetArrayLength() : 0;
+        var partes = new List<string> { $"{sucesso} {acaoLabel}" };
+        if (falhas > 0) partes.Add($"{falhas} falhou(ram)");
+        return string.Join(", ", partes) + ".";
+    }
 }

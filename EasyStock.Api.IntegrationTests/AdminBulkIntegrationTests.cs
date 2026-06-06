@@ -107,6 +107,22 @@ public sealed class AdminBulkIntegrationTests : IAsyncLifetime
         return Data(body).GetProperty("tenantId").GetGuid();
     }
 
+    private static async Task<Guid> CriarTicketAsync(HttpClient client, Guid empresaId, string titulo)
+    {
+        var resp = await client.PostAsJsonAsync("/api/admin/tickets", new
+        {
+            empresaId,
+            titulo,
+            descricao = "Descricao de teste do ticket em lote",
+            categoria = "Duvida",
+            prioridade = "Normal",
+            nivel = "N1"
+        });
+        resp.IsSuccessStatusCode.Should().BeTrue($"criar ticket deveria funcionar; corpo: {await resp.Content.ReadAsStringAsync()}");
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return Data(body).GetProperty("id").GetGuid();
+    }
+
     private static async Task<string?> StatusDoTenantAsync(HttpClient client, Guid id)
     {
         var resp = await client.GetAsync($"/api/admin/tenants/{id}");
@@ -190,5 +206,44 @@ public sealed class AdminBulkIntegrationTests : IAsyncLifetime
         var detalhe = await client!.GetAsync($"/api/admin/tenants/{id1}");
         var assinatura = Data(await detalhe.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("assinatura");
         assinatura.GetProperty("plano").GetProperty("id").GetGuid().Should().Be(planoAlvo);
+    }
+
+    [SkippableFact]
+    public async Task BulkTickets_fechar_com_falha_parcial_e_assumir_em_lote()
+    {
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        await using var factory = CriarFactory();
+        var client = await ClienteAdminAsync(factory);
+        Skip.If(client is null, "Seed admin indisponível neste ambiente.");
+
+        var empresaId = await CriarTenantAsync(client!, "Bulk Tickets Co");
+        var t1 = await CriarTicketAsync(client!, empresaId, "Ticket lote 1");
+        var t2 = await CriarTicketAsync(client!, empresaId, "Ticket lote 2");
+        var t3 = await CriarTicketAsync(client!, empresaId, "Ticket lote 3");
+        var fake = Guid.NewGuid();
+
+        // Fechar [t1, t2, fake] -> 2 sucesso, 1 falha.
+        var respFechar = await client!.PostAsJsonAsync("/api/admin/tickets/bulk/status",
+            new { ids = new[] { t1, t2, fake }, status = "Fechado" });
+        respFechar.IsSuccessStatusCode.Should().BeTrue();
+        var dataFechar = Data(await respFechar.Content.ReadFromJsonAsync<JsonElement>());
+        dataFechar.GetProperty("sucesso").GetInt32().Should().Be(2);
+        dataFechar.GetProperty("falhas").GetArrayLength().Should().Be(1);
+        dataFechar.GetProperty("falhas")[0].GetProperty("id").GetGuid().Should().Be(fake);
+
+        // Assumir [t3] -> 1 sucesso, atribui o ticket ao operador atual.
+        var respAssumir = await client!.PostAsJsonAsync("/api/admin/tickets/bulk/assumir",
+            new { ids = new[] { t3 } });
+        respAssumir.IsSuccessStatusCode.Should().BeTrue();
+        var dataAssumir = Data(await respAssumir.Content.ReadFromJsonAsync<JsonElement>());
+        dataAssumir.GetProperty("sucesso").GetInt32().Should().Be(1);
+
+        // Persistencia via DbContext: t1 fechado, t3 com atendente atribuido.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var t1Status = await db.AdminTickets.AsNoTracking().Where(t => t.Id == t1).Select(t => t.Status).FirstAsync();
+        t1Status.Should().Be(EasyStock.Domain.Enums.TicketStatus.Fechado);
+        var t3Atendente = await db.AdminTickets.AsNoTracking().Where(t => t.Id == t3).Select(t => t.AtendenteId).FirstAsync();
+        t3Atendente.Should().NotBeNull();
     }
 }

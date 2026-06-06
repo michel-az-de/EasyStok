@@ -16,7 +16,8 @@ public class AdminTicketsController(
     HelpdeskBugFixService bugFixService,
     HelpdeskDashboardService dashboardService,
     ObterPedidoDetalhesUseCase obterPedidoUseCase,
-    ExportarTicketsCsvUseCase exportarTicketsCsvUseCase) : EasyStockControllerBase
+    ExportarTicketsCsvUseCase exportarTicketsCsvUseCase,
+    ILogger<AdminTicketsController> logger) : EasyStockControllerBase
 {
     /// <summary>Exporta tickets filtrados (ou os ids selecionados) como CSV.</summary>
     [HttpGet("export.csv")]
@@ -386,6 +387,74 @@ public class AdminTicketsController(
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
     }
+
+    // ─────────────────── Acoes em massa (selecao por pagina) ───────────────────
+
+    /// <summary>Fecha varios tickets (best-effort; reusa o caminho do single via HelpdeskTicketService).</summary>
+    [HttpPost("bulk/status")]
+    public async Task<IActionResult> BulkStatus([FromBody] BulkTicketStatusRequest req)
+    {
+        if (req.Ids is null || req.Ids.Count == 0)
+            return DataBadRequest("Nenhum ticket selecionado.");
+        if (!Enum.TryParse<TicketStatus>(req.Status, out var alvo) || alvo != TicketStatus.Fechado)
+            return DataBadRequest("Status invalido.", "Aceito no lote: Fechado.");
+
+        var ids = req.Ids.Distinct().ToList();
+        var falhas = new List<BulkFalha>();
+        int sucesso = 0;
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
+                await ticketService.AlterarStatusAsync(new AlterarStatusTicketCommand(id, alvo));
+                await audit.LogAsync("TicketFechado", $"TicketId={id} (lote)", tenantId);
+                sucesso++;
+            }
+            catch (KeyNotFoundException ex) { falhas.Add(new BulkFalha(id, ex.Message)); }
+            catch (UnauthorizedAccessException ex) { falhas.Add(new BulkFalha(id, ex.Message)); }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Falha inesperada no fechamento em lote do ticket {TicketId}", id);
+                falhas.Add(new BulkFalha(id, "Erro inesperado."));
+            }
+            finally { db.ChangeTracker.Clear(); }
+        }
+
+        return DataOk(new BulkResult(ids.Count, sucesso, 0, falhas));
+    }
+
+    /// <summary>Assume varios tickets para o operador atual (best-effort).</summary>
+    [HttpPost("bulk/assumir")]
+    public async Task<IActionResult> BulkAssumir([FromBody] BulkTicketIdsRequest req)
+    {
+        if (req.Ids is null || req.Ids.Count == 0)
+            return DataBadRequest("Nenhum ticket selecionado.");
+
+        var ids = req.Ids.Distinct().ToList();
+        var falhas = new List<BulkFalha>();
+        int sucesso = 0;
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                await ticketService.AssumirAsync(new AssumirTicketCommand(id));
+                sucesso++;
+            }
+            catch (KeyNotFoundException ex) { falhas.Add(new BulkFalha(id, ex.Message)); }
+            catch (UnauthorizedAccessException ex) { falhas.Add(new BulkFalha(id, ex.Message)); }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Falha inesperada ao assumir ticket {TicketId} no lote", id);
+                falhas.Add(new BulkFalha(id, "Erro inesperado."));
+            }
+            finally { db.ChangeTracker.Clear(); }
+        }
+
+        return DataOk(new BulkResult(ids.Count, sucesso, 0, falhas));
+    }
 }
 
 public record CreateTicketRequest(Guid EmpresaId, string Titulo, string Descricao, string Categoria, string Prioridade, string? Nivel = null, Guid? FaturaId = null, Guid? PedidoId = null);
@@ -393,3 +462,7 @@ public record PatchTicketRequest(string? Status, string? Prioridade, Guid? Atend
 public record AddMensagemRequest(string Conteudo, bool Interno = false, IReadOnlyList<Guid>? AnexoIds = null);
 public record EncaminharRequest(string NovoNivel, string? Motivo);
 public record BugFixRequest(string Titulo, string Descricao, string Severidade, string? Componente, string? StackTrace);
+
+// Acoes em massa (BulkResult/BulkFalha definidos em AdminTenantsController).
+public record BulkTicketStatusRequest(List<Guid> Ids, string Status);
+public record BulkTicketIdsRequest(List<Guid> Ids);

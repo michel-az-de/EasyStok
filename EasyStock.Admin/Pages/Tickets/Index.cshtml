@@ -93,7 +93,7 @@
     @if (!string.IsNullOrEmpty(Model.Search))    { <es-filter-chip label="Busca"      remove-param="search">@Model.Search</es-filter-chip> }
 </es-filter-bar>
 
-<es-data-table sort-key="@orderBy" sort-dir="@dir" is-empty="@(!Model.Tickets.Any())">
+<es-data-table sort-key="@orderBy" sort-dir="@dir" bulk-name="ids" is-empty="@(!Model.Tickets.Any())">
     <es-data-table-column label="SLA" />
     <es-data-table-column key="titulo" label="Título" sortable="true" />
     <es-data-table-column label="Empresa" />
@@ -147,6 +147,7 @@
         <tr style="cursor:pointer;" tabindex="0"
             onclick="window.location.href='/Tickets/Detail/@tid'"
             onkeydown="if(event.key==='Enter') window.location.href='/Tickets/Detail/@tid'">
+            <td onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><input type="checkbox" name="ids" value="@tid" data-bulk-row aria-label="Selecionar ticket" /></td>
             <td data-label="SLA"><es-badge variant="@slaVariant">@slaText</es-badge></td>
             <td data-label="Título" style="font-weight:500; color:var(--text-primary);">
                 @titulo
@@ -164,6 +165,13 @@
             <td data-label="Criado" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ParaBrasilia().ToString("dd/MM/yy")</td>
         </tr>
     }
+
+    <es-data-table-bulk-actions>
+        <es-button variant="ghost" size="sm" icon="check-circle"
+                   x-on:click="esStampIds('bulkFecharForm', ids()); $dispatch('open-modal-bulk-fechar')">Fechar</es-button>
+        <es-button variant="ghost" size="sm" icon="user-check"
+                   x-on:click="esStampIds('bulkAssumirForm', ids()); $dispatch('open-modal-bulk-assumir')">Assumir</es-button>
+    </es-data-table-bulk-actions>
 
     <es-data-table-empty>
         <es-empty-state icon="ticket"
@@ -246,6 +254,46 @@
             <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
             <button type="submit" class="btn btn-primary btn-md" :disabled="!empresaSelecionada">
                 <span>Criar ticket</span>
+            </button>
+        </es-modal-footer>
+    </form>
+</es-modal>
+
+<!-- Modal: fechar tickets em lote -->
+<es-modal id="bulk-fechar" size="sm">
+    <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Fechar tickets selecionados?</h2>
+    <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+        Os tickets marcados serão marcados como Fechado. Registrado no histórico de cada ticket.
+    </p>
+    <form id="bulkFecharForm" method="post" asp-page-handler="FecharEmLote"
+          x-data="{ loading: false }" x-on:submit="loading = true">
+        @Html.AntiForgeryToken()
+        <div data-ids-slot></div>
+        <es-modal-footer>
+            <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+            <button type="submit" class="btn btn-primary btn-md" :disabled="loading">
+                <span x-show="!loading">Fechar selecionados</span>
+                <span x-show="loading" x-cloak>Fechando…</span>
+            </button>
+        </es-modal-footer>
+    </form>
+</es-modal>
+
+<!-- Modal: assumir tickets em lote -->
+<es-modal id="bulk-assumir" size="sm">
+    <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Assumir tickets selecionados?</h2>
+    <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
+        Os tickets marcados serão atribuídos a você como atendente.
+    </p>
+    <form id="bulkAssumirForm" method="post" asp-page-handler="AssumirEmLote"
+          x-data="{ loading: false }" x-on:submit="loading = true">
+        @Html.AntiForgeryToken()
+        <div data-ids-slot></div>
+        <es-modal-footer>
+            <es-button variant="ghost" x-on:click="close()" :disabled="loading">Cancelar</es-button>
+            <button type="submit" class="btn btn-primary btn-md" :disabled="loading">
+                <span x-show="!loading">Assumir selecionados</span>
+                <span x-show="loading" x-cloak>Atribuindo…</span>
             </button>
         </es-modal-footer>
     </form>
