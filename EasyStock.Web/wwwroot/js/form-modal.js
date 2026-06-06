@@ -200,6 +200,17 @@
 
             async submit() {
                 if (this.loading) return;
+                // Blindagem: o x-model so atualiza no evento input/change. Valores preenchidos
+                // programaticamente (autofill do browser, colar/paste, automacao de QA, gerenciador
+                // de senhas) setam el.value SEM disparar esses eventos, deixando this.form vazio —
+                // o cadastro "some" sem erro (BUG-01/02 do QA). Forcamos a captura aqui.
+                var _formEl = this.$el.querySelector('form');
+                if (_formEl) {
+                    _formEl.querySelectorAll('input, select, textarea').forEach(function (el) {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+                }
                 if (this.isInvalid()) {
                     this.erroMsg = config.requireMessage || 'Preencha os campos obrigatórios.';
                     return;
