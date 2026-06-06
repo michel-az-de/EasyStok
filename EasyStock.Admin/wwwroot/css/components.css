@@ -1792,3 +1792,54 @@ button:focus-visible {
   outline-offset: 4px;
   border-radius: var(--r-sm);
 }
+
+/* ============================================================
+   Copy-to-clipboard (es-copy / esCopy) — #F5
+   ============================================================ */
+.es-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.es-copy-text {
+  font: 500 12px/1.4 var(--font-mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.es-copy-text-plain {
+  font-family: inherit;
+}
+.es-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast, .15s) var(--ease-out, ease),
+              background var(--duration-fast, .15s) var(--ease-out, ease);
+}
+.es-copy-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-sunken);
+}
+.es-copy-btn:focus-visible {
+  outline: 2px solid var(--orange-500);
+  outline-offset: 2px;
+}
+.es-copy-ico {
+  display: block;
+}
+.es-copy-ico-check {
+  color: var(--ok-600, #16a34a);
+}
