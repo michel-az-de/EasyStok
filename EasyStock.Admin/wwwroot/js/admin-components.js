@@ -62,6 +62,33 @@
         };
     };
 
+    // ── Bulk: carimba os IDs selecionados em hidden inputs do form alvo ──
+    // Evita o gotcha do FormTagHelper (descarta @submit.prevent): os ids vao no
+    // @click do botao, ANTES do submit nativo do form.
+    window.esStampIds = function (formId, ids) {
+        const form = document.getElementById(formId);
+        if (!form) return 0;
+        const slot = form.querySelector('[data-ids-slot]');
+        if (!slot) return 0;
+        slot.innerHTML = '';
+        const list = ids || [];
+        list.forEach(function (id) {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'ids';
+            inp.value = id;
+            slot.appendChild(inp);
+        });
+        return list.length;
+    };
+
+    // Carimba e submete (Exportar selecionados: form GET que baixa o CSV).
+    window.esStampAndSubmit = function (formId, ids) {
+        if (window.esStampIds(formId, ids) > 0) {
+            document.getElementById(formId).submit();
+        }
+    };
+
     // ── Tabs: gerencia activeTab via querystring (?tab=key) ──
     window.esTabs = function (initialTab) {
         return {
