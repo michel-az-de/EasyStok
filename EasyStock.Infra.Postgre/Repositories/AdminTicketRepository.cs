@@ -71,6 +71,72 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (itens, total);
         }
 
+        public async Task<IReadOnlyList<TicketExportRow>> ListarParaExportarAsync(
+            AdminTicketExportFiltro filtro, CancellationToken ct = default)
+        {
+            var query = db.AdminTickets.AsNoTracking().AsQueryable();
+
+            // Ids selecionados na tela tem precedencia sobre os filtros.
+            if (filtro.Ids is { Count: > 0 })
+            {
+                var ids = filtro.Ids;
+                query = query.Where(t => ids.Contains(t.Id));
+            }
+            else
+            {
+                // Mesmas clausulas Where de AdminTicketsController.GetTickets — paridade de filtro.
+                if (filtro.Status.HasValue)
+                    query = query.Where(t => t.Status == filtro.Status.Value);
+                if (filtro.Prioridade.HasValue)
+                    query = query.Where(t => t.Prioridade == filtro.Prioridade.Value);
+                if (filtro.Nivel.HasValue)
+                    query = query.Where(t => t.Nivel == filtro.Nivel.Value);
+                if (filtro.Categoria.HasValue)
+                    query = query.Where(t => t.Categoria == filtro.Categoria.Value);
+                if (filtro.EmpresaId.HasValue)
+                    query = query.Where(t => t.EmpresaId == filtro.EmpresaId.Value);
+                if (filtro.AtendenteId.HasValue)
+                    query = query.Where(t => t.AtendenteId == filtro.AtendenteId.Value);
+                if (!string.IsNullOrWhiteSpace(filtro.SlaStatus))
+                {
+                    query = filtro.SlaStatus.ToLowerInvariant() switch
+                    {
+                        "violado" => query.Where(t => t.SlaRespostaViolado || t.SlaResolucaoViolado),
+                        "ok" => query.Where(t => !t.SlaRespostaViolado && !t.SlaResolucaoViolado),
+                        _ => query
+                    };
+                }
+                if (!string.IsNullOrWhiteSpace(filtro.Search))
+                    query = query.Where(t => t.Titulo.Contains(filtro.Search));
+            }
+
+            var limite = Math.Clamp(filtro.Limite, 1, 10000);
+
+            // Ordem da tela (GetTickets): violado, prazo proximo, criado — + Id de desempate.
+            return await query
+                .OrderByDescending(t => t.SlaRespostaViolado || t.SlaResolucaoViolado)
+                .ThenBy(t => t.PrazoResposta ?? DateTime.MaxValue)
+                .ThenByDescending(t => t.CriadoEm)
+                .ThenBy(t => t.Id)
+                .Take(limite)
+                .Select(t => new TicketExportRow(
+                    t.Titulo,
+                    t.Empresa != null ? t.Empresa.Nome : null,
+                    t.Categoria,
+                    t.Prioridade,
+                    t.Nivel,
+                    t.Status,
+                    t.Atendente != null ? t.Atendente.Nome : null,
+                    t.CriadoEm,
+                    t.PrazoResposta,
+                    t.PrazoResolucao,
+                    t.SlaRespostaViolado,
+                    t.SlaResolucaoViolado,
+                    t.ResolvidoEm,
+                    t.NotaCsat))
+                .ToListAsync(ct);
+        }
+
         public async Task InserirAsync(AdminTicket ticket, CancellationToken ct = default)
         {
             await db.AdminTickets.AddAsync(ticket, ct);

@@ -63,6 +63,50 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         }
     }
 
+    /// <summary>
+    /// Exporta tickets como CSV. Com <paramref name="ids"/> exporta só os selecionados;
+    /// senão respeita os filtros atuais da tela. Espelha Faturas/Clientes.
+    /// </summary>
+    public async Task<IActionResult> OnGetExportCsvAsync(Guid[]? ids, CancellationToken ct)
+    {
+        try
+        {
+            string query;
+            if (ids is { Length: > 0 })
+            {
+                query = "?" + string.Join("&", ids.Select(id => $"ids={id}"));
+            }
+            else
+            {
+                var qs = new List<string>();
+                if (!string.IsNullOrWhiteSpace(Status) && StatusValidos.Contains(Status))
+                    qs.Add($"status={Uri.EscapeDataString(Status)}");
+                if (!string.IsNullOrWhiteSpace(Prioridade) && PrioridadesValidas.Contains(Prioridade))
+                    qs.Add($"prioridade={Uri.EscapeDataString(Prioridade)}");
+                if (!string.IsNullOrWhiteSpace(Nivel) && NiveisValidos.Contains(Nivel))
+                    qs.Add($"nivel={Uri.EscapeDataString(Nivel)}");
+                if (!string.IsNullOrWhiteSpace(SlaStatus) && SlaStatusValidos.Contains(SlaStatus))
+                    qs.Add($"slaStatus={Uri.EscapeDataString(SlaStatus)}");
+                if (!string.IsNullOrWhiteSpace(Categoria) && CategoriasValidas.Contains(Categoria))
+                    qs.Add($"categoria={Uri.EscapeDataString(Categoria)}");
+                if (!string.IsNullOrWhiteSpace(Search))
+                    qs.Add($"search={Uri.EscapeDataString(Search)}");
+                query = qs.Count > 0 ? "?" + string.Join("&", qs) : "";
+            }
+
+            var (bytes, contentType) = await api.GetBytesAsync($"api/admin/tickets/export.csv{query}");
+            var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            return File(bytes, contentType ?? "text/csv", $"tickets-{ts}.csv");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao exportar CSV de tickets");
+            SetErroSeguro(ex, "Exportar CSV de tickets");
+            return RedirectToPage(new { Page, Status, Prioridade, Nivel, SlaStatus, Categoria, Search });
+        }
+    }
+
     public async Task<IActionResult> OnPostAsync(Guid empresaId, string titulo, string descricao, string categoria, string prioridade, string? nivel)
     {
         if (empresaId == Guid.Empty)

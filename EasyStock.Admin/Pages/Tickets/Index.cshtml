@@ -5,6 +5,15 @@
     ViewData["Title"] = "Tickets";
     var orderBy = Request.Query["orderBy"].FirstOrDefault();
     var dir = Request.Query["dir"].FirstOrDefault();
+
+    var qsExport = new List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
+    if (!string.IsNullOrWhiteSpace(Model.Prioridade)) qsExport.Add($"prioridade={Uri.EscapeDataString(Model.Prioridade)}");
+    if (!string.IsNullOrWhiteSpace(Model.Nivel)) qsExport.Add($"nivel={Uri.EscapeDataString(Model.Nivel)}");
+    if (!string.IsNullOrWhiteSpace(Model.SlaStatus)) qsExport.Add($"slaStatus={Uri.EscapeDataString(Model.SlaStatus)}");
+    if (!string.IsNullOrWhiteSpace(Model.Categoria)) qsExport.Add($"categoria={Uri.EscapeDataString(Model.Categoria)}");
+    if (!string.IsNullOrWhiteSpace(Model.Search)) qsExport.Add($"search={Uri.EscapeDataString(Model.Search)}");
+    var exportHref = "/Tickets?handler=ExportCsv" + (qsExport.Count > 0 ? "&" + string.Join("&", qsExport) : "");
 }
 
 <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
@@ -20,6 +29,7 @@
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <es-button variant="ghost" href="/Tickets/Dashboard" icon="trending-up">Dashboard</es-button>
         <es-button variant="ghost" href="/Configuracoes/SlaMatriz" icon="settings">Matriz SLA</es-button>
+        <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
         <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-ticket')">Novo ticket</es-button>
     </div>
 </div>

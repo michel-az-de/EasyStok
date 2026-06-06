@@ -1,4 +1,5 @@
 using EasyStock.Api.Services.Helpdesk;
+using EasyStock.Application.UseCases.Admin.ExportarTicketsCsv;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Infra.Postgre.Data;
 
@@ -14,8 +15,34 @@ public class AdminTicketsController(
     HelpdeskAnexoService anexoService,
     HelpdeskBugFixService bugFixService,
     HelpdeskDashboardService dashboardService,
-    ObterPedidoDetalhesUseCase obterPedidoUseCase) : EasyStockControllerBase
+    ObterPedidoDetalhesUseCase obterPedidoUseCase,
+    ExportarTicketsCsvUseCase exportarTicketsCsvUseCase) : EasyStockControllerBase
 {
+    /// <summary>Exporta tickets filtrados (ou os ids selecionados) como CSV.</summary>
+    [HttpGet("export.csv")]
+    public async Task<IActionResult> ExportarCsv(
+        [FromQuery] string? status,
+        [FromQuery] string? prioridade,
+        [FromQuery] string? nivel,
+        [FromQuery] string? slaStatus,
+        [FromQuery] string? categoria,
+        [FromQuery] string? search,
+        [FromQuery] Guid? empresaId,
+        [FromQuery] Guid? atendenteId,
+        [FromQuery] List<Guid>? ids,
+        CancellationToken ct = default)
+    {
+        TicketStatus? st = Enum.TryParse<TicketStatus>(status, out var se) ? se : null;
+        TicketPrioridade? pr = Enum.TryParse<TicketPrioridade>(prioridade, out var pe) ? pe : null;
+        NivelAtendimento? nv = Enum.TryParse<NivelAtendimento>(nivel, out var ne) ? ne : null;
+        TicketCategoria? cat = Enum.TryParse<TicketCategoria>(categoria, out var ce) ? ce : null;
+
+        var bytes = await exportarTicketsCsvUseCase.ExecuteAsync(
+            new ExportarTicketsCsvCommand(st, pr, nv, cat, empresaId, atendenteId, slaStatus, search, ids), ct);
+        var ts = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        return File(bytes, "text/csv; charset=utf-8", $"tickets-{ts}.csv");
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetTickets(
         [FromQuery] int page = 1,
