@@ -338,4 +338,116 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         itensBaixoA.Single().EmpresaId.Should().Be(empresaA.Id);
         totalA.Should().Be(1);
     }
+
+    [SkippableFact]
+    public async Task GetItensEstoquePaginadosAsync_status_vencendo_retorna_so_lotes_na_janela_com_saldo_e_nao_vencidos()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
+
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa V", Documento = "999", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Pereciveis", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.Add(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Queijo Fresco",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        });
+
+        var idVencendo = Guid.NewGuid();
+        context.ItensEstoque.AddRange(
+            // Vence em 3 dias, com saldo, nao vencido -> DEVE aparecer
+            new ItemEstoque
+            {
+                Id = idVencendo,
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(3)),
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            // Vence em 20 dias (fora da janela de 7) -> NAO aparece
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(20)),
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            // Ja vencido (Status Vencido) -> NAO aparece (proativo: so o que ainda vai vencer)
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(5),
+                QuantidadeAtual = Quantidade.From(5),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(-2)),
+                Status = StatusItemEstoque.Vencido,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            // Vence em 2 dias, mas sem saldo (qty 0) -> NAO aparece
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(8),
+                QuantidadeAtual = Quantidade.From(0),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(2)),
+                Status = StatusItemEstoque.Esgotado,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            // Sem validade -> NAO aparece
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = DateTime.UtcNow,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+        var (itens, total) = await repository.GetItensEstoquePaginadosAsync(empresaId, 1, 20, status: "vencendo");
+
+        total.Should().Be(1);
+        itens.Should().ContainSingle().Which.Id.Should().Be(idVencendo);
+    }
 }

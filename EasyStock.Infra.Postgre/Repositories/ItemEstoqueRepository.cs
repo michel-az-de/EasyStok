@@ -148,18 +148,31 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
 
-            var statusEnum = NormalizarStatusFiltro(status);
-            if (statusEnum.HasValue)
-                query = query.Where(i => i.Status == statusEnum.Value);
+            var vencendo = IsFiltroVencendo(status);
+            if (vencendo)
+                query = AplicarFiltroVencendo(query);
+            else
+            {
+                var statusEnum = NormalizarStatusFiltro(status);
+                if (statusEnum.HasValue)
+                    query = query.Where(i => i.Status == statusEnum.Value);
+            }
 
             if (categoriaId.HasValue)
                 query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
 
             var totalCount = await query.CountAsync();
-            var items = await query
+            var comInclude = query
                 .Include(i => i.Produto)
-                .Include(i => i.ProdutoVariacao)
-                .OrderByDescending(i => i.EntradaEm)
+                .Include(i => i.ProdutoVariacao);
+
+            // Filtro "Vencendo" usa FEFO (o que vence primeiro no topo, mais acionavel);
+            // os demais filtros mantem a ordem padrao por entrada mais recente.
+            var ordenada = vencendo
+                ? comInclude.OrderBy(i => (DateTime?)i.ValidadeEm)
+                : comInclude.OrderByDescending(i => i.EntradaEm);
+
+            var items = await ordenada
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -173,9 +186,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
 
-            var statusEnum = NormalizarStatusFiltro(status);
-            if (statusEnum.HasValue)
-                query = query.Where(i => i.Status == statusEnum.Value);
+            if (IsFiltroVencendo(status))
+                query = AplicarFiltroVencendo(query);
+            else
+            {
+                var statusEnum = NormalizarStatusFiltro(status);
+                if (statusEnum.HasValue)
+                    query = query.Where(i => i.Status == statusEnum.Value);
+            }
 
             if (categoriaId.HasValue)
                 query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
@@ -331,6 +349,23 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             dbContext.ItensEstoque.UpdateRange(itensEstoque);
             return Task.CompletedTask;
+        }
+
+        // Filtro "Vencendo": lotes dentro da janela DiasVencimentoProximo (7d), ainda
+        // NAO vencidos e com saldo. Nao e um StatusItemEstoque (o lote fica Ok/Warn/etc
+        // ate vencer) — e filtro por DATA, tratado fora do NormalizarStatusFiltro.
+        // Predicado canonico, espelhado em DashboardAnalyticsQueries (contagem do card)
+        // e em EstoqueService.MatchesStatusFilter (defesa client-side do Web).
+        private static bool IsFiltroVencendo(string? status) =>
+            string.Equals(status?.Trim(), "vencendo", StringComparison.OrdinalIgnoreCase);
+
+        private static IQueryable<ItemEstoque> AplicarFiltroVencendo(IQueryable<ItemEstoque> query)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(OperacionalDefaults.DiasVencimentoProximo);
+            return query.Where(i => i.ValidadeEm != null
+                && (DateTime?)i.ValidadeEm <= cutoff
+                && i.Status != StatusItemEstoque.Vencido
+                && (int)i.QuantidadeAtual > 0);
         }
 
         // Mapeia o valor PT-BR do querystring (vindo do frontend / deep-links do

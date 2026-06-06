@@ -70,13 +70,16 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var valorVenda = estoqueData.Sum(e => e.ValorVenda);
         var alertasBaixo = estoqueData.Count(e => e.EstaAbaixoMinimo);
 
-        // Alertas de validade (30 dias)
-        var cutoffValidade = DateTime.UtcNow.AddDays(30);
-        // BUG-010 (#459): "vence em ate 30 dias" nao deve incluir lotes JA vencidos.
-        // Exclui Status==Vencido (consistente com a query de estoque acima, linha ~50).
+        // Alertas de validade — janela canonica DiasVencimentoProximo (7d), a mesma do
+        // filtro "Vencendo" do Estoque (ItemEstoqueRepository.AplicarFiltroVencendo) e do
+        // realce vermelho da coluna Validade, pra contagem do card bater com a lista.
+        // BUG-010 (#459): "vencendo" nao inclui lotes JA vencidos (Status==Vencido).
+        // qty>0: so lotes acionaveis (com saldo), igual ao predicado do filtro.
+        var cutoffValidade = DateTime.UtcNow.AddDays(OperacionalDefaults.DiasVencimentoProximo);
         var validadeQuery = dbContext.ItensEstoque.AsNoTracking()
             .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido
-                && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade);
+                && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade
+                && (int)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
         var alertasValidade = await validadeQuery.CountAsync();
