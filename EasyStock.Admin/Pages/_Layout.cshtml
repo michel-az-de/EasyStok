@@ -9,10 +9,9 @@
     <script>
         // Theme bootstrap (Admin é dark-first; usuário pode ter toggleado para light).
         (function () {
-            try {
-                var saved = localStorage.getItem('easystok-admin-theme');
-                if (saved === 'light') document.documentElement.removeAttribute('data-theme');
-            } catch (e) { /* localStorage indisponível */ }
+            // Tema claro temporariamente desabilitado (sub-construido — #492/#376).
+            // Forca dark e limpa qualquer preferencia 'light' salva antes do toggle sair.
+            try { localStorage.removeItem('easystok-admin-theme'); } catch (e) { /* localStorage indisponível */ }
         })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -257,18 +256,7 @@
             </div>
 
             <div class="flex items-center gap-2">
-                <!-- Theme toggle -->
-                <button type="button"
-                        class="topbar-icon-btn"
-                        @@click="toggleTheme()"
-                        :aria-label="theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'">
-                    <template x-if="theme === 'dark'">
-                        <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-sun"/></svg>
-                    </template>
-                    <template x-if="theme === 'light'">
-                        <svg class="es-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="/icons/sprite.svg#icon-moon"/></svg>
-                    </template>
-                </button>
+                @* Theme toggle escondido: tema claro sub-construido, ver #492/#376. *@
 
                 <!-- Cheatsheet (?) -->
                 <button type="button"
@@ -335,7 +323,6 @@
             <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Admins</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g a</kbd></dd></div>
             <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Ir pra Diagnóstico</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g s</kbd></dd></div>
             <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Recolher menu lateral</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">[</kbd></dd></div>
-            <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Alternar tema claro/escuro</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">g h</kbd></dd></div>
             <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Esta tela</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">?</kbd></dd></div>
             <div class="flex items-center justify-between"><dt class="text-es-ink-dim">Fechar modais</dt><dd><kbd class="px-1.5 py-0.5 bg-es-surface-2 rounded font-mono text-xs">Esc</kbd></dd></div>
         </dl>
@@ -367,19 +354,10 @@
         });
     })();
 
-    // ── Helper global para alternar tema (consumido por ⌘K e por adminApp). ──
-    window.toggleTheme = function () {
-        var root = document.documentElement;
-        var isDark = root.getAttribute('data-theme') === 'dark';
-        if (isDark) {
-            root.removeAttribute('data-theme');
-            try { localStorage.setItem('easystok-admin-theme', 'light'); } catch (e) {}
-        } else {
-            root.setAttribute('data-theme', 'dark');
-            try { localStorage.setItem('easystok-admin-theme', 'dark'); } catch (e) {}
-        }
-        window.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: isDark ? 'light' : 'dark' } }));
-    };
+    // ── Tema claro desabilitado temporariamente (sub-construido — #492/#376). ──
+    // No-op: neutraliza qualquer caller remanescente (atalho, ⌘K) sem quebrar nada.
+    // O tema claro de verdade sera construido no epico de design #376.
+    window.toggleTheme = function () { /* no-op ate #376 */ };
 
     const RECENT_TENANTS_KEY = 'easystok-admin-recent-tenants';
     const SIDEBAR_RAIL_KEY  = 'easystok-admin-sidebar-rail';
