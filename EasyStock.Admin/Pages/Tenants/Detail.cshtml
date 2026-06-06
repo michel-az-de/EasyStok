@@ -197,13 +197,25 @@ function mobileSyncHealth(tenantId) {
                 @Html.AntiForgeryToken()
                 <div class="mb-4">
                     <label class="form-label">Plano</label>
+                    @{
+                        var assinPlano = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                            && Model.Assinatura.TryGetProperty("plano", out var apObj) && apObj.ValueKind != System.Text.Json.JsonValueKind.Null ? apObj : default;
+                        var planoAtualId = assinPlano.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                            && assinPlano.TryGetProperty("id", out var apIdP) && apIdP.ValueKind != System.Text.Json.JsonValueKind.Null ? apIdP.GetString() : null;
+                        var planoAtualNome = assinPlano.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                            && assinPlano.TryGetProperty("nome", out var apNmP) ? apNmP.GetString() : null;
+                    }
                     <select name="planoId" class="form-input" required>
                         @foreach (var p in Model.PlanosList)
                         {
                             var pid = p.TryGetProperty("id", out var pidp) ? pidp.GetString() : "";
                             var pnome = p.TryGetProperty("nome", out var pnp2) ? pnp2.GetString() : "";
                             var preco = p.TryGetProperty("precoMensal", out var precoP) ? precoP.GetDecimal() : 0;
-                            <option value="@pid">@pnome — R$ @preco.ToString("N2")</option>
+                            // Pré-seleciona o plano atual do tenant (id, com fallback por nome) para não
+                            // default no primeiro da lista, evitando troca acidental (BUG-002).
+                            var ehAtual = (planoAtualId != null && pid == planoAtualId)
+                                || (planoAtualId == null && planoAtualNome != null && pnome == planoAtualNome);
+                            <option value="@pid" selected="@ehAtual">@pnome — R$ @preco.ToString("N2")</option>
                         }
                     </select>
                 </div>
@@ -1532,6 +1544,8 @@ function mobileSyncHealth(tenantId) {
                 <div class="space-y-2">
                     <input type="text" x-model="exportarMotivo" placeholder="Justificativa (≥10 chars)"
                            class="form-input w-full text-xs font-mono" />
+                    <p x-show="exportarMotivo.length > 0 && exportarMotivo.trim().length < 10" x-cloak
+                       class="text-amber-400 text-xs">Mínimo de 10 caracteres para liberar a exportação (fica no audit log).</p>
                     <a :href="exportarUrl"
                        :class="exportarMotivo.trim().length >= 10 ? 'btn-primary' : 'btn-secondary opacity-50 pointer-events-none'"
                        class="text-xs w-full block text-center">

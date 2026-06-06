@@ -351,7 +351,7 @@
                 },
 
                 _buildRemoteMeta(r, group) {
-                    if (group === 'Cliente') return r.documento || (r.id ? String(r.id).slice(0, 8) : '');
+                    if (group === 'Cliente') return r.documento || '—';
                     if (group === 'Loja') return (r.empresaNome || '') + (r.ativa === false ? ' · inativa' : '');
                     if (group === 'Usuário') return (r.emailMascarado || '') + ' · ' + (r.empresaNome || '') + (r.ativo === false ? ' · inativo' : '');
                     return '';
