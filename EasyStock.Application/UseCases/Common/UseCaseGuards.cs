@@ -26,4 +26,17 @@ public static class UseCaseGuards
         if (id == Guid.Empty)
             throw new UseCaseValidationException($"{nomeCampo} é obrigatório.");
     }
+
+    /// <summary>
+    /// Rejeita os caracteres &lt; e &gt; em campos de texto livre exibidos ao usuário.
+    /// Defesa em profundidade contra XSS armazenado (BUG-05 do QA): a saída já escapa em
+    /// HTML (Razor), mas contextos como PDF/etiqueta/exportação podem não escapar —
+    /// bloquear na entrada cobre todos de uma vez, sem armazenar tags. Nomes legítimos
+    /// não usam &lt;/&gt;.
+    /// </summary>
+    public static void EnsureSemTagsHtml(string? texto, string nomeCampo)
+    {
+        if (!string.IsNullOrEmpty(texto) && (texto.Contains('<') || texto.Contains('>')))
+            throw new UseCaseValidationException($"{nomeCampo} não pode conter os caracteres < ou >.");
+    }
 }

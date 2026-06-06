@@ -35,6 +35,7 @@ public sealed class AtualizarProdutoUseCase(
         UseCaseGuards.EnsureNotEmpty(command.ProdutoId, "ProdutoId");
         if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId é obrigatório.");
         if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
+        UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do produto");
 
         var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");

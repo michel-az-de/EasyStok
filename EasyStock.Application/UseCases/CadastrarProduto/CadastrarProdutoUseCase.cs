@@ -264,6 +264,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
             UseCaseGuards.EnsureNotEmpty(command.CategoriaId, "CategoriaId");
             if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
+            UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do produto");
             if ((command.Embalagens ?? []).Count(e => e.Padrao) > 1) throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
 
             var skus = (command.Variacoes ?? [])
