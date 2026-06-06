@@ -46,6 +46,38 @@
 </head>
 <body class="h-full bg-es-bg text-es-ink font-sans" x-data="adminApp()">
 
+<!-- Barra de progresso de navegação (#F2): feedback de "carregando" em full-page nav. -->
+<div class="nav-progress" id="es-nav-progress" aria-hidden="true"></div>
+<script>
+    // Sem dependência de Alpine. A navegação recarrega a página e zera a barra naturalmente.
+    (function () {
+        var bar = document.getElementById('es-nav-progress');
+        if (!bar) return;
+        var started = false;
+        function start() {
+            if (started) return;
+            started = true;
+            bar.classList.add('is-loading');
+        }
+        document.addEventListener('click', function (e) {
+            var a = e.target.closest ? e.target.closest('a[href]') : null;
+            if (!a) return;
+            if (a.target === '_blank' || a.hasAttribute('download')) return;
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            var href = a.getAttribute('href') || '';
+            if (!href || href.charAt(0) === '#' || href.indexOf('javascript:') === 0) return;
+            if (a.origin && a.origin !== window.location.origin) return;
+            start();
+        }, true);
+        document.addEventListener('submit', function (e) {
+            if (e.target && e.target.target === '_blank') return;
+            start();
+        }, true);
+        // Volta via bfcache (botão voltar): garante a barra zerada.
+        window.addEventListener('pageshow', function () { started = false; bar.classList.remove('is-loading'); });
+    })();
+</script>
+
 <a href="#main" class="skip-link">Pular para o conteúdo</a>
 
 <div class="app-shell">

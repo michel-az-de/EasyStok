@@ -1843,3 +1843,30 @@ button:focus-visible {
 .es-copy-ico-check {
   color: var(--ok-600, #16a34a);
 }
+
+/* ============================================================
+   Barra de progresso de navegação (full-page nav) — #F2
+   ============================================================ */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  z-index: var(--z-loading, 80);
+  background: linear-gradient(90deg, var(--orange-600, #E85814), var(--orange-500, #f0660f));
+  box-shadow: 0 0 8px var(--orange-500, #f0660f);
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 0 2px 2px 0;
+  transition: width .3s ease, opacity .25s ease;
+}
+.nav-progress.is-loading {
+  opacity: 1;
+  width: 92%;
+  transition: width 9s cubic-bezier(.12, .72, .4, 1), opacity .25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress { transition: opacity .25s ease; }
+  .nav-progress.is-loading { width: 100%; }
+}
