@@ -16,10 +16,14 @@ namespace EasyStock.Admin.TagHelpers;
 ///   &lt;es-copy value="@email" label="E-mail" text="@email" /&gt;
 /// </summary>
 [HtmlTargetElement("es-copy", Attributes = "value")]
+[HtmlTargetElement("es-copy", Attributes = "expr")]
 public sealed class CopyTagHelper : TagHelper
 {
-    /// <summary>Valor cru a copiar (obrigatório).</summary>
+    /// <summary>Valor cru a copiar (estático). Use isto OU expr.</summary>
     public string Value { get; set; } = string.Empty;
+
+    /// <summary>Expressão Alpine a copiar (ex.: "d.id"), avaliada no escopo Alpine. Alternativa a value para valores dinâmicos (x-for, x-text).</summary>
+    public string? Expr { get; set; }
 
     /// <summary>Rótulo humano para o toast ("CNPJ copiado"). Opcional.</summary>
     public string? Label { get; set; }
@@ -50,14 +54,16 @@ public sealed class CopyTagHelper : TagHelper
         output.Attributes.SetAttribute("x-data", "esCopy()");
 
         var value = Value ?? string.Empty;
-        var visible = Text ?? value;
+        var hasExpr = !string.IsNullOrWhiteSpace(Expr);
+        var visible = Text ?? (hasExpr ? null : value);
         var actionLabel = string.IsNullOrWhiteSpace(Label) ? "Copiar" : "Copiar " + Label;
 
-        // Expressão Alpine do @click: value/label como string JS (JsonSerializer) e o
-        // conjunto HTML-encodado — as aspas viram &quot; e o browser decodifica antes do Alpine.
-        var jsVal = System.Text.Json.JsonSerializer.Serialize(value);
+        // Expressão Alpine do @click. value/label viram string JS (JsonSerializer); expr é
+        // injetada crua (já é expressão Alpine, ex.: d.id). O conjunto é HTML-encodado: as
+        // aspas viram &quot; e o browser decodifica antes do Alpine avaliar.
         var jsLabel = string.IsNullOrWhiteSpace(Label) ? "null" : System.Text.Json.JsonSerializer.Serialize(Label);
-        var clickExpr = WebUtility.HtmlEncode($"copy({jsVal}, {jsLabel})");
+        var copyArg = hasExpr ? Expr! : System.Text.Json.JsonSerializer.Serialize(value);
+        var clickExpr = WebUtility.HtmlEncode($"copy({copyArg}, {jsLabel})");
         var titleAttr = WebUtility.HtmlEncode(actionLabel);
 
         var sb = new StringBuilder();
