@@ -22,6 +22,7 @@ public class CriarClienteUseCase(
     public async Task<ClienteResult> ExecuteAsync(CriarClienteCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome do cliente");
 
         if (!string.IsNullOrWhiteSpace(cmd.Email))
             EmailValidator.EnsureValid(cmd.Email, "Email do cliente");

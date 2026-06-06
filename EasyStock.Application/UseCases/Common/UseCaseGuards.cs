@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace EasyStock.Application.UseCases.Common;
 
 /// <summary>
@@ -27,16 +29,20 @@ public static class UseCaseGuards
             throw new UseCaseValidationException($"{nomeCampo} é obrigatório.");
     }
 
+    // Detecta inicio de tag HTML: '<' seguido de letra, '/', '!' ou '?' (ex.: <script>, </b>, <!--).
+    // NAO casa '<'/'>' isolados — nomes legitimos como "Tamanho > M" ou "Loja <3" passam.
+    private static readonly Regex TagHtmlPattern = new(@"<[a-zA-Z/!?]", RegexOptions.Compiled);
+
     /// <summary>
-    /// Rejeita os caracteres &lt; e &gt; em campos de texto livre exibidos ao usuário.
+    /// Rejeita tags HTML (&lt;tag&gt;) em campos de texto livre exibidos ao usuário.
     /// Defesa em profundidade contra XSS armazenado (BUG-05 do QA): a saída já escapa em
     /// HTML (Razor), mas contextos como PDF/etiqueta/exportação podem não escapar —
-    /// bloquear na entrada cobre todos de uma vez, sem armazenar tags. Nomes legítimos
-    /// não usam &lt;/&gt;.
+    /// bloquear tags na entrada cobre todos de uma vez. '&lt;'/'&gt;' isolados são
+    /// liberados para não rejeitar nomes legítimos.
     /// </summary>
     public static void EnsureSemTagsHtml(string? texto, string nomeCampo)
     {
-        if (!string.IsNullOrEmpty(texto) && (texto.Contains('<') || texto.Contains('>')))
-            throw new UseCaseValidationException($"{nomeCampo} não pode conter os caracteres < ou >.");
+        if (!string.IsNullOrEmpty(texto) && TagHtmlPattern.IsMatch(texto))
+            throw new UseCaseValidationException($"{nomeCampo} não pode conter tags HTML.");
     }
 }
