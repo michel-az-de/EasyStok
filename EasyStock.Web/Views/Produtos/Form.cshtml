@@ -1514,6 +1514,19 @@
                 _clickHandler: null,
 
                 init() {
+                    // BUG-14 (hardening): liga o submit programaticamente, igual ao form-modal.js
+                    // (f95160dc). Se o @@submit.prevent nao ligar no form por algum motivo, sem isto
+                    // o form method=post faria POST NATIVO e pularia o fluxo AJAX desenhado (upload de
+                    // foto em 2 fases + toast). x-data esta no proprio form, entao $el e o proprio form.
+                    // Handlers idempotentes/guardados (saving / showConfirmModal): double-fire e seguro.
+                    // NOTA: a causa exata de o @@submit.prevent nao ligar precisa de verificacao em
+                    // runtime (HTML servido); este listener torna o submit robusto independente disso.
+                    this.$el.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        if (this.isEdit) this.abrirModalConfirmacao();
+                        else this.submitForm();
+                    });
+
                     // Restaurar rascunho manualmente (apenas novos produtos)
                     if (!isEdit) {
                         try {
