@@ -40,6 +40,11 @@ public static class AdminPipelineExtensions
             app.UseHsts();
         }
 
+        // Status codes sem corpo (404/403/...) re-executam a página /Error amigável.
+        // Fora do if(!Development) de propósito: queremos a página amigável também em dev
+        // (e testável localmente), em vez do 404 cru do Kestrel.
+        app.UseStatusCodePagesWithReExecute("/Error", "?code={0}");
+
         app.UseResponseCompression();
         app.UseHttpsRedirection();
         app.UseStaticFiles();
