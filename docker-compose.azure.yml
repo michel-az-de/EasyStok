@@ -70,6 +70,10 @@ services:
       Jwt__ExpirationMinutes: "60"
       Anthropic__Enabled: "false"
       FileStorage__Provider: Local
+      # URL publica absoluta da API para compor os links dos arquivos. Sem isso a URL
+      # salva e relativa (/files/...) e a imagem quebra na Web/Admin (outra origem, que
+      # nao serve /files). ${API_HOST} vem do .env (api.<ip>.sslip.io), igual ao web.
+      FileStorage__PublicBaseUrl: "https://${API_HOST}/files"
       # SuperAdmin do painel /admin — obrigatorio em Production (fail-fast se ausente).
       SEED_SUPERADMIN_EMAIL: ${SEED_SUPERADMIN_EMAIL}
       SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD}
