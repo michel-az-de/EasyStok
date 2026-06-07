@@ -36,7 +36,7 @@
 .alert.ok   { border-left-color: var(--ok-600);     background: var(--ok-50); }
 .alert.warn { border-left-color: var(--warn-600);   background: var(--warn-50); }
 .alert.crit { border-left-color: var(--crit-600);   background: var(--crit-50); }
-.alert.info { border-left-color: var(--orange-600); background: var(--orange-50); }
+.alert.info { border-left-color: var(--navy-600);   background: var(--navy-50); }
 .alert .ic {
   width: 44px; height: 44px; border-radius: 12px;
   display: grid; place-items: center; font-weight: 700; font-size: 22px; color: #fff;
@@ -44,7 +44,7 @@
 .alert.ok   .ic { background: var(--ok-600); }
 .alert.warn .ic { background: var(--warn-600); }
 .alert.crit .ic { background: var(--crit-600); }
-.alert.info .ic { background: var(--orange-600); }
+.alert.info .ic { background: var(--navy-600); }
 .alert .body .ttl  { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.005em; margin-bottom: 2px; }
 .alert .body .desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.45; }
 .alert .cta {
@@ -607,8 +607,8 @@ button:focus-visible {
 .toast.toast-error   .toast-icon { color: var(--crit-600); }
 .toast.toast-warn    { border-left: 3px solid var(--warn-600); }
 .toast.toast-warn    .toast-icon { color: var(--warn-600); }
-.toast.toast-info    { border-left: 3px solid var(--orange-500); }
-.toast.toast-info    .toast-icon { color: var(--orange-500); }
+.toast.toast-info    { border-left: 3px solid var(--navy-500); }
+.toast.toast-info    .toast-icon { color: var(--navy-500); }
 .toast .toast-body   { min-width: 0; }
 .toast .toast-title  { font-weight: 600; }
 .toast .toast-desc   { color: var(--text-secondary); margin-top: 2px; font-size: 13px; }
@@ -1363,7 +1363,7 @@ button:focus-visible {
   color: var(--ink-400);
   transition: color var(--duration-fast) var(--ease-out);
 }
-.es-data-table th.is-sorted .es-data-table-sort-icon { color: var(--orange-500); }
+.es-data-table th.is-sorted .es-data-table-sort-icon { color: var(--text-primary); }
 .es-data-table th.is-sorted-desc .es-data-table-sort-icon { transform: rotate(180deg); }
 .es-data-table tbody tr {
   border-bottom: 1px solid var(--border-soft);
