@@ -132,7 +132,7 @@
                         <input asp-for="Valor" type="number" step="0.01" min="0"
                                x-model.number="valorUnit"
                                @@input="calcularTotal()"
-                               placeholder="0,00"
+                               placeholder="R$ 0,00"
                                class="ui-field w-full text-sm" />
                     </div>
                     <div>
@@ -200,8 +200,11 @@
                     </a>
                     <button type="submit"
                             :disabled="loading || !produtoId || qty > estoqueAtual"
-                            :class="{ 'opacity-50 cursor-not-allowed': loading || !produtoId || qty > estoqueAtual }"
-                            class="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                            :title="!produtoId ? 'Selecione um produto primeiro' : (qty > estoqueAtual ? 'Quantidade acima do estoque disponível' : '')"
+                            :class="(loading || !produtoId || qty > estoqueAtual)
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+                            class="px-6 py-2 text-sm font-medium rounded-lg transition-colors">
                         <span x-show="!loading">Registrar Saída</span>
                         <span x-show="loading" x-cloak>Registrando...</span>
                     </button>
@@ -341,7 +344,7 @@ function saidaForm() {
         varId: '',
         estoqueAtual: 0,
         qty: 1,
-        valorUnit: 0,
+        valorUnit: null,
         loading: false,
         _debounce: null,
 
@@ -389,7 +392,7 @@ function saidaForm() {
             if (this.variacoes.length > 0 && this.variacoes[0].quantidadeEmEstoque !== undefined) {
                 this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque;
             }
-            this.valorUnit = d.precoReferencia || d.custoReferencia || 0;
+            this.valorUnit = d.precoReferencia || d.custoReferencia || null;
             this.produtoFotoUrl = d.fotoUrl || '';
             this.produtoMarca = d.marca || '';
             this.produtoCodigoBarras = d.codigoBarras || '';
@@ -408,7 +411,7 @@ function saidaForm() {
             if (this.valorUnit < 0) { window.showToast('Valor unitário não pode ser negativo.', 'warning'); return; }
             if (this.estoqueAtual === 0) { window.showToast('Este produto não tem estoque disponível.', 'error'); return; }
             if (this.qty > this.estoqueAtual) { window.showToast('Quantidade excede o estoque disponível (' + this.estoqueAtual + ').', 'error'); return; }
-            if (this.valorUnit === 0) {
+            if (!this.valorUnit) {
                 const self = this;
                 window.easyConfirm({
                     titulo: 'Saida com valor R$ 0,00?',
@@ -425,6 +428,8 @@ function saidaForm() {
             this.loading = true;
             const form = this.$el.closest('form');
             const fd = new FormData(form);
+            // Valor pode vir vazio (placeholder "R$ 0,00"); o server espera decimal -> coage p/ 0.
+            if (!fd.get('Valor')) fd.set('Valor', '0');
 
             const abortCtrl = new AbortController();
             const abortTimeout = setTimeout(() => abortCtrl.abort(), 30000);

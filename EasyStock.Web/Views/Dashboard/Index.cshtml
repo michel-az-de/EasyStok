@@ -18,22 +18,22 @@
     string statusTone;
     if (Model.EstoqueCritico > 0 && Model.ProximosVencimento > 0)
     {
-        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico e {Model.ProximosVencimento} próximo(s) ao vencimento.";
+        statusMsg = $"Você tem {TextHelpers.Plural(Model.EstoqueCritico, "item", "itens")} em estoque crítico e {TextHelpers.Plural(Model.ProximosVencimento, "próximo", "próximos")} ao vencimento.";
         statusTone = "critical";
     }
     else if (Model.EstoqueCritico > 0)
     {
-        statusMsg = $"Você tem {Model.EstoqueCritico} item(ns) em estoque crítico precisando de reposição.";
+        statusMsg = $"Você tem {TextHelpers.Plural(Model.EstoqueCritico, "item", "itens")} em estoque crítico precisando de reposição.";
         statusTone = "critical";
     }
     else if (Model.ProximosVencimento > 0)
     {
-        statusMsg = $"{Model.ProximosVencimento} item(ns) vencem em até 7 dias. Vale girar antes que estraguem.";
+        statusMsg = $"{TextHelpers.Plural(Model.ProximosVencimento, "item", "itens")} {(Model.ProximosVencimento == 1 ? "vence" : "vencem")} em até 7 dias. Vale girar antes que estraguem.";
         statusTone = "warning";
     }
     else if (Model.SugestoesReposicao > 0)
     {
-        statusMsg = $"Nada urgente hoje. {Model.SugestoesReposicao} sugestão(ões) de reposição prontas para revisão.";
+        statusMsg = $"Nada urgente hoje. {TextHelpers.Plural(Model.SugestoesReposicao, "sugestão", "sugestões")} de reposição {(Model.SugestoesReposicao == 1 ? "pronta" : "prontas")} para revisão.";
         statusTone = "info";
     }
     else if (Model.ReceitaMes > 0)
@@ -166,7 +166,7 @@ else if (Model.ResumoApiFalhou)
     <div class="ws ds-kpi" title="Capital imobilizado (a custo) de todo o estoque atual">
         <div class="ds-kpi-lbl">Estoque em R$ (custo)</div>
         <div class="ds-kpi-val text-slate-900">@Model.ValorEstoque.ToString("C", ptBR)</div>
-        <div class="ds-kpi-sub text-slate-400">@Model.TotalProdutos produto(s) · @Model.QuantidadeTotalEmEstoque unid.</div>
+        <div class="ds-kpi-sub text-slate-400">@TextHelpers.Plural(Model.TotalProdutos, "produto", "produtos") · @Model.QuantidadeTotalEmEstoque unid.</div>
     </div>
 
     <div class="ws ds-kpi" title="Média de unidades vendidas por dia">
@@ -218,12 +218,13 @@ else if (Model.ResumoApiFalhou)
             }
             @if (Model.ProdutosParados > 0)
             {
+                var paradosAria = $"{TextHelpers.Plural(Model.ProdutosParados, "produto parado", "produtos parados")} há mais de 30 dias. Considerar liquidar.";
                 <li>
                     <a href="/estoque?status=parado" class="ds-alert ds-alert--info"
-                       aria-label="@(Model.ProdutosParados) produto(s) parado(s) há mais de 30 dias. Considerar liquidar.">
+                       aria-label="@paradosAria">
                         <span class="ds-alert-dot" aria-hidden="true"></span>
                         <span class="ds-alert-count">@Model.ProdutosParados</span>
-                        <span class="ds-alert-text">parado(s) há +30 dias</span>
+                        <span class="ds-alert-text">@TextHelpers.PluralWord(Model.ProdutosParados, "parado", "parados") há +30 dias</span>
                         <span class="ds-alert-cta" aria-hidden="true">Considerar liquidar →</span>
                     </a>
                 </li>
@@ -318,8 +319,8 @@ else if (Model.ResumoApiFalhou)
                         var tipoNormalizado = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
                         var label = tipoNormalizado switch
                         {
-                            "Entrada" => $"{m.TotalMovimentacoes} entrada(s)",
-                            "Saida" => $"{m.TotalMovimentacoes} saída(s)",
+                            "Entrada" => TextHelpers.Plural(m.TotalMovimentacoes, "entrada", "entradas"),
+                            "Saida" => TextHelpers.Plural(m.TotalMovimentacoes, "saída", "saídas"),
                             _ => $"{m.TotalMovimentacoes} {m.Tipo.ToLower()}"
                         };
                         var dotClass = tipoNormalizado switch

@@ -46,16 +46,21 @@ select:invalid:focus {
   flex-shrink: 0;
 }
 
-/* Success state */
-input:valid:not(:placeholder-shown),
-textarea:valid:not(:placeholder-shown),
-select:valid:not(:placeholder-shown) {
+/* Success state — OPT-IN apenas (.is-valid). Em repouso o campo fica NEUTRO;
+   verde só quando a validação realmente confirma o valor. A regra antiga
+   (input:valid:not(:placeholder-shown)) pintava de verde TODO campo válido em
+   repouso — <select> é sempre :valid, date/number com valor idem — dando a
+   sensação de "tem algo selecionado que eu não selecionei". O foco volta a ser
+   navy (definido em app.css .ui-field:focus). Pente-fino UX 2026-06-07. */
+input.is-valid,
+textarea.is-valid,
+select.is-valid {
   border-color: var(--ok-600);
 }
 
-input:valid:focus,
-textarea:valid:focus,
-select:valid:focus {
+input.is-valid:focus,
+textarea.is-valid:focus,
+select.is-valid:focus {
   box-shadow: 0 0 0 3px rgba(24, 135, 78, 0.15);
   border-color: var(--ok-600);
   outline: none;

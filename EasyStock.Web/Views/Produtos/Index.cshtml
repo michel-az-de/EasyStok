@@ -111,13 +111,13 @@
                 </svg>
             </span>
         </div>
-        <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer select-none">
+        <label class="inline-flex items-center gap-2 h-10 px-3 text-sm cursor-pointer select-none rounded-full border transition-colors @(Model.SemPreco ? "border-indigo-300 bg-indigo-50 text-indigo-700 font-medium" : "border-slate-300 text-slate-600 hover:bg-slate-50")">
             <input type="checkbox" name="semPreco" value="true" @(Model.SemPreco ? "checked" : "")
                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" />
             Sem preço
         </label>
         <button type="submit"
-                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                class="h-10 inline-flex items-center px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
             Filtrar
         </button>
         @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Categoria) || !string.IsNullOrEmpty(Model.Status) || Model.SemPreco)
