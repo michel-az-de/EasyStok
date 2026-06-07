@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace EasyStock.Admin.UnitTests;
 
 /// <summary>
-/// BUG-004 (#463): empty-states que mostram "?empresaId=&lt;guid&gt;" sofriam
-/// double-encoding (a fonte vinha pre-escapada e o TagHelper re-encodava), exibindo
-/// "&amp;lt;guid&amp;gt;" cru ao usuario. Renderiza as paginas reais (OnGet vazio,
-/// sem API) e assere o HTML emitido pelo servidor. Reusa a factory de XssRenderTests.
+/// BUG-004 (#463): empty-states sofriam double-encoding (fonte pre-escapada + o
+/// TagHelper re-encodava). O hint tecnico de empresaId na URL foi removido depois
+/// em bbb9a33d (empty-state virou o CTA "Selecione um cliente"); o teste segue
+/// guardando que o HTML servidor-side nao tem double-encoding e que o empty-state
+/// renderiza. Renderiza as paginas reais (OnGet vazio, sem API) e assere o HTML
+/// emitido pelo servidor. Reusa a factory de XssRenderTests.
 /// </summary>
 public class EmptyStateEncodingTests : IClassFixture<XssRenderTests.AdminFactory>
 {
@@ -32,7 +34,7 @@ public class EmptyStateEncodingTests : IClassFixture<XssRenderTests.AdminFactory
         html.Should().NotContain("&amp;lt;");
         html.Should().NotContain("&amp;gt;");
 
-        // O texto de ajuda mostra "<guid>" (encodado UMA vez = "&lt;guid&gt;" no HTML).
-        html.Should().Contain("empresaId=&lt;guid&gt;");
+        // Empty-state (sem empresaId) renderiza o CTA amigavel introduzido em bbb9a33d.
+        html.Should().Contain("Selecione um cliente");
     }
 }
