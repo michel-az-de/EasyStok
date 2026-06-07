@@ -5,14 +5,39 @@ using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 {
-    public sealed record RegistrarSaidaEstoqueItemCommand(
-        Guid? ItemEstoqueId,
-        [property: Required] Guid ProdutoId,
-        Guid? ProdutoVariacaoId,
-        [property: Range(typeof(decimal), "0.001", "999999999999")] decimal Quantidade,
-        [property: Range(0, double.MaxValue)] decimal ValorVendaUnitario,
-        string? Descricao)
+    // Record NAO-posicional de proposito (#507 / QA EZ-STK-001): o System.Text.Json so
+    // desserializa um tipo com 1 construtor OU com um construtor marcado [JsonConstructor].
+    // Aqui ha 3 construtores (o canonico de 6 args + 2 atalhos usados em call-sites de
+    // producao e testes), entao o canonico leva [JsonConstructor] explicito. Sem isso o
+    // STJ lancava NotSupportedException ao desserializar o body, antes do use case, e
+    // TODA saida via HTTP retornava 500. As 3 assinaturas sao mantidas identicas — call-sites
+    // inalterados. Regressao em RegistrarSaidaEstoqueCommandSerializationTests.
+    public sealed record RegistrarSaidaEstoqueItemCommand
     {
+        public Guid? ItemEstoqueId { get; init; }
+        [Required] public Guid ProdutoId { get; init; }
+        public Guid? ProdutoVariacaoId { get; init; }
+        [Range(typeof(decimal), "0.001", "999999999999")] public decimal Quantidade { get; init; }
+        [Range(0, double.MaxValue)] public decimal ValorVendaUnitario { get; init; }
+        public string? Descricao { get; init; }
+
+        [System.Text.Json.Serialization.JsonConstructor]
+        public RegistrarSaidaEstoqueItemCommand(
+            Guid? itemEstoqueId,
+            Guid produtoId,
+            Guid? produtoVariacaoId,
+            decimal quantidade,
+            decimal valorVendaUnitario,
+            string? descricao)
+        {
+            ItemEstoqueId = itemEstoqueId;
+            ProdutoId = produtoId;
+            ProdutoVariacaoId = produtoVariacaoId;
+            Quantidade = quantidade;
+            ValorVendaUnitario = valorVendaUnitario;
+            Descricao = descricao;
+        }
+
         public RegistrarSaidaEstoqueItemCommand(
             Guid itemEstoqueId,
             decimal quantidade,
