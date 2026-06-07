@@ -130,17 +130,10 @@
 <!-- Tabelas lado a lado -->
 <div class="admin-dashboard-panels">
 
-    <es-card padding="none">
+    <es-card padding="none" title="Tickets críticos" description="Alta prioridade — ação imediata">
         <es-card-header-actions>
             <es-button variant="ghost" size="xs" href="/Tickets?prioridade=Critica" icon-trailing="arrow-right">Ver todos</es-button>
         </es-card-header-actions>
-
-        <header class="es-card-header">
-            <div>
-                <h3 class="es-card-title">Tickets críticos</h3>
-                <div class="es-card-desc">Alta prioridade — ação imediata</div>
-            </div>
-        </header>
 
         @if (!Model.UltimosTicketsCriticos.Any())
         {
@@ -184,17 +177,10 @@
         }
     </es-card>
 
-    <es-card padding="none">
+    <es-card padding="none" title="Tenants recentes" description="Últimos 30 dias">
         <es-card-header-actions>
             <es-button variant="ghost" size="xs" href="/Tenants" icon-trailing="arrow-right">Ver todos</es-button>
         </es-card-header-actions>
-
-        <header class="es-card-header">
-            <div>
-                <h3 class="es-card-title">Tenants recentes</h3>
-                <div class="es-card-desc">Últimos 30 dias</div>
-            </div>
-        </header>
 
         @if (!Model.TenantsRecentes.Any())
         {
