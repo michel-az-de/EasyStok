@@ -368,6 +368,12 @@ html, body {
 .btn-ghost:hover { background: var(--ink-100); }
 .btn-ghost:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-ghost:focus { box-shadow: var(--focus-ring-navy); }
+/* Dark: --navy-700 fica quase invisivel sobre superficies escuras (hero, cards,
+   acoes de linha). Espelha o override do .btn-secondary acima. --text-secondary
+   da contraste AAA (8.3-9.6:1) sobre surface/hero; no hover, --white sobre o
+   overlay claro fica 12.7:1. */
+[data-theme="dark"] .btn-ghost { color: var(--text-secondary); }
+[data-theme="dark"] .btn-ghost:hover { color: var(--white); background: rgba(255, 255, 255, 0.08); }
 .btn-dark {
   background: var(--navy-900);
   color: var(--white);
