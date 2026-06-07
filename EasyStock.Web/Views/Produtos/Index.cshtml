@@ -9,13 +9,23 @@
         <h1>Produtos</h1>
         <p>@Model.Paginacao.Total @(Model.Paginacao.Total == 1 ? "produto listado" : "produtos listados")</p>
     </div>
-    <a href="/produtos/novo"
-       class="app-primary-btn relative z-10 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Novo produto
-    </a>
+    <div class="flex items-center gap-2">
+        <button type="button"
+                onclick="window.dispatchEvent(new CustomEvent('open-modal-rapido'))"
+                class="inline-flex items-center gap-2 border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Cadastro rápido
+        </button>
+        <a href="/produtos/novo"
+           class="app-primary-btn relative z-10 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Novo produto
+        </a>
+    </div>
 </div>
 
 @* C2 (R4 — 2026-05-16): banner pos-migration AddTipoEmbalagemToProduto.
@@ -310,10 +320,203 @@
     }
     else
     {
-        <div class="text-center py-12 text-slate-400">
-            <es-icon name="package" class="mx-auto mb-3" style="width:48px; height:48px; color: var(--text-muted);"></es-icon>
-            <p class="font-semibold text-slate-600">Nenhum produto encontrado</p>
-            <p class="text-sm mt-1">Tente ajustar os filtros ou <a href="/produtos/novo" class="text-indigo-600 hover:underline">cadastre um novo produto</a>.</p>
-        </div>
+        var temFiltro = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Categoria) || !string.IsNullOrEmpty(Model.Status) || Model.SemPreco;
+        if (temFiltro)
+        {
+            <div class="text-center py-12 text-slate-400">
+                <es-icon name="package" class="mx-auto mb-3" style="width:48px; height:48px; color: var(--text-muted);"></es-icon>
+                <p class="font-semibold text-slate-600">Nenhum produto com esses filtros</p>
+                <p class="text-sm mt-1"><a href="/produtos" class="text-indigo-600 hover:underline">Limpar filtros</a></p>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-12 text-slate-400">
+                <es-icon name="package" class="mx-auto mb-3" style="width:48px; height:48px; color: var(--text-muted);"></es-icon>
+                <p class="font-semibold text-slate-600">Comece seu catálogo</p>
+                <p class="text-sm mt-1 max-w-md mx-auto">Cadastre seu primeiro produto. Use o Cadastro rápido para já pôr o item no sistema, ou o cadastro completo para caprichar.</p>
+                <div class="flex items-center justify-center gap-2 mt-4">
+                    <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-modal-rapido'))"
+                            class="inline-flex items-center gap-2 border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                        Cadastro rápido
+                    </button>
+                    <a href="/produtos/novo" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                        Cadastro completo
+                    </a>
+                </div>
+            </div>
+        }
     }
 </div>
+
+@* Modal de cadastro rapido (ADR-0027, #505) — reusa POST /produtos/quick.json + padrao fm-*.
+   Sem <form> (FormTagHelper descartaria @@submit.prevent — BUG-01/02); botoes type=button. *@
+<div x-data="cadastroRapidoModal()"
+     x-show="open" x-cloak
+     x-transition.opacity
+     @@open-modal-rapido.window="abrir()"
+     @@keydown.escape.window="if (open) fechar()"
+     class="fm-overlay"
+     role="dialog" aria-modal="true" aria-labelledby="cad-rapido-title"
+     @@click.self="fechar()">
+    <div x-ref="panel" class="fm-panel" style="max-width: 440px">
+        <header class="fm-header">
+            <div>
+                <h2 id="cad-rapido-title" class="fm-header__title">Cadastro rápido</h2>
+                <p class="fm-header__subtitle">Só o essencial agora. Preço, foto e detalhes você completa quando quiser.</p>
+            </div>
+            <button type="button" class="fm-close" aria-label="Fechar" @@click="fechar()">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </header>
+
+        <div class="fm-body">
+            <div x-show="erroMsg" x-cloak class="fm-error" x-text="erroMsg" role="alert"></div>
+            @Html.AntiForgeryToken()
+
+            <fieldset class="fm-section">
+                <div class="fm-field">
+                    <label class="fm-field__label" for="cad-rapido-nome">
+                        Nome do produto <span class="fm-field__required" aria-hidden="true">*</span>
+                    </label>
+                    <input id="cad-rapido-nome" x-ref="nomeInput" type="text" x-model="form.nome"
+                           placeholder="Ex: Camiseta básica" maxlength="180" autocomplete="off"
+                           @@input="erroMsg = ''" @@keydown.enter.prevent="salvar(true)"
+                           class="ui-field w-full text-sm" />
+                </div>
+                <div class="fm-field">
+                    <label class="fm-field__label" for="cad-rapido-cat">
+                        Categoria <span class="fm-field__required" aria-hidden="true">*</span>
+                    </label>
+                    <select id="cad-rapido-cat" x-model="form.categoriaId" @@change="erroMsg = ''"
+                            class="ui-field w-full text-sm">
+                        <option value="">Selecione…</option>
+                        @foreach (var cat in Model.Categorias)
+                        {
+                            <option value="@cat.Id">@cat.Nome</option>
+                        }
+                    </select>
+                </div>
+                <div class="fm-field">
+                    <label class="fm-field__label" for="cad-rapido-preco">
+                        Preço de venda <span class="text-slate-400 font-normal">(opcional)</span>
+                    </label>
+                    <input id="cad-rapido-preco" type="number" step="0.01" min="0" inputmode="decimal"
+                           x-model="form.precoReferencia" placeholder="0,00" class="ui-field w-full text-sm" />
+                    <span class="fm-field__hint">Sem preço, o produto entra como Incompleto e você define depois.</span>
+                </div>
+            </fieldset>
+
+            <p x-show="contador > 0" x-cloak class="text-sm text-emerald-600 font-medium mt-3"
+               x-text="contador + (contador === 1 ? ' produto cadastrado nesta sessão' : ' produtos cadastrados nesta sessão')"></p>
+        </div>
+
+        <footer class="fm-footer">
+            <button type="button" @@click="fechar()"
+                    class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                Fechar
+            </button>
+            <button type="button" @@click="salvar(true)" :disabled="loading"
+                    class="px-4 py-2 text-sm font-medium text-indigo-700 border border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50">
+                Salvar e cadastrar outro
+            </button>
+            <button type="button" @@click="salvar(false)" :disabled="loading"
+                    class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                <span x-show="loading" x-cloak class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <span x-text="loading ? 'Salvando…' : 'Salvar'"></span>
+            </button>
+        </footer>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function cadastroRapidoModal() {
+    return {
+        open: false,
+        loading: false,
+        erroMsg: '',
+        contador: 0,
+        form: { nome: '', categoriaId: '', precoReferencia: '' },
+
+        abrir() {
+            this.contador = 0;
+            this.erroMsg = '';
+            this.form = { nome: '', categoriaId: '', precoReferencia: '' };
+            this.open = true;
+            this.$nextTick(() => {
+                document.body.style.overflow = 'hidden';
+                if (this.$refs.nomeInput) this.$refs.nomeInput.focus();
+            });
+        },
+
+        fechar() {
+            this.open = false;
+            document.body.style.overflow = '';
+            // Refresca a lista uma unica vez SE algo foi cadastrado (cache ja invalidado no insert).
+            if (this.contador > 0) window.location.reload();
+        },
+
+        async salvar(continuar) {
+            if (this.loading) return;
+            // Blindagem BUG-01/02: autofill/paste setam value sem disparar input -> x-model nao atualiza.
+            var panel = this.$refs.panel;
+            if (panel) {
+                panel.querySelectorAll('input, select').forEach(function (el) {
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+            var nome = (this.form.nome || '').trim();
+            if (!nome) { this.erroMsg = 'Informe o nome do produto.'; return; }
+            if (!this.form.categoriaId) { this.erroMsg = 'Selecione uma categoria.'; return; }
+
+            this.loading = true;
+            this.erroMsg = '';
+            try {
+                var tokenEl = document.querySelector('[name=__RequestVerificationToken]');
+                var precoNum = this.form.precoReferencia === '' || this.form.precoReferencia == null
+                    ? null
+                    : parseFloat(String(this.form.precoReferencia).replace(',', '.'));
+                var res = await esFetch('/produtos/quick.json', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': tokenEl ? tokenEl.value : ''
+                    },
+                    body: JSON.stringify({
+                        nome: nome,
+                        categoriaId: this.form.categoriaId,
+                        precoReferencia: (precoNum != null && precoNum > 0) ? precoNum : null
+                    })
+                });
+                var raw = await res.text();
+                var data = null;
+                try { data = raw ? JSON.parse(raw) : null; } catch (e) { /* nao-JSON */ }
+
+                if (res.ok && data && data.success) {
+                    this.contador++;
+                    if (window.showToast) window.showToast('Produto criado. Complete preço e foto quando quiser.', 'success');
+                    if (continuar) {
+                        // Rajada: limpa nome e preco, MANTEM a categoria, foco no nome.
+                        this.form.nome = '';
+                        this.form.precoReferencia = '';
+                        this.$nextTick(() => { if (this.$refs.nomeInput) this.$refs.nomeInput.focus(); });
+                    } else {
+                        this.fechar();
+                    }
+                    return;
+                }
+                this.erroMsg = (data && data.errorMessage) || 'Não foi possível criar o produto. Tente de novo.';
+            } catch (e) {
+                this.erroMsg = 'Sem conexão com o servidor. Verifique sua internet.';
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+</script>
+}
