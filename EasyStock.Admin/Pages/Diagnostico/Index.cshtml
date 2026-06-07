@@ -287,7 +287,10 @@
                 </div>
 
                 <template x-if="erros.erro">
-                    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-3" x-text="erros.erro"></div>
+                    <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-sm mb-3 flex items-start gap-2">
+                        <span class="flex-1" x-text="erros.erro"></span>
+                        <button type="button" @@click="erros.refresh()" class="text-xs underline hover:text-red-300 shrink-0">↻ Tentar</button>
+                    </div>
                 </template>
 
                 <template x-if="!erros.loading && erros.items.length === 0 && !erros.erro">
@@ -766,7 +769,10 @@
         </div>
 
         <template x-if="infra.erro">
-            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4" x-text="infra.erro"></div>
+            <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4 flex items-start gap-2">
+                <span class="flex-1" x-text="infra.erro"></span>
+                <button type="button" @@click="infra.refresh()" class="text-xs underline hover:text-red-300 shrink-0">↻ Tentar</button>
+            </div>
         </template>
 
         <div x-show="infra.loading && !infra.data" x-cloak class="flex items-center gap-2 text-es-ink-mute text-sm py-8 justify-center">
@@ -1567,7 +1573,7 @@ function errosState() {
                     { credentials: 'same-origin', cache: 'no-store' });
                 if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
                 if (!r.ok) {
-                    this.erro = `HTTP ${r.status} ao buscar logs. Se a API está dormindo (Render), pode levar 30-60s pra acordar.`;
+                    this.erro = 'Não foi possível carregar os logs agora. Tente novamente em instantes.';
                     return;
                 }
                 const d = await r.json();
@@ -1781,7 +1787,7 @@ function infraState() {
                 const r = await fetch('/api-proxy/diag/infra', { credentials: 'same-origin', cache: 'no-store' });
                 if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
                 if (!r.ok) {
-                    this.erro = `HTTP ${r.status} ao carregar infra. Se a API está dormindo (Render), pode levar 30-60s pra acordar.`;
+                    this.erro = 'Não foi possível carregar a infraestrutura agora. Tente novamente em instantes.';
                     return;
                 }
                 this.data = await r.json();
