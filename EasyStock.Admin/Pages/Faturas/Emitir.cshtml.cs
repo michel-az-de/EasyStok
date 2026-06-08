@@ -8,6 +8,23 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
 {
     public string? Erro { get; private set; }
 
+    // Repopulacao no postback de erro (BUG-03): antes os campos do cliente eram
+    // perdidos porque o <es-input> nao relê do request. Agora o PageModel expoe
+    // os valores submetidos e a view os reinjeta via value="@Model...".
+    public string? EmpresaIdRaw { get; private set; }
+    public string? FaturadoNome { get; private set; }
+    public string? FaturadoDocumento { get; private set; }
+    public string? FaturadoTelefone { get; private set; }
+    public string? FaturadoEmail { get; private set; }
+    public string? ObservacoesRaw { get; private set; }
+
+    /// <summary>
+    /// Itens submetidos como JSON, para reidratar o Alpine no postback. Serializado
+    /// com o encoder default do System.Text.Json (escapa &lt; &gt; &amp; ' "), seguro
+    /// para embutir em &lt;script type="application/json"&gt; via @Html.Raw (G2).
+    /// </summary>
+    public string ItensJson { get; private set; } = "[]";
+
     private static readonly HashSet<string> TiposItemValidos = new(StringComparer.OrdinalIgnoreCase)
         { "Produto", "Servico", "Recorrencia", "Desconto", "Taxa" };
 
@@ -15,10 +32,12 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
 
     /// <summary>
     /// Aceita arrays paralelos para itens (dinamicos no form via Alpine).
+    /// empresaId chega como string (nao Guid) para preservar o texto invalido
+    /// no postback de erro (BUG-03/05) e validar com mensagem clara.
     /// </summary>
     public async Task<IActionResult> OnPostAsync(
-        Guid empresaId,
-        string faturadoNome,
+        string? empresaId,
+        string? faturadoNome,
         string? faturadoDocumento,
         string? faturadoEmail,
         string? faturadoTelefone,
@@ -29,10 +48,20 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
         string[]? itemTipo,
         string? observacoes)
     {
+        // ── Repopulacao (BUG-03): preserva tudo que o usuario digitou, ANTES de
+        //    qualquer return Page() por erro de validacao.
+        EmpresaIdRaw = empresaId;
+        FaturadoNome = faturadoNome;
+        FaturadoDocumento = faturadoDocumento;
+        FaturadoTelefone = faturadoTelefone;
+        FaturadoEmail = faturadoEmail;
+        ObservacoesRaw = observacoes;
+        ItensJson = SerializarItens(itemDescricao, itemQuantidade, itemPrecoUnitario, itemTipo);
+
         // ── Validacao basica ────────────────────────────────────────────
-        if (empresaId == Guid.Empty)
+        if (!Guid.TryParse(empresaId, out var empresaGuid) || empresaGuid == Guid.Empty)
         {
-            SetErro("Empresa e obrigatoria.");
+            SetErro("Empresa ID invalido — cole um GUID valido da pagina /Tenants.");
             return Page();
         }
         var nomeT = (faturadoNome ?? "").Trim();
@@ -107,7 +136,7 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
 
         var payload = new
         {
-            empresaId,
+            empresaId = empresaGuid,
             clienteId = (Guid?)null,
             dadosFaturado,
             dadosEmissor,
@@ -132,9 +161,31 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
-            log.LogError(ex, "Falha ao emitir fatura avulsa para empresa {EmpresaId}", empresaId);
+            log.LogError(ex, "Falha ao emitir fatura avulsa para empresa {EmpresaId}", empresaGuid);
             SetErro($"Falha ao emitir fatura: {ex.Message}");
             return Page();
         }
+    }
+
+    /// <summary>
+    /// Serializa os arrays paralelos no shape que o factory Alpine espera
+    /// (descricao/quantidade/precoUnitario/tipo). Encoder default = seguro p/ embed (G2).
+    /// </summary>
+    private static string SerializarItens(string[]? desc, decimal[]? qtd, decimal[]? preco, string[]? tipo)
+    {
+        var n = desc?.Length ?? 0;
+        if (n == 0) return "[]";
+        var lista = new List<object>(n);
+        for (var i = 0; i < n; i++)
+        {
+            lista.Add(new
+            {
+                descricao = desc![i] ?? "",
+                quantidade = (qtd != null && i < qtd.Length) ? qtd[i] : 1m,
+                precoUnitario = (preco != null && i < preco.Length) ? preco[i] : 0m,
+                tipo = (tipo != null && i < tipo.Length) ? (tipo[i] ?? "Servico") : "Servico"
+            });
+        }
+        return JsonSerializer.Serialize(lista);
     }
 }
