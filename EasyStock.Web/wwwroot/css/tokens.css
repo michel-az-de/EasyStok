@@ -136,6 +136,10 @@
   --focus-ring-orange: 0 0 0 3px rgba(232, 88, 20, .25);
   --focus-ring-danger: 0 0 0 3px rgba(192, 59, 42, .25);
   --focus-ring-success: 0 0 0 3px rgba(24, 135, 78, .25);
+  /* Ring de FOCO de acao (heroi/foco): halo branco + laranja, 2 camadas. Visivel
+     sobre qualquer superficie incl. botao laranja (WCAG 1.4.11). Acompanha o raio
+     por ser box-shadow. Aplicado em :focus-visible de controles de acao (Fase 1). */
+  --focus-ring-action: 0 0 0 2px var(--white), 0 0 0 4px var(--orange-600);
 
   /* ----- Motion: durations + easings (convergência Admin — Fase 0-core) -----
      --motion-* (acima) e --duration-* coexistem (famílias distintas, ambas em uso).
@@ -167,6 +171,11 @@
   --intent-action-hover:     var(--orange-700);
   --intent-action-active:    var(--orange-800);
   --intent-action-fg:        var(--white);
+  /* Acento de ACAO AA-safe (heroi/links/foco): orange-700 = 5.2:1 com texto branco
+     (orange-600 da so 3.6:1, reprova AA normal). Ponto unico de rollback da
+     promocao do laranja: repontar aqui reverte heroi+links+foco de uma vez. */
+  --action-accent:           var(--orange-700);
+  --action-accent-hover:     var(--orange-800);
   --intent-destructive:      var(--crit-600);
   --intent-destructive-hover:var(--crit-700);
   --intent-destructive-fg:   var(--white);
