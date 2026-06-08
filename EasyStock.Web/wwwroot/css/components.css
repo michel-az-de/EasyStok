@@ -361,8 +361,10 @@ button:focus-visible {
 .btn-lg { padding: 0.85rem 1.4rem; font-size: 0.95rem; border-radius: 12px; }
 .btn-block { width: 100%; }
 
-.btn-primary { background: var(--orange-500); color: #fff; border-color: var(--orange-500); }
-.btn-primary:hover { background: var(--orange-600); border-color: var(--orange-600); }
+/* Acao = orange-700 (AA 5.2:1 com branco). orange-500/600 reprovavam AA e mascaravam
+   a correcao em tokens.css (este bloco carrega depois). Ver epic #534. */
+.btn-primary { background: var(--action-accent); color: #fff; border-color: var(--action-accent); }
+.btn-primary:hover { background: var(--action-accent-hover); border-color: var(--action-accent-hover); }
 
 .btn-navy { background: var(--navy-700); color: #fff; border-color: var(--navy-700); }
 .btn-navy:hover { background: var(--navy-800, #0a1f54); border-color: var(--navy-800, #0a1f54); }

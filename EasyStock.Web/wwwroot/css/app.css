@@ -1477,6 +1477,13 @@ html.theme-dark .app-primary-btn {
     border-color: rgba(30, 72, 168, .32);
 }
 
+/* Heroi continua laranja no dark: a regra navy acima (html.theme-dark .app-primary-btn)
+   tem a mesma especificidade e venceria por ordem; esta vem depois e mantem o acento. */
+html.theme-dark .app-primary-btn--hero {
+    background: linear-gradient(135deg, var(--orange-700) 0%, var(--orange-800) 130%) !important;
+    border-color: rgba(232, 88, 20, .26);
+}
+
 html.theme-dark .ws {
     box-shadow: 0 12px 32px rgba(2, 6, 23, .35);
 }
