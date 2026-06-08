@@ -56,7 +56,7 @@ canonical_commands:
   commit-seguro:
     cmd: 'scripts/poka-yoke/commit-seguro.ps1'
     why: "stage por pathspec, diff cached, build-check, commit, valida HEAD (autor/arquivos/closes). Anti-race do auto-commit #448."
-    status: planned  # Fatia 3
+    status: active
   deploy-verify:
     cmd: 'scripts/poka-yoke/deploy-verify.ps1'
     why: "az vm run-command + docker inspect GIT_SHA==HEAD + grep asset + healthy. Verificacao sem HTTP (TLS bare-IP nao funciona)."
@@ -94,7 +94,7 @@ traps:
     class: B
     desc: "ambiente local #448 auto-commita o working tree, varre staged, autor/mensagem errados, closes #N nao dispara"
     detector: "commit-seguro (commit por pathspec) + hook PostToolUse valida HEAD"
-    status: planned  # Fatia 3
+    status: active
     evidence: "#448, 627157d3"
   - id: bin-lock-build
     class: D

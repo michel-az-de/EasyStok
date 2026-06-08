@@ -385,8 +385,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-# Worktrees de ferramentas de IA
-.claude/
+# Worktrees de ferramentas de IA (mantem .claude/ ignorado, exceto o settings.json versionado p/ hooks poka-yoke ADR-0029)
+.claude/*
+!.claude/settings.json
 .claire/
 builds/
 
