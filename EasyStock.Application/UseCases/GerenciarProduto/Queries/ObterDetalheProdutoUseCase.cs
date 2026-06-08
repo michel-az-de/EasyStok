@@ -5,7 +5,8 @@ namespace EasyStock.Application.UseCases.GerenciarProduto.Queries;
 /// <summary>
 /// Query: detalhe completo do produto. Carrega produto + variacoes + caracteristicas
 /// + embalagens + fotos (via ProdutoFotosSerializer) + itens de estoque + nomes de
-/// usuario (criado/alterado por). Cache em memoria 5 minutos por (empresa, produto).
+/// usuario (criado/alterado por). Cache em memoria 120s por (empresa, produto), invalidado
+/// por mutacao de saldo via EstoqueSaldoCacheInvalidationInterceptor (BUG-009/#517).
 ///
 /// Extraido do god-UseCase <c>GerenciarProdutoUseCase</c> (F9b). O facade continua
 /// expondo <c>ObterDetalheAsync</c> via delegacao, preservando contrato publico (R8).
@@ -22,7 +23,10 @@ public sealed class ObterDetalheProdutoUseCase(
         UseCaseGuards.EnsureEmpresaId(empresaId);
         UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
 
-        // Cache de 5 minutos — detalhe de produto inclui fotos, variações e itens de estoque (queries pesadas)
+        // Cache de 120s — detalhe de produto inclui fotos, variações e itens de estoque (queries pesadas).
+        // TTL deliberado (BUG-009/#517): o EstoqueSaldoCacheInvalidationInterceptor invalida
+        // esta chave em toda mutação de saldo, então o TTL deixou de ser a única defesa e virou
+        // rede de segurança das races residuais (read-repopulate + pré-commit) — 120s as estreita.
         if (cacheService is not null)
         {
             var cached = await cacheService.GetAsync<ProdutoDetalheResult>(CacheKeys.Produto(empresaId, produtoId));
@@ -120,7 +124,7 @@ public sealed class ObterDetalheProdutoUseCase(
             AtributosJson: produto.AtributosJson);
 
         if (cacheService is not null)
-            await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromMinutes(5));
+            await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromSeconds(120));
 
         return result;
     }

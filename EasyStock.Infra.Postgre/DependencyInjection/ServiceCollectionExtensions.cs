@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;
@@ -38,6 +39,11 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
             services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
             services.AddScoped<EntityChangeInterceptor>();
+            // BUG-009 (#517): invalida o cache de saldo (produto-detalhe) em QUALQUER
+            // mutacao de ItemEstoque via SaveChanges. Chokepoint — pega os 8 mutadores
+            // de saldo e futuros, sem cada call site lembrar de invalidar.
+            services.AddSingleton<IProdutoCacheInvalidator, ProdutoCacheInvalidator>();
+            services.AddSingleton<EstoqueSaldoCacheInvalidationInterceptor>();
             services.AddDbContext<EasyStockDbContext>((sp, options) =>
                 options.UseNpgsql(connectionString, npgsql =>
                 {
@@ -53,7 +59,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                     sp.GetRequiredService<AuditTimestampsInterceptor>(),
                     sp.GetRequiredService<SetTenantOnConnectionInterceptor>(),
                     sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>(),
-                    sp.GetRequiredService<EntityChangeInterceptor>()));
+                    sp.GetRequiredService<EntityChangeInterceptor>(),
+                    // BUG-009 (#517): por ULTIMO — captura o estado final da entidade.
+                    sp.GetRequiredService<EstoqueSaldoCacheInvalidationInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();

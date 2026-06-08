@@ -58,6 +58,14 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Connection string do superuser 'postgres' (a mesma de <see cref="CreateDbContext"/>) —
+    /// bypassa RLS. Usada por testes que sobem o DI de producao
+    /// (AddEasyStockPostgreInfrastructure) para validar o wiring dos interceptors.
+    /// </summary>
+    public string ConnectionString =>
+        _container?.GetConnectionString() ?? throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
+
+    /// <summary>
     /// Connection string de um login NOSUPERUSER/NOBYPASSRLS — sujeito as policies
     /// de RLS, ao contrario do 'postgres' usado por <see cref="CreateDbContext"/>.
     /// Pooling desligado: sem o interceptor para emitir RESET, uma conexao reciclada
