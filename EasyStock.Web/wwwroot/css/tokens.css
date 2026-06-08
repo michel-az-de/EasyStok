@@ -338,10 +338,10 @@ html, body {
 .btn:active { transform: translateY(1px); }
 .btn:focus { outline: none; box-shadow: var(--focus-ring-navy); }
 .btn-primary {
-  background: var(--orange-600);
-  color: var(--white);
+  background: var(--action-accent);
+  color: var(--intent-action-fg);
 }
-.btn-primary:hover { background: var(--orange-700); }
+.btn-primary:hover { background: var(--action-accent-hover); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-primary:focus { box-shadow: var(--focus-ring-orange); }
 .btn-navy {

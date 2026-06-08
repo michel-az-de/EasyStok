@@ -42,7 +42,6 @@ public class IndigoBanTests
     /// </summary>
     private static readonly HashSet<string> DebtAllowlist = new(StringComparer.OrdinalIgnoreCase)
     {
-        "wwwroot/js/toast.js",            // info bg #4F46E5 -> navy (Fase 1)
         "wwwroot/js/dashboard-charts.js", // barras rgba(99,102,241) -> navy (Fase 1/3)
         "wwwroot/css/app.css",            // gradientes do app-primary-btn dark + cores (Fase 1)
         "wwwroot/css/mobile.css",         // bottom-nav-item--active #4338CA (Fase 1/3)

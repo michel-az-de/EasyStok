@@ -36,7 +36,7 @@
 .alert.ok   { border-left-color: var(--ok-600);     background: var(--ok-50); }
 .alert.warn { border-left-color: var(--warn-600);   background: var(--warn-50); }
 .alert.crit { border-left-color: var(--crit-600);   background: var(--crit-50); }
-.alert.info { border-left-color: var(--orange-600); background: var(--orange-50); }
+.alert.info { border-left-color: var(--navy-600); background: var(--navy-50); }
 .alert .ic {
   width: 44px; height: 44px; border-radius: 12px;
   display: grid; place-items: center; font-weight: 700; font-size: 22px; color: #fff;
@@ -44,7 +44,7 @@
 .alert.ok   .ic { background: var(--ok-600); }
 .alert.warn .ic { background: var(--warn-600); }
 .alert.crit .ic { background: var(--crit-600); }
-.alert.info .ic { background: var(--orange-600); }
+.alert.info .ic { background: var(--navy-600); }
 .alert .body .ttl  { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.005em; margin-bottom: 2px; }
 .alert .body .desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.45; }
 .alert .cta {

@@ -598,13 +598,26 @@ html:not(.theme-dark) .app-search-trigger:hover {
 
 .app-primary-btn {
     background: linear-gradient(135deg, #0E2A6E 0%, #1E48A8 42%, #15388A 130%) !important;
-    border: 1px solid rgba(79, 70, 229, .15);
-    box-shadow: 0 16px 30px rgba(79, 70, 229, .22);
+    border: 1px solid rgba(30, 72, 168, .15);
+    box-shadow: 0 16px 30px rgba(30, 72, 168, .22);
 }
 
 .app-primary-btn:hover {
-    box-shadow: 0 20px 36px rgba(79, 70, 229, .28);
+    box-shadow: 0 20px 36px rgba(30, 72, 168, .28);
     transform: translateY(-1px);
+}
+
+/* Variante HEROI: o unico CTA de destaque por tela vira laranja (acento de acao);
+   demais .app-primary-btn seguem navy. orange-700 = AA 5.2:1 com texto branco.
+   Aplicado 1x por tela na Fase 3 (ex: "Novo produto", "Novo pedido"). */
+.app-primary-btn--hero {
+    background: linear-gradient(135deg, var(--orange-700) 0%, var(--orange-800) 130%) !important;
+    border-color: rgba(232, 88, 20, .20);
+    box-shadow: 0 16px 30px rgba(232, 88, 20, .24);
+}
+
+.app-primary-btn--hero:hover {
+    box-shadow: 0 20px 36px rgba(232, 88, 20, .30);
 }
 
 button,
@@ -1460,7 +1473,7 @@ html.theme-dark .tbl-full tr:hover td {
 }
 
 html.theme-dark .app-primary-btn {
-    background: linear-gradient(135deg, #4338CA 0%, #0E2A6E 52%, #2563EB 120%) !important;
+    background: linear-gradient(135deg, #15388A 0%, #0E2A6E 52%, #1E48A8 120%) !important;
     border-color: rgba(30, 72, 168, .32);
 }
 
