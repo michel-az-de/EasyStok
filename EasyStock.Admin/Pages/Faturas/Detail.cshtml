@@ -236,7 +236,8 @@
             <div class="text-xs text-es-ink-mute mt-3 space-y-1">
                 <div>Origem: <span class="text-es-ink-dim">@Model.Origem</span></div>
                 <div>Emissao: <span class="text-es-ink-dim">@Model.DataEmissao?.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</span></div>
-                <div>Vencimento: <span class="@(Model.Status == "Vencida" ? "text-red-400" : "text-es-ink-dim")">@Model.DataVencimento?.ParaBrasilia().ToString("dd/MM/yyyy")</span></div>
+                @* DataVencimento e data civil (sem hora): formatar SEM ParaBrasilia, senao a conversao de fuso (-3h) volta 1 dia (BUG-02). Emissao/Pago em sao instantes reais e mantem ParaBrasilia. *@
+                <div>Vencimento: <span class="@(Model.Status == "Vencida" ? "text-red-400" : "text-es-ink-dim")">@Model.DataVencimento?.ToString("dd/MM/yyyy")</span></div>
                 @if (Model.DataPagamentoTotal.HasValue)
                 {
                     <div>Pago em: <span class="text-green-400">@Model.DataPagamentoTotal?.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</span></div>

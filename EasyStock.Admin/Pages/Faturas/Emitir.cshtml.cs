@@ -111,7 +111,9 @@ public class EmitirModel(AdminApiClient api, AdminSessionService session, ILogge
             clienteId = (Guid?)null,
             dadosFaturado,
             dadosEmissor,
-            dataVencimento = dataVencimento.ToUniversalTime(),
+            // Vencimento e data civil: SpecifyKind(Utc) preserva 14/06 como 14/06T00:00Z
+            // independente do fuso do servidor (ToUniversalTime trataria como hora local). G4.
+            dataVencimento = DateTime.SpecifyKind(dataVencimento, DateTimeKind.Utc),
             itens,
             observacoes,
             dadosFiscais = (object?)null

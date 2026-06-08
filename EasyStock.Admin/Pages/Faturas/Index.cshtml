@@ -131,8 +131,8 @@
             <td data-label="Total" class="es-data-table-td-numeric" style="font-weight:600; color:var(--text-primary);">@FmtCurrency(total)</td>
             <td data-label="Pago" class="es-data-table-td-numeric" style="color:var(--text-muted);">@FmtCurrency(totalPago)</td>
             <td data-label="Pendente" class="es-data-table-td-numeric" style="color:@(pendente > 0 ? "var(--crit-600)" : "var(--text-muted)"); font-weight:@(pendente > 0 ? "600" : "400");">@FmtCurrency(pendente)</td>
-            <td data-label="Emissão" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@emissaoDt.ParaBrasilia().ToString("dd/MM/yy")</td>
-            <td data-label="Vencimento" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@vencDt.ParaBrasilia().ToString("dd/MM/yy")</td>
+            <td data-label="Emissão" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@emissaoDt.ParaBrasilia().ToString("dd/MM/yyyy")</td>
+            <td data-label="Vencimento" class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@vencDt.ToString("dd/MM/yyyy")</td>
         </tr>
     }
 
