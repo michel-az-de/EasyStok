@@ -25,9 +25,14 @@ Reporte em 4 linhas:
   - Working tree: <limpo OU dirty N arquivos>
   - Build: <verde OU N erros>
 
-Se branch != master, OU houver worktree alem do principal, OU houver stash,
-OU houver branch local alem de master: PARAR. Sistema esta sujo. Reportar
-e perguntar antes de qualquer outra acao. Estado limpo e premissa.
+Se a branch do repo principal != master, OU houver stash, OU houver worktree FORA
+de .claude/worktrees/ (os de .claude/worktrees/ sao criados pelo harness por sessao
+e sao esperados), OU houver branch local que nao seja master nem dev/* (as dev/* sao
+das sessoes do harness): PARAR. Sistema esta sujo. Reportar e perguntar antes de
+qualquer outra acao. Estado limpo e premissa.
+Para inventariar worktrees com seguranca (branch/merjado/dirty/atual, sem apagar sessao
+ativa): scripts/poka-yoke/worktree-status.ps1 (ADR-0029). O harness limpa worktrees ao
+encerrar a sessao.
 
 ## 1. REGRAS INVIOLAVEIS
 

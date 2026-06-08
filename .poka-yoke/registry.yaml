@@ -61,6 +61,10 @@ canonical_commands:
     cmd: 'scripts/poka-yoke/deploy-verify.ps1'
     why: "az vm run-command + docker inspect GIT_SHA==HEAD + grep asset + healthy. Verificacao sem HTTP (TLS bare-IP nao funciona)."
     status: planned  # Fatia 6
+  worktree-status:
+    cmd: 'powershell -File scripts/poka-yoke/worktree-status.ps1'
+    why: "inventario seguro de git worktrees (branch/merjado/dirty/atual); marca candidatos a remover SEM apagar a sessao atual nem o principal. O harness cria/remove worktree por sessao."
+    status: active
 
 # Armadilhas conhecidas e seu detector. status active = detector existe; planned = sera criado.
 traps:
@@ -118,6 +122,12 @@ traps:
     detector: "deploy-verify (GIT_SHA do container == HEAD)"
     status: planned  # Fatia 6
     evidence: "#494"
+  - id: worktree-vs-mainrepo
+    class: C
+    desc: "confusao worktree vs repo principal (tools defaultam p/ worktree stale); harness cria worktree por sessao -> o passo 0 disparava PARAR falso; risco de apagar worktree de sessao ativa"
+    detector: "worktree-status.ps1 (inventario seguro, exclui atual/principal) + passo 0 do CLAUDE.md reconciliado (worktrees do harness esperados)"
+    status: active
+    evidence: "9 worktrees nesta sessao; Glob defaultou p/ o worktree stale 01949b2e"
 
 # Gates de CI e o que cada um realmente cobre (medido 2026-06-08 via gh run list).
 ci_gates:
