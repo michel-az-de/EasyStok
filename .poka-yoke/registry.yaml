@@ -45,12 +45,13 @@ mirrored_constants:
 # Comandos canonicos. Qualquer agente invoca sem redescobrir.
 canonical_commands:
   build-check:
-    cmd: 'dotnet build EasyStok.CI.slnf --nologo -p:UseAppHost=false'
-    why: "slnf pula Mobile (sem maui); UseAppHost=false evita o lock de apphost.exe do ambiente local (#448). Substitui o build da sln cheia do paragrafo 0 do CLAUDE.md."
-    status: planned  # Fatia 2
+    cmd: 'powershell -File scripts/poka-yoke/build-check.ps1'
+    raw: 'dotnet build EasyStok.CI.slnf --nologo -p:UseAppHost=false -o $TEMP/easystok-build-check'
+    why: "slnf pula Mobile (sem maui); -o (dir temporario) + UseAppHost=false evitam o lock de bin do ambiente local (#448). Substitui o build da sln cheia do passo 0 do CLAUDE.md. Provado verde com Admin/Web ativos (1m01s, 0 erros)."
+    status: active
   arch-gate:
     cmd: 'dotnet test EasyStock.ArchitectureTests/EasyStock.ArchitectureTests.csproj --filter "Category=Architecture"'
-    why: "gate R4 de arquitetura (o mesmo que o Husky pre-commit roda). ~9-11 testes, nao a suite inteira."
+    why: "gate R4 de arquitetura (o mesmo que o Husky pre-commit roda). 12 testes Category=Architecture, nao a suite inteira."
     status: active
   commit-seguro:
     cmd: 'scripts/poka-yoke/commit-seguro.ps1'
