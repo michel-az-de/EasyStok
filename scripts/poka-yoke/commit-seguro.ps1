@@ -61,9 +61,13 @@ if ($Build) {
   if ($LASTEXITCODE -ne 0) { Fail "build-check vermelho; nao commito (R4)." }
 }
 
-# 7. commit por pathspec (anti-race #448)
-if ($NoVerify) { git -C $Repo commit --no-verify -m $Message -- $Paths }
-else { git -C $Repo commit -m $Message -- $Paths }
+# 7. commit por pathspec (anti-race #448). Mensagem via -F arquivo, NAO -m: o -m com aspas
+# duplas ou sinal de maior na mensagem e mangleado pelo PowerShell ao chamar o git nativo
+# (a mesma armadilha de quoting que o commit-seguro existe para evitar). -F le do arquivo, imune.
+$msgFile = Join-Path $env:TEMP 'commit-seguro-msg.txt'
+[IO.File]::WriteAllText($msgFile, ($Message -replace "`r`n", "`n"))
+if ($NoVerify) { git -C $Repo commit --no-verify -F $msgFile -- $Paths }
+else { git -C $Repo commit -F $msgFile -- $Paths }
 
 # 8. validar HEAD
 $headAfter = (git -C $Repo rev-parse HEAD).Trim()
