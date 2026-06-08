@@ -69,21 +69,21 @@ traps:
     desc: "x-show + .app-dropdown{display:none} persistente mata os dropdowns; usar [x-cloak] para anti-flash"
     fix_in_code: "EasyStock.Web/wwwroot/css/app.css:165 ([x-cloak]); aviso em Views/Shared/_Layout.cshtml:46-50"
     detector: "EasyStock.ArchitectureTests (teste estatico anti-regressao)"
-    status: planned  # Fatia 5
+    status: active
     evidence: "regrediu 5x: #103, #479, shas 531fcaa9 e79a0576 8c4d4a60"
   - id: formtaghelper-eats-submit-prevent
     class: E
     desc: "<form> (FormTagHelper) descarta @submit.prevent no render; modais submetem nativo"
     fix_in_code: "EasyStock.Web/wwwroot/js/form-modal.js:121-124 (listener programatico)"
     detector: "teste estatico: form-modal.js mantem o listener de submit"
-    status: planned  # Fatia 5
+    status: active
     evidence: "#481"
   - id: xmodel-programmatic-fill
     class: E
     desc: "x-model so atualiza em input/change; valor setado por autofill/automacao nao dispara"
     fix_in_code: "form-modal.js:207-213 e Produtos/Form.cshtml:1214-1222 (dispatchEvent input/change)"
     detector: "teste estatico: o dispatchEvent existe"
-    status: planned  # Fatia 5
+    status: active
     evidence: "#497 commit 941d7821"
   - id: generated-copy-edit
     class: A
