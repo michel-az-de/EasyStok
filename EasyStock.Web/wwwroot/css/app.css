@@ -4692,13 +4692,13 @@ html.theme-dark .ds-mov-day-label { color: #64748B; border-bottom-color: rgba(71
 }
 
 .ds-quick-action--primary {
-    background: linear-gradient(135deg, #1E48A8 0%, #0E2A6E 100%);
+    background: linear-gradient(135deg, var(--orange-700) 0%, var(--orange-800) 100%);
     color: #FFFFFF;
-    box-shadow: 0 4px 12px rgba(30, 72, 168, .25);
+    box-shadow: 0 4px 12px rgba(232, 88, 20, .25);
 }
 
 .ds-quick-action--primary:hover {
-    box-shadow: 0 8px 20px rgba(30, 72, 168, .35);
+    box-shadow: 0 8px 20px rgba(232, 88, 20, .35);
 }
 
 .ds-quick-action--secondary {
