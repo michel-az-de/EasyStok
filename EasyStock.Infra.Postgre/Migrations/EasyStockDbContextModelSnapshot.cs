@@ -1801,7 +1801,7 @@ namespace EasyStock.Infra.Postgre.Migrations
             modelBuilder.Entity("EasyStock.Domain.Entities.FaturaEvento", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                        .ValueGeneratedNever()
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("FaturaId")
@@ -1899,7 +1899,7 @@ namespace EasyStock.Infra.Postgre.Migrations
             modelBuilder.Entity("EasyStock.Domain.Entities.FaturaPagamento", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
+                        .ValueGeneratedNever()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("AlteradoEm")

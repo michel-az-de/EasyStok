@@ -41,7 +41,9 @@ public class CancelarFaturaUseCase(
             metadadosJson: cmd.Motivo is null ? null : System.Text.Json.JsonSerializer.Serialize(new { motivo = cmd.Motivo })
         ));
 
-        await repo.UpdateAsync(fatura, ct);
+        // ADR-0028: fatura ja rastreada (GetByIdAsync) — o evento novo e detectado como
+        // Added pelo change tracker; NAO chamar repo.UpdateAsync (rebaixaria o filho novo
+        // a Modified -> DbUpdateConcurrencyException, BUG-01 #512).
         await uow.CommitAsync();
 
         logger.LogInformation("Fatura cancelada. FaturaId={FaturaId} Motivo={Motivo}", fatura.Id, cmd.Motivo ?? "(nao informado)");

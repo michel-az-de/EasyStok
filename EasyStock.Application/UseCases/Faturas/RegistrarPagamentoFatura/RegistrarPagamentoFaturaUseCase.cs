@@ -69,7 +69,11 @@ public class RegistrarPagamentoFaturaUseCase(
             valorDepois: $"+{pagamento.Valor:F2} {fatura.Moeda} via {pagamento.Metodo} ({pagamento.GatewayProvedor})"
         ));
 
-        await repo.UpdateAsync(fatura, ct);
+        // ADR-0028: fatura ja rastreada (GetByIdAsync) — o change tracker detecta o
+        // pagamento e o evento novos como Added e a raiz como Modified no CommitAsync.
+        // NAO chamar repo.UpdateAsync: db.Faturas.Update() rebaixaria os filhos novos
+        // (PK preenchida) a Modified -> UPDATE em linha inexistente -> concorrencia falsa
+        // (BUG-01 #512). A protecao otimista (xmin) na raiz continua ativa.
         await uow.CommitAsync();
 
         logger.LogInformation(
