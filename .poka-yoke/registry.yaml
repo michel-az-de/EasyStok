@@ -60,7 +60,7 @@ canonical_commands:
   deploy-verify:
     cmd: 'scripts/poka-yoke/deploy-verify.ps1'
     why: "az vm run-command + docker inspect GIT_SHA==HEAD + grep asset + healthy. Verificacao sem HTTP (TLS bare-IP nao funciona)."
-    status: planned  # Fatia 6
+    status: active
   worktree-status:
     cmd: 'powershell -File scripts/poka-yoke/worktree-status.ps1'
     why: "inventario seguro de git worktrees (branch/merjado/dirty/atual); marca candidatos a remover SEM apagar a sessao atual nem o principal. O harness cria/remove worktree por sessao."
@@ -120,7 +120,7 @@ traps:
     class: F
     desc: "deploy manual da VM esquecido deixa prod em commit antigo; verify por HTTP nao funciona (TLS bare-IP)"
     detector: "deploy-verify (GIT_SHA do container == HEAD)"
-    status: planned  # Fatia 6
+    status: active
     evidence: "#494"
   - id: worktree-vs-mainrepo
     class: C
