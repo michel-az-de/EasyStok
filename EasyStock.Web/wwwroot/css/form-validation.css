@@ -51,7 +51,9 @@ select:invalid:focus {
    (input:valid:not(:placeholder-shown)) pintava de verde TODO campo válido em
    repouso — <select> é sempre :valid, date/number com valor idem — dando a
    sensação de "tem algo selecionado que eu não selecionei". O foco volta a ser
-   navy (definido em app.css .ui-field:focus). Pente-fino UX 2026-06-07. */
+   navy (definido em app.css .ui-field:focus). Pente-fino UX 2026-06-07.
+   NOTA: hook opt-in reservado — nenhum JS adiciona `.is-valid` ainda; o verde
+   fica latente até alguma tela optar por confirmar o valor explicitamente. */
 input.is-valid,
 textarea.is-valid,
 select.is-valid {

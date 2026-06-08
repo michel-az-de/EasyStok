@@ -1,5 +1,5 @@
 // EasyStok format.js — espelho JS de FormatHelper.cs.
-// Expoe window.fmt com: money, date, dateTime, relativeDate, quantity.
+// Expoe window.fmt com: money, date, dateTime, relativeDate, quantity, plural, pluralWord.
 (function (window) {
     'use strict';
 

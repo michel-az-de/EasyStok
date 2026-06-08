@@ -11,7 +11,7 @@
  *     </tbody>
  *   </table>
  *   <div class="bulk-bar" x-show="selected.length > 0" x-cloak>
- *     <span x-text="selected.length + ' selecionado(s)'"></span>
+ *     <span x-text="fmt.plural(selected.length, 'selecionado', 'selecionados')"></span>
  *     <button @click="clear()" class="btn btn-ghost btn-sm">Cancelar</button>
  *   </div>
  */

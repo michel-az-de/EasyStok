@@ -842,7 +842,7 @@ async function _save() {
     if (!nome) { alert('O nome do modelo é obrigatório.'); return; }
 
     const errors = _getValidationErrors();
-    if (errors.length) { alert(`Há ${errors.length} elemento(s) com problemas:\n${errors.join('\n')}`); return; }
+    if (errors.length) { alert(`Há ${errors.length} ${errors.length === 1 ? 'elemento' : 'elementos'} com problemas:\n${errors.join('\n')}`); return; }
 
     if (_offline) { alert('Sem conexão. Salve quando voltar.'); return; }
 

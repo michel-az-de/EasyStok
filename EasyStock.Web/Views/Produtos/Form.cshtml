@@ -1425,7 +1425,8 @@
                     this.uploadPhase = false;
 
                     if (successCount < files.length) {
-                        window.showToast(fmt.plural(files.length - successCount, 'foto', 'fotos') + ((files.length - successCount) === 1 ? ' falhou.' : ' falharam.') + ' Adicione na página do produto.', 'warning');
+                        const faltaram = files.length - successCount;
+                        window.showToast(fmt.plural(faltaram, 'foto', 'fotos') + (faltaram === 1 ? ' falhou.' : ' falharam.') + ' Adicione na página do produto.', 'warning');
                     }
                 },
 

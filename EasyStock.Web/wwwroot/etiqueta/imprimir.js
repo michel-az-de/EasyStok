@@ -202,7 +202,7 @@ function _updateCounts() {
   const semFicha = _payload.ProdutosSemFicha ?? [];
   const divSF = document.getElementById('etq-imp-sem-ficha');
   if (semFicha.length > 0) {
-    document.getElementById('etq-imp-sem-ficha-count').textContent = `${semFicha.length} produto(s)`;
+    document.getElementById('etq-imp-sem-ficha-count').textContent = `${semFicha.length} ${semFicha.length === 1 ? 'produto' : 'produtos'}`;
     divSF.style.display = 'block';
   } else {
     divSF.style.display = 'none';
