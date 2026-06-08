@@ -336,21 +336,20 @@ html, body {
   position: relative;
 }
 .btn:active { transform: translateY(1px); }
-.btn:focus { outline: none; box-shadow: var(--focus-ring-navy); }
+.btn:focus { outline: none; }
+.btn:focus-visible { box-shadow: var(--focus-ring-action); }
 .btn-primary {
   background: var(--action-accent);
   color: var(--intent-action-fg);
 }
 .btn-primary:hover { background: var(--action-accent-hover); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary:focus { box-shadow: var(--focus-ring-orange); }
 .btn-navy {
   background: var(--navy-700);
   color: var(--white);
 }
 .btn-navy:hover { background: var(--navy-800); }
 .btn-navy:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-navy:focus { box-shadow: var(--focus-ring-navy); }
 .btn-secondary {
   background: var(--bg-surface);
   color: var(--navy-700);
@@ -362,7 +361,6 @@ html, body {
   background: var(--ink-50);
 }
 .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-secondary:focus { box-shadow: var(--focus-ring-navy); }
 [data-theme="dark"] .btn-secondary { color: var(--navy-100); }
 [data-theme="dark"] .btn-secondary:hover {
   color: var(--white);
@@ -374,14 +372,12 @@ html, body {
 }
 .btn-ghost:hover { background: var(--ink-100); }
 .btn-ghost:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-ghost:focus { box-shadow: var(--focus-ring-navy); }
 .btn-dark {
   background: var(--navy-900);
   color: var(--white);
 }
 .btn-dark:hover { background: var(--navy-800); }
 .btn-dark:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-dark:focus { box-shadow: var(--focus-ring-navy); }
 .btn-sm { padding: 10px 14px; font-size: 14px; }
 .btn-lg { padding: 18px 28px; font-size: 17px; }
 

@@ -124,8 +124,10 @@
 .skip-link:focus { left: 12px; }
 
 /* ---------- Focus ring (a11y) ---------- */
+/* Ring canonico = box-shadow laranja (app.css). Este outline e fallback p/ contextos
+   onde o box-shadow e cortado (overflow:hidden) — tambem laranja, por consistencia. */
 :focus-visible {
-  outline: 2px solid var(--navy-500);
+  outline: 2px solid var(--orange-500);
   outline-offset: 2px;
   border-radius: 4px;
 }
