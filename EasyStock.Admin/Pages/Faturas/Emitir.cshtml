@@ -19,7 +19,7 @@
     <es-button variant="ghost" href="/Faturas" icon="arrow-left">Voltar</es-button>
 </div>
 
-<form method="post" x-data="emitirFatura()" x-init="if (itens.length === 0) addItem()" style="display:flex; flex-direction:column; gap:16px;">
+<form method="post" x-data="emitirFatura()" x-init="if (itens.length === 0) addItem()" x-on:submit="onSubmit($event)" style="display:flex; flex-direction:column; gap:16px;">
     @Html.AntiForgeryToken()
 
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
@@ -27,20 +27,21 @@
             <es-input name="empresaId"
                       label="Empresa ID"
                       required="true"
+                      value="@Model.EmpresaIdRaw"
                       placeholder="00000000-0000-0000-0000-000000000000"
-                      pattern="[0-9a-fA-F\-]{36}"
+                      pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
                       input-class="font-mono"
                       helper="Cole o GUID da página /Tenants." />
         </es-card>
 
         <es-card title="Dados do faturado" description="Quem aparece na fatura como destinatário">
             <div style="display:flex; flex-direction:column; gap:12px;">
-                <es-input name="faturadoNome" label="Nome" required="true" minlength="2" maxlength="200" />
+                <es-input name="faturadoNome" label="Nome" required="true" value="@Model.FaturadoNome" minlength="2" maxlength="200" />
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                    <es-input name="faturadoDocumento" label="CNPJ/CPF" label-optional="true" maxlength="20" />
-                    <es-input name="faturadoTelefone" label="Telefone" label-optional="true" maxlength="20" />
+                    <es-input name="faturadoDocumento" label="CNPJ/CPF" label-optional="true" value="@Model.FaturadoDocumento" maxlength="20" />
+                    <es-input name="faturadoTelefone" label="Telefone" label-optional="true" value="@Model.FaturadoTelefone" maxlength="20" />
                 </div>
-                <es-input name="faturadoEmail" type="email" label="Email" label-optional="true" maxlength="200" />
+                <es-input name="faturadoEmail" type="email" label="Email" label-optional="true" value="@Model.FaturadoEmail" maxlength="200" />
             </div>
         </es-card>
     </div>
@@ -72,8 +73,8 @@
                     <template x-for="(item, idx) in itens" :key="idx">
                         <tr>
                             <td><input type="text" name="itemDescricao" x-model="item.descricao" class="es-form-input" required minlength="2" maxlength="300" /></td>
-                            <td><input type="number" name="itemQuantidade" x-model.number="item.quantidade" step="0.001" min="0.001" class="es-form-input" style="text-align:right;" required /></td>
-                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="es-form-input" style="text-align:right;" required /></td>
+                            <td><input type="number" name="itemQuantidade" x-model.number="item.quantidade" step="0.001" min="0.001" class="es-form-input" style="text-align:right;" x-on:focus="$event.target.select()" required /></td>
+                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="es-form-input" style="text-align:right;" placeholder="0,00" x-on:focus="$event.target.select()" required /></td>
                             <td>
                                 <select name="itemTipo" x-model="item.tipo" class="es-form-select">
                                     <option value="Servico">Serviço</option>
@@ -119,12 +120,20 @@
     </div>
 </form>
 
+@* Itens submetidos reidratados no postback (BUG-03). Embed seguro: System.Text.Json
+   (encoder default) escapa < > & ' " -> "</script>" e aspas nao quebram o bloco (G2). *@
+<script type="application/json" id="faturas-itens">@Html.Raw(Model.ItensJson)</script>
 <script>
     function emitirFatura() {
+        let iniciais = [];
+        try { iniciais = JSON.parse(document.getElementById('faturas-itens').textContent || '[]'); }
+        catch (e) { iniciais = []; }
         return {
-            itens: [],
+            itens: iniciais,
             addItem() {
-                this.itens.push({ descricao: '', quantidade: 1, precoUnitario: 0, tipo: 'Servico' });
+                // precoUnitario null (campo vazio com placeholder) evita o '0' inicial
+                // concatenar ao digitar (BUG-04). Subtotal usa Number(...)||0.
+                this.itens.push({ descricao: '', quantidade: 1, precoUnitario: null, tipo: 'Servico' });
             },
             removeItem(idx) {
                 if (this.itens.length > 1) this.itens.splice(idx, 1);
@@ -137,6 +146,15 @@
             },
             formatCurrency(v) {
                 return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+            },
+            onSubmit(e) {
+                // IMP-03: rola/foca o 1o campo invalido (em vez de so o balao nativo solto).
+                if (!e.target.checkValidity()) {
+                    e.preventDefault();
+                    const inv = e.target.querySelector(':invalid');
+                    if (inv) { inv.scrollIntoView({ block: 'center', behavior: 'smooth' }); inv.focus(); }
+                    e.target.reportValidity();
+                }
             }
         };
     }

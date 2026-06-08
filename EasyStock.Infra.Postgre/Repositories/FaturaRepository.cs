@@ -10,7 +10,16 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
 
     public Task UpdateAsync(Fatura fatura, CancellationToken ct = default)
     {
-        db.Faturas.Update(fatura);
+        // ADR-0028 / BUG-01 (#512): a fatura sempre chega RASTREADA (carregada via
+        // GetByIdAsync no mesmo DbContext scoped); o change tracker ja persiste as
+        // mudancas (filho novo como Added, raiz como Modified) no CommitAsync. Chamar
+        // db.Faturas.Update() aqui rebaixaria filhos novos (PK preenchida) a Modified
+        // -> UPDATE em linha inexistente -> DbUpdateConcurrencyException. Detached com
+        // filhos novos nao e suportado: fail-fast em vez de reintroduzir o bug.
+        if (db.Entry(fatura).State == EntityState.Detached)
+            throw new InvalidOperationException(
+                "FaturaRepository.UpdateAsync requer uma fatura rastreada (carregue via GetByIdAsync). " +
+                "Grafo detached com filhos novos nao e suportado — confie no change tracker (ADR-0028).");
         return Task.CompletedTask;
     }
 

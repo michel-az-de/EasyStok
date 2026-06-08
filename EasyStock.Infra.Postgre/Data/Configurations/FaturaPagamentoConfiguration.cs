@@ -7,6 +7,12 @@ public class FaturaPagamentoConfiguration : IEntityTypeConfiguration<FaturaPagam
         builder.ToTable("fatura_pagamentos");
         builder.HasKey(p => p.Id);
 
+        // PK gerada no app (Guid.NewGuid no factory). ValueGeneratedNever faz o EF
+        // marcar um pagamento novo adicionado a uma Fatura RASTREADA como Added (INSERT),
+        // em vez de inferir Modified pela heuristica de chave store-generated preenchida
+        // -> UPDATE em linha inexistente -> DbUpdateConcurrencyException (BUG-01 #512, ADR-0028).
+        builder.Property(p => p.Id).ValueGeneratedNever();
+
         builder.Property(p => p.EmpresaId).IsRequired();
         builder.Property(p => p.Metodo).IsRequired().HasMaxLength(30);
         builder.Property(p => p.Valor).HasColumnType("decimal(14,2)");
