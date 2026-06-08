@@ -61,5 +61,8 @@
         dateTime: asDateTime,
         relativeDate: asRelative,
         quantity: asQuantity,
+        // Pluralizacao pt-BR (espelho de TextHelpers.Plural no C#). plural(1,'item','itens') => '1 item'.
+        plural: (n, sing, plur) => n + ' ' + (n === 1 ? sing : plur),
+        pluralWord: (n, sing, plur) => (n === 1 ? sing : plur),
     };
 })(window);

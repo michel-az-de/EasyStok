@@ -100,7 +100,7 @@
         </div>
 
         <div class="mt-3 text-sm text-gray-500 flex items-center justify-between">
-            <span>Total: @Model.Resultado.Total registro(s)</span>
+            <span>Total: @TextHelpers.Plural(Model.Resultado.Total, "registro", "registros")</span>
             <span>Pagina @Model.Resultado.Page de @(Math.Max(1, (int)Math.Ceiling((double)Model.Resultado.Total / Math.Max(1, Model.Resultado.PageSize))))</span>
         </div>
     }

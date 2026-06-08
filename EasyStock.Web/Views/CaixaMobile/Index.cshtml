@@ -22,7 +22,7 @@
                class="filter-tab @(isActive ? "active" : "")">@label</a>
         }
         </div>
-        <span class="text-sm text-slate-500 ml-auto">@Model.Items.Count lançamento(s)</span>
+        <span class="text-sm text-slate-500 ml-auto">@TextHelpers.Plural(Model.Items.Count, "lançamento", "lançamentos")</span>
     </form>
 </div>
 

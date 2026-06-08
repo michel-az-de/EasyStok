@@ -7,11 +7,12 @@ namespace EasyStock.Web.Helpers;
 /// </summary>
 public static class TextHelpers
 {
-    /// <summary>Número + palavra flexionada: <c>Plural(1, "item", "itens")</c> => "1 item".</summary>
-    public static string Plural(int n, string singular, string plural)
+    /// <summary>Número + palavra flexionada: <c>Plural(1, "item", "itens")</c> => "1 item".
+    /// Param <c>long</c> aceita int e long por widening (contadores variam).</summary>
+    public static string Plural(long n, string singular, string plural)
         => $"{n} {(n == 1 ? singular : plural)}";
 
     /// <summary>Só a palavra flexionada (sem número), p/ quando o número já é exibido à parte.</summary>
-    public static string PluralWord(int n, string singular, string plural)
+    public static string PluralWord(long n, string singular, string plural)
         => n == 1 ? singular : plural;
 }

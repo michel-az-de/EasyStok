@@ -45,7 +45,8 @@
     <div class="ml-auto flex gap-2">
         @if (l.Status == "em_producao")
         {
-            <form asp-action="Finalizar" asp-controller="Lotes" asp-route-id="@l.Id" method="post" data-confirm='@($"{{\"titulo\":\"Finalizar lote?\",\"mensagem\":\"Será gerado(s) {l.TotalUnidades} etiqueta(s) e o lote ficará congelado para alterações.\",\"textoBotao\":\"Finalizar lote\",\"classBotao\":\"bg-indigo-600 hover:bg-indigo-700\"}}")'>
+            var etiquetasMsg = $"{(l.TotalUnidades == 1 ? "Será gerada" : "Serão geradas")} {TextHelpers.Plural(l.TotalUnidades, "etiqueta", "etiquetas")} e o lote ficará congelado para alterações.";
+            <form asp-action="Finalizar" asp-controller="Lotes" asp-route-id="@l.Id" method="post" data-confirm='@($"{{\"titulo\":\"Finalizar lote?\",\"mensagem\":\"{etiquetasMsg}\",\"textoBotao\":\"Finalizar lote\",\"classBotao\":\"bg-indigo-600 hover:bg-indigo-700\"}}")'>
                 @Html.AntiForgeryToken()
                 <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">
                     🏁 Finalizar lote
@@ -62,12 +63,12 @@
             <dl class="space-y-2 text-sm">
                 <div><dt class="text-slate-500">Data produção</dt><dd>@l.DataProducao.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</dd></div>
                 @if (!string.IsNullOrEmpty(l.OperadorNome)) { <div><dt class="text-slate-500">Operador</dt><dd>@l.OperadorNome</dd></div> }
-                <div><dt class="text-slate-500">Itens</dt><dd>@l.ItensCount item(s) · @l.TotalUnidades unidades</dd></div>
+                <div><dt class="text-slate-500">Itens</dt><dd>@TextHelpers.Plural(l.ItensCount, "item", "itens") · @l.TotalUnidades unidades</dd></div>
                 <div><dt class="text-slate-500">Etiquetas</dt>
                      <dd>
                         @if (l.TotalUnidades == 0) { <span class="text-slate-400">— (finalizar para gerar)</span> }
                         else { <span>@l.EtiquetasConferidas/@l.TotalUnidades conferidas</span> }
-                        @if (l.EtiquetasDivergentes > 0) { <div class="text-xs text-red-600 mt-1">@l.EtiquetasDivergentes divergente(s)</div> }
+                        @if (l.EtiquetasDivergentes > 0) { <div class="text-xs text-red-600 mt-1">@TextHelpers.Plural(l.EtiquetasDivergentes, "divergente", "divergentes")</div> }
                      </dd></div>
                 @if (l.FinalizadoEm.HasValue) { <div><dt class="text-slate-500">Finalizado</dt><dd>@l.FinalizadoEm.Value.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</dd></div> }
                 @if (!string.IsNullOrEmpty(l.Observacoes)) { <div class="pt-2 border-t"><dt class="text-slate-500">Observações</dt><dd class="whitespace-pre-line">@l.Observacoes</dd></div> }

@@ -104,7 +104,7 @@
                                     _ => "⚪"
                                 };
                                 var healthTitle = h != null
-                                    ? $"{h.StatusLabel}{(h.PendingCommands > 0 ? $" · {h.PendingCommands} comando(s) pendente(s)" : "")}{(h.StuckCommands > 0 ? $" · {h.StuckCommands} preso(s) >1h" : "")}"
+                                    ? $"{h.StatusLabel}{(h.PendingCommands > 0 ? $" · {TextHelpers.Plural(h.PendingCommands, "comando", "comandos")} {(h.PendingCommands == 1 ? "pendente" : "pendentes")}" : "")}{(h.StuckCommands > 0 ? $" · {TextHelpers.Plural(h.StuckCommands, "preso", "presos")} >1h" : "")}"
                                     : "(sem dados)";
                             }
                             <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded @healthBadgeClass" title="@healthTitle">

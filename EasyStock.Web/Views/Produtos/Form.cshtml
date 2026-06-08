@@ -310,7 +310,7 @@
     </div>
 
     <!-- ══════════════ STEP 2: FOTOS E PRECOS ══════════════ -->
-    <div x-show="step === 2" x-transition:enter.duration.200ms>
+    <div x-show="step === 2" x-cloak x-transition:enter.duration.200ms>
 
         <!-- Fotos -->
         <div class="ws">
@@ -556,7 +556,7 @@
     </div>
 
     <!-- ══════════════ STEP 3: DETALHES (OPCIONAL) ══════════════ -->
-    <div x-show="step === 3" x-transition:enter.duration.200ms>
+    <div x-show="step === 3" x-cloak x-transition:enter.duration.200ms>
 
         <div class="bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm rounded-lg px-4 py-3 mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -880,7 +880,7 @@
     </div>
 
     <!-- ══════════════ STEP 4: REVISAO E-COMMERCE ══════════════ -->
-    <div x-show="step === 4" x-transition:enter.duration.200ms>
+    <div x-show="step === 4" x-cloak x-transition:enter.duration.200ms>
 
         <!-- Banner CTA: sem foto -->
         <div x-show="totalPhotoCount === 0" x-cloak
@@ -972,15 +972,15 @@
             <div class="product-review-card__meta border-t border-slate-100 px-5 sm:px-6 py-3 flex flex-wrap gap-4 text-xs text-slate-500 bg-slate-50/50">
                 <div x-show="variacoes.filter(v => v.nome).length > 0" x-cloak class="flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    <span x-text="variacoes.filter(v => v.nome).length + ' variação(ões)'"></span>
+                    <span x-text="fmt.plural(variacoes.filter(v => v.nome).length, 'variação', 'variações')"></span>
                 </div>
                 <div x-show="caracteristicas.filter(c => c.nome).length > 0" x-cloak class="flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                    <span x-text="caracteristicas.filter(c => c.nome).length + ' característica(s)'"></span>
+                    <span x-text="fmt.plural(caracteristicas.filter(c => c.nome).length, 'característica', 'características')"></span>
                 </div>
                 <div x-show="embalagens.filter(e => e.nome).length > 0" x-cloak class="flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>
-                    <span x-text="embalagens.filter(e => e.nome).length + ' embalagem(ns)'"></span>
+                    <span x-text="fmt.plural(embalagens.filter(e => e.nome).length, 'embalagem', 'embalagens')"></span>
                 </div>
                 <div x-show="controlaValidade" x-cloak class="flex items-center gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
@@ -1425,7 +1425,7 @@
                     this.uploadPhase = false;
 
                     if (successCount < files.length) {
-                        window.showToast((files.length - successCount) + ' foto(s) falharam. Adicione-as na página do produto.', 'warning');
+                        window.showToast(fmt.plural(files.length - successCount, 'foto', 'fotos') + ((files.length - successCount) === 1 ? ' falhou.' : ' falharam.') + ' Adicione na página do produto.', 'warning');
                     }
                 },
 

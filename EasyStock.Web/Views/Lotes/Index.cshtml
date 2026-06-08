@@ -44,9 +44,10 @@
             @if (Model.PendentesPesoCount > 0)
             {
                 var pendActive = Model.FiltroStatus == "pendente_peso";
+                var pendLbl = TextHelpers.Plural(Model.PendentesPesoCount, "lote", "lotes");
                 <a href="@Url.Action("Index", "Lotes", new { search = Model.Search, status = "pendente_peso" })"
                    class="filter-tab @(pendActive ? "active" : "") text-[var(--warn-600)]"
-                   title="@Model.PendentesPesoCount lote(s) com item embalado sem peso (RDC 727)"
+                   title="@pendLbl com item embalado sem peso (RDC 727)"
                    aria-label="Pendentes de peso (@Model.PendentesPesoCount)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -72,7 +73,7 @@
         else
         {
             <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
-                <strong>@Model.PendentesPeso.Count lote(s) com itens embalados sem peso.</strong>
+                <strong>@TextHelpers.Plural(Model.PendentesPeso.Count, "lote", "lotes") com itens embalados sem peso.</strong>
                 Abra cada lote e informe o peso por unidade antes de finalizar (RDC 727/2022).
             </div>
             <div class="overflow-x-auto">
@@ -86,7 +87,7 @@
                             <td class="text-xs text-slate-500">@p.DataProducao.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</td>
                             <td>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                                    @p.ItensPendentes item(ns) sem peso
+                                    @TextHelpers.Plural(p.ItensPendentes, "item", "itens") sem peso
                                 </span>
                             </td>
                             <td class="text-right">
@@ -136,7 +137,7 @@
                         }
                         else
                         {
-                            @l.ItensCount <text>item(s) · </text>@l.TotalUnidades <text>un</text>
+                            @TextHelpers.Plural(l.ItensCount, "item", "itens") <text>· </text>@l.TotalUnidades <text>un</text>
                         }
                     </td>
                     <td class="text-sm text-slate-600 col-num">

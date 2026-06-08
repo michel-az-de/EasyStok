@@ -50,6 +50,21 @@
        display:none na classe deixaria os 3 dropdowns do topbar (acoes rapidas,
        notificacoes, conta) SEMPRE invisiveis. Regressao ja corrigida em 531fcaa9,
        reintroduzida por #103 e removida de novo aqui. *@
+    @* theme-color (cor da barra do navegador mobile) a partir do token --navy-700.
+       Injetado via JS para nao hardcodar hex em view (RazorViewHygieneTests). *@
+    <script>
+        (function () {
+            try {
+                var navy = getComputedStyle(document.documentElement).getPropertyValue('--navy-700').trim();
+                if (navy) {
+                    var m = document.createElement('meta');
+                    m.name = 'theme-color';
+                    m.content = navy;
+                    document.head.appendChild(m);
+                }
+            } catch (e) {}
+        })();
+    </script>
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body h-full font-[Inter] antialiased @(theme == "dark" ? "theme-dark" : string.Empty)" style="background-color:var(--app-bg);background-image:var(--app-bg-image);color:var(--text-primary);">

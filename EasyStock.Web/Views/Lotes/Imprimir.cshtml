@@ -125,7 +125,7 @@ window.updateCounts = function() {
     document.getElementById('count-pendentes').textContent = _payload.Etiquetas.filter(e => e.Status === 'pendente').length;
     const sf = _payload.ProdutosSemFicha ?? [];
     const warn = document.getElementById('sem-ficha-warn');
-    if (sf.length > 0) { document.getElementById('sem-ficha-count').textContent = `${sf.length} produto(s)`; warn.style.display = 'block'; }
+    if (sf.length > 0) { document.getElementById('sem-ficha-count').textContent = `${sf.length} ${sf.length === 1 ? 'produto' : 'produtos'}`; warn.style.display = 'block'; }
     else warn.style.display = 'none';
 };
 

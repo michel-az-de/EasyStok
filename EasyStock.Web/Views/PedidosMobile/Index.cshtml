@@ -57,7 +57,7 @@
             </a>
         }
         </div>
-        <span class="text-sm text-slate-500 ml-auto">@visiveis.Count pedido(s)</span>
+        <span class="text-sm text-slate-500 ml-auto">@TextHelpers.Plural(visiveis.Count, "pedido", "pedidos")</span>
     </form>
 </div>
 

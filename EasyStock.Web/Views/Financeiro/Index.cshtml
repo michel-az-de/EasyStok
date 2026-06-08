@@ -73,7 +73,7 @@
                       delta-meta="@MetaReceber"
                       sparkline="@deltas.ReceberSerie"
                       href="@hrefReceber"
-                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{d.QtdContasReceberAbertas} conta(s) em aberto. Abrir recebíveis do período.")" />
+                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{TextHelpers.Plural(d.QtdContasReceberAbertas, "conta", "contas")} em aberto. Abrir recebíveis do período.")" />
 
         <es-stat-card label="A Pagar 30d"
                       value="@d.TotalAVencer30dPagar.AsMoney()"
@@ -82,13 +82,14 @@
                       delta-meta="@MetaPagar"
                       sparkline="@deltas.PagarSerie"
                       href="@hrefPagar"
-                      title="@Aria("A Pagar nos próximos 30 dias", d.TotalAVencer30dPagar.AsMoney(), $"{d.QtdContasPagarAbertas} conta(s) em aberto. Abrir pagáveis do período.")" />
+                      title="@Aria("A Pagar nos próximos 30 dias", d.TotalAVencer30dPagar.AsMoney(), $"{TextHelpers.Plural(d.QtdContasPagarAbertas, "conta", "contas")} em aberto. Abrir pagáveis do período.")" />
 
+        @{ var metaVenc = TextHelpers.PluralWord(d.QtdParcelasVencidasHoje, "atrasada", "atrasadas"); }
         <es-stat-card label="Vencidas"
                       value="@totalVencido.AsMoney()"
-                      delta-meta="@(d.QtdParcelasVencidasHoje) atrasada(s)"
+                      delta-meta="@(d.QtdParcelasVencidasHoje) @metaVenc"
                       href="@hrefVencidas"
-                      title="@Aria("Total vencido em aberto", totalVencido.AsMoney(), $"{d.QtdParcelasVencidasHoje} parcela(s) atrasada(s). Abrir contas vencidas.")" />
+                      title="@Aria("Total vencido em aberto", totalVencido.AsMoney(), $"{TextHelpers.Plural(d.QtdParcelasVencidasHoje, "parcela", "parcelas")} {(d.QtdParcelasVencidasHoje == 1 ? "atrasada" : "atrasadas")}. Abrir contas vencidas.")" />
 
         <es-stat-card label="Saldo do mês"
                       value="@saldoMes.AsMoney()"
