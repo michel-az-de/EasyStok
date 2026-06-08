@@ -16,8 +16,8 @@ name: Deploy to Render (master)
 # API primeiro, depois Web/Admin/Worker.
 
 on:
-  push:
-    branches: [master]
+  # Desabilitado do gatilho por push: Render suspenso + build quebra por maui ausente (ADR-0029).
+  # Mantido so manual; o deploy real de producao e o deploy-fly.
   workflow_dispatch:
 
 env:

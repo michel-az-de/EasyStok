@@ -15,7 +15,7 @@ Antes de qualquer outra coisa, execute estes 5 comandos:
   git -C C:/easy/EasyStok branch --show-current
   git -C C:/easy/EasyStok rev-list --count origin/master..master
   git -C C:/easy/EasyStok rev-list --count master..origin/master
-  dotnet build C:/easy/EasyStok/EasyStok.sln --nologo --verbosity quiet
+  powershell -File C:/easy/EasyStok/scripts/poka-yoke/build-check.ps1
 
 Reporte em 4 linhas:
 
@@ -43,7 +43,7 @@ R3. Conventional Commits obrigatorio: tipo(escopo): descricao imperativa.
     Mensagens proibidas: wip, snapshot, checkpoint, fix this, temp, tmp, asdf.
 
 R4. Build + arquitetura verdes antes de cada commit:
-      dotnet build EasyStok.sln --nologo
+      powershell -File scripts/poka-yoke/build-check.ps1   # = EasyStok.CI.slnf lock-immune (ADR-0029)
       dotnet test --filter "Category=Architecture"
     Falha = nao commita. Flaky catalogados em flaky-tests.md sao tolerados.
 
@@ -114,7 +114,7 @@ R13. Em caso de duvida: PARAR, perguntar, esperar confirmacao.
      - *.dll, *.exe, *.pdb
      - paths corrompidos (bytes octais C\357\200\272)
      - ~/.claude/, .claude/projects/
-  5. dotnet build EasyStok.sln --nologo
+  5. powershell -File scripts/poka-yoke/build-check.ps1   # build-check (ADR-0029)
   6. dotnet test --filter "Category=Architecture"
   7. git commit -m "tipo(escopo): descricao"
   8. Pedir GO ao Felipe (R9) para push

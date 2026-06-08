@@ -125,7 +125,8 @@ ci_gates:
     - ci.yml          # build EasyStok.CI.slnf + test (exclui ArchitectureDebt). Gate de merge.
     - secret-scan.yml # gitleaks. Gate.
     - deploy-fly.yml  # deploy prod Fly (API/Web/Admin + health). Gate de deploy.
-  red_chronic:        # ruido; Fatia 2 resolve (quarentena/fix)
-    - coverage.yml             # FAIL recorrente (build sln cheia + thresholds)
-    - deploy-render.yml        # FAIL; Render morto
-    - dual-frontend-drift.yml  # FAIL; mirror Mobile dessincronizado (Classe A)
+  quarantined:        # Fatia 2: tirados do gatilho por-commit (eram vermelho cronico = ruido)
+    - coverage.yml      # gatilho -> schedule + workflow_dispatch (era FAIL em todo commit)
+    - deploy-render.yml # gatilho -> workflow_dispatch (Render suspenso + build maui quebrado)
+  red_remaining:      # true-positive a resolver no codigo
+    - dual-frontend-drift.yml  # mirror Mobile dessincronizado (Classe A) -> Fatia 4

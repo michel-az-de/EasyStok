@@ -1,10 +1,10 @@
 name: Coverage
 
 on:
-  push:
-    branches: [master, main]
-  pull_request:
-    branches: [master, main]
+  # Tirado do gatilho por-commit: era vermelho cronico (ruido), nao gate real. Ver ADR-0029.
+  schedule:
+    - cron: '0 6 * * *'   # diario 06:00 UTC
+  workflow_dispatch:
 
 permissions:
   contents: read
