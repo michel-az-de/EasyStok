@@ -463,6 +463,11 @@ button:focus-visible {
 .badge-warn    { background: var(--warn-100);  color: var(--warn-700); }
 .badge-danger  { background: var(--crit-100);  color: var(--crit-700); }
 .badge-soft    { background: var(--ink-50);    color: var(--ink-600); border: 1px solid var(--ink-200); }
+/* Estado terminal de-enfatizado (ex: cancelado): riscado sobre o badge-neutral.
+   NB: o sistema de badge tem 4-5 definicoes sobrepostas (tokens/components/app, com
+   hex hardcoded em app.css vencendo). O dedup canonico fica p/ esforco proprio (#534);
+   aqui so o hook do riscado, que nenhuma outra regra define. */
+.badge-struck  { text-decoration: line-through; opacity: 0.9; }
 
 /* ---------- Stat card (T2.11) ---------- */
 .stat-card {
