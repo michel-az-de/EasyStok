@@ -1,0 +1,130 @@
+# Manifesto poka-yoke do EasyStok -- fonte unica legivel por maquina.
+# Definido em ADR-0029. Cada entrada e um guard rail ou um alvo de guard rail.
+# Mantido vivo: ampliar com evidencia medida (PS1). NAO editar sem atualizar o ADR.
+version: 1
+adr: docs/adr/0029-camada-poka-yoke-frugalidade-tokens.md
+updated: "2026-06-08"
+
+# Arquivos gerados/copiados em build: editar a copia e sempre-erro (a fonte manda).
+# severity block = hook PreToolUse nega Edit/Write (Fatia 4).
+generated_files:
+  - id: etiqueta-web-copy
+    path: EasyStock.Web/wwwroot/etiqueta/**
+    source: EasyStock.Api/wwwroot/pwa/etiqueta
+    mechanism: "msbuild target CopyEtiquetaAssets (EasyStock.Web/EasyStock.Web.csproj, BeforeTargets=Build)"
+    severity: block
+    evidence: "#527: commit saiu com 4 de 6 arquivos (a copia foi revertida pelo build)"
+  - id: etiqueta-mobile-mirror
+    path: EasyStok.Mobile/Resources/Raw/pwa/**
+    source: EasyStock.Api/wwwroot/pwa/**
+    mechanism: "manual-mirror (sem target MSBuild); gate CI dual-frontend-drift.yml"
+    severity: block
+    status_ci: RED  # dessincronizado desde 2026-06-03; Fatia 4 reconcilia
+  - id: tailwind-web
+    path: EasyStock.Web/wwwroot/css/tailwind.dist.css
+    source: "tailwind.config.js + Views/**/*.cshtml + wwwroot/js/**/*.js"
+    mechanism: "msbuild target TailwindBuild (EasyStock.Web/EasyStock.Web.csproj, BeforeTargets=BeforeBuild)"
+    severity: block
+  - id: tailwind-admin
+    path: EasyStock.Admin/wwwroot/css/tailwind.dist.css
+    source: "tailwind.config.js + Pages/**/*.cshtml + wwwroot/js/**/*.js"
+    mechanism: "msbuild target TailwindBuild (EasyStock.Admin/EasyStock.Admin.csproj, BeforeTargets=BeforeBuild)"
+    severity: block
+
+# Constantes do Domain espelhadas a mao no Web (BFF HTTP puro, sem ProjectReference).
+# severity warn = nao bloqueia, lembra de atualizar a fonte canonica junto.
+mirrored_constants:
+  - web: "EasyStock.Web/Models/ViewModels/Configuracoes/ConfiguracoesViewModel.cs:5-8"
+    source: "EasyStock.Domain/Defaults/OperacionalDefaults.cs"
+    severity: warn
+  - web: "EasyStock.Web/Services/EstoqueService.cs:85"
+    source: "EasyStock.Domain/Defaults/OperacionalDefaults.cs (DiasVencimentoProximo=7)"
+    severity: warn
+    note: "este ja tem comentario-espelho em EstoqueService.cs:78-80"
+
+# Comandos canonicos. Qualquer agente invoca sem redescobrir.
+canonical_commands:
+  build-check:
+    cmd: 'dotnet build EasyStok.CI.slnf --nologo -p:UseAppHost=false'
+    why: "slnf pula Mobile (sem maui); UseAppHost=false evita o lock de apphost.exe do ambiente local (#448). Substitui o build da sln cheia do paragrafo 0 do CLAUDE.md."
+    status: planned  # Fatia 2
+  arch-gate:
+    cmd: 'dotnet test EasyStock.ArchitectureTests/EasyStock.ArchitectureTests.csproj --filter "Category=Architecture"'
+    why: "gate R4 de arquitetura (o mesmo que o Husky pre-commit roda). ~9-11 testes, nao a suite inteira."
+    status: active
+  commit-seguro:
+    cmd: 'scripts/poka-yoke/commit-seguro.ps1'
+    why: "stage por pathspec, diff cached, build-check, commit, valida HEAD (autor/arquivos/closes). Anti-race do auto-commit #448."
+    status: planned  # Fatia 3
+  deploy-verify:
+    cmd: 'scripts/poka-yoke/deploy-verify.ps1'
+    why: "az vm run-command + docker inspect GIT_SHA==HEAD + grep asset + healthy. Verificacao sem HTTP (TLS bare-IP nao funciona)."
+    status: planned  # Fatia 6
+
+# Armadilhas conhecidas e seu detector. status active = detector existe; planned = sera criado.
+traps:
+  - id: alpine-dropdown-display-none
+    class: E
+    desc: "x-show + .app-dropdown{display:none} persistente mata os dropdowns; usar [x-cloak] para anti-flash"
+    fix_in_code: "EasyStock.Web/wwwroot/css/app.css:165 ([x-cloak]); aviso em Views/Shared/_Layout.cshtml:46-50"
+    detector: "EasyStock.ArchitectureTests (teste estatico anti-regressao)"
+    status: planned  # Fatia 5
+    evidence: "regrediu 5x: #103, #479, shas 531fcaa9 e79a0576 8c4d4a60"
+  - id: formtaghelper-eats-submit-prevent
+    class: E
+    desc: "<form> (FormTagHelper) descarta @submit.prevent no render; modais submetem nativo"
+    fix_in_code: "EasyStock.Web/wwwroot/js/form-modal.js:121-124 (listener programatico)"
+    detector: "teste estatico: form-modal.js mantem o listener de submit"
+    status: planned  # Fatia 5
+    evidence: "#481"
+  - id: xmodel-programmatic-fill
+    class: E
+    desc: "x-model so atualiza em input/change; valor setado por autofill/automacao nao dispara"
+    fix_in_code: "form-modal.js:207-213 e Produtos/Form.cshtml:1214-1222 (dispatchEvent input/change)"
+    detector: "teste estatico: o dispatchEvent existe"
+    status: planned  # Fatia 5
+    evidence: "#497 commit 941d7821"
+  - id: generated-copy-edit
+    class: A
+    desc: "editar a copia gerada em vez da fonte; revertido no proximo build"
+    detector: "hook PreToolUse (deny) + header GENERATED + teste copia==fonte"
+    status: planned  # Fatia 4
+  - id: autocommit-hijack
+    class: B
+    desc: "ambiente local #448 auto-commita o working tree, varre staged, autor/mensagem errados, closes #N nao dispara"
+    detector: "commit-seguro (commit por pathspec) + hook PostToolUse valida HEAD"
+    status: planned  # Fatia 3
+    evidence: "#448, 627157d3"
+  - id: bin-lock-build
+    class: D
+    desc: "dotnet watch do ambiente local trava apphost.exe; build da sln cheia falha MSB3021"
+    detector: "build-check (UseAppHost=false)"
+    status: planned  # Fatia 2
+  - id: ci-chronic-red
+    class: D
+    desc: "coverage/deploy-render/dual-frontend-drift vermelhos sempre; red deixa de significar problema"
+    detector: "quarentena: Render off, coverage non-required, drift consertado"
+    status: planned  # Fatia 2
+  - id: migration-sem-designer
+    class: G
+    desc: "migration .cs sem .Designer.cs e invisivel ao EF (0 pendentes), DDL nunca roda"
+    detector: "EasyStock.ArchitectureTests MigrationDesignerHygieneTests"
+    status: active  # ADR-0024, ja no gate
+    evidence: "#290, #464, #465, ADR-0024"
+  - id: deploy-manual-esquecido
+    class: F
+    desc: "deploy manual da VM esquecido deixa prod em commit antigo; verify por HTTP nao funciona (TLS bare-IP)"
+    detector: "deploy-verify (GIT_SHA do container == HEAD)"
+    status: planned  # Fatia 6
+    evidence: "#494"
+
+# Gates de CI e o que cada um realmente cobre (medido 2026-06-08 via gh run list).
+ci_gates:
+  green_real:
+    - ci.yml          # build EasyStok.CI.slnf + test (exclui ArchitectureDebt). Gate de merge.
+    - secret-scan.yml # gitleaks. Gate.
+    - deploy-fly.yml  # deploy prod Fly (API/Web/Admin + health). Gate de deploy.
+  red_chronic:        # ruido; Fatia 2 resolve (quarentena/fix)
+    - coverage.yml             # FAIL recorrente (build sln cheia + thresholds)
+    - deploy-render.yml        # FAIL; Render morto
+    - dual-frontend-drift.yml  # FAIL; mirror Mobile dessincronizado (Classe A)
