@@ -78,3 +78,10 @@
 *.sh        text eol=lf   working-tree-encoding=UTF-8
 # Git hooks do Husky (sem extensão): SEMPRE LF, senão o shebang quebra no Git Bash (/bin/sh^M)
 .husky/*    text eol=lf   working-tree-encoding=UTF-8
+
+# Arquivos gerados/copiados em build (poka-yoke, ADR-0029): marcar como generated para o GitHub
+# colapsar o diff e sinalizar que NAO se edita a mao (a fonte manda; ver .poka-yoke/registry.yaml).
+EasyStock.Web/wwwroot/etiqueta/**             linguist-generated=true
+EasyStock.Web/wwwroot/css/tailwind.dist.css   linguist-generated=true
+EasyStock.Admin/wwwroot/css/tailwind.dist.css linguist-generated=true
+EasyStok.Mobile/Resources/Raw/pwa/**          linguist-generated=true

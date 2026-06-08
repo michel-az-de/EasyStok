@@ -3624,6 +3624,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: none; z-index: 9200;
   align-items: flex-end; justify-content: center;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .cobranca-overlay.show { display: flex; }
 .cobranca-sheet {
@@ -3739,6 +3740,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: none; z-index: 9300;
   align-items: flex-end; justify-content: center;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .ajustes-overlay.show { display: flex; }
 .ajustes-sheet {
@@ -4021,6 +4023,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   align-items: center; justify-content: center;
   padding: 24px;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .confer-overlay.show { display: flex; }
 .confer-sheet {
@@ -4716,6 +4719,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: none; z-index: 9350;
   align-items: flex-end; justify-content: center;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); /* #427 */
 }
 .historico-overlay.show { display: flex; }
 .historico-sheet {
@@ -5453,7 +5457,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   margin: 0 0 2px; overflow-wrap: anywhere; color: #000;
   border: none; padding: 0; border-radius: 0;
 }
-.etq-card .et-unit { font-size: 12px; font-weight: 500; color: #555; margin-bottom: 8px; }
+.etq-card .et-unit { font-size: 13px; font-weight: 700; color: #000; margin-bottom: 8px; } /* #437: destaque */
 .etq-card .et-photo-wrap {
   display: flex; justify-content: center; margin: 6px 0;
 }
@@ -7362,6 +7366,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="ccc-cta">Detalhes →</div>
       </button>
 
+      <!-- #423 — summary bar: faturamento + ticket medio + produto mais pedido -->
+      <div id="homeSummaryBar" style="display:none;background:var(--bg-elev);border-radius:14px;padding:10px 14px;margin-bottom:10px;display:flex;gap:0;flex-wrap:wrap"></div>
+
+      <!-- #440 — expiry bar: vence hoje / amanha -->
+      <div id="homeExpiryBar" style="display:none"></div>
+
       <details class="home-ops-disclosure" id="homeOpsDisclosure">
         <summary>
           <span>
@@ -7371,6 +7381,8 @@ body.ux-calm [data-screen="producao"] .section-label {
           <span class="home-ops-chip" id="homeOpsChip">ver</span>
         </summary>
         <div class="home-ops-body">
+          <!-- #424 — checklist de operacao: 3 checkmarks derivados de estado -->
+          <div id="homeChecklist" style="display:none;background:var(--bg-elev);border-radius:14px;padding:10px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px"></div>
           <div class="trust-badges" id="trustBadges" aria-label="Confianca operacional"></div>
           <div class="premium-panel" id="premiumOpsPanel"></div>
 
@@ -7932,6 +7944,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <span class="currency">R$</span>
         <div class="input-box"><input id="newProdCost" type="text" inputmode="decimal" placeholder="9,50" autocomplete="off" oninput="updateMarginPreview()"></div>
       </div>
+      <!-- #425 — estoque minimo: threshold de alerta por produto (padrao: <=2) -->
+      <label class="modal-label">Estoque mínimo
+        <span class="ml-hint">alerta quando stock ≤ este valor (padrão: 2)</span>
+      </label>
+      <div class="input-box"><input id="newProdMinStock" type="text" inputmode="numeric" placeholder="2" autocomplete="off" style="max-width:80px"></div>
+
       <!-- Preview de margem: mostra lucro absoluto e % quando os 2 campos
            tem valor. Esconde por default. -->
       <div id="marginPreview" class="margin-preview" style="display:none">
@@ -8072,7 +8090,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <label class="modal-label">Valor</label>
       <div class="price-row">
         <span class="currency">R$</span>
-        <div class="input-box"><input id="cashAmount" type="text" inputmode="decimal" placeholder="45,00" autocomplete="off" oninput="updateCashSaveState()"></div>
+        <div class="input-box"><input id="cashAmount" type="text" inputmode="numeric" placeholder="45,00" autocomplete="off" oninput="maskMoneyInput(this); updateCashSaveState()"></div>
       </div>
 
       <div class="modal-ctas">
@@ -8514,6 +8532,29 @@ body.ux-calm [data-screen="producao"] .section-label {
     </div>
   </div>
 
+  <!-- Modal de descarte de lote -->
+  <div class="modal-overlay" id="batchDiscardModal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Descartar lote</div>
+      <div class="modal-sub" id="batchDiscardSub">Informe o motivo do descarte</div>
+      <label class="modal-label">Motivo</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="batchDiscardChips">
+        <button type="button" class="cash-type-pill active" data-reason="vencido" onclick="selectDiscardReason(this)">Vencido</button>
+        <button type="button" class="cash-type-pill" data-reason="contaminado" onclick="selectDiscardReason(this)">Contaminado</button>
+        <button type="button" class="cash-type-pill" data-reason="acidente" onclick="selectDiscardReason(this)">Acidente</button>
+        <button type="button" class="cash-type-pill" data-reason="sobra" onclick="selectDiscardReason(this)">Sobra</button>
+        <button type="button" class="cash-type-pill" data-reason="outro" onclick="selectDiscardReason(this)">Outro</button>
+      </div>
+      <label class="modal-label">Observação (opcional)</label>
+      <div class="input-box"><input id="batchDiscardNote" placeholder="ex: contaminado com água" autocomplete="off"></div>
+      <div class="modal-ctas">
+        <button class="cta-btn" onclick="closeBatchDiscardModal()">Cancelar</button>
+        <button class="cta-btn primary" style="background:var(--accent)" onclick="confirmBatchDiscard()">Descartar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Diagnostico operacional — substitui o alert() antigo do printerDiagnostics.
        Modal scrollavel com seções: APP, SYNC, STORAGE, INTEGRIDADE, IMPRESSORA,
        CAMERA, ATALHOS. Util em campo quando algo nao esta bem. Conteudo
@@ -8659,6 +8700,17 @@ body.ux-calm [data-screen="producao"] .section-label {
                aria-label="Observação rápida para a etiqueta" title="Máximo 40 caracteres"
                oninput="onEtqNoteInput()">
       </div>
+      <!-- #437 — seletor de copias e retry -->
+      <div style="display:flex;align-items:center;gap:8px;padding:0 0 8px 0;font-size:13px">
+        <span style="color:var(--ink-mute)">Cópias:</span>
+        <select id="etqCopiesSelect" style="background:var(--bg-elev);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:13px">
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="5">5×</option>
+          <option value="10">10×</option>
+        </select>
+        <button id="etqRetryBtn" style="display:none;font-size:13px;padding:4px 12px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer" onclick="etqRetry()">↻ Tentar de novo</button>
+      </div>
       <div class="etq-actions">
         <button class="etq-btn etq-print"  onclick="etqAction('print')">Imprimir</button>
         <button class="etq-btn etq-save"   onclick="etqAction('save')">Salvar PNG</button>
@@ -8696,6 +8748,9 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
     </div>
   </div>
+
+  <!-- #434 — backdrop do menu Mais: cobre a tela atras do menu (z-index 54, abaixo do menu 55) -->
+  <div id="moreMenuBackdrop" onclick="closeMoreMenu()" style="display:none;position:fixed;inset:0;z-index:54;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)"></div>
 
   <div class="more-menu" id="moreMenu" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Mais páginas">
     <div class="more-menu-head">
@@ -10154,6 +10209,9 @@ function closeMoreMenu() {
   menu?.classList.remove('show');
   menu?.setAttribute('aria-hidden', 'true');
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.remove('active');
+  // #434 — esconde o backdrop junto com o menu.
+  const bd = document.getElementById('moreMenuBackdrop');
+  if (bd) bd.style.display = 'none';
   if (typeof updateNavA11y === 'function') updateNavA11y();
 }
 
@@ -10164,6 +10222,9 @@ function toggleMoreMenu() {
   const willOpen = !menu.classList.contains('show');
   menu.classList.toggle('show', willOpen);
   menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
+  // #434 — mostra/esconde o backdrop junto com o menu.
+  const bd = document.getElementById('moreMenuBackdrop');
+  if (bd) bd.style.display = willOpen ? 'block' : 'none';
   document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
   document.querySelector('.nav-btn[data-nav="more"]')?.classList.toggle('active', willOpen);
   if (typeof updateNavA11y === 'function') updateNavA11y();
@@ -10520,6 +10581,9 @@ function renderHome() {
     renderAttentionCenter();
     renderHomeShopping();
     renderHomeOpsDisclosure();
+    renderHomeSummaryBar();  // #423
+    renderHomeChecklist();   // #424
+    renderHomeExpiryBar();   // #440
   } finally {
     _derivBatching = false;
     _derivCache = Object.create(null);
@@ -10545,7 +10609,9 @@ function renderHomeFocusCard() {
   el.style.display = open.length ? 'none' : '';
   const ready = open.filter(o => o.status === STATUS.PRONTO);
   const preparing = open.filter(o => o.status === STATUS.PREPARANDO);
-  const waiting = open.filter(o => o.status === STATUS.AGUARDANDO);
+  // #429 — exclui conferidos do contador de aguardando (as 2 dimensoes sao separadas).
+  const waiting = open.filter(o => o.status === STATUS.AGUARDANDO &&
+    (typeof getConferStatus !== 'function' || getConferStatus(o) !== CONFER_STATUS.CONFERIDO));
   const pendingConfer = open.filter(o => typeof getConferStatus === 'function' && getConferStatus(o) === CONFER_STATUS.PENDENTE);
   const shopping = typeof getShoppingRows === 'function' ? getShoppingRows().filter(x => !x.done) : [];
   const sum = typeof calcCashSummaryToday === 'function' ? calcCashSummaryToday() : { sold: 0, balance: 0 };
@@ -10734,7 +10800,48 @@ function _attentionFmtElapsed(ms) {
 // BUG #14: fonte unica pra "estoque critico" — centro de atencao e card
 // da home liam o mesmo filtro inline, abrindo brecha pra desync futuro.
 function getCriticalProducts() {
-  return (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+  // #425: usa product.minStock se definido, senao fallback para <=2.
+  return (products || []).filter(function (p) {
+    if (p.archived) return false;
+    const threshold = (p.minStock != null && isFinite(Number(p.minStock))) ? Number(p.minStock) : 2;
+    return (Number(p.stock) || 0) <= threshold;
+  });
+}
+
+// #423 — summary bar: faturamento + ticket medio + produto mais pedido hoje.
+// Visivel sem expandir o details. Aparece so quando ha pedidos entregues.
+function renderHomeSummaryBar() {
+  const bar = document.getElementById('homeSummaryBar');
+  if (!bar) return;
+  const sum = calcCashSummaryToday();
+  if (sum.ordersCount === 0) { bar.style.display = 'none'; return; }
+  const ticket = sum.ordersCount > 0 ? sum.sold / sum.ordersCount : 0;
+  // Produto mais pedido hoje: agrega itens dos pedidos entregues hoje por nome.
+  const freq = {};
+  (orders || []).filter(function (o) { return o.status === 'entregue' && isToday(o.updatedAt); })
+    .forEach(function (o) {
+      (o.items || []).forEach(function (it) {
+        const k = it.name || 'Item';
+        freq[k] = (freq[k] || 0) + (Number(it.qty) || 1);
+      });
+    });
+  const top = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; })[0] || null;
+  const metricCss = 'flex:1;min-width:80px;text-align:center;padding:4px 8px;border-right:1px solid var(--line)';
+  const lastCss  = 'flex:1;min-width:80px;text-align:center;padding:4px 8px';
+  bar.style.display = 'flex';
+  bar.innerHTML =
+    '<div style="' + metricCss + '">'
+      + '<div style="font-size:11px;color:var(--ink-mute)">Faturado hoje</div>'
+      + '<div style="font-size:15px;font-weight:800">' + money(sum.sold) + '</div>'
+    + '</div>'
+    + '<div style="' + metricCss + '">'
+      + '<div style="font-size:11px;color:var(--ink-mute)">Ticket médio</div>'
+      + '<div style="font-size:15px;font-weight:800">' + money(ticket) + '</div>'
+    + '</div>'
+    + '<div style="' + lastCss + '">'
+      + '<div style="font-size:11px;color:var(--ink-mute)">+ pedido</div>'
+      + '<div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(top || '—') + '</div>'
+    + '</div>';
 }
 
 function _buildAttentionItemsImpl() {
@@ -11372,6 +11479,28 @@ function renderHomeInsights() {
   const conferNote = `${ready} pronto · ${preparing} preparo` +
     (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
 
+  // #440/#441 — perda: confirmada (descartada pelo operador) + estimada (expirada sem descarte)
+  const waste = typeof calcWasteLoss === 'function'
+    ? calcWasteLoss()
+    : { confLoss: 0, confCount: 0, estLoss: 0, estCount: 0, semCusto: 0, totalLoss: 0, itemCount: 0 };
+  const hasWaste = waste.itemCount > 0 || waste.semCusto > 0;
+  const wasteCard = hasWaste
+    ? (function() {
+        const hasConf = waste.confCount > 0;
+        const hasEst  = waste.estCount > 0;
+        const label   = hasConf && !hasEst ? 'Perda' : 'Perda ~';
+        const value   = waste.totalLoss > 0 ? money(waste.totalLoss).replace(',00','') : '—';
+        const parts = [];
+        if (hasConf) parts.push(waste.confCount + ' un. descartada' + (waste.confCount === 1 ? '' : 's'));
+        if (hasEst)  parts.push(waste.estCount  + ' un. expirada'  + (waste.estCount  === 1 ? '' : 's') + ' ~');
+        if (waste.semCusto > 0) parts.push(waste.semCusto + ' sem custo');
+        return `<div class="home-insight${waste.totalLoss > 0 ? ' warn' : ''}">
+          <div class="hi-label">${label}</div>
+          <div class="hi-value">${value}</div>
+          <div class="hi-note">${parts.join(' · ')}</div>
+        </div>`;
+      })()
+    : '';
   host.innerHTML = `
     <div class="home-insight${critical ? ' warn' : ''}">
       <div class="hi-label">Estoque crítico</div>
@@ -11393,6 +11522,7 @@ function renderHomeInsights() {
       <div class="hi-value">${money(soldToday).replace(',00', '')}</div>
       <div class="hi-note">pedidos entregues</div>
     </div>
+    ${wasteCard}
   `;
 }
 
@@ -11491,6 +11621,106 @@ function renderHomeShopping() {
   `;
 }
 
+// #424 — checklist de operacao: 3 checkmarks derivados de estado existente.
+// Zero localStorage novo; tudo calculado em tempo real.
+// #440 — widget de validade: itens vencendo hoje ou amanha, visiveis sem expandir o details.
+function renderHomeExpiryBar() {
+  const bar = document.getElementById('homeExpiryBar');
+  if (!bar) return;
+  const now = Date.now();
+  const H24 = 24 * 3600 * 1000;
+  const H48 = 48 * 3600 * 1000;
+  const hoje = [], amanha = [];
+  (batches || []).filter(function (b) { return !b.deleted && !b.discarded; }).forEach(function (b) {
+    (b.items || []).forEach(function (it) {
+      if (!it.expiresAt) return;
+      const diff = it.expiresAt - now;
+      if (diff <= 0) return; // ja venceu — vai pro indicador de perda, nao aqui
+      const entry = { name: it.name, qty: Number(it.qty) || 0, expires: it.expiresAt, lote: b.lote || b.code };
+      if (diff < H24) hoje.push(entry);
+      else if (diff < H48) amanha.push(entry);
+    });
+  });
+  if (hoje.length === 0 && amanha.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  const chips = [];
+  if (hoje.length > 0) {
+    const nomes = hoje.slice(0, 2).map(function (e) { return escapeHtml(e.name); }).join(', ');
+    chips.push('<span onclick="go(\'conferencia\'); setTimeout(function(){if(typeof setConferTab===\'function\')setConferTab(\'producao\');},50)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:rgba(231,104,69,0.12);color:var(--accent);border:1px solid rgba(231,104,69,0.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700">🔴 Vence hoje: ' + hoje.length + (hoje.length <= 2 ? ' · ' + nomes : '') + '</span>');
+  }
+  if (amanha.length > 0) {
+    const nomes = amanha.slice(0, 2).map(function (e) { return escapeHtml(e.name); }).join(', ');
+    chips.push('<span onclick="go(\'conferencia\'); setTimeout(function(){if(typeof setConferTab===\'function\')setConferTab(\'producao\');},50)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:rgba(240,184,74,0.12);color:var(--gold);border:1px solid rgba(240,184,74,0.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700">🟡 Vence amanhã: ' + amanha.length + (amanha.length <= 2 ? ' · ' + nomes : '') + '</span>');
+  }
+  bar.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">' + chips.join('') + '</div>';
+}
+
+// #440/#441 — calcula perda: separa confirmado (batch.discarded=true) de estimado (so expirado).
+function calcWasteLoss() {
+  const now = Date.now();
+  let confLoss = 0, confCount = 0;
+  let estLoss = 0, estCount = 0, semCusto = 0;
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
+    (b.items || []).forEach(function (it) {
+      const qty = Number(it.qty) || 0;
+      const p = (products || []).find(function (x) { return x.id === it.productId; });
+      const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
+      if (b.discarded) {
+        // Confirmado pelo operador — independe de expiresAt
+        if (cost != null) { confLoss += qty * cost; confCount += qty; }
+        else { semCusto += qty; }
+      } else if (it.expiresAt && it.expiresAt <= now) {
+        // Estimado: expirou mas nao foi descartado manualmente
+        if (cost != null) { estLoss += qty * cost; estCount += qty; }
+        else { semCusto += qty; }
+      }
+    });
+  });
+  return {
+    confLoss: confLoss, confCount: confCount,
+    estLoss: estLoss, estCount: estCount,
+    semCusto: semCusto,
+    totalLoss: confLoss + estLoss,
+    itemCount: confCount + estCount
+  };
+}
+
+let _homeChecklistAutoOpened = false; // flag: abre so uma vez por sessao.
+function renderHomeChecklist() {
+  const host = document.getElementById('homeChecklist');
+  if (!host) return;
+  const now = Date.now();
+  const open = (typeof openOrders === 'function') ? openOrders() : [];
+  // 1. Caixa do dia
+  const cashFechado = isCashClosedToday();
+  const temMovimento = (calcCashSummaryToday().ordersCount > 0 || (cashEntries || []).some(function (e) { return isToday(e.createdAt); }));
+  const cashOk = !temMovimento || cashFechado; // ok se nao tem movimento OU caixa fechado
+  // 2. Pedidos fluindo (nenhum em preparando ha >30min)
+  const stuck = open.filter(function (o) { return o.status === 'preparando' && (now - (o.updatedAt || o.createdAt || now)) > ATTENTION_TRAVADO_MS; });
+  const pedidosOk = stuck.length === 0;
+  // 3. Estoque
+  const estoqueOk = getCriticalProducts().length === 0;
+  const items = [
+    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: cashFechado ? null : function () { openCashCloseModal(); }, ctaLabel: 'Fechar' },
+    { ok: pedidosOk, icon: pedidosOk ? '✅' : '⏱',   label: 'Pedidos fluindo', sub: pedidosOk ? 'sem travados' : stuck.length + ' parado' + (stuck.length > 1 ? 's' : '') + ' >30min', cta: pedidosOk ? null : function () { go('pedidos'); }, ctaLabel: 'Ver' },
+    { ok: estoqueOk, icon: estoqueOk ? '📦' : '⚠',   label: 'Estoque',         sub: estoqueOk ? 'sem críticos' : getCriticalProducts().length + ' item(ns) crítico(s)', cta: estoqueOk ? null : function () { go('producao'); }, ctaLabel: 'Produção' }
+  ];
+  host.style.display = 'flex';
+  host.innerHTML = items.map(function (it) {
+    const ctaHtml = (!it.ok && it.cta)
+      ? '<button onclick="(function(){' + it.ctaLabel.toLowerCase().replace(/[^a-z]/g,'') + '})()" style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;margin-left:auto" onclick="void(0)">' + escapeHtml(it.ctaLabel) + '</button>'
+      : '';
+    return '<div style="display:flex;align-items:center;gap:8px;' + (it.ok ? '' : 'color:var(--accent)') + '">'
+      + '<span style="font-size:16px">' + it.icon + '</span>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:700">' + escapeHtml(it.label) + '</div>'
+        + '<div style="font-size:11px;color:var(--ink-mute)">' + escapeHtml(it.sub) + '</div>'
+      + '</div>'
+      + ((!it.ok && it.cta) ? '<button onclick="(' + it.cta.toString() + ')()" style="font-size:11px;padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer">' + escapeHtml(it.ctaLabel) + '</button>' : '')
+    + '</div>';
+  }).join('');
+}
+
 function renderHomeOpsDisclosure() {
   const box = document.getElementById('homeOpsDisclosure');
   if (!box) return;
@@ -11501,6 +11731,11 @@ function renderHomeOpsDisclosure() {
   const shopping = getShoppingRows().filter(item => !item.done).length;
   const urgent = attention.filter(item => item.severity === 'err' || item.severity === 'warn').length;
   const shouldOpen = urgent > 0 || shopping > 0;
+  // #424: auto-expand quando ha pendencias urgentes (so uma vez por sessao).
+  if (shouldOpen && !_homeChecklistAutoOpened && !box.open) {
+    box.open = true;
+    _homeChecklistAutoOpened = true;
+  }
   box.ontoggle = function () {
     if (chip) chip.textContent = box.open ? 'ocultar' : (shouldOpen ? 'pendente' : 'ver');
   };
@@ -11592,7 +11827,11 @@ function renderOpenOrders() {
     const laneEl = document.createElement('section');
     laneEl.className = 'home-lane';
     laneEl.dataset.status = lane.key;
-    laneEl.innerHTML = `<div class="home-lane-head"><span>${lane.label}</span><span class="count">${items.length}</span></div>`;
+    // #429 — badge de aguardando exclui conferidos (sem esconder os cards, so o numero).
+    const laneCount = lane.key === STATUS.AGUARDANDO
+      ? items.filter(o => typeof getConferStatus !== 'function' || getConferStatus(o) !== CONFER_STATUS.CONFERIDO).length
+      : items.length;
+    laneEl.innerHTML = `<div class="home-lane-head"><span>${lane.label}</span><span class="count">${laneCount}</span></div>`;
     const body = document.createElement('div');
     body.className = 'home-lane-body';
     if (!items.length) {
@@ -12773,8 +13012,25 @@ function calcCashSummary(dateKey) {
   const sold = dayOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const inX = dayEntries.filter(e => e.type === 'income').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const out = dayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  // #421 — custo dos produtos vendidos (COGS): qty * product.cost por item.
+  // Itens sem custo cadastrado nao entram no calculo mas sao contados em semCusto.
+  let cogs = 0;
+  let semCusto = 0;
+  dayOrders.forEach(function (o) {
+    (o.items || []).forEach(function (it) {
+      const p = (typeof products !== 'undefined' && products) ? products.find(function (x) { return x.id === it.productId; }) : null;
+      const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
+      if (cost != null) {
+        cogs += (Number(it.qty) || 0) * cost;
+      } else {
+        semCusto++;
+      }
+    });
+  });
+  const margem = sold - cogs - out;
   return {
     sold, in: inX, out, balance: sold + inX - out,
+    cogs, margem, semCusto,
     ordersCount: dayOrders.length,
     entriesCount: dayEntries.length
   };
@@ -12828,11 +13084,21 @@ function openCashCloseModal(dateKey) {
   if (titleEl) {
     titleEl.textContent = k === dateKeyOf() ? 'Fechar caixa do dia' : `Fechar caixa de ${fmtDateKey(k)}`;
   }
+  // #421 — linha de margem: so aparece quando ha pedidos no dia.
+  const margemLabel = sum.ordersCount > 0
+    ? (() => {
+        const approx = sum.semCusto > 0;
+        const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
+        const suf = approx ? ` <span style="font-size:10px;color:var(--ink-mute)">(${sum.semCusto} item${sum.semCusto > 1 ? 'ns' : ''} sem custo)</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
+      })()
+    : '';
   document.getElementById('cashCloseSummary').innerHTML = `
     <div style="display:flex;justify-content:space-between"><span>Vendas</span><span style="font-weight:800">${money(sum.sold)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span>${money(sum.in)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
     <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px"><span>Saldo</span><span style="font-weight:800;color:var(--gold)">${money(sum.balance)}</span></div>
+    ${margemLabel}
   `;
   document.getElementById('cashCloseConferred').value = '';
   document.getElementById('cashCloseDiff').textContent = '';
@@ -12923,11 +13189,21 @@ function openCashDetails() { go('caixa'); }
 function closeCashDetails() { /* no-op: navegacao pela back button */ }
 function renderCashDetails() {
   const sum = calcCashSummaryToday();
+  // #421 — mesma logica do fechamento; mostra margem quando ha pedidos.
+  const margemDetailLabel = sum.ordersCount > 0
+    ? (() => {
+        const approx = sum.semCusto > 0;
+        const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
+        const suf = approx ? ` <span style="font-size:10px;color:var(--ink-mute)">(${sum.semCusto} sem custo)</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
+      })()
+    : '';
   document.getElementById('cashDetailsSummary').innerHTML = `
     <div style="display:flex;justify-content:space-between"><span>Vendas (${sum.ordersCount})</span><span style="font-weight:800">${money(sum.sold)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span style="color:var(--basil)">+${money(sum.in)}</span></div>
     <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
     <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px;font-weight:800"><span>Saldo</span><span style="color:var(--gold)">${money(sum.balance)}</span></div>
+    ${margemDetailLabel}
   `;
   const closed = isCashClosedToday();
   document.getElementById('cashDetailsClosedBanner').style.display = closed ? 'block' : 'none';
@@ -15893,14 +16169,19 @@ function setRetroActive(active) {
       dt.min = new Date(minDate - tzOff).toISOString().slice(0,16);
       dt.max = new Date(maxDate - tzOff).toISOString().slice(0,16);
       if (!dt.value) {
-        // default 1h atrás pra forçar o operador a confirmar data/hora
-        const now = new Date(Date.now() - 60*60*1000);
-        dt.value = new Date(now - tzOff).toISOString().slice(0,16);
+        // #435: preenche com o horario atual (nao mais 1h atras).
+        // O operador ve a hora certa e ajusta se necessario.
+        dt.value = new Date(Date.now() - tzOff).toISOString().slice(0,16);
       }
     }
   } else {
     const dt = document.getElementById('retroDatetime');
-    if (dt) dt.value = '';
+    if (dt) {
+      dt.value = '';
+      dt.min = '';
+      dt.max = '';
+    }
+    if (typeof updateSaveOrderBtn === 'function') updateSaveOrderBtn();
   }
 }
 function toggleRetroactive() {
@@ -15940,7 +16221,16 @@ function setAgendaActive(active) {
     }
   } else {
     const dt = document.getElementById('scheduleDatetime');
-    if (dt) dt.value = '';
+    if (dt) {
+      dt.value = '';
+      // #435: limpa min/max para nao deixar browser em estado invalido
+      // (min violado bloqueia silenciosamente em alguns mobiles mesmo com value='').
+      dt.min = '';
+      dt.max = '';
+    }
+    // #435: reavalia o botao salvar (pode ter ficado desabilitado por validacao
+    // de data invalida enquanto o toggle estava ativo).
+    if (typeof updateSaveOrderBtn === 'function') updateSaveOrderBtn();
   }
 }
 function toggleAgendamento() {
@@ -16754,25 +17044,34 @@ function renderConferenciaScreen() {
 function renderConferProPanel() {
   const el = document.getElementById('conferProPanel');
   if (!el) return;
-  const pendingOrders = (orders || []).filter(o =>
-    o.status !== STATUS.CANCELADO &&
-    typeof getConferStatus === 'function' &&
-    getConferStatus(o) === CONFER_STATUS.PENDENTE
-  ).length;
+  const allOrders = orders || [];
+  const pendingOrders = allOrders.filter(function (o) {
+    return o.status !== STATUS.CANCELADO &&
+      typeof getConferStatus === 'function' &&
+      getConferStatus(o) === CONFER_STATUS.PENDENTE;
+  }).length;
   let totalUnits = 0, doneUnits = 0, problemUnits = 0;
-  (batches || []).filter(b => !b.deleted).forEach(b => {
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
     const ets = etiquetasFromBatch(b);
     totalUnits += ets.length;
-    ets.forEach(et => {
+    ets.forEach(function (et) {
       const st = getUnitStatus(b, et.idxStr);
-      if (st === CONFER_STATUS.CONFERIDO) doneUnits++;
+      if (st === CONFER_STATUS.CONFERIDO)   doneUnits++;
       if (st === CONFER_STATUS.DIVERGENCIA) problemUnits++;
     });
   });
-  el.innerHTML = `
-    <div class="confer-pro-stat"><span class="v">${pendingOrders}</span><span class="k">Pedidos pendentes</span></div>
-    <div class="confer-pro-stat"><span class="v">${totalUnits ? (doneUnits + '/' + totalUnits) : '—'}</span><span class="k">Etiquetas conferidas</span></div>
-    <div class="confer-pro-stat"><span class="v">${problemUnits}</span><span class="k">Divergências</span></div>`;
+  // #433 — quando sem lotes (totalUnits=0), mostra pedidos conferidos hoje em vez de '—'.
+  // Sem lotes, 'Etiquetas conferidas' e sempre vazio e confunde quem confere so pedidos.
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const conferidosHoje = totalUnits === 0
+    ? allOrders.filter(function (o) { return o.confirmation && (o.confirmation.at || 0) >= today0.getTime(); }).length
+    : 0;
+  const etqValue = totalUnits ? (doneUnits + '/' + totalUnits) : String(conferidosHoje);
+  const etqLabel = totalUnits ? 'Etiquetas conferidas' : 'Conferidos hoje';
+  el.innerHTML =
+    '<div class="confer-pro-stat"><span class="v">' + pendingOrders + '</span><span class="k">Pedidos pendentes</span></div>' +
+    '<div class="confer-pro-stat"><span class="v">' + etqValue + '</span><span class="k">' + etqLabel + '</span></div>' +
+    '<div class="confer-pro-stat"><span class="v">' + problemUnits + '</span><span class="k">Divergências</span></div>';
 }
 
 function batchCardHtml(batch) {
@@ -16782,6 +17081,15 @@ function batchCardHtml(batch) {
   const conferidos = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.CONFERIDO).length;
   const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
   const items = (batch.items || []).map(i => `${i.qty}× ${i.name}`).join(' · ');
+  // #440 — validade: badge de urgência por item
+  const now440 = Date.now(); const H24_440 = 24*3600*1000; const H7D_440 = 7*24*3600*1000;
+  const validadeHtml = (batch.items || []).filter(function(i){ return i.expiresAt; }).map(function(i) {
+    const diff = i.expiresAt - now440;
+    const label = diff <= 0 ? '⛔ vencido' : (diff < H24_440 ? '🔴 vence hoje' : (diff < H7D_440 ? '🟡 vence em ' + Math.ceil(diff/H24_440) + 'd' : null));
+    if (!label) return '';
+    const cor = diff <= 0 ? 'var(--accent)' : (diff < H24_440 ? 'var(--accent)' : 'var(--gold)');
+    return '<span style="font-size:11px;color:'+cor+';font-weight:700">'+label+' · '+escapeHtml(i.name)+'</span>';
+  }).filter(Boolean).join(' · ');
   const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
     new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
   const progress = `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
@@ -16797,26 +17105,52 @@ function batchCardHtml(batch) {
       <button class="u-action" onclick="event.stopPropagation();openConferProducao('${batch.id}','${et.idxStr}')">${actionLabel}</button>
     </div>`;
   }).join('');
-  const statusBadge = isClosed
-    ? `<span class="u-status divergencia">Fechado</span>`
-    : `<span class="u-status conferido">Aberto</span>`;
-  const actionsHtml = isClosed ? `
+  const isDiscarded = !!batch.discarded;
+  const statusBadge = isDiscarded
+    ? `<span class="u-status divergencia">⛔ Descartado</span>`
+    : isClosed
+      ? `<span class="u-status divergencia">Fechado</span>`
+      : `<span class="u-status conferido">Aberto</span>`;
+  // #441 — botao Descartar/Reverter em todas as acoes
+  const discardBtn = isDiscarded
+    ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard('${batch.id}')">↩ Reverter</button>`
+    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')">⛔ Descartar</button>`;
+  const actionsHtml = isDiscarded ? `
+    <div class="batch-actions closed-actions">
+      <span style="font-size:12px;color:var(--ink-mute);flex:1">${escapeHtml(batch.discardReason || 'descartado')}</span>
+      ${discardBtn}
+    </div>` : isClosed ? `
     <div class="batch-actions closed-actions">
       <button class="batch-action primary" onclick="event.stopPropagation();toggleBatchStatus('${batch.id}')">Reabrir</button>
       <button class="batch-action info" onclick="event.stopPropagation();openBatchHistory('${batch.id}')">Histórico</button>
       <button class="batch-action" onclick="event.stopPropagation();openBatchDetails('${batch.id}')">Detalhes</button>
+      ${discardBtn}
     </div>` : `
     <div class="batch-actions">
       <button class="batch-action primary" onclick="event.stopPropagation();appendProductionToBatch('${batch.id}')">+ Produção</button>
       <button class="batch-action info" onclick="event.stopPropagation();editBatchFlow('${batch.id}')">Editar</button>
       <button class="batch-action" onclick="event.stopPropagation();toggleBatchStatus('${batch.id}')">Fechar</button>
+      ${discardBtn}
     </div>`;
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
     <div class="batch-card-head" onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')">
       <div class="bc-info">
         <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>
+        ${validadeHtml ? '<div class="bc-progress">' + validadeHtml + '</div>' : ''}
         <div class="bc-progress">${escapeHtml(progress)}</div>
+        ${(function(){
+          // #437 — historico de impressoes: le do audit log as entradas 'etiqueta.print' do lote.
+          try {
+            const log = (typeof loadAuditLog === 'function' ? loadAuditLog() : []) || [];
+            const prints = log.filter(e => e.action === 'etiqueta.print' && e.entityId === batch.id).slice(0, 3);
+            if (!prints.length) return '';
+            return prints.map(p => {
+              const ts = p.ts ? new Date(p.ts).toLocaleTimeString('pt-BR').slice(0,5) : '';
+              return '<div style="font-size:11px;color:var(--ink-mute)">🖨 ' + escapeHtml(p.summary || '') + (p.operator ? ' · ' + escapeHtml(p.operator) : '') + (ts ? ' às ' + ts : '') + '</div>';
+            }).join('');
+          } catch(_) { return ''; }
+        })()}
       </div>
       <span class="bc-toggle">›</span>
     </div>
@@ -17693,9 +18027,11 @@ function cestaCalcRender(data) {
       tag.textContent = 'sem receita';
       head.appendChild(tag);
       card.appendChild(head);
-      const note = document.createElement('div');
-      note.style.cssText = 'font-size:12px;color:var(--ink-mute);';
-      note.textContent = 'Cadastre a composição em Produção > Catálogo.';
+      // #428 — botao acionavel em vez de texto plano.
+      const note = document.createElement('button');
+      note.style.cssText = 'font-size:12px;color:var(--accent);background:none;border:none;padding:2px 0;cursor:pointer;text-decoration:underline;text-align:left;';
+      note.textContent = 'Cadastrar receita →';
+      note.onclick = function () { cestaCalcFechar(); go('producao'); };
       card.appendChild(note);
     } else if (statusStr === 'erro' || statusStr === '2') {
       const tag = document.createElement('span');
@@ -17851,6 +18187,67 @@ function openBatchHistory(batchId) {
   openBatchDetails(batchId);
 }
 function closeBatchDetails() { toggleModal('batchDetailsModal', false); }
+
+// ===== DESCARTE DE LOTE =====================================================
+let _discardingBatchId = null;
+
+function openBatchDiscardModal(batchId) {
+  const batch = (batches || []).find(function (b) { return b.id === batchId; });
+  if (!batch) return;
+  _discardingBatchId = batchId;
+  const lote = batch.lote || batch.code || batchId.slice(-6);
+  const sub = document.getElementById('batchDiscardSub');
+  if (sub) sub.textContent = 'Lote ' + lote + ' · ' + (batch.items || []).map(function(i){ return i.qty + '× ' + i.name; }).join(', ');
+  document.querySelectorAll('#batchDiscardChips .cash-type-pill').forEach(function (b) { b.classList.remove('active'); });
+  const first = document.querySelector('#batchDiscardChips .cash-type-pill');
+  if (first) first.classList.add('active');
+  const note = document.getElementById('batchDiscardNote');
+  if (note) note.value = '';
+  toggleModal('batchDiscardModal', true);
+}
+function closeBatchDiscardModal() { toggleModal('batchDiscardModal', false); _discardingBatchId = null; }
+
+function selectDiscardReason(el) {
+  document.querySelectorAll('#batchDiscardChips .cash-type-pill').forEach(function (b) { b.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function confirmBatchDiscard() {
+  if (!_discardingBatchId) return;
+  const batch = (batches || []).find(function (b) { return b.id === _discardingBatchId; });
+  if (!batch) { closeBatchDiscardModal(); return; }
+  const activeChip = document.querySelector('#batchDiscardChips .cash-type-pill.active');
+  const reason = activeChip ? (activeChip.dataset.reason || 'outro') : 'outro';
+  const note = (document.getElementById('batchDiscardNote')?.value || '').trim();
+  batch.discarded = true;
+  batch.discardedAt = Date.now();
+  batch.discardedBy = operatorName || null;
+  batch.discardReason = reason + (note ? ' · ' + note : '');
+  const lote = batch.lote || batch.code || batch.id;
+  logAction({ action: 'batch.discard', entityType: 'batch', entityId: batch.id, summary: 'Descarte: lote ' + lote + ' · ' + reason + (note ? ' · ' + note : '') });
+  persistAll();
+  pendingSync++;
+  updateSync();
+  closeBatchDiscardModal();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+  showToast('Lote ' + lote + ' descartado');
+}
+
+function revertBatchDiscard(batchId) {
+  const batch = (batches || []).find(function (b) { return b.id === batchId; });
+  if (!batch) return;
+  delete batch.discarded; delete batch.discardedAt; delete batch.discardedBy; delete batch.discardReason;
+  logAction({ action: 'batch.discard_revert', entityType: 'batch', entityId: batch.id, summary: 'Descarte revertido: lote ' + (batch.lote || batch.code || batch.id) });
+  persistAll();
+  pendingSync++;
+  updateSync();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+  showToast('Descarte revertido');
+}
 function openBatchDetails(batchId) {
   const batch = getBatchById(batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
@@ -18277,6 +18674,9 @@ function escPosOrderLabel(o, nota) {
   // Itens (qty x nome | preco) com truncamento via padLine
   (o.items || []).forEach(it => {
     b.line(padLine(it.qty + 'x ' + it.name, money(it.qty * it.unitPrice)));
+    // #417 — observacao por item (ex "sem cebola"), indentada sob o item.
+    const inote = (it.note || '').trim();
+    if (inote) b.line(asciiNorm('  obs: ' + inote).slice(0, PRINT_COLS));
   });
   b.line(divider());
   // TOTAL em negrito (sem big — elegante, cabe na linha)
@@ -18391,7 +18791,25 @@ function printViaBluetooth(bytes, onFallback) {
       btStep('print:send-write retry=' + !canRetry);
       try {
         bs.write(bytes,
-          () => { btStep('print:write-ok'); showToast('Enviado pra impressora'); releasePrinting(); },
+          () => {
+            btStep('print:write-ok');
+            showToast('Enviado pra impressora');
+            releasePrinting();
+            // #437 — registra impressao no audit log pra historico por lote.
+            try {
+              const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+              const kind = currentEtiquetasKind;
+              const qtd = (currentEtiquetas && currentEtiquetas.length || 0) * copies;
+              const loteId = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].id) || null;
+              const lote  = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].lote) || null;
+              logAction({
+                action: 'etiqueta.print',
+                entityType: kind === 'order' ? 'order' : 'batch',
+                entityId: loteId,
+                summary: qtd + ' etiqueta' + (qtd === 1 ? '' : 's') + (lote ? ' · ' + lote : '') + ' impressa' + (qtd === 1 ? '' : 's')
+              });
+            } catch (_) {}
+          },
           (err) => {
             const msg = (err && err.message) || err;
             btStep('print:write-err ' + msg);
@@ -18598,7 +19016,8 @@ function etiquetaProducaoHtml(et, nota) {
     <img src="/etiqueta/assets/logo-easystok.svg" alt="">
     <span class="et-brand-name">Easy<b>Stok</b></span>
   </div>`;
-  const prodBlock = `<div class="et-prod">${escapeHtml(et.productName)}</div>
+  // #437: emoji antes do nome (dado já existe, nunca foi renderizado)
+  const prodBlock = `<div class="et-prod">${et.emoji ? escapeHtml(et.emoji) + ' ' : ''}${escapeHtml(et.productName)}</div>
     ${et.unit ? `<div class="et-unit">${escapeHtml(et.unit)}</div>` : ''}`;
   const infoBlock = `<div class="et-info">
     <div class="et-info-row"><span class="et-lbl">FAB:</span><span class="et-val">${fmtDateBR(et.productionDate)}</span></div>
@@ -18616,7 +19035,11 @@ function etiquetaProducaoHtml(et, nota) {
     : '';
 
   if (horiz) {
-    return `${brand}<div class="et-main">${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
+    // #438: brand DENTRO do et-main (nao irmao flex) — sem isso o brand
+    // ocupa ~104px de largura horizontal e et-main fica com ~105px, fazendo
+    // overflow-wrap:anywhere quebrar "Talharim" caractere a caractere.
+    // Espelha o canvas horizontal onde logo fica na mesma coluna que o nome.
+    return `<div class="et-main">${brand}${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
   }
   return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
 }
@@ -18681,7 +19104,7 @@ function etiquetasToPng(etiquetas, kind, note) {
   function calcRowH(et) {
     if (kind === 'order') {
       const o = et.order || {};
-      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24), 0);
+      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24) + ((it.note || '').trim() ? 16 : 0), 0); // #417: +16 por item com obs
       if (horizOrder) {
         // Horizontal: duas colunas. Altura = max(left, right).
         // Left: brand(30)+kicker(14)+title(24)+ref(18)+date(16)+cliente(70)+items+ITENS(12)+total(48)+notes+nota
@@ -18770,14 +19193,15 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
     ctx.fillText('EasyStok', lx + 30, y + 14);
     y += 34;
 
-    // Nome do produto
+    // Nome do produto + emoji (#437)
     ctx.fillStyle = '#000';
     ctx.font = '800 18px Inter, Arial, sans-serif';
     const maxChars = Math.max(8, Math.floor((mainW - lx - 8) / 10));
-    wordWrap(et.productName, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
+    const prodLineHoriz = (et.emoji ? et.emoji + ' ' : '') + et.productName;
+    wordWrap(prodLineHoriz, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
     if (et.unit) {
-      ctx.fillStyle = '#555';
-      ctx.font = '500 12px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#000';
+      ctx.font = '700 13px Inter, Arial, sans-serif';
       ctx.fillText(et.unit, lx, y); y += 16;
     }
 
@@ -18869,14 +19293,15 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
   ctx.font = '800 18px Inter, Arial, sans-serif';
   ctx.fillText('EasyStok', lx + 30, y + 16);
   y += 36;
-  // Product name
+  // Product name + emoji (#437)
   ctx.fillStyle = '#000';
   ctx.font = '800 22px Inter, Arial, sans-serif';
-  wordWrap(et.productName, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
+  const prodLineVert = (et.emoji ? et.emoji + ' ' : '') + et.productName;
+  wordWrap(prodLineVert, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
   if (et.unit) {
-    ctx.fillStyle = '#555';
-    ctx.font = '500 13px Inter, Arial, sans-serif';
-    ctx.fillText(et.unit, lx, y); y += 16;
+    ctx.fillStyle = '#000';
+    ctx.font = '700 14px Inter, Arial, sans-serif';
+    ctx.fillText(et.unit, lx, y); y += 18;
   }
   // Photo
   if (photoImg && photoImg.width && photoImg.height) {
@@ -18899,8 +19324,9 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
   ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 20;
   ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
   ctx.fillText('VAL:', lx, y);
-  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
-  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 20;
+  // #437: VAL em destaque (900 16px) — é a info mais consultada na geladeira
+  ctx.fillStyle = '#000'; ctx.font = '900 16px Inter, Arial, sans-serif';
+  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 22;
   ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
   ctx.fillText('LOTE:', lx, y);
   ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
@@ -19021,7 +19447,16 @@ function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
     ctx.font = '900 15px Arial, sans-serif';
     ctx.fillText(money(it.qty * it.unitPrice), W - 24, y);
     ctx.textAlign = 'left';
-    y += it.unit ? 34 : 24;
+    let adv = it.unit ? 34 : 24;
+    // #417 — observacao por item, abaixo do item (altura reservada em calcRowH).
+    const inote = (it.note || '').trim();
+    if (inote) {
+      ctx.fillStyle = '#c2410c';
+      ctx.font = 'italic 700 11px Arial, sans-serif';
+      ctx.fillText(('obs: ' + inote).slice(0, 40), 30, y + adv - 6);
+      adv += 16;
+    }
+    y += adv;
   });
   ctx.fillRect(24, y, W - 48, 2); y += 12;
   ctx.strokeStyle = '#000';
@@ -19180,7 +19615,17 @@ function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showB
       ctx.font = '400 10px Arial, sans-serif';
       ctx.fillText(String(it.unit).slice(0, 24), lx + 20, y + 13);
     }
-    y += it.unit ? 28 : 18;
+    let adv = it.unit ? 28 : 18;
+    // #417 — observacao por item (altura reservada em calcRowH via itemsH).
+    const inote = (it.note || '').trim();
+    if (inote) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#c2410c';
+      ctx.font = 'italic 700 9px Arial, sans-serif';
+      ctx.fillText(('obs: ' + inote).slice(0, 32), lx + 8, y + (it.unit ? 24 : 13));
+      adv += 16;
+    }
+    y += adv;
   });
   ctx.textAlign = 'left';
   ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
@@ -19479,9 +19924,38 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
 function closeEtiquetasPreview() {
   document.getElementById('etiquetasPreview').classList.remove('show');
   try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+  try { document.getElementById('etqCopiesSelect').value = '1'; } catch (_) {}
+  try { document.getElementById('etqRetryBtn').style.display = 'none'; } catch (_) {}
   // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
   if (currentEtiquetasKind === 'producao') go('home');
   currentEtiquetas = [];
+}
+
+// #437 — guarda os ultimos bytes impressos para retry em caso de falha BT.
+let _etqLastPrintBytes = null;
+let _etqLastPrintKind  = null;
+
+function _etqShowRetry() {
+  const btn = document.getElementById('etqRetryBtn');
+  if (btn) btn.style.display = '';
+}
+function _etqHideRetry() {
+  const btn = document.getElementById('etqRetryBtn');
+  if (btn) btn.style.display = 'none';
+}
+function etqRetry() {
+  if (!_etqLastPrintBytes) { showToast('Nada para reimprimir'); return; }
+  _etqHideRetry();
+  printViaBluetooth(_etqLastPrintBytes, function () {
+    showToast('Sem conexão BT — use Salvar ou Compartilhar');
+    _etqShowRetry();
+  });
+}
+
+function getEtqCopies() {
+  const sel = document.getElementById('etqCopiesSelect');
+  const n = sel ? parseInt(sel.value, 10) : 1;
+  return (!isNaN(n) && n >= 1) ? n : 1;
 }
 
 /**
@@ -19664,30 +20138,48 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
+      // #437: cópias (1/2/5/10) e retry
+      const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+      _etqHideRetry();
       if (currentEtiquetasKind === 'order') {
         const et = currentEtiquetas[0];
         const printNota = getEtqNota() || null;
-        printViaBluetooth(escPosOrderLabel(et.order, printNota), () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+        const oneShot = escPosOrderLabel(et.order, printNota);
+        // Repete os bytes N vezes para N cópias
+        const totalBytes = new Uint8Array(oneShot.length * copies);
+        for (let ci = 0; ci < copies; ci++) totalBytes.set(oneShot, ci * oneShot.length);
+        _etqLastPrintBytes = totalBytes;
+        printViaBluetooth(totalBytes, function () {
+          showToast('Sem conexão BT — use Salvar ou Compartilhar');
+          _etqShowRetry();
+        });
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
         // etiqueta, travando o app pra batches de 100+ unidades).
         const prodNota = getEtqNota() || null;
-        let totalLen = 0;
+        let singleLen = 0;
         const parts = currentEtiquetas.map(et => {
           if (prodNota) et._nota = prodNota;
           try {
             const b = escPosLabelProducao(et);
-            totalLen += b.length;
+            singleLen += b.length;
             return b;
           } finally {
             delete et._nota;
           }
         });
-        const totalBytes = new Uint8Array(totalLen);
+        const singleRun = new Uint8Array(singleLen);
         let off = 0;
-        for (const b of parts) { totalBytes.set(b, off); off += b.length; }
-        printViaBluetooth(totalBytes, () => showToast('Sem conexão BT — use Salvar ou Compartilhar'));
+        for (const b of parts) { singleRun.set(b, off); off += b.length; }
+        // Repete N vezes para N cópias de cada etiqueta
+        const totalBytes = new Uint8Array(singleLen * copies);
+        for (let ci = 0; ci < copies; ci++) totalBytes.set(singleRun, ci * singleLen);
+        _etqLastPrintBytes = totalBytes;
+        printViaBluetooth(totalBytes, function () {
+          showToast('Sem conexão BT — use Salvar ou Compartilhar');
+          _etqShowRetry();
+        });
       }
       return;
     }
@@ -19728,6 +20220,7 @@ function orderLabelHtml(o, horizontal, nota) {
       <span class="pi-main">
         <span class="pi-name">${escapeHtml(it.name)}</span>
         ${it.unit ? `<span class="pi-unit">${escapeHtml(it.unit)}</span>` : ''}
+        ${(it.note || '').trim() ? `<span class="pi-note" style="display:block;font-size:0.82em;color:#c2410c;font-style:italic">obs: ${escapeHtml(it.note.trim())}</span>` : ''}
       </span>
       <span class="pi-price">${money(it.qty*it.unitPrice)}</span>
     </div>`
@@ -19874,6 +20367,11 @@ function cashClosingPlainText(dateKey) {
   lines.push(`Entradas extras: +${money(sum.in)}`);
   lines.push(`Saidas: -${money(sum.out)}`);
   lines.push(`SALDO: ${money(sum.balance)}`);
+  // #421 — margem so quando ha pedidos no dia.
+  if (sum.ordersCount > 0) {
+    const approx = sum.semCusto > 0 ? ' (aprox - ' + sum.semCusto + ' item(ns) sem custo)' : '';
+    lines.push(`Margem${sum.semCusto > 0 ? ' ~' : ''}: ${money(sum.margem)}${approx}`);
+  }
   const conf = closing && closing.summary && closing.summary.conferredBalance;
   if (typeof conf === 'number' && !isNaN(conf)) {
     const diff = conf - sum.balance;
@@ -20718,9 +21216,10 @@ function renderOrderDraftSummary() {
 }
 
 function saveOrder() {
-  if (!selectedClient) return;
+  // #435: returns silenciosos viraram toasts para o operador saber o que falta.
+  if (!selectedClient) { showToast('Escolha o cliente antes de salvar'); return; }
   const notes = document.getElementById('orderNotes').value.trim();
-  if (currentOrderItems.length === 0 && !notes) return;
+  if (currentOrderItems.length === 0 && !notes) { showToast('Adicione pelo menos 1 item ao pedido'); return; }
 
   const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
@@ -20973,6 +21472,10 @@ function saveNewProduct() {
   const costStr = (document.getElementById('newProdCost')?.value || '').trim();
   const costParsed = costStr ? parseMoneyInput(costStr) : NaN;
   const cost = isNaN(costParsed) ? null : costParsed;
+  // #425 — estoque minimo configuravel
+  const minStockStr = (document.getElementById('newProdMinStock')?.value || '').trim();
+  const minStockParsed = minStockStr ? parseInt(minStockStr, 10) : NaN;
+  const minStock = (!isNaN(minStockParsed) && minStockParsed >= 0) ? minStockParsed : null;
 
   // Modo edit: editingProductId setado por openProductModalForEdit
   if (editingProductId) {
@@ -20982,9 +21485,9 @@ function saveNewProduct() {
     products[idx] = {
       ...products[idx],
       name, emoji: selectedEmoji, category: selectedCat,
-      unit: unit || '', price, cost
+      unit: unit || '', price, cost, minStock
     };
-    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost']);
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock']);
     persistAll();
     renderProductGrid();
     if (typeof renderCatalogList === 'function') renderCatalogList();
@@ -21005,7 +21508,7 @@ function saveNewProduct() {
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
-    unit: unit || '', price, cost, count: 0, photo: null, stock: 0, custom: true
+    unit: unit || '', price, cost, minStock, count: 0, photo: null, stock: 0, custom: true
   };
   products.push(product);
   persistAll();
@@ -21043,6 +21546,8 @@ function openProductModalForEdit(productId) {
   document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
   const costEl = document.getElementById('newProdCost');
   if (costEl) costEl.value = (p.cost != null ? formatMoneyInput(p.cost) : '');
+  const minStockEl = document.getElementById('newProdMinStock');
+  if (minStockEl) minStockEl.value = (p.minStock != null ? String(p.minStock) : '');
   selectedCat = p.category || 'massa';
   selectedEmoji = p.emoji || '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(x => {
@@ -21228,6 +21733,21 @@ function parseMoneyInput(raw) {
   }
   const n = parseFloat(s);
   return isNaN(n) ? NaN : n;
+}
+
+// #416 — mascara de moeda "de centavos": usuario digita digitos e o campo
+// formata da direita pra esquerda (4500 -> 45,00; 450000 -> 4.500,00). Sempre
+// produz formato pt-BR valido que parseMoneyInput le no salvar. Limite de 11
+// digitos (ate 999.999.999,99) evita overflow. Sem digito -> campo vazio.
+function maskMoneyInput(el) {
+  if (!el) return;
+  const digits = String(el.value || '').replace(/\D/g, '').slice(0, 11);
+  if (!digits) { el.value = ''; return; }
+  const cents = parseInt(digits, 10);
+  const intPart = Math.floor(cents / 100);
+  const centPart = String(cents % 100).padStart(2, '0');
+  const intStr = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  el.value = intStr + ',' + centPart;
 }
 
 function updateCashSaveState() {

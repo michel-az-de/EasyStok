@@ -19,7 +19,7 @@ generated_files:
     source: EasyStock.Api/wwwroot/pwa/**
     mechanism: "manual-mirror (sem target MSBuild); gate CI dual-frontend-drift.yml"
     severity: block
-    status_ci: RED  # dessincronizado desde 2026-06-03; Fatia 4 reconcilia
+    status_ci: GREEN  # Fatia 4 sincronizou os 3 arquivos divergentes (2026-06-08)
   - id: tailwind-web
     path: EasyStock.Web/wwwroot/css/tailwind.dist.css
     source: "tailwind.config.js + Views/**/*.cshtml + wwwroot/js/**/*.js"
@@ -88,8 +88,8 @@ traps:
   - id: generated-copy-edit
     class: A
     desc: "editar a copia gerada em vez da fonte; revertido no proximo build"
-    detector: "hook PreToolUse (deny) + header GENERATED + teste copia==fonte"
-    status: planned  # Fatia 4
+    detector: "hook PreToolUse deny (pretooluse-block-generated.ps1) + .gitattributes linguist-generated + gate dual-frontend-drift (mirror Mobile)"
+    status: active
   - id: autocommit-hijack
     class: B
     desc: "ambiente local #448 auto-commita o working tree, varre staged, autor/mensagem errados, closes #N nao dispara"
@@ -128,5 +128,4 @@ ci_gates:
   quarantined:        # Fatia 2: tirados do gatilho por-commit (eram vermelho cronico = ruido)
     - coverage.yml      # gatilho -> schedule + workflow_dispatch (era FAIL em todo commit)
     - deploy-render.yml # gatilho -> workflow_dispatch (Render suspenso + build maui quebrado)
-  red_remaining:      # true-positive a resolver no codigo
-    - dual-frontend-drift.yml  # mirror Mobile dessincronizado (Classe A) -> Fatia 4
+  red_remaining: []   # vazio: dual-frontend-drift verdejado na Fatia 4 (mirror Mobile sincronizado, drift 0)
