@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -299,7 +300,16 @@ public static class PipelineExtensions
                 apiVersion = info,
                 mobileSchemaVersion = 2,
                 buildSha = Environment.GetEnvironmentVariable("BUILD_SHA") ?? "master",
-                serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                // Fuso resolvido: deploy-verify confirma source=Iana e offsetMinutes=-180.
+                timezone = new
+                {
+                    id = HorarioBrasil.ZonaId,
+                    source = HorarioBrasil.Fonte.ToString(),
+                    offsetMinutes = HorarioBrasil.OffsetMinutosAtual(),
+                    hoje = HorarioBrasil.Hoje().ToString("yyyy-MM-dd"),
+                    degradado = HorarioBrasil.Degradado
+                }
             });
         })
         .AllowAnonymous()

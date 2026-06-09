@@ -1,4 +1,5 @@
 using EasyStock.Api.Configuration;
+using EasyStock.Application.Common;
 
 namespace EasyStock.Api.Startup;
 
@@ -47,5 +48,24 @@ public static class StartupHardening
             if (builder.Environment.IsProduction() && mobileApiKey.Length < 24)
                 throw new InvalidOperationException("Mobile:ApiKey must be at least 24 characters long in Production.");
         }
+    }
+
+    /// <summary>
+    /// Fuso de Brasilia: em Production recusa subir se o fuso degradou (caiu na zona fixa
+    /// -03:00, tipicamente imagem sem tzdata) ou se o offset esta fora da banda plausivel.
+    /// Em dev/teste apenas tolera (o app sobe). Os fluxos que dependem de hora nao podem
+    /// rodar em producao com o relogio errado — falhar rapido evita dano silencioso.
+    /// </summary>
+    public static void ValidateTimezone(IHostEnvironment environment)
+        => ValidateTimezoneCore(environment.IsProduction(), HorarioBrasil.Fonte, HorarioBrasil.OffsetMinutosAtual());
+
+    /// <summary>Nucleo puro/testavel de <see cref="ValidateTimezone"/>.</summary>
+    public static void ValidateTimezoneCore(bool isProduction, FonteFuso fonte, int offsetMinutos)
+    {
+        var plausivel = offsetMinutos is >= -300 and <= -60; // Brasil: -180 (ou -120 se o DST voltar).
+        if (isProduction && (fonte == FonteFuso.FallbackFixo || !plausivel))
+            throw new InvalidOperationException(
+                $"CRITICAL: fuso de Brasilia degradado em producao (fonte={fonte}, offset={offsetMinutos}min). " +
+                "A imagem provavelmente esta sem tzdata; rebuild com 'apt-get install -y tzdata'.");
     }
 }

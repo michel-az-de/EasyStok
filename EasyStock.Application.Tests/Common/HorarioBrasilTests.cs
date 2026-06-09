@@ -89,4 +89,17 @@ public class HorarioBrasilTests
         // ha um problema de ambiente (imagem sem tzdata) que o startup de producao deve barrar.
         HorarioBrasil.Degradado.Should().BeFalse();
     }
+
+    [Fact]
+    public void OffsetMinutosAtual_em_Brasilia_e_menos_180()
+    {
+        // Brasil sem DST desde 2019: offset fixo -03:00 = -180 min.
+        HorarioBrasil.OffsetMinutosAtual().Should().Be(-180);
+    }
+
+    [Fact]
+    public void ZonaId_nao_e_vazio()
+    {
+        HorarioBrasil.ZonaId.Should().NotBeNullOrWhiteSpace();
+    }
 }

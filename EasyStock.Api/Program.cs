@@ -164,6 +164,8 @@ if (resolvedProvider is "postgresql")
 
 // ── Startup hardening: JWT, connection strings, Mobile API key ────────────────
 StartupHardening.Validate(builder, postgresConnectionString);
+// Fuso de Brasilia: em producao recusa subir se degradou (ex.: imagem sem tzdata).
+StartupHardening.ValidateTimezone(builder.Environment);
 
 Log.Information("""
 

@@ -46,6 +46,12 @@ public static class HorarioBrasil
     /// <summary>True quando nem IANA nem Windows resolveram e caiu na zona fixa -03:00.</summary>
     public static bool Degradado => Resolvido.Fonte == FonteFuso.FallbackFixo;
 
+    /// <summary>Id da zona resolvida (diagnostico p/ /health e startup).</summary>
+    public static string ZonaId => Tz.Id;
+
+    /// <summary>Offset atual de Brasilia em minutos (-180 normal; -120 so se o DST voltar).</summary>
+    public static int OffsetMinutosAtual() => (int)Tz.GetUtcOffset(DateTime.UtcNow).TotalMinutes;
+
     /// <summary>
     /// Resolve a zona de Brasilia: IANA -> Windows -> zona fixa -03:00. NUNCA lanca (a versao
     /// antiga lancava se faltasse tzdata no container, derrubando a 1a request). O `finder`
