@@ -58,8 +58,11 @@ WORKDIR /app
 # gosu: o entrypoint inicia como root para dar chown no volume de uploads (no Fly o
 # volume monta root-owned por padrao) e depois dropa privilegios para appuser. gosu
 # preserva o cwd (/app), entao o ContentRootPath continua /app.
+# tzdata: garante /usr/share/zoneinfo/America/Sao_Paulo para o TimeZoneInfo resolver o
+# fuso de Brasilia (source=Iana). Sem ele, HorarioBrasil cai na zona fixa -03:00 (modo
+# degradado) e o StartupHardening.ValidateTimezone recusa subir em producao.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends gosu \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gosu tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 # Criar usuario nao-root
