@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
@@ -45,7 +46,10 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
         if (cached != default) return cached;
 
         var cutoff = DateTime.UtcNow.AddDays(dias);
-        var hoje = DateTime.UtcNow.Date;
+        // HojeInstanteUtc = data civil BRT como meia-noite UTC (00:00Z).
+        // DataValidade tambem e meia-noite UTC (data civil gravada via DataUtc.ParaUtc).
+        // JanelaDiaUtc seria errado aqui: 03:00Z marcaria vencido no proprio dia.
+        var hoje = HorarioBrasil.HojeInstanteUtc();
 
         var query = dbContext.ItensEstoque
             .AsNoTracking()

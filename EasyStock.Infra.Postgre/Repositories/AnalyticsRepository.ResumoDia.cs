@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 
 namespace EasyStock.Infra.Postgre.Repositories
@@ -11,11 +12,13 @@ namespace EasyStock.Infra.Postgre.Repositories
     {
         public async Task<ResumoDia> GetResumoDiaAsync(Guid empresaId, Guid? lojaId = null)
         {
-            var hojeIni = DateTime.UtcNow.Date;
-            var hojeFim = hojeIni.AddDays(1);
+            // JanelaDiaUtc: meia-noite BRT como UTC (03:00Z). Antes UtcNow.Date
+            // (00:00Z) fazia o bucket resetar as 21h BRT (janela 21h-23h59).
+            var (hojeIni, hojeFim) = HorarioBrasil.JanelaDiaUtc();
+            var hojeBrt = HorarioBrasil.Hoje(); // data civil BRT para cache key
 
-            // Cache key inclui a data — invalida naturalmente ao virar o dia.
-            var cacheKey = $"analytics:resumo-dia:{empresaId}:{lojaId?.ToString() ?? "all"}:{hojeIni:yyyy-MM-dd}";
+            // Cache key usa a data BRT — invalida naturalmente ao virar a meia-noite de Brasilia.
+            var cacheKey = $"analytics:resumo-dia:{empresaId}:{lojaId?.ToString() ?? "all"}:{hojeBrt:yyyy-MM-dd}";
             var cached = await GetCachedAsync<ResumoDia>(cacheKey);
             if (cached is not null) return cached;
 

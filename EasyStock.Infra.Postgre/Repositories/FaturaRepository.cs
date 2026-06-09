@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 
@@ -171,7 +172,7 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
 
     public async Task<double> MediaDiasAtrasoVencidasAsync(Guid? empresaId = null, CancellationToken ct = default)
     {
-        var hoje = DateTime.UtcNow.Date;
+        var hoje = HorarioBrasil.HojeInstanteUtc(); // data civil BRT como midnight UTC
         var q = db.Faturas
             .IgnoreQueryFilters()
             .Where(f => f.Status == StatusFatura.Vencida && f.DataPagamentoTotal == null);

@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Postgre.Data;
@@ -16,8 +17,9 @@ public sealed class GetVendasHojeQuery(
     public async Task<VendasHojeDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        // JanelaDiaUtc: [ini,fim) = meia-noite BRT em UTC (03:00Z–03:00Z+24h).
+        // Antes UtcNow.Date (00:00Z) fazia o bucket "hoje" resetar as 21h BRT.
+        var (hoje, amanha) = HorarioBrasil.JanelaDiaUtc();
 
         var vendasQuery = db.Vendas
             .AsNoTracking()
@@ -47,7 +49,7 @@ public sealed class GetVendasHojeQuery(
             .AsNoTracking()
             .Where(i => i.Venda!.EmpresaId == empresaId
                      && i.Venda.DataVenda >= hoje
-                     && i.Venda.DataVenda < amanha
+                     && i.Venda.DataVenda < amanha   // mesmo intervalo BRT
                      && (lojaId == null || i.Venda.LojaId == lojaId))
             .GroupBy(i => new { i.ProdutoId, Descricao = i.DescricaoSnapshot })
             .Select(g => new TopProdutoDto(

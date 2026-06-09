@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Defaults;
 using EasyStock.Infra.Postgre.Data;
@@ -533,7 +534,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         foreach (var item in itens)
         {
-            var dias = (item.ValidadeEm - now.Date).TotalDays;
+            var dias = (item.ValidadeEm - HorarioBrasil.HojeInstanteUtc()).TotalDays;
             var semana = Math.Min(4, Math.Max(1, (int)Math.Ceiling(dias / 7.0)));
             var b = buckets[semana];
             var nome = nomes.TryGetValue(item.ProdutoId, out var n) ? n : "Produto";

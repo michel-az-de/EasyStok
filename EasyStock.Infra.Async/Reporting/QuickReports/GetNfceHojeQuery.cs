@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Domain.Fiscal;
@@ -26,8 +27,7 @@ public sealed class GetNfceHojeQuery(
     public async Task<NfceHojeDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        var (hoje, amanha) = HorarioBrasil.JanelaDiaUtc();
 
         // Nota: NfeDocumento não possui LojaId — está vinculado à loja via PedidoId.
         // O filtro de lojaId não é aplicável nesta query; o parâmetro é mantido

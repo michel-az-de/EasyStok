@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.QuickReports;
 using EasyStock.Infra.Postgre.Data;
@@ -17,8 +18,7 @@ public sealed class GetVendasVendedorTurnoQuery(
     public async Task<VendasVendedorTurnoDto> ExecuteAsync(Guid? lojaId, CancellationToken ct)
     {
         var empresaId = currentUser.EmpresaId;
-        var hoje      = DateTime.UtcNow.Date;
-        var amanha    = hoje.AddDays(1);
+        var (hoje, amanha) = HorarioBrasil.JanelaDiaUtc();
 
         var query = db.Vendas
             .AsNoTracking()

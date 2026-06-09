@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Services.Helpdesk;
@@ -47,8 +48,7 @@ public sealed class HelpdeskDashboardService(EasyStockDbContext db)
 {
     public async Task<HelpdeskDashboardResultado> ObterAsync(Guid empresaId, CancellationToken ct = default)
     {
-        var hojeUtc = DateTime.UtcNow.Date;
-        var amanhaUtc = hojeUtc.AddDays(1);
+        var (hojeUtc, amanhaUtc) = HorarioBrasil.JanelaDiaUtc();
 
         var statusCounts = await db.AdminTickets
             .AsNoTracking()

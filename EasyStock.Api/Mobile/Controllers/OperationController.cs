@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
@@ -58,7 +59,7 @@ public class OperationController(
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
 
-        var todayStart = DateTime.UtcNow.Date;
+        var (todayStart, _) = HorarioBrasil.JanelaDiaUtc();
 
         // Pedidos abertos (não entregue/cancelado)
         var openOrdersQ = _db.Set<Order>().AsNoTracking()
