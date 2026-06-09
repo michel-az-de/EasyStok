@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibili
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using Npgsql;
 
 namespace EasyStock.Api.Controllers;
 
@@ -27,7 +28,9 @@ public class AdminStorefrontCardapioController(
     ILogger<AdminStorefrontCardapioController> logger) : EasyStockControllerBase
 {
     public sealed record AdicionarItemRequest(
-        Guid ProdutoId,
+        Guid? ProdutoId,        // null = item avulso (ADR-0031)
+        string? NomePublico,    // obrigatório para avulso; override opcional para vinculado
+        string? CategoriaTexto,
         double OrdemExibicao,
         bool Visivel,
         string? DescricaoPublica,
@@ -43,6 +46,8 @@ public class AdminStorefrontCardapioController(
         string? Motivo);
 
     public sealed record EditarItemRequest(
+        string? NomePublico,    // override de nome para avulso ou vinculado
+        string? CategoriaTexto,
         string? DescricaoPublica,
         string? Ingredientes,
         string? Alergenos,
@@ -76,6 +81,8 @@ public class AdminStorefrontCardapioController(
             var result = await adicionar.ExecuteAsync(new AdicionarCardapioItemAdminCommand(
                 storefrontId,
                 req.ProdutoId,
+                req.NomePublico,
+                req.CategoriaTexto,
                 req.OrdemExibicao,
                 req.Visivel,
                 req.DescricaoPublica,
@@ -91,7 +98,7 @@ public class AdminStorefrontCardapioController(
 
             await audit.LogAsync(
                 "AdminAdicionouCardapioItem",
-                $"StorefrontId={storefrontId}, ItemId={result.ItemId}, ProdutoId={req.ProdutoId}",
+                $"StorefrontId={storefrontId}, ItemId={result.ItemId}, ProdutoId={req.ProdutoId?.ToString() ?? "avulso"}",
                 motivo: req.Motivo,
                 entidadeAfetadaId: result.ItemId);
 
@@ -102,6 +109,11 @@ public class AdminStorefrontCardapioController(
         catch (StorefrontNaoEncontradoException) { return DataNotFound("Storefront não encontrado."); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+        // Tradução de violações de constraint do Postgres → 400 amigável (ADR-0031)
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+            { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
+        catch (PostgresException ex) when (ex.SqlState == "23514")
+            { return DataBadRequest("Nome é obrigatório para itens sem produto vinculado."); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item ao cardápio {StorefrontId}", storefrontId);
@@ -117,6 +129,8 @@ public class AdminStorefrontCardapioController(
             var result = await editar.ExecuteAsync(new EditarCardapioItemAdminCommand(
                 storefrontId,
                 itemId,
+                req.NomePublico,
+                req.CategoriaTexto,
                 req.DescricaoPublica,
                 req.Ingredientes,
                 req.Alergenos,

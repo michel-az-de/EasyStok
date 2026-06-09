@@ -11,6 +11,8 @@ namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapi
 public sealed record EditarCardapioItemAdminCommand(
     Guid StorefrontId,
     Guid ItemId,
+    string? NomePublico,    // override de nome (avulso ou vinculado)
+    string? CategoriaTexto, // override de categoria
     string? DescricaoPublica,
     string? Ingredientes,
     string? Alergenos,
@@ -42,6 +44,8 @@ public class EditarCardapioItemAdminUseCase(
         }
 
         item.AtualizarMetadata(
+            nomePublico: command.NomePublico,
+            categoriaTexto: command.CategoriaTexto,
             descricaoPublica: command.DescricaoPublica,
             ingredientes: command.Ingredientes,
             alergenos: command.Alergenos,

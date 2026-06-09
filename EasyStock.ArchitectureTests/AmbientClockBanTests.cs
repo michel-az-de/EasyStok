@@ -75,6 +75,8 @@ public class AmbientClockBanTests
             foreach (var file in Directory.GetFiles(fullDir, "*.cs", SearchOption.AllDirectories))
             {
                 if (file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
+                // NuGet source link faz cache de pacotes em .nuget/packages/ dentro do projeto — excluir.
+                if (file.Contains(Path.DirectorySeparatorChar + ".nuget" + Path.DirectorySeparatorChar)) continue;
                 var rel = Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
                 if (DebtAllowlist.Contains(rel)) continue;
 

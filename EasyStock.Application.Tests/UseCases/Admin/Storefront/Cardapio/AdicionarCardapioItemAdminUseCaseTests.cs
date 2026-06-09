@@ -94,7 +94,9 @@ public class AdicionarCardapioItemAdminUseCaseTests
 
     private static AdicionarCardapioItemAdminCommand NewCommand(Guid storefrontId, Guid? produtoId = null) =>
         new(storefrontId,
-            produtoId ?? Guid.NewGuid(),
+            ProdutoId: produtoId ?? Guid.NewGuid(),
+            NomePublico: null,
+            CategoriaTexto: null,
             OrdemExibicao: 1.0,
             Visivel: false,
             DescricaoPublica: null,
