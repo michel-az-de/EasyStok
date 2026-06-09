@@ -3,7 +3,7 @@ using System.Security.Claims;
 
 namespace EasyStock.Api.Services;
 
-public class AdminAuditService(EasyStockDbContext db, IHttpContextAccessor http)
+public class AdminAuditService(EasyStockDbContext db, IHttpContextAccessor http, ILogger<AdminAuditService> logger)
 {
     /// <summary>
     /// Log de ação do operador admin. Use <paramref name="motivo"/> para a justificativa
@@ -40,5 +40,28 @@ public class AdminAuditService(EasyStockDbContext db, IHttpContextAccessor http)
             : ctx?.Connection.RemoteIpAddress?.ToString();
         db.AdminAuditLogs.Add(AdminAuditLog.Criar(email, acao, detalhes, tenantId, ip, motivo, entidadeAfetadaId));
         await db.CommitAsync();
+    }
+
+    /// <summary>
+    /// Variante best-effort de <see cref="LogAsync"/> (ADR-0030): para auditoria de operação
+    /// corriqueira (ex.: mutações de ticket) onde a operação JÁ foi commitada e uma falha de
+    /// auditoria NÃO pode derrubar a resposta. NUNCA usar para auditoria sensível (revelação de
+    /// PII/LGPD), que deve continuar em <see cref="LogAsync"/> (que lança).
+    /// </summary>
+    public async Task TryLogAsync(
+        string acao,
+        string? detalhes = null,
+        Guid? tenantId = null,
+        string? motivo = null,
+        Guid? entidadeAfetadaId = null)
+    {
+        try
+        {
+            await LogAsync(acao, detalhes, tenantId, motivo, entidadeAfetadaId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha (best-effort) ao auditar acao {Acao} tenant {TenantId}", acao, tenantId);
+        }
     }
 }

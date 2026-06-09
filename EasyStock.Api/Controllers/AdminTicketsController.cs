@@ -234,7 +234,7 @@ public class AdminTicketsController(
             var ticket = await ticketService.AbrirAsync(new AbrirAdminTicketCommand(
                 req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel,
                 FaturaId: req.FaturaId, PedidoId: req.PedidoId));
-            await audit.LogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}, PedidoId={req.PedidoId}", req.EmpresaId);
+            await audit.TryLogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}, PedidoId={req.PedidoId}", req.EmpresaId);
             return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -265,7 +265,7 @@ public class AdminTicketsController(
             var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             var msg = await ticketService.ResponderAsync(new ResponderAdminTicketCommand(
                 id, req.Conteudo, req.Interno, req.AnexoIds));
-            await audit.LogAsync("TicketRespondido", $"TicketId={id}, Interno={req.Interno}", tenantId);
+            await audit.TryLogAsync("TicketRespondido", $"TicketId={id}, Interno={req.Interno}", tenantId);
             return DataCreated($"/api/admin/tickets/{id}/mensagens/{msg.Id}", new { msg.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -305,7 +305,7 @@ public class AdminTicketsController(
             var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             var bug = await bugFixService.GerarAsync(new GerarBugFixCommand(
                 id, req.Titulo, req.Descricao, req.Severidade, req.Componente, req.StackTrace));
-            await audit.LogAsync("BugFixGerado", $"OrigemTicketId={id}, NovoTicketId={bug.Id}", tenantId);
+            await audit.TryLogAsync("BugFixGerado", $"OrigemTicketId={id}, NovoTicketId={bug.Id}", tenantId);
             return DataCreated($"/api/admin/tickets/{bug.Id}", new { bug.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -382,7 +382,7 @@ public class AdminTicketsController(
         {
             var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
             await ticketService.AlterarStatusAsync(new AlterarStatusTicketCommand(id, TicketStatus.Fechado));
-            await audit.LogAsync("TicketFechado", $"TicketId={id}", tenantId);
+            await audit.TryLogAsync("TicketFechado", $"TicketId={id}", tenantId);
             return DataOk(new { id, status = "Fechado" });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }
@@ -409,7 +409,7 @@ public class AdminTicketsController(
             {
                 var tenantId = await db.AdminTickets.Where(t => t.Id == id).Select(t => (Guid?)t.EmpresaId).FirstOrDefaultAsync();
                 await ticketService.AlterarStatusAsync(new AlterarStatusTicketCommand(id, alvo));
-                await audit.LogAsync("TicketFechado", $"TicketId={id} (lote)", tenantId);
+                await audit.TryLogAsync("TicketFechado", $"TicketId={id} (lote)", tenantId);
                 sucesso++;
             }
             catch (KeyNotFoundException ex) { falhas.Add(new BulkFalha(id, ex.Message)); }

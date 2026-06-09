@@ -36,7 +36,7 @@ public class AdminClientesControllerTests : IDisposable
         var http = Substitute.For<IHttpContextAccessor>();
         http.HttpContext.Returns((HttpContext?)null);
 
-        var audit = new AdminAuditService(_db, http);
+        var audit = new AdminAuditService(_db, http, NullLogger<AdminAuditService>.Instance);
 
         var uow = Substitute.For<IUnitOfWork>();
 
