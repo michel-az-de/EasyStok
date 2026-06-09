@@ -154,7 +154,7 @@ else
             <div class="font-semibold text-yellow-900 text-sm">Pagamento pendente</div>
             <div class="text-xs text-yellow-800 mt-0.5">Este pedido foi entregue mas o pagamento ainda não foi registrado.</div>
         </div>
-        <button type="button" x-data @@click="$dispatch('open-modal', 'registrar-pagamento')"
+        <button type="button" x-data @@click="$dispatch('ir-para-pagamento')"
                 class="shrink-0 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-semibold rounded-lg">
             Registrar recebimento
         </button>
@@ -267,7 +267,8 @@ else
         </div>
     </div>
 
-    <div class="lg:col-span-2 space-y-4" x-data="{ tab: 'itens' }">
+    <div class="lg:col-span-2 space-y-4" x-data="{ tab: 'itens' }"
+         @@ir-para-pagamento.window="tab = 'pagamentos'; $nextTick(() => { const el = document.getElementById('ped-valor-pagamento'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); } })">
         <div class="ws p-0">
             <div class="flex border-b border-slate-200 px-4 pt-2 gap-1 overflow-x-auto">
                 @foreach (var (key, label, count) in new[] {
@@ -424,7 +425,7 @@ else
                                 <option value="transferencia">Transferência</option>
                                 <option value="outro">Outro</option>
                             </select>
-                            <input type="number" name="valor" x-model.number="valor" placeholder="Valor *" step="0.01" min="0.01" required
+                            <input type="number" id="ped-valor-pagamento" name="valor" x-model.number="valor" placeholder="Valor *" step="0.01" min="0.01" required
                                    aria-label="Valor do pagamento" class="ui-field text-sm text-right" style="grid-area: valor;" />
                             <input type="text" name="referencia" placeholder="Referência (txid, NSU)" aria-label="Referência" class="ui-field text-sm" style="grid-area: ref;" />
                             <input type="text" name="observacao" placeholder="Observação opcional" aria-label="Observação" class="ui-field text-sm" style="grid-area: obs;" />
