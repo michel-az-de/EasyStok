@@ -11,7 +11,15 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.HasKey(c => c.Id);
 
         builder.Property(c => c.StorefrontId).IsRequired();
-        builder.Property(c => c.ProdutoId).IsRequired();
+
+        // ProdutoId nullable: null = item avulso (sem vínculo com ERP).
+        // CHECK constraint no banco: produto_id IS NOT NULL OR nome_publico IS NOT NULL
+        // (adicionada via migration 0031-cardapio-produto-agnostico).
+        builder.Property(c => c.ProdutoId).IsRequired(false);
+
+        // Novos campos (ADR-0031): presentes no banco após migration 0031.
+        builder.Property(c => c.NomePublico).HasMaxLength(200);
+        builder.Property(c => c.CategoriaTexto).HasMaxLength(100);
 
         builder.Property(c => c.Visivel)
             .IsRequired()
@@ -45,10 +53,15 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.CriadoEm).IsRequired();
         builder.Property(c => c.AlteradoEm).IsRequired();
 
-        // Único (StorefrontId, ProdutoId): cada Produto aparece no máximo uma vez por storefront.
+        // Único (StorefrontId, ProdutoId) para itens VINCULADOS: cada Produto aparece
+        // no máximo uma vez por storefront. A condição WHERE produto_id IS NOT NULL
+        // é aplicada via SQL bruto na migration (EF não suporta partial index nativo).
         builder.HasIndex(c => new { c.StorefrontId, c.ProdutoId })
             .IsUnique()
+            .HasFilter("produto_id IS NOT NULL")
             .HasDatabaseName("uq_cardapio_item_storefront_produto");
+        // Nota: índice único para avulso (LOWER(nome_publico)) WHERE produto_id IS NULL
+        // é criado via migrationBuilder.Sql(..., suppressTransaction: true) na migration 0031.
 
         // Lookup por ordem dentro do storefront (lista pública do cardápio).
         builder.HasIndex(c => new { c.StorefrontId, c.OrdemExibicao })
@@ -61,10 +74,11 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
             .OnDelete(DeleteBehavior.Cascade);
 
         // FK Produto — RESTRICT: não permite deletar produto que está em algum cardápio.
-        // Forces explicit cleanup: remover do cardápio antes de deletar produto.
+        // IsRequired(false): FK é opcional — itens avulsos têm ProdutoId = null.
         builder.HasOne(c => c.Produto)
             .WithMany()
             .HasForeignKey(c => c.ProdutoId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

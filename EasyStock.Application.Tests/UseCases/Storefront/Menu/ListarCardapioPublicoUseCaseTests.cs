@@ -144,7 +144,7 @@ public class ListarCardapioPublicoUseCaseTests
         dto.Ordem.Should().Be(1.0);
         dto.Tag.Should().Be("vegetariano");
         dto.Disponivel.Should().BeTrue();
-        dto.EstoqueAtual.Should().Be(0, "estoque é snapshot eventual; valor real fora deste escopo");
+        dto.EstoqueAtual.Should().Be(0, "vinculado com ProdutoId retorna 0 (snapshot eventual); avulsos retornariam null");
     }
 
     // ── Storefront inexistente / inativo ───────────────────────────────

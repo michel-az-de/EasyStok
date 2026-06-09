@@ -57,16 +57,21 @@ public sealed class ListarCardapioPublicoUseCase(
         var itens = await cardapioItemRepository.GetVisiveisDoStorefrontAsync(storefront.Id, ct);
 
         var dtos = itens
-            .OrderBy(i => i.Produto?.Categoria?.Nome ?? SemCategoriaSentinela, StringComparer.Ordinal)
+            // CategoriaTexto ?? Produto.Categoria.Nome: avulsos usam CategoriaTexto;
+            // vinculados usam Produto.Categoria.Nome como fallback.
+            // Sentinela empurra itens sem categoria para o fim.
+            .OrderBy(i => i.CategoriaEfetiva() ?? SemCategoriaSentinela, StringComparer.Ordinal)
             .ThenBy(i => i.OrdemExibicao)
             .Select(i => new CardapioItemPublicoDto(
                 Id: i.Id,
-                Nome: i.Produto?.Nome ?? string.Empty,
+                Nome: i.NomeEfetivo() ?? string.Empty,
                 Descricao: i.DescricaoPublica,
                 PrecoCentavos: (long)Math.Round(i.PrecoEfetivo() * 100m, MidpointRounding.AwayFromZero),
                 ImagemUrl: i.FotoUrl,
-                EstoqueAtual: 0, // snapshot eventual — fora deste escopo (ver YAML TASK-EZ-MENU-001).
-                Categoria: i.Produto?.Categoria?.Nome,
+                // Avulso: null (frontend usa disponivel; estoqueAtual não se aplica).
+                // Vinculado: 0 por ora — snapshot eventual fora deste escopo (TASK-EZ-MENU-001).
+                EstoqueAtual: i.ProdutoId.HasValue ? 0 : null,
+                Categoria: i.CategoriaEfetiva(),
                 Ordem: i.OrdemExibicao,
                 Disponivel: i.Disponivel,
                 Tag: i.Tag))

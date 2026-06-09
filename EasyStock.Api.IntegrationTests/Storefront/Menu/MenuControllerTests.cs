@@ -318,7 +318,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
         string? Descricao,
         long PrecoCentavos,
         string? ImagemUrl,
-        int EstoqueAtual,
+        int? EstoqueAtual,   // null para itens avulsos (ADR-0031)
         string? Categoria,
         double Ordem,
         bool Disponivel,

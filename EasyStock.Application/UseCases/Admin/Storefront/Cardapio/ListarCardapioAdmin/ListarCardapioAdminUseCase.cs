@@ -7,8 +7,8 @@ public sealed record ListarCardapioAdminCommand(Guid StorefrontId) : ICommand;
 
 public sealed record CardapioItemAdminListItem(
     Guid Id,
-    Guid ProdutoId,
-    string ProdutoNome,
+    Guid? ProdutoId,          // null = item avulso (sem vínculo com ERP)
+    string NomeEfetivo,       // NomePublico ?? Produto.Nome
     double OrdemExibicao,
     decimal PrecoEfetivo,
     decimal? PrecoStorefrontOverride,
@@ -16,7 +16,8 @@ public sealed record CardapioItemAdminListItem(
     bool Disponivel,
     string? Tag,
     string? FotoUrl,
-    string? PesoExibicao);
+    string? PesoExibicao,
+    string? CategoriaTexto);  // categoria de exibição (avulso ou override de vinculado)
 
 public sealed record ListarCardapioAdminResult(
     Guid StorefrontId,
@@ -42,7 +43,7 @@ public class ListarCardapioAdminUseCase(
         var itens = items.Select(i => new CardapioItemAdminListItem(
             i.Id,
             i.ProdutoId,
-            i.Produto?.Nome ?? "(produto removido)",
+            i.NomeEfetivo() ?? "(sem nome)",
             i.OrdemExibicao,
             i.PrecoEfetivo(),
             i.PrecoStorefront,
@@ -50,7 +51,8 @@ public class ListarCardapioAdminUseCase(
             i.Disponivel,
             i.Tag,
             i.FotoUrl,
-            i.PesoExibicao)).ToList();
+            i.PesoExibicao,
+            i.CategoriaEfetiva())).ToList();
 
         return new ListarCardapioAdminResult(s.Id, s.Slug, s.TituloPublico, itens);
     }

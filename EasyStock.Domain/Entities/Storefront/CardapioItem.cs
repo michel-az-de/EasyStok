@@ -3,21 +3,28 @@ using System.Text.Json;
 namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
-/// Ponte entre <see cref="Storefront"/> e <see cref="Produto"/> (ERP).
-/// Cada CardapioItem aponta para um Produto e adiciona metadata pública
-/// (foto, descrição, tag, filtros, ordem) consumida pela UI.
+/// Item de cardápio público de um <see cref="Storefront"/>.
+/// Suporta dois modos que coexistem no mesmo storefront:
+///
+/// <list type="bullet">
+/// <item><term>Avulso</term>
+/// <description>Sem <see cref="ProdutoId"/>. Nome e preço são próprios do item
+/// (<see cref="NomePublico"/> obrigatório, <see cref="PrecoStorefront"/> obrigatório).
+/// Útil para tenants sem ERP (ex: Casa da Baba adicionando "Lasanha Bolonhesa").</description></item>
+/// <item><term>Vinculado</term>
+/// <description>Com <see cref="ProdutoId"/> (FK para Produto do ERP).
+/// <see cref="NomePublico"/> e <see cref="PrecoStorefront"/> são overrides opcionais;
+/// quando null, herda de <c>Produto.Nome</c> e <c>Produto.PrecoReferencia</c>.</description></item>
+/// </list>
 ///
 /// <para>
-/// <strong>Preço efetivo</strong>: <see cref="PrecoStorefront"/> (override
-/// específico do storefront) OU <c>Produto.PrecoReferencia</c> como fallback.
-/// Permite vender o mesmo produto por preços diferentes em storefronts diferentes
-/// sem duplicar Produto.
+/// <strong>Invariante de banco</strong>: CHECK constraint garante
+/// <c>produto_id IS NOT NULL OR nome_publico IS NOT NULL</c>.
 /// </para>
 ///
 /// <para>
 /// <strong>Default oculto</strong>: <see cref="Visivel"/> = false ao criar.
-/// Babá aprova manualmente após importar do ERP — evita publicar produtos
-/// sem revisar foto, descrição, alergênicos etc.
+/// Tenant publica manualmente — evita itens sem foto/descrição revisados irem ao ar.
 /// </para>
 ///
 /// <para>
@@ -33,7 +40,26 @@ public class CardapioItem
 
     public Guid Id { get; private set; }
     public Guid StorefrontId { get; private set; }
-    public Guid ProdutoId { get; private set; }
+
+    /// <summary>
+    /// FK para Produto do ERP. Null = item avulso (sem vínculo com ERP).
+    /// Invariante: <see cref="NomePublico"/> obrigatório quando null.
+    /// </summary>
+    public Guid? ProdutoId { get; private set; }
+
+    /// <summary>
+    /// Nome exibido no cardápio público. Armazenado em lowercase.
+    /// Obrigatório para itens avulsos (<see cref="ProdutoId"/> = null).
+    /// Para vinculados: override de <c>Produto.Nome</c> quando presente.
+    /// </summary>
+    public string? NomePublico { get; private set; }
+
+    /// <summary>
+    /// Categoria de exibição no cardápio. Armazenada em lowercase.
+    /// Para avulsos: categoria livre do tenant.
+    /// Para vinculados: override de <c>Produto.Categoria.Nome</c> quando presente.
+    /// </summary>
+    public string? CategoriaTexto { get; private set; }
 
     public bool Visivel { get; private set; }
     public bool Disponivel { get; private set; }
@@ -73,8 +99,55 @@ public class CardapioItem
     private CardapioItem() { }
 
     /// <summary>
-    /// Factory: cria item a partir de Produto existente. Defaults seguros:
-    /// <see cref="Visivel"/>=false, <see cref="Disponivel"/>=true, <see cref="FiltrosJson"/>="[]".
+    /// Factory: cria item <strong>avulso</strong> sem vínculo com Produto do ERP.
+    /// Útil para tenants que não usam inventário (ex: Casa da Baba).
+    /// </summary>
+    /// <param name="storefrontId">Storefront onde o item será exibido.</param>
+    /// <param name="nome">Nome exibido no cardápio. Armazenado em lowercase.</param>
+    /// <param name="precoEmReais">Preço em R$ (decimal, ex: 35.00m). Deve ser positivo.</param>
+    /// <param name="categoria">Categoria opcional. Armazenada em lowercase.</param>
+    public static CardapioItem CriarAvulso(
+        Guid storefrontId,
+        string nome,
+        decimal precoEmReais,
+        string? categoria = null)
+    {
+        if (storefrontId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("StorefrontId é obrigatório.");
+
+        if (string.IsNullOrWhiteSpace(nome))
+            throw new RegraDeDominioVioladaException("Nome é obrigatório para item avulso.");
+
+        ValidarTamanho(nome, max: 200, nome: "Nome do item");
+
+        if (precoEmReais <= 0m)
+            throw new RegraDeDominioVioladaException(
+                $"Preço deve ser positivo (recebido: {precoEmReais:C}).");
+
+        if (categoria is not null)
+            ValidarTamanho(categoria, max: 100, nome: "Categoria");
+
+        var agora = DateTime.UtcNow;
+        return new CardapioItem
+        {
+            Id = Guid.NewGuid(),
+            StorefrontId = storefrontId,
+            ProdutoId = null,                                            // avulso
+            NomePublico = nome.Trim().ToLowerInvariant(),
+            CategoriaTexto = categoria?.Trim().ToLowerInvariant(),
+            PrecoStorefront = precoEmReais,
+            Visivel = false,         // safe default — tenant publica manualmente
+            Disponivel = true,
+            OrdemExibicao = 0,
+            FiltrosJson = "[]",
+            CriadoEm = agora,
+            AlteradoEm = agora,
+        };
+    }
+
+    /// <summary>
+    /// Factory: cria item <strong>vinculado</strong> a Produto existente do ERP.
+    /// Defaults seguros: <see cref="Visivel"/>=false, <see cref="Disponivel"/>=true.
     /// </summary>
     public static CardapioItem CriarAPartirDeProduto(Guid storefrontId, Produto produto)
     {
@@ -93,7 +166,7 @@ public class CardapioItem
             Id = Guid.NewGuid(),
             StorefrontId = storefrontId,
             ProdutoId = produto.Id,
-            Visivel = false,         // safe default — Babá aprova manualmente
+            Visivel = false,         // safe default — tenant publica manualmente
             Disponivel = true,
             OrdemExibicao = 0,
             FiltrosJson = "[]",
@@ -101,6 +174,17 @@ public class CardapioItem
             AlteradoEm = agora,
         };
     }
+
+    /// <summary>
+    /// Nome efetivo: <see cref="NomePublico"/> override OU <c>Produto.Nome</c>.
+    /// Retorna null apenas se avulso sem NomePublico (estado inválido — CHECK no banco evita).
+    /// </summary>
+    public string? NomeEfetivo() => NomePublico ?? Produto?.Nome;
+
+    /// <summary>
+    /// Categoria efetiva: <see cref="CategoriaTexto"/> override OU <c>Produto.Categoria.Nome</c>.
+    /// </summary>
+    public string? CategoriaEfetiva() => CategoriaTexto ?? Produto?.Categoria?.Nome;
 
     /// <summary>
     /// Preço efetivo: <see cref="PrecoStorefront"/> override OU
@@ -162,6 +246,8 @@ public class CardapioItem
     /// limpo via "" (string vazia) ou via reset semantics (não suportado aqui — use sentinel).
     /// </summary>
     public void AtualizarMetadata(
+        string? nomePublico = null,
+        string? categoriaTexto = null,
         string? descricaoPublica = null,
         string? ingredientes = null,
         string? alergenos = null,
@@ -173,6 +259,22 @@ public class CardapioItem
         string? filtrosJson = null,
         string? pesoExibicao = null)
     {
+        if (nomePublico is not null)
+        {
+            if (string.IsNullOrWhiteSpace(nomePublico))
+                throw new RegraDeDominioVioladaException("Nome não pode ser vazio.");
+            ValidarTamanho(nomePublico, max: 200, nome: "Nome do item");
+            NomePublico = nomePublico.Trim().ToLowerInvariant();
+        }
+
+        if (categoriaTexto is not null)
+        {
+            ValidarTamanho(categoriaTexto, max: 100, nome: "Categoria");
+            CategoriaTexto = string.IsNullOrWhiteSpace(categoriaTexto)
+                ? null
+                : categoriaTexto.Trim().ToLowerInvariant();
+        }
+
         if (descricaoPublica is not null)
         {
             ValidarTamanho(descricaoPublica, max: 240, nome: "Descrição pública");

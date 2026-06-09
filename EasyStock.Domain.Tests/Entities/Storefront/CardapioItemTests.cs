@@ -384,4 +384,116 @@ public class CardapioItemTests
 
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
+
+    // ── CriarAvulso: item sem vínculo com ERP (ADR-0031) ──────────────
+
+    [Fact]
+    public void CriarAvulso_sucesso_ProdutoId_nulo()
+    {
+        var item = CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: "Lasanha Bolonhesa",
+            precoEmReais: 35.00m,
+            categoria: "Lasanhas");
+
+        item.ProdutoId.Should().BeNull("item avulso não tem vínculo com produto do ERP");
+        item.NomePublico.Should().Be("lasanha bolonhesa", "armazenado em lowercase");
+        item.CategoriaTexto.Should().Be("lasanhas", "armazenado em lowercase");
+        item.PrecoStorefront.Should().Be(35.00m, "preço é obrigatório para avulso");
+        item.Visivel.Should().BeFalse("safe default — tenant publica manualmente");
+        item.Disponivel.Should().BeTrue("disponível por padrão");
+        item.FiltrosJson.Should().Be("[]");
+    }
+
+    [Fact]
+    public void CriarAvulso_nome_nulo_throws()
+    {
+        var act = () => CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: null!,
+            precoEmReais: 35.00m);
+
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .WithMessage("*Nome*");
+    }
+
+    [Fact]
+    public void CriarAvulso_nome_whitespace_throws()
+    {
+        var act = () => CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: "   ",
+            precoEmReais: 35.00m);
+
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .WithMessage("*Nome*");
+    }
+
+    [Fact]
+    public void CriarAvulso_preco_zero_throws()
+    {
+        var act = () => CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: "Lasanha",
+            precoEmReais: 0m);
+
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .WithMessage("*Preço*positivo*");
+    }
+
+    [Fact]
+    public void CriarAvulso_preco_negativo_throws()
+    {
+        var act = () => CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: "Lasanha",
+            precoEmReais: -1m);
+
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .WithMessage("*Preço*positivo*");
+    }
+
+    [Fact]
+    public void CriarAvulso_sem_categoria_categoria_texto_null()
+    {
+        var item = CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: "Capeletti",
+            precoEmReais: 28.00m);
+
+        item.CategoriaTexto.Should().BeNull();
+        item.NomePublico.Should().Be("capeletti");
+    }
+
+    [Fact]
+    public void CriarAPartirDeProduto_backward_compat_com_produto_existente()
+    {
+        // Garante que a factory original (modo vinculado) não regrediu
+        var produto = NovoProdutoValido();
+        var item = CardapioItem.CriarAPartirDeProduto(Guid.NewGuid(), produto);
+        item.Produto = produto;
+
+        item.ProdutoId.Should().Be(produto.Id);
+        item.NomePublico.Should().BeNull("vinculado não preenche NomePublico por padrão");
+        item.CategoriaTexto.Should().BeNull("vinculado não preenche CategoriaTexto por padrão");
+        item.PrecoEfetivo().Should().Be(produto.PrecoReferencia!.Valor);
+    }
+
+    /// <summary>
+    /// Unit-pinning: fixa a conversão R$→centavos na camada de domínio.
+    /// PrecoEfetivo() retorna decimal em R$, não centavos.
+    /// A conversão ×100 acontece na projeção do DTO (ListarCardapioPublicoUseCase).
+    /// </summary>
+    [Fact]
+    public void PrecoEfetivo_avulso_retorna_decimal_em_reais_nao_centavos()
+    {
+        var item = CardapioItem.CriarAvulso(
+            storefrontId: Guid.NewGuid(),
+            nome: "Lasanha",
+            precoEmReais: 35.00m);
+
+        // PrecoEfetivo = 35.00m (R$), NÃO 3500 (centavos)
+        item.PrecoEfetivo().Should().Be(35.00m,
+            "domínio armazena e retorna em R$; centavos são responsabilidade do DTO");
+    }
 }

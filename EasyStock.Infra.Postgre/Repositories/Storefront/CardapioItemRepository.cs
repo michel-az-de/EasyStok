@@ -48,7 +48,7 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
     public async Task<IReadOnlyCollection<Guid>> GetProdutoIdsDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
         await db.CardapioItens
             .AsNoTracking()
-            .Where(c => c.StorefrontId == storefrontId)
-            .Select(c => c.ProdutoId)
+            .Where(c => c.StorefrontId == storefrontId && c.ProdutoId.HasValue)
+            .Select(c => c.ProdutoId!.Value)   // Guid? → Guid: safe após filtro HasValue
             .ToListAsync(ct);
 }

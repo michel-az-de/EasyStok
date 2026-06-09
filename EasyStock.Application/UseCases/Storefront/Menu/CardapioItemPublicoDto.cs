@@ -14,6 +14,8 @@
 /// <strong>EstoqueAtual</strong> é snapshot eventual — pode estar desatualizado
 /// pela cache HTTP de 5 min. Não usar para decisão de compra; apenas para sinal
 /// visual ("esgotado" via <see cref="Disponivel"/>).
+/// Null para itens avulsos (sem vínculo com ERP); frontend usa <see cref="Disponivel"/>
+/// como sinal canônico (esgotado = disponivel === false).
 /// </para>
 /// </summary>
 public sealed record CardapioItemPublicoDto(
@@ -22,7 +24,7 @@ public sealed record CardapioItemPublicoDto(
     string? Descricao,
     long PrecoCentavos,
     string? ImagemUrl,
-    int EstoqueAtual,
+    int? EstoqueAtual,   // null = avulso (sem inventário ERP)
     string? Categoria,
     double Ordem,
     bool Disponivel,
