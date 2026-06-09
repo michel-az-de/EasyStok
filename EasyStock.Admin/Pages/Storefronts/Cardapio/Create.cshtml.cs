@@ -5,6 +5,8 @@ namespace EasyStock.Admin.Pages.Storefronts.Cardapio;
 public class CreateModel(AdminApiClient api, AdminSessionService session, ILogger<CreateModel> log)
     : AdminPageBase(session)
 {
+    protected override bool PermiteNivelAdmin => true;
+
     [BindProperty(SupportsGet = true)] public Guid StorefrontId { get; set; }
     [BindProperty] public CreateInput Input { get; set; } = new();
 

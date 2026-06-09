@@ -435,34 +435,54 @@
         <form method="post" id="loginForm" autocomplete="on" aria-busy="false">
             @Html.AntiForgeryToken()
 
-            <div class="field-group">
-                <label for="Email">E-mail</label>
-                <input asp-for="Email" id="Email" type="email" required autocomplete="username"
-                       class="field-input"
-                       placeholder="admin@easystock.com.br" />
-            </div>
+            <!-- EmpresaId preenchido pelo JS step-2 antes do submit final -->
+            <input type="hidden" asp-for="EmpresaId" id="hiddenEmpresaId" />
 
-            <div class="field-group">
-                <label for="Senha">Senha</label>
-                <div class="relative">
-                    <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
-                           class="field-input pr-10"
-                           placeholder="••••••••••••" />
-                    <button type="button" id="toggleSenha"
-                            class="absolute right-3 top-1/2 -translate-y-1/2 text-es-ink-mute hover:text-es-ink text-base leading-none"
-                            aria-label="Mostrar/ocultar senha"
-                            onclick="const s=document.getElementById('Senha');s.type=s.type==='password'?'text':'password';this.textContent=s.type==='password'?'👁':'🙈';">👁</button>
+            <!-- Step 1: credenciais (sempre visível no início) -->
+            <div id="stepCredenciais">
+                <div class="field-group">
+                    <label for="Email">E-mail</label>
+                    <input asp-for="Email" id="Email" type="email" required autocomplete="username"
+                           class="field-input"
+                           placeholder="admin@easystock.com.br" />
                 </div>
+
+                <div class="field-group">
+                    <label for="Senha">Senha</label>
+                    <div class="relative">
+                        <input asp-for="Senha" id="Senha" type="password" required autocomplete="current-password"
+                               class="field-input pr-10"
+                               placeholder="••••••••••••" />
+                        <button type="button" id="toggleSenha"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-es-ink-mute hover:text-es-ink text-base leading-none"
+                                aria-label="Mostrar/ocultar senha"
+                                onclick="const s=document.getElementById('Senha');s.type=s.type==='password'?'text':'password';this.textContent=s.type==='password'?'👁':'🙈';">👁</button>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-launch" id="btnVerificar">
+                    Continuar
+                </button>
             </div>
 
-            <button type="submit" class="btn-launch" id="loginBtn">
-                Iniciar sessão
-            </button>
+            <!-- Step 2: seleção de empresa (visível só após verificação) -->
+            <div id="stepEmpresa" style="display:none;">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(247,242,232,.55);letter-spacing:.16em;text-transform:uppercase;margin-bottom:12px;">
+                    Selecione a empresa
+                </div>
+                <div id="listaEmpresas" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+                    <!-- Empresas injetadas pelo JS -->
+                </div>
+                <button type="button" id="btnVoltarEmpresa"
+                        style="font-size:12px;color:rgba(247,242,232,.5);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">
+                    ← Voltar
+                </button>
+            </div>
         </form>
     </div>
 
     <p class="footer-tag">
-        ACESSO RESTRITO <span class="sep">◇</span> SUPER ADMIN
+        ACESSO RESTRITO <span class="sep">◇</span> ADMIN
     </p>
 </div>
 
@@ -504,36 +524,28 @@
         setTimeout(type, 250);
     })();
 
-    // ── Loading overlay ao submeter ──────────────────────────────────────
+    // ── Login 2-etapas (ADR-0031) ────────────────────────────────────────
     (function () {
         const form = document.getElementById('loginForm');
         const overlay = document.getElementById('loadingOverlay');
-        const btn = document.getElementById('loginBtn');
+        const btnVerificar = document.getElementById('btnVerificar');
+        const stepCred = document.getElementById('stepCredenciais');
+        const stepEmp = document.getElementById('stepEmpresa');
+        const listaEmpresas = document.getElementById('listaEmpresas');
+        const hiddenEmpresaId = document.getElementById('hiddenEmpresaId');
+        const btnVoltar = document.getElementById('btnVoltarEmpresa');
         if (!form || !overlay) return;
 
-        // Foco inteligente: se há erro de autenticação server-side foca senha,
-        // senão foca email (substitui o autofocus nativo removido).
+        // Foco inteligente
         const hasServerError = !!document.querySelector('.alert-error');
         (hasServerError ? document.getElementById('Senha') : document.getElementById('Email'))?.focus();
 
-        form.addEventListener('submit', function () {
-            // Não previne o submit — só mostra o overlay enquanto o servidor processa
-            // e redireciona. Em caso de erro de validação client-side (HTML5 required),
-            // o submit é cancelado pelo browser e o overlay nem aparece.
-            if (!form.checkValidity()) return;
-
-            btn.disabled = true;
-            form.setAttribute('aria-busy', 'true');
+        function showOverlay() {
             overlay.classList.add('active');
-
-            // Sequência de checks animada — tempos cosméticos, não bloqueantes.
-            // O POST do form roda em paralelo; quando o servidor responder com
-            // redirect, o browser navega e descarta este script.
             const lines = overlay.querySelectorAll('.step-line');
             const stepDelays = [0, 600, 1100, 1700];
             lines.forEach((line, idx) => {
                 setTimeout(() => {
-                    // Marca a linha atual como ativa, anteriores como done.
                     lines.forEach((l, i) => {
                         l.classList.remove('active');
                         l.removeAttribute('aria-current');
@@ -545,23 +557,85 @@
                     });
                 }, stepDelays[idx]);
             });
-            // Última linha vira "done" depois de mais um tempinho — caso o servidor
-            // ainda não respondeu (rede lenta), mantém visual coerente.
-            setTimeout(() => {
-                lines.forEach((l) => {
-                    l.classList.remove('active');
-                    l.removeAttribute('aria-current');
-                    l.classList.add('done');
+        }
+
+        // Botão "Continuar": step 1 — verifica credenciais e lista empresas
+        btnVerificar?.addEventListener('click', async function () {
+            const email = document.getElementById('Email')?.value?.trim();
+            const senha = document.getElementById('Senha')?.value;
+            if (!email || !senha) { alert('Preencha e-mail e senha.'); return; }
+
+            btnVerificar.disabled = true;
+            btnVerificar.textContent = 'Verificando...';
+
+            try {
+                const resp = await fetch('/api/auth/lista-empresas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
                 });
-            }, stepDelays[stepDelays.length - 1] + 400);
+                const json = await resp.json();
+
+                if (!resp.ok) {
+                    const msg = json?.error?.message ?? 'E-mail ou senha incorretos.';
+                    alert(msg);
+                    btnVerificar.disabled = false;
+                    btnVerificar.textContent = 'Continuar';
+                    return;
+                }
+
+                const data = json.data ?? json;
+                if (data.isSuperAdmin) {
+                    // SuperAdmin: submit direto (sem empresa)
+                    showOverlay();
+                    form.submit();
+                    return;
+                }
+
+                // Tenant: mostrar picker de empresa
+                listaEmpresas.innerHTML = '';
+                (data.empresas ?? []).forEach(function (emp) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = emp.nome;
+                    btn.style.cssText = 'width:100%;padding:12px 14px;border-radius:8px;' +
+                        'background:rgba(2,8,31,.6);border:1px solid rgba(247,242,232,.18);' +
+                        'color:#F7F2E8;font-size:14px;cursor:pointer;text-align:left;' +
+                        'font-family:Inter,sans-serif;transition:border-color .2s;';
+                    btn.addEventListener('mouseenter', () => btn.style.borderColor = '#F47920');
+                    btn.addEventListener('mouseleave', () => btn.style.borderColor = 'rgba(247,242,232,.18)');
+                    btn.addEventListener('click', function () {
+                        hiddenEmpresaId.value = emp.id;
+                        showOverlay();
+                        form.submit();
+                    });
+                    listaEmpresas.appendChild(btn);
+                });
+
+                stepCred.style.display = 'none';
+                stepEmp.style.display = 'block';
+
+            } catch (e) {
+                alert('Erro de conexão. Tente novamente.');
+                btnVerificar.disabled = false;
+                btnVerificar.textContent = 'Continuar';
+            }
         });
 
-        // Se o usuário voltou pra esta página via Back após login bem-sucedido,
-        // garante que o overlay esteja invisível.
+        // Botão voltar: volta para step 1
+        btnVoltar?.addEventListener('click', function () {
+            stepEmp.style.display = 'none';
+            stepCred.style.display = 'block';
+            btnVerificar.disabled = false;
+            btnVerificar.textContent = 'Continuar';
+            hiddenEmpresaId.value = '';
+        });
+
+        // Se há erro server-side (POST voltou pra esta página), mostrar step 1
+        // (o servidor rejeitou o login, seja por credencial ou empresa).
         window.addEventListener('pageshow', () => {
             overlay.classList.remove('active');
             form.setAttribute('aria-busy', 'false');
-            if (btn) btn.disabled = false;
         });
     })();
 </script>

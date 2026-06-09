@@ -76,8 +76,15 @@ public class AuthControllerTests
         var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, currentUser, exportarLogger);
         var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, currentUser, unitOfWork2, anonimizarLogger);
 
+        var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
+        var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
+            Substitute.For<IUsuarioRepository>(),
+            Substitute.For<IPasswordHasher>(),
+            listarEmpresasLogger);
+
         _controller = new AuthController(
             _autenticarUseCase,
+            listarEmpresasUseCase,
             _mockJwtService,
             _refreshTokenRepository,
             _auditLogRepository,

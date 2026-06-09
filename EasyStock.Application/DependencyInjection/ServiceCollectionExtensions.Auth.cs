@@ -28,6 +28,7 @@ public static partial class ServiceCollectionExtensions
     {
         // Fluxos de login e sessão
         services.AddScoped<AutenticarUsuarioUseCase>();
+        services.AddScoped<ListarEmpresasParaLoginUseCase>(); // step-1 do login 2-etapas (ADR-0031)
         services.AddScoped<CadastrarUsuarioUseCase>();
         services.AddScoped<RefreshTokenUseCase>();
         services.AddScoped<LogoutUseCase>();

@@ -43,10 +43,13 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
             return;
         }
 
-        // Validação adicional: token tem claim nivel=SuperAdmin? Login filtra,
-        // mas é defesa em profundidade — se a claim sumiu/foi adulterada
-        // (token comprometido, app migrado), revoga sessão.
-        if (!IsSuperAdmin(token))
+        // Validação adicional: token tem claim nivel autorizado para esta página?
+        // PermiteNivelAdmin=true → cardápio/pages do tenant; false → SuperAdmin apenas.
+        var autorizado = PermiteNivelAdmin
+            ? IsSuperAdmin(token) || IsAdminComEmpresa(token)
+            : IsSuperAdmin(token);
+
+        if (!autorizado)
         {
             session.ClearSession();
             context.Result = new RedirectToPageResult("/Auth/Login");
@@ -94,10 +97,14 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
     }
 
     /// <summary>
+    /// Quando true, esta página aceita NivelAcesso.Admin (tenant) além de SuperAdmin.
+    /// Override nas pages de cardápio (ADR-0031). Default: false (SuperAdmin apenas).
+    /// </summary>
+    protected virtual bool PermiteNivelAdmin => false;
+
+    /// <summary>
     /// Decodifica o payload do JWT (segunda parte, base64url) e checa claim
-    /// nivel == SuperAdmin. Sem validação de assinatura — isso já é feito
-    /// pela API quando o token é usado em chamadas downstream; aqui é apenas
-    /// uma defesa em profundidade contra sessões com tokens não-admin.
+    /// nivel == SuperAdmin. Sem validação de assinatura — defesa em profundidade.
     /// </summary>
     private static bool IsSuperAdmin(string token)
     {
@@ -113,6 +120,54 @@ public abstract class AdminPageBase(AdminSessionService session) : PageModel
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Checa se o token tem nivel == Admin E empresaId preenchido.
+    /// Usado em páginas tenant (PermiteNivelAdmin = true).
+    /// </summary>
+    private static bool IsAdminComEmpresa(string token)
+    {
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return false;
+            var payload = Base64UrlDecode(parts[1]);
+            using var doc = JsonDocument.Parse(payload);
+            var nivel = doc.RootElement.TryGetProperty("nivel", out var n) ? n.GetString() : null;
+            var empresaId = doc.RootElement.TryGetProperty("empresaId", out var e) ? e.GetString() : null;
+            return string.Equals(nivel, "Admin", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrEmpty(empresaId);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Extrai o empresaId do JWT armazenado na sessão.
+    /// Retorna null para SuperAdmin (sem restrição de empresa).
+    /// </summary>
+    protected Guid? GetEmpresaIdFromToken()
+    {
+        var token = session.GetToken();
+        if (string.IsNullOrEmpty(token)) return null;
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return null;
+            var payload = Base64UrlDecode(parts[1]);
+            using var doc = JsonDocument.Parse(payload);
+            if (doc.RootElement.TryGetProperty("empresaId", out var e)
+                && Guid.TryParse(e.GetString(), out var id))
+                return id;
+            return null;
+        }
+        catch
+        {
+            return null;
         }
     }
 

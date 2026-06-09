@@ -23,6 +23,11 @@ public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
     [Required] string Senha,
     Guid? EmpresaId);
+
+/// <summary>Request para step-1 do login 2-etapas (ADR-0031).</summary>
+public sealed record ListarEmpresasParaLoginRequest(
+    [Required, EmailAddress] string Email,
+    [Required] string Senha);
 public sealed record LoginUsuarioInfo(Guid id, string nome, string email, string nivel);
 public sealed record LoginResponse(string token, string refreshToken, int expiresIn, LoginUsuarioInfo usuario);
 
@@ -31,6 +36,7 @@ public sealed record LoginResponse(string token, string refreshToken, int expire
 [Route("api/auth")]
 public class AuthController(
     AutenticarUsuarioUseCase autenticarUseCase,
+    ListarEmpresasParaLoginUseCase listarEmpresasParaLoginUseCase,
     IJwtTokenService jwtService,
     IRefreshTokenRepository refreshTokenRepository,
     IAuditLogRepository auditLogRepository,
@@ -106,6 +112,32 @@ public class AuthController(
             refreshTokenValue,
             jwtService.ExpiresInSeconds,
             new LoginUsuarioInfo(resultado.UsuarioId, resultado.Nome, resultado.Email, resultado.Nivel.ToString())));
+    }
+
+    /// <summary>
+    /// Step 1 do login 2-etapas (ADR-0031): valida credenciais sem emitir token.
+    /// Retorna lista de Empresas acessíveis ao usuário para exibir seletor de empresa.
+    /// Se IsSuperAdmin=true, o client prossegue direto para POST /login sem empresa.
+    /// Rate-limited igual ao login.
+    /// </summary>
+    [SwaggerOperation(Summary = "Step-1 login: validate credentials and return empresa list")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("lista-empresas")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ListarEmpresasParaLogin([FromBody] ListarEmpresasParaLoginRequest request)
+    {
+        try
+        {
+            var resultado = await listarEmpresasParaLoginUseCase.ExecuteAsync(
+                new ListarEmpresasParaLoginCommand(request.Email, request.Senha));
+            return DataOk(resultado);
+        }
+        catch (CredenciaisInvalidasException)
+        {
+            return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = "E-mail ou senha incorretos." } });
+        }
     }
 
     [SwaggerOperation(Summary = "Register new user account")]

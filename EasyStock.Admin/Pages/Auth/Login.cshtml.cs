@@ -16,6 +16,13 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
     [StringLength(200, MinimumLength = 8, ErrorMessage = "Senha deve ter pelo menos 8 caracteres.")]
     public string Senha { get; set; } = "";
 
+    /// <summary>
+    /// EmpresaId selecionado no step-2 do login (ADR-0031).
+    /// Null = tentativa step-1 ou SuperAdmin (sem restrição de empresa).
+    /// </summary>
+    [BindProperty]
+    public Guid? EmpresaId { get; set; }
+
     public string? Erro { get; set; }
     /// <summary>True quando o usuário caiu aqui por sessão expirada (cookie _se_admin).
     /// UI distingue visualmente desse caso (banner amarelo) vs erro de credencial (vermelho).</summary>
@@ -43,7 +50,7 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
 
         try
         {
-            var raw = await api.PostRawAsync("api/auth/login", new { email = Email, senha = Senha });
+            var raw = await api.PostRawAsync("api/auth/login", new { email = Email, senha = Senha, empresaId = EmpresaId });
 
             if (raw.TryGetProperty("error", out _))
             {
@@ -69,9 +76,18 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
                 return Page();
             }
 
-            if (!string.Equals(nivel, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            // Aceita SuperAdmin (acesso total) ou Admin com EmpresaId (tenant — ADR-0031).
+            var isSuperAdmin = string.Equals(nivel, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+            var isAdmin = string.Equals(nivel, "Admin", StringComparison.OrdinalIgnoreCase);
+            if (!isSuperAdmin && !isAdmin)
             {
                 Erro = "Acesso restrito a administradores.";
+                return Page();
+            }
+            // Admin sem empresa = token sem escopo → rejeitar
+            if (isAdmin && EmpresaId == null)
+            {
+                Erro = "Selecione a empresa antes de entrar.";
                 return Page();
             }
 

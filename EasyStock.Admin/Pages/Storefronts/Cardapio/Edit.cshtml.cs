@@ -5,6 +5,8 @@ namespace EasyStock.Admin.Pages.Storefronts.Cardapio;
 public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<EditModel> log)
     : AdminPageBase(session)
 {
+    protected override bool PermiteNivelAdmin => true;
+
     [BindProperty(SupportsGet = true)] public Guid StorefrontId { get; set; }
     [BindProperty(SupportsGet = true)] public Guid ItemId { get; set; }
     [BindProperty] public EditInput Input { get; set; } = new();

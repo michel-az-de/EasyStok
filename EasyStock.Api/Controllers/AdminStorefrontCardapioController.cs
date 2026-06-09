@@ -11,12 +11,13 @@ using Npgsql;
 namespace EasyStock.Api.Controllers;
 
 /// <summary>
-/// CRUD admin do Cardápio de um Storefront. Toda rota exige Policy SuperAdmin.
-/// Aninhado em /api/admin/storefronts/{storefrontId}/cardapio — convenção REST.
+/// CRUD admin do Cardápio de um Storefront.
+/// Aceita SuperAdmin e Admin (tenant). Aninhado em
+/// /api/admin/storefronts/{storefrontId}/cardapio — convenção REST.
 /// </summary>
 [ApiController]
 [Route("api/admin/storefronts/{storefrontId:guid}/cardapio")]
-[Authorize(Policy = "SuperAdmin")]
+[Authorize(Policy = "Admin")]   // "Admin" policy = SuperAdmin | Admin (ADR-0031)
 public class AdminStorefrontCardapioController(
     ListarCardapioAdminUseCase listar,
     AdicionarCardapioItemAdminUseCase adicionar,

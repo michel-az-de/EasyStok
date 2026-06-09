@@ -3,6 +3,8 @@
 public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger<IndexModel> log)
     : AdminPageBase(session)
 {
+    /// <summary>Permite NivelAcesso.Admin (tenant) acessar o cardápio — ADR-0031.</summary>
+    protected override bool PermiteNivelAdmin => true;
     [BindProperty(SupportsGet = true)] public Guid StorefrontId { get; set; }
 
     public string StorefrontSlug { get; private set; } = "";

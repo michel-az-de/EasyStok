@@ -55,6 +55,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     .AsNoTracking()
                     .IgnoreQueryFilters()
                     .Include(u => u.Empresas)
+                        .ThenInclude(ue => ue.Empresa) // carrega Nome da Empresa para ListarEmpresasParaLogin
                     .Include(u => u.Perfis!)
                         .ThenInclude(up => up.Perfil)
                             .ThenInclude(p => p!.Permissoes)
