@@ -207,6 +207,12 @@
         if (form.dataset._validateAttached === '1') return;
         form.dataset._validateAttached = '1';
 
+        // novalidate sistemico: impede a constraint validation HTML5 nativa de cancelar o
+        // submit antes deste handler (senao a mensagem custom + toast nao aparecem em campos
+        // com min/required/pattern nativos — ex.: o abrir-caixa do #546). Generaliza o padrao
+        // de Produtos/Pedidos a todo form[data-validate], sem depender de novalidate por view.
+        form.setAttribute('novalidate', '');
+
         // Limpa erro do campo enquanto o usuário digita — feedback rápido sem revalidar tudo.
         form.addEventListener('input', (e) => {
             const t = e.target;
