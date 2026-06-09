@@ -60,12 +60,11 @@ public class ResponderTicketClienteUseCaseTests
         await _ticketRepo.Received(1).UpdateAsync(ticket);
         await _ticketRepo.Received().AddHistoricoAsync(Arg.Is<TicketHistorico>(h =>
             h.Acao == TicketAcaoHistorico.Comentario));
-        await _notificador.Received(1).PublicarEventoAsync(
+        await _notificador.Received(1).EnfileirarEventoAsync(
             TipoEventoNotificacao.TicketRespondidoCliente,
             EmpresaId,
-            Arg.Any<Guid?>(),
             Arg.Any<string>(),
-            Arg.Any<IDictionary<string, object?>>(),
+            Arg.Any<Guid?>(),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).CommitAsync();
     }
@@ -128,9 +127,9 @@ public class ResponderTicketClienteUseCaseTests
         var act = () => Sut().ExecuteAsync(new ResponderTicketClienteCommand(Guid.NewGuid(), "ok"));
 
         await act.Should().ThrowAsync<KeyNotFoundException>();
-        await _notificador.DidNotReceive().PublicarEventoAsync(
-            Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<Guid?>(),
-            Arg.Any<string>(), Arg.Any<IDictionary<string, object?>>(), Arg.Any<CancellationToken>());
+        await _notificador.DidNotReceive().EnfileirarEventoAsync(
+            Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(),
+            Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
 
     [Theory]

@@ -1,7 +1,5 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Helpdesk;
-using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Services.Helpdesk;
@@ -14,8 +12,7 @@ namespace EasyStock.Api.Services.Helpdesk;
 public sealed class HelpdeskBugFixService(
     EasyStockDbContext db,
     ICurrentUserAccessor currentUser,
-    ISlaResolver slaResolver,
-    INotificadorService notificador)
+    ISlaResolver slaResolver)
 {
     public async Task<AdminTicket> GerarAsync(GerarBugFixCommand cmd, CancellationToken ct = default)
     {
@@ -25,8 +22,10 @@ public sealed class HelpdeskBugFixService(
         var origem = await db.AdminTickets.FirstOrDefaultAsync(t => t.Id == cmd.TicketOrigemId, ct)
             ?? throw new KeyNotFoundException("Ticket de origem nao encontrado.");
 
-        // Bug-fix sempre na maior prioridade da origem (no minimo Alta) e nivel N4.
-        var prioridade = origem.Prioridade == TicketPrioridade.Critica ? TicketPrioridade.Critica : TicketPrioridade.Alta;
+        // BUG-03: respeitar a severidade ESCOLHIDA no modal. Antes ignorava cmd.SeveridadeTecnica
+        // e usava sempre a prioridade da origem (no minimo Alta) -> "Media" virava "Alta". Decisao
+        // (Felipe): a escolha do operador manda (pode rebaixar uma origem Critica conscientemente).
+        var prioridade = MapearSeveridade(cmd.SeveridadeTecnica);
         var sla = await slaResolver.ResolverAsync(origem.EmpresaId, prioridade, ct: ct);
 
         var ticket = AdminTicket.Criar(
@@ -59,22 +58,23 @@ public sealed class HelpdeskBugFixService(
             ticket.Id, currentUser.UsuarioId, TicketAcaoHistorico.Criado,
             metadadosJson: JsonSerializer.Serialize(new { origem = origem.Id })));
 
+        // ADR-0030: BugFixCriado nao e enfileirado no P0 — destinatario seria o time de dev
+        // (usuarioId=null -> Falhado garantido). Notificacao do time de dev = P1-C.
         await db.CommitAsync();
-
-        await notificador.PublicarEventoAsync(
-            TipoEventoNotificacao.BugFixCriado,
-            origem.EmpresaId,
-            usuarioDestinoId: null,
-            payloadJson: JsonSerializer.Serialize(new
-            {
-                ticketId = ticket.Id,
-                ticketOrigemId = origem.Id,
-                titulo = ticket.Titulo,
-                severidade = cmd.SeveridadeTecnica,
-                componente = cmd.ComponenteAfetado
-            }),
-            ct: ct);
 
         return ticket;
     }
+
+    // BUG-03: mapeia a severidade tecnica escolhida -> prioridade do ticket de bug-fix.
+    // "Media" -> Normal (o enum TicketPrioridade nao tem "Media"). Tolerante a acento.
+    // Default Alta (bug de dev sem severidade explicita assume-se relevante).
+    private static TicketPrioridade MapearSeveridade(string? severidade) =>
+        (severidade ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "critica" or "crítica" => TicketPrioridade.Critica,
+            "alta" => TicketPrioridade.Alta,
+            "media" or "média" or "normal" => TicketPrioridade.Normal,
+            "baixa" => TicketPrioridade.Baixa,
+            _ => TicketPrioridade.Alta,
+        };
 }

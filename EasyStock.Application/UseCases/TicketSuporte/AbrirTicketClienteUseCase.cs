@@ -140,14 +140,13 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                 });
             }
 
-            await unitOfWork.CommitAsync();
-
-            // Notifica admins/atendentes — evento outbox publicado fora da transacao
-            // do ticket de proposito: se a notificacao falhar, ticket permanece criado.
-            await notificador.PublicarEventoAsync(
+            // ADR-0030: enfileira o evento no MESMO commit do negocio (atomico, nada aguardado
+            // pos-commit — se a notificacao falhasse pos-commit, antes corrompia a resposta do
+            // cliente). Sem modelo de destinatario de fila ainda (P1-C) o avaliador marca
+            // Falhado; a wiring fica pronta para o P1-C resolver o destino do time de atendimento.
+            await notificador.EnfileirarEventoAsync(
                 TipoEventoNotificacao.TicketCriado,
                 currentUser.EmpresaId,
-                usuarioDestinoId: null,
                 payloadJson: JsonSerializer.Serialize(new
                 {
                     ticketId = ticket.Id,
@@ -159,7 +158,10 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     pedidoId = pedido?.Id,
                     abertoPorCliente = true
                 }),
+                refEntidadeId: ticket.Id,
                 ct: ct);
+
+            await unitOfWork.CommitAsync();
 
             return new(ticket.Id, ticket.Status.ToString(), ticket.CriadoEm);
         }

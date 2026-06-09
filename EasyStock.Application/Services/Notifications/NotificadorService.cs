@@ -40,6 +40,20 @@ public sealed class NotificadorService(
         await unitOfWork.CommitAsync();
     }
 
+    public async Task EnfileirarEventoAsync(
+        TipoEventoNotificacao tipo,
+        Guid empresaId,
+        string payloadJson,
+        Guid? refEntidadeId = null,
+        CancellationToken ct = default)
+    {
+        // ADR-0030: só estagia o evento Pendente na UoW atual (sem ProcessarEventoInternoAsync,
+        // sem CommitAsync). O caller commita junto com a mutação de negócio (atômico). O
+        // Avaliador processa fora de banda — nada aguardado/falível após o commit do negócio.
+        var evento = EventoNotificacao.Criar(tipo, empresaId, payloadJson, refEntidadeId);
+        await eventoRepository.AddAsync(evento, ct);
+    }
+
     public async Task AvaliarEventoAsync(EventoNotificacao evento, CancellationToken ct = default)
     {
         Guid? usuarioDestinoId = null;

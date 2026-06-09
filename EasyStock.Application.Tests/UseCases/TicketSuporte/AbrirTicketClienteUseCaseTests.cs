@@ -62,12 +62,11 @@ public class AbrirTicketClienteUseCaseTests
         await _slaResolver.Received(1).ResolverAsync(EmpresaId, TicketPrioridade.Normal, Arg.Any<DateTime?>(), Arg.Any<CancellationToken>());
         await _ticketRepo.Received(1).AddHistoricoAsync(Arg.Is<TicketHistorico>(h =>
             h.Acao == TicketAcaoHistorico.Criado && h.AutorId == UsuarioId));
-        await _notificador.Received(1).PublicarEventoAsync(
+        await _notificador.Received(1).EnfileirarEventoAsync(
             TipoEventoNotificacao.TicketCriado,
             EmpresaId,
-            Arg.Any<Guid?>(),
             Arg.Any<string>(),
-            Arg.Any<IDictionary<string, object?>>(),
+            Arg.Any<Guid?>(),
             Arg.Any<CancellationToken>());
         await _uow.Received(1).CommitAsync();
         result.TicketId.Should().Be(capturado.Id);
@@ -121,9 +120,9 @@ public class AbrirTicketClienteUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Fatura*");
         await _ticketRepo.DidNotReceive().InsertAsync(Arg.Any<AdminTicket>());
-        await _notificador.DidNotReceive().PublicarEventoAsync(
-            Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<Guid?>(),
-            Arg.Any<string>(), Arg.Any<IDictionary<string, object?>>(), Arg.Any<CancellationToken>());
+        await _notificador.DidNotReceive().EnfileirarEventoAsync(
+            Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(),
+            Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

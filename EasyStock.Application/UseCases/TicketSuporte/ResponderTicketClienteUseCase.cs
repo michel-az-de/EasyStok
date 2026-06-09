@@ -79,20 +79,21 @@ namespace EasyStock.Application.UseCases.TicketSuporte
                     valorDepois: ticket.Status.ToString()));
             }
 
-            await unitOfWork.CommitAsync();
-
-            await notificador.PublicarEventoAsync(
+            await notificador.EnfileirarEventoAsync(
                 TipoEventoNotificacao.TicketRespondidoCliente,
                 ticket.EmpresaId,
-                usuarioDestinoId: ticket.AtendenteId,
                 payloadJson: JsonSerializer.Serialize(new
                 {
                     ticketId = ticket.Id,
                     titulo = ticket.Titulo,
+                    usuarioId = ticket.AtendenteId,
                     reaberto,
                     autorId = currentUser.UsuarioId
                 }),
+                refEntidadeId: ticket.Id,
                 ct: ct);
+
+            await unitOfWork.CommitAsync();
         }
     }
 }

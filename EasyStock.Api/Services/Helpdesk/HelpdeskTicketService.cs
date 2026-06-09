@@ -22,7 +22,7 @@ public class HelpdeskTicketService(
     // justificado para um servico interno da camada Api.
     public virtual async Task<AdminTicket> AbrirAsync(AbrirAdminTicketCommand cmd, CancellationToken ct = default)
     {
-        var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Id == cmd.EmpresaId, ct)
+        _ = await db.Empresas.FirstOrDefaultAsync(e => e.Id == cmd.EmpresaId, ct)
             ?? throw new KeyNotFoundException("Empresa nao encontrada.");
 
         // F9 — valida fatura pertence a empresa quando informada.
@@ -74,21 +74,10 @@ public class HelpdeskTicketService(
             db.Faturas.Update(fatura);
         }
 
+        // ADR-0030: TicketCriado nao e enfileirado no P0 — so teria destinatario de "fila"
+        // (usuarioId=null -> Falhado garantido, poluindo o sinal de Falhado). Notificacao de
+        // fila/nivel para o time de atendimento entra no P1-C (modelo de destinatario de fila).
         await db.CommitAsync();
-
-        await notificador.PublicarEventoAsync(
-            TipoEventoNotificacao.TicketCriado,
-            cmd.EmpresaId,
-            usuarioDestinoId: null,
-            payloadJson: JsonSerializer.Serialize(new
-            {
-                ticketId = ticket.Id,
-                titulo = ticket.Titulo,
-                prioridade = ticket.Prioridade.ToString(),
-                nivel = ticket.Nivel.ToString(),
-                empresaNome = empresa.Nome
-            }),
-            ct: ct);
 
         return ticket;
     }
@@ -97,6 +86,9 @@ public class HelpdeskTicketService(
     {
         var ticket = await db.AdminTickets.FirstOrDefaultAsync(t => t.Id == cmd.TicketId, ct)
             ?? throw new KeyNotFoundException("Ticket nao encontrado.");
+
+        if (ticket.Status == TicketStatus.Fechado)
+            throw new RegraDeDominioVioladaException("Não é possível responder um ticket fechado. Reabra-o antes.");
 
         if (cmd.Interno && !currentUser.TemPermissao(Permissao.ResponderTicketsInternos))
             throw new UnauthorizedAccessException("Sem permissao para comentario interno.");
@@ -136,22 +128,23 @@ public class HelpdeskTicketService(
             cmd.Interno ? TicketAcaoHistorico.Comentario : TicketAcaoHistorico.Comentario,
             metadadosJson: JsonSerializer.Serialize(new { interno = cmd.Interno, transicionou })));
 
-        await db.CommitAsync();
-
         if (!cmd.Interno)
         {
-            await notificador.PublicarEventoAsync(
+            await notificador.EnfileirarEventoAsync(
                 TipoEventoNotificacao.TicketRespondidoAdmin,
                 ticket.EmpresaId,
-                usuarioDestinoId: ticket.CriadoPorId,
                 payloadJson: JsonSerializer.Serialize(new
                 {
                     ticketId = ticket.Id,
                     titulo = ticket.Titulo,
+                    usuarioId = ticket.CriadoPorId,
                     autorNome = currentUser.UsuarioId.ToString()
                 }),
+                refEntidadeId: ticket.Id,
                 ct: ct);
         }
+
+        await db.CommitAsync();
 
         return mensagem;
     }
@@ -200,29 +193,30 @@ public class HelpdeskTicketService(
             });
         }
 
-        await db.CommitAsync();
-
-        await notificador.PublicarEventoAsync(
+        await notificador.EnfileirarEventoAsync(
             TipoEventoNotificacao.TicketStatusAlterado,
             ticket.EmpresaId,
-            usuarioDestinoId: ticket.CriadoPorId,
-            payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, statusAntes = statusAntes.ToString(), statusDepois = cmd.NovoStatus.ToString() }),
+            payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, usuarioId = ticket.CriadoPorId, statusAntes = statusAntes.ToString(), statusDepois = cmd.NovoStatus.ToString() }),
+            refEntidadeId: ticket.Id,
             ct: ct);
 
         if (enviarConviteCsat)
         {
-            await notificador.PublicarEventoAsync(
+            await notificador.EnfileirarEventoAsync(
                 TipoEventoNotificacao.ConviteCsat,
                 ticket.EmpresaId,
-                usuarioDestinoId: ticket.CriadoPorId,
                 payloadJson: JsonSerializer.Serialize(new
                 {
                     ticketId = ticket.Id,
                     titulo = ticket.Titulo,
+                    usuarioId = ticket.CriadoPorId,
                     avaliarUrl = $"/api/helpdesk/tickets/{ticket.Id}/avaliacao"
                 }),
+                refEntidadeId: ticket.Id,
                 ct: ct);
         }
+
+        await db.CommitAsync();
     }
 
     public async Task AlterarPrioridadeAsync(AlterarPrioridadeTicketCommand cmd, CancellationToken ct = default)
@@ -259,6 +253,9 @@ public class HelpdeskTicketService(
         var ticket = await db.AdminTickets.FirstOrDefaultAsync(t => t.Id == cmd.TicketId, ct)
             ?? throw new KeyNotFoundException("Ticket nao encontrado.");
 
+        if (ticket.Status is TicketStatus.Resolvido or TicketStatus.Fechado)
+            throw new RegraDeDominioVioladaException("Não é possível assumir um ticket resolvido ou fechado.");
+
         var antes = ticket.AtendenteId;
         ticket.AtendenteId = currentUser.UsuarioId;
         ticket.AlteradoEm = DateTime.UtcNow;
@@ -270,14 +267,9 @@ public class HelpdeskTicketService(
             valorAntes: antes?.ToString(),
             valorDepois: currentUser.UsuarioId.ToString()));
 
+        // ADR-0030: nao enfileira TicketAtribuido aqui — assumir = auto-atribuicao (o ator e o
+        // proprio atendente); auto-notificacao seria ruido. Notifica so em AtribuirAsync.
         await db.CommitAsync();
-
-        await notificador.PublicarEventoAsync(
-            TipoEventoNotificacao.TicketAtribuido,
-            ticket.EmpresaId,
-            usuarioDestinoId: currentUser.UsuarioId,
-            payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo }),
-            ct: ct);
     }
 
     public async Task AtribuirAsync(AtribuirTicketCommand cmd, CancellationToken ct = default)
@@ -297,14 +289,18 @@ public class HelpdeskTicketService(
             valorAntes: antes?.ToString(),
             valorDepois: cmd.AtendenteId.ToString()));
 
-        await db.CommitAsync();
+        // Notifica o atendente designado — exceto auto-atribuicao (ator == destino), que seria ruido.
+        if (cmd.AtendenteId != currentUser.UsuarioId)
+        {
+            await notificador.EnfileirarEventoAsync(
+                TipoEventoNotificacao.TicketAtribuido,
+                ticket.EmpresaId,
+                payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo, usuarioId = cmd.AtendenteId }),
+                refEntidadeId: ticket.Id,
+                ct: ct);
+        }
 
-        await notificador.PublicarEventoAsync(
-            TipoEventoNotificacao.TicketAtribuido,
-            ticket.EmpresaId,
-            usuarioDestinoId: cmd.AtendenteId,
-            payloadJson: JsonSerializer.Serialize(new { ticketId = ticket.Id, titulo = ticket.Titulo }),
-            ct: ct);
+        await db.CommitAsync();
     }
 
     public async Task EncaminharAsync(EncaminharNivelCommand cmd, CancellationToken ct = default)
@@ -314,6 +310,9 @@ public class HelpdeskTicketService(
 
         var ticket = await db.AdminTickets.FirstOrDefaultAsync(t => t.Id == cmd.TicketId, ct)
             ?? throw new KeyNotFoundException("Ticket nao encontrado.");
+
+        if (ticket.Status == TicketStatus.Fechado)
+            throw new RegraDeDominioVioladaException("Não é possível encaminhar um ticket fechado.");
 
         var antes = ticket.Nivel;
         if (antes == cmd.NovoNivel) return;
@@ -328,20 +327,8 @@ public class HelpdeskTicketService(
             valorDepois: cmd.NovoNivel.ToString(),
             metadadosJson: cmd.Motivo is null ? null : JsonSerializer.Serialize(new { motivo = cmd.Motivo })));
 
+        // ADR-0030: TicketEncaminhadoNivel nao e enfileirado no P0 — destinatario seria a "fila"
+        // do nivel destino (usuarioId=null -> Falhado). Notificacao de fila/nivel = P1-C.
         await db.CommitAsync();
-
-        await notificador.PublicarEventoAsync(
-            TipoEventoNotificacao.TicketEncaminhadoNivel,
-            ticket.EmpresaId,
-            usuarioDestinoId: null,
-            payloadJson: JsonSerializer.Serialize(new
-            {
-                ticketId = ticket.Id,
-                titulo = ticket.Titulo,
-                nivelOrigem = antes.ToString(),
-                nivelDestino = cmd.NovoNivel.ToString(),
-                motivo = cmd.Motivo
-            }),
-            ct: ct);
     }
 }
