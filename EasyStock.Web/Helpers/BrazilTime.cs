@@ -15,9 +15,17 @@ public static class BrazilTime
 
     private static TimeZoneInfo ResolveTimeZone()
     {
-        // Linux (Render) usa IANA; Windows usa o nome MSFT. Fallback evita crash em dev local.
+        // Linux (container) usa IANA; Windows usa o nome MSFT; se nada resolver (ex.: imagem
+        // sem tzdata) cai na zona fixa -03:00 em vez de derrubar a tela. Brasil sem DST desde
+        // a Lei 13.650/2019, entao o offset fixo e correto p/ datas atuais.
         try { return TimeZoneInfo.FindSystemTimeZoneById(IanaId); }
-        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById(WindowsId); }
+        catch (TimeZoneNotFoundException) { }
+        catch (InvalidTimeZoneException) { }
+        try { return TimeZoneInfo.FindSystemTimeZoneById(WindowsId); }
+        catch (TimeZoneNotFoundException) { }
+        catch (InvalidTimeZoneException) { }
+        return TimeZoneInfo.CreateCustomTimeZone(
+            "America/Sao_Paulo (fixo -03:00)", TimeSpan.FromHours(-3), "Horario de Brasilia (fixo)", "BRT");
     }
 
     public static DateTime Now() => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZone);
