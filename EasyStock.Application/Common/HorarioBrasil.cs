@@ -20,7 +20,7 @@ public enum FonteFuso
 /// (BRT) e a validacao/abertura usavam DateOnly.FromDateTime(UtcNow) (UTC), dando saldos
 /// diferentes na janela noturna. Use isto para agrupar/validar por dia operacional.
 ///
-/// DUAS CLASSES DE COLUNA, FIXES OPOSTOS (ADR-0031):
+/// DUAS CLASSES DE COLUNA, FIXES OPOSTOS (ADR-0032):
 ///  - Colunas de INSTANTE real (DataMovimento, DataVenda, EntreguEm, PagoEm, CriadoEm):
 ///    agrupar pelo dia civil de Brasilia com <see cref="JanelaDiaUtc"/> (limites em UTC real,
 ///    meia-noite de Brasilia = 03:00Z). Comparar `col >= ini && col < fim`. Nunca `.Date`.

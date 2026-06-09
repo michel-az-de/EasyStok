@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace EasyStock.ArchitectureTests;
 
 /// <summary>
-/// Guard (Anel 1 / ADR-0031): DateTime.Now, DateTime.Today, DateTimeOffset.Now e
+/// Guard (Anel 1 / ADR-0032): DateTime.Now, DateTime.Today, DateTimeOffset.Now e
 /// TimeZoneInfo.Local NAO podem aparecer nos projetos core do backend.
 ///
 /// Racionamento: o servidor roda em UTC; esses membros retornam o "horario local do
