@@ -1,3 +1,5 @@
+using EasyStock.Application.Common;
+
 namespace EasyStock.Api.Services;
 
 public sealed class GeradorNotificacoesAutomaticas(
@@ -67,7 +69,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                     page => estoqueRepository.GetProximoVencimentoAsync(empresa.Id, configuracaoLoja.DiasAlertaValidade, page, 100, loja.Id),
                     item =>
                     {
-                        var diasRestantes = item.ValidadeEm?.DiasAteVencimento() ?? 0;
+                        var diasRestantes = item.ValidadeEm?.DiasAteVencimento(HorarioBrasil.Hoje()) ?? 0;
                         if (diasRestantes < 0)
                         {
                             // Ja vencido — gera ProdutoVencido

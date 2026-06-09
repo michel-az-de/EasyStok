@@ -1,3 +1,4 @@
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Services
@@ -22,7 +23,7 @@ namespace EasyStock.Domain.Services
             if (limiteEstoqueBaixo < 0) throw new ArgumentOutOfRangeException(nameof(limiteEstoqueBaixo));
             if (diasProximoVencimento < 0) throw new ArgumentOutOfRangeException(nameof(diasProximoVencimento));
 
-            var hoje = DateTime.UtcNow.Date;
+            var hoje = OperacionalFuso.DataOperacional(DateTime.UtcNow);
             var sinais = new List<SinalSaude>();
 
             foreach (var (produtoNome, quantidade, validade) in itens)

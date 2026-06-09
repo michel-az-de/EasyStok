@@ -20,19 +20,24 @@ namespace EasyStock.Domain.ValueObjects
             return new Validade(dataValidade);
         }
 
-        public bool EstaVencido(DateTime? referencia = null)
-        {
-            var refDate = (referencia ?? DateTime.UtcNow).Date;
-            return DataValidade < refDate;
-        }
+        /// <summary>
+        /// True se a validade ja passou (DataValidade &lt; referencia). Requer
+        /// a data civil de Brasilia — nunca passe UtcNow.Date diretamente; use
+        /// HorarioBrasil.Hoje() (Application) ou OperacionalFuso.DataOperacional()
+        /// (Domain) para obter o dia operacional correto.
+        /// </summary>
+        public bool EstaVencido(DateOnly referencia)
+            => DateOnly.FromDateTime(DataValidade) < referencia;
 
-        public int DiasAteVencimento(DateTime? referencia = null)
-        {
-            var refDate = (referencia ?? DateTime.UtcNow).Date;
-            return (DataValidade - refDate).Days;
-        }
+        /// <summary>
+        /// Dias restantes ate o vencimento (negativo = ja vencido). Requer
+        /// a data civil de Brasilia — mesma observacao de <see cref="EstaVencido"/>.
+        /// </summary>
+        public int DiasAteVencimento(DateOnly referencia)
+            => DateOnly.FromDateTime(DataValidade).DayNumber - referencia.DayNumber;
 
-        public bool EstaProntoParaVencerEm(int dias, DateTime? referencia = null)
+        /// <summary>True se o produto vence em ate <paramref name="dias"/> dias.</summary>
+        public bool EstaProntoParaVencerEm(int dias, DateOnly referencia)
         {
             if (dias < 0) throw new ArgumentOutOfRangeException(nameof(dias), "Dias não pode ser negativo.");
             return DiasAteVencimento(referencia) <= dias;

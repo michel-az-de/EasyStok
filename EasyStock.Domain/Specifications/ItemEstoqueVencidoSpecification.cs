@@ -8,13 +8,14 @@ namespace EasyStock.Domain.Specifications;
 /// </summary>
 public sealed class ItemEstoqueVencidoSpecification : IEspecificacao<ItemEstoque>
 {
-    private readonly DateTime _dataReferencia;
+    private readonly DateOnly _dataReferencia;
 
-    public ItemEstoqueVencidoSpecification(DateTime dataReferencia)
+    public ItemEstoqueVencidoSpecification(DateOnly dataReferencia)
     {
-        _dataReferencia = dataReferencia.Date;
+        _dataReferencia = dataReferencia;
     }
 
     public bool EhSatisfeitaPor(ItemEstoque item)
-        => item.ValidadeEm?.DataValidade.Date < _dataReferencia;
+        => item.ValidadeEm != null &&
+           DateOnly.FromDateTime(item.ValidadeEm.DataValidade) < _dataReferencia;
 }

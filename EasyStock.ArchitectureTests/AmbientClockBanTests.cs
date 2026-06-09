@@ -53,8 +53,6 @@ public class AmbientClockBanTests
     /// </summary>
     private static readonly HashSet<string> DebtAllowlist = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Fase B: DateTime.Today em ItemEstoqueProximoDoVencimentoSpecification (fix = HorarioBrasil.Hoje())
-        "EasyStock.Domain/Specifications/ItemEstoqueProximoDoVencimentoSpecification.cs",
         // Fase D: DateTime.Now em NfeCertificadoA1Service (X509.NotAfter Kind=Local — fix = normalizar para UTC)
         "EasyStock.Infra.Integrations/Fiscal/FocusNFe/NfeCertificadoA1Service.cs",
         // Baixa prio: DateTime.Today em nome de arquivo de relatorio (nao afeta dados)

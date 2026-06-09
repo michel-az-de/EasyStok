@@ -1,3 +1,4 @@
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Services
@@ -13,10 +14,10 @@ namespace EasyStock.Domain.Services
             PriorizarVenda
         }
 
-        public AcaoValidade Avaliar(Validade validade, DateTime? referencia = null, int diasPriorizarVenda = 7)
+        public AcaoValidade Avaliar(Validade validade, DateOnly? referencia = null, int diasPriorizarVenda = 7)
         {
             if (diasPriorizarVenda < 0) throw new ArgumentOutOfRangeException(nameof(diasPriorizarVenda));
-            var refDate = (referencia ?? DateTime.UtcNow).Date;
+            var refDate = referencia ?? OperacionalFuso.DataOperacional(DateTime.UtcNow);
             var dias = validade.DiasAteVencimento(refDate);
             if (dias < 0) return AcaoValidade.Descartar;
             if (dias == 0) return AcaoValidade.SepararParaQuarentena;

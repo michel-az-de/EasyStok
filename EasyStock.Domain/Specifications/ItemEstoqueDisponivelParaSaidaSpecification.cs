@@ -1,12 +1,15 @@
+using EasyStock.Domain.Defaults;
+
 namespace EasyStock.Domain.Specifications;
 
 public class ItemEstoqueDisponivelParaSaidaSpecification : IEspecificacao<ItemEstoque>
 {
-    private readonly DateTime _dataReferencia;
+    private readonly DateOnly _dataReferencia;
 
     public ItemEstoqueDisponivelParaSaidaSpecification(DateTime dataReferencia)
     {
-        _dataReferencia = dataReferencia;
+        // Converte o instante UTC para o dia operacional de Brasilia (ADR-0032).
+        _dataReferencia = OperacionalFuso.DataOperacional(dataReferencia);
     }
 
     public bool EhSatisfeitaPor(ItemEstoque item)

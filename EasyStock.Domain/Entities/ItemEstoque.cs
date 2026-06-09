@@ -165,7 +165,7 @@ namespace EasyStock.Domain.Entities
             if (Status == StatusItemEstoque.Bloqueado)
                 throw new ItemEstoqueBloqueadoException(Id);
 
-            if (ValidadeEm?.EstaVencido(dataReferencia) == true)
+            if (ValidadeEm?.EstaVencido(OperacionalFuso.DataOperacional(dataReferencia)) == true)
                 throw new ItemEstoqueVencidoException(Id, ValidadeEm.DataValidade);
 
             if (Status == StatusItemEstoque.Descartado)
@@ -194,7 +194,10 @@ namespace EasyStock.Domain.Entities
 
         public void RecalcularIndicadores(DateTime dataReferencia, int diasAlertaParado = OperacionalDefaults.DiasAlertaParado)
         {
-            if (ValidadeEm?.EstaVencido(dataReferencia) == true)
+            // Converte o instante UTC para o dia operacional de Brasilia (ADR-0032).
+            // Assinatura externa mantem DateTime para nao quebrar callers; conversao e interna.
+            var dataOp = OperacionalFuso.DataOperacional(dataReferencia);
+            if (ValidadeEm?.EstaVencido(dataOp) == true)
             {
                 Status = StatusItemEstoque.Vencido;
                 AtualizarDiasSemMovimentacao(dataReferencia);
