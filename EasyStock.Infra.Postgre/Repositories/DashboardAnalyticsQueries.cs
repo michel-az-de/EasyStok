@@ -433,12 +433,15 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         foreach (var v in vendasRaw)
         {
-            var k = BucketKey(porDia ? ToLocal(v.DataVenda) : v.DataVenda);
+            // ToLocal em ambos os casos: o bucket mensal tambem precisa do fuso do cliente.
+            // Antes, no modo mensal, DataVenda (UTC) podia cair no bucket do mes seguinte
+            // para vendas de 22h-23h59 BRT no ultimo dia do mes.
+            var k = BucketKey(ToLocal(v.DataVenda));
             if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita + v.Valor, b.Custo);
         }
         foreach (var c in custoRaw)
         {
-            var k = BucketKey(porDia ? ToLocal(c.DataMovimentacao) : c.DataMovimentacao);
+            var k = BucketKey(ToLocal(c.DataMovimentacao));
             if (buckets.TryGetValue(k, out var b)) buckets[k] = (b.Receita, b.Custo + c.Valor);
         }
 
@@ -759,8 +762,10 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         if (cached is not null) return cached;
 
         var ate = DateTime.UtcNow;
-        // Início do primeiro bucket: meses-1 meses atrás, dia 1, para retornar exatamente `meses` buckets.
-        var primeiroMes = new DateTime(ate.Year, ate.Month, 1).AddMonths(-(meses - 1));
+        // Deriva o mes atual a partir do fuso de Brasilia. Antes usava ate.Year/Month
+        // (UTC), o que jogava clientes criados em 31/mai 22h-23h59 BRT no bucket de junho.
+        var ateBrt = HorarioBrasil.DataOperacional(ate);
+        var primeiroMes = new DateTime(ateBrt.Year, ateBrt.Month, 1).AddMonths(-(meses - 1));
         var de = DateTime.SpecifyKind(primeiroMes, DateTimeKind.Utc);
 
         var clientes = await dbContext.Clientes.AsNoTracking()
@@ -774,7 +779,8 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         foreach (var c in clientes)
         {
-            var k = c.CriadoEm.ToString("MM/yyyy");
+            // CriadoEm e timestamptz (Kind=Utc); converte para data civil BRT antes de bucketizar.
+            var k = HorarioBrasil.DataOperacional(c.CriadoEm).ToString("MM/yyyy");
             if (buckets.ContainsKey(k)) buckets[k]++;
         }
 

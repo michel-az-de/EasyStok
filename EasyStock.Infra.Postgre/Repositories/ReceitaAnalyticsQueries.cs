@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
@@ -49,18 +50,20 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
         if (lojaId.HasValue)
             vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
 
+        // Busca DataVenda completa (timestamptz Kind=Utc) para converter ao mes BRT em memoria.
+        // Antes, groupBy por v.DataVenda.Year/Month (UTC) jogava vendas de 22h-23h59 BRT
+        // no bucket do mes seguinte na virada de mes.
         var raw = await vendasQuery
             .Select(v => new
             {
-                v.DataVenda.Year,
-                v.DataVenda.Month,
+                v.DataVenda,
                 ValorTotal = (decimal)v.ValorTotal,
                 TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
             })
             .ToListAsync();
 
         var result = raw
-            .GroupBy(v => new { v.Year, v.Month })
+            .GroupBy(v => { var d = HorarioBrasil.DataOperacional(v.DataVenda); return new { d.Year, d.Month }; })
             .Select(g =>
             {
                 var totalVendas = g.Count();
