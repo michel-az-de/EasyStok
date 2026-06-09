@@ -36,8 +36,9 @@ public sealed class HelpdeskClienteService(
 
     public async Task<EmpresaPreviewResultado> RevelarAsync(RevelarClienteCommand cmd, CancellationToken ct = default)
     {
-        if (!currentUser.TemPermissao(Permissao.RevelarPiiCliente))
-            throw new UnauthorizedAccessException("Sem permissao para revelar dados de cliente.");
+        // BUG-05/ADR-0030: gate unico = policy SuperAdmin no AdminEmpresaPreviewController (unico
+        // caller de RevelarAsync). A checagem redundante de Permissao.RevelarPiiCliente foi
+        // removida para alinhar a um so portao (SuperAdmin-only, decisao Felipe).
         if (string.IsNullOrWhiteSpace(cmd.Motivo) || cmd.Motivo.Trim().Length < 10)
             throw new InvalidOperationException("Motivo obrigatorio (minimo 10 caracteres).");
 

@@ -177,7 +177,9 @@ public static class ApiProxyEndpoints
                 var data = await api.PostAsync<JsonElement>(
                     $"api/admin/empresas/{empresaId}/preview/revelar",
                     new { motivo, ticketIdContexto = ticketId });
-                return Results.Ok(new { data });
+                // BUG-05: envelope consistente com os demais proxies (PostAsync ja desembrulha o
+                // "data" da Api). O front faz `clienteRevelado = d.data || d` e resolve em ambos.
+                return Results.Ok(data);
             }
             catch (EasyStock.Admin.Services.SessionExpiredException)
             {

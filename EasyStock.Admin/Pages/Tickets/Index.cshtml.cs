@@ -148,9 +148,18 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
         try
         {
-            await api.PostAsync<JsonElement>("api/admin/tickets",
+            var criado = await api.PostAsync<JsonElement>("api/admin/tickets",
                 new { empresaId, titulo = tituloT, descricao = descricaoT, categoria = categoriaT, prioridade = prioridadeT, nivel = nivelT });
             SetSucesso("Ticket criado com sucesso.");
+            // IMP-05/BUG-02: abre o ticket criado em vez de voltar p/ a lista. TryGetProperty
+            // case-insensitive com fallback NUNCA lanca (GetProperty lancaria e reintroduziria
+            // o 500 no exato fluxo que existe p/ tirar o 500 da criacao).
+            if (criado.ValueKind == JsonValueKind.Object
+                && (criado.TryGetProperty("id", out var idP) || criado.TryGetProperty("Id", out idP))
+                && Guid.TryParse(idP.GetString(), out var novoId) && novoId != Guid.Empty)
+            {
+                return RedirectToPage("Detail", new { Id = novoId });
+            }
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)

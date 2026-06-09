@@ -124,7 +124,15 @@
         DateTime.TryParse(prazoResp, out var prazoRespDt);
 
         string slaVariant; string slaText;
-        if (slaRespViolado || slaResolViolado) { slaVariant = "crit"; slaText = "VIOLADO"; }
+        var statusFinalizado = string.Equals(status, "Resolvido", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(status, "Fechado", StringComparison.OrdinalIgnoreCase);
+        if (statusFinalizado)
+        {
+            // BUG-04: ticket finalizado mostra o DESFECHO do SLA, nao tempo restante "corrente".
+            if (slaRespViolado || slaResolViolado) { slaVariant = "crit"; slaText = "Violado"; }
+            else { slaVariant = "ok"; slaText = "Cumprido"; }
+        }
+        else if (slaRespViolado || slaResolViolado) { slaVariant = "crit"; slaText = "VIOLADO"; }
         else if (prazoRespDt != default)
         {
             var restante = prazoRespDt.ToUniversalTime() - DateTime.UtcNow;
