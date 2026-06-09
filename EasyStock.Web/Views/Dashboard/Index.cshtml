@@ -216,6 +216,19 @@ else if (Model.ResumoApiFalhou)
                     </a>
                 </li>
             }
+            @if (Model.LotesVencidos > 0)
+            {
+                var lblV = Model.LotesVencidos == 1 ? "lote vencido com saldo" : "lotes vencidos com saldo";
+                <li>
+                    <a href="/estoque?status=vencido" class="ds-alert ds-alert--critical"
+                       aria-label="@(Model.LotesVencidos) @lblV. Risco sanitário (RDC 727). Ir para os lotes vencidos.">
+                        <span class="ds-alert-dot" aria-hidden="true"></span>
+                        <span class="ds-alert-count">@Model.LotesVencidos</span>
+                        <span class="ds-alert-text">@lblV</span>
+                        <span class="ds-alert-cta" aria-hidden="true">Descartar/revisar →</span>
+                    </a>
+                </li>
+            }
             @if (Model.ProdutosParados > 0)
             {
                 var paradosAria = $"{TextHelpers.Plural(Model.ProdutosParados, "produto parado", "produtos parados")} há mais de 30 dias. Considerar liquidar.";

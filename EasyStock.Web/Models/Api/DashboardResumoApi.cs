@@ -14,4 +14,5 @@ public record DashboardResumoApi
     public int AlertasEstoqueBaixo { get; init; }
     public int AlertasVencimento { get; init; }
     public int AlertasItensParados { get; init; }
+    public int AlertasVencidos { get; init; }
 }

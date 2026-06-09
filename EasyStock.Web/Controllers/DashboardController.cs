@@ -44,6 +44,7 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             vm.EstoqueCritico = d.AlertasEstoqueBaixo;
             vm.ProximosVencimento = d.AlertasVencimento;
             vm.ProdutosParados = d.AlertasItensParados;
+            vm.LotesVencidos = d.AlertasVencidos;
         }
 
         if (diaResult.Success && diaResult.Data is { } dia)

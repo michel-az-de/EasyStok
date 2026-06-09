@@ -14,7 +14,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal ReceitaEstimadaPeriodo,
         int AlertasEstoqueBaixo,
         int AlertasVencimento,
-        int AlertasItensParados);
+        int AlertasItensParados,
+        // #541: lotes JA vencidos com saldo > 0 (alerta sanitario RDC 727). Default 0 para
+        // nao quebrar construtores posicionais de teste; a query de producao passa o valor real.
+        int AlertasVencidos = 0);
 
     public sealed record ReceitaPorPeriodo(
         int Ano,

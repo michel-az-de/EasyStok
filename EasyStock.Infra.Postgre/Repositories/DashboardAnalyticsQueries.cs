@@ -94,6 +94,16 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             paradosQuery = paradosQuery.Where(i => i.LojaId == lojaId.Value);
         var alertasParados = await paradosQuery.CountAsync();
 
+        // Alerta sanitario (#541, RDC 727): lotes JA vencidos (Status==Vencido) com saldo > 0.
+        // Diferente do "vencendo" acima (ainda nao vencido); aqui o risco e vender produto
+        // vencido. Nao afeta a valoracao (estoqueQuery ja exclui Vencido) — so vira alerta.
+        var vencidosQuery = dbContext.ItensEstoque.AsNoTracking()
+            .Where(i => i.EmpresaId == empresaId && i.Status == StatusItemEstoque.Vencido
+                && (int)i.QuantidadeAtual > 0);
+        if (lojaId.HasValue)
+            vencidosQuery = vencidosQuery.Where(i => i.LojaId == lojaId.Value);
+        var alertasVencidos = await vencidosQuery.CountAsync();
+
         // Receita do período — filtra Natureza=Venda para excluir Perda,
         // Prejuizo, Vencimento, Doacao e UsoInterno do cálculo de receita.
         var movQuery = dbContext.MovimentacoesEstoque
@@ -129,7 +139,8 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             ReceitaEstimadaPeriodo: Math.Round(receitaEstimada, 2),
             AlertasEstoqueBaixo: alertasBaixo,
             AlertasVencimento: alertasValidade,
-            AlertasItensParados: alertasParados);
+            AlertasItensParados: alertasParados,
+            AlertasVencidos: alertasVencidos);
 
         await SetCachedAsync(cacheKey, result, DashboardTtl);
         return result;

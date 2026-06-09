@@ -12,7 +12,8 @@ public sealed record GetDashboardResult(
     decimal ReceitaEstimadaPeriodo,
     int AlertasEstoqueBaixo,
     int AlertasVencimento,
-    int AlertasItensParados)
+    int AlertasItensParados,
+    int AlertasVencidos = 0)
 {
     public static GetDashboardResult FromDto(DashboardResumo dto) =>
         new(
@@ -27,5 +28,6 @@ public sealed record GetDashboardResult(
             dto.ReceitaEstimadaPeriodo,
             dto.AlertasEstoqueBaixo,
             dto.AlertasVencimento,
-            dto.AlertasItensParados);
+            dto.AlertasItensParados,
+            dto.AlertasVencidos);
 }

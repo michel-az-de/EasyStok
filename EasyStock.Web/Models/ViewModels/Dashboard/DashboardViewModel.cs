@@ -11,6 +11,7 @@ public class DashboardViewModel
     public int EstoqueCritico { get; set; }
     public int ProximosVencimento { get; set; }
     public int ProdutosParados { get; set; }
+    public int LotesVencidos { get; set; }
     public int SugestoesReposicao { get; set; }
 
     // Resumo do dia (Pulso de hoje) — vem de /analytics/dia
@@ -57,7 +58,7 @@ public class DashboardViewModel
 
     public bool TemAlertasCriticos => EstoqueCritico > 0 || ProximosVencimento > 0;
     public bool TemQualquerAlerta =>
-        EstoqueCritico > 0 || ProximosVencimento > 0 || ProdutosParados > 0 || SugestoesReposicao > 0;
+        EstoqueCritico > 0 || ProximosVencimento > 0 || ProdutosParados > 0 || SugestoesReposicao > 0 || LotesVencidos > 0;
 
     public bool ResumoApiFalhou { get; set; }
     public bool TodasApisFalharam { get; set; }
