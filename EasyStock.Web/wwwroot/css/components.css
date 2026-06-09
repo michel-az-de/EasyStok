@@ -36,7 +36,7 @@
 .alert.ok   { border-left-color: var(--ok-600);     background: var(--ok-50); }
 .alert.warn { border-left-color: var(--warn-600);   background: var(--warn-50); }
 .alert.crit { border-left-color: var(--crit-600);   background: var(--crit-50); }
-.alert.info { border-left-color: var(--orange-600); background: var(--orange-50); }
+.alert.info { border-left-color: var(--navy-600); background: var(--navy-50); }
 .alert .ic {
   width: 44px; height: 44px; border-radius: 12px;
   display: grid; place-items: center; font-weight: 700; font-size: 22px; color: #fff;
@@ -44,7 +44,7 @@
 .alert.ok   .ic { background: var(--ok-600); }
 .alert.warn .ic { background: var(--warn-600); }
 .alert.crit .ic { background: var(--crit-600); }
-.alert.info .ic { background: var(--orange-600); }
+.alert.info .ic { background: var(--navy-600); }
 .alert .body .ttl  { font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.005em; margin-bottom: 2px; }
 .alert .body .desc { font-size: 13.5px; color: var(--text-secondary); line-height: 1.45; }
 .alert .cta {
@@ -124,8 +124,10 @@
 .skip-link:focus { left: 12px; }
 
 /* ---------- Focus ring (a11y) ---------- */
+/* Ring canonico = box-shadow laranja (app.css). Este outline e fallback p/ contextos
+   onde o box-shadow e cortado (overflow:hidden) — tambem laranja, por consistencia. */
 :focus-visible {
-  outline: 2px solid var(--navy-500);
+  outline: 2px solid var(--orange-500);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -361,8 +363,10 @@ button:focus-visible {
 .btn-lg { padding: 0.85rem 1.4rem; font-size: 0.95rem; border-radius: 12px; }
 .btn-block { width: 100%; }
 
-.btn-primary { background: var(--orange-500); color: #fff; border-color: var(--orange-500); }
-.btn-primary:hover { background: var(--orange-600); border-color: var(--orange-600); }
+/* Acao = orange-700 (AA 5.2:1 com branco). orange-500/600 reprovavam AA e mascaravam
+   a correcao em tokens.css (este bloco carrega depois). Ver epic #534. */
+.btn-primary { background: var(--action-accent); color: #fff; border-color: var(--action-accent); }
+.btn-primary:hover { background: var(--action-accent-hover); border-color: var(--action-accent-hover); }
 
 .btn-navy { background: var(--navy-700); color: #fff; border-color: var(--navy-700); }
 .btn-navy:hover { background: var(--navy-800, #0a1f54); border-color: var(--navy-800, #0a1f54); }
@@ -459,6 +463,11 @@ button:focus-visible {
 .badge-warn    { background: var(--warn-100);  color: var(--warn-700); }
 .badge-danger  { background: var(--crit-100);  color: var(--crit-700); }
 .badge-soft    { background: var(--ink-50);    color: var(--ink-600); border: 1px solid var(--ink-200); }
+/* Estado terminal de-enfatizado (ex: cancelado): riscado sobre o badge-neutral.
+   NB: o sistema de badge tem 4-5 definicoes sobrepostas (tokens/components/app, com
+   hex hardcoded em app.css vencendo). O dedup canonico fica p/ esforco proprio (#534);
+   aqui so o hook do riscado, que nenhuma outra regra define. */
+.badge-struck  { text-decoration: line-through; opacity: 0.9; }
 
 /* ---------- Stat card (T2.11) ---------- */
 .stat-card {

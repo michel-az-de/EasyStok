@@ -1,0 +1,10 @@
+@*
+    Badge de status canonico. Uso:
+        <partial name="_StatusBadge" model="@pedido.Status" />
+    Resolve label + classe via StatusHelper (vocabulario unico, esquema nao-laranja,
+    estados terminais de-enfatizados). Centraliza a renderizacao de status: substitui
+    pills inline ad-hoc. Ver epic #534 / StatusHelper.cs.
+*@
+@model string
+@{ var info = EasyStock.Web.Helpers.StatusHelper.Resolve(Model); }
+<span class="badge @info.BadgeClass">@info.Label</span>

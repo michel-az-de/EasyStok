@@ -16,7 +16,7 @@
         'success-undo': { bg: '#059669', icon: '✓' }, // C3: alias visual de success
         error:          { bg: '#DC2626', icon: '✕' },
         warning:        { bg: '#D97706', icon: '⚠' },
-        info:           { bg: '#4F46E5', icon: 'ℹ' },
+        info:           { bg: '#15388A', icon: 'ℹ' },
     };
 
     const DURATION = { success: 3500, 'success-undo': 5000, error: 6000, warning: 5000, info: 3500 };

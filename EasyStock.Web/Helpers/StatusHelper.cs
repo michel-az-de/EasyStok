@@ -15,11 +15,13 @@ public static class StatusHelper
     private static readonly Dictionary<string, StatusInfo> Map = new(StringComparer.OrdinalIgnoreCase)
     {
         // ----- Pedidos -----
+        // Esquema de-enfatiza estados terminais (epic #534): cor chama atencao no que
+        // precisa de acao (aguardando/preparando); pronto=positivo; entregue/cancelado calmos.
         ["aguardando"] = new("Aguardando", "badge-warn",    "warn"),
         ["preparando"] = new("Preparando", "badge-info",    "info"),
-        ["pronto"]     = new("Pronto",     "badge-info",    "info"),
-        ["entregue"]   = new("Entregue",   "badge-ok",      "ok"),
-        ["cancelado"]  = new("Cancelado",  "badge-crit",    "crit"),
+        ["pronto"]     = new("Pronto",     "badge-ok",      "ok"),
+        ["entregue"]   = new("Entregue",   "badge-neutral", "neutral"),
+        ["cancelado"]  = new("Cancelado",  "badge-neutral badge-struck", "neutral"),
         ["em_producao"] = new("Em produção", "badge-info",  "info"),
 
         // ----- Lotes -----
