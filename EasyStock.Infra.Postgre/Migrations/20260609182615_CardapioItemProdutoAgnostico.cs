@@ -41,14 +41,18 @@ namespace EasyStock.Infra.Postgre.Migrations
                 table: "cardapio_item",
                 columns: new[] { "StorefrontId", "ProdutoId" },
                 unique: true,
-                filter: "produto_id IS NOT NULL");
+                filter: "\"ProdutoId\" IS NOT NULL");
 
-            // CHECK: garante invariante de domínio no banco (produto_id OR nome_publico NOT NULL).
+            // CHECK: garante invariante de domínio no banco ("ProdutoId" OR "NomePublico" NOT NULL).
             // Impede estado podre via import SQL, seeds ou bugs em outros use cases.
+            // Colunas em PascalCase citado (convenção do schema). DROP+ADD = idempotente
+            // (Postgres nao suporta ADD CONSTRAINT IF NOT EXISTS).
             migrationBuilder.Sql(@"
                 ALTER TABLE cardapio_item
-                ADD CONSTRAINT IF NOT EXISTS chk_cardapio_item_nome_ou_produto
-                CHECK (produto_id IS NOT NULL OR nome_publico IS NOT NULL);");
+                DROP CONSTRAINT IF EXISTS chk_cardapio_item_nome_ou_produto;
+                ALTER TABLE cardapio_item
+                ADD CONSTRAINT chk_cardapio_item_nome_ou_produto
+                CHECK (""ProdutoId"" IS NOT NULL OR ""NomePublico"" IS NOT NULL);");
 
             // Índice único para itens avulsos (produto_id IS NULL).
             // Previne duplicatas por nome no mesmo storefront.
@@ -57,8 +61,8 @@ namespace EasyStock.Infra.Postgre.Migrations
             // IF NOT EXISTS: idempotente (safe re-run).
             migrationBuilder.Sql(
                 @"CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cardapio_item_storefront_nome_avulso
-                  ON cardapio_item(""StorefrontId"", LOWER(nome_publico))
-                  WHERE produto_id IS NULL AND nome_publico IS NOT NULL;",
+                  ON cardapio_item(""StorefrontId"", LOWER(""NomePublico""))
+                  WHERE ""ProdutoId"" IS NULL AND ""NomePublico"" IS NOT NULL;",
                 suppressTransaction: true);
         }
 

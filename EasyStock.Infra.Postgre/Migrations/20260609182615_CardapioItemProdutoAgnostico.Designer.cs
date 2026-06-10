@@ -6843,7 +6843,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("StorefrontId", "ProdutoId")
                         .IsUnique()
                         .HasDatabaseName("uq_cardapio_item_storefront_produto")
-                        .HasFilter("produto_id IS NOT NULL");
+                        .HasFilter("\"ProdutoId\" IS NOT NULL");
 
                     b.ToTable("cardapio_item", (string)null);
                 });

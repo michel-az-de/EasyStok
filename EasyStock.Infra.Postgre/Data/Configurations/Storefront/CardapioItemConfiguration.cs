@@ -58,7 +58,7 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         // é aplicada via SQL bruto na migration (EF não suporta partial index nativo).
         builder.HasIndex(c => new { c.StorefrontId, c.ProdutoId })
             .IsUnique()
-            .HasFilter("produto_id IS NOT NULL")
+            .HasFilter("\"ProdutoId\" IS NOT NULL")
             .HasDatabaseName("uq_cardapio_item_storefront_produto");
         // Nota: índice único para avulso (LOWER(nome_publico)) WHERE produto_id IS NULL
         // é criado via migrationBuilder.Sql(..., suppressTransaction: true) na migration 0031.
