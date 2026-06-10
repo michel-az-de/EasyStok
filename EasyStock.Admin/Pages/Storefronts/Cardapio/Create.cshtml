@@ -15,88 +15,129 @@
 <es-card padding="lg" card-class="mt-4" style="max-width:720px;">
     <h2 style="margin:0 0 4px; font-size:18px; font-weight:600;">Adicionar item ao cardápio</h2>
     <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">
-        Item entra <strong>oculto</strong> por padrão — torne visível depois de revisar foto e descrição.
+        O item entra como <strong>rascunho</strong> (só você vê). Publique quando estiver pronto.
     </p>
 
-    @if (!Model.Produtos.Any())
-    {
-        <div style="background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.30); border-radius:var(--r-md); padding:12px 16px; color:var(--warn-700); font-size:13px;">
-            Nenhum produto disponível para adicionar — todos da empresa já estão no cardápio,
-            ou a empresa não tem produtos cadastrados. Cadastre produtos no ERP primeiro.
-        </div>
-    }
-    else
-    {
-        <form method="post" novalidate x-data="{ submitting: false }" x-on:submit="submitting = true">
-            @Html.AntiForgeryToken()
+    <form method="post" novalidate
+          x-data="{ modo: '@(Model.Input.Modo ?? "avulso")', submitting: false, detalhes: false }"
+          x-on:submit="submitting = true">
+        @Html.AntiForgeryToken()
 
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div style="background:rgba(239,68,68,.10); border:1px solid rgba(239,68,68,.30); color:var(--erro-600); border-radius:var(--r-md); padding:10px 14px; margin-bottom:16px; font-size:13px;">
-                    @foreach (var entry in ViewData.ModelState)
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div style="background:rgba(239,68,68,.10); border:1px solid rgba(239,68,68,.30); color:var(--erro-600); border-radius:var(--r-md); padding:10px 14px; margin-bottom:16px; font-size:13px;">
+                @foreach (var entry in ViewData.ModelState)
+                {
+                    foreach (var err in entry.Value!.Errors)
                     {
-                        foreach (var err in entry.Value!.Errors)
-                        {
-                            <div>• @err.ErrorMessage</div>
-                        }
+                        <div>• @err.ErrorMessage</div>
                     }
-                </div>
-            }
+                }
+            </div>
+        }
 
-            <div style="display:flex; flex-direction:column; gap:16px;">
-                <es-select asp-for="Input.ProdutoId" label="Produto" required="true">
+        <!-- Toggle de modo: avulso (padrão) vs vincular produto do ERP -->
+        @if (Model.Produtos.Any())
+        {
+            <div role="radiogroup" aria-label="Tipo de item"
+                 style="display:flex; gap:8px; margin-bottom:20px; background:var(--surface-2); padding:4px; border-radius:var(--r-md);">
+                <label style="flex:1; cursor:pointer; text-align:center; padding:8px 12px; border-radius:var(--r-sm); font-size:13px; font-weight:500;"
+                       x-bind:style="modo === 'avulso' ? 'background:var(--surface-1); box-shadow:var(--shadow-sm); color:var(--text-primary)' : 'color:var(--text-muted)'">
+                    <input type="radio" name="Input.Modo" value="avulso" x-model="modo" style="position:absolute; opacity:0; pointer-events:none;" />
+                    Criar item novo
+                </label>
+                <label style="flex:1; cursor:pointer; text-align:center; padding:8px 12px; border-radius:var(--r-sm); font-size:13px; font-weight:500;"
+                       x-bind:style="modo === 'vinculado' ? 'background:var(--surface-1); box-shadow:var(--shadow-sm); color:var(--text-primary)' : 'color:var(--text-muted)'">
+                    <input type="radio" name="Input.Modo" value="vinculado" x-model="modo" style="position:absolute; opacity:0; pointer-events:none;" />
+                    Usar produto do estoque
+                </label>
+            </div>
+        }
+        else
+        {
+            <input type="hidden" name="Input.Modo" value="avulso" />
+        }
+
+        <div style="display:flex; flex-direction:column; gap:16px;">
+
+            <!-- ── AVULSO: nome próprio ─────────────────────────────────── -->
+            <div x-show="modo === 'avulso'" style="display:flex; flex-direction:column; gap:16px;">
+                <es-input asp-for="Input.NomePublico" label="Nome do item"
+                          placeholder="Ex.: Lasanha Bolonhesa" maxlength="200" />
+            </div>
+
+            <!-- ── VINCULADO: produto do ERP ────────────────────────────── -->
+            <div x-show="modo === 'vinculado'" x-cloak style="display:flex; flex-direction:column; gap:16px;">
+                <es-select asp-for="Input.ProdutoId" label="Produto do estoque">
                     <option value="">— Escolha o produto —</option>
                     @foreach (var p in Model.Produtos)
                     {
                         <option value="@p.Id">
-                            @p.Nome
-                            @(p.PrecoReferencia.HasValue ? $" (R$ {p.PrecoReferencia.Value:F2})" : "")
+                            @p.Nome@(p.PrecoReferencia.HasValue ? $" (R$ {p.PrecoReferencia.Value:F2})" : "")
                         </option>
                     }
                 </es-select>
-
-                <es-input asp-for="Input.OrdemExibicao" type="number" step="0.5" min="0"
-                          label="Ordem de exibição" help-text="Use 0.5 entre 1 e 2 para reordenar sem renumerar." />
-
-                <es-checkbox asp-for="Input.Visivel" label="Tornar visível imediatamente"
-                             help-text="Por padrão entra oculto." />
-
-                <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0"
-                          label="Preço override (R$)" help-text="Deixe vazio para usar o PreçoReferência do Produto." />
-
-                <es-input asp-for="Input.FotoUrl" type="url" label="URL da foto" placeholder="https://cdn.exemplo.com/foto.webp"
-                          help-text="Upload de imagem para R2 está em pós-MVP. Por enquanto use URL externa." />
-
-                <es-input asp-for="Input.DescricaoPublica" label="Descrição pública"
-                          placeholder="Massa fresca em camadas com molho de tomate caseiro..." maxlength="240" />
-
-                <es-input asp-for="Input.Ingredientes" label="Ingredientes" maxlength="500" />
-
-                <es-input asp-for="Input.Alergenos" label="Alergênicos" placeholder="contém glúten, leite, ovo" maxlength="200" />
-
-                <es-input asp-for="Input.SugestaoMolho" label="Sugestão de molho" maxlength="200" />
-
-                <es-input asp-for="Input.TempoPreparo" label="Tempo de preparo" placeholder="ex: 25 min" maxlength="50" />
-
-                <es-input asp-for="Input.PesoExibicao" label="Peso de exibição" placeholder="ex: 500g" maxlength="50" />
-
-                <es-select asp-for="Input.Tag" label="Tag (opcional)">
-                    <option value="">— Sem tag —</option>
-                    <option value="assinatura">Assinatura</option>
-                    <option value="novo">Novo</option>
-                    <option value="vegetariano">Vegetariano</option>
-                </es-select>
-
-                <es-input asp-for="Input.Motivo" label="Motivo (opcional)" placeholder="Ex.: nova receita, demo" />
             </div>
 
-            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">
-                <es-button variant="ghost" href="/Storefronts/@Model.StorefrontId/Cardapio" :disabled="submitting">Cancelar</es-button>
-                <button type="submit" class="btn btn-primary btn-md" :disabled="submitting">
-                    <span x-show="!submitting">Adicionar ao cardápio</span>
-                    <span x-show="submitting" x-cloak>Adicionando…</span>
+            <!-- ── Comuns ───────────────────────────────────────────────── -->
+            <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0"
+                      label="Preço (R$)"
+                      help-text="No modo 'produto do estoque', deixe vazio para herdar o preço do produto." />
+
+            <div>
+                <es-input asp-for="Input.CategoriaTexto" label="Categoria"
+                          placeholder="Ex.: Lasanhas" maxlength="100" list="cat-existentes"
+                          help-text="Agrupa o item no cardápio público." />
+                <datalist id="cat-existentes">
+                    @foreach (var cat in Model.CategoriasExistentes)
+                    {
+                        <option value="@cat"></option>
+                    }
+                </datalist>
+            </div>
+
+            <es-input asp-for="Input.FotoUrl" type="url" label="URL da foto"
+                      placeholder="https://cdn.exemplo.com/foto.webp"
+                      help-text="Cole o link de uma imagem. Upload direto vem depois." />
+
+            <es-input asp-for="Input.DescricaoPublica" label="Descrição"
+                      placeholder="Massa fresca em camadas com molho de tomate caseiro..." maxlength="240" />
+
+            <es-select asp-for="Input.Tag" label="Tag (opcional)">
+                <option value="">— Sem tag —</option>
+                <option value="assinatura">Assinatura</option>
+                <option value="novo">Novo</option>
+                <option value="vegetariano">Vegetariano</option>
+            </es-select>
+
+            <!-- ── Detalhes nutricionais (colapsável) ───────────────────── -->
+            <div>
+                <button type="button" x-on:click="detalhes = !detalhes"
+                        style="background:none; border:none; padding:0; cursor:pointer; color:var(--accent); font-size:13px; font-weight:500; display:flex; align-items:center; gap:6px;">
+                    <span x-text="detalhes ? '▾' : '▸'"></span>
+                    Detalhes nutricionais (opcional)
                 </button>
+                <div x-show="detalhes" x-cloak style="display:flex; flex-direction:column; gap:16px; margin-top:16px;">
+                    <es-input asp-for="Input.Ingredientes" label="Ingredientes" maxlength="500" />
+                    <es-input asp-for="Input.Alergenos" label="Alergênicos" placeholder="contém glúten, leite, ovo" maxlength="200" />
+                    <es-input asp-for="Input.SugestaoMolho" label="Sugestão de molho" maxlength="200" />
+                    <es-input asp-for="Input.TempoPreparo" label="Tempo de preparo" placeholder="ex: 25 min" maxlength="50" />
+                    <es-input asp-for="Input.PesoExibicao" label="Peso de exibição" placeholder="ex: 500g" maxlength="50" />
+                    <es-input asp-for="Input.OrdemExibicao" type="number" step="0.5" min="0"
+                              label="Ordem de exibição" help-text="Use 0.5 entre 1 e 2 para reordenar sem renumerar." />
+                </div>
             </div>
-        </form>
-    }
+
+            <es-checkbox asp-for="Input.Visivel" label="Publicar imediatamente"
+                         help-text="Desmarcado = rascunho. Você publica quando estiver pronto." />
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">
+            <es-button variant="ghost" href="/Storefronts/@Model.StorefrontId/Cardapio" :disabled="submitting">Cancelar</es-button>
+            <button type="submit" class="btn btn-primary btn-md" :disabled="submitting">
+                <span x-show="!submitting">Adicionar ao cardápio</span>
+                <span x-show="submitting" x-cloak>Adicionando…</span>
+            </button>
+        </div>
+    </form>
 </es-card>

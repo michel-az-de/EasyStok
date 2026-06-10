@@ -25,7 +25,8 @@
 
 <es-data-table is-empty="@(!Model.Itens.Any())">
     <es-data-table-column key="ordem" label="Ordem" align="right" width="100px" />
-    <es-data-table-column key="produto" label="Produto" />
+    <es-data-table-column key="item" label="Item" />
+    <es-data-table-column label="Categoria" />
     <es-data-table-column label="Preço" align="right" />
     <es-data-table-column label="Visível" align="center" width="100px" />
     <es-data-table-column label="Disponível" align="center" width="120px" />
@@ -35,7 +36,11 @@
     @foreach (var item in Model.Itens)
     {
         var id = item.TryGetProperty("id", out var idP) ? idP.GetGuid() : Guid.Empty;
-        var produtoNome = item.TryGetProperty("produtoNome", out var pn) ? pn.GetString() ?? "(?)" : "(?)";
+        var nomeItem = item.TryGetProperty("nomeEfetivo", out var pn) ? pn.GetString() ?? "(?)" : "(?)";
+        var categoria = item.TryGetProperty("categoriaTexto", out var cP) && cP.ValueKind == System.Text.Json.JsonValueKind.String
+            ? cP.GetString()
+            : null;
+        var avulso = !(item.TryGetProperty("produtoId", out var pidP) && pidP.ValueKind != System.Text.Json.JsonValueKind.Null);
         var ordem = item.TryGetProperty("ordemExibicao", out var oP) && oP.TryGetDouble(out var ov) ? ov : 0;
         var preco = item.TryGetProperty("precoEfetivo", out var pP) && pP.TryGetDecimal(out var pv) ? pv : 0m;
         var overrideP = item.TryGetProperty("precoStorefrontOverride", out var pop)
@@ -61,7 +66,18 @@
                            x-on:blur="if (parseFloat($el.value) !== @ordem.ToString(System.Globalization.CultureInfo.InvariantCulture)) $el.form.submit()" />
                 </form>
             </td>
-            <td data-label="Produto" style="color:var(--text-primary); font-weight:500;">@produtoNome</td>
+            <td data-label="Item" style="color:var(--text-primary); font-weight:500;">
+                @nomeItem
+                @if (!visivel)
+                {
+                    <es-badge variant="warn" style="margin-left:6px;">Rascunho</es-badge>
+                }
+                @if (avulso)
+                {
+                    <span style="margin-left:4px; font-size:11px; color:var(--text-muted); cursor:help;" title="Item avulso (sem vínculo com o estoque)">avulso</span>
+                }
+            </td>
+            <td data-label="Categoria" style="color:var(--text-muted);">@(string.IsNullOrEmpty(categoria) ? "—" : categoria)</td>
             <td data-label="Preço" class="es-data-table-td-numeric">
                 R$ @preco.ToString("F2")
                 @if (overrideP)

@@ -1,7 +1,7 @@
 @page "{storefrontId:guid}/Cardapio/Edit/{itemId:guid}"
 @model EasyStock.Admin.Pages.Storefronts.Cardapio.EditModel
 @{
-    ViewData["Title"] = $"Editar item — {Model.ProdutoNome}";
+    ViewData["Title"] = $"Editar item — {Model.NomeEfetivo}";
 }
 
 <es-breadcrumb>
@@ -13,9 +13,9 @@
 </es-breadcrumb>
 
 <es-card padding="lg" card-class="mt-4" style="max-width:720px;">
-    <h2 style="margin:0 0 4px; font-size:18px; font-weight:600;">@Model.ProdutoNome</h2>
+    <h2 style="margin:0 0 4px; font-size:18px; font-weight:600;">@Model.NomeEfetivo</h2>
     <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">
-        Editar metadata pública. Visibilidade / disponibilidade / ordem têm controles
+        Editar dados do item. Visibilidade / disponibilidade / ordem têm controles
         próprios na <a href="/Storefronts/@Model.StorefrontId/Cardapio" style="color:var(--accent);">listagem</a>.
     </p>
 
@@ -36,7 +36,17 @@
         }
 
         <div style="display:flex; flex-direction:column; gap:16px;">
-            <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0" label="Preço override (R$)" help-text="Vazio = usa Produto.PrecoReferencia." />
+            @if (Model.Avulso)
+            {
+                <es-input asp-for="Input.NomePublico" label="Nome do item" maxlength="200" />
+            }
+
+            <es-input asp-for="Input.CategoriaTexto" label="Categoria" placeholder="Ex.: Lasanhas" maxlength="100"
+                      help-text="Agrupa o item no cardápio público." />
+
+            <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0"
+                      label="@(Model.Avulso ? "Preço (R$)" : "Preço override (R$)")"
+                      help-text="@(Model.Avulso ? "Preço do item." : "Vazio = usa Produto.PrecoReferencia.")" />
 
             <es-input asp-for="Input.FotoUrl" type="url" label="URL da foto" placeholder="https://cdn..." />
 
@@ -58,8 +68,6 @@
                 <option value="novo">Novo</option>
                 <option value="vegetariano">Vegetariano</option>
             </es-select>
-
-            <es-input asp-for="Input.Motivo" label="Motivo (opcional)" />
         </div>
 
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:24px;">

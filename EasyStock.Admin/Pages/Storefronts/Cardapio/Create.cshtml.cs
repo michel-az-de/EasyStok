@@ -13,12 +13,25 @@ public class CreateModel(AdminApiClient api, AdminSessionService session, ILogge
     public string StorefrontSlug { get; private set; } = "";
     public Guid EmpresaIdStorefront { get; private set; }
 
-    /// <summary>Produtos da empresa do storefront que ainda não estão no cardápio.</summary>
+    /// <summary>Produtos da empresa do storefront que ainda não estão no cardápio (modo vinculado).</summary>
     public IReadOnlyList<ProdutoOption> Produtos { get; private set; } = Array.Empty<ProdutoOption>();
+
+    /// <summary>Categorias já usadas no cardápio (sugestões para o datalist de item avulso).</summary>
+    public IReadOnlyList<string> CategoriasExistentes { get; private set; } = Array.Empty<string>();
 
     public sealed class CreateInput
     {
-        [Required(ErrorMessage = "Escolha o produto.")] public Guid ProdutoId { get; set; }
+        /// <summary>"avulso" (item novo, sem ERP) ou "vinculado" (usa Produto do estoque). Default: avulso.</summary>
+        public string Modo { get; set; } = "avulso";
+
+        /// <summary>Preenchido só no modo vinculado.</summary>
+        public Guid? ProdutoId { get; set; }
+
+        /// <summary>Nome do item — obrigatório no modo avulso.</summary>
+        [StringLength(200)] public string? NomePublico { get; set; }
+
+        /// <summary>Categoria de exibição (livre). Usada para agrupar no cardápio público.</summary>
+        [StringLength(100)] public string? CategoriaTexto { get; set; }
 
         [Range(0, 1000)] public double OrdemExibicao { get; set; }
 
@@ -30,14 +43,14 @@ public class CreateModel(AdminApiClient api, AdminSessionService session, ILogge
         [StringLength(200)] public string? SugestaoMolho { get; set; }
         [StringLength(50)] public string? TempoPreparo { get; set; }
         [StringLength(500)] public string? FotoUrl { get; set; }
+
+        /// <summary>Preço em R$. Obrigatório no modo avulso; override opcional no vinculado.</summary>
         [Range(0, 100000)] public decimal? PrecoStorefront { get; set; }
 
         /// <summary>Valores permitidos: "assinatura", "novo", "vegetariano", ou vazio.</summary>
         public string? Tag { get; set; }
 
         [StringLength(50)] public string? PesoExibicao { get; set; }
-
-        [StringLength(500)] public string? Motivo { get; set; }
     }
 
     public sealed record ProdutoOption(Guid Id, string Nome, decimal? PrecoReferencia);
@@ -51,6 +64,21 @@ public class CreateModel(AdminApiClient api, AdminSessionService session, ILogge
 
     public async Task<IActionResult> OnPostAsync()
     {
+        var avulso = !string.Equals(Input.Modo, "vinculado", StringComparison.OrdinalIgnoreCase);
+
+        // Validação condicional por modo (não dá pra usar [Required] estático).
+        if (avulso)
+        {
+            if (string.IsNullOrWhiteSpace(Input.NomePublico))
+                ModelState.AddModelError("Input.NomePublico", "Informe o nome do item.");
+            if (!Input.PrecoStorefront.HasValue || Input.PrecoStorefront.Value <= 0m)
+                ModelState.AddModelError("Input.PrecoStorefront", "Informe um preço maior que zero.");
+        }
+        else if (!Input.ProdutoId.HasValue || Input.ProdutoId.Value == Guid.Empty)
+        {
+            ModelState.AddModelError("Input.ProdutoId", "Escolha o produto do estoque.");
+        }
+
         if (!ModelState.IsValid)
         {
             await CarregarContextoAsync();
@@ -59,11 +87,14 @@ public class CreateModel(AdminApiClient api, AdminSessionService session, ILogge
 
         try
         {
-            var resp = await api.PostAsync<JsonElement>(
+            await api.PostAsync<JsonElement>(
                 $"api/admin/storefronts/{StorefrontId}/cardapio",
                 new
                 {
-                    produtoId = Input.ProdutoId,
+                    // Avulso envia produtoId null + nomePublico; vinculado envia produtoId.
+                    produtoId = avulso ? (Guid?)null : Input.ProdutoId,
+                    nomePublico = avulso ? Input.NomePublico : null,
+                    categoriaTexto = string.IsNullOrWhiteSpace(Input.CategoriaTexto) ? null : Input.CategoriaTexto,
                     ordemExibicao = Input.OrdemExibicao,
                     visivel = Input.Visivel,
                     descricaoPublica = Input.DescricaoPublica,
@@ -74,11 +105,10 @@ public class CreateModel(AdminApiClient api, AdminSessionService session, ILogge
                     fotoUrl = Input.FotoUrl,
                     precoStorefront = Input.PrecoStorefront,
                     tag = string.IsNullOrWhiteSpace(Input.Tag) ? null : Input.Tag,
-                    pesoExibicao = Input.PesoExibicao,
-                    motivo = Input.Motivo
+                    pesoExibicao = Input.PesoExibicao
                 });
 
-            SetSucesso("Item adicionado ao cardápio.");
+            SetSucesso(Input.Visivel ? "Item adicionado e publicado." : "Item salvo como rascunho.");
             return RedirectToPage("/Storefronts/Cardapio/Index", new { storefrontId = StorefrontId });
         }
         catch (SessionExpiredException) { throw; }
@@ -127,20 +157,30 @@ public class CreateModel(AdminApiClient api, AdminSessionService session, ILogge
                 }
 
                 // 3. Filtrar produtos já no cardápio (call separado p/ não bloquear o pageload)
+                //    + coletar categorias existentes para o datalist do item avulso.
                 var rawCard = await api.GetRawAsync($"api/admin/storefronts/{StorefrontId}/cardapio");
                 var jaUsados = new HashSet<Guid>();
+                var categorias = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (rawCard.TryGetProperty("data", out var dCard) && dCard.TryGetProperty("itens", out var itArr))
                 {
                     foreach (var it in itArr.EnumerateArray())
                     {
                         if (it.TryGetProperty("produtoId", out var pid)
+                            && pid.ValueKind != JsonValueKind.Null
                             && Guid.TryParse(pid.GetString(), out var pidGuid))
                         {
                             jaUsados.Add(pidGuid);
                         }
+                        if (it.TryGetProperty("categoriaTexto", out var cat)
+                            && cat.ValueKind == JsonValueKind.String
+                            && !string.IsNullOrWhiteSpace(cat.GetString()))
+                        {
+                            categorias.Add(cat.GetString()!);
+                        }
                     }
                 }
                 Produtos = produtosList.Where(p => !jaUsados.Contains(p.Id)).ToList();
+                CategoriasExistentes = categorias.OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList();
             }
         }
         catch (Exception ex)

@@ -12,10 +12,16 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
     [BindProperty] public EditInput Input { get; set; } = new();
 
     public string StorefrontSlug { get; private set; } = "";
-    public string ProdutoNome { get; private set; } = "";
+    public string NomeEfetivo { get; private set; } = "";
+
+    /// <summary>True = item avulso (sem produto vinculado) — nome é editável.</summary>
+    public bool Avulso { get; private set; }
 
     public sealed class EditInput
     {
+        /// <summary>Nome editável (só persiste para avulso ou como override de vinculado).</summary>
+        [StringLength(200)] public string? NomePublico { get; set; }
+        [StringLength(100)] public string? CategoriaTexto { get; set; }
         [StringLength(240)] public string? DescricaoPublica { get; set; }
         [StringLength(500)] public string? Ingredientes { get; set; }
         [StringLength(200)] public string? Alergenos { get; set; }
@@ -25,7 +31,6 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         [Range(0, 100000)] public decimal? PrecoStorefront { get; set; }
         public string? Tag { get; set; }
         [StringLength(50)] public string? PesoExibicao { get; set; }
-        [StringLength(500)] public string? Motivo { get; set; }
     }
 
     public async Task<IActionResult> OnGetAsync()
@@ -49,9 +54,15 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                             && Guid.TryParse(idP.GetString(), out var idGuid)
                             && idGuid == ItemId)
                         {
-                            ProdutoNome = it.TryGetProperty("produtoNome", out var pn) ? pn.GetString() ?? "" : "";
+                            NomeEfetivo = it.TryGetProperty("nomeEfetivo", out var pn) ? pn.GetString() ?? "" : "";
+                            Avulso = !(it.TryGetProperty("produtoId", out var pid) && pid.ValueKind != JsonValueKind.Null);
+                            var categoria = it.TryGetProperty("categoriaTexto", out var ct) && ct.ValueKind == JsonValueKind.String
+                                ? ct.GetString() : null;
                             Input = new EditInput
                             {
+                                // Avulso: nome editável pré-preenchido. Vinculado: vazio (não força override).
+                                NomePublico = Avulso ? NomeEfetivo : null,
+                                CategoriaTexto = categoria,
                                 DescricaoPublica = null, // listagem não retorna esses campos — começa vazio
                                 FotoUrl = it.TryGetProperty("fotoUrl", out var fu) ? fu.GetString() : null,
                                 PrecoStorefront = it.TryGetProperty("precoStorefrontOverride", out var pso) && pso.ValueKind == JsonValueKind.Number ? pso.GetDecimal() : null,
@@ -84,6 +95,8 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                 $"api/admin/storefronts/{StorefrontId}/cardapio/{ItemId}",
                 new
                 {
+                    nomePublico = string.IsNullOrWhiteSpace(Input.NomePublico) ? null : Input.NomePublico,
+                    categoriaTexto = string.IsNullOrWhiteSpace(Input.CategoriaTexto) ? null : Input.CategoriaTexto,
                     descricaoPublica = Input.DescricaoPublica,
                     ingredientes = Input.Ingredientes,
                     alergenos = Input.Alergenos,
@@ -92,8 +105,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
                     fotoUrl = Input.FotoUrl,
                     precoStorefront = Input.PrecoStorefront,
                     tag = Input.Tag,
-                    pesoExibicao = Input.PesoExibicao,
-                    motivo = Input.Motivo
+                    pesoExibicao = Input.PesoExibicao
                 });
 
             SetSucesso("Item atualizado.");
