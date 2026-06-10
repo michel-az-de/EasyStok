@@ -87,6 +87,20 @@ public static class HorarioBrasil
     public static DateOnly Hoje() => DataOperacional(DateTime.UtcNow);
 
     /// <summary>
+    /// Instante UTC -> data E hora em Brasilia (Kind=Unspecified), para render de
+    /// data/hora local em telas/impressao. NAO usar para persistir nem comparar com
+    /// colunas (use as variantes de instante/janela). Ex.: carimbo "impresso em 09/06 14:32".
+    /// </summary>
+    public static DateTime ConverterParaBrasilia(DateTime utc)
+    {
+        var asUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        return TimeZoneInfo.ConvertTimeFromUtc(asUtc, Tz);
+    }
+
+    /// <summary>"Agora" no horario de Brasilia (data + hora). Para exibicao apenas.</summary>
+    public static DateTime Agora() => ConverterParaBrasilia(DateTime.UtcNow);
+
+    /// <summary>
     /// Janela UTC [ini, fim) correspondente ao dia civil de Brasilia, para filtrar colunas de
     /// INSTANTE real (timestamptz gravado de UtcNow). Ex.: `WHERE col >= ini && col < fim`.
     /// A meia-noite de Brasilia vira 03:00Z (offset -03:00). DST-safe.

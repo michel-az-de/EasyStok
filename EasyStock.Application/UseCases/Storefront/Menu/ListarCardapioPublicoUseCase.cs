@@ -77,6 +77,6 @@ public sealed class ListarCardapioPublicoUseCase(
                 Tag: i.Tag))
             .ToList();
 
-        return new ListarCardapioPublicoResult(dtos);
+        return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);
     }
 }

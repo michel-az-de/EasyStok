@@ -308,6 +308,45 @@ public sealed class MenuControllerTests : IAsyncLifetime
             "endpoint é AllowAnonymous — não exige cookie nem JWT");
     }
 
+    // ── Impressão (ADR-0031 fatia 9) ───────────────────────────────────
+
+    [SkippableFact]
+    public async Task GetImprimir_StorefrontComItens_RetornaHtmlComTituloENoStore()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+
+        var seed = await SeedCardapioAsync(factory, slug: "casa-da-baba-print");
+
+        var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu/imprimir");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.Content.Headers.ContentType?.MediaType.Should().Be("text/html");
+        resp.Headers.CacheControl?.NoStore.Should().BeTrue(
+            "impressão carimba data/hora local — não pode ser cacheada");
+
+        var html = await resp.Content.ReadAsStringAsync();
+        html.Should().Contain("Casa da Babá", "cabeçalho usa o título público do storefront");
+        html.Should().Contain("Lasanha de berinjela", "item visível deve aparecer");
+        html.Should().NotContain("Em rascunho", "item oculto (Visivel=false) não vai para impressão");
+        html.Should().Contain("window.print()", "botão de imprimir presente (escondido no @media print)");
+    }
+
+    [SkippableFact]
+    public async Task GetImprimir_SlugInexistente_Retorna404()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+
+        var resp = await client.GetAsync("/api/storefront/nao-existe-print/menu/imprimir");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ── DTO espelho ────────────────────────────────────────────────────
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
