@@ -100,6 +100,13 @@ public static class WebHttpServicesExtensions
         services.AddScoped<NotasFiscaisService>();
         services.AddScoped<ConfiguracaoFiscalService>();
 
+        // 6d. Menu lateral (ADR-0032, fatia 2): badges agregados com cache curto (60s)
+        // por empresa+loja. AddMemoryCache registra IMemoryCache (distinto do distributed
+        // cache da Session acima) — explícito mesmo que o Razor possa trazê-lo transitivo.
+        services.AddMemoryCache();
+        services.AddScoped<IMenuResumoSource, MenuResumoSource>();
+        services.AddScoped<MenuResumoService>();
+
         // 6b. Marketing options + Leads API service (landing publica)
         services.Configure<MarketingOptions>(config.GetSection("Marketing"));
         services.AddScoped<LeadsApiService>();
