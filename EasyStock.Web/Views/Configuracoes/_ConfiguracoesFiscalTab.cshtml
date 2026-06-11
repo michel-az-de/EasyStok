@@ -1,8 +1,11 @@
 @model EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal.ConfiguracaoFiscalViewModel
+@*
+    Aba "Fiscal" de Configurações (ADR-0032, fatia 8). Conteúdo movido de
+    ConfiguracaoFiscal/Index. Os formulários continuam POSTando para
+    /configuracao-fiscal/* (ConfiguracaoFiscalController), que redireciona
+    de volta para /configuracoes?tab=fiscal com Toast.
+*@
 @{
-    ViewBag.Title = "Configuração Fiscal";
-    Layout = "_Layout";
-
     var habilitada = Model.Habilitada;
     var podeHabilitar = Model.PodeHabilitar;
     var statusBadge = habilitada ? "badge-ok" : (podeHabilitar ? "badge-warn" : "badge-neutral");
@@ -12,9 +15,9 @@
 }
 
 <div class="flex items-center justify-between mb-6">
-    <div class="pg-hd">
-        <h1>Configuração Fiscal</h1>
-        <p>Defina regime, emitente, provedor SEFAZ e habilite a emissão de NFC-e.</p>
+    <div>
+        <h2 class="text-lg font-semibold text-slate-900">Configuração Fiscal</h2>
+        <p class="text-sm text-slate-500">Defina regime, emitente, provedor SEFAZ e habilite a emissão de NFC-e.</p>
     </div>
     <span class="badge @statusBadge text-sm">@statusTexto</span>
 </div>
