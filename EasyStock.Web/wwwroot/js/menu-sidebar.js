@@ -6,6 +6,7 @@
   if (!root) return;
 
   var MAX_FAV = 20;
+  var fine = !!(window.matchMedia && window.matchMedia('(pointer: fine)').matches); // desktop -> DnD
 
   function token() {
     var m = document.querySelector('meta[name="csrf-token"]');
@@ -83,6 +84,15 @@
       clone.id = 'es-row-' + k + '-fav';
       var star = clone.querySelector('.es-star');
       if (star) { star.setAttribute('aria-pressed', 'true'); star.setAttribute('aria-label', 'Remover de Meu dia'); }
+      // reorder (fatia 7c): DnD no desktop + botao ⋮ (menu de contexto, a11y/touch)
+      clone.setAttribute('draggable', fine ? 'true' : 'false');
+      var more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'es-more';
+      more.setAttribute('data-more', k);
+      more.setAttribute('aria-label', 'Mover ou remover de Meu dia');
+      more.innerHTML = '<span aria-hidden="true">⋮</span>';
+      clone.appendChild(more);
       sec.appendChild(clone);
     });
   }
@@ -129,6 +139,113 @@
     applyFav(next); // otimista
     save(next, current);
   });
+
+  // ─── Reorder dos favoritos (fatia 7c): DnD desktop + menu de contexto ───
+  var live = document.createElement('span');
+  live.setAttribute('aria-live', 'polite');
+  live.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;';
+  root.appendChild(live);
+
+  function favOrder() {
+    return Array.prototype.map.call(
+      root.querySelectorAll('[data-meu-dia] .es-ni-row[data-menu-key]'),
+      function (r) { return r.getAttribute('data-menu-key'); });
+  }
+  function announce(key, order) {
+    var lbl = root.querySelector('[data-meu-dia] .es-ni-row[data-menu-key="' + cssEsc(key) + '"] .es-ni-lbl');
+    var nome = lbl ? lbl.textContent : key;
+    live.textContent = nome + ', posicao ' + (order.indexOf(key) + 1) + ' de ' + order.length;
+  }
+  function move(key, dir) {
+    var order = favOrder();
+    var i = order.indexOf(key);
+    if (i < 0) return;
+    var j = i + dir;
+    if (j < 0 || j >= order.length) return;
+    var before = order.slice();
+    order.splice(i, 1);
+    order.splice(j, 0, key);
+    applyFav(order);
+    announce(key, order);
+    save(order, before);
+  }
+  function unpin(key) {
+    var before = favOrder();
+    var next = before.filter(function (k) { return k !== key; });
+    applyFav(next);
+    save(next, before);
+  }
+
+  // DnD (desktop, pointer:fine)
+  var dragKey = null;
+  root.addEventListener('dragstart', function (e) {
+    var row = e.target.closest ? e.target.closest('[data-meu-dia] .es-ni-row[data-menu-key]') : null;
+    if (!row) return;
+    dragKey = row.getAttribute('data-menu-key');
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', dragKey); } catch (x) { } }
+  });
+  root.addEventListener('dragover', function (e) {
+    if (dragKey && e.target.closest && e.target.closest('[data-meu-dia] .es-ni-row[data-menu-key]')) e.preventDefault();
+  });
+  root.addEventListener('drop', function (e) {
+    if (!dragKey) return;
+    var row = e.target.closest ? e.target.closest('[data-meu-dia] .es-ni-row[data-menu-key]') : null;
+    var key = dragKey; dragKey = null;
+    if (!row) return;
+    e.preventDefault();
+    var target = row.getAttribute('data-menu-key');
+    if (target === key) return;
+    var order = favOrder();
+    var before = order.slice();
+    order.splice(order.indexOf(key), 1);
+    order.splice(order.indexOf(target), 0, key);
+    applyFav(order);
+    announce(key, order);
+    save(order, before);
+  });
+
+  // Menu de contexto (botao ⋮) — alternativa a11y/touch
+  var ctx = document.createElement('div');
+  ctx.className = 'es-ctx';
+  ctx.setAttribute('role', 'menu');
+  ctx.hidden = true;
+  ctx.innerHTML =
+    '<button type="button" role="menuitem" data-act="up">Mover para cima</button>' +
+    '<button type="button" role="menuitem" data-act="down">Mover para baixo</button>' +
+    '<button type="button" role="menuitem" data-act="remove">Remover de Meu dia</button>';
+  document.body.appendChild(ctx);
+  var ctxKey = null;
+  function openCtx(btn, key) {
+    ctxKey = key;
+    var r = btn.getBoundingClientRect();
+    ctx.hidden = false;
+    ctx.style.top = (r.bottom + 4) + 'px';
+    ctx.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 200)) + 'px';
+    var first = ctx.querySelector('button');
+    if (first) first.focus();
+  }
+  function closeCtx() { ctx.hidden = true; ctxKey = null; }
+  root.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-more]') : null;
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (ctx.hidden) openCtx(b, b.getAttribute('data-more')); else closeCtx();
+  });
+  ctx.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+    if (!b || !ctxKey) return;
+    var act = b.getAttribute('data-act');
+    var key = ctxKey;
+    closeCtx();
+    if (act === 'up') move(key, -1);
+    else if (act === 'down') move(key, 1);
+    else if (act === 'remove') unpin(key);
+  });
+  document.addEventListener('click', function (e) {
+    if (!ctx.hidden && !ctx.contains(e.target) && !(e.target.closest && e.target.closest('[data-more]'))) closeCtx();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !ctx.hidden) closeCtx(); });
 
   // ─── Rail (~64px) — preferencia de DISPOSITIVO (es:rail), sem scope ───
   function setRail(on) {

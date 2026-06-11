@@ -632,6 +632,56 @@ html.es-rail .es-badge {
 html.es-rail .app-store-trigger { justify-content: center; }
 html.es-rail .app-store-trigger > div { display: none; }
 
+/* ─── Reorder dos favoritos (fatia 7c): botao ⋮ + menu de contexto ──── */
+.es-more {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 26px;
+    margin-right: 4px;
+    border: 0;
+    background: transparent;
+    color: #64748B;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .16s ease, color .16s ease, background .16s ease;
+}
+.es-fav .es-ni-row:hover .es-more,
+.es-more:focus-visible { opacity: 1; }
+.es-more:hover { background: rgba(255, 255, 255, .06); color: #CBD5E1; }
+html.es-rail .es-more { display: none; }
+
+.es-ctx {
+    position: fixed;
+    z-index: 300;
+    min-width: 184px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    background: #1E293B;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .45);
+}
+.es-ctx[hidden] { display: none; }
+.es-ctx button {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #CBD5E1;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.es-ctx button:hover,
+.es-ctx button:focus-visible { background: rgba(255, 255, 255, .07); color: #FFF; outline: none; }
+
 /* ─── Tables ─────────────────────────────────────────────────── */
 .tbl-full { width: 100%; border-collapse: collapse; }
 .tbl-full th {
