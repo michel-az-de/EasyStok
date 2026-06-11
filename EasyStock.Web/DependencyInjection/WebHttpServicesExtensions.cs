@@ -106,6 +106,8 @@ public static class WebHttpServicesExtensions
         services.AddMemoryCache();
         services.AddScoped<IMenuResumoSource, MenuResumoSource>();
         services.AddScoped<MenuResumoService>();
+        services.AddScoped<IPreferenciaMenuFonte, PreferenciaMenuFonte>();
+        services.AddScoped<PreferenciaMenuService>();
 
         // 6b. Marketing options + Leads API service (landing publica)
         services.Configure<MarketingOptions>(config.GetSection("Marketing"));
