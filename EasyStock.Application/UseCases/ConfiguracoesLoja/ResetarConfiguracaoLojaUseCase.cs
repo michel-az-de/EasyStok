@@ -39,6 +39,7 @@ public class ResetarConfiguracaoLojaUseCase(
             configuracao.NotificarReposicao,
             configuracao.FifoAtivo,
             configuracao.Moeda,
-            configuracao.Timezone);
+            configuracao.Timezone,
+            configuracao.KdsHabilitado);
     }
 }

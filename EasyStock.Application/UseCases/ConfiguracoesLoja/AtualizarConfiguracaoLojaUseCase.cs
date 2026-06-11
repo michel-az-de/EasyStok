@@ -13,7 +13,8 @@ public sealed record AtualizarConfiguracaoLojaCommand(
     bool? NotificarReposicao,
     bool? FifoAtivo,
     string? Moeda,
-    string? Timezone);
+    string? Timezone,
+    bool? KdsHabilitado = null);
 
 public class AtualizarConfiguracaoLojaUseCase(
     ILojaRepository lojaRepository,
@@ -43,7 +44,8 @@ public class AtualizarConfiguracaoLojaUseCase(
             command.FifoAtivo,
             command.Moeda,
             command.Timezone,
-            command.QuantidadeCriticaPadrao);
+            command.QuantidadeCriticaPadrao,
+            kdsHabilitado: command.KdsHabilitado);
 
         if (nova) await configuracaoRepository.AddAsync(configuracao);
         else await configuracaoRepository.UpdateAsync(configuracao);
@@ -64,6 +66,7 @@ public class AtualizarConfiguracaoLojaUseCase(
             configuracao.NotificarReposicao,
             configuracao.FifoAtivo,
             configuracao.Moeda,
-            configuracao.Timezone);
+            configuracao.Timezone,
+            configuracao.KdsHabilitado);
     }
 }

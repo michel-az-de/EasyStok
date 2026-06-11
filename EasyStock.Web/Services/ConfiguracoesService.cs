@@ -31,6 +31,7 @@ public class ConfiguracoesService(ApiClient api, SessionService session)
             notificarValidade = vm.NotifValidade,
             notificarParado = vm.NotifParado,
             notificarReposicao = vm.NotifReposicao,
-            fifoAtivo = vm.Fifo
+            fifoAtivo = vm.Fifo,
+            kdsHabilitado = vm.KdsHabilitado
         });
 }

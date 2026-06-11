@@ -118,7 +118,7 @@
     </div>
 
     <!-- Operacional -->
-    <div class="ws" x-data="{ fifo: @Model.Fifo.ToString().ToLower() }">
+    <div class="ws" x-data="{ fifo: @Model.Fifo.ToString().ToLower(), kds: @Model.KdsHabilitado.ToString().ToLower() }">
         <h2 class="font-semibold text-slate-900 mb-4">Operacional</h2>
         <div class="flex items-center justify-between gap-4 py-2">
             <div class="flex-1 min-w-0">
@@ -131,6 +131,21 @@
                         :class="fifo ? 'bg-indigo-600' : 'bg-slate-200'"
                         class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
                     <span :class="fifo ? 'translate-x-6' : 'translate-x-1'"
+                          class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"></span>
+                </button>
+            </div>
+        </div>
+        <div class="flex items-center justify-between gap-4 py-2 mt-2 pt-4 border-t border-slate-100">
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-700">Produção / KDS habilitado</div>
+                <div class="text-xs text-slate-500">Ativa o fluxo de cozinha (KDS) e adapta o "Meu dia" do menu para produção (pedidos, KDS, lotes e estoque).</div>
+            </div>
+            <div class="relative">
+                <input type="hidden" name="KdsHabilitado" :value="kds ? 'true' : 'false'" />
+                <button type="button" @@click="kds = !kds"
+                        :class="kds ? 'bg-indigo-600' : 'bg-slate-200'"
+                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
+                    <span :class="kds ? 'translate-x-6' : 'translate-x-1'"
                           class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"></span>
                 </button>
             </div>

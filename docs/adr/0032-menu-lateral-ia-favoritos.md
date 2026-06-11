@@ -46,9 +46,9 @@ Nova entidade `PreferenciaMenuUsuario` (PK `Id`, único `(UsuarioId, LojaId)`, `
 
 Pipeline do builder na ordem (1) filtra a árvore por `KdsHabilitado` (itens `IsProducaoKds` somem quando off) → (2) resolve favoritos contra a árvore filtrada e descarta órfãos. Favorito de KDS gravado com a flag ligada some sozinho quando ela desliga.
 
-### 5. Flag `Loja.KdsHabilitado` e seed do "Meu dia"
+### 5. Flag `ConfiguracaoLoja.KdsHabilitado` e seed do "Meu dia"
 
-Nova coluna `Loja.KdsHabilitado` (default `false`, exposta no `LojaApi`, toggle em Configurações). Seed por perfil: com KDS `[pedidos, kds-operacao, lotes-validade, posicao-estoque]`; sem KDS `[pedidos, posicao-estoque]`. Não persiste no 1º acesso (builder devolve o default; grava só no 1º pin/unpin/reorder).
+Nova coluna `ConfiguracaoLoja.KdsHabilitado` (default `false`). **Refinamento na implementação (fatia 3):** a flag vive em `ConfiguracaoLoja` (config por-loja), não em `Loja`/`LojaApi` como o rascunho inicial supunha — assim reusa o caminho de save existente `GET/PATCH /api/configuracoes` + o toggle na seção Operacional de Configurações, sem novo endpoint nem mudança em `Loja`/`LojaApi`. O valor é retornado no GET de configurações (e, na fatia 4, no GET de favoritos para o seed). Seed por perfil: com KDS `[pedidos, kds-operacao, lotes-validade, posicao-estoque]`; sem KDS `[pedidos, posicao-estoque]`. Não persiste no 1º acesso (builder devolve o default; grava só no 1º pin/unpin/reorder).
 
 ### 6. Badges via BFF cacheado
 
@@ -107,7 +107,7 @@ Nova coluna `Loja.KdsHabilitado` (default `false`, exposta no `LojaApi`, toggle 
 | 0 | ADR-0032 (este) + issue (backfill) |
 | 1 | `MenuDefinition` + `MenuViewModelBuilder` + testes unitários |
 | 2 | Badges BFF (`/menu/resumo` + `menu-badges.js`) |
-| 3 | Flag `Loja.KdsHabilitado` (coluna + migration + `LojaApi` + toggle) |
+| 3 | Flag `ConfiguracaoLoja.KdsHabilitado` (coluna + migration + GET/PATCH configurações + toggle) |
 | 4 | Persistência favoritos (entidade + migration + API + BFF) |
 | 5 | `EsSidebarTagHelper` (render isolado + testes `ProcessAsync`) |
 | 6 | Swap do `_Sidebar.cshtml` |

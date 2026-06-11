@@ -15,6 +15,11 @@ public class ConfiguracaoLoja
     public bool NotificarParado { get; set; } = true;
     public bool NotificarReposicao { get; set; } = true;
     public bool FifoAtivo { get; set; } = true;
+
+    // Perfil de negocio: loja com producao/KDS habilitado. Default false.
+    // Dirige o seed do "Meu dia" do menu lateral (ADR-0032).
+    public bool KdsHabilitado { get; set; } = false;
+
     public string Moeda { get; set; } = OperacionalDefaults.Moeda;
     public string Timezone { get; set; } = OperacionalDefaults.Timezone;
 
@@ -54,7 +59,8 @@ public class ConfiguracaoLoja
         int? quantidadeCriticaPadrao = null,
         bool? gerarContaReceberAutomaticaDePedido = null,
         bool? gerarContaPagarAutomaticaDePedidoFornecedor = null,
-        string? statusPedidoQueGeraContaReceber = null)
+        string? statusPedidoQueGeraContaReceber = null,
+        bool? kdsHabilitado = null)
     {
         if (diasAlertaValidade.HasValue) DiasAlertaValidade = diasAlertaValidade.Value;
         if (diasAlertaParado.HasValue) DiasAlertaParado = diasAlertaParado.Value;
@@ -70,6 +76,7 @@ public class ConfiguracaoLoja
         if (gerarContaReceberAutomaticaDePedido.HasValue) GerarContaReceberAutomaticaDePedido = gerarContaReceberAutomaticaDePedido.Value;
         if (gerarContaPagarAutomaticaDePedidoFornecedor.HasValue) GerarContaPagarAutomaticaDePedidoFornecedor = gerarContaPagarAutomaticaDePedidoFornecedor.Value;
         if (!string.IsNullOrWhiteSpace(statusPedidoQueGeraContaReceber)) StatusPedidoQueGeraContaReceber = statusPedidoQueGeraContaReceber.Trim();
+        if (kdsHabilitado.HasValue) KdsHabilitado = kdsHabilitado.Value;
         AlteradoEm = DateTime.UtcNow;
     }
 
@@ -89,6 +96,7 @@ public class ConfiguracaoLoja
         GerarContaReceberAutomaticaDePedido = false;
         GerarContaPagarAutomaticaDePedidoFornecedor = false;
         StatusPedidoQueGeraContaReceber = "entregue";
+        KdsHabilitado = false;
         AlteradoEm = DateTime.UtcNow;
     }
 }

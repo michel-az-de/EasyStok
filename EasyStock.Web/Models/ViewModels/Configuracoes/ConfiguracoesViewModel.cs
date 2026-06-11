@@ -11,4 +11,5 @@ public class ConfiguracoesViewModel
     public bool NotifParado { get; set; } = true;
     public bool NotifReposicao { get; set; } = true;
     public bool Fifo { get; set; } = true;
+    public bool KdsHabilitado { get; set; } = false;
 }

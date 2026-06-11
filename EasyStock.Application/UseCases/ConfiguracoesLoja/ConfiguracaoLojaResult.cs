@@ -12,4 +12,5 @@ public sealed record ConfiguracaoLojaResult(
     bool NotificarReposicao,
     bool FifoAtivo,
     string Moeda,
-    string Timezone);
+    string Timezone,
+    bool KdsHabilitado = false);

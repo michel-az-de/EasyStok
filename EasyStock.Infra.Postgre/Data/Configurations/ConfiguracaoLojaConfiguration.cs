@@ -18,6 +18,7 @@ public class ConfiguracaoLojaConfiguration : IEntityTypeConfiguration<Configurac
         builder.Property(x => x.NotificarParado).HasDefaultValue(true);
         builder.Property(x => x.NotificarReposicao).HasDefaultValue(true);
         builder.Property(x => x.FifoAtivo).HasDefaultValue(true);
+        builder.Property(x => x.KdsHabilitado).HasDefaultValue(false);
         builder.Property(x => x.Moeda).HasMaxLength(10).HasDefaultValue(OperacionalDefaults.Moeda);
         builder.Property(x => x.Timezone).HasMaxLength(100).HasDefaultValue(OperacionalDefaults.Timezone);
 

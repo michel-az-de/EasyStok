@@ -30,4 +30,7 @@ public record Configuracoes
 
     [JsonPropertyName("fifoAtivo")]
     public bool Fifo { get; init; } = true;
+
+    [JsonPropertyName("kdsHabilitado")]
+    public bool KdsHabilitado { get; init; } = false;
 }

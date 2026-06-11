@@ -27,7 +27,8 @@ public class ConfiguracoesController(ConfiguracoesService svc, SessionService se
             NotifValidade = cfg.NotifValidade,
             NotifParado = cfg.NotifParado,
             NotifReposicao = cfg.NotifReposicao,
-            Fifo = cfg.Fifo
+            Fifo = cfg.Fifo,
+            KdsHabilitado = cfg.KdsHabilitado
         };
 
         return View(vm);

@@ -24,6 +24,7 @@ public class ObterConfiguracaoLojaUseCase(
             config.NotificarReposicao,
             config.FifoAtivo,
             config.Moeda,
-            config.Timezone);
+            config.Timezone,
+            config.KdsHabilitado);
     }
 }
