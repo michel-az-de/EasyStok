@@ -33,7 +33,10 @@ public sealed record AdicionarCardapioItemAdminCommand(
     decimal? PrecoStorefront,
     string? Tag,
     string? PesoExibicao,
-    string? FiltrosJson) : ICommand;
+    string? FiltrosJson,
+    // EmpresaId: null = SuperAdmin; com valor = escopo do tenant (storefront de outra
+    // empresa → StorefrontNaoEncontradoException = 404). Fecha IDOR cross-tenant (ADR-0031 §3).
+    Guid? EmpresaId = null) : ICommand;
 
 public sealed record AdicionarCardapioItemAdminResult(Guid ItemId, Guid StorefrontId, Guid? ProdutoId);
 
@@ -48,6 +51,10 @@ public class AdicionarCardapioItemAdminUseCase(
     {
         var storefront = await storefrontRepository.GetByIdAsync(command.StorefrontId)
             ?? throw new StorefrontNaoEncontradoException();
+
+        // Escopo de tenant (ADR-0031 §3): Admin só adiciona no próprio storefront.
+        if (command.EmpresaId is Guid emp && storefront.EmpresaId != emp)
+            throw new StorefrontNaoEncontradoException();
 
         CardapioItem item;
 

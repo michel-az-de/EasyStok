@@ -22,7 +22,9 @@ public sealed record EditarCardapioItemAdminCommand(
     decimal? PrecoStorefront,
     string? Tag,
     string? PesoExibicao,
-    string? FiltrosJson) : ICommand;
+    string? FiltrosJson,
+    // EmpresaId: null = SuperAdmin; com valor = escopo do tenant (ADR-0031 §3, fecha IDOR).
+    Guid? EmpresaId = null) : ICommand;
 
 public sealed record EditarCardapioItemAdminResult(Guid ItemId);
 
@@ -33,7 +35,7 @@ public class EditarCardapioItemAdminUseCase(
 {
     public async Task<EditarCardapioItemAdminResult> ExecuteAsync(EditarCardapioItemAdminCommand command)
     {
-        var item = await cardapioRepository.GetByIdAsync(command.StorefrontId, command.ItemId)
+        var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
         // Tag == "" significa "limpar". Tag null = "não tocar".

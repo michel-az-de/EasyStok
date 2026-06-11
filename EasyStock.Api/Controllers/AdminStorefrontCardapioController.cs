@@ -26,8 +26,15 @@ public class AdminStorefrontCardapioController(
     ToggleDisponibilidadeCardapioItemAdminUseCase toggleDisponivel,
     ReordenarCardapioItemAdminUseCase reordenar,
     AdminAuditService audit,
+    ICurrentUserAccessor currentUser,
     ILogger<AdminStorefrontCardapioController> logger) : EasyStockControllerBase
 {
+    // Escopo de empresa do chamador: SuperAdmin = null (cross-tenant liberado por design);
+    // Admin tenant = sua própria empresa (use cases barram storefront alheio → 404, não 403).
+    // Fecha IDOR cross-tenant (ADR-0031 §3).
+    private Guid? EscopoEmpresa() =>
+        currentUser.Nivel == NivelAcesso.SuperAdmin ? null : currentUser.EmpresaId;
+
     public sealed record AdicionarItemRequest(
         Guid? ProdutoId,        // null = item avulso (ADR-0031)
         string? NomePublico,    // obrigatório para avulso; override opcional para vinculado
@@ -68,7 +75,7 @@ public class AdminStorefrontCardapioController(
     {
         try
         {
-            var result = await listar.ExecuteAsync(new ListarCardapioAdminCommand(storefrontId));
+            var result = await listar.ExecuteAsync(new ListarCardapioAdminCommand(storefrontId, EscopoEmpresa()));
             return DataOk(result);
         }
         catch (StorefrontNaoEncontradoException) { return DataNotFound("Storefront não encontrado."); }
@@ -95,7 +102,8 @@ public class AdminStorefrontCardapioController(
                 req.PrecoStorefront,
                 req.Tag,
                 req.PesoExibicao,
-                req.FiltrosJson));
+                req.FiltrosJson,
+                EscopoEmpresa()));
 
             await audit.LogAsync(
                 "AdminAdicionouCardapioItem",
@@ -141,7 +149,8 @@ public class AdminStorefrontCardapioController(
                 req.PrecoStorefront,
                 req.Tag,
                 req.PesoExibicao,
-                req.FiltrosJson));
+                req.FiltrosJson,
+                EscopoEmpresa()));
 
             await audit.LogAsync(
                 "AdminEditouCardapioItem",
@@ -165,7 +174,7 @@ public class AdminStorefrontCardapioController(
     {
         try
         {
-            var result = await toggleVisivel.ExecuteAsync(new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, itemId));
+            var result = await toggleVisivel.ExecuteAsync(new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, itemId, EscopoEmpresa()));
             await audit.LogAsync(
                 "AdminToggleVisivelCardapioItem",
                 $"StorefrontId={storefrontId}, ItemId={itemId}, VisivelAgora={result.VisivelAgora}",
@@ -180,7 +189,7 @@ public class AdminStorefrontCardapioController(
     {
         try
         {
-            var result = await toggleDisponivel.ExecuteAsync(new ToggleDisponibilidadeCardapioItemAdminCommand(storefrontId, itemId));
+            var result = await toggleDisponivel.ExecuteAsync(new ToggleDisponibilidadeCardapioItemAdminCommand(storefrontId, itemId, EscopoEmpresa()));
             await audit.LogAsync(
                 "AdminToggleDisponivelCardapioItem",
                 $"StorefrontId={storefrontId}, ItemId={itemId}, DisponivelAgora={result.DisponivelAgora}",
@@ -195,7 +204,7 @@ public class AdminStorefrontCardapioController(
     {
         try
         {
-            var result = await reordenar.ExecuteAsync(new ReordenarCardapioItemAdminCommand(storefrontId, itemId, req.NovaOrdem));
+            var result = await reordenar.ExecuteAsync(new ReordenarCardapioItemAdminCommand(storefrontId, itemId, req.NovaOrdem, EscopoEmpresa()));
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }

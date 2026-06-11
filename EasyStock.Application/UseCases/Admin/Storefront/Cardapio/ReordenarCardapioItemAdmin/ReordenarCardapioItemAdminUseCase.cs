@@ -11,7 +11,8 @@ namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCard
 public sealed record ReordenarCardapioItemAdminCommand(
     Guid StorefrontId,
     Guid ItemId,
-    double NovaOrdem) : ICommand;
+    double NovaOrdem,
+    Guid? EmpresaId = null) : ICommand;
 
 public sealed record ReordenarCardapioItemAdminResult(Guid ItemId, double Ordem);
 
@@ -22,7 +23,7 @@ public class ReordenarCardapioItemAdminUseCase(
 {
     public async Task<ReordenarCardapioItemAdminResult> ExecuteAsync(ReordenarCardapioItemAdminCommand command)
     {
-        var item = await cardapioRepository.GetByIdAsync(command.StorefrontId, command.ItemId)
+        var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
         item.DefinirOrdem(command.NovaOrdem);

@@ -7,7 +7,7 @@ namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibil
 /// Alterna Visivel do CardapioItem. Operação idempotente — chamar 2x volta ao
 /// estado original (toggle).
 /// </summary>
-public sealed record ToggleVisibilidadeCardapioItemAdminCommand(Guid StorefrontId, Guid ItemId) : ICommand;
+public sealed record ToggleVisibilidadeCardapioItemAdminCommand(Guid StorefrontId, Guid ItemId, Guid? EmpresaId = null) : ICommand;
 
 public sealed record ToggleVisibilidadeCardapioItemAdminResult(Guid ItemId, bool VisivelAgora);
 
@@ -19,7 +19,7 @@ public class ToggleVisibilidadeCardapioItemAdminUseCase(
     public async Task<ToggleVisibilidadeCardapioItemAdminResult> ExecuteAsync(
         ToggleVisibilidadeCardapioItemAdminCommand command)
     {
-        var item = await cardapioRepository.GetByIdAsync(command.StorefrontId, command.ItemId)
+        var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
         if (item.Visivel) item.Ocultar();

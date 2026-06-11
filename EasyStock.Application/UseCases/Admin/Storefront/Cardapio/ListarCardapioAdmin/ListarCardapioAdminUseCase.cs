@@ -3,7 +3,9 @@ using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
 
-public sealed record ListarCardapioAdminCommand(Guid StorefrontId) : ICommand;
+// EmpresaId: null = SuperAdmin (acessa qualquer storefront); com valor = escopo do tenant
+// (storefront de outra empresa → StorefrontNaoEncontradoException = 404, não vaza existência).
+public sealed record ListarCardapioAdminCommand(Guid StorefrontId, Guid? EmpresaId = null) : ICommand;
 
 public sealed record CardapioItemAdminListItem(
     Guid Id,
@@ -38,6 +40,10 @@ public class ListarCardapioAdminUseCase(
     {
         var s = await storefrontRepository.GetByIdAsync(command.StorefrontId)
             ?? throw new StorefrontNaoEncontradoException();
+
+        // Escopo de tenant (ADR-0031 §3): Admin só enxerga o próprio storefront.
+        if (command.EmpresaId is Guid emp && s.EmpresaId != emp)
+            throw new StorefrontNaoEncontradoException();
 
         var items = await cardapioRepository.GetTodosDoStorefrontAsync(command.StorefrontId);
         var itens = items.Select(i => new CardapioItemAdminListItem(

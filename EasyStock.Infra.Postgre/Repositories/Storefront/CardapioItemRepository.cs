@@ -11,6 +11,23 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Include(c => c.Produto)
             .FirstOrDefaultAsync(c => c.StorefrontId == storefrontId && c.Id == id, ct);
 
+    public Task<CardapioItem?> GetByIdAndScopeAsync(Guid storefrontId, Guid itemId, Guid? empresaId, CancellationToken ct = default)
+    {
+        var query = db.CardapioItens
+            .Include(c => c.Produto)
+            .Where(c => c.StorefrontId == storefrontId && c.Id == itemId);
+
+        // Escopo de tenant: só itens cujo Storefront pertence à empresa. SuperAdmin (null) ignora.
+        // CardapioItem não tem navegação para Storefront — filtro via EXISTS em db.Storefronts.
+        if (empresaId.HasValue)
+        {
+            var emp = empresaId.Value;
+            query = query.Where(c => db.Storefronts.Any(s => s.Id == c.StorefrontId && s.EmpresaId == emp));
+        }
+
+        return query.FirstOrDefaultAsync(ct);
+    }
+
     public async Task<IReadOnlyList<CardapioItem>> GetVisiveisDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
         await db.CardapioItens
             .IgnoreQueryFilters()

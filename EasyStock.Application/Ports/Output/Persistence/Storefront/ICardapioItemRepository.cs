@@ -5,6 +5,15 @@ namespace EasyStock.Application.Ports.Output.Persistence.Storefront;
 public interface ICardapioItemRepository
 {
     Task<CardapioItem?> GetByIdAsync(Guid storefrontId, Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Busca item por id COM escopo de empresa (ADR-0031 §3 — fecha IDOR cross-tenant).
+    /// <paramref name="empresaId"/> null = SuperAdmin (sem filtro de empresa); com valor =
+    /// só retorna o item se o Storefront pertencer àquela empresa, devolvendo null (→ 404,
+    /// não 403, para não vazar existência) caso o item seja de outro tenant.
+    /// </summary>
+    Task<CardapioItem?> GetByIdAndScopeAsync(Guid storefrontId, Guid itemId, Guid? empresaId, CancellationToken ct = default);
+
     Task<IReadOnlyList<CardapioItem>> GetVisiveisDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
     Task<IReadOnlyList<CardapioItem>> GetTodosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
     Task AddAsync(CardapioItem item, CancellationToken ct = default);
