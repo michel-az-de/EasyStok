@@ -18,7 +18,12 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Where(c => c.StorefrontId == storefrontId && c.Id == itemId);
 
         // Escopo de tenant: só itens cujo Storefront pertence à empresa. SuperAdmin (null) ignora.
-        // CardapioItem não tem navegação para Storefront — filtro via EXISTS em db.Storefronts.
+        // CardapioItem não tem EmpresaId (logo não recebe o global query filter de tenant) nem
+        // navegação para Storefront — por isso o EXISTS em db.Storefronts. O `s.EmpresaId == emp`
+        // é REDUNDANTE com o global query filter que já incide sobre db.Storefronts (s.EmpresaId ==
+        // CurrentTenantId), mas é mantido de propósito como defense-in-depth: o escopo do item passa
+        // a ser garantido aqui de forma explícita, independente do contexto de tenant do request
+        // (ADR-0031 §3; auditoria 2026-06-11, finding p3 — manter ambos é intencional).
         if (empresaId.HasValue)
         {
             var emp = empresaId.Value;

@@ -7,6 +7,7 @@ using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibili
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Npgsql;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -32,9 +33,21 @@ public class TenantVitrineCardapioController(
     ToggleDisponibilidadeCardapioItemAdminUseCase toggleDisponivel,
     ReordenarCardapioItemAdminUseCase reordenar,
     ICurrentUserAccessor currentUser,
-    ILogger<TenantVitrineCardapioController> logger) : EasyStockControllerBase
+    ILogger<TenantVitrineCardapioController> logger) : EasyStockControllerBase, IActionFilter
 {
     private const string SemVitrine = "Sua vitrine ainda não foi criada. Fale com o suporte.";
+
+    // p2 (auditoria 2026-06-11): sem empresa no token (SuperAdmin, ou Admin com 2+ empresas sem
+    // seleção) → EmpresaId=Guid.Empty. Em vez de 404 confuso ("sem vitrine"), 400 com orientação.
+    void IActionFilter.OnActionExecuting(ActionExecutingContext context)
+    {
+        if (currentUser.EmpresaId == Guid.Empty)
+            context.Result = DataBadRequest(
+                "Sua sessão não está vinculada a uma empresa. Selecione uma empresa para gerenciar a vitrine " +
+                "(SuperAdmin: use o painel admin em /api/admin/storefronts).");
+    }
+
+    void IActionFilter.OnActionExecuted(ActionExecutedContext context) { }
 
     public sealed record VitrineResumoResponse(Guid StorefrontId, string Slug, string TituloPublico, bool Ativo);
 

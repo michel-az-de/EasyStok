@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibili
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Npgsql;
 
 namespace EasyStock.Api.Controllers;
@@ -27,13 +28,26 @@ public class AdminStorefrontCardapioController(
     ReordenarCardapioItemAdminUseCase reordenar,
     AdminAuditService audit,
     ICurrentUserAccessor currentUser,
-    ILogger<AdminStorefrontCardapioController> logger) : EasyStockControllerBase
+    ILogger<AdminStorefrontCardapioController> logger) : EasyStockControllerBase, IActionFilter
 {
     // Escopo de empresa do chamador: SuperAdmin = null (cross-tenant liberado por design);
     // Admin tenant = sua própria empresa (use cases barram storefront alheio → 404, não 403).
-    // Fecha IDOR cross-tenant (ADR-0031 §3).
+    // Fecha IDOR cross-tenant (ADR-0031 §3). Quando chega aqui, Admin já tem EmpresaId != Empty
+    // (garantido pelo OnActionExecuting abaixo).
     private Guid? EscopoEmpresa() =>
         currentUser.Nivel == NivelAcesso.SuperAdmin ? null : currentUser.EmpresaId;
+
+    // p2 (auditoria 2026-06-11): Admin (não-SuperAdmin) sem empresa vinculada — ex.: usuário com
+    // 2+ empresas que não selecionou uma — teria EmpresaId=Guid.Empty e cairia em 404 silencioso
+    // em toda operação. Devolvemos 400 com mensagem clara antes de qualquer use case (ADR-0031 §4).
+    void IActionFilter.OnActionExecuting(ActionExecutingContext context)
+    {
+        if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId == Guid.Empty)
+            context.Result = DataBadRequest(
+                "Sua conta de administrador não está vinculada a uma empresa. Selecione uma empresa para gerenciar o cardápio.");
+    }
+
+    void IActionFilter.OnActionExecuted(ActionExecutedContext context) { }
 
     public sealed record AdicionarItemRequest(
         Guid? ProdutoId,        // null = item avulso (ADR-0031)

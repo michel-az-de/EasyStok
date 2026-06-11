@@ -347,6 +347,119 @@ public sealed class MenuControllerTests : IAsyncLifetime
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    // ── Item avulso (ADR-0031) ─────────────────────────────────────────
+
+    private sealed record SeedAvulsoResult(StorefrontEntity Storefront, CardapioItem Vinculado, CardapioItem Avulso);
+
+    /// <summary>
+    /// Seeda Storefront ativo + 1 item vinculado (visível) + 1 item avulso (visível, ADR-0031).
+    /// O avulso não tem Produto: nome/preço/categoria vêm do próprio CardapioItem.
+    /// </summary>
+    private static async Task<SeedAvulsoResult> SeedComAvulsoAsync(
+        WebApplicationFactory<Program> factory, string slug)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var _ = db.UseRowLevelSecurityBypass();
+
+        var empresa = new Empresa
+        {
+            Id = Guid.NewGuid(),
+            Nome = "Casa da Babá (avulso test)",
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+        };
+        db.Empresas.Add(empresa);
+
+        var categoria = new Categoria
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresa.Id,
+            Nome = "Massas",
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+        };
+        db.Categorias.Add(categoria);
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresa.Id,
+            CategoriaId = categoria.Id,
+            Nome = "Lasanha",
+            Tipo = TipoProduto.Alimento,
+            PrecoReferencia = Dinheiro.FromDecimal(42.50m),
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+        };
+        db.Produtos.Add(produto);
+
+        var storefront = StorefrontEntity.Criar(empresa.Id, slug, "Casa da Babá", 0m);
+        storefront.Ativar();
+        db.Storefronts.Add(storefront);
+
+        var vinculado = CardapioItem.CriarAPartirDeProduto(storefront.Id, produto);
+        vinculado.DefinirOrdem(1.0);
+        vinculado.TornarVisivel();
+
+        // Avulso (ADR-0031): sem ProdutoId; nome/preço/categoria no próprio item.
+        var avulso = CardapioItem.CriarAvulso(storefront.Id, "Pão de Alho", 18.00m, "Acompanhamentos");
+        avulso.DefinirOrdem(2.0);
+        avulso.TornarVisivel();
+
+        db.CardapioItens.Add(vinculado);
+        db.CardapioItens.Add(avulso);
+
+        await db.SaveChangesAsync();
+        return new SeedAvulsoResult(storefront, vinculado, avulso);
+    }
+
+    [SkippableFact]
+    public async Task GetMenu_RetornaItemAvulso_ComNomePublico()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+
+        var seed = await SeedComAvulsoAsync(factory, slug: "casa-da-baba-avulso");
+
+        var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var itens = JsonSerializer.Deserialize<List<MenuItemDto>>(
+            await resp.Content.ReadAsStringAsync(), JsonOpts)!;
+        var avulso = itens.Single(i => i.Id == seed.Avulso.Id);
+        avulso.Nome.Should().Be("pão de alho", "NomePublico avulso é lowercase (text-transform no front)");
+        avulso.PrecoCentavos.Should().Be(1800);
+        avulso.EstoqueAtual.Should().BeNull("avulso (ProdutoId null) não tem snapshot de estoque do ERP");
+        avulso.Categoria.Should().Be("acompanhamentos");
+        avulso.Disponivel.Should().BeTrue("front usa Disponivel, não EstoqueAtual, para 'Esgotado'");
+    }
+
+    [SkippableFact]
+    public async Task GetMenu_MixAvulsoVinculado_NaoLancaException_RetornaAmbos()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+
+        var seed = await SeedComAvulsoAsync(factory, slug: "casa-da-baba-mix");
+
+        var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu");
+
+        // Valida que GetVisiveisDoStorefrontAsync (OrderBy c.Produto!.Categoria!.Nome SQL-side)
+        // traduz para LEFT JOIN com NULLs (item avulso) sem NRE contra Postgres real — exatamente
+        // a classe de risco do #567 que o mock LINQ-to-Objects não pega (ADR-0031 §3).
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var itens = JsonSerializer.Deserialize<List<MenuItemDto>>(
+            await resp.Content.ReadAsStringAsync(), JsonOpts)!;
+        itens.Should().HaveCount(2);
+        itens.Select(i => i.Id).Should().Contain(new[] { seed.Vinculado.Id, seed.Avulso.Id });
+    }
+
     // ── DTO espelho ────────────────────────────────────────────────────
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
