@@ -4,7 +4,8 @@
     var hasLojaEmoji = !string.IsNullOrWhiteSpace(lojaEmoji);
 }
 
-<aside class="app-sidebar fixed inset-y-0 left-0 z-50 w-60 flex flex-col flex-shrink-0
+<aside id="app-sidebar"
+       class="app-sidebar fixed inset-y-0 left-0 z-50 w-60 flex flex-col flex-shrink-0
               transition-transform duration-300 ease-in-out
               lg:relative lg:inset-auto lg:z-auto lg:translate-x-0"
        aria-label="Navegação principal"
@@ -21,7 +22,7 @@
             <es-icon name="panel-left" class="w-4 h-4"></es-icon>
         </button>
         <!-- Close button (mobile only) -->
-        <button @@click="sidebarOpen = false"
+        <button @@click="sidebarOpen = false; document.getElementById('sidebar-toggle')?.focus()"
                 aria-label="Fechar menu"
                 class="lg:hidden p-2 text-slate-400 hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-navy-500">
             <es-icon name="x" class="w-5 h-5"></es-icon>

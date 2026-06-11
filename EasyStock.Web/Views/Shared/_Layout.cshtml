@@ -90,7 +90,9 @@
         <p class="text-sm opacity-80">Gire o aparelho ou abra em tela maior (mínimo 320px).</p>
     </div>
 
-    <div x-data="{ sidebarOpen: false }" class="flex h-screen overflow-hidden">
+    <div x-data="{ sidebarOpen: false }"
+         @@keydown.escape.window="if (sidebarOpen) { sidebarOpen = false; document.getElementById('sidebar-toggle')?.focus(); }"
+         class="flex h-screen overflow-hidden">
         <div x-show="sidebarOpen" x-cloak
              x-transition:enter="transition-opacity ease-linear duration-200"
              x-transition:enter-start="opacity-0"

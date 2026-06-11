@@ -11,7 +11,10 @@
         style="background: var(--bg-surface); border-bottom: 1px solid var(--border-soft);">
     <!-- Hamburger (mobile only) -->
     <button @@click="sidebarOpen = !sidebarOpen"
+            id="sidebar-toggle"
             aria-label="Abrir menu"
+            aria-controls="app-sidebar"
+            :aria-expanded="sidebarOpen ? 'true' : 'false'"
             class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
             style="color: var(--text-secondary);">
         <es-icon name="menu" class="w-5 h-5"></es-icon>
