@@ -111,6 +111,17 @@ public class ListarCardapioPublicoUseCaseTests
         return item;
     }
 
+    // Item AVULSO (ADR-0031): sem Produto vinculado; nome/categoria/preço vêm do próprio item.
+    private static CardapioItem CriarItemAvulso(
+        Guid storefrontId, string nome, decimal precoReais, string? categoria = null,
+        double ordem = 0, bool visivel = true)
+    {
+        var item = CardapioItem.CriarAvulso(storefrontId, nome, precoReais, categoria);
+        item.DefinirOrdem(ordem);
+        if (visivel) item.TornarVisivel();
+        return item;
+    }
+
     // ── Happy path ─────────────────────────────────────────────────────
 
     [Fact]
@@ -302,5 +313,67 @@ public class ListarCardapioPublicoUseCaseTests
             .GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>());
         await f.CardapioItemRepository.DidNotReceive()
             .GetTodosDoStorefrontAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── Item avulso (ADR-0031) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task ExecuteAsync_AvulsoPreco35Reais_PrecoCentavos3500()
+    {
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, "Pão de Alho", 35.00m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens.Single().PrecoCentavos.Should().Be(3500,
+            "pina a conversão R$→centavos (×100) da projeção para item avulso, não só o domínio");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AvulsoDisponivel_EstoqueAtualNuloEDisponivelTrue()
+    {
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, "Pão de Alho", 18.00m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var dto = (await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido))).Itens.Single();
+
+        dto.EstoqueAtual.Should().BeNull("avulso (ProdutoId null) não tem snapshot de estoque do ERP");
+        dto.Disponivel.Should().BeTrue("o front usa Disponivel, não EstoqueAtual, para 'Esgotado'");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AvulsoComCategoria_UsaCategoriaTextoLowercase()
+    {
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, "Pão de Alho", 18.00m, categoria: "Acompanhamentos");
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var dto = (await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido))).Itens.Single();
+
+        dto.Nome.Should().Be("pão de alho", "NomePublico avulso é armazenado lowercase (text-transform no front)");
+        dto.Categoria.Should().Be("acompanhamentos", "CategoriaTexto avulso vem de CategoriaEfetiva(), lowercase");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MixAvulsoVinculado_OrdenaSemExcecao()
+    {
+        var f = BuildFakes();
+        var vinculado = CriarItem(f.Storefront.Id, f.EmpresaId, "Lasanha",
+            precoReferencia: 42m, categoriaNome: "Pratos", ordem: 1.0);
+        var avulso = CriarItemAvulso(f.Storefront.Id, "Pão de Alho", 18.00m,
+            categoria: "acompanhamentos", ordem: 1.0);
+
+        // Repo retorna mistura fora de ordem; o sort-key usa CategoriaEfetiva() (cobre avulso + vinculado).
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { vinculado, avulso });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens.Should().HaveCount(2, "mix avulso+vinculado não lança e mantém ambos");
     }
 }

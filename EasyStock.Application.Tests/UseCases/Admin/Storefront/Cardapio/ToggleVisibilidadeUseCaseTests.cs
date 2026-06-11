@@ -28,7 +28,7 @@ public class ToggleVisibilidadeUseCaseTests
     {
         var storefrontId = Guid.NewGuid();
         var item = ItemFake(storefrontId, visivel: false);
-        _repo.GetByIdAsync(storefrontId, item.Id, Arg.Any<CancellationToken>()).Returns(item);
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
 
         var result = await Sut().ExecuteAsync(
             new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, item.Id));
@@ -43,7 +43,7 @@ public class ToggleVisibilidadeUseCaseTests
     {
         var storefrontId = Guid.NewGuid();
         var item = ItemFake(storefrontId, visivel: true);
-        _repo.GetByIdAsync(storefrontId, item.Id, Arg.Any<CancellationToken>()).Returns(item);
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
 
         var result = await Sut().ExecuteAsync(
             new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, item.Id));
@@ -57,7 +57,7 @@ public class ToggleVisibilidadeUseCaseTests
     {
         var storefrontId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        _repo.GetByIdAsync(storefrontId, itemId, Arg.Any<CancellationToken>())
+        _repo.GetByIdAndScopeAsync(storefrontId, itemId, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns((CardapioItem?)null);
 
         var act = async () => await Sut().ExecuteAsync(

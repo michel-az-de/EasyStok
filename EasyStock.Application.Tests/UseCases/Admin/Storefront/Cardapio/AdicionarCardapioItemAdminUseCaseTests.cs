@@ -92,6 +92,65 @@ public class AdicionarCardapioItemAdminUseCaseTests
         await _uow.Received(1).CommitAsync();
     }
 
+    // ── Modo AVULSO (ADR-0031) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task DeveAdicionar_ItemAvulso_SemVinculoComProduto()
+    {
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-av", "AV", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+
+        CardapioItem? capturado = null;
+        await _cardapioRepo.AddAsync(
+            Arg.Do<CardapioItem>(c => capturado = c), Arg.Any<CancellationToken>());
+
+        var result = await Sut().ExecuteAsync(NewCommandAvulso(s.Id, nome: "Pão de Alho", preco: 18m));
+
+        result.ItemId.Should().NotBeEmpty();
+        capturado.Should().NotBeNull();
+        capturado!.ProdutoId.Should().BeNull("avulso não vincula produto");
+        capturado.NomePublico.Should().Be("pão de alho", "factory CriarAvulso armazena em lowercase");
+        capturado.PrecoStorefront.Should().Be(18m);
+        capturado.Visivel.Should().BeFalse("default seguro: tenant publica manualmente");
+        await _uow.Received(1).CommitAsync();
+        // Modo avulso nunca consulta o repositório de produtos.
+        await _produtoRepo.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task DeveLancar_AvulsoSemNome()
+    {
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-sn", "SN", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+
+        var act = async () => await Sut().ExecuteAsync(NewCommandAvulso(s.Id, nome: null));
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .Where(e => e.Code == "NOME_OBRIGATORIO");
+    }
+
+    [Fact]
+    public async Task DeveLancar_AvulsoSemPreco()
+    {
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-sp", "SP", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+
+        var act = async () => await Sut().ExecuteAsync(NewCommandAvulso(s.Id, preco: null));
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .Where(e => e.Code == "PRECO_OBRIGATORIO");
+    }
+
+    [Fact]
+    public async Task DeveLancar_QuandoEmpresaIdNaoBateComStorefront()
+    {
+        // Escopo de tenant (Slice 1 — fix IDOR): Admin de outra empresa não opera storefront alheio.
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-esc", "ESC", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+
+        var act = async () => await Sut().ExecuteAsync(NewCommandAvulso(s.Id, empresaId: Guid.NewGuid()));
+        await act.Should().ThrowAsync<StorefrontNaoEncontradoException>(
+            "storefront de outra empresa retorna 404, não vaza existência");
+    }
+
     private static AdicionarCardapioItemAdminCommand NewCommand(Guid storefrontId, Guid? produtoId = null) =>
         new(storefrontId,
             ProdutoId: produtoId ?? Guid.NewGuid(),
@@ -109,4 +168,24 @@ public class AdicionarCardapioItemAdminUseCaseTests
             Tag: null,
             PesoExibicao: null,
             FiltrosJson: null);
+
+    private static AdicionarCardapioItemAdminCommand NewCommandAvulso(
+        Guid storefrontId, string? nome = "Pão de Alho", decimal? preco = 18m, Guid? empresaId = null) =>
+        new(storefrontId,
+            ProdutoId: null,                 // avulso
+            NomePublico: nome,
+            CategoriaTexto: "acompanhamentos",
+            OrdemExibicao: 1.0,
+            Visivel: false,
+            DescricaoPublica: null,
+            Ingredientes: null,
+            Alergenos: null,
+            SugestaoMolho: null,
+            TempoPreparo: null,
+            FotoUrl: null,
+            PrecoStorefront: preco,
+            Tag: null,
+            PesoExibicao: null,
+            FiltrosJson: null,
+            EmpresaId: empresaId);
 }
