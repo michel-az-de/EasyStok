@@ -23,6 +23,13 @@
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
     </script>
+    @* Rail do menu lateral (ADR-0032): preferencia de DISPOSITIVO (es:rail), aplicada
+       ANTES da pintura p/ evitar flash de expandir->encolher. *@
+    <script>
+        (function () {
+            try { if (localStorage.getItem('es:rail') === '1') document.documentElement.classList.add('es-rail'); } catch (e) { }
+        })();
+    </script>
     @* Alpine self-hosted (mesma origem) — sem CDN/SRI. O jsDelivr era bloqueado pelo
        firewall corporativo E os hashes SRI antigos estavam errados; ambos matavam o
        Alpine -> interatividade inteira inerte. Vendored de alpinejs@3.14.9 (core). *@

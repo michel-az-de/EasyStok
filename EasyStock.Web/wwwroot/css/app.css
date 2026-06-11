@@ -601,6 +601,37 @@ html.theme-dark .badge-slow {
     .es-ni, .es-group-hd, .es-group-chevron, .es-star { transition: none; }
 }
 
+/* ─── Rail (~64px, so icones) — preferencia de DISPOSITIVO (es:rail) ──── */
+html.es-rail .app-sidebar { width: 64px; }
+html.es-rail .es-nav { padding: 8px 6px 12px; }
+html.es-rail .es-ni-lbl,
+html.es-rail .es-group-lbl,
+html.es-rail .es-nav-label,
+html.es-rail .es-tag,
+html.es-rail .es-star,
+html.es-rail .es-group-chevron { display: none; }
+html.es-rail .es-ni { justify-content: center; padding: 9px 8px; }
+html.es-rail .es-group-hd { justify-content: center; padding: 9px 8px; }
+html.es-rail .es-group > .es-ni-row { margin-left: 0; }
+html.es-rail .es-group > .es-ni-row::after { display: none; }
+/* badge vira dot no canto do item */
+html.es-rail .es-badge {
+    position: absolute;
+    top: 5px;
+    right: 9px;
+    min-width: 7px;
+    width: 7px;
+    height: 7px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0;
+    color: transparent;
+    overflow: hidden;
+}
+/* seletor de loja: so o emoji/icone (esconde o texto) */
+html.es-rail .app-store-trigger { justify-content: center; }
+html.es-rail .app-store-trigger > div { display: none; }
+
 /* ─── Tables ─────────────────────────────────────────────────── */
 .tbl-full { width: 100%; border-collapse: collapse; }
 .tbl-full th {

@@ -129,4 +129,25 @@
     applyFav(next); // otimista
     save(next, current);
   });
+
+  // ─── Rail (~64px) — preferencia de DISPOSITIVO (es:rail), sem scope ───
+  function setRail(on) {
+    document.documentElement.classList.toggle('es-rail', on);
+    try { localStorage.setItem('es:rail', on ? '1' : '0'); } catch (e) { }
+  }
+  document.querySelectorAll('[data-rail-toggle]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      setRail(!document.documentElement.classList.contains('es-rail'));
+    });
+  });
+  // Em rail, clicar no header de um grupo expande o menu e abre o grupo (sem flyouts).
+  root.querySelectorAll('details.es-group > summary').forEach(function (s) {
+    s.addEventListener('click', function (e) {
+      if (document.documentElement.classList.contains('es-rail')) {
+        e.preventDefault();
+        setRail(false);
+        if (s.parentElement) s.parentElement.open = true;
+      }
+    });
+  });
 })();

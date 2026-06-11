@@ -13,6 +13,13 @@
     <!-- Logo -->
     <div class="px-5 py-4 flex items-center gap-2.5 border-b border-white/5 justify-between">
         <partial name="_LogoEasyStock" model='new { Size = 28, Variant = "inverted" }' />
+        <!-- Rail toggle (desktop): recolhe o menu para ~64px (so icones). -->
+        <button type="button" data-rail-toggle
+                aria-label="Recolher ou expandir o menu"
+                title="Recolher / expandir menu"
+                class="es-rail-toggle hidden lg:inline-flex p-2 text-slate-400 hover:text-white transition-colors rounded focus:outline-none focus:ring-2 focus:ring-navy-500">
+            <es-icon name="panel-left" class="w-4 h-4"></es-icon>
+        </button>
         <!-- Close button (mobile only) -->
         <button @@click="sidebarOpen = false"
                 aria-label="Fechar menu"

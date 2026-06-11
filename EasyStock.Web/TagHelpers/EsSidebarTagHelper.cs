@@ -115,7 +115,8 @@ public sealed class EsSidebarTagHelper(
           .Append(" data-menu-key=\"").Append(Enc(i.Key)).Append("\">");
 
         var href = i.IsExternal && _publicApi.Length > 0 ? _publicApi + i.Href : i.Href;
-        sb.Append("<a class=\"es-ni\" href=\"").Append(Enc(href)).Append('"');
+        // title = tooltip nativo (usado sobretudo no modo rail, onde o label some).
+        sb.Append("<a class=\"es-ni\" href=\"").Append(Enc(href)).Append("\" title=\"").Append(Enc(i.Label)).Append('"');
         if (v.IsActive) sb.Append(" aria-current=\"page\"");
         if (i.IsExternal) sb.Append(" target=\"_blank\" rel=\"noopener\"");
         sb.Append('>');
