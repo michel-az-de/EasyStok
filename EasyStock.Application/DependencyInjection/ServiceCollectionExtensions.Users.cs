@@ -57,6 +57,10 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();
 
+        // Favoritos do menu lateral / "Meu dia" (ADR-0032, fatia 4)
+        services.AddScoped<EasyStock.Application.UseCases.MenuFavoritos.ObterFavoritosMenuUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.MenuFavoritos.SalvarFavoritosMenuUseCase>();
+
         // Auditoria de usuários (deletar dados após LGPD)
         services.AddScoped<DeleteUserAuditDataUseCase>();
 
