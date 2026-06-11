@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -53,7 +54,8 @@ public class EsSidebarTagHelperTests
         var viewCtx = new ViewContext(actionCtx, Substitute.For<IView>(), viewData,
             Substitute.For<ITempDataDictionary>(), TextWriter.Null, new HtmlHelperOptions());
 
-        var th = new EsSidebarTagHelper(favSvc, resumoSvc, session, icons) { ViewContext = viewCtx };
+        var config = Substitute.For<IConfiguration>();
+        var th = new EsSidebarTagHelper(favSvc, resumoSvc, session, icons, config) { ViewContext = viewCtx };
 
         var ctx = new TagHelperContext(new TagHelperAttributeList(), new Dictionary<object, object>(), "t");
         var output = new TagHelperOutput("es-sidebar", new TagHelperAttributeList(),

@@ -22,14 +22,20 @@ public sealed class EsSidebarTagHelper(
     PreferenciaMenuService favoritosSvc,
     MenuResumoService resumoSvc,
     SessionService session,
-    LucideIconResolver icons) : TagHelper
+    LucideIconResolver icons,
+    IConfiguration config) : TagHelper
 {
+    // KDS Visor abre o PWA no BROWSER -> precisa da URL PUBLICA da API (BUG-13),
+    // nao da interna. Resolvido em ProcessAsync a partir de PublicApiUrl.
+    private string _publicApi = string.Empty;
+
     [ViewContext]
     [HtmlAttributeNotBound]
     public ViewContext ViewContext { get; set; } = default!;
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
+        _publicApi = (config["PublicApiUrl"] ?? string.Empty).TrimEnd('/');
         var path = ViewContext?.HttpContext?.Request?.Path.Value;
         var activeMenuItem = ViewContext?.ViewData["ActiveMenuItem"] as string;
         var usuarioId = session.GetUsuarioId();
@@ -108,7 +114,8 @@ public sealed class EsSidebarTagHelper(
           .Append(" class=\"es-ni-row").Append(v.IsActive ? " is-active" : "").Append('"')
           .Append(" data-menu-key=\"").Append(Enc(i.Key)).Append("\">");
 
-        sb.Append("<a class=\"es-ni\" href=\"").Append(Enc(i.Href)).Append('"');
+        var href = i.IsExternal && _publicApi.Length > 0 ? _publicApi + i.Href : i.Href;
+        sb.Append("<a class=\"es-ni\" href=\"").Append(Enc(href)).Append('"');
         if (v.IsActive) sb.Append(" aria-current=\"page\"");
         if (i.IsExternal) sb.Append(" target=\"_blank\" rel=\"noopener\"");
         sb.Append('>');

@@ -1,21 +1,13 @@
-@inject IConfiguration Configuration
 @{
-    var activeItem = ViewBag.ActiveMenuItem as string ?? "";
     var lojaNome = ViewBag.LojaAtualNome as string ?? "Selecionar loja";
     var lojaEmoji = ViewBag.LojaAtualEmoji as string;
     var hasLojaEmoji = !string.IsNullOrWhiteSpace(lojaEmoji);
-    // O link do KDS abre o PWA no BROWSER do usuario -> precisa da URL PUBLICA da API,
-    // nao da interna (ApiSettings:BaseUrl = http://api:8080/api no docker, que vaza
-    // hostname interno e ainda monta /api/pwa -> 404). PublicApiUrl vem do
-    // docker-compose.azure (https://${API_HOST}); o PWA fica em /pwa/ (sem /api). BUG-13.
-    var publicApi = (Configuration["PublicApiUrl"] ?? "").TrimEnd('/');
-    var kdsUrl = string.IsNullOrEmpty(publicApi) ? "/pwa/#kds" : $"{publicApi}/pwa/#kds";
 }
 
 <aside class="app-sidebar fixed inset-y-0 left-0 z-50 w-60 flex flex-col flex-shrink-0
               transition-transform duration-300 ease-in-out
               lg:relative lg:inset-auto lg:z-auto lg:translate-x-0"
-       role="navigation" aria-label="Navegação principal"
+       aria-label="Navegação principal"
        :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
 
     <!-- Logo -->
@@ -60,156 +52,12 @@
         </div>
     </div>
 
-    <!-- Navegação -->
+    @* Navegação (ADR-0032): estrutura, favoritos (Meu dia), grupos e badges renderizados
+       no servidor pelo <es-sidebar> (EsSidebarTagHelper). A interatividade (pin/accordion
+       exclusivo/rail/reorder) entra na fatia 7. *@
     <div class="sidebar-nav-wrap flex-1 min-h-0 relative">
-    <nav class="sidebar-nav flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5">
-
-        <div class="nav-sep"><span>Principal</span></div>
-
-        <a href="/dashboard" class="ni @(activeItem == "Dashboard" ? "active" : "")">
-            <es-icon name="layout-dashboard" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Dashboard
-        </a>
-
-        <div class="nav-section">Cadastros e estoque</div>
-
-        <a href="/produtos" class="ni @(activeItem == "Produtos" ? "active" : "")">
-            <es-icon name="package" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Produtos
-        </a>
-        <a href="/estoque" class="ni @(activeItem == "Estoque" ? "active" : "")">
-            <es-icon name="clipboard-list" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Estoque
-        </a>
-        <a href="/fornecedores" class="ni @(activeItem is "Fornecedores" or "PedidosAbertos" ? "active" : "")">
-            <es-icon name="truck" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Fornecedores
-        </a>
-        <a href="/clientes" class="ni @(activeItem is "Clientes" or "ClientesMobile" ? "active" : "")">
-            <es-icon name="users" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Clientes
-        </a>
-
-        <div class="nav-section">Vendas e caixa</div>
-
-        <a href="/pedidos" class="ni @(activeItem is "Pedidos" or "PedidosMobile" ? "active" : "")">
-            <es-icon name="shopping-cart" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Pedidos
-        </a>
-        <a href="/caixa" class="ni @(activeItem is "Caixa" or "CaixaMobile" ? "active" : "")">
-            <es-icon name="wallet" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Caixa
-        </a>
-
-        <div class="nav-section">Financeiro</div>
-
-        <a href="/financeiro" class="ni @(activeItem == "Financeiro" ? "active" : "")">
-            <es-icon name="bar-chart-3" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Financeiro
-        </a>
-        <a href="/contas-a-receber" class="ni @(activeItem == "ContasAReceber" ? "active" : "")">
-            <es-icon name="banknote" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Contas a Receber
-        </a>
-        <a href="/contas-a-pagar" class="ni @(activeItem == "ContasAPagar" ? "active" : "")">
-            <es-icon name="credit-card" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Contas a Pagar
-        </a>
-
-        <div class="nav-section">Produção e compras</div>
-
-        <a href="/lotes" class="ni @(activeItem is "Lotes" or "LotesMobile" ? "active" : "")">
-            <es-icon name="layers" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Lotes
-        </a>
-        <a href="/listas-compras" class="ni @(activeItem == "ListasCompras" ? "active" : "")">
-            <es-icon name="list-checks" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Compras
-        </a>
-        <a href="/categorias" class="ni @(activeItem == "Categorias" ? "active" : "")">
-            <es-icon name="tag" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Categorias
-        </a>
-
-        <div class="nav-section">Movimentações e fiscal</div>
-
-        <a href="/entradas/historico" class="ni @(activeItem is "Entradas" or "EntradasNova" or "EntradasHistorico" or "EntradasReposicao" ? "active" : "")">
-            <es-icon name="arrow-down-to-line" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Entradas
-        </a>
-        <a href="/saidas/historico" class="ni @(activeItem is "Saidas" or "SaidasNova" or "SaidasHistorico" ? "active" : "")">
-            <es-icon name="arrow-up-from-line" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Saídas
-        </a>
-        <a href="/notas-fiscais" class="ni @(activeItem == "NotasFiscais" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Notas Fiscais
-        </a>
-        <a href="/configuracao-fiscal" class="ni @(activeItem == "ConfiguracaoFiscal" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Configuração Fiscal
-        </a>
-
-        <div class="nav-section">App e atendimento</div>
-
-        <a href="/kds" class="ni @(activeItem == "Kds" ? "active" : "")"
-           title="Gerenciar configurações e filas do KDS">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-            KDS Operação
-        </a>
-        <a href="/dispositivos" class="ni @(activeItem is "Dispositivos" or "ProdutosMobile" or "Operacao" ? "active" : "")">
-            <es-icon name="monitor" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Dispositivos
-        </a>
-
-        <div class="nav-section">Inteligência</div>
-
-        <a href="/analytics" class="ni @(activeItem is "Analytics" or "Movimentacoes" or "Inteligencia" or "InteligenciaLojas" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Análises
-        </a>
-        <a href="/relatorios" class="ni @(activeItem == "Relatorios" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Relatórios
-        </a>
-        <a href="/anuncios" class="ni @(activeItem == "Anuncios" ? "active" : "")">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-            </svg>
-            Anúncios
-        </a>
-
-        <div class="nav-section">Sistema</div>
-
-        <a href="@kdsUrl" target="_blank" rel="noopener" class="ni"
-           title="Abre o KDS num tablet/TV em nova aba. Precisa de device pareado nesse navegador.">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            KDS Visor <span class="ml-auto text-[9px] uppercase tracking-wider text-orange-400 font-bold">alpha</span>
-        </a>
-        <a href="/usuarios" class="ni @(activeItem == "Usuarios" ? "active" : "")">
-            <es-icon name="user-cog" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Usuários
-        </a>
-        <a href="/configuracoes" class="ni @(activeItem is "Configuracoes" or "Lojas" or "Assinatura" or "Notificacoes" ? "active" : "")">
-            <es-icon name="settings" class="w-4 h-4 flex-shrink-0"></es-icon>
-            Configurações
-        </a>
-
-    </nav>
-    <div class="sidebar-scroll-hint" aria-hidden="true"></div>
+        <es-sidebar></es-sidebar>
+        <div class="sidebar-scroll-hint" aria-hidden="true"></div>
     </div>
 
     <!-- Footer -->
