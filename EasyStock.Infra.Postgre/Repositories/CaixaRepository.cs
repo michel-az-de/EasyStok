@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 
@@ -36,13 +37,16 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, total);
         }
 
-        private static DateTime ToUtc(DateOnly d) =>
-            DateTime.SpecifyKind(d.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        // DataMovimento/DataVenda/PagoEm sao colunas de INSTANTE real (gravadas de UtcNow).
+        // Agrupar pelo dia civil de Brasilia via JanelaDiaUtc (meia-noite BRT = 03:00Z),
+        // alinhado com AbrirCaixaUseCase, HorarioBrasil.DataOperacional e o indice unico de
+        // abertura (#379). Antes ancorava em 00:00Z (ToUtc), perdendo a abertura feita na
+        // janela 21h-23h59 BRT (cujo timestamp UTC ja virou o dia seguinte): a tela mostrava
+        // "aguardando abertura" e a reabertura batia no indice unico -> "ja existe".
 
         public async Task<IEnumerable<MovimentoCaixa>> GetMovimentosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
-            var inicio = ToUtc(data);
-            var fim    = ToUtc(data.AddDays(1));
+            var (inicio, fim) = HorarioBrasil.JanelaDiaUtc(data);
 
             var q = db.MovimentosCaixa.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.EstornadoEm == null
@@ -75,8 +79,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalVendasDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
-            var inicio = ToUtc(data);
-            var fim    = ToUtc(data.AddDays(1));
+            var (inicio, fim) = HorarioBrasil.JanelaDiaUtc(data);
 
             var q = db.Vendas.AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId && v.DataVenda >= inicio && v.DataVenda < fim);
@@ -88,8 +91,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
-            var inicio = ToUtc(data);
-            var fim    = ToUtc(data.AddDays(1));
+            var (inicio, fim) = HorarioBrasil.JanelaDiaUtc(data);
 
             var pagamentos = await db.Set<PedidoPagamento>().AsNoTracking()
                 .Where(pg => pg.PagoEm >= inicio && pg.PagoEm < fim)
