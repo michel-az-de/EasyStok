@@ -656,13 +656,49 @@
                                 <div class="ped-prod-cadastro__grid">
                                     <div class="ped-prod-cadastro__field">
                                         <label>Categoria</label>
-                                        <select x-model="it.categoriaId" class="ui-field text-sm w-full" required>
-                                            <option value="">Selecione…</option>
-                                            @foreach (var c in Model.Categorias)
-                                            {
-                                                <option value="@c.Id">@c.Nome</option>
-                                            }
-                                        </select>
+                                        <div class="ped-combobox" @@click.outside="it.catDropdownOpen = false">
+                                            <input type="text" x-model="it.catBusca" autocomplete="off"
+                                                   maxlength="60" role="combobox" aria-autocomplete="list"
+                                                   :aria-expanded="it.catDropdownOpen ? 'true' : 'false'"
+                                                   placeholder="Buscar ou criar categoria…"
+                                                   class="ui-field text-sm w-full"
+                                                   :class="it.novoCadastro && !it.categoriaId ? 'border-amber-300 ring-1 ring-amber-200' : ''"
+                                                   @@focus="buscarCategorias(it)"
+                                                   @@input="buscarCategorias(it)"
+                                                   @@blur="setTimeout(() => { it.catDropdownOpen = false }, 150)"
+                                                   @@keydown.arrow-down.prevent="navCategoria(it, 1)"
+                                                   @@keydown.arrow-up.prevent="navCategoria(it, -1)"
+                                                   @@keydown.enter.prevent="confirmarCategoria(it)"
+                                                   @@keydown.escape.prevent="it.catDropdownOpen = false" />
+                                            <input type="hidden" x-model="it.categoriaId" />
+                                            <ul x-show="it.catDropdownOpen" x-cloak role="listbox"
+                                                class="ped-combobox__list ped-prod-dropdown">
+                                                <template x-for="(c, idx) in it.catResultados" :key="c.id">
+                                                    <li class="ped-combobox__option" role="option"
+                                                        :aria-selected="idx === it.catIndex ? 'true' : 'false'"
+                                                        :class="{ 'ped-combobox__option--active': idx === it.catIndex }"
+                                                        @@mouseenter="it.catIndex = idx"
+                                                        @@mousedown.prevent="selecionarCategoria(it, c)">
+                                                        <span class="font-medium" x-text="c.nome"></span>
+                                                    </li>
+                                                </template>
+                                                <li x-show="it.catResultados.length === 0 && !podeCriarCategoria(it)"
+                                                    class="ped-combobox__option text-xs text-slate-400">
+                                                    Digite para buscar ou criar uma categoria.
+                                                </li>
+                                                <li x-show="podeCriarCategoria(it)" role="option"
+                                                    :aria-selected="it.catIndex === it.catResultados.length ? 'true' : 'false'"
+                                                    class="ped-combobox__option ped-prod-dropdown__create"
+                                                    :class="{ 'ped-combobox__option--active': it.catIndex === it.catResultados.length }"
+                                                    @@mouseenter="it.catIndex = it.catResultados.length"
+                                                    @@mousedown.prevent="criarCategoriaInline(it)">
+                                                    <div class="ped-prod-dropdown__create-title">
+                                                        + Criar categoria “<span x-text="(it.catBusca || '').trim()"></span>”
+                                                    </div>
+                                                    <div class="text-xs text-slate-500">Nova categoria, disponível na hora.</div>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     </div>
                                     <div class="ped-prod-cadastro__field">
                                         <label>Custo (opcional)</label>
@@ -760,7 +796,11 @@ function novoPedidoModal() {
         telefone = c.Telefone
     })));
     const categoriaPadrao = @Html.Raw(Json.Serialize(Model.Categorias.FirstOrDefault()?.Id.ToString() ?? ""));
-    const categoriasIds = @Html.Raw(Json.Serialize(Model.Categorias.Select(c => c.Id.ToString()).ToArray()));
+    const categoriaPadraoNome = @Html.Raw(Json.Serialize(Model.Categorias.FirstOrDefault()?.Nome ?? ""));
+    // Normaliza texto pra busca de categoria: minusculo, sem acento, trim. Regex montado via
+    // String.fromCharCode pra evitar escapes de barra invertida serializados de forma fragil.
+    const _reDiacriticos = new RegExp('[' + String.fromCharCode(0x300) + '-' + String.fromCharCode(0x36f) + ']', 'g');
+    const normalizarTexto = (s) => (s || '').toString().trim().toLowerCase().normalize('NFD').replace(_reDiacriticos, '');
 
     let _itemUid = 0;
     const novoItem = () => ({
@@ -769,6 +809,8 @@ function novoPedidoModal() {
         produtoId: null, novoCadastro: false, busca: '', nome: '',
         // Cadastro inline (quando novoCadastro = true)
         categoriaId: categoriaPadrao || '', custoCadastro: null,
+        // Picker de categoria (combobox): busca, dropdown, resultados, indice do teclado.
+        catBusca: categoriaPadraoNome || '', catDropdownOpen: false, catResultados: [], catIndex: -1,
         // Quantidade e preço
         quantidade: 1, precoUnitario: 0,
         // Combobox
@@ -791,6 +833,8 @@ function novoPedidoModal() {
         pedidoCriado: null,       // { id }
         ultimoPedido: null,       // {found, pedidoId, criadoEm, total, itensCount, itens[]}
         ultimoPedidoCarregando: false,
+        // Catalogo de categorias (mutavel: o picker injeta as criadas inline).
+        categorias: @Html.Raw(Json.Serialize(Model.Categorias.Select(c => new { id = c.Id.ToString(), nome = c.Nome }).ToArray())),
         form: {
             modo: 'auto',           // auto | avulso
             clienteId: '',
@@ -1060,18 +1104,17 @@ function novoPedidoModal() {
         abrirCadastroProduto(it) {
             const nome = (it.busca || '').trim();
             if (!nome) return;
-            // Prevenção: API exige CategoriaId. Se a empresa não tem nenhuma cadastrada,
-            // bloqueia o caminho e orienta — em vez de deixar quebrar com 400 no submit.
-            if (categoriasIds.length === 0) {
-                this.erroMsg = 'Cadastre uma categoria em Produtos antes de criar produtos novos pelo modal.';
-                it.dropdownOpen = false;
-                return;
-            }
             it.nome = nome;
             it.novoCadastro = true;
             it.produtoId = null;
             it.dropdownOpen = false;
-            if (!it.categoriaId) it.categoriaId = categoriaPadrao || '';
+            // Categoria: pre-seleciona a padrao quando houver. O picker permite buscar
+            // ou criar inline (inclusive a PRIMEIRA categoria, quando a empresa nao tem nenhuma) —
+            // por isso nao ha mais o beco "cadastre uma categoria em Produtos antes".
+            if (!it.categoriaId) {
+                it.categoriaId = categoriaPadrao || '';
+                it.catBusca = categoriaPadraoNome || '';
+            }
         },
 
         // Bipar produto (camera/USB) reusa o scanner global: resolve o EAN via
@@ -1110,6 +1153,83 @@ function novoPedidoModal() {
                     window.showToast('Erro ao ler o codigo. Tente novamente.', 'error');
                 }
             } } }));
+        },
+
+        // ── Picker de categoria (combobox: busca + criar inline) ──────────
+        buscarCategorias(it) {
+            const q = normalizarTexto(it.catBusca);
+            it.catDropdownOpen = true;
+            it.catIndex = 0; // destaca a 1a linha (resultado ou "criar"): Enter aceita o topo, nao cria por engano
+            const todas = this.categorias || [];
+            const filtradas = q ? todas.filter(c => normalizarTexto(c.nome).includes(q)) : todas.slice();
+            it.catResultados = filtradas.slice(0, 8);
+            // Mantem categoriaId em sincronia: so vale se o texto bate EXATAMENTE uma categoria.
+            const exata = todas.find(c => normalizarTexto(c.nome) === q);
+            it.categoriaId = exata ? exata.id : '';
+        },
+        podeCriarCategoria(it) {
+            const q = normalizarTexto(it.catBusca);
+            if (!q) return false;
+            return !(this.categorias || []).some(c => normalizarTexto(c.nome) === q);
+        },
+        navCategoria(it, delta) {
+            it.catDropdownOpen = true;
+            const total = it.catResultados.length + (this.podeCriarCategoria(it) ? 1 : 0);
+            if (total === 0) { it.catIndex = -1; return; }
+            let i = it.catIndex + delta;
+            if (i < 0) i = total - 1;
+            if (i >= total) i = 0;
+            it.catIndex = i;
+        },
+        confirmarCategoria(it) {
+            const n = it.catResultados.length;
+            const temCriar = this.podeCriarCategoria(it);
+            const total = n + (temCriar ? 1 : 0);
+            // Age sobre a linha destacada (default 0 = topo). So cria se a linha "criar"
+            // estiver destacada OU nao houver nenhum resultado — nunca cria por engano
+            // quando o usuario quis o match do topo (ex: digitou "beb", Enter -> "Bebidas").
+            let i = it.catIndex;
+            if (i < 0 || i >= total) i = 0;
+            if (i < n) this.selecionarCategoria(it, it.catResultados[i]);
+            else if (temCriar) this.criarCategoriaInline(it);
+        },
+        selecionarCategoria(it, c) {
+            it.categoriaId = c.id;
+            it.catBusca = c.nome;
+            it.catDropdownOpen = false;
+            it.catIndex = -1;
+        },
+        async criarCategoriaInline(it) {
+            const nome = (it.catBusca || '').trim();
+            if (!nome) return;
+            const q = normalizarTexto(nome);
+            // Idempotencia: se ja existe localmente (mesmo nome normalizado), so seleciona — nao duplica.
+            const existente = (this.categorias || []).find(c => normalizarTexto(c.nome) === q);
+            if (existente) { this.selecionarCategoria(it, existente); return; }
+            const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+            try {
+                const res = await this._postJson('/categorias/criar-json', { nome }, token);
+                if (!res.ok) {
+                    this.erroMsg = 'Não foi possível criar a categoria "' + nome + '": ' + (res.err || 'erro desconhecido');
+                    return;
+                }
+                // /categorias/criar-json devolve só { success }; re-lista pra obter o id da nova categoria.
+                let lista = [];
+                try {
+                    const r = await esFetch('/categorias/listar');
+                    lista = r.ok ? await r.json() : [];
+                } catch { lista = []; }
+                const nova = lista.find(c => normalizarTexto(c.nome) === q);
+                if (nova) {
+                    this.categorias = lista;
+                    this.selecionarCategoria(it, nova);
+                    if (window.showToast) window.showToast('Categoria "' + nova.nome + '" criada.', 'success');
+                } else {
+                    this.erroMsg = 'Categoria "' + nome + '" criada, mas não consegui selecioná-la automaticamente. Recarregue e selecione.';
+                }
+            } catch (err) {
+                this.erroMsg = 'Falha ao criar a categoria "' + nome + '": ' + (err?.message || 'erro de rede');
+            }
         },
 
         // ── Totais e validação ────────────────────────────────────────────
@@ -1154,7 +1274,7 @@ function novoPedidoModal() {
             if (!it.nome || !it.nome.trim()) return 'Item sem nome.';
             if (it.novoCadastro) {
                 if (!it.categoriaId) return 'Selecione a categoria do produto novo "' + it.nome + '".';
-                if (!categoriasIds.includes(String(it.categoriaId))) return 'Categoria do produto "' + it.nome + '" não existe.';
+                if (!(this.categorias || []).some(c => String(c.id) === String(it.categoriaId))) return 'Categoria do produto "' + it.nome + '" não existe.';
             }
             const q = Number(it.quantidade);
             if (!(q > 0)) return 'Quantidade do item "' + it.nome + '" precisa ser maior que zero.';
