@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
 using EasyStock.Application.UseCases.BuscarEstoqueInteligente;
+using EasyStock.Application.UseCases.DocumentoEntrada;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -19,6 +20,7 @@ public class ItemEstoqueController(
     EstornarSaidaUseCase estornarSaidaUseCase,
     ReporEstoqueUseCase reporEstoqueUseCase,
     BuscarEstoqueInteligenteUseCase buscarUseCase,
+    GerarDocumentoEntradaUseCase gerarDocumentoUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List stock items (paginated)")]
@@ -145,6 +147,33 @@ public class ItemEstoqueController(
 
         var result = await registrarEntradaUseCase.ExecuteAsync(command with { EmpresaId = resolvedEmpresaId });
         return DataCreated($"/api/estoque/{result.ItemEstoqueId}", result);
+    }
+
+    [SwaggerOperation(Summary = "Etiqueta (PDF) do lote da entrada — com QRCode")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("{id:guid}/etiqueta/pdf")]
+    public Task<IActionResult> EtiquetaPdf(Guid id, [FromQuery] Guid empresaId, CancellationToken ct)
+        => GerarDocumentoAsync(id, empresaId, TipoDocumentoEntrada.Etiqueta, ct);
+
+    [SwaggerOperation(Summary = "Nota de Entrada (PDF) — com QRCode")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [HttpGet("{id:guid}/nota-entrada/pdf")]
+    public Task<IActionResult> NotaEntradaPdf(Guid id, [FromQuery] Guid empresaId, CancellationToken ct)
+        => GerarDocumentoAsync(id, empresaId, TipoDocumentoEntrada.Nota, ct);
+
+    private async Task<IActionResult> GerarDocumentoAsync(Guid id, Guid empresaId, TipoDocumentoEntrada tipo, CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
+            return error!;
+
+        var result = await gerarDocumentoUseCase.ExecuteAsync(
+            new GerarDocumentoEntradaQuery(resolvedEmpresaId, id, tipo), ct);
+        if (result is null) return DataNotFound("Item de estoque nao encontrado.");
+        return File(result.Bytes, result.ContentType, result.FileName);
     }
 
     [SwaggerOperation(Summary = "Register stock exit", Description = "Removes quantity from stock. Validates minimum stock levels.")]

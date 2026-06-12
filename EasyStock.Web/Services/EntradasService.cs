@@ -25,12 +25,41 @@ public class EntradasService(ApiClient api, SessionService session)
         return api.GetAsync<PagedResult<Movimentacao>>(qs);
     }
 
-    public async Task<ApiResult<object>> CriarEntradaAsync(EntradaFormViewModel vm)
+    public async Task<ApiResult<EntradaCriadaApi>> CriarEntradaAsync(EntradaFormViewModel vm)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty)
-            return ApiResult<object>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
-        return await api.PostAsync<object>("estoque/entrada", BuildEntradaBody(vm, "Compra", empresaId));
+            return ApiResult<EntradaCriadaApi>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
+        return await api.PostAsync<EntradaCriadaApi>("estoque/entrada", BuildEntradaBody(vm, "Compra", empresaId));
+    }
+
+    /// <summary>Busca lotes existentes da empresa (combobox da entrada). Filtra por codigo/operador/obs.</summary>
+    public async Task<ApiResult<PagedResult<LoteBuscaApi>>> BuscarLotesAsync(string? termo)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return ApiResult<PagedResult<LoteBuscaApi>>.Fail("EMPRESA_INVALIDA", "Loja não identificada.");
+        var qs = $"lotes?empresaId={empresaId}&pageSize=8";
+        if (!string.IsNullOrWhiteSpace(termo)) qs += $"&search={Uri.EscapeDataString(termo)}";
+        return await api.GetAsync<PagedResult<LoteBuscaApi>>(qs);
+    }
+
+    /// <summary>Gera o proximo codigo de lote para uma entrada do produto (LOTE-SKU-AAMMDD-NNN).</summary>
+    public async Task<ApiResult<ProximoCodigoLoteApi>> ProximoCodigoLoteAsync(Guid produtoId)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty)
+            return ApiResult<ProximoCodigoLoteApi>.Fail("EMPRESA_INVALIDA", "Loja não identificada.");
+        return await api.GetAsync<ProximoCodigoLoteApi>(
+            $"lotes/proximo-codigo-entrada?empresaId={empresaId}&produtoId={produtoId}");
+    }
+
+    /// <summary>Proxy do PDF (etiqueta/nota) da entrada — streama o binario vindo da Api.</summary>
+    public Task<ApiResult<Stream>> DocumentoPdfAsync(string tipo, Guid itemEstoqueId)
+    {
+        var empresaId = GetEmpresaId();
+        var rota = tipo == "etiqueta" ? "etiqueta/pdf" : "nota-entrada/pdf";
+        return api.GetStreamAsync($"estoque/{itemEstoqueId}/{rota}?empresaId={empresaId}");
     }
 
     public async Task<ApiResult<object>> ReposicaoAsync(ReposicaoFormViewModel vm)

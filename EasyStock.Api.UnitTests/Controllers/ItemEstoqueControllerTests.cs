@@ -79,6 +79,10 @@ public class ItemEstoqueControllerTests
             Substitute.For<ILojaRepository>(),
             Substitute.For<IUsuarioRepository>(),
             _movimentacaoEstoqueRepository);
+        var gerarDocumentoUseCase = new EasyStock.Application.UseCases.DocumentoEntrada.GerarDocumentoEntradaUseCase(
+            _itemEstoqueRepository,
+            Substitute.For<IEmpresaRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Pdf.IDocumentoEntradaPdfRenderer>());
         _controller = new ItemEstoqueController(
             _itemEstoqueRepository,
             _registrarEntradaUseCase,
@@ -86,6 +90,7 @@ public class ItemEstoqueControllerTests
             _estornarSaidaUseCase,
             _reporEstoqueUseCase,
             _buscarUseCase,
+            gerarDocumentoUseCase,
             _currentUser);
     }
 

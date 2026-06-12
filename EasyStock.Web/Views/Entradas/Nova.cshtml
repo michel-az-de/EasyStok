@@ -140,8 +140,50 @@
                         </div>
                         <div>
                             <label class="text-sm font-semibold text-slate-700 mb-1.5 block">Lote</label>
-                            <input type="text" x-model="lote"
-                                   class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                            <div class="flex gap-2">
+                                <div class="ped-combobox flex-1" @@click.outside="loteDropdownOpen = false">
+                                    <div class="ped-combobox__input-wrap">
+                                        <input type="text" x-model="lote" maxlength="40"
+                                               autocomplete="off" role="combobox" aria-autocomplete="list"
+                                               :aria-expanded="loteDropdownOpen ? 'true' : 'false'"
+                                               placeholder="Buscar ou criar lote…"
+                                               @@focus="buscarLotes()"
+                                               @@input="lote = lote.toUpperCase(); buscarLotes()"
+                                               @@keydown.arrow-down.prevent="navLote(1)"
+                                               @@keydown.arrow-up.prevent="navLote(-1)"
+                                               @@keydown.enter.prevent="confirmarLote()"
+                                               @@keydown.escape.prevent="loteDropdownOpen = false"
+                                               class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                                    </div>
+                                    <ul x-show="loteDropdownOpen" x-cloak role="listbox" class="ped-combobox__list">
+                                        <template x-for="(l, idx) in loteResultados" :key="l.codigo">
+                                            <li role="option" :aria-selected="idx === loteIndex ? 'true' : 'false'"
+                                                class="ped-combobox__option" :class="idx === loteIndex ? 'ped-combobox__option--active' : ''"
+                                                @@mousedown.prevent="selecionarLote(l)">
+                                                <span class="font-mono text-sm" x-text="l.codigo"></span>
+                                                <span class="text-xs text-slate-400 ml-2"
+                                                      x-text="l.status === 'finalizado' ? 'finalizado' : 'em produção'"></span>
+                                            </li>
+                                        </template>
+                                        <li x-show="podeCriarLote()" role="option"
+                                            :aria-selected="loteIndex === loteResultados.length ? 'true' : 'false'"
+                                            class="ped-combobox__option" :class="loteIndex === loteResultados.length ? 'ped-combobox__option--active' : ''"
+                                            @@mousedown.prevent="usarNovoLote()">
+                                            <div class="text-sm font-semibold text-indigo-600">+ Usar novo lote "<span x-text="lote"></span>"</div>
+                                            <div class="text-xs text-slate-500">Será criado e aparecerá em Lotes.</div>
+                                        </li>
+                                        <li x-show="loteResultados.length === 0 && !podeCriarLote()" class="px-2 py-2 text-xs text-slate-400">
+                                            Digite para buscar ou criar um lote.
+                                        </li>
+                                    </ul>
+                                </div>
+                                <button type="button" @@click="gerarCodigoLote()" :disabled="gerandoLote || !produtoId"
+                                        class="shrink-0 px-3 py-2.5 border border-indigo-300 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                                        title="Gerar código automático (LOTE-SKU-AAMMDD-NNN)">
+                                    <span x-text="gerandoLote ? '…' : 'Gerar'"></span>
+                                </button>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1">Opcional. Informe ou gere um lote para rastrear esta entrada em Lotes.</p>
                         </div>
                         <div>
                             <label class="text-sm font-semibold mb-1.5 block"
@@ -313,7 +355,40 @@
             </div>
         </div>
 
-        <!-- Passo 4: Confirmado (não é atingido via form submit, é alcançado após redirect com toast) -->
+        <!-- Passo 4: Concluído -->
+        <div x-show="step === 4" x-cloak>
+            <div class="ws text-center">
+                <div class="w-14 h-14 mx-auto rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+                    <svg class="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg mb-1">Entrada registrada!</h3>
+                <p class="text-sm text-slate-500 mb-2" x-text="produtoNome"></p>
+                <p x-show="loteSalvo" class="text-xs text-slate-500 mb-5">
+                    Lote <span class="font-mono font-semibold" x-text="loteSalvo"></span> disponível em
+                    <a href="/lotes" class="text-indigo-600 hover:underline">Lotes</a>.
+                </p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
+                    <a :href="'/entradas/' + itemEstoqueId + '/etiqueta.pdf'" target="_blank" rel="noopener noreferrer"
+                       :class="itemEstoqueId ? '' : 'opacity-50 pointer-events-none'"
+                       class="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                        🏷️ Imprimir etiqueta (PDF)
+                    </a>
+                    <a :href="'/entradas/' + itemEstoqueId + '/nota.pdf'" target="_blank" rel="noopener noreferrer"
+                       :class="itemEstoqueId ? '' : 'opacity-50 pointer-events-none'"
+                       class="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                        📄 Nota de entrada (PDF)
+                    </a>
+                </div>
+
+                <div class="flex gap-3 justify-center mt-6">
+                    <a href="/estoque" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800">Ir para estoque</a>
+                    <a href="/entradas/nova" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">Nova entrada</a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -353,6 +428,15 @@
                 controlaValidade: false,
                 erroMsg: '',
                 submitting: false,
+                // Combobox de lote (busca + criar inline + gerar)
+                loteResultados: [],
+                loteDropdownOpen: false,
+                loteIndex: 0,
+                gerandoLote: false,
+                _loteAbort: null,
+                // Resultado da entrada (passo 4)
+                itemEstoqueId: '',
+                loteSalvo: '',
                 get variacaoNome() {
                     if (!this.varId || this.variacoes.length === 0) return '';
                     return this.variacoes.find(v => v.id === this.varId)?.nome || '';
@@ -467,6 +551,82 @@
                     // Margem é calculada como getter reativo, não precisa de atualização manual
                 },
 
+                // ── Combobox de lote: busca + criar inline + gerar (espelha o seletor de categoria do pedido) ──
+                _normLote(s) { return (s || '').toString().trim().toUpperCase(); },
+
+                async buscarLotes() {
+                    this.loteDropdownOpen = true;
+                    this.loteIndex = 0;
+                    if (this._loteAbort) this._loteAbort.abort();
+                    this._loteAbort = new AbortController();
+                    try {
+                        const r = await esFetch('/entradas/lotes/buscar?q=' + encodeURIComponent(this.lote || ''), { signal: this._loteAbort.signal });
+                        this.loteResultados = r.ok ? await r.json() : [];
+                    } catch (e) {
+                        if (e && e.name === 'AbortError') return;
+                        this.loteResultados = [];
+                    }
+                },
+
+                podeCriarLote() {
+                    const q = this._normLote(this.lote);
+                    if (!q) return false;
+                    return !this.loteResultados.some(l => this._normLote(l.codigo) === q);
+                },
+
+                navLote(delta) {
+                    this.loteDropdownOpen = true;
+                    const total = this.loteResultados.length + (this.podeCriarLote() ? 1 : 0);
+                    if (total === 0) { this.loteIndex = -1; return; }
+                    let i = this.loteIndex + delta;
+                    if (i < 0) i = total - 1;
+                    if (i >= total) i = 0;
+                    this.loteIndex = i;
+                },
+
+                confirmarLote() {
+                    const n = this.loteResultados.length;
+                    const temCriar = this.podeCriarLote();
+                    const total = n + (temCriar ? 1 : 0);
+                    let i = this.loteIndex;
+                    if (i < 0 || i >= total) i = 0;
+                    if (i < n) this.selecionarLote(this.loteResultados[i]);
+                    else if (temCriar) this.usarNovoLote();
+                },
+
+                selecionarLote(l) {
+                    this.lote = l.codigo;
+                    this.loteDropdownOpen = false;
+                    this.loteIndex = -1;
+                },
+
+                usarNovoLote() {
+                    this.lote = this._normLote(this.lote);
+                    this.loteDropdownOpen = false;
+                    this.loteIndex = -1;
+                },
+
+                async gerarCodigoLote() {
+                    if (!this.produtoId) { window.showToast('Selecione um produto antes de gerar o lote.', 'warning'); return; }
+                    if (this.gerandoLote) return;
+                    this.gerandoLote = true;
+                    try {
+                        const r = await esFetch('/entradas/lote/proximo-codigo?produtoId=' + encodeURIComponent(this.produtoId));
+                        if (r.ok) {
+                            const d = await r.json();
+                            this.lote = d.codigo || this.lote;
+                            this.loteDropdownOpen = false;
+                            window.showToast('Código de lote gerado.', 'success');
+                        } else {
+                            window.showToast('Não foi possível gerar o código do lote.', 'error');
+                        }
+                    } catch (e) {
+                        window.showToast('Não foi possível conectar ao servidor.', 'error');
+                    } finally {
+                        this.gerandoLote = false;
+                    }
+                },
+
                 async submitEntrada() {
                     if (this.submitting) return;
                     this.submitting = true;
@@ -492,7 +652,10 @@
                         });
                         const data = await res.json();
                         if (res.ok && data.success) {
-                            window.location.href = '/estoque';
+                            this.itemEstoqueId = data.itemEstoqueId || '';
+                            this.loteSalvo = data.lote || (this.lote ? this.lote.toUpperCase() : '');
+                            this.step = 4;
+                            window.showToast('Entrada registrada!', 'success');
                         } else {
                             this.erroMsg = data.errorMessage || 'Erro ao registrar entrada. Tente novamente.';
                             window.showToast(this.erroMsg, 'error', 4000);

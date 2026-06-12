@@ -72,6 +72,8 @@ public static class ServiceCollectionExtensions
 
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
         services.AddSingleton<IFaturaPdfRenderer, FaturaPdfRenderer>();
+        // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
+        services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
 
         // Modulo Financeiro F3 — abstracao multi-gateway de pagamento.
         // Adapters base sao Scoped (consomem repos scoped via DI). Cada IPagamentoGateway

@@ -83,7 +83,56 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
                 }
             });
 
-        return Ok(new { success = true });
+        // Devolve o id do item p/ o passo de sucesso oferecer etiqueta/nota (PDF) e o lote
+        // normalizado p/ o link de "ver em Lotes".
+        return Ok(new
+        {
+            success = true,
+            itemEstoqueId = result.Data?.ItemEstoqueId,
+            lote = string.IsNullOrWhiteSpace(vm.Lote) ? null : vm.Lote.Trim().ToUpperInvariant()
+        });
+    }
+
+    [HttpGet("/entradas/lotes/buscar")]
+    public async Task<IActionResult> BuscarLotes(string? q = null)
+    {
+        var result = await svc.BuscarLotesAsync(q);
+        if (!result.Success || result.Data is null)
+            return Json(Array.Empty<object>());
+        return Json(result.Data.Data.Select(l => new { codigo = l.Codigo, status = l.Status }));
+    }
+
+    [HttpGet("/entradas/lote/proximo-codigo")]
+    public async Task<IActionResult> ProximoCodigoLote(string? produtoId = null)
+    {
+        if (!Guid.TryParse(produtoId, out var pid))
+            return BadRequest(new { error = new { message = "Selecione um produto válido." } });
+
+        var result = await svc.ProximoCodigoLoteAsync(pid);
+        if (!result.Success || result.Data is null)
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400,
+                new { error = new { message = result.ErrorMessage ?? "Não foi possível gerar o código." } });
+        return Json(new { codigo = result.Data.Codigo });
+    }
+
+    [HttpGet("/entradas/{itemEstoqueId:guid}/etiqueta.pdf")]
+    public Task<IActionResult> EtiquetaPdf(Guid itemEstoqueId) => DocumentoPdf("etiqueta", itemEstoqueId);
+
+    [HttpGet("/entradas/{itemEstoqueId:guid}/nota.pdf")]
+    public Task<IActionResult> NotaPdf(Guid itemEstoqueId) => DocumentoPdf("nota", itemEstoqueId);
+
+    private async Task<IActionResult> DocumentoPdf(string tipo, Guid itemEstoqueId)
+    {
+        var result = await svc.DocumentoPdfAsync(tipo, itemEstoqueId);
+        if (!result.Success || result.Data is null)
+            return NotFound();
+
+        var nome = tipo == "etiqueta"
+            ? $"etiqueta-{itemEstoqueId:N}.pdf"
+            : $"nota-entrada-{itemEstoqueId:N}.pdf";
+        // inline: abre no navegador (target=_blank) em vez de forcar download.
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{nome}\"";
+        return File(result.Data, "application/pdf");
     }
 
     [HttpGet("/entradas/reposicao")]

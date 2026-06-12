@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RemoverItemLote;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -72,6 +73,19 @@ public class LotesController(
             Origem = command.Origem ?? "web"
         });
         return DataCreated($"/api/lotes/{result.Id}", result);
+    }
+
+    [SwaggerOperation(Summary = "Proximo codigo de lote para entrada de estoque (LOTE-SKU-AAMMDD-NNN)")]
+    [HttpGet("proximo-codigo-entrada")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> ProximoCodigoEntrada([FromQuery] Guid? empresaId, [FromQuery] Guid produtoId)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var produto = await produtoRepo.GetByIdAsync(produtoId);
+        var sku = produto != null && produto.EmpresaId == emp ? produto.SkuBase?.Value : null;
+        var codigo = await GeradorCodigoLoteEntrada.GerarAsync(
+            loteRepo, emp, sku, EasyStock.Application.Common.HorarioBrasil.Agora());
+        return DataOk(new { codigo });
     }
 
     [SwaggerOperation(Summary = "Add item to batch")]
@@ -199,7 +213,9 @@ public class LotesController(
         // Filtro por Embalado + sem peso e feito em memoria para reusar
         // GetTipoEmbalagemMapAsync (1 query batch em vez de join custom).
         var (todos, _) = await loteRepo.ListAsync(emp, 1, 500, status: "em_producao");
-        var lotesEmProducao = todos.ToList();
+        // Lotes de ENTRADA de estoque (Origem="entrada") nao seguem a trava RDC-727 de peso da
+        // producao — nao devem poluir a fila "pendentes de peso" do modulo de producao (P5).
+        var lotesEmProducao = todos.Where(l => l.Origem != "entrada").ToList();
 
         var todosProdutoIds = lotesEmProducao
             .SelectMany(l => l.Itens)

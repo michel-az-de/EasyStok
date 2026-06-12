@@ -36,6 +36,7 @@ using EasyStock.Application.UseCases.GerenciarVariacaoProduto;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Application.UseCases.GerenciarCategoria;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
+using EasyStock.Application.UseCases.DocumentoEntrada;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 using EasyStock.Application.UseCases.EstornarSaida;
 using EasyStock.Application.UseCases.ReporEstoque;
@@ -113,6 +114,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
         services.AddScoped<ConferirEtiquetaUseCase>();
+        services.AddScoped<GerarDocumentoEntradaUseCase>(); // P5: PDF etiqueta + Nota de Entrada
 
         // Módulo Etiquetas (F2)
         services.AddScoped<ListarTemplatesUseCase>();
