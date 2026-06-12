@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
@@ -21,8 +22,14 @@ public class PedidoUseCasesTests
 
     private CriarPedidoUseCase CriarPedidoUC() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
         Substitute.For<ILogger<CriarPedidoUseCase>>());
-    private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo, _uow,
-        Substitute.For<ILogger<CancelarPedidoUseCase>>());
+    private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo,
+        new PedidoEstoqueIntegrationService(
+            Substitute.For<IItemEstoqueRepository>(),
+            Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
+            Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
+        Substitute.For<IContaReceberRepository>(),
+        _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
         Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>());
 
@@ -226,7 +233,7 @@ public class PedidoUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var pedidoId = Guid.NewGuid();
-        _pedidoRepo.GetByIdAsync(empresaId, pedidoId).Returns((Pedido?)null);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedidoId).Returns((Pedido?)null);
 
         var result = await CancelarUC().ExecuteAsync(new CancelarPedidoCommand(empresaId, pedidoId));
 
@@ -241,7 +248,7 @@ public class PedidoUseCasesTests
         var pedido = Pedido.Criar(empresaId);
         pedido.Cancelar();
         var canceladoEmOriginal = pedido.CanceladoEm;
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         var result = await CancelarUC().ExecuteAsync(
             new CancelarPedidoCommand(empresaId, pedido.Id, Motivo: "tentativa nova"));
@@ -258,7 +265,7 @@ public class PedidoUseCasesTests
     {
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         PedidoEvento? evento = null;
         await _pedidoRepo.AddEventoAsync(Arg.Do<PedidoEvento>(e => evento = e));

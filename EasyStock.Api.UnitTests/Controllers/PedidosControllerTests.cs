@@ -74,7 +74,8 @@ public class PedidosControllerTests
             NullLogger<AtualizarStatusPedidoUseCase>.Instance);
 
         var cancelar = new CancelarPedidoUseCase(
-            _pedidoRepo, _uow, NullLogger<CancelarPedidoUseCase>.Instance);
+            _pedidoRepo, estoqueIntegration, Substitute.For<IContaReceberRepository>(),
+            _uow, NullLogger<CancelarPedidoUseCase>.Instance);
 
         var agendamento = new AlterarAgendamentoPedidoUseCase(
             _pedidoRepo, _uow, NullLogger<AlterarAgendamentoPedidoUseCase>.Instance);
