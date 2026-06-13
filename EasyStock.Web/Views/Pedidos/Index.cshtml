@@ -467,7 +467,7 @@
                                    @@input="comboboxOpen = true"
                                    @@keydown.arrow-down.prevent="comboboxNavega(1)"
                                    @@keydown.arrow-up.prevent="comboboxNavega(-1)"
-                                   @@keydown.enter.prevent="comboboxEnter()" />
+                                   @@keydown.enter.prevent="($event.ctrlKey || $event.metaKey) || comboboxEnter()" />
                         </div>
                         <span class="fm-field__hint" x-show="clienteBusca.length === 0">
                             @Model.Clientes.Count clientes cadastrados · digite para buscar ou cadastrar novo
@@ -594,6 +594,10 @@
                                            @@input="buscarProdutos(it)"
                                            @@focus="it.dropdownOpen = true"
                                            @@blur="setTimeout(() => it.dropdownOpen = false, 150)"
+                                           @@keydown.arrow-down.prevent="navProduto(it, 1)"
+                                           @@keydown.arrow-up.prevent="navProduto(it, -1)"
+                                           @@keydown.enter.prevent="($event.ctrlKey || $event.metaKey) || confirmarProduto(it)"
+                                           @@keydown.escape.stop="it.dropdownOpen = false"
                                            placeholder="Buscar produto pelo nome…"
                                            :class="(it.busca || '').trim().length > 0 ? 'ui-field text-sm w-full ped-prod-input--pendente' : 'ui-field text-sm w-full'" />
                                     <!-- Aviso quando há texto mas item não foi consolidado -->
@@ -612,8 +616,10 @@
                                     <ul x-show="it.dropdownOpen && !it.produtoId && !it.novoCadastro && (it.busca || '').trim().length > 0"
                                         x-cloak
                                         class="ped-combobox__list ped-prod-dropdown">
-                                        <template x-for="p in it.resultados" :key="p.id">
+                                        <template x-for="(p, pi) in it.resultados" :key="p.id">
                                             <li class="ped-combobox__option"
+                                                :class="{ 'ped-combobox__option--active': it.prodIndex === pi }"
+                                                @@mouseenter="it.prodIndex = pi"
                                                 @@mousedown.prevent="selecionarProduto(it, p)">
                                                 <div class="font-medium" x-text="p.nome"></div>
                                                 <div class="text-xs text-slate-500">
@@ -623,6 +629,8 @@
                                             </li>
                                         </template>
                                         <li class="ped-combobox__option ped-prod-dropdown__create"
+                                            :class="{ 'ped-combobox__option--active': it.prodIndex === it.resultados.length }"
+                                            @@mouseenter="it.prodIndex = it.resultados.length"
                                             @@mousedown.prevent="abrirCadastroProduto(it)">
                                             <div class="ped-prod-dropdown__create-title">
                                                 + Cadastrar "<span x-text="(it.busca || '').trim()"></span>" como novo produto
@@ -669,7 +677,7 @@
                                                    @@blur="setTimeout(() => { it.catDropdownOpen = false }, 150)"
                                                    @@keydown.arrow-down.prevent="navCategoria(it, 1)"
                                                    @@keydown.arrow-up.prevent="navCategoria(it, -1)"
-                                                   @@keydown.enter.prevent="confirmarCategoria(it)"
+                                                   @@keydown.enter.prevent="($event.ctrlKey || $event.metaKey) || confirmarCategoria(it)"
                                                    @@keydown.escape.prevent="it.catDropdownOpen = false" />
                                             <input type="hidden" x-model="it.categoriaId" />
                                             <ul x-show="it.catDropdownOpen" x-cloak role="listbox"
@@ -735,17 +743,16 @@
                     <div class="grid grid-cols-2 gap-2">
                         <button type="button" @@click="vendaBalcao = true; form.agendarAtivo = false"
                                 :class="vendaBalcao ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
-                                class="px-3 py-2 rounded-lg text-sm border text-left transition">
-                            <div class="font-semibold">Venda balcão</div>
-                            <div class="text-xs opacity-80">finaliza e baixa estoque agora</div>
+                                class="px-3 py-2 rounded-lg text-sm font-semibold border text-center transition">
+                            Venda balcão
                         </button>
                         <button type="button" @@click="vendaBalcao = false"
                                 :class="!vendaBalcao ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
-                                class="px-3 py-2 rounded-lg text-sm border text-left transition">
-                            <div class="font-semibold">Pedido</div>
-                            <div class="text-xs opacity-80">fica aguardando, finalizo depois</div>
+                                class="px-3 py-2 rounded-lg text-sm font-semibold border text-center transition">
+                            Pedido
                         </button>
                     </div>
+                    <p class="text-xs text-slate-500 mt-1" x-text="vendaBalcao ? 'Finaliza e baixa o estoque agora.' : 'Fica aguardando — você finaliza depois.'"></p>
                     <div x-show="vendaBalcao" x-cloak class="mt-3 p-3 rounded-lg border border-indigo-100 bg-slate-50">
                         <label class="flex items-center gap-2 text-sm cursor-pointer select-none mb-2">
                             <input type="checkbox" x-model="pagou" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
@@ -821,6 +828,7 @@
                 <span class="ped-total__label">Total</span>
                 <span class="ped-total__value" x-text="formatBRL(totalPedido)"></span>
             </div>
+            <span class="text-xs text-slate-400 hidden sm:inline" aria-hidden="true">Ctrl+Enter finaliza · Esc fecha</span>
             <button type="button" @@click="close()"
                     class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
                 Cancelar
@@ -828,6 +836,7 @@
             <button type="button" @@click="submit()"
                     :disabled="loading || !podeEnviar()"
                     :class="{ 'opacity-50 cursor-not-allowed': loading || !podeEnviar() }"
+                    title="Ctrl+Enter pra finalizar sem sair do teclado"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
                 <span x-text="vendaBalcao ? (pagou ? 'Finalizar venda' : 'Finalizar pedido') : 'Criar pedido'"></span>
             </button>
@@ -863,8 +872,8 @@ function novoPedidoModal() {
         catBusca: categoriaPadraoNome || '', catDropdownOpen: false, catResultados: [], catIndex: -1,
         // Quantidade e preço
         quantidade: 1, precoUnitario: 0,
-        // Combobox
-        resultados: [], dropdownOpen: false,
+        // Combobox (prodIndex = item destacado p/ navegacao por teclado; ultimo = "cadastrar novo")
+        resultados: [], dropdownOpen: false, prodIndex: 0,
         _buscaTimer: null
     });
 
@@ -1145,14 +1154,38 @@ function novoPedidoModal() {
             clearTimeout(it._buscaTimer);
             const q = (it.busca || '').trim();
             it.dropdownOpen = q.length > 0;
+            it.prodIndex = 0; // cada tecla recoloca o destaque no topo
             if (q.length < 2) { it.resultados = []; return; }
             it._buscaTimer = setTimeout(async () => {
                 try {
                     const r = await esFetch('/produtos/buscar?q=' + encodeURIComponent(q) + '&limit=8');
                     if (!r.ok) { it.resultados = []; return; }
                     it.resultados = await r.json();
+                    it.prodIndex = 0;
                 } catch { it.resultados = []; }
             }, 200);
+        },
+        // Navegacao por teclado no dropdown de produto (seta cima/baixo). O indice vai
+        // de 0..length, onde o ultimo (= length) e a opcao "cadastrar novo produto".
+        navProduto(it, delta) {
+            it.dropdownOpen = true;
+            const max = (it.resultados || []).length;
+            it.prodIndex = Math.max(0, Math.min(max, (it.prodIndex ?? 0) + delta));
+        },
+        // Enter no campo de busca: confirma o item destacado (ou cadastra novo).
+        // Boca de caixa: produto EXISTENTE na ultima linha encadeia abrindo a proxima
+        // linha com foco; cadastro novo nao encadeia (precisa escolher categoria antes).
+        confirmarProduto(it) {
+            if (it.produtoId || it.novoCadastro) return; // ja consolidado
+            const lista = it.resultados || [];
+            const idx = it.prodIndex ?? 0;
+            const ehUltimaLinha = this.form.itens[this.form.itens.length - 1] === it;
+            if (idx < lista.length) {
+                this.selecionarProduto(it, lista[idx]);
+                if (ehUltimaLinha) this.adicionarItem();
+            } else if ((it.busca || '').trim().length > 0) {
+                this.abrirCadastroProduto(it);
+            }
         },
         selecionarProduto(it, p) {
             it.produtoId = p.id;
