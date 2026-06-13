@@ -141,7 +141,10 @@ public class FinalizarVendaBalcaoUseCase(
                     FornecedorNome: null,
                     Validade: null,
                     Observacoes: "Entrada inicial — produto cadastrado na venda balcao.",
-                    DescricaoAnuncio: null,
+                    // Passa DescricaoAnuncio (nome) de proposito: com vazio + gerador de IA
+                    // registrado, RegistrarEntrada faria uma chamada de IA EXTERNA dentro da
+                    // transacao (lenta, segura a transacao aberta). Evitamos isso no balcao.
+                    DescricaoAnuncio: it.Nome.Trim(),
                     DocumentoReferencia: null,
                     DimensoesReais: null,
                     InstrucoesGeracaoDescricao: null,
