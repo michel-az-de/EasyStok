@@ -121,8 +121,14 @@
                 </div>
                 <div>
                     <label class="block text-xs text-slate-600 mb-1" for="cep">CEP</label>
-                    <input type="text" id="cep" name="cep" value="@Model.Endereco?.Cep" maxlength="10"
-                           placeholder="00000-000"
+                    <input type="text" id="cep" name="cep" value="@Model.Endereco?.Cep" maxlength="9"
+                           placeholder="00000-000" data-mask="cep" inputmode="numeric"
+                           data-cep-autofill
+                           data-cep-logradouro='[name="logradouro"]'
+                           data-cep-bairro='[name="bairro"]'
+                           data-cep-cidade='[name="cidade"]'
+                           data-cep-uf='[name="uf"]'
+                           data-cep-focus='[name="numero"]'
                            class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" />
                 </div>
             </div>
