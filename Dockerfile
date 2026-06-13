@@ -82,6 +82,13 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
+# GIT_SHA do commit (passado via --build-arg). Declarado so no runtime para nao
+# invalidar o cache das camadas de build/publish a cada commit. Exposto em
+# /health/version (buildSha) para deploy-verify provar a versao da API no ar.
+# Espelha Dockerfile.Web (#572).
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
+
 # start-period generoso pra migrations rodarem antes do health check trancar.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD wget -qO- http://localhost:8080/health || exit 1

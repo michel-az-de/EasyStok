@@ -57,11 +57,32 @@ dc up -d --force-recreate $SERVICES
 echo "==> [4/5] Estado dos containers"
 dc ps
 
-# Verificacao pos-deploy: o /health do web expoe o commit (GIT_SHA). O deploy so
-# e "sucesso" se o commit servido == HEAD. So o web tem GIT_SHA+/health hoje.
+# Verificacao pos-deploy. Apos #572 os 3 containers (web/api/admin) carimbam GIT_SHA
+# no env; o deploy so e "sucesso" se o commit no ar == HEAD. Dois sinais:
+#   (a) env GIT_SHA de cada container == HEAD (uniforme, todos os servicos);
+#   (b) prova end-to-end de que o app SERVE o commit (web /health.commit, api
+#       /health/version.buildSha) — pega container 'no env certo mas processo velho'.
+echo "==> [5/5] Verificando que o commit no ar == $(git_ rev-parse --short HEAD)"
+VERIFY_FAIL=0
+
+for svc in $SERVICES; do
+  case "$svc" in
+    api)   cname=easystok-api ;;
+    web)   cname=easystok-web ;;
+    admin) cname=easystok-admin ;;
+    *)     continue ;;
+  esac
+  CSHA="$("${DOCKER[@]}" inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cname" 2>/dev/null | sed -n 's/^GIT_SHA=//p' | head -1)"
+  if [ "$CSHA" = "$GIT_SHA" ]; then
+    echo "    OK    $cname env GIT_SHA confere"
+  else
+    echo "    FALHA $cname env GIT_SHA='${CSHA:-<ausente>}' != HEAD"
+    VERIFY_FAIL=1
+  fi
+done
+
 case " $SERVICES " in
   *" web "*)
-    echo "==> [5/5] Verificando /health.commit == $GIT_SHA"
     WEBIP="$("${DOCKER[@]}" inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' easystok-web 2>/dev/null || true)"
     SERVED=""
     for _ in $(seq 1 20); do
@@ -70,17 +91,29 @@ case " $SERVICES " in
       [ -n "$SERVED" ] && [ "$SERVED" != "unknown" ] && break
       sleep 3
     done
-    echo "    servido: ${SERVED:-<vazio>}"
-    if [ "$SERVED" != "$GIT_SHA" ]; then
-      echo "    FALHA: /health serve '${SERVED:-<vazio>}', esperado '$GIT_SHA'."
-      echo "    O deploy do web NAO refletiu o estado novo. Investigar antes de confiar."
-      exit 1
-    fi
-    echo "    OK: commit servido confere com origin/master."
-    ;;
-  *)
-    echo "==> [5/5] (web fora do conjunto; verificacao de /health pulada)"
+    if [ "$SERVED" = "$GIT_SHA" ]; then echo "    OK    web /health.commit == HEAD"
+    else echo "    FALHA web /health.commit='${SERVED:-<vazio>}' != HEAD"; VERIFY_FAIL=1; fi
     ;;
 esac
+
+case " $SERVICES " in
+  *" api "*)
+    APIIP="$("${DOCKER[@]}" inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' easystok-api 2>/dev/null || true)"
+    SERVED=""
+    for _ in $(seq 1 20); do
+      BODY="$(curl -s -m 5 "http://${APIIP}:8080/health/version" 2>/dev/null || true)"
+      SERVED="$(printf '%s' "$BODY" | grep -o '"buildSha":"[^"]*"' | cut -d'"' -f4 || true)"
+      [ -n "$SERVED" ] && [ "$SERVED" != "unknown" ] && [ "$SERVED" != "master" ] && break
+      sleep 3
+    done
+    if [ "$SERVED" = "$GIT_SHA" ]; then echo "    OK    api /health/version.buildSha == HEAD"
+    else echo "    FALHA api /health/version.buildSha='${SERVED:-<vazio>}' != HEAD"; VERIFY_FAIL=1; fi
+    ;;
+esac
+
+if [ "$VERIFY_FAIL" -ne 0 ]; then
+  echo "    O deploy NAO refletiu em algum container/endpoint. Investigar antes de confiar."
+  exit 1
+fi
 
 echo "==> DEPLOY OK - VM em $(git_ rev-parse --short HEAD)"

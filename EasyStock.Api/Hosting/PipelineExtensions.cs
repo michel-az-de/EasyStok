@@ -299,7 +299,12 @@ public static class PipelineExtensions
             {
                 apiVersion = info,
                 mobileSchemaVersion = 2,
-                buildSha = Environment.GetEnvironmentVariable("BUILD_SHA") ?? "master",
+                // GIT_SHA e o env carimbado pelo build-arg (vm-deploy.sh/azure-deploy.sh/
+                // compose), unificado com o /health do Web (#572). BUILD_SHA mantido como
+                // fallback de compat; "master" so quando nenhum esta setado (dev local).
+                buildSha = Environment.GetEnvironmentVariable("GIT_SHA")
+                           ?? Environment.GetEnvironmentVariable("BUILD_SHA")
+                           ?? "master",
                 serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 // Fuso resolvido: deploy-verify confirma source=Iana e offsetMinutes=-180.
                 timezone = new

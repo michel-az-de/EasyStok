@@ -49,6 +49,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     image: easystok-api:latest
     container_name: easystok-api
     restart: unless-stopped
@@ -128,6 +130,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cloudrun.admin
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     image: easystok-admin:latest
     container_name: easystok-admin
     restart: unless-stopped

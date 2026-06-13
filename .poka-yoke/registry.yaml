@@ -59,7 +59,7 @@ canonical_commands:
     status: active
   deploy-verify:
     cmd: 'scripts/poka-yoke/deploy-verify.ps1'
-    why: "az vm run-command + docker inspect GIT_SHA==HEAD + grep asset + healthy. Verificacao sem HTTP (TLS bare-IP nao funciona)."
+    why: "az vm run-command + docker inspect GIT_SHA==HEAD nos 3 containers (web/api/admin, #572). Verificacao sem HTTP (TLS bare-IP nao funciona)."
     status: active
   worktree-status:
     cmd: 'powershell -File scripts/poka-yoke/worktree-status.ps1'

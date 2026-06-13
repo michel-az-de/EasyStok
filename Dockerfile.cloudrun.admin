@@ -34,4 +34,9 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
+# GIT_SHA do commit (passado via --build-arg). So no runtime p/ nao invalidar cache.
+# Espelha Dockerfile.Web/Dockerfile (API) — deploy-verify cobre os 3 containers (#572).
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
+
 ENTRYPOINT ["dotnet", "EasyStock.Admin.dll"]
