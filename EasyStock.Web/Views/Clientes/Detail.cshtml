@@ -174,7 +174,13 @@
                 <form asp-action="AddEndereco" asp-controller="Clientes" asp-route-id="@c.Id" method="post" class="grid grid-cols-2 gap-2 pt-3 border-t">
                     @Html.AntiForgeryToken()
                     <input type="text" name="tipo" placeholder="Tipo · ex: residencial, comercial" class="ui-field text-sm" />
-                    <input type="text" name="cep" placeholder="CEP" data-mask="cep" inputmode="numeric" maxlength="9" class="ui-field text-sm" />
+                    <input type="text" name="cep" placeholder="CEP" data-mask="cep" inputmode="numeric" maxlength="9" class="ui-field text-sm"
+                           data-cep-autofill
+                           data-cep-logradouro='[name="logradouro"]'
+                           data-cep-bairro='[name="bairro"]'
+                           data-cep-cidade='[name="cidade"]'
+                           data-cep-uf='[name="estado"]'
+                           data-cep-focus='[name="numero"]' />
                     <input type="text" name="logradouro" placeholder="Logradouro" class="ui-field text-sm col-span-2" />
                     <input type="text" name="numero" placeholder="Número" class="ui-field text-sm" />
                     <input type="text" name="complemento" placeholder="Complemento" class="ui-field text-sm" />

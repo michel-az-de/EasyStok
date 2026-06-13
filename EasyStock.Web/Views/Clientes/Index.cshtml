@@ -209,6 +209,14 @@
                                placeholder="cliente@email.com"
                                class="ui-field w-full text-sm" />
                     </div>
+                    <div class="fm-field">
+                        <label class="fm-field__label" for="cli-cep">CEP</label>
+                        <input id="cli-cep" type="text" x-mask:cep
+                               inputmode="numeric" placeholder="00000-000" maxlength="9"
+                               data-cep-autofill data-cep-compose="#cli-end" data-cep-focus="#cli-end"
+                               class="ui-field w-full text-sm" />
+                        <span class="fm-field__hint">Preenche o endereço automaticamente</span>
+                    </div>
                     <div class="fm-field fm-col-2">
                         <label class="fm-field__label" for="cli-end">Endereço</label>
                         <input id="cli-end" type="text" x-model="form.endereco"
