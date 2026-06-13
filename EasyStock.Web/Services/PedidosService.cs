@@ -61,6 +61,29 @@ public class PedidosService(ApiClient api, SessionService session)
         });
     }
 
+    /// <summary>Venda balcao atomica: passa lojaId da sessao (necessario pra saida de estoque).</summary>
+    public Task<ApiResult<BalcaoResultApi>> FinalizarBalcaoAsync(EasyStock.Web.Controllers.CriarBalcaoWebRequest req)
+    {
+        var empresaId = GetEmpresaId();
+        if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<BalcaoResultApi>());
+        Guid? lojaId = Guid.TryParse(session.GetLojaId(), out var l) && l != Guid.Empty ? l : (Guid?)null;
+        return api.PostAsync<BalcaoResultApi>("pedidos/balcao", new
+        {
+            empresaId,
+            lojaId,
+            clienteId = req.ClienteId,
+            novoClienteNome = req.NovoClienteNome,
+            novoClienteApt = req.NovoClienteApt,
+            novoClienteTelefone = req.NovoClienteTelefone,
+            clienteNomeAdHoc = req.NomeAdHoc,
+            itens = req.Itens,
+            pagou = req.Pagou,
+            formaPagamento = req.FormaPagamento,
+            observacoes = req.Observacoes,
+            origem = "balcao"
+        });
+    }
+
     public Task<ApiResult<Pedido>> AlterarAgendamentoAsync(string id, DateTime? agendadoParaEm)
     {
         var empresaId = GetEmpresaId();

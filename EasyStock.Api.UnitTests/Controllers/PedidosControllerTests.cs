@@ -6,12 +6,16 @@ using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
+using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.CriarCliente;
 using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.FinalizarVendaBalcao;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.ListarPedidosCliente;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
@@ -96,10 +100,23 @@ public class PedidosControllerTests
         var removePag = new RemoverPagamentoPedidoUseCase(
             _pedidoRepo, _uow, NullLogger<RemoverPagamentoPedidoUseCase>.Instance);
 
+        var criarCliente = new CriarClienteUseCase(
+            _clienteRepo, _uow, NullLogger<CriarClienteUseCase>.Instance);
+        var cadastrarProduto = new CadastrarProdutoUseCase(
+            _produtoRepo, Substitute.For<ICategoriaRepository>(),
+            Substitute.For<IProdutoCaracteristicaRepository>(), Substitute.For<IProdutoEmbalagemRepository>(),
+            Substitute.For<IProdutoVariacaoRepository>(), _uow, NullLogger<CadastrarProdutoUseCase>.Instance);
+        var registrarEntrada = new RegistrarEntradaEstoqueUseCase(
+            _produtoRepo, Substitute.For<IProdutoVariacaoRepository>(), Substitute.For<IItemEstoqueRepository>(),
+            Substitute.For<IMovimentacaoEstoqueRepository>(), _uow, NullLogger<RegistrarEntradaEstoqueUseCase>.Instance);
+        var finalizarBalcao = new FinalizarVendaBalcaoUseCase(
+            criarCliente, cadastrarProduto, registrarEntrada, criar, status, addPag,
+            _uow, NullLogger<FinalizarVendaBalcaoUseCase>.Instance);
+
         _controller = new PedidosController(
             criar, status, cancelar, agendamento,
             listar, obter, addItem, removeItem, addPag, removePag,
-            _currentUser);
+            finalizarBalcao, _currentUser);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -199,7 +216,7 @@ public class PedidosControllerTests
     public async Task Cancelar_DeveRetornarOk_QuandoPedidoCancelado()
     {
         var pedido = MakePedido(_empresaId);
-        _pedidoRepo.GetByIdAsync(_empresaId, pedido.Id)
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id)
             .Returns(pedido);
 
         var result = await _controller.Cancelar(pedido.Id, new CancelarPedidoCommand(_empresaId, pedido.Id));
@@ -213,7 +230,7 @@ public class PedidosControllerTests
     public async Task Cancelar_DeveRetornarNotFound_QuandoPedidoNaoExiste()
     {
         var id = Guid.NewGuid();
-        _pedidoRepo.GetByIdAsync(_empresaId, id)
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, id)
             .Returns((Pedido?)null);
 
         var result = await _controller.Cancelar(id, new CancelarPedidoCommand(_empresaId, id));

@@ -729,6 +729,44 @@
             </fieldset>
 
             <fieldset class="fm-section">
+                <legend class="fm-section__legend">Finalização</legend>
+                <div class="fm-field fm-col-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" @@click="vendaBalcao = true; form.agendarAtivo = false"
+                                :class="vendaBalcao ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+                                class="px-3 py-2 rounded-lg text-sm border text-left transition">
+                            <div class="font-semibold">Venda balcão</div>
+                            <div class="text-xs opacity-80">finaliza e baixa estoque agora</div>
+                        </button>
+                        <button type="button" @@click="vendaBalcao = false"
+                                :class="!vendaBalcao ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+                                class="px-3 py-2 rounded-lg text-sm border text-left transition">
+                            <div class="font-semibold">Pedido</div>
+                            <div class="text-xs opacity-80">fica aguardando, finalizo depois</div>
+                        </button>
+                    </div>
+                    <div x-show="vendaBalcao" x-cloak class="mt-3 p-3 rounded-lg border border-indigo-100 bg-slate-50">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer select-none mb-2">
+                            <input type="checkbox" x-model="pagou" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                            <span class="font-medium">Cliente já pagou</span>
+                        </label>
+                        <div x-show="pagou" x-cloak>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Forma de pagamento</label>
+                            <select x-model="formaPagamento" class="ui-field text-sm w-full">
+                                <option value="dinheiro">Dinheiro</option>
+                                <option value="pix">PIX</option>
+                                <option value="credito">Crédito</option>
+                                <option value="debito">Débito</option>
+                                <option value="transferencia">Transferência</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                        <p x-show="!pagou" x-cloak class="text-xs text-slate-500 mt-1">Sem pagamento agora — fica como recebível no pedido.</p>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="fm-section">
                 <legend class="fm-section__legend">Observações</legend>
                 <div class="fm-field fm-col-2">
                     <textarea x-model="form.observacoes" rows="2"
@@ -737,7 +775,7 @@
                 </div>
             </fieldset>
 
-            <fieldset class="fm-section">
+            <fieldset class="fm-section" x-show="!vendaBalcao" x-cloak>
                 <legend class="fm-section__legend">Agendamento</legend>
                 <div class="fm-field fm-col-2">
                     <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
@@ -790,7 +828,7 @@
                     :disabled="loading || !podeEnviar()"
                     :class="{ 'opacity-50 cursor-not-allowed': loading || !podeEnviar() }"
                     class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                <span>Criar pedido</span>
+                <span x-text="vendaBalcao ? (pagou ? 'Finalizar venda' : 'Finalizar pedido') : 'Criar pedido'"></span>
             </button>
         </footer>
         </div><!-- /fase editando -->
@@ -834,6 +872,11 @@ function novoPedidoModal() {
         fase: 'editando',         // editando | processando | concluido
         loading: false,
         erroMsg: '',
+        // Venda balcao: finaliza o pedido na hora (saida de estoque + caixa) com pagamento,
+        // numa transacao atomica no backend. false = pedido normal (nasce Aguardando).
+        vendaBalcao: false,
+        pagou: true,
+        formaPagamento: 'dinheiro',
         clienteBusca: '',
         comboboxOpen: false,
         comboboxIndex: 0,
@@ -1329,6 +1372,62 @@ function novoPedidoModal() {
             return m;
         },
 
+        // Venda balcao: 1 chamada atomica ao backend (cliente+produto+entrada+pedido+saida+pagamento).
+        // Substitui a orquestracao em 3 fetches do submit() normal.
+        async submitBalcao() {
+            if (this.loading) return;
+            const motivo = this._preflight();
+            if (motivo) { this.erroMsg = motivo; console.warn('[Balcao] Pré-flight bloqueou:', motivo); return; }
+            this.loading = true; this.erroMsg = ''; this.etapas = []; this.avisos = []; this.fase = 'processando';
+            const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
+            const usaAvulso = this.form.modo === 'avulso' && !this.form.clienteId;
+            const payload = {
+                clienteId: this.form.clienteId || null,
+                novoClienteNome: this.clienteNovo.ativo ? (this.clienteNovo.nome || '').trim() : null,
+                novoClienteApt: this.clienteNovo.ativo ? (this.clienteNovo.apt || null) : null,
+                novoClienteTelefone: this.clienteNovo.ativo ? (this.clienteNovo.telefone || null) : null,
+                nomeAdHoc: usaAvulso ? this.form.nomeAdHoc : null,
+                itens: this.form.itens.map(it => ({
+                    nome: (it.nome || '').trim(),
+                    quantidade: it.quantidade,
+                    precoUnitario: it.precoUnitario,
+                    produtoId: it.produtoId || null,
+                    novoProduto: !!it.novoCadastro,
+                    categoriaId: it.novoCadastro ? (it.categoriaId || null) : null,
+                    custoReferencia: it.novoCadastro ? (it.custoCadastro || null) : null
+                })),
+                pagou: this.pagou,
+                formaPagamento: this.pagou ? this.formaPagamento : null,
+                observacoes: this.form.observacoes
+            };
+            console.group('%c[Balcao] Finalizando venda', 'font-weight:bold');
+            console.log('Pagou:', this.pagou, '| forma:', this.formaPagamento, '| itens:', this.form.itens.length);
+            const t0 = performance.now();
+            try {
+                const res = await this._runEtapa('balcao',
+                    'Finalizar venda (produto + estoque + pedido' + (this.pagou ? ' + pagamento' : '') + ')',
+                    async () => {
+                        const r = await this._postJson('/pedidos/balcao.json', payload, token);
+                        if (!r.ok) throw new Error(r.err);
+                        const id = r.data?.id;
+                        if (!id || typeof id !== 'string' || id.length < 30)
+                            throw new Error('Servidor retornou sucesso sem id do pedido. Recarregue a lista pra confirmar.');
+                        return { id, pago: r.data?.pago, total: r.data?.total };
+                    });
+                this.pedidoCriado = { id: res.id };
+                console.log('%c✓ Venda finalizada em ' + Math.round(performance.now() - t0) + 'ms', 'font-weight:bold', res);
+                console.groupEnd();
+                await new Promise(r => setTimeout(r, 350));
+                this.fase = 'concluido';
+            } catch (err) {
+                console.groupEnd();
+                this.erroMsg = this._formatarErro(err, err?.etapaLabel);
+                console.error('[Balcao] Falhou:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+
         // Pré-flight rigoroso: roda todas as validações e retorna a primeira mensagem
         // de erro acionável. Ponto único de prevenção antes de bater na API.
         _preflight() {
@@ -1356,8 +1455,9 @@ function novoPedidoModal() {
         // ── Submit: orquestração com etapas animadas + console group ──────
         async submit() {
             console.log('%c[Pedidos] submit() chamado', 'font-weight:bold',
-                'fase=' + this.fase, 'loading=' + this.loading);
+                'fase=' + this.fase, 'loading=' + this.loading, 'balcao=' + this.vendaBalcao);
             if (this.loading) return;
+            if (this.vendaBalcao) { await this.submitBalcao(); return; }
             const motivo = this._preflight();
             if (motivo) {
                 this.erroMsg = motivo;

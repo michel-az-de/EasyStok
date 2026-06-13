@@ -16,6 +16,31 @@ public class CriarPedidoWebRequest
     public DateTime? AgendadoParaEm { get; set; }
 }
 
+/// <summary>Venda balcao: cliente + itens (com produto novo opcional) + pagamento, finalizado atomico.</summary>
+public class CriarBalcaoWebRequest
+{
+    public Guid? ClienteId { get; set; }
+    public string? NovoClienteNome { get; set; }
+    public string? NovoClienteApt { get; set; }
+    public string? NovoClienteTelefone { get; set; }
+    public string? NomeAdHoc { get; set; }
+    public List<BalcaoItemInput>? Itens { get; set; }
+    public bool Pagou { get; set; }
+    public string? FormaPagamento { get; set; }
+    public string? Observacoes { get; set; }
+}
+
+public class BalcaoItemInput
+{
+    public string Nome { get; set; } = "";
+    public decimal Quantidade { get; set; }
+    public decimal PrecoUnitario { get; set; }
+    public Guid? ProdutoId { get; set; }
+    public bool NovoProduto { get; set; }
+    public Guid? CategoriaId { get; set; }
+    public decimal? CustoReferencia { get; set; }
+}
+
 public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
@@ -98,6 +123,32 @@ public class PedidosController(
             });
 
         return Ok(new { success = true, id = result.Data?.Id });
+    }
+
+    [HttpPost("/pedidos/balcao.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriarBalcaoJson([FromBody] CriarBalcaoWebRequest req)
+    {
+        if (req.Itens == null || req.Itens.Count == 0)
+            return BadRequest(new
+            {
+                success = false,
+                error = new { code = "VALIDATION_ERROR", message = "Adicione pelo menos 1 item ao pedido." }
+            });
+
+        var result = await svc.FinalizarBalcaoAsync(req);
+        if (!result.Success)
+            return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
+            {
+                success = false,
+                error = new
+                {
+                    code = result.ErrorCode ?? "API_ERROR",
+                    message = result.ErrorMessage ?? "Erro ao finalizar a venda balcão."
+                }
+            });
+
+        return Ok(new { success = true, id = result.Data?.PedidoId, pago = result.Data?.Pago, total = result.Data?.Total });
     }
 
     [HttpPost("/pedidos/{id}/status")]

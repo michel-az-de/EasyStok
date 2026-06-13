@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.FinalizarVendaBalcao;
 using EasyStock.Application.UseCases.ListarPedidosCliente;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
@@ -28,6 +29,7 @@ public class PedidosController(
     RemoverItemPedidoUseCase removeItemUseCase,
     RegistrarPagamentoPedidoUseCase addPagUseCase,
     RemoverPagamentoPedidoUseCase removePagUseCase,
+    FinalizarVendaBalcaoUseCase finalizarBalcaoUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List orders (paginated, filterable)")]
@@ -75,6 +77,20 @@ public class PedidosController(
             Origem = command.Origem ?? "web"
         });
         return DataCreated($"/api/pedidos/{result.Id}", result);
+    }
+
+    [SwaggerOperation(Summary = "Venda balcao atomica: cliente+produto+entrada+pedido+saida+pagamento numa transacao")]
+    [HttpPost("balcao")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> CreateBalcao([FromBody] FinalizarVendaBalcaoCommand command)
+    {
+        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
+        var result = await finalizarBalcaoUseCase.ExecuteAsync(command with
+        {
+            EmpresaId = emp,
+            CriadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
+        });
+        return DataCreated($"/api/pedidos/{result.PedidoId}", result);
     }
 
     [SwaggerOperation(Summary = "Update order status (aguardando→preparando→pronto→entregue)")]
