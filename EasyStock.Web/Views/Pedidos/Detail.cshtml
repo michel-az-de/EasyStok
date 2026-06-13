@@ -267,7 +267,7 @@ else
         </div>
     </div>
 
-    <div class="lg:col-span-2 space-y-4" x-data="{ tab: 'itens' }"
+    <div class="lg:col-span-2 space-y-4" x-data="{ tab: (location.search.match(/tab=(pagamentos|eventos|auditoria)/) || [])[1] || 'itens' }"
          @@ir-para-pagamento.window="tab = 'pagamentos'; $nextTick(() => { const el = document.getElementById('ped-valor-pagamento'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); } })">
         <div class="ws p-0">
             <div class="flex border-b border-slate-200 px-4 pt-2 gap-1 overflow-x-auto">

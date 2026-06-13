@@ -195,10 +195,14 @@ public class PedidosController(
     public async Task<IActionResult> AddPagamento(string id, string metodo, decimal valor, string? referencia, string? observacao)
     {
         var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasError(result))
+        {
+            Toast("error", result.ErrorMessage ?? "Não foi possível registrar o pagamento. Confira os dados e tente de novo.");
+            return RedirectToAction(nameof(Detail), new { id, tab = "pagamentos" });
+        }
 
-        Toast("success", $"Pagamento {metodo} de {valor:C} registrado.");
-        return RedirectToAction(nameof(Detail), new { id });
+        Toast("success", $"Pagamento de {valor:C} ({metodo}) registrado.");
+        return RedirectToAction(nameof(Detail), new { id, tab = "pagamentos" });
     }
 
     [HttpPost("/pedidos/{id}/pagamentos/{pagamentoId}/excluir")]
@@ -206,10 +210,14 @@ public class PedidosController(
     public async Task<IActionResult> RemovePagamento(string id, string pagamentoId)
     {
         var result = await svc.RemoverPagamentoAsync(id, pagamentoId);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+        if (HasError(result))
+        {
+            Toast("error", result.ErrorMessage ?? "Não foi possível remover o pagamento.");
+            return RedirectToAction(nameof(Detail), new { id, tab = "pagamentos" });
+        }
 
-        Toast("success", "Pagamento removido.");
-        return RedirectToAction(nameof(Detail), new { id });
+        Toast("success", "Pagamento estornado do pedido.");
+        return RedirectToAction(nameof(Detail), new { id, tab = "pagamentos" });
     }
 
     /// <summary>
