@@ -187,12 +187,16 @@ html:not(.theme-dark) .app-main::before {
     background:
         radial-gradient(circle at 20% 18%, rgba(255, 255, 255, .45) 0%, transparent 20%),
         linear-gradient(180deg, rgba(255, 255, 255, .10) 0%, rgba(255, 255, 255, 0) 16%);
-    z-index: 0;
+    z-index: -1;
 }
 
 .app-main > * {
+    /* position:relative permite filhos absolutos posicionarem, mas SEM z-index:
+       z-index aqui criava um stacking context em CADA bloco de topo, aprisionando
+       popovers/dropdowns dentro do bloco (o popover do Agendar ficava atras do
+       stepper; dropdown do modal idem). O ::before decorativo foi pra z-index:-1,
+       entao o conteudo ja fica acima sem precisar de z-index nos blocos. */
     position: relative;
-    z-index: 1;
 }
 
 /* ─── Focus ring moderno (acao = laranja, halo branco, ring unico) ─── */
