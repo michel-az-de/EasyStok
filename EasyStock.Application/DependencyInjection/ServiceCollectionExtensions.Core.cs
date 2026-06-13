@@ -93,6 +93,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RemoverItemPedidoUseCase>();
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.FinalizarVendaBalcao.FinalizarVendaBalcaoUseCase>();
         services.AddScoped<ListarPedidosUseCase>();
         services.AddScoped<AlterarAgendamentoPedidoUseCase>();
 
