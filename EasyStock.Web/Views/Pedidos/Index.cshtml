@@ -582,7 +582,8 @@
 
                 <ul class="ped-itens-list" x-show="form.itens.length > 0" x-cloak>
                     <template x-for="(it, i) in form.itens" :key="it.uid">
-                        <li class="ped-item-row">
+                        <li class="ped-item-row"
+                            :class="{ 'is-dropdown-open': it.dropdownOpen || it.catDropdownOpen }">
                             <!-- Linha do item: usa grid .ped-item original -->
                             <div class="ped-item">
                                 <div class="ped-item__nome ped-prod-cell">
@@ -1006,9 +1007,16 @@ function novoPedidoModal() {
         },
 
         handleKeydown(e) {
+            if (!this.open) return;
             if (e.key === 'Escape') {
                 if (this.comboboxOpen) { this.comboboxOpen = false; return; }
                 this.close();
+                return;
+            }
+            // Ctrl/Cmd+Enter: fecha a venda direto se estiver liberado (boca de caixa:
+            // sem tirar a mao do teclado). Bloqueado = nao faz nada (o painel ambar mostra o que falta).
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                if (!this.loading && this.podeEnviar()) { e.preventDefault(); this.submit(); }
             }
         },
 
@@ -1317,9 +1325,16 @@ function novoPedidoModal() {
             if (this.form.modo === 'avulso') return !!this.form.nomeAdHoc.trim();
             return false;
         },
+        // Item "vazio" = linha em branco (nada digitado nem selecionado). Boca de caixa:
+        // a linha ociosa do "+ Adicionar item" NAO trava o operador nem entra no pedido.
+        _itemVazio(it) {
+            return !it.produtoId && !it.novoCadastro
+                && !(it.busca || '').trim() && !(it.nome || '').trim();
+        },
+        _itensReais() { return this.form.itens.filter(it => !this._itemVazio(it)); },
         itensValidos() {
-            if (this.form.itens.length === 0) return false;
-            return this.form.itens.every(it => this._itemValido(it) === true);
+            const reais = this._itensReais();
+            return reais.length > 0 && reais.every(it => this._itemValido(it) === true);
         },
         // Retorna true ou string com motivo do erro (pra _preflight()).
         _itemValido(it) {
@@ -1351,10 +1366,11 @@ function novoPedidoModal() {
             else if (this.form.modo === 'avulso' && !(this.form.nomeAdHoc || '').trim())
                 m.push('Venda avulsa: informe um nome ou identificação do cliente.');
             // Itens
-            if (this.form.itens.length === 0) {
+            if (this._itensReais().length === 0) {
                 m.push('Adicione pelo menos 1 item ao pedido.');
             } else {
                 this.form.itens.forEach((it, i) => {
+                    if (this._itemVazio(it)) return; // linha em branco: ignora (nao trava)
                     const nome = (it.nome || it.busca || '').trim();
                     const rotulo = 'Item ' + (i + 1) + (nome ? ' (' + nome + ')' : '');
                     if (!it.produtoId && !it.novoCadastro)
@@ -1387,7 +1403,7 @@ function novoPedidoModal() {
                 novoClienteApt: this.clienteNovo.ativo ? (this.clienteNovo.apt || null) : null,
                 novoClienteTelefone: this.clienteNovo.ativo ? (this.clienteNovo.telefone || null) : null,
                 nomeAdHoc: usaAvulso ? this.form.nomeAdHoc : null,
-                itens: this.form.itens.map(it => ({
+                itens: this._itensReais().map(it => ({
                     nome: (it.nome || '').trim(),
                     quantidade: it.quantidade,
                     precoUnitario: it.precoUnitario,
@@ -1444,8 +1460,9 @@ function novoPedidoModal() {
                 return 'Informe pelo menos uma identificação para a venda avulsa.';
             }
             // Itens
-            if (this.form.itens.length === 0) return 'Adicione pelo menos 1 item ao pedido.';
-            for (const it of this.form.itens) {
+            const reais = this._itensReais();
+            if (reais.length === 0) return 'Adicione pelo menos 1 item ao pedido.';
+            for (const it of reais) {
                 const v = this._itemValido(it);
                 if (v !== true) return v;
             }
@@ -1471,7 +1488,7 @@ function novoPedidoModal() {
             this.avisos = [];
             this.fase = 'processando';
             const token = document.querySelector('[name=__RequestVerificationToken]')?.value;
-            const novos = this.form.itens.filter(it => it.novoCadastro);
+            const novos = this._itensReais().filter(it => it.novoCadastro);
 
             // Pré-popula etapas com status "pending" pra usuário ver o roteiro completo.
             if (this.clienteNovo.ativo) {
@@ -1572,7 +1589,7 @@ function novoPedidoModal() {
                     telefoneAdHoc: usaAvulso ? this.form.telefoneAdHoc : null,
                     observacoes: this.form.observacoes,
                     agendadoParaEm: agendadoUtc,
-                    itens: this.form.itens.map(it => ({
+                    itens: this._itensReais().map(it => ({
                         nome: it.nome.trim(),
                         quantidade: it.quantidade,
                         precoUnitario: it.precoUnitario,

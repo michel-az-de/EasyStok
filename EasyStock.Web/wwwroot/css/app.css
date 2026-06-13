@@ -3550,6 +3550,16 @@ html.theme-dark .ped-prod-badge--ok {
     overflow-y: auto;
 }
 
+/* --- Stacking do dropdown de produto/categoria que transborda pra baixo ---
+   A lista de itens e os controles seguintes ("+ Adicionar item", Finalizacao)
+   sao irmaos no scroll do .fm-body. Sem isto pintam em ordem de fonte e os
+   botoes ficam por cima do dropdown (CSS "uma zona" do modal). Elevamos a lista
+   inteira acima do que vem depois e, dentro dela, a linha cujo dropdown esta
+   aberto acima das demais linhas. */
+.ped-itens-list { position: relative; z-index: 30; }
+.ped-item-row { position: relative; }
+.ped-item-row.is-dropdown-open { z-index: 5; }
+
 /* Opcao de cadastrar produto novo: sticky no fundo do dropdown pra nunca
    sumir abaixo do fold quando ha muitos resultados de busca. */
 .ped-prod-dropdown__create {
