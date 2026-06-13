@@ -757,8 +757,19 @@
             </fieldset>
         </div>
 
-        <!-- Resumo de impacto: o que será criado ao confirmar -->
-        <div x-show="impactoResumo.length > 0" x-cloak
+        <!-- Validacao inteligente: lista TODOS os motivos que travam o Criar (quando ha
+             interacao e ainda nao esta pronto). Quando pronto, mostra o impacto do pedido.
+             Atualiza ao vivo conforme o operador resolve cada item. -->
+        <div x-show="!podeEnviar() && (form.itens.length > 0 || clienteNovo.ativo || form.modo === 'avulso')" x-cloak
+             class="px-4 py-2 text-xs border-t border-amber-200 bg-amber-50">
+            <div class="font-semibold text-amber-800 mb-1">⚠ Pra criar o pedido, falta:</div>
+            <ul class="space-y-0.5">
+                <template x-for="m in motivosBloqueio()" :key="m">
+                    <li class="text-amber-800 flex gap-1.5"><span aria-hidden="true">•</span><span x-text="m"></span></li>
+                </template>
+            </ul>
+        </div>
+        <div x-show="podeEnviar() && impactoResumo.length > 0" x-cloak
              class="px-4 py-2 text-xs text-slate-600 border-t border-slate-200 bg-slate-50">
             <div class="font-medium text-slate-700 mb-1">Ao criar este pedido:</div>
             <template x-for="linha in impactoResumo" :key="linha">
@@ -1283,6 +1294,40 @@ function novoPedidoModal() {
             return true;
         },
         podeEnviar() { return this.clienteValido() && this.itensValidos(); },
+
+        // Lista TODOS os motivos que travam o "Criar pedido", com label por item.
+        // Atualiza ao vivo (Alpine) conforme o operador resolve. Tela critica = agilidade:
+        // o operador ve tudo que falta de uma vez, sem adivinhar por que o botao esta travado.
+        motivosBloqueio() {
+            const m = [];
+            // Cliente
+            if (this.clienteNovo.ativo && !(this.clienteNovo.nome || '').trim())
+                m.push('Informe o nome do cliente novo.');
+            else if (!this.form.clienteId && !this.clienteNovo.ativo && this.form.modo !== 'avulso')
+                m.push('Escolha o cliente: busque um cadastrado, cadastre um novo, ou marque "venda avulsa".');
+            else if (this.form.modo === 'avulso' && !(this.form.nomeAdHoc || '').trim())
+                m.push('Venda avulsa: informe um nome ou identificação do cliente.');
+            // Itens
+            if (this.form.itens.length === 0) {
+                m.push('Adicione pelo menos 1 item ao pedido.');
+            } else {
+                this.form.itens.forEach((it, i) => {
+                    const nome = (it.nome || it.busca || '').trim();
+                    const rotulo = 'Item ' + (i + 1) + (nome ? ' (' + nome + ')' : '');
+                    if (!it.produtoId && !it.novoCadastro)
+                        m.push(rotulo + ': selecione um resultado da busca ou clique em "+ Cadastrar como novo produto".');
+                    else if (it.novoCadastro && !it.categoriaId)
+                        m.push(rotulo + ': escolha a categoria do produto novo.');
+                    else if (it.novoCadastro && !(this.categorias || []).some(c => String(c.id) === String(it.categoriaId)))
+                        m.push(rotulo + ': a categoria selecionada não existe — escolha outra.');
+                    else if (!(Number(it.quantidade) > 0))
+                        m.push(rotulo + ': a quantidade precisa ser maior que zero.');
+                    else if (!(Number(it.precoUnitario) >= 0))
+                        m.push(rotulo + ': preço inválido.');
+                });
+            }
+            return m;
+        },
 
         // Pré-flight rigoroso: roda todas as validações e retorna a primeira mensagem
         // de erro acionável. Ponto único de prevenção antes de bater na API.
