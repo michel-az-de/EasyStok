@@ -1261,6 +1261,11 @@
                     if (!this.nome) { this.step = 1; window.showToast('Informe o nome do produto.', 'warning'); return; }
                     if (this.nome.trim().length < 3) { this.step = 1; window.showToast('O nome deve ter pelo menos 3 caracteres.', 'warning'); return; }
                     if (!this.categoriaId) { this.step = 1; window.showToast('Selecione uma categoria.', 'warning'); return; }
+                    // issue 577: categoria "rascunho" — cria de fato agora, no save (wizard abandonado nao cria).
+                    if (this.categoriaId === '__nova__') {
+                        const okCat = await this._resolverCategoriaPendente();
+                        if (!okCat) return;
+                    }
                     // No modo edição, se o SKU não foi alterado, ignorar status "indisponivel"
                     if (isEdit && this.sku === this._originalSku && this.skuStatus === 'indisponivel') {
                         this.skuStatus = '';
@@ -1800,7 +1805,7 @@
 
                 categoriaId: '@(Model.CategoriaId == Guid.Empty ? "" : Model.CategoriaId.ToString().ToLower())',
                 subcategoriaId: '@(Model.SubcategoriaId?.ToString().ToLower() ?? "")',
-                novaCategoria: { aberto: false, nome: '', salvando: false },
+                novaCategoria: { aberto: false, nome: '', salvando: false, pendente: '' },
 
                 variacoes: @Html.Raw(JsonSerializer.Serialize((Model.VariacoesRich ?? []).Select(v => new {
                     _id = Guid.NewGuid().ToString("N"),
@@ -1917,10 +1922,29 @@
                 // Cria categoria sem sair do form (issue 420): POST criar-json,
                 // recarrega listar, injeta a option no select e seleciona. Reusa
                 // o backend existente; nunca recarrega a pagina.
-                async criarCategoriaInline() {
+                // issue 577: NAO cria a categoria agora — vira rascunho ate o produto ser salvo.
+                // A criacao real acontece em _resolverCategoriaPendente (chamado pelo submitForm),
+                // evitando categoria-fantasma quando o wizard e abandonado (QA v1.10 BUG-003).
+                criarCategoriaInline() {
                     const nome = (this.novaCategoria.nome || '').trim();
                     if (nome.length < 2) { window.showToast('Informe o nome da categoria (minimo 2 letras).', 'warning'); return; }
-                    this.novaCategoria.salvando = true;
+                    this.novaCategoria.pendente = nome;
+                    const sel = this.$refs.categoriaSelect;
+                    if (sel) {
+                        let opt = Array.from(sel.options).find(o => o.value === '__nova__');
+                        if (!opt) { opt = document.createElement('option'); opt.value = '__nova__'; sel.appendChild(opt); }
+                        opt.textContent = 'Nova: "' + nome + '" (será criada ao salvar)';
+                    }
+                    this.categoriaId = '__nova__';
+                    this.novaCategoria.nome = '';
+                    this.novaCategoria.aberto = false;
+                    window.showToast('Categoria "' + nome + '" será criada quando você salvar o produto.', 'info');
+                },
+
+                // issue 577: cria de fato a categoria rascunho, no momento do save. Retorna true/false.
+                async _resolverCategoriaPendente() {
+                    const nome = (this.novaCategoria.pendente || '').trim();
+                    if (!nome) { this.step = 1; window.showToast('Informe o nome da nova categoria.', 'warning'); return false; }
                     try {
                         const token = document.querySelector('[name=__RequestVerificationToken]')?.value ?? '';
                         const resp = await esFetch('/categorias/criar-json', {
@@ -1930,29 +1954,34 @@
                         });
                         const data = await resp.json().catch(() => ({}));
                         if (!resp.ok || !data.success) {
+                            this.step = 1;
                             window.showToast(data?.error?.message || 'Nao foi possivel criar a categoria.', 'error');
-                            return;
+                            return false;
                         }
                         const lista = await (await esFetch('/categorias/listar')).json();
                         const nova = lista.find(c => (c.nome || '').trim().toLowerCase() === nome.toLowerCase());
-                        if (!nova) { window.showToast('Categoria criada. Recarregue a pagina para seleciona-la.', 'warning'); return; }
+                        if (!nova) { this.step = 1; window.showToast('Categoria criada, mas nao foi possivel seleciona-la. Recarregue.', 'warning'); return false; }
                         const novoId = String(nova.id).toLowerCase();
                         const sel = this.$refs.categoriaSelect;
-                        if (sel && !Array.from(sel.options).some(o => o.value === novoId)) {
-                            const opt = document.createElement('option');
-                            opt.value = novoId;
-                            opt.textContent = nova.nome;
-                            sel.appendChild(opt);
+                        if (sel) {
+                            const sentinel = Array.from(sel.options).find(o => o.value === '__nova__');
+                            if (sentinel) sentinel.remove();
+                            if (!Array.from(sel.options).some(o => o.value === novoId)) {
+                                const opt = document.createElement('option');
+                                opt.value = novoId;
+                                opt.textContent = nova.nome;
+                                sel.appendChild(opt);
+                            }
+                            sel.value = novoId; // FormData le o Guid real (antes do flush do Alpine)
                         }
                         if (!allCats.some(c => String(c.id).toLowerCase() === novoId)) allCats.push({ id: nova.id, nome: nova.nome });
                         this.categoriaId = novoId;
-                        this.novaCategoria.nome = '';
-                        this.novaCategoria.aberto = false;
-                        window.showToast('Categoria "' + nova.nome + '" criada e selecionada.', 'success');
+                        this.novaCategoria.pendente = '';
+                        return true;
                     } catch (e) {
+                        this.step = 1;
                         window.showToast('Erro ao criar categoria. Tente novamente.', 'error');
-                    } finally {
-                        this.novaCategoria.salvando = false;
+                        return false;
                     }
                 },
 
