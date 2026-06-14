@@ -47,6 +47,9 @@
         <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
             🖨 Recibo
         </a>
+        <a href="/pedidos/@p.Id/etiqueta" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
+            🏷 Etiqueta
+        </a>
         @if (p.Status != "entregue" && !isCancelado)
         {
             var nxt = nextStatus(p.Status);

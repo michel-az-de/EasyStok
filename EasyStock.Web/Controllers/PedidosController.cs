@@ -103,6 +103,21 @@ public class PedidosController(
         return View(new PedidoDetailViewModel { Detalhe = result.Data });
     }
 
+    /// <summary>
+    /// Etiqueta de entrega print-friendly (~80mm, termica/A4). Mesmo padrao do recibo:
+    /// HTML otimizado pra CTRL+P → "Salvar como PDF", sem dependencia de lib de PDF.
+    /// Issue #583.
+    /// </summary>
+    [HttpGet("/pedidos/{id}/etiqueta")]
+    public async Task<IActionResult> Etiqueta(string id)
+    {
+        var result = await svc.ObterAsync(id);
+        if (HasError(result) || result.Data is null) return RedirectToAction(nameof(Detail), new { id });
+
+        ViewBag.Title = "Etiqueta de entrega";
+        return View(new PedidoDetailViewModel { Detalhe = result.Data });
+    }
+
     [HttpPost("/pedidos/json")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CriarJson([FromBody] CriarPedidoWebRequest req)

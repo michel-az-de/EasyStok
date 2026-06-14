@@ -46,6 +46,7 @@ public class CssHexHygieneTests
         "auth-premium.css",
         "mobile.css",
         "recibo.css",
+        "etiqueta-pedido.css",  // print page standalone (~80mm), hex explicito p/ impressao (refs #583)
         "lista-print.css",
         "print.css",
         "site.css",

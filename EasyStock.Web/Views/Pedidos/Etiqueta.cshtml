@@ -1,0 +1,81 @@
+@model PedidoDetailViewModel
+@{
+    var p = Model.Detalhe.Pedido;
+    Layout = null;
+    var lojaNome = ViewBag.LojaAtualNome as string ?? "";
+    var lojaEmoji = ViewBag.LojaAtualEmoji as string ?? "";
+}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <title>Etiqueta - @p.Id.Substring(0, 8)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/etiqueta-pedido.css" asp-append-version="true" />
+</head>
+<body class="etq-page">
+    <div class="etq-toolbar">
+        <a href="/pedidos/@p.Id" class="btn-secondary">&larr; Voltar</a>
+        <button type="button" class="btn-primary" onclick="window.print()">Imprimir / Salvar PDF</button>
+    </div>
+
+    <div class="etq">
+        <div class="etq-head">
+            <span class="etq-remet">@lojaEmoji @lojaNome</span>
+            <span class="etq-id">#@p.Id.Substring(0, 8).ToUpper()</span>
+        </div>
+
+        <div class="etq-dest">
+            <div class="etq-dest-label">ENTREGAR A</div>
+            <div class="etq-dest-nome">@(string.IsNullOrEmpty(p.ClienteNome) ? "Cliente avulso" : p.ClienteNome)</div>
+            @if (!string.IsNullOrEmpty(p.ClienteApt))
+            {
+                <div class="etq-dest-linha">🏠 @p.ClienteApt</div>
+            }
+            @if (!string.IsNullOrEmpty(p.ClienteTelefone))
+            {
+                <div class="etq-dest-linha">📞 @p.ClienteTelefone</div>
+            }
+        </div>
+
+        <div class="etq-itens">
+            @foreach (var i in Model.Detalhe.Itens)
+            {
+                <div class="etq-item">
+                    <span class="etq-item-qtd">@i.Quantidade @i.Unidade</span>
+                    <span class="etq-item-nome">@i.Emoji @i.Nome</span>
+                </div>
+            }
+        </div>
+
+        <div class="etq-total">
+            <span>TOTAL</span>
+            <span>@p.Total.ToString("C")</span>
+        </div>
+
+        <div class="etq-pag @(p.Quitado ? "etq-pag--ok" : "etq-pag--pend")">
+            @if (p.Quitado)
+            {
+                <span>✓ PAGO</span>
+            }
+            else if (p.TotalPago > 0)
+            {
+                <span>PARCIAL · falta @p.Pendente.ToString("C")</span>
+            }
+            else
+            {
+                <span>⚠ A COBRAR @p.Pendente.ToString("C")</span>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(p.Observacoes))
+        {
+            <div class="etq-obs">📝 @p.Observacoes</div>
+        }
+
+        <div class="etq-foot">
+            <span>@p.CriadoEm.ParaBrasilia().ToString("dd/MM HH:mm")</span>
+            <span>@p.Status</span>
+        </div>
+    </div>
+</body>
+</html>

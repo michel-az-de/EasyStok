@@ -1,0 +1,124 @@
+/* Etiqueta de entrega do pedido — formato estreito ~80mm (impressora termica e
+   centraliza em A4 comum). Espelha o padrao print-friendly do recibo.css:
+   HTML + window.print(), sem lib de PDF. Issue #583. */
+
+* { box-sizing: border-box; }
+
+body.etq-page {
+    margin: 0;
+    padding: 16px;
+    background: #f1f5f9;
+    color: #0f172a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.etq-toolbar {
+    width: 80mm;
+    max-width: 100%;
+    margin: 0 auto 12px;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.etq-toolbar .btn-primary,
+.etq-toolbar .btn-secondary {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+}
+
+.etq-toolbar .btn-primary { background: #0E2A6E; color: #fff; border-color: #0E2A6E; }
+.etq-toolbar .btn-secondary { background: #fff; color: #334155; }
+
+.etq {
+    width: 80mm;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 6mm 5mm;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+
+.etq-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    border-bottom: 1px dashed #94a3b8;
+}
+
+.etq-remet { font-weight: 700; font-size: 13px; }
+.etq-id { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-weight: 700; font-size: 13px; }
+
+.etq-dest { margin-bottom: 10px; }
+.etq-dest-label { font-size: 10px; letter-spacing: .12em; color: #64748b; font-weight: 700; }
+.etq-dest-nome { font-size: 21px; font-weight: 800; line-height: 1.15; word-break: break-word; }
+.etq-dest-linha { font-size: 14px; margin-top: 3px; }
+
+.etq-itens {
+    padding: 6px 0;
+    margin-bottom: 8px;
+    border-top: 1px dashed #94a3b8;
+    border-bottom: 1px dashed #94a3b8;
+}
+
+.etq-item { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; }
+.etq-item-qtd { font-weight: 700; min-width: 42px; white-space: nowrap; }
+.etq-item-nome { flex: 1; word-break: break-word; }
+
+.etq-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 5px;
+}
+
+.etq-pag {
+    text-align: center;
+    font-weight: 800;
+    font-size: 14px;
+    padding: 5px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.etq-pag--ok { background: #dcfce7; color: #166534; }
+.etq-pag--pend { background: #fef9c3; color: #854d0e; }
+
+.etq-obs {
+    font-size: 12px;
+    padding: 4px 7px;
+    margin-bottom: 8px;
+    background: #f8fafc;
+    border-left: 3px solid #cbd5e1;
+    word-break: break-word;
+}
+
+.etq-foot {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #64748b;
+}
+
+@media print {
+    @page { size: 80mm auto; margin: 0; }
+    body.etq-page { padding: 0; background: #fff; }
+    .etq-toolbar { display: none; }
+    .etq {
+        width: 80mm;
+        margin: 0;
+        padding: 4mm;
+        border: 0;
+        border-radius: 0;
+    }
+}
