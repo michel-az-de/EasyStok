@@ -57,9 +57,14 @@ public class PedidosController(
         ViewBag.Title = "Pedidos";
         ViewBag.ActiveMenuItem = "Pedidos";
 
-        var vm = new PedidosListViewModel { Search = search, FiltroStatus = status };
+        // Status invalido na URL (?status=naoexiste) caia em lista vazia enganosa e sumia
+        // a aba Agendados (BUG-016). Normaliza para "Todos" (null) fora do conjunto valido.
+        var statusesValidos = new[] { "aguardando", "preparando", "pronto", "entregue", "cancelado" };
+        var statusFiltro = !string.IsNullOrWhiteSpace(status) && statusesValidos.Contains(status) ? status : null;
 
-        var result = await svc.ListarAsync(status, search: search);
+        var vm = new PedidosListViewModel { Search = search, FiltroStatus = statusFiltro };
+
+        var result = await svc.ListarAsync(statusFiltro, search: search);
         if (result.Success && result.Data is not null) vm.Items = result.Data;
 
         var cli = await clientesSvc.ListarAsync(status: "ativo");
