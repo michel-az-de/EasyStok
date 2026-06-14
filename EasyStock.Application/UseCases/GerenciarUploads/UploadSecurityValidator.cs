@@ -101,4 +101,57 @@ public static class UploadSecurityValidator
             throw new InvalidOperationException(
                 $"ContentType '{mainType}' nao permitido. Tipos aceitos: {string.Join(", ", AllowedMimeTypes)}.");
     }
+
+    /// <summary>
+    /// Valida que os PRIMEIROS BYTES do conteudo batem com a assinatura (magic number)
+    /// do tipo declarado. Defesa contra arquivo malicioso renomeado (ex.: HTML/SVG/EXE
+    /// com ContentType image/jpeg) que seria servido publico do bucket (XSS armazenado,
+    /// content smuggling). So rejeita quando a assinatura do tipo e CONHECIDA e nao
+    /// corresponde; tipos sem assinatura confiavel (ex.: text/csv) passam de proposito.
+    /// Chame APOS <see cref="EnsureValidMime"/>.
+    /// </summary>
+    public static void EnsureContentMatchesDeclaredType(byte[]? content, string? contentType)
+    {
+        if (content is null || content.Length == 0)
+            throw new InvalidOperationException("Conteudo do upload vazio.");
+        if (string.IsNullOrWhiteSpace(contentType))
+            throw new InvalidOperationException("ContentType nao informado no upload.");
+
+        // Remove parametros (ex.: "image/jpeg; charset=binary" -> "image/jpeg")
+        var mainType = contentType.Split(';', 2)[0].Trim();
+
+        if (ContentSignatures.TryGetValue(mainType, out var matches) && !matches(content))
+            throw new InvalidOperationException(
+                $"Conteudo do arquivo nao corresponde ao tipo declarado '{mainType}'.");
+    }
+
+    // Mapa tipo -> verificador de assinatura de bytes. Tipos ausentes (ex.: text/csv)
+    // nao tem assinatura confiavel e sao deliberadamente permitidos (default seguro = passa).
+    private static readonly FrozenDictionary<string, Func<byte[], bool>> ContentSignatures =
+        new Dictionary<string, Func<byte[], bool>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["image/jpeg"] = b => HasPrefix(b, 0, 0xFF, 0xD8, 0xFF),
+            ["image/png"] = b => HasPrefix(b, 0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A),
+            ["image/gif"] = b => HasPrefix(b, 0, 0x47, 0x49, 0x46, 0x38),                 // "GIF8"
+            ["image/webp"] = b => HasPrefix(b, 0, 0x52, 0x49, 0x46, 0x46)                  // "RIFF"
+                                   && HasPrefix(b, 8, 0x57, 0x45, 0x42, 0x50),              // "WEBP"
+            ["application/pdf"] = b => HasPrefix(b, 0, 0x25, 0x50, 0x44, 0x46),             // "%PDF"
+            ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = IsZip,
+            ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] = IsZip,
+            ["application/vnd.ms-excel"] = b => HasPrefix(b, 0, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1),
+        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
+    private static bool HasPrefix(byte[] content, int offset, params byte[] signature)
+    {
+        if (content.Length < offset + signature.Length) return false;
+        for (var i = 0; i < signature.Length; i++)
+            if (content[offset + i] != signature[i]) return false;
+        return true;
+    }
+
+    // OOXML (.xlsx/.docx) sao containers ZIP: "PK\x03\x04" (ou variantes vazio/spanned).
+    private static bool IsZip(byte[] b) =>
+        HasPrefix(b, 0, 0x50, 0x4B, 0x03, 0x04)
+        || HasPrefix(b, 0, 0x50, 0x4B, 0x05, 0x06)
+        || HasPrefix(b, 0, 0x50, 0x4B, 0x07, 0x08);
 }

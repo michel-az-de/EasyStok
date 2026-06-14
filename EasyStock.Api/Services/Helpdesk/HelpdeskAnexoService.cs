@@ -27,6 +27,7 @@ public sealed class HelpdeskAnexoService(
 
         var nomeSeguro = UploadSecurityValidator.SanitizeFileName(cmd.NomeArquivo);
         UploadSecurityValidator.EnsureValidMime(cmd.ContentType);
+        UploadSecurityValidator.EnsureContentMatchesDeclaredType(cmd.Conteudo, cmd.ContentType);
 
         var ticket = await db.AdminTickets
             .Where(t => t.Id == cmd.TicketId)

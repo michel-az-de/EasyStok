@@ -186,6 +186,10 @@ public sealed class GerenciarUploadsUseCase(
         if (!AllowedImageTypes.Contains(contentType))
             throw new UseCaseValidationException("Formato de arquivo não suportado.");
 
+        // Confere a assinatura de bytes contra o tipo declarado (anti arquivo renomeado).
+        // SkiaSharp decodifica depois como segundo gate para imagens.
+        UploadSecurityValidator.EnsureContentMatchesDeclaredType(content, contentType);
+
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrWhiteSpace(extension))
             throw new UseCaseValidationException("Arquivo sem extensao valida.");
