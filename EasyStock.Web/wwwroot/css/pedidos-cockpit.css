@@ -1,0 +1,52 @@
+/* Cockpit de Pedidos (issue 591) — estilos da listagem operacional (Views/Pedidos/Index).
+   Isolado em arquivo próprio (não no app.css compartilhado) para evitar contenção
+   no bundle com outras frentes. Só tokens → correto em claro/escuro. */
+
+/* Pills compactas pra densidade da listagem (status + pagamento). */
+.stp.stp--sm { padding: 3px 9px; font-size: 12px; gap: 6px; }
+.stp.stp--sm .ind,
+.stp.stp--sm .stp-dot { width: 6px; height: 6px; }
+
+/* Linha: acento de atraso à esquerda (crit), sem banho de cor na linha toda. */
+.ped-table td { vertical-align: middle; }
+.ped-row--atrasado td { background: var(--crit-50); }
+.ped-row--atrasado td:first-child { box-shadow: inset 3px 0 0 var(--crit-600); }
+html.theme-dark .ped-row--atrasado td { background: rgba(192, 59, 42, .12); }
+
+.ped-cliente { font-weight: 600; color: var(--text-strong); text-decoration: none; }
+.ped-cliente:hover { color: var(--navy-600); text-decoration: underline; text-underline-offset: 2px; }
+.ped-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.ped-dash { color: var(--ink-300); }
+
+.ped-sched {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500;
+    padding: 3px 9px; border-radius: 999px;
+    background: var(--navy-50); color: var(--navy-700); border: 1px solid var(--navy-200);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ped-sched--late { background: var(--crit-50); color: var(--crit-700); border-color: var(--crit-200); }
+
+.ped-data { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.ped-data-rel { font-size: 11px; color: var(--ink-400); margin-top: 1px; }
+.ped-total { font-weight: 600; color: var(--text-strong); }
+
+/* Coluna de ações: avançar status (laranja = ação do próximo passo) + abrir. */
+.ped-actions { white-space: nowrap; text-align: right; }
+.ped-advance-form { display: inline; }
+.ped-advance {
+    display: inline-flex; align-items: center;
+    font-size: 12.5px; font-weight: 600; color: var(--intent-action-fg);
+    background: linear-gradient(135deg, var(--orange-700) 0%, var(--orange-800) 130%);
+    border: 1px solid rgba(232, 88, 20, .22);
+    padding: 6px 12px; border-radius: 8px;
+    box-shadow: 0 6px 14px rgba(232, 88, 20, .18);
+    cursor: pointer;
+}
+.ped-advance:hover { filter: brightness(1.05); box-shadow: 0 8px 18px rgba(232, 88, 20, .24); }
+.ped-open {
+    margin-left: 10px; font-size: 12.5px; font-weight: 600;
+    color: var(--navy-600); text-decoration: none; white-space: nowrap;
+}
+.ped-open:hover { color: var(--navy-800); text-decoration: underline; text-underline-offset: 2px; }
+a.ped-verificar { text-decoration: none; }

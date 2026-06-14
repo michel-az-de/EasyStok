@@ -18,6 +18,8 @@
 .stp.pronto .ind { background: var(--ok-600); }
 .stp.entregue   { background: var(--ink-100);  border-color: var(--ink-200);  color: var(--ink-600); }
 .stp.entregue .ind { background: var(--ink-400); }
+.stp.cancelado  { background: var(--ink-50);   border-color: var(--ink-200);  color: var(--ink-500); text-decoration: line-through; }
+.stp.cancelado .ind { background: var(--ink-400); }
 .stp.vencendo   { background: var(--warn-50);  border-color: #F0DC9A;         color: var(--warn-700); }
 .stp.vencendo .ind { background: var(--warn-600); }
 .stp.critico    { background: var(--crit-50);  border-color: #EFB7AD;         color: var(--crit-700); }

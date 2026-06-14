@@ -76,7 +76,7 @@ public class PedidosController(
 
         var vm = new PedidosListViewModel { Search = search, FiltroStatus = statusFiltro };
 
-        var result = await svc.ListarAsync(statusFiltro, search: search);
+        var result = await svc.ListarAsync(statusFiltro, search: search, sort: "urgencia");
         if (result.Success && result.Data is not null) vm.Items = result.Data;
 
         var cli = await clientesSvc.ListarAsync(status: "ativo");
