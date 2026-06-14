@@ -91,6 +91,7 @@ public static class WebHttpServicesExtensions
         services.AddScoped<AnunciosService>();
         services.AddScoped<CategoriasService>();
         services.AddScoped<LojasService>();
+        services.AddScoped<CardapioService>();
         services.AddScoped<BuscaUnificadaService>();
         services.AddScoped<InteligenciaLojasService>();
         services.AddScoped<MobileDevicesService>();
