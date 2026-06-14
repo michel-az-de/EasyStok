@@ -41,6 +41,18 @@ public class BalcaoItemInput
     public decimal? CustoReferencia { get; set; }
 }
 
+// Corpos JSON do cockpit (#591). Endpoints *.json reusam os mesmos serviços dos
+// form-POST; campos vazios/ausentes caem na validação da API (400), nunca em NRE.
+public class AtualizarStatusJsonRequest { public string? Status { get; set; } }
+public class RegistrarPagamentoJsonRequest
+{
+    public string? Metodo { get; set; }
+    public decimal Valor { get; set; }
+    public string? Referencia { get; set; }
+    public string? Observacao { get; set; }
+}
+public class CancelarPedidoJsonRequest { public string? Motivo { get; set; } }
+
 public class PedidosController(
     PedidosService svc,
     ClientesService clientesSvc,
@@ -170,6 +182,28 @@ public class PedidosController(
 
         return Ok(new { success = true, id = result.Data?.PedidoId, pago = result.Data?.Pago, total = result.Data?.Total });
     }
+
+    // ── Variantes JSON (cockpit #591) ─────────────────────────────────
+    // Mesma proteção do CriarJson: [Authorize] herdado do BaseController +
+    // [ValidateAntiForgeryToken] (token via header RequestVerificationToken).
+    // Retornam o pedido atualizado (PedidoRowDto) pra UI re-renderizar a linha
+    // sem reload. Os form-POST abaixo seguem INTACTOS (Detail + degradação sem JS).
+
+    [HttpPost("/pedidos/{id}/status.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AtualizarStatusJson(string id, [FromBody] AtualizarStatusJsonRequest? req) =>
+        PedidoJsonContract.From(await svc.AtualizarStatusAsync(id, req?.Status ?? ""));
+
+    [HttpPost("/pedidos/{id}/pagamentos.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddPagamentoJson(string id, [FromBody] RegistrarPagamentoJsonRequest? req) =>
+        PedidoJsonContract.From(await svc.RegistrarPagamentoAsync(
+            id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao));
+
+    [HttpPost("/pedidos/{id}/cancelar.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelarJson(string id, [FromBody] CancelarPedidoJsonRequest? req) =>
+        PedidoJsonContract.From(await svc.CancelarAsync(id, req?.Motivo));
 
     [HttpPost("/pedidos/{id}/status")]
     [ValidateAntiForgeryToken]

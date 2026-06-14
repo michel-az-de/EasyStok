@@ -27,7 +27,7 @@ public class PedidosService(ApiClient api, SessionService session)
 
     public Task<ApiResult<List<Pedido>>> ListarAsync(
         string? status = null, Guid? clienteId = null,
-        DateTime? desde = null, DateTime? ate = null, string? search = null)
+        DateTime? desde = null, DateTime? ate = null, string? search = null, string? sort = null)
     {
         var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=500";
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
@@ -35,6 +35,7 @@ public class PedidosService(ApiClient api, SessionService session)
         if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";
         if (ate.HasValue)   qs += $"&ate={Uri.EscapeDataString(ate.Value.ToString("o"))}";
         if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
+        if (!string.IsNullOrEmpty(sort)) qs += $"&sort={Uri.EscapeDataString(sort)}";
         return api.GetAsync<List<Pedido>>(qs);
     }
 

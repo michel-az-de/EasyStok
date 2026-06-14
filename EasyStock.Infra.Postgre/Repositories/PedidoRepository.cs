@@ -47,9 +47,13 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             var total = await query.CountAsync();
             var desc = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+            var agora = DateTime.UtcNow;
 
             query = sort?.ToLowerInvariant() switch
             {
+                // Cockpit (#591): abertos antes de terminais → o cap de pagina nunca
+                // descarta pedido ativo; refino atrasado/agendado/recencia por cima.
+                "urgencia" => PedidoOrdering.PorUrgencia(query, agora),
                 "total"   => desc ? query.OrderByDescending(p => p.Total)     : query.OrderBy(p => p.Total),
                 "status"  => desc ? query.OrderByDescending(p => p.Status)    : query.OrderBy(p => p.Status),
                 "cliente" => desc ? query.OrderByDescending(p => p.ClienteNome) : query.OrderBy(p => p.ClienteNome),
