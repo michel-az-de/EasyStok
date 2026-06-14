@@ -97,6 +97,78 @@ public class RegistrarSaidaEstoqueUseCaseTests
     }
 
     [Fact]
+    public async Task Saida_acima_do_saldo_com_PermitirDescoberto_nao_trava_e_registra_descoberto()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var vendaRepository = Substitute.For<IVendaRepository>();
+        var itemVendaRepository = Substitute.For<IItemVendaRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = Guid.NewGuid(),
+            Nome = "Vassoura",
+            Status = StatusProduto.Ativo
+        };
+
+        var lote = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = produto.EmpresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(3),
+            QuantidadeInicial = Quantidade.From(3),
+            QuantidadeMinima = 5,
+            CustoUnitario = Dinheiro.FromDecimal(10m),
+            Status = StatusItemEstoque.Ok,
+            EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        itemRepository.GetByIdComLockAsync(produto.EmpresaId, lote.Id).Returns(lote);
+        movimentacaoRepository.GetTaxaSaidaDiariaAsync(produto.EmpresaId, produto.Id, Arg.Any<DateTime>(), Arg.Any<DateTime>())
+            .Returns(0m);
+
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        var useCase = new RegistrarSaidaEstoqueUseCase(
+            produtoRepository,
+            itemRepository,
+            vendaRepository,
+            itemVendaRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>());
+
+        var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+            produto.EmpresaId,
+            [new RegistrarSaidaEstoqueItemCommand(lote.Id, 999, 20m, "Venda a descoberto")],
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 3, 12, 5, 0, DateTimeKind.Utc),
+            null,
+            null,
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            "QuickSaida",
+            PermitirDescoberto: true));
+
+        // A venda sai inteira (999 x R$20 = R$19.980, receita real)...
+        result.Itens.Should().HaveCount(1);
+        result.Itens.Single().QuantidadeSaida.Should().Be(999);
+        result.ValorTotal.Should().Be(999 * 20m);
+
+        // ...e a falta vira descoberto auditavel no lote, sem fabricar estoque.
+        lote.QuantidadeAtual.Value.Should().Be(0);
+        lote.QuantidadeDescoberta.Value.Should().Be(996);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
     public async Task Deve_registrar_saida_multi_item_e_baixar_quantidade_do_estoque()
     {
         var produtoRepository = Substitute.For<IProdutoRepository>();

@@ -69,7 +69,12 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         CanalVenda Canal,
         string? Observacoes,
         Guid? VendedorId = null,
-        string? FormaPagamentoPrincipal = null);
+        string? FormaPagamentoPrincipal = null,
+        // #540: quando true, a saida nao trava por estoque insuficiente — a falta vira
+        // descoberto auditavel no lote (sem entrada-fantasma). Usado pelo QuickSaida do
+        // Estoque (operacao nao trava). Fluxos de venda cliente (mobile/storefront) deixam
+        // false e seguem bloqueando oversell.
+        bool PermitirDescoberto = false);
 
     public sealed record RegistrarSaidaEstoqueItemResult(
         Guid ItemEstoqueId,
@@ -208,25 +213,45 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                     throw new ProdutoInativoException(produto.Id);
 
                 var disponivel = lotes.Sum(i => i.QuantidadeAtual.Value);
-                if (disponivel < quantidadeSolicitada.Value)
+                // #540: com PermitirDescoberto a operacao nao trava — a falta vira descoberto
+                // auditavel no ultimo lote (ver loop). Sem o flag, oversell segue barrado.
+                if (!command.PermitirDescoberto && disponivel < quantidadeSolicitada.Value)
                     throw new EstoqueInsuficienteException(produto.Id, quantidadeSolicitada.Value, disponivel);
 
                 var restante = quantidadeSolicitada.Value;
                 decimal totalSaidoNoComando = 0m;
                 var lotesTocados = new List<ItemEstoque>();
 
-                foreach (var lote in lotes)
+                for (var idx = 0; idx < lotes.Length; idx++)
                 {
                     if (restante <= 0)
                         break;
 
-                    lote.GarantirDisponivelParaSaida(command.DataSaida);
-                    var quantidadeConsumida = Math.Min(lote.QuantidadeAtual.Value, restante);
-                    if (quantidadeConsumida <= 0)
-                        continue;
+                    var lote = lotes[idx];
+                    // Descoberto so no ULTIMO lote: os anteriores sao consumidos normalmente
+                    // (FEFO) e a falta remanescente fica no ultimo, sem entrada-fantasma (#540).
+                    var permiteDescobertoNesteLote = command.PermitirDescoberto
+                        && idx == lotes.Length - 1
+                        && restante > lote.QuantidadeAtual.Value;
 
-                    var quantidadeDoLote = Quantidade.From(quantidadeConsumida);
-                    lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora);
+                    decimal quantidadeConsumida;
+                    Quantidade quantidadeDoLote;
+                    if (permiteDescobertoNesteLote)
+                    {
+                        // A saida sai inteira (venda real); a falta vira descoberto auditavel.
+                        quantidadeConsumida = restante;
+                        quantidadeDoLote = Quantidade.From(quantidadeConsumida);
+                        lote.RegistrarSaidaPermitindoDescoberto(quantidadeDoLote, command.DataSaida, agora);
+                    }
+                    else
+                    {
+                        lote.GarantirDisponivelParaSaida(command.DataSaida);
+                        quantidadeConsumida = Math.Min(lote.QuantidadeAtual.Value, restante);
+                        if (quantidadeConsumida <= 0)
+                            continue;
+                        quantidadeDoLote = Quantidade.From(quantidadeConsumida);
+                        lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora);
+                    }
 
                     var itemVenda = new ItemVenda
                     {
