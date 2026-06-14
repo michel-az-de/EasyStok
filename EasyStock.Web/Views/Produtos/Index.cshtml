@@ -178,11 +178,11 @@
                                 <div>
                                     <div class="font-semibold text-slate-900 flex items-center gap-1.5">
                                         <span>@p.Nome</span>
-                                        @if (!p.EstaCompleto)
+                                        @if (p.CompletudePercent < 100)
                                         {
-                                            var faltam = string.Join(" e ", p.Pendencias);
+                                            var faltam = string.Join(", ", p.Pendencias);
                                             <span class="badge badge-warn px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap"
-                                                  title="Falta @faltam">Incompleto</span>
+                                                  title="Cadastro @(p.CompletudePercent)% — falta @faltam">@(p.CompletudePercent)%</span>
                                         }
                                     </div>
                                     <div class="text-xs text-slate-400 font-mono">@(p.SkuBase?.Value ?? string.Empty)</div>

@@ -67,5 +67,53 @@ namespace EasyStock.Domain.Entities
 
         /// <summary>Linhas de receita onde este produto e o produto-final.</summary>
         public ICollection<ProdutoComposicao> Composicoes { get; set; } = new List<ProdutoComposicao>();
+
+        // ── Completude do cadastro (#582 / ADR-0033) ──
+        // Fonte unica do % de completude: derivada (recomputa por leitura, nunca persistida);
+        // lista, detalhe e (futuro) mobile leem daqui em vez de rederivar. Variacoes/Nome/Categoria
+        // sempre pontuam (opcionais ou garantidos no produto salvo), entao NAO exige eager-load de
+        // navegacoes. Pesos calibrados nos ADR-0027/0033. EF ignora estes getters (ProdutoConfiguration).
+        private bool TemFotoCadastrada =>
+            !string.IsNullOrWhiteSpace(FotosJson) && FotosJson.Trim() != "[]";
+
+        private bool TemFichaTecnica =>
+            !string.IsNullOrWhiteSpace(AtributosJson) && AtributosJson.Trim() != "{}";
+
+        /// <summary>% ponderado de completude do cadastro (0–100). Soma crua dos campos presentes.</summary>
+        public int CompletudePercent
+        {
+            get
+            {
+                var pct = 10 + 3 + 2; // Variacoes + Nome + Categoria sempre pontuam
+                if (TemFotoCadastrada) pct += 20;
+                if (!string.IsNullOrWhiteSpace(DescricaoBase)) pct += 15;
+                if (CustoReferencia is { Valor: > 0 }) pct += 15;
+                if (PrecoReferencia is { Valor: > 0 }) pct += 15;
+                if (!string.IsNullOrWhiteSpace(CodigoBarras)) pct += 10;
+                if (!string.IsNullOrWhiteSpace(Marca)) pct += 5;
+                if (Dimensoes != null) pct += 5;
+                if (TemFichaTecnica) pct += 10; // ficha tecnica / nutricional
+                return pct;
+            }
+        }
+
+        /// <summary>Campos que faltam para o cadastro ficar completo (mesma regra do %).</summary>
+        public IReadOnlyList<string> Pendencias
+        {
+            get
+            {
+                var faltas = new List<string>();
+                if (!TemFotoCadastrada) faltas.Add("Foto");
+                if (string.IsNullOrWhiteSpace(DescricaoBase)) faltas.Add("Descrição");
+                if (CustoReferencia is not { Valor: > 0 }) faltas.Add("Custo");
+                if (PrecoReferencia is not { Valor: > 0 }) faltas.Add("Preço");
+                if (string.IsNullOrWhiteSpace(CodigoBarras)) faltas.Add("Cód.Barras");
+                if (string.IsNullOrWhiteSpace(Marca)) faltas.Add("Marca");
+                if (Dimensoes == null) faltas.Add("Dimensões");
+                // Nutricional so e lacuna quando exigido (alimento) e ausente.
+                if ((Tipo == TipoProduto.Alimento || TemFichaTecnica) && !TemFichaTecnica) faltas.Add("Nutricional");
+                return faltas;
+            }
+        }
     }
 }

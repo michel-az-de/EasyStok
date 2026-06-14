@@ -11,36 +11,11 @@ public class ProdutoDetailViewModel
 
     public bool MostrarFichaNutricional => Produto.Tipo == 1 || TemFicha;
 
-    private (bool ok, string label, int pts)[] IntegrityFields
-    {
-        get
-        {
-            var p = Produto;
-            var baseFields = new (bool ok, string label, int pts)[]
-            {
-                (p.Fotos.Any(),                               "Foto",        20),
-                (!string.IsNullOrWhiteSpace(p.DescricaoBase), "Descrição",   15),
-                (p.CustoReferencia is > 0,                    "Custo",       15),
-                (p.PrecoReferencia is > 0,                    "Preço",       15),
-                (!string.IsNullOrWhiteSpace(p.CodigoBarras),  "Cód.Barras",  10),
-                // BUG-61/62 (#450): variação é opcional; ausência não é lacuna. Sempre
-                // satisfeito para o produto simples poder atingir 100% (score é soma crua).
-                (true,                                         "Variações",   10),
-                (!string.IsNullOrWhiteSpace(p.Marca),         "Marca",        5),
-                (p.Dimensoes != null,                         "Dimensões",    5),
-                (true,                                        "Nome",         3),
-                (true,                                        "Categoria",    2),
-            };
-            return MostrarFichaNutricional
-                ? [.. baseFields, (TemFicha, "Nutricional", 10)]
-                : baseFields;
-        }
-    }
+    // #582 / ADR-0033: completude agora vem do backend (fonte unica) — lista e detalhe exibem
+    // o MESMO valor. O calculo ponderado vive em Produto.CalcularCompletude (dominio).
+    public int IntegrityScore => Produto.CompletudePercent;
 
-    public int IntegrityScore => IntegrityFields.Where(f => f.ok).Sum(f => f.pts);
-
-    public List<string> IntegrityMissing =>
-        IntegrityFields.Where(f => !f.ok).Select(f => f.label).ToList();
+    public List<string> IntegrityMissing => Produto.Pendencias.ToList();
 
     public static readonly Dictionary<string, int> IntegrityMissingStepMap = new()
     {

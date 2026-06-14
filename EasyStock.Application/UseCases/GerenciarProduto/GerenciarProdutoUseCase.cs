@@ -63,7 +63,10 @@ public sealed record ProdutoDetalheResult(
     // C2 (RDC 727/2022): "Avulso" (default) | "Embalado".
     TipoEmbalagem TipoEmbalagem = TipoEmbalagem.Avulso,
     // Ficha tecnica nutricional (JSON serializado via ProdutoFichaTecnica VO).
-    string? AtributosJson = null);
+    string? AtributosJson = null,
+    // #582 / ADR-0033: completude calculada no backend (fonte unica), nao mais derivada no Web.
+    int CompletudePercent = 0,
+    IReadOnlyList<string>? Pendencias = null);
 
 public sealed record DimensoesDetalheResult(
     decimal Peso,

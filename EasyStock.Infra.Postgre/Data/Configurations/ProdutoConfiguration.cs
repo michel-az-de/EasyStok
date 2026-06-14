@@ -76,6 +76,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasMany(p => p.Embalagens).WithOne(e => e.Produto).HasForeignKey(e => e.ProdutoId);
             builder.HasMany(p => p.Variacoes).WithOne(v => v.Produto).HasForeignKey(v => v.ProdutoId);
 
+            // #582 / ADR-0033: completude e DERIVADA (getters computados), nunca persistida.
+            // Ignora explicitamente para o EF nao tentar mapear como coluna (model-build quebraria).
+            builder.Ignore(p => p.CompletudePercent);
+            builder.Ignore(p => p.Pendencias);
+
             // ── Indexes ──
             builder.HasIndex(p => new { p.EmpresaId, p.SkuBase })
                 .IsUnique()

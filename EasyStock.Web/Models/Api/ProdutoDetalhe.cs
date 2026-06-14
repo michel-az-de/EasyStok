@@ -47,6 +47,10 @@ public record ProdutoDetalhe
     // Preenchido via PUT /api/produtos/{id}/ficha-tecnica.
     public string? AtributosJson { get; init; }
 
+    // #582 / ADR-0033: completude calculada no backend (fonte unica). Mesmo valor da lista.
+    public int CompletudePercent { get; init; }
+    public IReadOnlyList<string> Pendencias { get; init; } = [];
+
     public string StatusNome => Status == 0 ? "Ativo" : "Inativo";
 }
 

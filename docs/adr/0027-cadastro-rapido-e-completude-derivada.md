@@ -1,6 +1,6 @@
 # ADR-0027 — Cadastro rápido de produto e completude derivada
 
-**Status:** Aceito  
+**Status:** Parcialmente superseded por ADR-0033 — a completude migrou de Web-derived para calculada no backend (fonte única no domínio). O cadastro rápido/lote desta ADR permanece vigente. Original: Aceito  
 **Data:** 2026-06-06
 
 ## Contexto

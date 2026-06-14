@@ -121,7 +121,9 @@ public sealed class ObterDetalheProdutoUseCase(
             QuantidadeMinima: produto.QuantidadeMinima,
             QuantidadeCritica: produto.QuantidadeCritica,
             TipoEmbalagem: produto.TipoEmbalagem, // C2 (RDC 727/2022)
-            AtributosJson: produto.AtributosJson);
+            AtributosJson: produto.AtributosJson,
+            CompletudePercent: produto.CompletudePercent,
+            Pendencias: produto.Pendencias);
 
         if (cacheService is not null)
             await cacheService.SetAsync(CacheKeys.Produto(empresaId, produtoId), result, TimeSpan.FromSeconds(120));

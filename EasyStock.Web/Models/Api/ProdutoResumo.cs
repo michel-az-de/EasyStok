@@ -33,24 +33,17 @@ public record ProdutoResumo
     public string? PrimeiraFotoUrl => FotoJsonHelper.PrimeiraUrl(FotosJson);
 
     /// <summary>
-    /// Completude DERIVADA (nunca persistida, ADR-0027): o produto tem o minimo para vender bem.
-    /// Preco de venda &gt; 0 e, para itens fisicos/alimento, foto. Servico (Tipo 2) nao exige foto.
-    /// Recomputa a cada leitura, entao nunca diverge do estado real.
+    /// Completude do cadastro (#582 / ADR-0033): % ponderado calculado no BACKEND
+    /// (Produto.CompletudePercent), nao mais derivado no Web. A API de listagem serializa
+    /// a entidade inteira, entao chega pronto. Lista e detalhe exibem o MESMO numero.
     /// </summary>
-    public bool EstaCompleto =>
-        PrecoReferencia?.Valor is > 0 && (PrimeiraFotoUrl is not null || Tipo == 2);
+    public int CompletudePercent { get; init; }
 
-    /// <summary>O que falta para o cadastro ficar pronto (vazia se completo). Alimenta o chip "Incompleto".</summary>
-    public IReadOnlyList<string> Pendencias
-    {
-        get
-        {
-            var faltas = new List<string>(2);
-            if (PrecoReferencia?.Valor is not > 0) faltas.Add("preço");
-            if (PrimeiraFotoUrl is null && Tipo != 2) faltas.Add("foto");
-            return faltas;
-        }
-    }
+    /// <summary>O que falta para o cadastro ficar pronto (do backend, mesma regra do %).</summary>
+    public IReadOnlyList<string> Pendencias { get; init; } = [];
+
+    /// <summary>Conveniencia: cadastro 100% completo.</summary>
+    public bool EstaCompleto => CompletudePercent >= 100;
 }
 
 /// <summary>Utilitário para extrair dados de <c>FotosJson</c> sem duplicar lógica de parsing.</summary>
