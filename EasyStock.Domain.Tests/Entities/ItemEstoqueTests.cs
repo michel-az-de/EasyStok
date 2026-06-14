@@ -100,6 +100,51 @@ public class ItemEstoqueTests
     }
 
     [Fact]
+    public void Saida_com_descoberto_dentro_do_saldo_abate_normalmente_sem_gerar_descoberto()
+    {
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 10);
+
+        item.RegistrarSaidaPermitindoDescoberto(Quantidade.From(3), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        item.QuantidadeAtual.Value.Should().Be(7);
+        item.QuantidadeDescoberta.Value.Should().Be(0);
+    }
+
+    [Fact]
+    public void Saida_acima_do_saldo_zera_e_registra_descoberto_sem_fabricar_estoque()
+    {
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 3);
+
+        item.RegistrarSaidaPermitindoDescoberto(Quantidade.From(999), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        item.QuantidadeAtual.Value.Should().Be(0);
+        item.QuantidadeDescoberta.Value.Should().Be(996);
+        item.Status.Should().Be(StatusItemEstoque.Esgotado);
+    }
+
+    [Fact]
+    public void Saidas_sucessivas_com_descoberto_acumulam_a_falta()
+    {
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 2);
+
+        item.RegistrarSaidaPermitindoDescoberto(Quantidade.From(5), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+        item.RegistrarSaidaPermitindoDescoberto(Quantidade.From(4), new DateTime(2026, 4, 4, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        item.QuantidadeAtual.Value.Should().Be(0);
+        item.QuantidadeDescoberta.Value.Should().Be(7); // (5-2) + 4
+    }
+
+    [Fact]
+    public void Saida_com_descoberto_de_item_bloqueado_continua_barrada()
+    {
+        var item = CriarItem(status: StatusItemEstoque.Bloqueado, quantidadeAtual: 1);
+
+        Action act = () => item.RegistrarSaidaPermitindoDescoberto(Quantidade.From(10), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        act.Should().Throw<ItemEstoqueBloqueadoException>();
+    }
+
+    [Fact]
     public void Deve_marcar_vencido_ao_recalcular_status()
     {
         var item = CriarItem(status: StatusItemEstoque.Ok, validade: Validade.From(new DateTime(2026, 4, 1)));

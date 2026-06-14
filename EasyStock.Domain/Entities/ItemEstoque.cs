@@ -28,6 +28,13 @@ namespace EasyStock.Domain.Entities
 
         public Quantidade QuantidadeInicial { get; set; } = null!;
         public Quantidade QuantidadeAtual { get; set; } = null!;
+
+        /// <summary>
+        /// Saldo a repor (descoberto). Quando uma saída excede o disponível, o saldo vai a 0
+        /// e a falta fica registrada aqui — sinal auditável de "repor de verdade", sem
+        /// fabricar entrada-fantasma (#540). Sempre &gt;= 0.
+        /// </summary>
+        public Quantidade QuantidadeDescoberta { get; set; } = Quantidade.Zero;
         public int QuantidadeMinima { get; set; } = OperacionalDefaults.QuantidadeMinima;
         public int QuantidadeCritica { get; set; } = OperacionalDefaults.QuantidadeCritica;
         public decimal VelocidadeSaidaDiaria { get; set; }
@@ -162,6 +169,18 @@ namespace EasyStock.Domain.Entities
 
         public void GarantirDisponivelParaSaida(DateTime dataReferencia)
         {
+            GarantirOperavelParaSaida(dataReferencia);
+
+            if (QuantidadeAtual.Value <= 0)
+                throw new EstoqueInsuficienteException(ProdutoId, 1, QuantidadeAtual.Value);
+        }
+
+        /// <summary>
+        /// Guards de operabilidade que NÃO dependem de saldo (Bloqueado/Vencido/Descartado).
+        /// Continuam valendo mesmo na saída com descoberto.
+        /// </summary>
+        private void GarantirOperavelParaSaida(DateTime dataReferencia)
+        {
             if (Status == StatusItemEstoque.Bloqueado)
                 throw new ItemEstoqueBloqueadoException(Id);
 
@@ -170,9 +189,35 @@ namespace EasyStock.Domain.Entities
 
             if (Status == StatusItemEstoque.Descartado)
                 throw new RegraDeDominioVioladaException($"Operacao invalida: item de estoque '{Id}' foi descartado.");
+        }
 
-            if (QuantidadeAtual.Value <= 0)
-                throw new EstoqueInsuficienteException(ProdutoId, 1, QuantidadeAtual.Value);
+        /// <summary>
+        /// Saída que permite descoberto (#540, decisão Felipe): a operação não trava quando a
+        /// quantidade solicitada excede o disponível. O saldo vai a 0 e a falta é somada a
+        /// <see cref="QuantidadeDescoberta"/>, auditável, para reposição posterior — sem fabricar
+        /// entrada-fantasma. Bloqueado/Vencido/Descartado continuam barrando.
+        /// </summary>
+        public Quantidade RegistrarSaidaPermitindoDescoberto(Quantidade quantidadeSaida, DateTime dataSaida, DateTime alteradoEm)
+        {
+            GarantirOperavelParaSaida(dataSaida);
+
+            var disponivel = QuantidadeAtual.Value;
+            if (quantidadeSaida.Value <= disponivel)
+            {
+                QuantidadeAtual = QuantidadeAtual.Subtract(quantidadeSaida);
+            }
+            else
+            {
+                var falta = quantidadeSaida.Value - disponivel;
+                QuantidadeDescoberta = QuantidadeDescoberta.Add(Quantidade.From(falta));
+                QuantidadeAtual = Quantidade.Zero;
+            }
+
+            UltimaMovimentacaoEm = dataSaida;
+            AlteradoEm = alteradoEm;
+            RecalcularIndicadores(dataSaida);
+
+            return QuantidadeAtual;
         }
 
         public void RestaurarQuantidade(Quantidade quantidade, DateTime alteradoEm)
