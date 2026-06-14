@@ -5158,6 +5158,94 @@ html.theme-dark .ds-quick-action--secondary:hover {
     color: #93C5FD;
 }
 
+/* ── Cabecalho de secao do dashboard (issue #592) ──────────── */
+.ds-section-hd {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 14px;
+}
+.ds-section-hd h2 {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text-primary);
+}
+.ds-section-meta {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-400);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ── Pulso de hoje — resumo do dia (issue #592) ────────────── */
+.ds-pulse-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+}
+.ds-pulse {
+    padding: 13px 15px;
+    border-radius: 11px;
+    background: var(--ink-50);
+    border: 1px solid var(--ink-100);
+    transition: border-color var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out);
+}
+a.ds-pulse { text-decoration: none; display: block; }
+a.ds-pulse:hover { border-color: var(--navy-200); transform: translateY(-1px); }
+.ds-pulse-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-500);
+}
+.ds-pulse-val {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-top: 3px;
+    color: var(--text-primary);
+}
+.ds-pulse-val small {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-500);
+}
+.ds-pulse-sub {
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 3px;
+    color: var(--ink-500);
+}
+.ds-pulse-sub.up { color: var(--ok-600); }
+.ds-pulse-sub.warn { color: var(--warn-600); }
+.ds-pulse-sub .ds-pulse-led {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ok-500);
+    margin-right: 4px;
+    vertical-align: 1px;
+}
+.ds-pulse--accent {
+    background: var(--orange-50);
+    border-color: var(--orange-200);
+}
+.ds-pulse--accent .ds-pulse-lbl { color: var(--orange-800); }
+.ds-pulse--accent .ds-pulse-val { color: var(--orange-900); }
+html.theme-dark .ds-pulse--accent {
+    background: rgba(232, 88, 20, .12);
+    border-color: rgba(232, 88, 20, .28);
+}
+html.theme-dark .ds-pulse--accent .ds-pulse-lbl { color: var(--orange-300); }
+html.theme-dark .ds-pulse--accent .ds-pulse-val { color: var(--orange-300); }
+
 @media (max-width: 640px) {
     .ds-kpi-val {
         font-size: 22px;

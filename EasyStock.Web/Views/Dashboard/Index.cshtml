@@ -137,6 +137,81 @@ else if (Model.ResumoApiFalhou)
     <p class="text-xs text-slate-400 mt-1">@dataHoje</p>
 </header>
 
+@* ─── Pulso de hoje: resumo do dia já buscado em /analytics/dia (issue 592) ─── *@
+@{
+    var temPulsoHoje = Model.FaturamentoHoje > 0 || Model.PedidosEntreguesHoje > 0
+        || Model.PedidosPendentes > 0 || Model.CaixaAbertaHoje || Model.CaixaFechadaHoje
+        || Model.PixRecebidosHoje > 0;
+}
+@if (temPulsoHoje)
+{
+    <section class="ws mb-6" aria-labelledby="ds-pulso-title">
+        <div class="ds-section-hd">
+            <svg class="w-5 h-5" style="color:var(--orange-600)" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <h2 id="ds-pulso-title">Pulso de hoje</h2>
+            <span class="ds-section-meta">resumo de @dataHoje</span>
+        </div>
+        <div class="ds-pulse-grid">
+            <div class="ds-pulse ds-pulse--accent">
+                <div class="ds-pulse-lbl">Faturamento hoje</div>
+                <div class="ds-pulse-val">@Model.FaturamentoHoje.ToString("C", ptBR)</div>
+                <div class="ds-pulse-sub">@TextHelpers.Plural(Model.PedidosEntreguesHoje, "pedido entregue", "pedidos entregues")</div>
+            </div>
+
+            <div class="ds-pulse">
+                <div class="ds-pulse-lbl">Ticket médio</div>
+                <div class="ds-pulse-val">@Model.TicketMedioHoje.ToString("C", ptBR)</div>
+                <div class="ds-pulse-sub">por pedido hoje</div>
+            </div>
+
+            @if (Model.CaixaAbertaHoje)
+            {
+                <a href="/caixa" class="ds-pulse">
+                    <div class="ds-pulse-lbl">Caixa</div>
+                    <div class="ds-pulse-val">@Model.SaldoCaixaAtual.ToString("C", ptBR)</div>
+                    <div class="ds-pulse-sub up"><span class="ds-pulse-led"></span>caixa aberto</div>
+                </a>
+            }
+            else if (Model.CaixaFechadaHoje)
+            {
+                <a href="/caixa" class="ds-pulse">
+                    <div class="ds-pulse-lbl">Caixa</div>
+                    <div class="ds-pulse-val">@Model.SaldoCaixaAtual.ToString("C", ptBR)</div>
+                    <div class="ds-pulse-sub">fechado hoje</div>
+                </a>
+            }
+            else
+            {
+                <a href="/caixa" class="ds-pulse">
+                    <div class="ds-pulse-lbl">Caixa</div>
+                    <div class="ds-pulse-val" style="font-size:16px">Abrir caixa →</div>
+                    <div class="ds-pulse-sub warn">não aberto hoje</div>
+                </a>
+            }
+
+            @if (Model.PedidosPendentes > 0)
+            {
+                <div class="ds-pulse">
+                    <div class="ds-pulse-lbl">Pendentes</div>
+                    <div class="ds-pulse-val">@Model.PedidosPendentes <small>· @Model.ValorPedidosPendentes.ToString("C", ptBR)</small></div>
+                    <div class="ds-pulse-sub warn">aguardando entrega</div>
+                </div>
+            }
+
+            @if (Model.PixRecebidosHoje > 0)
+            {
+                <div class="ds-pulse">
+                    <div class="ds-pulse-lbl">Pix recebidos</div>
+                    <div class="ds-pulse-val">@Model.ValorPixHoje.ToString("C", ptBR)</div>
+                    <div class="ds-pulse-sub">@TextHelpers.Plural(Model.PixRecebidosHoje, "transação", "transações")</div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
 @* ─── KPIs principais (3 cards) ─────────────────────────────── *@
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <div class="ws ds-kpi" title="Receita gerada com saídas nos últimos 30 dias">
