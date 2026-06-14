@@ -120,6 +120,11 @@
                 // submit programaticamente aqui -> vale para TODOS os modais formModal.
                 const formEl = this.$el.querySelector('form');
                 if (formEl) {
+                    // novalidate: a validacao do app e custom (inline _attachInlineValidation +
+                    // erro do server). Sem isto, type=email/required nativos disparam o balao do
+                    // browser SOBRE a msg inline com texto identico (BUG-014 do QA: "Inclua um @"
+                    // duplicado e sobreposto). Mesma decisao do #549/#546, estendida aos formModal.
+                    formEl.setAttribute('novalidate', '');
                     formEl.addEventListener('submit', (e) => { e.preventDefault(); this.submit(); });
                 }
                 window.addEventListener('open-modal', (e) => {
