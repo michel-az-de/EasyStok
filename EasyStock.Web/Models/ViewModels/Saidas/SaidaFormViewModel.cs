@@ -37,6 +37,13 @@ public class SaidaFormViewModel
     public string? Canal { get; set; }
     public string? Descricao { get; set; }
 
+    /// <summary>
+    /// #540: quando true, a saída não trava por estoque insuficiente — a falta vira
+    /// descoberto auditável no lote (sem entrada-fantasma). Setado pelo QuickSaida
+    /// (operação não trava). Demais fluxos deixam false e seguem bloqueando oversell.
+    /// </summary>
+    public bool PermitirDescoberto { get; set; }
+
     // Preenchidos pela view
     public Produto? ProdutoSelecionado { get; set; }
     public int QtyDisponivel { get; set; }

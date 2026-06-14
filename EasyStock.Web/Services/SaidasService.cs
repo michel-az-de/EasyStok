@@ -69,7 +69,9 @@ public class SaidasService(ApiClient api, SessionService session)
             notaFiscal = vm.NotaFiscal,
             natureza = MapNatureza(vm.Natureza),
             canal = MapCanal(vm.Canal),
-            observacoes = vm.Descricao
+            observacoes = vm.Descricao,
+            // #540: QuickSaida envia true — saída não trava, a falta vira descoberto auditável.
+            permitirDescoberto = vm.PermitirDescoberto
         });
     }
 

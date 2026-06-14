@@ -133,7 +133,7 @@
                        :class="qty > qtyDisponivel ? 'text-amber-600 font-medium' : 'text-slate-500 dark:text-slate-400'">
                         <span x-show="qty <= qtyDisponivel">Disponível: <span x-text="qtyDisponivel"></span></span>
                         <span x-show="qty > qtyDisponivel" x-cloak>
-                            ⚠ Excede estoque atual (<span x-text="qtyDisponivel"></span>un). Sistema vai repor <span x-text="qty - qtyDisponivel"></span>un automaticamente — revise depois.
+                            ⚠ Excede o saldo (<span x-text="qtyDisponivel"></span>un). A saída sai assim mesmo; <span x-text="qty - qtyDisponivel"></span>un ficarão como saldo a repor (descoberto).
                         </span>
                     </p>
                 </div>
@@ -444,8 +444,8 @@
                 },
 
                 podeEnviar() {
-                    // Excesso vs estoque NAO bloqueia mais — servidor faz reposicao automatica
-                    // mantendo a operacao fluindo (regra do Felipe).
+                    // Excesso vs estoque NAO bloqueia — servidor registra a falta como descoberto
+                    // (issue 540), sem entrada-fantasma; a operacao flui (regra do Felipe).
                     if (!this.qty || this.qty < 1) return false;
                     if (this.natureza === 'venda' && (!this.valor || this.valor <= 0)) return false;
                     if ((this.natureza === 'perda' || this.natureza === 'prejuizo') && !this.motivo.trim()) return false;
@@ -489,8 +489,8 @@
                             let delay = 800;
                             try {
                                 const d = await r.json();
-                                if (d && d.ajusteAutomatico) {
-                                    msg = d.mensagemAjuste || 'Saída registrada com ajuste automático de estoque. Revise o cadastro depois.';
+                                if (d && d.descoberto) {
+                                    msg = d.mensagemDescoberto || 'Saída registrada. A falta ficou como saldo a repor (descoberto).';
                                     type = 'warning';
                                     delay = 1800;
                                 }

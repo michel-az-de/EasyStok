@@ -1,6 +1,5 @@
 using System.Text;
 using EasyStock.Web.Helpers;
-using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Estoque;
 using EasyStock.Web.Models.ViewModels.Saidas;
 using EasyStock.Web.Models.ViewModels.Shared;
@@ -12,7 +11,6 @@ namespace EasyStock.Web.Controllers;
 public class EstoqueController(
     EstoqueService svc,
     SaidasService saidasSvc,
-    EntradasService entradasSvc,
     SessionService session,
     ILogger<EstoqueController> log) : BaseController(session)
 {
@@ -148,40 +146,14 @@ public class EstoqueController(
         if ((natureza == "perda" || natureza == "prejuizo") && motivoNorm is null)
             return BadRequest(new { success = false, errorMessage = "Informe o motivo da saída para auditoria." });
 
-        // Politica "operacao nao trava": se estoque insuficiente, repoe automaticamente
-        // o lote clicado com a diferenca, mantem trilha de auditoria com observacao
-        // padronizada e segue com a saida. Operador corrige depois — ver req do Felipe.
-        bool ajusteAutomatico = false;
-        int qtyAjuste = 0;
-        if (req.Qty > item.Qty)
-        {
-            qtyAjuste = req.Qty - item.Qty;
-            var custoUnitario = item.CustoUnitario?.Valor > 0 ? item.CustoUnitario.Valor : 0.01m;
-            var reposicaoVm = new ReposicaoFormViewModel
-            {
-                ItemEstoqueId = req.EstoqueId,
-                ProdutoId = item.ProdutoId,
-                Qty = qtyAjuste,
-                Custo = custoUnitario,
-                Data = data,
-                Validade = item.Validade,
-                Observacoes = $"Ajuste automatico: saida solicitou {req.Qty}un mas estoque tinha {item.Qty}un. Operador deve revisar."
-            };
-            var ajusteResult = await entradasSvc.ReposicaoAsync(reposicaoVm);
-            if (!ajusteResult.Success)
-            {
-                log.LogWarning("Ajuste automatico FALHOU em /estoque/saida. itemId={ItemId} produtoId={ProdutoId} solicitado={Solicitado} disponivel={Disponivel} erro={Erro}",
-                    req.EstoqueId, item.ProdutoId, req.Qty, item.Qty, ajusteResult.ErrorMessage);
-                return BadRequest(new
-                {
-                    success = false,
-                    errorMessage = $"Estoque insuficiente ({item.Qty}un disponiveis) e nao foi possivel ajustar automaticamente: {ajusteResult.ErrorMessage ?? "erro desconhecido"}."
-                });
-            }
-            ajusteAutomatico = true;
-            log.LogWarning("Ajuste automatico aplicado em /estoque/saida. itemId={ItemId} produtoId={ProdutoId} reposicao={Ajuste}un (de {Disponivel} para {Total}). Saida natureza={Natureza} qty={Qty}.",
-                req.EstoqueId, item.ProdutoId, qtyAjuste, item.Qty, req.Qty, natureza, req.Qty);
-        }
+        // #540: a operacao nao trava por estoque insuficiente, mas SEM fabricar entrada-fantasma.
+        // A saida sai pela quantidade cheia (receita real) e a falta vira "descoberto" auditavel
+        // no lote (PermitirDescoberto), sinalizando reposicao real. Substitui a reposicao-automatica
+        // (entrada-fantasma) que corrompia o saldo de estoque (QA v1.10 BUG-001).
+        var qtyDescoberto = Math.Max(0, req.Qty - item.Qty);
+        if (qtyDescoberto > 0)
+            log.LogInformation("Saida com descoberto em /estoque/saida. itemId={ItemId} produtoId={ProdutoId} solicitado={Solicitado} disponivel={Disponivel} descoberto={Descoberto} natureza={Natureza}.",
+                req.EstoqueId, item.ProdutoId, req.Qty, item.Qty, qtyDescoberto, natureza);
 
         var saidaVm = new SaidaFormViewModel
         {
@@ -192,7 +164,8 @@ public class EstoqueController(
             Qty = req.Qty,
             Valor = req.Valor,
             DtVenda = data,
-            Descricao = motivoNorm
+            Descricao = motivoNorm,
+            PermitirDescoberto = true
         };
 
         var result = await saidasSvc.CriarAsync(saidaVm);
@@ -202,10 +175,10 @@ public class EstoqueController(
         return Ok(new
         {
             success = true,
-            ajusteAutomatico,
-            qtyAjuste,
-            mensagemAjuste = ajusteAutomatico
-                ? $"Estoque tinha {item.Qty}un, foram repostas {qtyAjuste}un automaticamente. Revise o cadastro depois."
+            descoberto = qtyDescoberto > 0,
+            qtyDescoberto,
+            mensagemDescoberto = qtyDescoberto > 0
+                ? $"Saída registrada. O estoque tinha {item.Qty}un; {qtyDescoberto}un ficaram como saldo a repor (descoberto). Reponha quando possível."
                 : null
         });
     }
