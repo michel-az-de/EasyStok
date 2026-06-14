@@ -49,13 +49,21 @@
     var totalAgendados = Model.Items.Count(p => p.IsScheduled);
     var totalAtrasados = Model.Items.Count(p => p.IsAtrasado);
     var filtroAgenda = Context.Request.Query["agenda"].ToString();
+
+    // itemsFinais aplica o filtro client-side de agenda; o header deve contar o que e
+    // renderizado, nao o total do status (BUG-006). As abas Agendados/Atrasados seguem
+    // contando Model.Items (total real por categoria).
+    var itemsFiltrados = Model.Items.AsEnumerable();
+    if (filtroAgenda == "agendados") itemsFiltrados = itemsFiltrados.Where(i => i.IsScheduled);
+    else if (filtroAgenda == "atrasados") itemsFiltrados = itemsFiltrados.Where(i => i.IsAtrasado);
+    var itemsFinais = itemsFiltrados.ToList();
 }
 
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Pedidos</h1>
         <p>
-            @Model.Items.Count @(Model.Items.Count == 1 ? "pedido listado" : "pedidos listados") · Gerencie pedidos e pagamentos
+            @itemsFinais.Count @(itemsFinais.Count == 1 ? "pedido listado" : "pedidos listados") · Gerencie pedidos e pagamentos
         </p>
     </div>
     <div class="flex gap-3 flex-wrap">
@@ -113,12 +121,6 @@
 </div>
 
 <div class="ws">
-    @{
-        var itemsFiltrados = Model.Items.AsEnumerable();
-        if (filtroAgenda == "agendados") itemsFiltrados = itemsFiltrados.Where(i => i.IsScheduled);
-        else if (filtroAgenda == "atrasados") itemsFiltrados = itemsFiltrados.Where(i => i.IsAtrasado);
-        var itemsFinais = itemsFiltrados.ToList();
-    }
     @if (!itemsFinais.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
