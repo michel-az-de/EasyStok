@@ -8,7 +8,10 @@
         ? "fiscal" : "geral";
 }
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-4 mb-6">
+    <span class="cfg-ico cfg-ico--accent" style="width:48px;height:48px;border-radius:15px;">
+        <es-icon name="settings"></es-icon>
+    </span>
     <div class="pg-hd">
         <h1>Configurações</h1>
         <p>Alertas, notificações, regras operacionais e emissão fiscal</p>
@@ -19,10 +22,12 @@
     <div class="tabs" role="tablist" aria-label="Seções de configuração">
         <button type="button" role="tab" id="tab-geral" aria-controls="panel-geral"
                 :aria-selected="active === 'geral'" :tabindex="active === 'geral' ? 0 : -1"
-                @@click="active = 'geral'">Geral</button>
+                @@click="active = 'geral'" style="display:inline-flex;align-items:center;gap:7px;">
+            <es-icon name="sliders-horizontal" class="es-icon--sm"></es-icon> Geral</button>
         <button type="button" role="tab" id="tab-fiscal" aria-controls="panel-fiscal"
                 :aria-selected="active === 'fiscal'" :tabindex="active === 'fiscal' ? 0 : -1"
-                @@click="active = 'fiscal'">Fiscal (NFC-e)</button>
+                @@click="active = 'fiscal'" style="display:inline-flex;align-items:center;gap:7px;">
+            <es-icon name="file-text" class="es-icon--sm"></es-icon> Fiscal (NFC-e)</button>
     </div>
 
     <div id="panel-geral" role="tabpanel" aria-labelledby="tab-geral"
