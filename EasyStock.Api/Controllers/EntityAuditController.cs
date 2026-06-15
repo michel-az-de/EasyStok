@@ -26,7 +26,7 @@ public class EntityAuditController(
     {
         var empresaId = currentUser.EmpresaId;
         if (empresaId == Guid.Empty)
-            return Unauthorized();
+            return Forbid();
 
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
@@ -49,7 +49,7 @@ public class EntityAuditController(
     {
         var empresaId = currentUser.EmpresaId;
         if (empresaId == Guid.Empty)
-            return Unauthorized();
+            return Forbid();
 
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
@@ -68,7 +68,7 @@ public class EntityAuditController(
     {
         var empresaId = currentUser.EmpresaId;
         if (empresaId == Guid.Empty)
-            return Unauthorized();
+            return Forbid();
 
         var summary = await entityAudit.ResumoPorTipoAsync(empresaId, ct);
         var total = summary.Sum(s => s.Count);
