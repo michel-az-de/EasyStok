@@ -10237,7 +10237,11 @@ document.addEventListener('click', function (ev) {
   closeMoreMenu();
 });
 document.addEventListener('keydown', function (ev) {
-  if (ev.key === 'Escape') closeMoreMenu();
+  if (ev.key !== 'Escape') return;
+  // Esc fecha o overlay topmost: o scanner (fullscreen, camera ligada) tem
+  // prioridade e libera a camera no closeScanner; senao fecha o more-menu. (issue 611)
+  if (scannerActive) { closeScanner(); return; }
+  closeMoreMenu();
 });
 
 let currentScreen = 'home';
