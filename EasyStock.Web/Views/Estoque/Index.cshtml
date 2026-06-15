@@ -1,6 +1,12 @@
 @model EstoqueListViewModel
 @{
     var statusOpcoes = new[] { ("", "Todos"), ("ok", "OK"), ("atencao", "Atenção"), ("critico", "Crítico"), ("parado", "Parado"), ("vencendo", "Vencendo"), ("vencido", "Vencido") };
+    // issue 454: os links de paginacao/pills precisam de URL-encode no termo/categoria/status;
+    // sem isso, '#'/'&'/espaco no termo de busca quebram a querystring a partir da pagina 2
+    // (agora que a busca pagina de verdade e os links de pagina passaram a renderizar).
+    var qStatus = System.Uri.EscapeDataString(Model.StatusFiltro ?? "");
+    var qCategoria = System.Uri.EscapeDataString(Model.Categoria ?? "");
+    var qSearch = System.Uri.EscapeDataString(Model.Search ?? "");
 }
 
 <div class="flex items-center justify-between mb-6">
@@ -46,7 +52,7 @@
             @foreach (var (val, label) in statusOpcoes)
             {
                 var isActive = (Model.StatusFiltro ?? "") == val;
-                <a href="?status=@val&categoria=@Model.Categoria&search=@Model.Search"
+                <a href="?status=@val&categoria=@qCategoria&search=@qSearch"
                    class="filter-tab @(isActive ? "active" : "")">@label</a>
             }
         </div>
@@ -350,29 +356,29 @@
                     <div class="flex items-center gap-1">
                         @if (Model.Paginacao.HasPrevious)
                         {
-                            <a href="?page=@(Model.Paginacao.Page - 1)&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                            <a href="?page=@(Model.Paginacao.Page - 1)&status=@qStatus&categoria=@qCategoria&search=@qSearch"
                                class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">←</a>
                         }
                         @if (estPgStart > 1)
                         {
-                            <a href="?page=1&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                            <a href="?page=1&status=@qStatus&categoria=@qCategoria&search=@qSearch"
                                class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">1</a>
                             if (estPgStart > 2) { <span class="px-1 text-slate-400 text-sm">…</span> }
                         }
                         @for (int pg = estPgStart; pg <= estPgEnd; pg++)
                         {
-                            <a href="?page=@pg&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                            <a href="?page=@pg&status=@qStatus&categoria=@qCategoria&search=@qSearch"
                                class="px-2.5 py-1.5 text-sm border rounded-lg transition-colors @(pg == Model.Paginacao.Page ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-300 hover:bg-slate-50")">@pg</a>
                         }
                         @if (estPgEnd < Model.Paginacao.Pages)
                         {
                             if (estPgEnd < Model.Paginacao.Pages - 1) { <span class="px-1 text-slate-400 text-sm">…</span> }
-                            <a href="?page=@Model.Paginacao.Pages&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                            <a href="?page=@Model.Paginacao.Pages&status=@qStatus&categoria=@qCategoria&search=@qSearch"
                                class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">@Model.Paginacao.Pages</a>
                         }
                         @if (Model.Paginacao.HasNext)
                         {
-                            <a href="?page=@(Model.Paginacao.Page + 1)&status=@Model.StatusFiltro&categoria=@Model.Categoria&search=@Model.Search"
+                            <a href="?page=@(Model.Paginacao.Page + 1)&status=@qStatus&categoria=@qCategoria&search=@qSearch"
                                class="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">→</a>
                         }
                     </div>

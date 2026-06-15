@@ -171,9 +171,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             // Filtro "Vencendo" usa FEFO (o que vence primeiro no topo, mais acionavel);
             // os demais filtros mantem a ordem padrao por entrada mais recente.
+            // ThenBy(Id) garante ordem deterministica entre paginas quando ha lotes
+            // irmaos com a mesma EntradaEm/ValidadeEm (ex.: varios lotes do mesmo SKU
+            // numa busca paginada) — alinhado a SearchAsync (#454).
             var ordenada = vencendo
-                ? comInclude.OrderBy(i => (DateTime?)i.ValidadeEm)
-                : comInclude.OrderByDescending(i => i.EntradaEm);
+                ? comInclude.OrderBy(i => (DateTime?)i.ValidadeEm).ThenBy(i => i.Id)
+                : comInclude.OrderByDescending(i => i.EntradaEm).ThenBy(i => i.Id);
 
             var items = await ordenada
                 .Skip((page - 1) * pageSize)

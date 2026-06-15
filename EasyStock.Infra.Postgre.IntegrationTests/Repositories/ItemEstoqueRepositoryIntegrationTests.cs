@@ -450,4 +450,111 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         total.Should().Be(1);
         itens.Should().ContainSingle().Which.Id.Should().Be(idVencendo);
     }
+
+    [SkippableFact]
+    public async Task GetItensEstoquePaginadosAsync_termo_casa_por_sku_nome_e_ignora_outros_produtos()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoAlvo = Guid.NewGuid();
+        var produtoOutro = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
+
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Busca", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Geral", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.AddRange(
+            new Produto
+            {
+                Id = produtoAlvo,
+                EmpresaId = empresaId,
+                CategoriaId = categoriaId,
+                Nome = "Caixa Organizadora",
+                SkuBase = CodigoSku.From("ZFZW"),
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new Produto
+            {
+                Id = produtoOutro,
+                EmpresaId = empresaId,
+                CategoriaId = categoriaId,
+                Nome = "Vassoura",
+                SkuBase = CodigoSku.From("VSSR"),
+                Tipo = TipoProduto.Fisico,
+                Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        var entrada = DateTime.UtcNow;
+        // 2 lotes do produto alvo com a MESMA EntradaEm -> exercita o tie-breaker por Id (#454)
+        context.ItensEstoque.AddRange(
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoAlvo,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ChavePesquisa = "ZFZW CAIXA ORGANIZADORA",
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = entrada,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoAlvo,
+                QuantidadeInicial = Quantidade.From(5),
+                QuantidadeAtual = Quantidade.From(5),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ChavePesquisa = "ZFZW CAIXA ORGANIZADORA",
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = entrada,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            // Lote de OUTRO produto -> nao casa "ZFZW"
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoOutro,
+                QuantidadeInicial = Quantidade.From(7),
+                QuantidadeAtual = Quantidade.From(7),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ChavePesquisa = "VSSR VASSOURA",
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = entrada,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+
+        // SKU base exato e case-insensitive (o termo minusculo normaliza para o SKU armazenado)
+        var (porSku, totalSku) = await repository.GetItensEstoquePaginadosAsync(empresaId, 1, 20, termo: "zfzw");
+        totalSku.Should().Be(2);
+        porSku.Should().OnlyContain(i => i.ProdutoId == produtoAlvo);
+
+        // Nome parcial (ILIKE)
+        var (_, totalNome) = await repository.GetItensEstoquePaginadosAsync(empresaId, 1, 20, termo: "organiz");
+        totalNome.Should().Be(2);
+
+        // Termo que nao casa nada
+        var (vazio, totalVazio) = await repository.GetItensEstoquePaginadosAsync(empresaId, 1, 20, termo: "naoexiste");
+        totalVazio.Should().Be(0);
+        vazio.Should().BeEmpty();
+    }
 }

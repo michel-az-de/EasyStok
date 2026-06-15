@@ -115,6 +115,24 @@ public class ItemEstoqueControllerTests
     }
 
     [Fact]
+    public async Task GetAll_DeveRepassarTermoDeBusca_AoRepositorio()
+    {
+        // #454: trava o contrato de que o termo de busca chega ao repositorio. Sem isso,
+        // um refactor poderia dropar o &termo= e reabrir o ESTK-001 (busca por SKU/nome
+        // devolvia lista vazia) sem o CI acusar.
+        var empresaId = Guid.NewGuid();
+        _itemEstoqueRepository
+            .GetItensEstoquePaginadosAsync(empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), "ZFZW")
+            .Returns((new List<ItemEstoque>(), 0));
+
+        var result = await _controller.GetAll(empresaId, termo: "ZFZW");
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _itemEstoqueRepository.Received(1)
+            .GetItensEstoquePaginadosAsync(empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), "ZFZW");
+    }
+
+    [Fact]
     public async Task GetById_DeveRetornarOk_ComDtoNoFormatoEstoqueSku()
     {
         var empresaId = Guid.NewGuid();

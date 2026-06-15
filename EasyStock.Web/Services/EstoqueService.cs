@@ -29,7 +29,11 @@ public class EstoqueService(ApiClient api, SessionService session)
         // "Atencao"). Aqui aplicamos um segundo filtro client-side espelhando
         // a logica que a view usa para renderizar o badge — assim filtro e
         // badge sempre concordam visualmente, ate o backend corrigir.
-        if (!string.IsNullOrEmpty(status)
+        // #454: nao reaplica o filtro de status client-side quando ha busca ativa.
+        // A API ja filtra status E termo server-side com paginacao real; reaplicar aqui
+        // (e reescrever Meta) colapsaria a paginacao da busca para uma unica pagina.
+        if (string.IsNullOrEmpty(search)
+            && !string.IsNullOrEmpty(status)
             && result.Success
             && result.Data is { Data: { } items } paged
             && items.Count > 0)
