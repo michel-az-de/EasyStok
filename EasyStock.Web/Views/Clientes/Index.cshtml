@@ -98,7 +98,7 @@
                             @c.OrderCount
                             @if (c.LastOrderAt.HasValue)
                             {
-                                <span class="text-xs text-slate-400 block">último em @c.LastOrderAt.Value.AsDate()</span>
+                                <span class="text-xs text-slate-400 block">último em @c.LastOrderAt.Value.ParaBrasilia().AsDate()</span>
                             }
                         </td>
                         <td>
