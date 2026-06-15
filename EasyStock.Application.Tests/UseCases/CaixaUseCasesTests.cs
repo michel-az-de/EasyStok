@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using Microsoft.Extensions.Logging;
 
@@ -390,5 +391,118 @@ public class CaixaUseCasesTests
         result.EstornadoPorNome.Should().Be("Maria");
         await _repo.Received(1).UpdateMovimentoAsync(mov);
         await _uow.Received(1).CommitAsync();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // ObterCaixaDia — resolução cross-day (issue #596)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task ObterCaixaDia_DeveResolverSessaoCrossDay_QuandoHojeSemAberturaMasComPendente()
+    {
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        // Abertura de ontem (R$44) nunca fechada: sessão cross-day em aberto.
+        var aberturaOntem = MovimentoCaixa.Criar(empresaId, "abertura", 44m, DateTime.UtcNow.AddDays(-1));
+
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(Array.Empty<MovimentoCaixa>());
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(aberturaOntem);
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { aberturaOntem });
+        _repo.GetTotalVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
+
+        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+
+        result.Aberto.Should().BeTrue();
+        result.AberturaPendenteCrossDay.Should().BeTrue();
+        result.AbertoDesde.Should().Be(
+            EasyStock.Application.Common.HorarioBrasil.DataOperacional(aberturaOntem.DataMovimento));
+        result.SaldoInicial.Should().Be(44m);
+        result.SaldoEsperado.Should().Be(44m);
+        await _repo.Received(1).GetAberturaPendenteAsync(empresaId, null);
+        // Cross-day agrega por intervalo, não pelo dia civil.
+        await _repo.DidNotReceive().GetTotalVendasDoDiaAsync(empresaId, hoje, null);
+    }
+
+    [Fact]
+    public async Task ObterCaixaDia_NaoResolveCrossDay_QuandoDiaTemAberturaPropria()
+    {
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
+
+        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+
+        result.Aberto.Should().BeTrue();
+        result.AberturaPendenteCrossDay.Should().BeFalse();
+        result.AbertoDesde.Should().BeNull();
+        result.SaldoInicial.Should().Be(100m);
+        await _repo.DidNotReceive().GetAberturaPendenteAsync(Arg.Any<Guid>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task ObterCaixaDia_NaoResolveCrossDay_QuandoDataNaoEHoje()
+    {
+        var empresaId = Guid.NewGuid();
+        var ontem = EasyStock.Application.Common.HorarioBrasil.Hoje().AddDays(-1);
+        _repo.GetFechamentoDoDiaAsync(empresaId, ontem, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, ontem, null).Returns(Array.Empty<MovimentoCaixa>());
+        _repo.GetTotalVendasDoDiaAsync(empresaId, ontem, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, ontem, null).Returns(0m);
+
+        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, ontem));
+
+        result.Aberto.Should().BeFalse();
+        result.AberturaPendenteCrossDay.Should().BeFalse();
+        // Dia histórico mantém semântica estrita: não puxa abertura anterior.
+        await _repo.DidNotReceive().GetAberturaPendenteAsync(Arg.Any<Guid>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task ObterCaixaDia_NaoResolveCrossDay_QuandoDiaJaFechado()
+    {
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, hoje, 0, 0, 0, 0, 0));
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(Array.Empty<MovimentoCaixa>());
+        _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
+
+        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+
+        result.Fechado.Should().BeTrue();
+        result.AberturaPendenteCrossDay.Should().BeFalse();
+        await _repo.DidNotReceive().GetAberturaPendenteAsync(Arg.Any<Guid>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task ObterCaixaDia_RetornaNaoAberto_QuandoHojeSemAberturaNemPendente()
+    {
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(Array.Empty<MovimentoCaixa>());
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns((MovimentoCaixa?)null);
+        _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
+
+        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+
+        result.Aberto.Should().BeFalse();
+        result.AberturaPendenteCrossDay.Should().BeFalse();
+        result.AbertoDesde.Should().BeNull();
+        await _repo.Received(1).GetAberturaPendenteAsync(empresaId, null);
     }
 }

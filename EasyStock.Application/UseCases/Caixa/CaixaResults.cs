@@ -41,6 +41,10 @@ public sealed record FechamentoCaixaResult(
 );
 
 /// <summary>Resumo consolidado do caixa de um dia (mesmo se ainda não fechado).</summary>
+/// <param name="AberturaPendenteCrossDay">True quando o dia consultado é hoje, não teve
+/// abertura própria, mas há uma sessão aberta de um dia anterior (abertura sem fechamento).
+/// Nesse caso os totais agregam a sessão desde <paramref name="AbertoDesde"/> (issue #596).</param>
+/// <param name="AbertoDesde">Data civil (BRT) da abertura quando a sessão é cross-day; null caso contrário.</param>
 public sealed record CaixaDiaResult(
     DateOnly Data,
     Guid EmpresaId,
@@ -54,5 +58,7 @@ public sealed record CaixaDiaResult(
     bool Aberto,
     bool Fechado,
     FechamentoCaixaResult? Fechamento,
-    IReadOnlyList<MovimentoCaixaResult> Movimentos
+    IReadOnlyList<MovimentoCaixaResult> Movimentos,
+    bool AberturaPendenteCrossDay = false,
+    DateOnly? AbertoDesde = null
 );
