@@ -189,6 +189,15 @@ button:focus-visible {
   font-feature-settings: "tnum" 1;
 }
 
+/* ---------- Semantic text color (pente fino onda 2, issue #603) ----------
+   Para texto solto on-brand (valores monetarios, rotulos de status) onde nao
+   cabe o componente .badge. Substituem text-green-700/text-red-700 crus do
+   Tailwind por tokens (ok/warn/crit/info), eliminando off-brand nas views. */
+.text-ok   { color: var(--ok-700); }
+.text-warn { color: var(--warn-700); }
+.text-crit { color: var(--crit-700); }
+.text-info { color: var(--navy-700); }
+
 /* ---------- Tabela financeira (UX-005 / issue #474) ----------
    Escopada em .fin-table (ContasAReceber/ContasAPagar). NAO afeta .tbl/.tbl-full
    nem tabelas de dashboard. Valores monetarios (celulas .text-right) nao quebram

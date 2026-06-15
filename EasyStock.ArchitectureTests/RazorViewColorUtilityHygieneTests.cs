@@ -58,7 +58,6 @@ public class RazorViewColorUtilityHygieneTests
         "ContasAPagar/Detalhe.cshtml",
         "ContasAPagar/Index.cshtml",
         "ContasAReceber/Detalhe.cshtml",
-        "ContasAReceber/Index.cshtml",
         "Dashboard/Index.cshtml",
         "Dev/Components.cshtml",
         "Downloads/Index.cshtml",
