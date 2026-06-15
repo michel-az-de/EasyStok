@@ -41,6 +41,7 @@
       _inflight: {},              // chave -> true (guarda sincrona)
       focusId: null,
       pay: { open: false, id: null, metodo: 'pix', valor: '', enviando: false },
+      announce: '',               // regiao aria-live (leitor de tela)
 
       init: function () {
         this.filter = (this.$root.dataset.initialFilter || '').trim();
@@ -123,6 +124,7 @@
             }
             Object.assign(it, data.pedido); it._justMoved = true;   // servidor vence
             toast('success', 'Pedido: ' + self.statusLabel(it.status) + (it.status === 'pronto' ? ' · estoque baixado' : '') + '.');
+            self.announce = 'Pedido atualizado para ' + self.statusLabel(it.status) + '.';
             self._linger(id);
           });
         }).catch(function () {
@@ -173,6 +175,7 @@
             }
             Object.assign(it, data.pedido);              // servidor vence
             toast('success', 'Pagamento de ' + money(valor) + ' registrado.');
+            self.announce = 'Pagamento de ' + money(valor) + ' registrado.';
             self.closePay();
           });
         }).catch(function () {

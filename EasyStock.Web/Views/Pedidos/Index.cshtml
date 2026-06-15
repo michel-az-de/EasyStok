@@ -57,6 +57,7 @@
 
 <div x-data="pedidosCockpit()" data-initial-filter="@initialFilter">
 <script type="application/json" id="pedidos-seed">@Html.Raw(seedJson)</script>
+<div class="sr-only" aria-live="polite" x-text="announce"></div>
 
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
@@ -223,6 +224,10 @@
             </tbody>
         </table>
         </div>
+        @if (Model.Items.Count >= 200)
+        {
+            <div class="ped-cap-note">Mostrando os 200 pedidos mais urgentes (abertos primeiro). Refine a busca para ver os demais.</div>
+        }
     }
 </div>
 
