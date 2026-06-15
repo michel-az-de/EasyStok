@@ -428,7 +428,7 @@ else
                                 <option value="transferencia">Transferência</option>
                                 <option value="outro">Outro</option>
                             </select>
-                            <input type="number" id="ped-valor-pagamento" name="valor" x-model.number="valor" placeholder="Valor *" step="0.01" min="0.01" required
+                            <input type="number" id="ped-valor-pagamento" name="valor" x-model.number="valor" placeholder="Valor *" step="0.01" min="0.01" max="99999999.99" required
                                    aria-label="Valor do pagamento" class="ui-field text-sm text-right" style="grid-area: valor;" />
                             <input type="text" name="referencia" placeholder="Referência (txid, NSU)" aria-label="Referência" class="ui-field text-sm" style="grid-area: ref;" />
                             <input type="text" name="observacao" placeholder="Observação opcional" aria-label="Observação" class="ui-field text-sm" style="grid-area: obs;" />
@@ -436,6 +436,10 @@ else
                                 Registrar pagamento
                             </button>
                         </div>
+                        <p class="text-xs text-amber-600 mt-1.5" x-cloak
+                           x-show="valor > @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                            Valor acima do pendente (@p.Pendente.AsMoney()). Será registrado assim mesmo.
+                        </p>
                     </form>
                 }
             </div>

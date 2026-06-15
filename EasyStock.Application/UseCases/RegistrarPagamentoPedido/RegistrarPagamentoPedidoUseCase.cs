@@ -31,6 +31,12 @@ public class RegistrarPagamentoPedidoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor do pagamento deve ser maior que zero.");
+        // Teto de sanidade anti-fat-finger (espelha LimitesProduto.ValorMaximo). NAO bloqueia
+        // overpay (pagar acima do pendente e cenario real: gorjeta/arredondamento) -- o aviso
+        // de overpay e so no frontend (Detail.cshtml). QA v1.10 r3 BUG-004 (issue 607).
+        if (cmd.Valor > EasyStock.Application.Validators.LimitesProduto.ValorMaximo)
+            throw new UseCaseValidationException(
+                $"Valor do pagamento acima do teto permitido ({EasyStock.Application.Validators.LimitesProduto.ValorMaximo.ToString("C", Cultura.PtBr)}).");
 
         var metodo = (cmd.Metodo ?? "").Trim().ToLowerInvariant();
         if (!MetodosValidos.Contains(metodo))
