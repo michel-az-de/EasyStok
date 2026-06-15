@@ -121,12 +121,26 @@
 }
 else
 {
+    @if (d.AberturaPendenteCrossDay)
+    {
+        <div class="bg-[var(--warn-50)] border border-[var(--warn-200)] rounded-xl p-4 mb-6 flex items-start gap-3">
+            <es-icon name="history" class="es-icon--sm text-[var(--warn-600)]"></es-icon>
+            <p class="text-sm text-[var(--warn-700)]">
+                <strong>Caixa aberto em @(d.AbertoDesde?.ToString("dd/MM/yyyy"))</strong>, ainda sem fechamento.
+                Os totais abaixo somam a sessão inteira desde a abertura. Feche o caixa ao concluir o turno.
+            </p>
+        </div>
+    }
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="ws">
             <h3 class="text-sm font-semibold text-slate-500 mb-1">Saldo esperado</h3>
             <div class="text-2xl font-bold text-slate-900 tabular-nums">@d.SaldoEsperado.AsMoney()</div>
             <div class="text-xs text-slate-500 mt-1">
-                @(d.Fechado ? "Caixa fechado" : (d.Aberto ? "Caixa aberto" : "Caixa não aberto"))
+                @(d.Fechado ? "Caixa fechado"
+                  : d.AberturaPendenteCrossDay ? ("Aberto desde " + d.AbertoDesde?.ToString("dd/MM"))
+                  : d.Aberto ? "Caixa aberto"
+                  : "Caixa não aberto")
             </div>
         </div>
         <div class="ws">

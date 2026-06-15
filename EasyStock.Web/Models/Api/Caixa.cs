@@ -56,6 +56,11 @@ public record CaixaDia
     public bool Fechado { get; init; }
     public FechamentoCaixa? Fechamento { get; init; }
     public List<MovimentoCaixa> Movimentos { get; init; } = new();
+
+    // Sessão aberta de um dia anterior, ainda sem fechamento (issue #596). Quando true,
+    // os totais somam a sessão desde AbertoDesde e o caixa aparece aberto convidando a fechar.
+    public bool AberturaPendenteCrossDay { get; init; }
+    public DateOnly? AbertoDesde { get; init; }
 }
 
 public record MobileCashSummary
