@@ -569,7 +569,7 @@
             btnVerificar.textContent = 'Verificando...';
 
             try {
-                const resp = await fetch('/api/auth/lista-empresas', {
+                const resp = await fetch('/api-proxy/auth/lista-empresas', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, senha })

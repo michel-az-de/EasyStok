@@ -16,6 +16,40 @@ public static class ApiProxyEndpoints
 {
     public static void MapAdminApiProxies(this WebApplication app)
     {
+        // Step-1 do login 2-etapas (ADR-0031): valida credenciais e lista as empresas
+        // do tenant SEM emitir token. Pre-login -> NAO exige sessao (anonimo); o upstream
+        // api/auth/lista-empresas e [AllowAnonymous] e rate-limited. Encaminha o envelope
+        // cru (PostRawAsync) pro front diferenciar error/data. 401 do upstream = credencial
+        // invalida (o AdminTokenRefreshHandler nao tenta refresh em rota /auth/), traduzido
+        // aqui em envelope de erro amigavel.
+        app.MapPost("/api-proxy/auth/lista-empresas", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            HttpContext ctx,
+            ILogger<Program> log) =>
+        {
+            try
+            {
+                using var reader = new StreamReader(ctx.Request.Body);
+                var body = await reader.ReadToEndAsync();
+                var payload = JsonSerializer.Deserialize<JsonElement>(body);
+                var data = await api.PostRawAsync("api/auth/lista-empresas", payload);
+                return Results.Content(data.GetRawText(), "application/json");
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException)
+            {
+                // 401 upstream = credenciais invalidas no step-1. Devolve erro amigavel
+                // (nao "sessao expirada") pro front mostrar "E-mail ou senha incorretos.".
+                return Results.Json(new { error = new { message = "E-mail ou senha incorretos." } },
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Proxy auth/lista-empresas falhou");
+                return Results.Json(new { error = new { message = "Erro ao verificar credenciais. Tente novamente." } },
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
         // Proxy endpoint para badges do sidebar (polling JS a cada 60s)
         app.MapGet("/api-proxy/dashboard-badges", async (
             EasyStock.Admin.Services.AdminApiClient api,
