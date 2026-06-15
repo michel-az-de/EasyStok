@@ -27,7 +27,7 @@
         <div class="lp-head">
             <h1>@l.Nome</h1>
             <div class="lp-meta">
-                @(string.IsNullOrWhiteSpace(lojaNome) ? "" : $"{lojaEmoji} {lojaNome} · ")@DateTime.Now.ToString("dd/MM/yyyy") · @l.TotalItens @(l.TotalItens == 1 ? "item" : "itens")
+                @(string.IsNullOrWhiteSpace(lojaNome) ? "" : $"{lojaEmoji} {lojaNome} · ")@BrazilTime.Now().ToString("dd/MM/yyyy") · @l.TotalItens @(l.TotalItens == 1 ? "item" : "itens")
             </div>
         </div>
 
@@ -56,7 +56,7 @@
             }
         }
 
-        <div class="lp-foot">Gerado em @DateTime.Now.ToString("dd/MM/yyyy HH:mm") · EasyStok</div>
+        <div class="lp-foot">Gerado em @BrazilTime.Now().ToString("dd/MM/yyyy HH:mm") · EasyStok</div>
     </div>
 </body>
 </html>
