@@ -66,7 +66,14 @@ public class AdicionarItemPedidoUseCase(
         item.RecalcularSubtotal();
 
         await repo.AddItemAsync(item);
-        pedido.Itens.Add(item);
+        // O relationship fixup do EF Core ja insere o item em pedido.Itens, pois o
+        // pedido vem rastreado com Itens carregado (GetByIdWithDetailsAsync). Sem a
+        // guarda, pedido.Itens.Add duplicaria a MESMA instancia na colecao e
+        // RecalcularTotal contaria o item 2x, inflando o Total (QA v1.10 BUG-001, #595).
+        // A guarda mantem 1 ocorrencia mesmo se o fixup nao disparar (provider futuro
+        // sem tracking) -> nunca sub/superconta.
+        if (!pedido.Itens.Contains(item))
+            pedido.Itens.Add(item);
         pedido.RecalcularTotal();
 
         await repo.AddEventoAsync(new PedidoEvento
