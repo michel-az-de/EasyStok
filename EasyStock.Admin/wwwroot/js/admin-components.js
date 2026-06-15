@@ -119,16 +119,26 @@
     };
 
     // ── CountUp helper para números — usado pelo StatCard quando animated=true ──
-    window.esCountUp = function (target, durationMs) {
+    // 3o arg `format` (opcional, retrocompativel): 'currency' = moeda BRL (R$ pt-BR, 2 casas),
+    // function(n) = formatter custom, ausente = inteiro/decimal pt-BR (comportamento legado).
+    // A11y: respeita prefers-reduced-motion pulando direto ao valor final (sem animar).
+    window.esCountUp = function (target, durationMs, format) {
         return {
             display: '0',
             init() {
                 const t = Number(target) || 0;
                 const d = Number(durationMs) || 800;
                 const isInt = Number.isInteger(t);
-                const fmt = (n) => isInt
-                    ? Math.round(n).toLocaleString('pt-BR')
-                    : n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+                const fmt = (typeof format === 'function')
+                    ? format
+                    : (format === 'currency')
+                        ? (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        : (n) => isInt
+                            ? Math.round(n).toLocaleString('pt-BR')
+                            : n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+                const reduce = window.matchMedia
+                    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if (reduce) { this.display = fmt(t); return; }
                 const start = performance.now();
                 const tick = (now) => {
                     const p = Math.min(1, (now - start) / d);

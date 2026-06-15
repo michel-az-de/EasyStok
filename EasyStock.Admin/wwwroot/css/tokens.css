@@ -193,6 +193,21 @@
   --es-ink-dim:   var(--text-secondary);
   --es-ink-mute:  var(--text-muted);
 
+  /* ----- Deck de Operacoes (Admin premium, issue #614) -----
+     Camada premium SO do Admin. Nomes novos: nao entram na interseccao do
+     TokensCssDrift (o Web nao os tem). Valores light = fallback; o deck e dark-first. */
+  --deck-canvas:          var(--paper);
+  --deck-canvas-deep:     #EEF2F9;
+  --deck-panel:           var(--white);
+  --deck-panel-raised:    var(--white);
+  --deck-hairline:        rgba(10,21,48,.10);
+  --deck-hairline-strong: rgba(10,21,48,.16);
+  --deck-top-highlight:   rgba(255,255,255,.70);
+  --deck-glow:            rgba(232,88,20,.08);
+  --deck-grain-opacity:   .025;
+  --deck-accent:          var(--orange-600);
+  --deck-accent-soft:     rgba(232,88,20,.12);
+  --deck-eyebrow:         var(--text-muted);
 }
 
 /* ----- Dark theme ----- */
@@ -233,6 +248,21 @@
   --surface-sunken:  rgba(255,255,255,.04);
   --surface-overlay: rgba(0,0,0,.65);
   --surface-inverted: var(--paper);
+
+  /* Deck de Operacoes — dark (palco principal). Painel solido opaco (look glass
+     sem backdrop-filter); contraste AA verificado (texto sobre --deck-panel). */
+  --deck-canvas:          #06143A;
+  --deck-canvas-deep:     #04102E;
+  --deck-panel:           #0C1E48;
+  --deck-panel-raised:    #102452;
+  --deck-hairline:        rgba(255,255,255,.08);
+  --deck-hairline-strong: rgba(255,255,255,.14);
+  --deck-top-highlight:   rgba(255,255,255,.05);
+  --deck-glow:            rgba(232,88,20,.14);
+  --deck-grain-opacity:   .04;
+  --deck-accent:          var(--orange-500);
+  --deck-accent-soft:     rgba(242,107,37,.16);
+  --deck-eyebrow:         #8A95B0;
 }
 
 /* ----- Base ----- */

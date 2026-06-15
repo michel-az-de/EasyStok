@@ -1,0 +1,119 @@
+/* EasyStok Admin — camada premium "Deck de Operacoes" (issue #614).
+   Escopo: SO o Admin. Dark-first. Consome os tokens --deck-* de tokens.css.
+
+   Decisoes de hardening (ver plano):
+   - G2: SEM backdrop-filter (painel solido opaco = "look glass" sem o jank de blur
+     em sticky e sem invalidar o contraste medido). Grao = 1 camada fixa unica.
+   - G1: texto sempre sobre painel solido (--deck-panel); glow so no canvas, nunca sob texto.
+   - G6: todo movimento novo morre sob prefers-reduced-motion. */
+
+/* ── Canvas do deck: navy profundo + malha radial + glow laranja (so atras de paineis) ── */
+.deck {
+  position: relative;
+  background-color: var(--deck-canvas);
+  background-image:
+    radial-gradient(120% 85% at 88% -12%, var(--deck-glow), transparent 60%),
+    radial-gradient(100% 120% at 50% 118%, var(--deck-canvas-deep), transparent 72%);
+  background-attachment: fixed;
+}
+
+/* Grao: 1 camada fixa unica sobre o canvas, atras do conteudo. feTurbulence em
+   luminancia (hex-free); opacity-only (sem mix-blend-mode) p/ nao recompor ao rolar. */
+.deck::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--deck-grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+.deck > * { position: relative; z-index: 1; }
+
+/* ── Painel solido (look glass, sem backdrop-filter) ── */
+.deck-panel {
+  position: relative;
+  background: var(--deck-panel);
+  border: 1px solid var(--deck-hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
+}
+.deck-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--deck-top-highlight);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  pointer-events: none;
+}
+.deck-panel.is-interactive {
+  transition: transform var(--duration-base) var(--ease-out),
+              border-color var(--duration-base) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out);
+}
+.deck-panel.is-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--deck-hairline-strong);
+  box-shadow: var(--elev-4);
+}
+
+/* ── Instrumentacao: eyebrow mono uppercase ── */
+.deck-eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--deck-eyebrow);
+}
+
+/* ── KPI heroi: numeral Fraunces, tabular (assinatura do deck) ── */
+.deck-kpi {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+/* ── Acento laranja disciplinado: underline fino ── */
+.deck-accent-underline { position: relative; }
+.deck-accent-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 28px;
+  height: 2px;
+  background: var(--deck-accent);
+  border-radius: var(--r-pill);
+}
+
+/* ── Coreografia de entrada: rise com stagger (--deck-i no elemento) ── */
+@keyframes deck-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.deck-rise {
+  opacity: 0;
+  animation: deck-rise var(--duration-slow) var(--ease-out) forwards;
+  animation-delay: calc(var(--deck-i, 0) * 60ms);
+}
+
+/* ── Pulso ao vivo (respira) — dot de status live ── */
+@keyframes deck-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .35; }
+}
+.deck-pulse { animation: deck-pulse 2s var(--ease-in-out) infinite; }
+
+/* ── Reduced-motion: corta TODO movimento novo (G6) ── */
+@media (prefers-reduced-motion: reduce) {
+  .deck-rise { opacity: 1; transform: none; animation: none; }
+  .deck-pulse { animation: none; }
+  .deck-panel.is-interactive { transition: none; }
+  .deck-panel.is-interactive:hover { transform: none; }
+}
