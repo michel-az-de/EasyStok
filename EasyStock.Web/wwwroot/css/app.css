@@ -5106,58 +5106,6 @@ html.theme-dark .ds-mov-main strong { color: #E2E8F0; }
 html.theme-dark .ds-mov-val { color: #94A3B8; }
 html.theme-dark .ds-mov-day-label { color: #64748B; border-bottom-color: rgba(71, 85, 105, .3); }
 
-/* ── Ações rápidas (2 botões) ──────────────────────────────── */
-.ds-quick-action {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 14px 18px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    text-decoration: none;
-    transition: transform .18s var(--ease-spring), box-shadow .18s var(--ease-smooth);
-}
-
-.ds-quick-action:hover {
-    transform: translateY(-2px);
-}
-
-.ds-quick-action--primary {
-    background: linear-gradient(135deg, var(--orange-700) 0%, var(--orange-800) 100%);
-    color: #FFFFFF;
-    box-shadow: 0 4px 12px rgba(232, 88, 20, .25);
-}
-
-.ds-quick-action--primary:hover {
-    box-shadow: 0 8px 20px rgba(232, 88, 20, .35);
-}
-
-.ds-quick-action--secondary {
-    background: #FFFFFF;
-    color: #1E293B;
-    border: 1.5px solid #E2E8F0;
-    box-shadow: 0 2px 6px rgba(6, 20, 58, .05);
-}
-
-.ds-quick-action--secondary:hover {
-    border-color: #1E48A8;
-    color: #1E48A8;
-    box-shadow: 0 6px 16px rgba(30, 72, 168, .12);
-}
-
-html.theme-dark .ds-quick-action--secondary {
-    background: rgba(30, 41, 59, .6);
-    color: #E2E8F0;
-    border-color: rgba(71, 85, 105, .5);
-}
-
-html.theme-dark .ds-quick-action--secondary:hover {
-    border-color: #60A5FA;
-    color: #93C5FD;
-}
-
 /* ── Cabecalho de secao do dashboard (issue #592) ──────────── */
 .ds-section-hd {
     display: flex;
@@ -5297,6 +5245,20 @@ html.theme-dark .ds-shortcut {
 }
 html.theme-dark .ds-shortcut svg { color: var(--navy-200); }
 html.theme-dark .ds-shortcut:hover { border-color: rgba(255, 255, 255, .18); }
+
+/* ── Layout 2 colunas do dashboard (issue #592) ────────────── */
+.ds-dash-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
+    align-items: flex-start;
+}
+.ds-dash-main { flex: 1.6 1 380px; min-width: 0; }
+.ds-dash-aside { flex: 1 1 280px; min-width: 0; }
+.ds-kpi-stack { display: flex; flex-direction: column; }
+@media (max-width: 1023px) {
+    .ds-dash-main, .ds-dash-aside { flex-basis: 100%; }
+}
 
 @media (max-width: 640px) {
     .ds-kpi-val {
