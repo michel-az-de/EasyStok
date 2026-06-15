@@ -193,11 +193,11 @@ else if (Model.ResumoApiFalhou)
 
             @if (Model.PedidosPendentes > 0)
             {
-                <div class="ds-pulse">
+                <a href="/pedidos" class="ds-pulse" aria-label="Ver pedidos pendentes no cockpit de pedidos">
                     <div class="ds-pulse-lbl">Pendentes</div>
                     <div class="ds-pulse-val">@Model.PedidosPendentes <small>· @Model.ValorPedidosPendentes.ToString("C", ptBR)</small></div>
                     <div class="ds-pulse-sub warn">aguardando entrega</div>
-                </div>
+                </a>
             }
 
             @if (Model.PixRecebidosHoje > 0)
