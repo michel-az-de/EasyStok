@@ -23,9 +23,16 @@ public sealed class LojaRequiredMiddleware(RequestDelegate next)
         "/_framework/",
         "/_blazor/",
         "/favicon",
-        // Submit do wizard de criar primeira loja vive em /lojas/criar — sem essa
-        // excecao o usuario sem LojaId voltaria pra /auth/selecionar-loja num loop.
-        "/lojas/criar",
+        // Rotas acessiveis SEM loja selecionada — devem espelhar
+        // BaseController.ControllersAllowedWithoutLoja {Lojas, Assinatura, Kds}.
+        // Sem este alinhamento, qualquer redirect para /assinatura (ex.: criacao
+        // de loja bloqueada por limite de plano OU pelo SubscriptionGate da Api,
+        // que devolve 402) era imediatamente devolvido pelo middleware a
+        // /auth/selecionar-loja — loop de onboarding sem feedback
+        // (BUG-LOJA-ONBOARDING-001). "/lojas" cobre o wizard /lojas/criar.
+        "/lojas",
+        "/assinatura",
+        "/kds",
     ];
 
     public async Task InvokeAsync(HttpContext context, SessionService session)
