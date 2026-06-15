@@ -142,7 +142,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
@@ -160,6 +160,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             if (categoriaId.HasValue)
                 query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
+
+            if (!string.IsNullOrWhiteSpace(termo))
+                query = AplicarFiltroBusca(query, termo);
 
             var totalCount = await query.CountAsync();
             var comInclude = query
@@ -201,6 +204,30 @@ namespace EasyStock.Infra.Postgre.Repositories
             var cadastrados = await query.CountAsync();
             var comSaldo = await query.CountAsync(i => (int)i.QuantidadeAtual > 0);
             return (cadastrados, comSaldo);
+        }
+
+        // Busca textual da listagem de estoque (#454): casa o termo contra a chave
+        // de pesquisa denormalizada (que ja embute SKU base, lote, nome e codigo de
+        // barras), o codigo interno do lote e, via Produto, nome/codigo de barras e o
+        // SKU base exato. ILike e case-insensitive no Postgres; o SKU exato segue o
+        // padrao de ProdutoRepository.SearchAsync (VO comparado por igualdade, com
+        // try/catch porque CodigoSku.From rejeita termos com espaco/caractere invalido).
+        private static IQueryable<ItemEstoque> AplicarFiltroBusca(IQueryable<ItemEstoque> query, string termo)
+        {
+            var t = termo.Trim();
+            var pattern = $"%{t}%";
+
+            EasyStock.Domain.ValueObjects.CodigoSku? skuExato = null;
+            try { skuExato = EasyStock.Domain.ValueObjects.CodigoSku.From(t); }
+            catch (ArgumentException) { /* termo nao e um SKU valido (espaco/caractere) — ignora o ramo de SKU exato */ }
+
+            return query.Where(i =>
+                (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern)) ||
+                (i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern)) ||
+                (i.Produto != null &&
+                    (EF.Functions.ILike(i.Produto.Nome, pattern) ||
+                     (i.Produto.CodigoBarras != null && EF.Functions.ILike(i.Produto.CodigoBarras, pattern)) ||
+                     (skuExato != null && i.Produto.SkuBase == skuExato))));
         }
 
         public async Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId)

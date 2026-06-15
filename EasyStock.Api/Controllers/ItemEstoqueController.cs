@@ -32,13 +32,14 @@ public class ItemEstoqueController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? status = null,
-        [FromQuery] Guid? categoriaId = null)
+        [FromQuery] Guid? categoriaId = null,
+        [FromQuery] string? termo = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
         var (p, ps) = NormalisePage(page, pageSize);
-        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps, status, categoriaId);
+        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps, status, categoriaId, termo);
 
         var dtos = itens.Select(MapItemToDto);
 

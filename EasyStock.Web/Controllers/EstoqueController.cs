@@ -24,9 +24,10 @@ public class EstoqueController(
         // separam "cadastrados" (= Paginacao.Total, inclui qty 0) de "com saldo"
         // (qty > 0) pra que o cabecalho da tela bata com o KPI "Unidades em
         // estoque" do dashboard, que conta unidades dos lotes com saldo.
-        // Skip nos contadores quando ha search ativo: a busca usa endpoint
-        // separado (estoque/buscar) que nao tem paginacao real, entao contar
-        // o universo total nao agrega valor.
+        // Skip nos contadores quando ha search ativo: a busca agora e filtrada
+        // server-side na propria listagem paginada (estoque?...&termo=), mas os
+        // contadores contam o universo da empresa (sem o termo), entao exibi-los
+        // durante a busca seria enganoso (#454).
         var listarTask = svc.ListarAsync(page, status, categoria, search);
         var contadoresTask = string.IsNullOrEmpty(search)
             ? svc.ContadoresAsync(status, categoria)

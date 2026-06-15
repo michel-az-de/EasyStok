@@ -10,36 +10,17 @@ public class EstoqueService(ApiClient api, SessionService session)
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ListarAsync(
         int page = 1, string? status = null, string? categoria = null, string? search = null)
     {
-        if (!string.IsNullOrEmpty(search))
-        {
-            var buscarQs = $"estoque/buscar?empresaId={GetEmpresaId()}&termo={Uri.EscapeDataString(search)}&limite=100";
-            var buscarResult = await api.GetAsync<List<EstoqueSku>>(buscarQs);
-            if (!buscarResult.Success)
-                return ApiResult<PagedResult<EstoqueSku>>.Fail(
-                    buscarResult.ErrorCode!, buscarResult.ErrorMessage!, buscarResult.HttpStatus);
-
-            var searchItems = buscarResult.Data ?? [];
-
-            // Aplicar filtro de status sobre os resultados de busca (client-side).
-            // Reusa MatchesStatusFilter pra cobrir "vencendo" (filtro por validade, nao
-            // por Status) e as variantes de cada status, igual a listagem paginada.
-            if (!string.IsNullOrEmpty(status))
-                searchItems = searchItems
-                    .Where(i => MatchesStatusFilter(i, status))
-                    .ToList();
-
-            return ApiResult<PagedResult<EstoqueSku>>.Ok(new PagedResult<EstoqueSku>
-            {
-                Data = searchItems,
-                Meta = new Meta(searchItems.Count, 1, 1, searchItems.Count)
-            });
-        }
-
         var qs = $"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize=20";
         if (!string.IsNullOrEmpty(status))
             qs += $"&status={Uri.EscapeDataString(status)}";
         if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
             qs += $"&categoriaId={catId}";
+        // #454: a busca por SKU/nome agora e filtrada server-side na propria listagem
+        // paginada (a API casa o termo contra a chave de pesquisa + Produto.Nome/SkuBase),
+        // em vez do endpoint /estoque/buscar (busca inteligente global), cujo contrato
+        // (ResultadoBuscaInteligente) nao batia com EstoqueSku e devolvia lista vazia.
+        if (!string.IsNullOrEmpty(search))
+            qs += $"&termo={Uri.EscapeDataString(search)}";
 
         var result = await api.GetAsync<PagedResult<EstoqueSku>>(qs);
 
