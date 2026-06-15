@@ -32,4 +32,31 @@ public class UseCaseGuardsTests
 
         act.Should().NotThrow();
     }
+
+    // PROD-002 (#612): variante sanitizadora usada onde nao da pra rejeitar (auto-link mobile).
+    [Theory]
+    [InlineData("<script>alert(1)</script>Bolo", "alert(1)Bolo")]
+    [InlineData("Camiseta <b>nova</b>", "Camiseta nova")]
+    [InlineData("<img src=x onerror=alert(1)>", "")]
+    public void RemoverTagsHtml_remove_tags(string entrada, string esperado)
+    {
+        UseCaseGuards.RemoverTagsHtml(entrada).Should().Be(esperado);
+    }
+
+    [Theory]
+    [InlineData("Bolo de cenoura")]
+    [InlineData("Tamanho > M")]
+    [InlineData("Loja <3")]
+    [InlineData("2 < 3 unidades")]
+    public void RemoverTagsHtml_preserva_texto_sem_tags(string entrada)
+    {
+        UseCaseGuards.RemoverTagsHtml(entrada).Should().Be(entrada);
+    }
+
+    [Fact]
+    public void RemoverTagsHtml_aceita_null_e_vazio()
+    {
+        UseCaseGuards.RemoverTagsHtml(null).Should().BeNull();
+        UseCaseGuards.RemoverTagsHtml("").Should().Be("");
+    }
 }

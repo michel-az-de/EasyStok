@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -45,11 +46,19 @@ public sealed class ProductLinker(
                     .FirstOrDefaultAsync(p => p.Id == pid && p.EmpresaId == empresaId);
                 if (mobileP == null || mobileP.ErpProductId.HasValue) { idempotentSkip++; continue; }
 
+                // PROD-002 (#612): o nome vem do push do PWA/app sem validacao de tags. Sanitiza
+                // antes de matchear/criar o Produto ERP para nao persistir markup (XSS armazenado
+                // que vazaria em PDF/etiqueta/exportacao). Em background nao da pra rejeitar:
+                // sanitiza-e-loga.
+                var nomeLimpo = UseCaseGuards.RemoverTagsHtml(mobileP.Name) ?? string.Empty;
+                if (!string.Equals(nomeLimpo, mobileP.Name, StringComparison.Ordinal))
+                    log.LogWarning("AutoLink Produto: nome do mobile continha tags HTML e foi sanitizado. mobile={MobileId} empresaId={EmpresaId}", pid, empresaId);
+
                 var webP = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
                     .FirstOrDefaultAsync(p =>
                         p.EmpresaId == empresaId
                         && p.Status == StatusProduto.Ativo
-                        && EF.Functions.ILike(p.Nome, mobileP.Name));
+                        && EF.Functions.ILike(p.Nome, nomeLimpo));
 
                 if (webP != null)
                 {
@@ -79,7 +88,7 @@ public sealed class ProductLinker(
                     Id = Guid.NewGuid(),
                     EmpresaId = empresaId.Value,
                     CategoriaId = cachedCategoriaId.Value,
-                    Nome = mobileP.Name,
+                    Nome = nomeLimpo,
                     Tipo = TipoProduto.Alimento,
                     Status = StatusProduto.Ativo,
                     PrecoReferencia = mobileP.Price is { } pr && pr > 0 ? Dinheiro.FromDecimal(pr) : null,
@@ -105,7 +114,7 @@ public sealed class ProductLinker(
                 });
                 created++;
                 log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
-                    pid, novoProd.Id, mobileP.Name);
+                    pid, novoProd.Id, nomeLimpo);
             }
             catch (Exception ex)
             {

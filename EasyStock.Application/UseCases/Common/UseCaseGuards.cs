@@ -45,4 +45,18 @@ public static class UseCaseGuards
         if (!string.IsNullOrEmpty(texto) && TagHtmlPattern.IsMatch(texto))
             throw new UseCaseValidationException($"{nomeCampo} não pode conter tags HTML.");
     }
+
+    // Remove sequencias tag-like ('<' + letra/'/'/'!'/'?' ate o proximo '>', com ou sem
+    // fechamento): mesma deteccao do TagHtmlPattern, em forma de remocao. Preserva
+    // '<'/'>' isolados (ex.: "Tamanho > M", "Loja <3").
+    private static readonly Regex TagHtmlStripPattern = new(@"<[a-zA-Z/!?][^>]*>?", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Versão sanitizadora do <see cref="EnsureSemTagsHtml"/>: REMOVE tags HTML em vez de
+    /// lançar. Para caminhos que não podem rejeitar a entrada (ex.: auto-link mobile em
+    /// background), mas onde ainda não queremos persistir markup que vazaria em
+    /// PDF/etiqueta/exportação. Preserva '&lt;'/'&gt;' isolados.
+    /// </summary>
+    public static string? RemoverTagsHtml(string? texto)
+        => string.IsNullOrEmpty(texto) ? texto : TagHtmlStripPattern.Replace(texto, string.Empty);
 }
