@@ -19,6 +19,15 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>Movimentos não-estornados de um dia específico (resumo do caixa).</summary>
         Task<IEnumerable<MovimentoCaixa>> GetMovimentosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
 
+        /// <summary>Movimentos não-estornados num intervalo de instante real [iniUtc, fimUtc).
+        /// Base cross-day: agrega a sessão de caixa que pode atravessar a meia-noite BRT.</summary>
+        Task<IEnumerable<MovimentoCaixa>> GetMovimentosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
+
+        /// <summary>Última abertura sem fechamento posterior (sessão em aberto, possivelmente de um
+        /// dia anterior). Null se o último evento abertura/fechamento foi um fechamento. Espelha a
+        /// lógica de "último evento" do dashboard (AnalyticsRepository.ResumoDia) — issue #596.</summary>
+        Task<MovimentoCaixa?> GetAberturaPendenteAsync(Guid empresaId, Guid? lojaId = null);
+
         Task AddMovimentoAsync(MovimentoCaixa movimento);
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 
@@ -35,7 +44,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>Soma de Vendas do dia (não-canceladas) para a empresa+loja.</summary>
         Task<decimal> GetTotalVendasDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
 
+        /// <summary>Soma de Vendas (não-canceladas) num intervalo de instante real [iniUtc, fimUtc).</summary>
+        Task<decimal> GetTotalVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
+
         /// <summary>Soma de pagamentos de pedidos não-cancelados naquele dia.</summary>
         Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
+
+        /// <summary>Soma de pagamentos de pedidos não-cancelados num intervalo [iniUtc, fimUtc).</summary>
+        Task<decimal> GetTotalPagamentosPedidosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
     }
 }

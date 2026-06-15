@@ -44,15 +44,32 @@ namespace EasyStock.Infra.Postgre.Repositories
         // janela 21h-23h59 BRT (cujo timestamp UTC ja virou o dia seguinte): a tela mostrava
         // "aguardando abertura" e a reabertura batia no indice unico -> "ja existe".
 
-        public async Task<IEnumerable<MovimentoCaixa>> GetMovimentosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
+        public Task<IEnumerable<MovimentoCaixa>> GetMovimentosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
             var (inicio, fim) = HorarioBrasil.JanelaDiaUtc(data);
+            return GetMovimentosNoIntervaloAsync(empresaId, inicio, fim, lojaId);
+        }
 
+        public async Task<IEnumerable<MovimentoCaixa>> GetMovimentosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
             var q = db.MovimentosCaixa.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.EstornadoEm == null
-                         && m.DataMovimento >= inicio && m.DataMovimento < fim);
+                         && m.DataMovimento >= iniUtc && m.DataMovimento < fimUtc);
             if (lojaId.HasValue) q = q.Where(m => m.LojaId == lojaId);
             return await q.OrderBy(m => m.DataMovimento).ToListAsync();
+        }
+
+        // Ultima abertura sem fechamento posterior (sessao em aberto, possivelmente cross-day).
+        // Espelha o "ultimo evento abertura/fechamento" do AnalyticsRepository.ResumoDia (issue 596):
+        // o estado da sessao e dado pelo evento mais recente; se for abertura, ha caixa em aberto.
+        public async Task<MovimentoCaixa?> GetAberturaPendenteAsync(Guid empresaId, Guid? lojaId = null)
+        {
+            var q = db.MovimentosCaixa.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.EstornadoEm == null
+                         && (m.Tipo == "abertura" || m.Tipo == "fechamento"));
+            if (lojaId.HasValue) q = q.Where(m => m.LojaId == lojaId);
+            var ultimo = await q.OrderByDescending(m => m.DataMovimento).FirstOrDefaultAsync();
+            return ultimo?.Tipo == "abertura" ? ultimo : null;
         }
 
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
@@ -77,24 +94,32 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task AddFechamentoAsync(FechamentoCaixa f) { db.FechamentosCaixa.Add(f); return Task.CompletedTask; }
 
-        public async Task<decimal> GetTotalVendasDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
+        public Task<decimal> GetTotalVendasDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
             var (inicio, fim) = HorarioBrasil.JanelaDiaUtc(data);
+            return GetTotalVendasNoIntervaloAsync(empresaId, inicio, fim, lojaId);
+        }
 
+        public async Task<decimal> GetTotalVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
             var q = db.Vendas.AsNoTracking()
-                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= inicio && v.DataVenda < fim);
+                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
 
             var vendas = await q.ToListAsync();
             return vendas.Sum(v => v.ValorTotal == null ? 0m : v.ValorTotal.Valor);
         }
 
-        public async Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
+        public Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
         {
             var (inicio, fim) = HorarioBrasil.JanelaDiaUtc(data);
+            return GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, inicio, fim, lojaId);
+        }
 
+        public async Task<decimal> GetTotalPagamentosPedidosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
             var pagamentos = await db.Set<PedidoPagamento>().AsNoTracking()
-                .Where(pg => pg.PagoEm >= inicio && pg.PagoEm < fim)
+                .Where(pg => pg.PagoEm >= iniUtc && pg.PagoEm < fimUtc)
                 .Join(db.Pedidos.AsNoTracking(),
                       pg => pg.PedidoId,
                       p => p.Id,
