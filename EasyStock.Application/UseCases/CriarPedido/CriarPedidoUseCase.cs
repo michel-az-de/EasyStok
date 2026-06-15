@@ -143,7 +143,7 @@ public class CriarPedidoUseCase(
             UsuarioNome = cmd.CriadoPorNome,
             Origem = cmd.Origem,
             OcorridoEm = DateTime.UtcNow,
-            Detalhes = $"{pedido.Itens.Count} item(s), total {pedido.Total:C}"
+            Detalhes = $"{pedido.Itens.Count} item(s), total {pedido.Total.Valor.ToString("C", Cultura.PtBr)}"
         });
 
         await pedidoRepo.AddAsync(pedido);

@@ -40,7 +40,7 @@ public class RemoverPagamentoPedidoUseCase(
             UsuarioNome = cmd.UsuarioNome,
             Origem = cmd.Origem,
             OcorridoEm = DateTime.UtcNow,
-            Detalhes = $"-{pag.Valor:C} ({pag.Metodo})"
+            Detalhes = $"-{pag.Valor.ToString("C", Cultura.PtBr)} ({pag.Metodo})"
         });
 
         await uow.CommitAsync();

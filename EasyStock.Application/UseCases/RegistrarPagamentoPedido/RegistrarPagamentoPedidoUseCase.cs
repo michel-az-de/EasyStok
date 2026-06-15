@@ -64,7 +64,7 @@ public class RegistrarPagamentoPedidoUseCase(
             UsuarioNome = cmd.RegistradoPorNome,
             Origem = cmd.Origem,
             OcorridoEm = DateTime.UtcNow,
-            Detalhes = $"+{pag.Valor:C} via {metodo}"
+            Detalhes = $"+{pag.Valor.ToString("C", Cultura.PtBr)} via {metodo}"
         });
 
         await TentarAbrirCaixaAsync(cmd, pedido, pag.PagoEm);

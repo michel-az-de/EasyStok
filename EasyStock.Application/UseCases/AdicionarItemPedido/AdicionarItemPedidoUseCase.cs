@@ -85,7 +85,7 @@ public class AdicionarItemPedidoUseCase(
             UsuarioNome = cmd.UsuarioNome,
             Origem = cmd.Origem,
             OcorridoEm = DateTime.UtcNow,
-            Detalhes = $"+{item.Quantidade} {item.Nome} ({item.Subtotal:C})"
+            Detalhes = $"+{item.Quantidade} {item.Nome} ({item.Subtotal.ToString("C", Cultura.PtBr)})"
         });
 
         await repo.UpdateAsync(pedido);
