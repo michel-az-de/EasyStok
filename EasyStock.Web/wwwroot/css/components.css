@@ -14,15 +14,15 @@
 .stp.aguardando .ind { background: var(--ink-500); }
 .stp.preparando { background: var(--navy-50);  border-color: var(--navy-200); color: var(--navy-700); }
 .stp.preparando .ind { background: var(--navy-600); }
-.stp.pronto     { background: var(--ok-50);    border-color: #BFE0CC;         color: var(--ok-700); }
+.stp.pronto     { background: var(--ok-50);    border-color: var(--ok-200);   color: var(--ok-700); }
 .stp.pronto .ind { background: var(--ok-600); }
 .stp.entregue   { background: var(--ink-100);  border-color: var(--ink-200);  color: var(--ink-600); }
 .stp.entregue .ind { background: var(--ink-400); }
 .stp.cancelado  { background: var(--ink-50);   border-color: var(--ink-200);  color: var(--ink-500); text-decoration: line-through; }
 .stp.cancelado .ind { background: var(--ink-400); }
-.stp.vencendo   { background: var(--warn-50);  border-color: #F0DC9A;         color: var(--warn-700); }
+.stp.vencendo   { background: var(--warn-50);  border-color: var(--warn-200); color: var(--warn-700); }
 .stp.vencendo .ind { background: var(--warn-600); }
-.stp.critico    { background: var(--crit-50);  border-color: #EFB7AD;         color: var(--crit-700); }
+.stp.critico    { background: var(--crit-50);  border-color: var(--crit-200); color: var(--crit-700); }
 .stp.critico .ind { background: var(--crit-600); }
 
 /* ---------- Alerts (4px left border, 44px icon slot) ---------- */
