@@ -7,13 +7,9 @@
 
 @*
     Seed do dashboard: gera JSON em <script> num escopo global (window.__initialDash).
-    O adminApp() do _Layout.cshtml lê isso no init() e popula `dash` no escopo certo.
-
-    POR QUE NÃO USAR <div x-init="Object.assign($root.dash, ...)"> AQUI:
-    - <div x-init> SEM x-data ainda cria escopo Alpine; $root passa a apontar pro próprio
-      <div>, não pro <body x-data="adminApp()">. Resultado: $root.dash é undefined,
-      os <span x-text="dash.X"> renderizam vazio. Bug observado em produção
-      (todos os KPIs em branco mesmo com sidebar mostrando contadores corretos).
+    O adminApp() do _Layout.cshtml le isso no init() e popula `dash` no escopo certo.
+    NAO usar <div x-init> aqui (cria escopo Alpine proprio -> $root.dash undefined). Ver
+    historico no git: KPIs em branco em producao.
 *@
 <script>
     window.__initialDash = {
@@ -30,127 +26,106 @@
     };
 </script>
 
-<!-- Header com indicador de polling -->
-<section class="admin-hero">
-    <div class="admin-hero-main">
-        <div class="admin-eyebrow">Central de controle</div>
-        <h2 class="admin-page-title">Visão geral</h2>
-        <p>Clientes, tickets, receita e saúde operacional em tempo real.</p>
+@* Tira de telemetria: dado real (stack health, tickets criticos, MRR). Dot CINZA/
+   indeterminado quando stackStatus ainda null, NUNCA verde otimista. *@
+<div class="deck-telemetry deck-rise" style="--deck-i:0" role="status" aria-live="polite" aria-label="Telemetria operacional">
+    <span class="deck-tele-item">
+        <span class="deck-dot" :class="stackStatus==='Healthy' ? 'is-ok deck-pulse' : (stackStatus==='Degraded' ? 'is-warn' : (stackStatus ? 'is-crit' : 'is-unknown'))"></span>
+        stack <strong x-text="stackStatus ? (stackStatus==='Healthy' ? 'operacional' : stackStatus) : 'verificando…'">verificando…</strong>
+    </span>
+    <span class="deck-tele-sep"></span>
+    <span class="deck-tele-item">
+        <span class="deck-dot" :class="dash.ticketsCriticos > 0 ? 'is-crit' : 'is-ok'"></span>
+        tickets criticos <strong x-text="dash.ticketsCriticos">@Model.TicketsCriticos</strong>
+    </span>
+    <span class="deck-tele-ticker deck-tele-item">
+        MRR <strong>R$&nbsp;<span x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })">@Model.ReceitaMensal.ToString("N2")</span></strong>
+        · <span x-text="dashSecsAgo > 0 ? 'ha ' + dashSecsAgo + 's' : 'agora'"></span>
+    </span>
+</div>
+
+@* Hero header *@
+<header class="deck-head deck-rise" style="--deck-i:1">
+    <div>
+        <div class="deck-eyebrow deck-accent-underline">Central de controle</div>
+        <h1>Visao geral</h1>
+        <p>Clientes, tickets, receita e saude operacional em tempo real.</p>
     </div>
-    <div class="admin-hero-actions">
-        <div class="admin-live-pill">
-            <span aria-hidden="true"></span>
-            <span x-text="dashSecsAgo > 0 ? 'Atualizado há ' + dashSecsAgo + 's' : 'Atualizando…'"></span>
-        </div>
+    <div class="deck-head-actions">
         <es-button variant="ghost" href="/Tenants" icon="building-2">Clientes</es-button>
         <es-button variant="ghost" href="/Tickets" icon="ticket">Tickets</es-button>
     </div>
-</section>
+</header>
 
-<!-- Card de seed quando ambiente está vazio -->
-<div x-show="dash.totalTenants === 0" x-cloak
-     class="es-card card-interactive"
-     style="background:linear-gradient(135deg, rgba(232,88,20,.10), rgba(232,88,20,.02)); border-color:rgba(232,88,20,.30); padding: 22px; margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:18px;">
-    <span style="display:inline-grid; place-items:center; width:56px; height:56px; border-radius:var(--r-lg); background:rgba(232,88,20,.20);">
-        <es-icon name="zap" size="28" />
+@* Card de seed quando o ambiente esta vazio *@
+<div x-show="dash.totalTenants === 0" x-cloak class="deck-panel deck-rise"
+     style="--deck-i:2; padding:22px; margin-bottom:20px; display:flex; flex-wrap:wrap; align-items:center; gap:18px;">
+    <span style="display:inline-grid; place-items:center; width:52px; height:52px; border-radius:var(--r-lg); background:var(--deck-accent-soft); color:var(--deck-accent);">
+        <es-icon name="zap" size="26" />
     </span>
     <div style="flex:1; min-width:240px;">
         <h3 style="margin:0 0 4px; color:var(--text-primary); font-weight:700; font-size:15px;">Banco vazio — nada pra testar</h3>
-        <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.5;">
-            Ainda não há tenants. Popule o ambiente com cenários de teste (4 tenants variados, tickets, notas internas e audit logs).
-        </p>
+        <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.5;">Ainda nao ha tenants. Popule o ambiente com cenarios de teste (tenants, tickets, audit logs).</p>
     </div>
     <es-button variant="primary" icon="zap" href="/Diagnostico?tab=operacoes">Popular ambiente</es-button>
 </div>
 
-<!-- Métricas principais (4 cards com drill-down) -->
-<div class="admin-metric-grid">
+@* Hero assimetrico: tile-feature de receita (Fraunces) + rail de indicadores secundarios *@
+<section class="deck-hero" aria-label="Receita e indicadores secundarios">
+    <article class="deck-panel deck-feature deck-rise" style="--deck-i:2">
+        <div class="deck-eyebrow">Receita mensal recorrente</div>
+        <div>
+            <span class="deck-feature-cur">R$</span><span class="deck-kpi" x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })">@Model.ReceitaMensal.ToString("N2")</span>
+        </div>
+        <div class="deck-eyebrow" style="color:var(--text-muted)">estimativa mensal · assinaturas ativas</div>
+    </article>
+    <aside class="deck-panel deck-rail deck-rise" style="--deck-i:3" aria-label="Indicadores secundarios">
+        <div class="deck-rail-item"><span class="deck-rail-label">Usuarios ativos</span><span class="deck-rail-value" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</span></div>
+        <div class="deck-rail-item"><span class="deck-rail-label">Logins (24h)</span><span class="deck-rail-value" x-text="dash.logins24h">@Model.Logins24h</span></div>
+        <div class="deck-rail-item"><span class="deck-rail-label">Em atendimento</span><span class="deck-rail-value" :style="dash.ticketsEmAtendimento > 0 ? 'color:var(--warn-500)' : ''" x-text="dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</span></div>
+        <div class="deck-rail-item"><span class="deck-rail-label">Tenants novos (30d)</span><span class="deck-rail-value" x-text="dash.tenantsNovos">@Model.TenantsNovos</span></div>
+    </aside>
+</section>
 
-    <a href="/Tenants?status=Ativa" class="es-stat-card is-link card-interactive">
-        <div class="es-stat-label">Tenants ativos</div>
-        <div class="es-stat-value" x-text="dash.tenantsAtivos">@Model.TenantsAtivos</div>
-        <div class="es-stat-meta">
-            <span>de <strong style="color:var(--text-primary);" x-text="dash.totalTenants">@Model.TotalTenants</strong> total</span>
+@* KPI row (drill-down) *@
+<section class="deck-kpis deck-rise" style="--deck-i:4" aria-label="Indicadores principais">
+    <a class="deck-panel deck-tile is-interactive" href="/Tenants?status=Ativa">
+        <div class="deck-eyebrow">Tenants ativos</div>
+        <div class="deck-kpi" x-text="dash.tenantsAtivos">@Model.TenantsAtivos</div>
+        <div class="deck-meta">de <strong x-text="dash.totalTenants">@Model.TotalTenants</strong> total</div>
+    </a>
+    <a class="deck-panel deck-tile is-interactive" href="/Tenants?status=Suspensa">
+        <div class="deck-eyebrow">Suspensos</div>
+        <div class="deck-kpi" :style="dash.tenantsSuspensos > 0 ? 'color:var(--warn-500)' : ''" x-text="dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
+        <div class="deck-meta">de <strong x-text="dash.totalTenants">@Model.TotalTenants</strong> total</div>
+    </a>
+    <a class="deck-panel deck-tile is-interactive" href="/Tickets?prioridade=Critica">
+        <div class="deck-eyebrow">Tickets abertos</div>
+        <div class="deck-kpi" x-text="dash.ticketsAbertos">@Model.TicketsAbertos</div>
+        <div class="deck-meta">
+            <span class="deck-crit" x-show="dash.ticketsCriticos > 0" x-cloak><span class="deck-dot is-crit"></span> <span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> criticos</span>
+            <span x-show="!dash.ticketsCriticos">sem criticos</span>
         </div>
     </a>
+</section>
 
-    <a href="/Tenants?status=Suspensa" class="es-stat-card is-link card-interactive">
-        <div class="es-stat-label">Suspensos</div>
-        <div class="es-stat-value" :style="dash.tenantsSuspensos > 0 ? 'color: var(--warn-600);' : ''" x-text="dash.tenantsSuspensos">@Model.TenantsSuspensos</div>
-        <div class="es-stat-meta">
-            <span>de <strong style="color:var(--text-primary);" x-text="dash.totalTenants">@Model.TotalTenants</strong> total</span>
-        </div>
-    </a>
-
-    <a href="/Tickets?prioridade=Critica" class="es-stat-card is-link card-interactive">
-        <div class="es-stat-label">Tickets abertos</div>
-        <div class="es-stat-value" x-text="dash.ticketsAbertos">@Model.TicketsAbertos</div>
-        <div class="es-stat-meta">
-            <span class="es-stat-delta es-stat-delta-down" x-show="dash.ticketsCriticos > 0" x-cloak>
-                <es-icon name="alert-triangle" size="10" />
-                <span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> críticos
-            </span>
-            <span x-show="!dash.ticketsCriticos">sem críticos</span>
-        </div>
-    </a>
-
-    <div class="es-stat-card">
-        <div class="es-stat-label">Receita estimada</div>
-        <div class="es-stat-value" style="color:var(--orange-500);">
-            R$ <span x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })">@Model.ReceitaMensal.ToString("N2")</span>
-        </div>
-        <div class="es-stat-meta">
-            <span>mensal · assinaturas ativas</span>
-        </div>
-    </div>
-</div>
-
-<!-- Métricas secundárias -->
-<div class="admin-metric-grid admin-metric-grid-secondary">
-    <div class="es-stat-card">
-        <div class="es-stat-label">Usuários ativos</div>
-        <div class="es-stat-value es-stat-value-sm" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</div>
-        <div class="es-stat-meta"><span>plataforma (inclui super-admin)</span></div>
-    </div>
-    <div class="es-stat-card">
-        <div class="es-stat-label">Logins (24h)</div>
-        <div class="es-stat-value es-stat-value-sm" x-text="dash.logins24h">@Model.Logins24h</div>
-    </div>
-    <div class="es-stat-card">
-        <div class="es-stat-label">Em atendimento</div>
-        <div class="es-stat-value es-stat-value-sm" :style="dash.ticketsEmAtendimento > 0 ? 'color: var(--warn-600);' : ''" x-text="dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</div>
-    </div>
-    <div class="es-stat-card">
-        <div class="es-stat-label">Tenants novos</div>
-        <div class="es-stat-value es-stat-value-sm" x-text="dash.tenantsNovos">@Model.TenantsNovos</div>
-        <div class="es-stat-meta"><span>últimos 30 dias</span></div>
-    </div>
-</div>
-
-<!-- Tabelas lado a lado -->
-<div class="admin-dashboard-panels">
-
-    <es-card padding="none" title="Tickets críticos" description="Alta prioridade — ação imediata">
-        <es-card-header-actions>
+@* Tabelas lado a lado *@
+<section class="deck-panels" aria-label="Tickets criticos e tenants recentes">
+    <article class="deck-panel deck-rise" style="--deck-i:5">
+        <div class="deck-panel-head">
+            <h3>Tickets criticos</h3>
             <es-button variant="ghost" size="xs" href="/Tickets?prioridade=Critica" icon-trailing="arrow-right">Ver todos</es-button>
-        </es-card-header-actions>
-
+        </div>
         @if (!Model.UltimosTicketsCriticos.Any())
         {
-            <div style="padding:32px;">
-                <es-empty-state icon="check-circle" title="Nenhum ticket crítico" description="A fila está em dia." />
+            <div style="padding:8px var(--s-5) 28px;">
+                <es-empty-state icon="check-circle" title="Nenhum ticket critico" description="A fila esta em dia." />
             </div>
         }
         else
         {
-            <table class="es-data-table">
-                <thead>
-                    <tr>
-                        <th scope="col">Título</th>
-                        <th scope="col">Empresa</th>
-                        <th scope="col">Status</th>
-                    </tr>
-                </thead>
+            <table class="deck-table">
+                <thead><tr><th scope="col">Titulo</th><th scope="col">Empresa</th><th scope="col">Status</th></tr></thead>
                 <tbody>
                     @foreach (var t in Model.UltimosTicketsCriticos)
                     {
@@ -167,37 +142,31 @@
                             _ => "neutral"
                         };
                         <tr>
-                            <td><a href="/Tickets/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@titulo</a></td>
-                            <td style="color:var(--text-muted); font-size:13px;">@empresa</td>
+                            <td><a href="/Tickets/Detail/@id">@titulo</a></td>
+                            <td style="color:var(--text-muted);">@empresa</td>
                             <td><es-badge variant="@stVar">@status</es-badge></td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
-    </es-card>
+    </article>
 
-    <es-card padding="none" title="Tenants recentes" description="Últimos 30 dias">
-        <es-card-header-actions>
+    <article class="deck-panel deck-rise" style="--deck-i:6">
+        <div class="deck-panel-head">
+            <h3>Tenants recentes</h3>
             <es-button variant="ghost" size="xs" href="/Tenants" icon-trailing="arrow-right">Ver todos</es-button>
-        </es-card-header-actions>
-
+        </div>
         @if (!Model.TenantsRecentes.Any())
         {
-            <div style="padding:32px;">
-                <es-empty-state icon="building-2" title="Nenhum tenant novo" description="Sem cadastros nos últimos 30 dias." />
+            <div style="padding:8px var(--s-5) 28px;">
+                <es-empty-state icon="building-2" title="Nenhum tenant novo" description="Sem cadastros nos ultimos 30 dias." />
             </div>
         }
         else
         {
-            <table class="es-data-table">
-                <thead>
-                    <tr>
-                        <th scope="col">Nome</th>
-                        <th scope="col">Documento</th>
-                        <th scope="col" class="es-data-table-td-numeric">Criado</th>
-                    </tr>
-                </thead>
+            <table class="deck-table">
+                <thead><tr><th scope="col">Nome</th><th scope="col">Documento</th><th scope="col" style="text-align:right">Criado</th></tr></thead>
                 <tbody>
                     @foreach (var t in Model.TenantsRecentes)
                     {
@@ -207,17 +176,13 @@
                         var criado = t.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : "";
                         DateTime.TryParse(criado, out var criadoDt);
                         <tr>
-                            <td><a href="/Tenants/Detail/@id" style="color:var(--text-primary); font-weight:500; text-decoration:none;">@nome</a></td>
-                            <td style="color:var(--text-muted); font-family:var(--font-mono); font-size:11px;">@(doc ?? "—")</td>
-                            <td class="es-data-table-td-numeric" style="color:var(--text-muted); font-size:12px;">@criadoDt.ParaBrasilia().ToString("dd/MM/yy")</td>
+                            <td><a href="/Tenants/Detail/@id">@nome</a></td>
+                            <td class="deck-mono">@(doc ?? "—")</td>
+                            <td class="deck-mono" style="text-align:right">@criadoDt.ParaBrasilia().ToString("dd/MM/yy")</td>
                         </tr>
                     }
                 </tbody>
             </table>
         }
-    </es-card>
-</div>
-
-<style>
-    @@keyframes dash-pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
-</style>
+    </article>
+</section>
