@@ -146,6 +146,29 @@ public class CaixaUseCasesTests
         await _uow.Received(1).CommitAsync();
     }
 
+    [Fact]
+    public async Task FecharCaixa_MarcadorFechamento_DeveUsarDataMovimentoUtc()
+    {
+        // Regressao #615: data.ToDateTime(TimeOnly.MaxValue) gerava Kind=Unspecified, que o
+        // Npgsql rejeita em coluna timestamptz, abortando o CommitAsync (o caixa nao fechava).
+        // O marcador de fechamento deve gravar DataMovimento em UTC.
+        var empresaId = Guid.NewGuid();
+        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, data, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, data, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, data, null).Returns(0m);
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m =>
+            m.Tipo == "fechamento" && m.DataMovimento.Kind == DateTimeKind.Utc));
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // RegistrarMovimentoCaixa
     // ════════════════════════════════════════════════════════════════════

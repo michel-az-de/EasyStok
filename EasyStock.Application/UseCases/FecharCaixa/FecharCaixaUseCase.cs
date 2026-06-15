@@ -46,9 +46,13 @@ public class FecharCaixaUseCase(
         fechamento.FechadoPorNome = cmd.FechadoPorNome;
         fechamento.Observacoes = cmd.Observacoes;
 
-        // Cria movimento "fechamento" como marcador (não move saldo).
+        // Cria movimento "fechamento" como marcador (não move saldo). Usa o instante real
+        // do fechamento (DateTime.UtcNow, Kind=Utc): data.ToDateTime(TimeOnly.MaxValue) produz
+        // Kind=Unspecified, que o Npgsql rejeita na coluna timestamptz, abortando o CommitAsync
+        // inteiro (o caixa nunca fecha). UtcNow também fica sempre após a abertura no
+        // OrderByDescending(DataMovimento) de GetAberturaPendenteAsync (issue 615).
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, "fechamento", 0m,
-            data.ToDateTime(TimeOnly.MaxValue), cmd.LojaId);
+            DateTime.UtcNow, cmd.LojaId);
         mov.Descricao = $"Fechamento {data:yyyy-MM-dd}: saldo final {fechamento.SaldoFinal:F2}";
         mov.RegistradoPorUserId = cmd.FechadoPorUserId;
         mov.RegistradoPorNome = cmd.FechadoPorNome;
