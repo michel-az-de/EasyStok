@@ -1,5 +1,5 @@
 using EasyStock.Api.Utilities;
-using System.Text;
+using EasyStock.Application.Common;
 
 namespace EasyStock.Api.Controllers;
 
@@ -28,16 +28,19 @@ public class AdminAuditLogsController(IAdminAuditLogQueries auditLogs) : EasySto
         {
             var all = await auditLogs.ExportarAsync(filtro, ct);
 
-            var sb = new StringBuilder();
-            sb.AppendLine("AdminEmail,Acao,TenantId,Detalhes,IP,CriadoEm");
-            foreach (var r in all)
+            var headers = new[] { "AdminEmail", "Acao", "TenantId", "Detalhes", "IP", "CriadoEm" };
+            var rows = all.Select(r => new string[]
             {
-                var maskedEmail = PiiMaskingHelper.MaskEmail(r.AdminEmail);
-                var maskedIp = PiiMaskingHelper.MaskIpAddress(r.Ip);
-                sb.AppendLine($"\"{maskedEmail}\",\"{r.Acao}\",\"{r.TenantId}\",\"{r.Detalhes?.Replace("\"", "\"\"")}\",\"{maskedIp}\",\"{r.CriadoEm:O}\"");
-            }
+                PiiMaskingHelper.MaskEmail(r.AdminEmail) ?? "",
+                r.Acao ?? "",
+                r.TenantId.ToString(),
+                r.Detalhes ?? "",
+                PiiMaskingHelper.MaskIpAddress(r.Ip) ?? "",
+                r.CriadoEm.ToString("O")
+            });
 
-            return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "admin-audit-logs.csv");
+            // CSV central (#612): BOM UTF-8, separador ';', anti-injecao de formula + quoting RFC-4180.
+            return File(Csv.Build(headers, rows), "text/csv", "admin-audit-logs.csv");
         }
 
         var (items, total) = await auditLogs.ListarAsync(filtro, ct);

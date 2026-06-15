@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 
 namespace EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
 
@@ -49,50 +48,38 @@ public class ExportarFaturasCsvUseCase(IFaturaRepository repo)
             pageSize: pageSize,
             ct);
 
-        var sb = new StringBuilder();
-        // BOM UTF-8 — Excel reconhece como UTF-8 sem precisar de import wizard.
-        // Adicionado manualmente nos bytes finais (Encoding.UTF8.GetPreamble).
-        sb.AppendLine("Numero;EmpresaNome;FaturadoNome;FaturadoDocumento;Origem;Status;DataEmissao;DataVencimento;DataPagamentoTotal;SubTotal;Descontos;Acrescimos;Total;TotalPago;Pendente;Moeda");
+        var headers = new[]
+        {
+            "Numero", "EmpresaNome", "FaturadoNome", "FaturadoDocumento", "Origem", "Status",
+            "DataEmissao", "DataVencimento", "DataPagamentoTotal", "SubTotal", "Descontos",
+            "Acrescimos", "Total", "TotalPago", "Pendente", "Moeda"
+        };
 
-        foreach (var f in itens)
+        var rows = itens.Select(f =>
         {
             ct.ThrowIfCancellationRequested();
-            sb.Append(Csv(f.Numero)).Append(';');
-            sb.Append(Csv(f.Empresa?.Nome)).Append(';');
-            sb.Append(Csv(f.DadosFaturado?.Nome)).Append(';');
-            sb.Append(Csv(f.DadosFaturado?.Documento)).Append(';');
-            sb.Append(f.Origem.ToString()).Append(';');
-            sb.Append(f.Status.ToString()).Append(';');
-            sb.Append(f.DataEmissao.ToString("yyyy-MM-dd HH:mm:ss")).Append(';');
-            sb.Append(f.DataVencimento.ToString("yyyy-MM-dd")).Append(';');
-            sb.Append(f.DataPagamentoTotal?.ToString("yyyy-MM-dd HH:mm:ss") ?? "").Append(';');
-            sb.Append(f.SubTotal.ToString("F2", PtBr)).Append(';');
-            sb.Append(f.Descontos.ToString("F2", PtBr)).Append(';');
-            sb.Append(f.Acrescimos.ToString("F2", PtBr)).Append(';');
-            sb.Append(f.Total.ToString("F2", PtBr)).Append(';');
-            sb.Append(f.TotalPago.ToString("F2", PtBr)).Append(';');
-            sb.Append(f.Pendente.ToString("F2", PtBr)).Append(';');
-            sb.Append(f.Moeda);
-            sb.AppendLine();
-        }
+            return new[]
+            {
+                f.Numero ?? "",
+                f.Empresa?.Nome ?? "",
+                f.DadosFaturado?.Nome ?? "",
+                f.DadosFaturado?.Documento ?? "",
+                f.Origem.ToString(),
+                f.Status.ToString(),
+                f.DataEmissao.ToString("yyyy-MM-dd HH:mm:ss"),
+                f.DataVencimento.ToString("yyyy-MM-dd"),
+                f.DataPagamentoTotal?.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
+                f.SubTotal.ToString("F2", PtBr),
+                f.Descontos.ToString("F2", PtBr),
+                f.Acrescimos.ToString("F2", PtBr),
+                f.Total.ToString("F2", PtBr),
+                f.TotalPago.ToString("F2", PtBr),
+                f.Pendente.ToString("F2", PtBr),
+                f.Moeda ?? ""
+            };
+        });
 
-        // BOM UTF-8 + content
-        var bom = Encoding.UTF8.GetPreamble();
-        var content = Encoding.UTF8.GetBytes(sb.ToString());
-        var result = new byte[bom.Length + content.Length];
-        Buffer.BlockCopy(bom, 0, result, 0, bom.Length);
-        Buffer.BlockCopy(content, 0, result, bom.Length, content.Length);
-        return result;
-    }
-
-    /// <summary>Escapa campo CSV: envolve em aspas se contem ; aspa ou newline; duplica aspas internas.</summary>
-    private static string Csv(string? raw)
-    {
-        if (string.IsNullOrEmpty(raw)) return "";
-        if (raw.Contains(';') || raw.Contains('"') || raw.Contains('\n') || raw.Contains('\r'))
-        {
-            return "\"" + raw.Replace("\"", "\"\"") + "\"";
-        }
-        return raw;
+        // CSV central (#612): BOM UTF-8, separador ';', anti-injecao de formula + quoting RFC-4180.
+        return Csv.Build(headers, rows);
     }
 }

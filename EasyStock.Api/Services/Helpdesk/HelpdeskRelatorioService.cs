@@ -1,5 +1,5 @@
 using System.Globalization;
-using System.Text;
+using EasyStock.Application.Common;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Services.Helpdesk;
@@ -43,12 +43,15 @@ public sealed class HelpdeskRelatorioService(EasyStockDbContext db)
             })
             .ToListAsync(ct);
 
-        var sb = new StringBuilder();
         var inv = CultureInfo.InvariantCulture;
 
-        sb.AppendLine("id;titulo;categoria;prioridade;status;criado_em;resolvido_em;tempo_resolucao_horas;sla_atendido;nota_csat;atendente");
+        var headers = new[]
+        {
+            "id", "titulo", "categoria", "prioridade", "status", "criado_em", "resolvido_em",
+            "tempo_resolucao_horas", "sla_atendido", "nota_csat", "atendente"
+        };
 
-        foreach (var l in linhas)
+        var rows = linhas.Select(l =>
         {
             var tempoHoras = l.ResolvidoEm.HasValue
                 ? Math.Round((l.ResolvidoEm.Value - l.CriadoEm).TotalHours, 2).ToString(inv)
@@ -59,34 +62,23 @@ public sealed class HelpdeskRelatorioService(EasyStockDbContext db)
                 ? (l.SlaResolucaoViolado ? "nao" : "sim")
                 : "";
 
-            sb.Append(l.Id).Append(';');
-            sb.Append(EscapeCsv(l.Titulo)).Append(';');
-            sb.Append(l.Categoria).Append(';');
-            sb.Append(l.Prioridade).Append(';');
-            sb.Append(l.Status).Append(';');
-            sb.Append(l.CriadoEm.ToString("yyyy-MM-dd HH:mm:ss", inv)).Append(';');
-            sb.Append(l.ResolvidoEm?.ToString("yyyy-MM-dd HH:mm:ss", inv) ?? "").Append(';');
-            sb.Append(tempoHoras).Append(';');
-            sb.Append(slaAtendido).Append(';');
-            sb.Append(l.NotaCsat?.ToString(inv) ?? "").Append(';');
-            sb.Append(EscapeCsv(l.AtendenteNome ?? ""));
-            sb.AppendLine();
-        }
+            return new[]
+            {
+                l.Id.ToString(),
+                l.Titulo ?? "",
+                l.Categoria,
+                l.Prioridade,
+                l.Status,
+                l.CriadoEm.ToString("yyyy-MM-dd HH:mm:ss", inv),
+                l.ResolvidoEm?.ToString("yyyy-MM-dd HH:mm:ss", inv) ?? "",
+                tempoHoras,
+                slaAtendido,
+                l.NotaCsat?.ToString(inv) ?? "",
+                l.AtendenteNome ?? ""
+            };
+        });
 
-        // BOM UTF-8 — Excel/Google Sheets reconhece encoding correto.
-        var bom = Encoding.UTF8.GetPreamble();
-        var body = Encoding.UTF8.GetBytes(sb.ToString());
-        var output = new byte[bom.Length + body.Length];
-        Buffer.BlockCopy(bom, 0, output, 0, bom.Length);
-        Buffer.BlockCopy(body, 0, output, bom.Length, body.Length);
-        return output;
-    }
-
-    private static string EscapeCsv(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return "";
-        if (value.Contains(';') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        return value;
+        // CSV central (#612): BOM UTF-8, separador ';', anti-injecao de formula + quoting RFC-4180.
+        return Csv.Build(headers, rows);
     }
 }

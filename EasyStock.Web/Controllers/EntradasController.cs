@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Shared;
@@ -236,24 +235,20 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         var result = await svc.ExportarAsync(tipo, periodoInicio, periodoFim);
         if (!result.Success) return BadRequest();
 
-        var sb = new StringBuilder();
-        sb.AppendLine("Data,Produto,Variação,Quantidade,Custo Unitário,Total,Natureza,Documento,Descrição");
-        foreach (var m in result.Data!.Data)
+        var headers = new[] { "Data", "Produto", "Variação", "Quantidade", "Custo Unitário", "Total", "Natureza", "Documento", "Descrição" };
+        var rows = result.Data!.Data.Select(m => new[]
         {
-            sb.AppendLine(string.Join(",",
-                m.Data.ToString("yyyy-MM-dd"),
-                Csv(m.Produto?.Nome),
-                Csv(m.ProdutoVariacao?.Nome),
-                m.Qty,
-                m.Custo?.ToString("F2", CultureInfo.InvariantCulture) ?? "",
-                m.ValorTotal?.Valor.ToString("F2", CultureInfo.InvariantCulture) ?? "",
-                Csv(m.Natureza),
-                Csv(m.DocumentoReferencia),
-                Csv(m.Descricao)));
-        }
-
-        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-        return File(bytes, "text/csv", $"entradas-{BrazilTime.Now():yyyyMMdd}.csv");
+            m.Data.ToString("yyyy-MM-dd"),
+            m.Produto?.Nome ?? "",
+            m.ProdutoVariacao?.Nome ?? "",
+            m.Qty.ToString(),
+            m.Custo?.ToString("F2", CultureInfo.InvariantCulture) ?? "",
+            m.ValorTotal?.Valor.ToString("F2", CultureInfo.InvariantCulture) ?? "",
+            m.Natureza ?? "",
+            m.DocumentoReferencia ?? "",
+            m.Descricao ?? ""
+        });
+        return File(CsvExport.Build(headers, rows), "text/csv", $"entradas-{BrazilTime.Now():yyyyMMdd}.csv");
     }
 
     private bool ValidarProdutoId(EntradaFormViewModel vm)
@@ -264,6 +259,4 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         return false;
     }
 
-    private static string Csv(string? value) =>
-        value is null ? "" : $"\"{value.Replace("\"", "\"\"").Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ")}\"";
 }

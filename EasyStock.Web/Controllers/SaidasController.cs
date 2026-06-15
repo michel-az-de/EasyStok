@@ -1,4 +1,3 @@
-using System.Text;
 using EasyStock.Web.Constants;
 using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Saidas;
@@ -122,24 +121,20 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         var result = await svc.ExportarAsync(periodoInicio, periodoFim);
         if (!result.Success) return BadRequest();
 
-        var sb = new StringBuilder();
-        sb.AppendLine("Data,Produto,Variação,Quantidade,Valor Unitário,Total,Natureza,Documento,Descrição");
-        foreach (var m in result.Data!.Data)
+        var headers = new[] { "Data", "Produto", "Variação", "Quantidade", "Valor Unitário", "Total", "Natureza", "Documento", "Descrição" };
+        var rows = result.Data!.Data.Select(m => new[]
         {
-            sb.AppendLine(string.Join(",",
-                m.Data.ToString("yyyy-MM-dd"),
-                Csv(m.Produto?.Nome),
-                Csv(m.ProdutoVariacao?.Nome),
-                m.Qty,
-                m.ValorUnitario?.Valor.ToString("F2") ?? "",
-                m.ValorTotal?.Valor.ToString("F2") ?? "",
-                Csv(m.Natureza),
-                Csv(m.DocumentoReferencia),
-                Csv(m.Descricao)));
-        }
-
-        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-        return File(bytes, "text/csv", $"saidas-{BrazilTime.Now():yyyyMMdd}.csv");
+            m.Data.ToString("yyyy-MM-dd"),
+            m.Produto?.Nome ?? "",
+            m.ProdutoVariacao?.Nome ?? "",
+            m.Qty.ToString(),
+            m.ValorUnitario?.Valor.ToString("F2") ?? "",
+            m.ValorTotal?.Valor.ToString("F2") ?? "",
+            m.Natureza ?? "",
+            m.DocumentoReferencia ?? "",
+            m.Descricao ?? ""
+        });
+        return File(CsvExport.Build(headers, rows), "text/csv", $"saidas-{BrazilTime.Now():yyyyMMdd}.csv");
     }
 
     [HttpPost("/saidas/{id}/estornar")]
@@ -159,6 +154,4 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         return RedirectToAction(nameof(Historico));
     }
 
-    private static string Csv(string? value) =>
-        value is null ? "" : $"\"{value.Replace("\"", "\"\"").Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ")}\"";
 }
