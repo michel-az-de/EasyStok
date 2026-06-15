@@ -151,7 +151,7 @@
             <form method="post" action="/contas-a-pagar/@c.Id/cancelar"
                   x-data="{}"
                   class="flex gap-2 items-end"
-                  @@submit.prevent="() => { const f = $el, id = '_cp' + Date.now(); (window.__easyConfirmCallbacks ??= {})[id] = () => f.submit(); $dispatch('confirm-action', { titulo: 'Cancelar lançamento', mensagem: 'Esta ação não pode ser desfeita. O lançamento será marcado como <strong>cancelado</strong>.', textoBotao: 'Sim, cancelar lançamento', classBotao: 'bg-red-600 hover:bg-red-700', callbackId: id }); }">
+                  @@submit.prevent="() => { const f = $el; if (!f.reportValidity()) return; const id = '_cp' + Date.now(); (window.__easyConfirmCallbacks ??= {})[id] = () => f.submit(); $dispatch('confirm-action', { titulo: 'Cancelar lançamento', mensagem: 'Esta ação não pode ser desfeita. O lançamento será marcado como <strong>cancelado</strong>.', textoBotao: 'Sim, cancelar lançamento', classBotao: 'bg-red-600 hover:bg-red-700', callbackId: id }); }">
                 @Html.AntiForgeryToken()
                 <div class="flex-1">
                     <label class="form-label text-xs">Motivo *</label>
