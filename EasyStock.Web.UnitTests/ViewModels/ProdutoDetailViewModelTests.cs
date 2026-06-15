@@ -5,61 +5,44 @@ using FluentAssertions;
 namespace EasyStock.Web.UnitTests.ViewModels;
 
 /// <summary>
-/// BUG-61/62 (#450): "Variações" é opcional na completude. Produto sem variação
-/// (simples) não deve ser penalizado nem nunca alcançar 100%. O score é soma crua
-/// (campos base somam 100), então os 10 pts de Variações são sempre contados.
+/// #582 / ADR-0033: a completude passou a vir PRONTA do backend (fonte unica de lista e
+/// detalhe). O ProdutoDetailViewModel apenas REPASSA Produto.CompletudePercent -> IntegrityScore
+/// e Produto.Pendencias -> IntegrityMissing. O calculo ponderado (incl. "Variacoes opcional",
+/// BUG-61/62 #450) vive e e testado no dominio:
+/// EasyStock.Domain.Tests/Entities/ProdutoCompletudeTests. Aqui so verificamos o repasse.
 /// </summary>
 public class ProdutoDetailViewModelTests
 {
-    private const string LabelVariacoes = "Variações";
-
-    private static ProdutoDetalhe ProdutoBase(bool comVariacao) => new()
+    [Fact]
+    public void IntegrityScore_repassa_CompletudePercent_do_backend()
     {
-        Nome = "Produto Teste",
-        Tipo = 0, // não-alimento => Nutricional não entra na completude
-        Variacoes = comVariacao
-            ? [new VariacaoDetalhe { VariacaoId = Guid.NewGuid(), Nome = "Padrão" }]
-            : [],
-    };
+        var vm = new ProdutoDetailViewModel
+        {
+            Produto = new ProdutoDetalhe { Nome = "Produto Teste", CompletudePercent = 73 },
+        };
 
-    private static ProdutoDetalhe ProdutoCompletoSimples() => ProdutoBase(comVariacao: false) with
-    {
-        DescricaoBase = "descrição",
-        Marca = "Marca",
-        SkuBase = "SKU1",
-        CodigoBarras = "7891234567895",
-        CustoReferencia = 10m,
-        PrecoReferencia = 12m,
-        Dimensoes = new ProdutoDimensoesDetalhe(1m, 1m, 1m, 1m),
-        Fotos = [new ProdutoFotoDetalhe(Guid.NewGuid(), "/img/x.jpg", DateTime.UtcNow)],
-    };
+        vm.IntegrityScore.Should().Be(73);
+    }
 
     [Fact]
-    public void ProdutoSimplesCompleto_Atinge100_SemVariacoesEmFalta()
+    public void IntegrityMissing_repassa_Pendencias_do_backend()
     {
-        var vm = new ProdutoDetailViewModel { Produto = ProdutoCompletoSimples() };
+        var vm = new ProdutoDetailViewModel
+        {
+            Produto = new ProdutoDetalhe { Nome = "Produto Teste", Pendencias = ["Foto", "Preço"] },
+        };
 
-        vm.IntegrityScore.Should().Be(100);
-        vm.IntegrityMissing.Should().NotContain(LabelVariacoes);
+        vm.IntegrityMissing.Should().Equal("Foto", "Preço");
+    }
+
+    [Fact]
+    public void IntegrityMissing_vazio_quando_backend_nao_reporta_pendencias()
+    {
+        var vm = new ProdutoDetailViewModel
+        {
+            Produto = new ProdutoDetalhe { Nome = "Produto Teste" },
+        };
+
         vm.IntegrityMissing.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void ProdutoSimplesVazio_NaoListaVariacoesComoFaltante()
-    {
-        var vm = new ProdutoDetailViewModel { Produto = ProdutoBase(comVariacao: false) };
-
-        // Nome (3) + Categoria (2) + Variações (10, agora opcional) = 15.
-        vm.IntegrityScore.Should().Be(15);
-        vm.IntegrityMissing.Should().NotContain(LabelVariacoes);
-        vm.IntegrityMissing.Should().Contain("Foto");
-    }
-
-    [Fact]
-    public void ProdutoComVariacao_NaoListaVariacoesComoFaltante()
-    {
-        var vm = new ProdutoDetailViewModel { Produto = ProdutoBase(comVariacao: true) };
-
-        vm.IntegrityMissing.Should().NotContain(LabelVariacoes);
     }
 }
