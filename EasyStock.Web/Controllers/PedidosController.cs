@@ -76,7 +76,11 @@ public class PedidosController(
 
         var vm = new PedidosListViewModel { Search = search, FiltroStatus = statusFiltro };
 
-        var result = await svc.ListarAsync(statusFiltro, search: search, sort: "urgencia");
+        // Cockpit (#591 fatia 2b): carrega o conjunto INTEIRO (sem filtro de status) +
+        // sort=urgencia. O filtro de status/agenda passa a ser client-side (instantaneo,
+        // sem reload) e as KPIs ficam sobre o todo carregado. statusFiltro vira so o
+        // filtro INICIAL do cliente (deep-link ?status=). `search` segue server-side.
+        var result = await svc.ListarAsync(status: null, search: search, sort: "urgencia");
         if (result.Success && result.Data is not null) vm.Items = result.Data;
 
         var cli = await clientesSvc.ListarAsync(status: "ativo");

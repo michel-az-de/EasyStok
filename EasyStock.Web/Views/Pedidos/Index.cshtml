@@ -40,28 +40,29 @@
         _            => ""
     };
 
-    var totalAgendados = Model.Items.Count(p => p.IsScheduled);
-    var totalAtrasados = Model.Items.Count(p => p.IsAtrasado);
-    var filtroAgenda = Context.Request.Query["agenda"].ToString();
+    // Cockpit (fatia 2b): renderiza o conjunto INTEIRO; o filtro de status/agenda e
+    // client-side (Alpine). agenda/statusFiltro sao so o filtro INICIAL (deep-link).
+    var agenda = Context.Request.Query["agenda"].ToString();
+    var initialFilter = !string.IsNullOrEmpty(agenda) ? agenda : (Model.FiltroStatus ?? "");
 
-    // itemsFinais aplica o filtro client-side de agenda; o header deve contar o que e
-    // renderizado, nao o total do status (BUG-006). As abas Agendados/Atrasados seguem
-    // contando Model.Items (total real por categoria).
-    var itemsFiltrados = Model.Items.AsEnumerable();
-    if (filtroAgenda == "agendados") itemsFiltrados = itemsFiltrados.Where(i => i.IsScheduled);
-    else if (filtroAgenda == "atrasados") itemsFiltrados = itemsFiltrados.Where(i => i.IsAtrasado);
-    var itemsFinais = itemsFiltrados.ToList();
+    // Seed do store: MESMA projecao (PedidoRowDto) das celulas SSR -> anti-flash.
+    var seedJson = System.Text.Json.JsonSerializer.Serialize(
+        Model.Items.Select(EasyStock.Web.Models.Api.PedidoRowDto.From),
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/pedidos-cockpit.css" asp-append-version="true" />
 }
 
+<div x-data="pedidosCockpit()" data-initial-filter="@initialFilter">
+<script type="application/json" id="pedidos-seed">@Html.Raw(seedJson)</script>
+
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Pedidos</h1>
         <p>
-            @itemsFinais.Count @(itemsFinais.Count == 1 ? "pedido listado" : "pedidos listados") · Gerencie pedidos e pagamentos
+            <span x-text="visibleCount">@Model.Items.Count</span> de @Model.Items.Count @(Model.Items.Count == 1 ? "pedido" : "pedidos") · fila operacional
         </p>
     </div>
     <div class="flex gap-3 flex-wrap">
@@ -72,7 +73,7 @@
             </svg>
             App mobile
         </a>
-        <button type="button" x-data
+        <button type="button" x-data data-cockpit-novo
                 @@click="$dispatch('open-modal', 'novo-pedido')"
                 class="app-primary-btn app-primary-btn--hero inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,43 +84,49 @@
     </div>
 </div>
 
+@* Faixa de KPIs "carregados" — derivada do store (numerais Fraunces). Reflete o
+   conjunto INTEIRO carregado, nao o filtro corrente. *@
+<div class="ped-kpis" aria-label="Resumo dos pedidos carregados">
+    <div class="ped-kpi">
+        <span class="ped-kpi__eyebrow">Em aberto</span>
+        <span class="ped-kpi__val" x-text="kpiAberto">0</span>
+    </div>
+    <div class="ped-kpi ped-kpi--accent">
+        <span class="ped-kpi__eyebrow">Prontos</span>
+        <span class="ped-kpi__val" x-text="kpiPronto">0</span>
+    </div>
+    <div class="ped-kpi ped-kpi--crit" x-show="kpiAtrasado > 0" x-cloak>
+        <span class="ped-kpi__eyebrow">Atrasados</span>
+        <span class="ped-kpi__val" x-text="kpiAtrasado">0</span>
+    </div>
+    <div class="ped-kpi ped-kpi--warn">
+        <span class="ped-kpi__eyebrow">A receber</span>
+        <span class="ped-kpi__val ped-kpi__val--money" x-text="kpiReceberFmt">R$ 0,00</span>
+    </div>
+</div>
+
 <div class="ws mb-6">
-    <form method="get" class="flex gap-3 flex-wrap items-center" role="search" aria-label="Filtrar pedidos">
-        <div class="flex flex-1 min-w-48 gap-3">
-            <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, unidade ou número do pedido…"
-                   aria-label="Buscar pedido"
-                   class="ui-field flex-1 min-w-48" />
+    <div class="flex gap-3 flex-wrap items-center">
+        <form method="get" class="flex flex-1 min-w-48 gap-3" role="search" aria-label="Buscar pedidos">
+            <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, unidade ou número…"
+                   aria-label="Buscar pedido" class="ui-field flex-1 min-w-48" />
             <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
+        </form>
+        <div class="filter-tab-group flex-wrap" role="tablist" aria-label="Filtrar por status">
+            <button type="button" class="filter-tab" :class="{ active: isFilter('') }" @@click="setFilter('')">Todos</button>
+            <button type="button" class="filter-tab" :class="{ active: isFilter('aguardando') }" @@click="setFilter('aguardando')">Aguardando</button>
+            <button type="button" class="filter-tab" :class="{ active: isFilter('preparando') }" @@click="setFilter('preparando')">Em preparo</button>
+            <button type="button" class="filter-tab" :class="{ active: isFilter('pronto') }" @@click="setFilter('pronto')">Pronto</button>
+            <button type="button" class="filter-tab" :class="{ active: isFilter('entregue') }" @@click="setFilter('entregue')">Entregue</button>
+            <button type="button" class="filter-tab" :class="{ active: isFilter('atrasados') }" @@click="setFilter('atrasados')" x-show="kpiAtrasado > 0" x-cloak>
+                ⚠ Atrasados (<span x-text="kpiAtrasado"></span>)
+            </button>
         </div>
-        <div class="filter-tab-group flex-wrap">
-            @foreach (var (val, label) in new[] { ("", "Todos"), ("aguardando", "Aguardando"), ("preparando", "Em preparo"), ("pronto", "Pronto"), ("entregue", "Entregue") })
-            {
-                var isActive = Model.FiltroStatus == val || (val == "" && Model.FiltroStatus == null);
-                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = val == "" ? null : val })"
-                   class="filter-tab @(isActive ? "active" : "")">@label</a>
-            }
-            @if (totalAgendados > 0)
-            {
-                var agActive = filtroAgenda == "agendados";
-                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = agActive ? null : "agendados" })"
-                   class="filter-tab @(agActive ? "active" : "")">
-                    📅 Agendados (@totalAgendados)
-                </a>
-            }
-            @if (totalAtrasados > 0)
-            {
-                var atActive = filtroAgenda == "atrasados";
-                <a href="@Url.Action("Index", "Pedidos", new { search = Model.Search, status = Model.FiltroStatus, agenda = atActive ? null : "atrasados" })"
-                   class="filter-tab @(atActive ? "active" : "") text-[var(--crit-400)]">
-                    ⚠ Atrasados (@totalAtrasados)
-                </a>
-            }
-        </div>
-    </form>
+    </div>
 </div>
 
 <div class="ws">
-    @if (!itemsFinais.Any())
+    @if (!Model.Items.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIllustration", "inbox" },
@@ -131,7 +138,11 @@
     }
     else
     {
-        <div class="overflow-x-auto">
+        <div class="ped-empty-filter" x-show="visibleCount === 0" x-cloak>
+            Nenhum pedido neste filtro.
+            <button type="button" class="ped-link" @@click="setFilter('')">Ver todos</button>
+        </div>
+        <div class="overflow-x-auto" x-show="visibleCount > 0">
         <table class="tbl-full ped-table">
             <thead>
                 <tr>
@@ -146,9 +157,13 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var p in itemsFinais)
+                @foreach (var p in Model.Items)
                 {
-                    <tr class="ped-row @(p.IsAtrasado ? "ped-row--atrasado" : "")">
+                    <tr id="row-@p.Id" class="ped-row"
+                        x-data="{ p: items['@p.Id'] }"
+                        :class="{ 'ped-row--atrasado': p.isAtrasado, 'ped-row--moved': p._justMoved, 'ped-row--focus': isFocus('@p.Id') }"
+                        x-show="matches(p)" x-transition.opacity
+                        @@click="focusId = '@p.Id'">
                         <td>
                             <a asp-action="Detail" asp-controller="Pedidos" asp-route-id="@p.Id" class="ped-cliente">@(p.ClienteNome ?? "—")</a>
                             @if (!string.IsNullOrEmpty(p.ClienteApt) || !string.IsNullOrEmpty(p.ClienteTelefone))
@@ -161,14 +176,14 @@
                             }
                         </td>
                         <td>
-                            <span class="stp stp--sm @p.Status"><span class="ind"></span>@statusDisplayLabel(p.Status)</span>
+                            <span class="stp stp--sm" :class="p.status"><span class="ind"></span><span x-text="statusLabel(p.status)">@statusDisplayLabel(p.Status)</span></span>
                         </td>
                         <td>
                             @if (p.IsScheduled)
                             {
-                                <span class="ped-sched @(p.IsAtrasado ? "ped-sched--late" : "")"
+                                <span class="ped-sched" :class="{ 'ped-sched--late': p.isAtrasado }"
                                       title="@p.AgendadoParaEm?.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")">
-                                    @(p.IsAtrasado ? "atrasado" : "agendado") · @p.AgendadoParaEm?.ParaBrasilia().ToString("dd/MM HH:mm")
+                                    <span x-text="p.isAtrasado ? 'atrasado' : 'agendado'">@(p.IsAtrasado ? "atrasado" : "agendado")</span> · @p.AgendadoParaEm?.ParaBrasilia().ToString("dd/MM HH:mm")
                                 </span>
                             }
                             else
@@ -177,54 +192,30 @@
                             }
                         </td>
                         <td class="col-num">@p.ItensCount</td>
-                        <td class="col-num"><span class="ped-total">@p.Total.AsMoney()</span></td>
+                        <td class="col-num"><span class="ped-total" x-text="money(p.total)">@p.Total.AsMoney()</span></td>
                         <td>
-                            @if (p.Status == "cancelado")
-                            {
-                                @* Pedido cancelado nao tem cobranca em aberto. *@
-                                @if (p.TotalPago > 0)
-                                {
-                                    <span class="stp stp--sm stp-neutral" title="Pedido cancelado com pagamento ja recebido"><span class="stp-dot"></span>Pago · @p.TotalPago.AsMoney()</span>
-                                }
-                                else
-                                {
-                                    <span class="stp stp--sm stp-neutral" title="Pedido cancelado nao gera cobranca"><span class="stp-dot"></span>Sem cobrança</span>
-                                }
-                            }
-                            else if (p.Quitado)
-                            {
-                                <span class="stp stp--sm stp-ok"><span class="stp-dot"></span>Quitado</span>
-                            }
-                            else if (p.TotalPago > 0)
-                            {
-                                <span class="stp stp--sm stp-warn"><span class="stp-dot"></span>Parcial · @p.TotalPago.AsMoney()</span>
-                            }
-                            else if (p.Status == "entregue")
-                            {
-                                @* BUG-5: agregado da lista pode estar defasado; "Verificar" leva ao detalhe. *@
-                                <a asp-action="Detail" asp-controller="Pedidos" asp-route-id="@p.Id"
-                                   class="stp stp--sm stp-neutral ped-verificar"
-                                   title="Valor agregado diverge do detalhe — clique para ver o pagamento real"><span class="stp-dot"></span>Verificar</a>
-                            }
-                            else
-                            {
-                                <span class="stp stp--sm stp-warn"><span class="stp-dot"></span>Pendente</span>
-                            }
+                            <span class="stp stp--sm" :class="payClass(p)"><span class="stp-dot"></span><span x-text="payText(p)">@(p.Quitado ? "Quitado" : "Pendente")</span></span>
                         </td>
                         <td class="ped-data">
                             <div>@p.CriadoEm.ParaBrasilia().AsDateTime()</div>
                             <div class="ped-data-rel">criado @tempoRelativo(p.CriadoEm)</div>
                         </td>
                         <td class="ped-actions">
-                            @{ var nxt = nextStatus(p.Status); }
-                            @if (!string.IsNullOrEmpty(nxt))
+                            @* SSR so renderiza o form pra nao-terminal (degrada sem JS: form-POST
+                               + reload). Com JS, x-show o esconde dinamicamente quando o pedido
+                               vira terminal apos o avanco. Sem x-cloak: visivel sem JS. *@
+                            @if (!string.IsNullOrEmpty(nextStatus(p.Status)))
                             {
-                                <form asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post" class="ped-advance-form">
+                                <form asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                                      class="ped-advance-form" x-show="nextStatus(p.status)"
+                                      @@submit.prevent="advance('@p.Id')">
                                     @Html.AntiForgeryToken()
-                                    <input type="hidden" name="status" value="@nxt" />
-                                    <button type="submit" class="ped-advance" title="Avançar para @statusDisplayLabel(nxt)">@nextLabel(p.Status)</button>
+                                    <input type="hidden" name="status" value="@nextStatus(p.Status)" />
+                                    <button type="submit" class="ped-advance" :disabled="!!_inflight['@p.Id']"
+                                            x-text="nextLabel(p.status)">@nextLabel(p.Status)</button>
                                 </form>
                             }
+                            <button type="button" class="ped-pay-btn" x-show="canPay(p)" x-cloak @@click="openPay('@p.Id')">Receber</button>
                             <a asp-action="Detail" asp-controller="Pedidos" asp-route-id="@p.Id" class="ped-open">Abrir</a>
                         </td>
                     </tr>
@@ -234,6 +225,42 @@
         </div>
     }
 </div>
+
+@* Popover de pagamento inline (#591) — registra parcial/total sem sair da lista. *@
+<div class="ped-pay-overlay" x-show="pay.open" x-cloak @@click.self="closePay()" x-transition.opacity>
+    <div class="ped-pay-card" role="dialog" aria-modal="true" aria-label="Registrar pagamento">
+        <div class="ped-pay-card__hd">
+            <strong>Registrar pagamento</strong>
+            <button type="button" class="ped-pay-close" @@click="closePay()" aria-label="Fechar">✕</button>
+        </div>
+        <div class="ped-pay-card__bd">
+            <div class="ped-pay-pendente">Pendente: <strong x-text="money(payTarget().pendente)">R$ 0,00</strong></div>
+            <label class="ped-pay-label" for="ped-pay-metodo">Método</label>
+            <select id="ped-pay-metodo" class="ui-field" x-model="pay.metodo">
+                <option value="pix">PIX</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="credito">Crédito</option>
+                <option value="debito">Débito</option>
+                <option value="transferencia">Transferência</option>
+                <option value="outro">Outro</option>
+            </select>
+            <label class="ped-pay-label" for="ped-pay-valor">Valor</label>
+            <div class="ped-pay-valor">
+                <input id="ped-pay-valor" type="number" step="0.01" min="0" class="ui-field"
+                       x-ref="payValor" x-model="pay.valor" @@keydown.enter.prevent="submitPay()" />
+                <button type="button" class="ped-pay-quick" @@click="payFill('pendente')">Pendente</button>
+                <button type="button" class="ped-pay-quick" @@click="payFill('total')">Total</button>
+            </div>
+        </div>
+        <div class="ped-pay-card__ft">
+            <button type="button" class="ui-secondary-btn" @@click="closePay()">Cancelar</button>
+            <button type="button" class="app-primary-btn app-primary-btn--hero" :disabled="pay.enviando"
+                    @@click="submitPay()" x-text="pay.enviando ? 'Registrando…' : 'Registrar'">Registrar</button>
+        </div>
+    </div>
+</div>
+
+</div>@* /x-data cockpit *@
 
 <!-- Modal: novo pedido -->
 <div x-data="novoPedidoModal()"
@@ -824,6 +851,7 @@
 </div>
 
 @section Scripts {
+<script src="~/js/pedidos-cockpit.js" asp-append-version="true"></script>
 <script>
 function novoPedidoModal() {
     const clientes = @Html.Raw(Json.Serialize(Model.Clientes.Select(c => new {

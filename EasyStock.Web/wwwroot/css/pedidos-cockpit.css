@@ -50,3 +50,79 @@ html.theme-dark .ped-row--atrasado td { background: rgba(192, 59, 42, .12); }
 }
 .ped-open:hover { color: var(--navy-800); text-decoration: underline; text-underline-offset: 2px; }
 a.ped-verificar { text-decoration: none; }
+
+/* ── Faixa de KPIs (carregados) — numerais Fraunces, eyebrow JetBrains Mono. ── */
+.ped-kpis { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.ped-kpi {
+    flex: 1 1 140px; min-width: 0;
+    background: var(--bg-surface); border: 1px solid var(--border-soft);
+    border-radius: var(--radius); padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+    border-top: 3px solid var(--ink-300);
+}
+.ped-kpi--accent { border-top-color: var(--orange-600); }
+.ped-kpi--crit   { border-top-color: var(--crit-600); }
+.ped-kpi--warn   { border-top-color: var(--warn-600); }
+.ped-kpi__eyebrow {
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted);
+}
+.ped-kpi__val {
+    font-family: var(--font-display); font-size: 30px; font-weight: 700;
+    line-height: 1; color: var(--text-strong); font-variant-numeric: tabular-nums;
+}
+.ped-kpi--accent .ped-kpi__val { color: var(--orange-700); }
+.ped-kpi--crit .ped-kpi__val { color: var(--crit-700); }
+.ped-kpi__val--money { font-size: 22px; }
+
+/* ── Estados de linha ── */
+.ped-row--focus td { box-shadow: inset 0 0 0 2px var(--navy-200); }
+.ped-row--moved td { background: var(--ok-50); transition: background .4s var(--ease-out); }
+html.theme-dark .ped-row--moved td { background: rgba(24, 135, 78, .12); }
+
+/* ── Botao "Receber" inline ── */
+.ped-pay-btn {
+    margin-left: 8px; font-size: 12.5px; font-weight: 600;
+    color: var(--ok-700); background: var(--ok-50);
+    border: 1px solid var(--ok-200); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+.ped-pay-btn:hover { background: var(--ok-100); }
+
+/* ── Mensagem de filtro vazio ── */
+.ped-empty-filter { padding: 28px; text-align: center; color: var(--text-muted); font-size: 14px; }
+.ped-link { color: var(--navy-600); font-weight: 600; background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Popover de pagamento inline ── */
+.ped-pay-overlay {
+    position: fixed; inset: 0; z-index: var(--z-modal, 55);
+    background: rgba(5, 11, 27, .45);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.ped-pay-card {
+    width: 100%; max-width: 380px;
+    background: var(--bg-surface); border: 1px solid var(--border-soft);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg, 0 24px 60px rgba(5, 11, 27, .3));
+    overflow: hidden;
+}
+.ped-pay-card__hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; border-bottom: 1px solid var(--border-soft);
+    font-size: 15px; color: var(--text-strong);
+}
+.ped-pay-close { background: none; border: none; font-size: 16px; color: var(--text-muted); cursor: pointer; line-height: 1; }
+.ped-pay-card__bd { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.ped-pay-pendente { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.ped-pay-pendente strong { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.ped-pay-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-top: 6px; }
+.ped-pay-valor { display: flex; gap: 8px; align-items: center; }
+.ped-pay-valor .ui-field { flex: 1; min-width: 0; }
+.ped-pay-quick {
+    font-size: 12px; font-weight: 600; color: var(--navy-700);
+    background: var(--navy-50); border: 1px solid var(--navy-200);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; white-space: nowrap;
+}
+.ped-pay-quick:hover { background: var(--navy-100); }
+.ped-pay-card__ft {
+    display: flex; gap: 10px; justify-content: flex-end;
+    padding: 14px 18px; border-top: 1px solid var(--border-soft); background: var(--bg-app);
+}
