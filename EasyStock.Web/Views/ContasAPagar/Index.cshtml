@@ -70,28 +70,28 @@
                     {
                         var badge = c.Status switch
                         {
-                            "Rascunho" => "bg-gray-100 text-gray-700",
-                            "Aberta" => "bg-blue-100 text-blue-700",
-                            "ParcialmentePaga" => "bg-yellow-100 text-yellow-700",
-                            "Paga" => "bg-green-100 text-green-700",
-                            "Vencida" => "bg-red-100 text-red-700",
-                            "Cancelada" => "bg-gray-100 text-gray-500 line-through",
-                            _ => "bg-gray-100 text-gray-700"
+                            "Rascunho" => "badge badge-neutral",
+                            "Aberta" => "badge badge-info",
+                            "ParcialmentePaga" => "badge badge-warn",
+                            "Paga" => "badge badge-ok",
+                            "Vencida" => "badge badge-crit",
+                            "Cancelada" => "badge badge-neutral badge-struck",
+                            _ => "badge badge-neutral"
                         };
                         <tr>
                             <td class="px-4 py-3 font-medium">
-                                <a href="/contas-a-pagar/@c.Id" class="text-blue-600 hover:underline">@c.Descricao</a>
+                                <a href="/contas-a-pagar/@c.Id" class="text-navy-600 hover:underline">@c.Descricao</a>
                             </td>
                             <td class="px-4 py-3">
-                                <span class="inline-block px-2 py-0.5 text-xs rounded @badge">@Humanizar(c.Status)</span>
+                                <span class="@badge">@Humanizar(c.Status)</span>
                             </td>
                             <td class="px-4 py-3 text-right">@c.ValorTotal.ToString("C")</td>
-                            <td class="px-4 py-3 text-right text-green-700">@c.TotalPago.ToString("C")</td>
-                            <td class="px-4 py-3 text-right text-red-700">@c.Pendente.ToString("C")</td>
+                            <td class="px-4 py-3 text-right text-ok">@c.TotalPago.ToString("C")</td>
+                            <td class="px-4 py-3 text-right text-crit">@c.Pendente.ToString("C")</td>
                             <td class="px-4 py-3 text-sm text-gray-600">@c.DataEmissao.ToString("dd/MM/yyyy")</td>
                             <td class="px-4 py-3 text-sm">@c.Parcelas.Count</td>
                             <td class="px-4 py-3">
-                                <a href="/contas-a-pagar/@c.Id" class="text-blue-600 text-sm hover:underline">Ver</a>
+                                <a href="/contas-a-pagar/@c.Id" class="text-navy-600 text-sm hover:underline">Ver</a>
                             </td>
                         </tr>
                     }

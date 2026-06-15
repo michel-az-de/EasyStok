@@ -27,7 +27,7 @@
             <h3 class="font-bold text-slate-800 mb-4">Situação do estoque</h3>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div class="text-center p-4 bg-slate-50 rounded-xl">
-                    <div class="kpi-val @(item.Qty == 0 ? "text-red-600" : item.Qty < 5 ? "text-amber-600" : "text-emerald-600")">@item.Qty</div>
+                    <div class="kpi-val @(item.Qty == 0 ? "text-crit" : item.Qty < 5 ? "text-warn" : "text-ok")">@item.Qty</div>
                     <div class="kpi-lbl">Quantidade</div>
                 </div>
                 <div class="text-center p-4 bg-slate-50 rounded-xl">
@@ -77,7 +77,7 @@
                 {
                     <div class="flex justify-between">
                         <dt class="text-sm text-slate-500">Validade</dt>
-                        <dd class="text-sm font-semibold @(diasParaVencer <= 7 ? "text-red-600" : "")">
+                        <dd class="text-sm font-semibold @(diasParaVencer <= 7 ? "text-crit" : "")">
                             @item.Validade.Value.ToString("dd/MM/yyyy")
                             @if (diasParaVencer <= 7)
                             {
@@ -103,7 +103,7 @@
                     Repor estoque
                 </a>
                 <a href="/entradas/nova"
-                   class="flex items-center gap-2 w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                   class="btn btn-success w-full">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
@@ -150,7 +150,7 @@
                     var margem = (item.PrecoVendaSugerido.Valor - item.CustoUnitario.Valor) / item.PrecoVendaSugerido.Valor * 100;
                     <div class="flex justify-between border-t border-slate-100 pt-2">
                         <dt class="text-sm text-slate-500">Margem</dt>
-                        <dd class="text-sm font-bold @(margem >= 30 ? "text-emerald-600" : margem >= 15 ? "text-amber-600" : "text-red-600")">
+                        <dd class="text-sm font-bold @(margem >= 30 ? "text-ok" : margem >= 15 ? "text-warn" : "text-crit")">
                             @margem.ToString("F1")%
                         </dd>
                     </div>
