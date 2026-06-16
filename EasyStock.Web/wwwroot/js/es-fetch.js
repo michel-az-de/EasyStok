@@ -42,6 +42,19 @@
       window.location.href = '/auth/selecionar-loja';
       return NEVER;
     }
+    // 402 de bloqueio de assinatura (SubscriptionGate: trial vencido/suspenso/cancelado):
+    // leva pra landing e NUNCA resolve. Cobre quem estava logado quando o trial venceu no
+    // meio do uso (#619). 402 de limite de recurso (error.recurso) passa cru pro caller.
+    if (res.status === 402) {
+      try {
+        var corpo = await res.clone().json();
+        var code = corpo && corpo.error && corpo.error.code;
+        if (code && /^(TRIAL_EXPIRED|NO_SUBSCRIPTION|SUBSCRIPTION_)/.test(code)) {
+          window.location.href = '/assinatura/bloqueado';
+          return NEVER;
+        }
+      } catch (e) { /* corpo nao-JSON ou sem code: deixa passar cru */ }
+    }
     return res;
   };
 })();

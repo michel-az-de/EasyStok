@@ -1,0 +1,130 @@
+@model EasyStock.Web.Models.ViewModels.Assinatura.AssinaturaBloqueadaViewModel
+@{
+    Layout = null;
+    ViewBag.Title = Model.Titulo;
+    var plano = Model.PlanoDestaque;
+    var planoNome = plano?.Nome;
+    var waMsg = Uri.EscapeDataString(planoNome is null
+        ? "Oi! Quero assinar o EasyStok."
+        : $"Oi! Quero assinar o EasyStok (plano {planoNome}).");
+    var temWhats = !string.IsNullOrWhiteSpace(Model.WhatsAppNumero);
+    var ctaHref = temWhats
+        ? $"https://wa.me/{Model.WhatsAppNumero}?text={waMsg}"
+        : $"mailto:{Model.EmailContato}?subject=Quero%20assinar%20o%20EasyStok";
+}
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.Titulo — EasyStok</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    <style>
+        .fr{font-family:'Fraunces',Georgia,serif}
+        .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+        @@keyframes esRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .rise{opacity:0;animation:esRise .5s cubic-bezier(.16,1,.3,1) forwards}
+    </style>
+</head>
+<body class="h-full font-[Inter] antialiased flex items-center justify-center min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
+    <div class="w-full max-w-xl mx-auto px-4 py-10 text-center">
+
+        <div class="rise flex items-center justify-center gap-2 mb-6" style="animation-delay:.02s">
+            <span class="inline-flex items-center justify-center rounded-lg" style="width:30px;height:30px;background:var(--navy-700);color:var(--white);">
+                <es-icon name="store" class="w-4 h-4"></es-icon>
+            </span>
+            <span class="fr text-xl font-bold" style="color:var(--navy-700)">EasyStok</span>
+        </div>
+
+        <span class="rise mono inline-block uppercase tracking-wider mb-4" style="animation-delay:.06s;font-size:11px;color:var(--warn-700);background:var(--warn-50);border:1px solid var(--warn-200);padding:5px 13px;border-radius:999px;">
+            @Model.ChipTexto
+        </span>
+
+        <h1 class="rise fr font-bold mb-3" style="animation-delay:.1s;font-size:clamp(26px,5vw,34px);line-height:1.14;color:var(--text-primary);max-width:30ch;margin-inline:auto;">
+            @Model.Titulo
+        </h1>
+
+        <p class="rise mx-auto mb-5" style="animation-delay:.14s;font-size:15px;line-height:1.6;color:var(--text-secondary);max-width:46ch;">
+            @Model.Subtitulo
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SeloTexto))
+        {
+            <div class="rise inline-flex items-center gap-2 mb-7" style="animation-delay:.18s;font-size:13px;color:var(--ok-700);background:var(--ok-50);border-radius:999px;padding:6px 14px;">
+                <es-icon name="shield-check" class="w-4 h-4"></es-icon>
+                @Model.SeloTexto
+            </div>
+        }
+
+        @if (plano is not null)
+        {
+            <div class="rise auth-card rounded-2xl p-6 mx-auto mb-4 text-left" style="animation-delay:.22s;max-width:420px;">
+                <div class="flex items-baseline justify-between mb-1">
+                    <span class="font-bold" style="font-size:16px;color:var(--text-primary)">@plano.Nome</span>
+                    <span class="font-semibold" style="font-size:11px;color:var(--action-accent);background:var(--orange-50);padding:3px 9px;border-radius:999px;">Recomendado</span>
+                </div>
+                <div class="flex items-baseline gap-1 mb-4">
+                    <span class="fr font-bold" style="font-size:34px;color:var(--navy-700)">R$ @plano.PrecoMensal.ToString("N2")</span>
+                    <span style="font-size:14px;color:var(--text-muted)">/mês</span>
+                </div>
+                <ul class="space-y-2 mb-5">
+                    <li class="flex items-center gap-2" style="font-size:14px;color:var(--text-secondary)">
+                        <es-icon name="check" class="w-4 h-4" style="color:var(--ok-600)"></es-icon>
+                        <span><strong>@PlanoInfo.FormatarLimite(plano.LimiteLojas)</strong> lojas</span>
+                    </li>
+                    <li class="flex items-center gap-2" style="font-size:14px;color:var(--text-secondary)">
+                        <es-icon name="check" class="w-4 h-4" style="color:var(--ok-600)"></es-icon>
+                        <span><strong>@PlanoInfo.FormatarLimite(plano.LimiteUsuarios)</strong> usuários</span>
+                    </li>
+                    <li class="flex items-center gap-2" style="font-size:14px;color:var(--text-secondary)">
+                        <es-icon name="check" class="w-4 h-4" style="color:var(--ok-600)"></es-icon>
+                        <span><strong>@PlanoInfo.FormatarLimite(plano.LimiteProdutos)</strong> produtos</span>
+                    </li>
+                    <li class="flex items-center gap-2" style="font-size:14px;color:var(--text-secondary)">
+                        <es-icon name="check" class="w-4 h-4" style="color:var(--ok-600)"></es-icon>
+                        <span>Caixa, pedidos e relatórios completos</span>
+                    </li>
+                </ul>
+                <button type="button" disabled
+                        class="w-full rounded-lg font-semibold cursor-not-allowed"
+                        style="padding:12px;font-size:14px;background:var(--ink-100);color:var(--text-muted);border:1px dashed var(--border-strong);"
+                        title="Pagamento por Pix em breve. Por enquanto, assine pelo WhatsApp.">
+                    Assinar via Pix (em breve)
+                </button>
+            </div>
+        }
+
+        <a href="@ctaHref" @(temWhats ? "target=_blank rel=noopener" : "")
+           class="rise inline-flex items-center justify-center gap-2 rounded-lg font-semibold mb-4"
+           style="animation-delay:.26s;padding:13px 22px;font-size:15px;background:var(--action-accent);color:var(--white);text-decoration:none;">
+            <es-icon name="message-circle" class="w-4 h-4"></es-icon>
+            @Model.CtaTexto
+        </a>
+
+        <p class="rise mx-auto mb-6" style="animation-delay:.3s;font-size:12px;color:var(--text-muted);max-width:40ch;">
+            Ativação na hora · Sem fidelidade, cancele quando quiser ·
+            <a href="mailto:@Model.EmailContato" style="color:var(--navy-700);text-decoration:none;">prefere e-mail?</a>
+        </p>
+
+        <div class="rise" style="animation-delay:.34s;border-top:1px solid var(--border-soft);padding-top:14px;">
+            <p class="mb-2" style="font-size:12px;color:var(--text-muted)">Quem cuida da assinatura é outra pessoa? Avise o administrador da conta.</p>
+            <form asp-action="Logout" asp-controller="Auth" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="font-semibold hover:underline" style="font-size:12px;color:var(--navy-700);background:none;border:none;cursor:pointer;">Sair desta conta</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

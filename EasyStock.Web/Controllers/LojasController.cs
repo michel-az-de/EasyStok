@@ -39,6 +39,9 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
         }
 
         var result = await svc.CriarAsync(nomeTrim, cidade?.Trim(), telefone?.Trim());
+        // Bloqueio de assinatura ANTES de limite/HasError: sem isso o ramo "sem lojaId"
+        // devolve o usuário a SelecionarLoja e o loop de criar loja reaparece (#619).
+        if (RedirectIfAssinaturaBloqueada(result) is { } bloqueio) return bloqueio;
         if (RedirectIfLimitReached(result) is { } limitRedirect) return limitRedirect;
         if (HasError(result))
         {

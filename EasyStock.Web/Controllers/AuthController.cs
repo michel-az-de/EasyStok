@@ -138,6 +138,7 @@ public class AuthController(
         }
 
         var lojasResult = await api.GetAsync<List<Loja>>("lojas");
+        if (RedirectSeAssinaturaBloqueada(lojasResult) is { } bloqueado) return bloqueado;
         if (lojasResult.Success && lojasResult.Data is { Count: > 0 } lojas)
         {
             if (lojas.Count == 1)
@@ -174,6 +175,7 @@ public class AuthController(
         else
         {
             var lojasResult = await api.GetAsync<List<Loja>>("lojas");
+            if (RedirectSeAssinaturaBloqueada(lojasResult) is { } bloqueado) return bloqueado;
             lojas = lojasResult.Success ? lojasResult.Data ?? [] : [];
         }
 
@@ -424,6 +426,18 @@ public class AuthController(
         !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? Redirect(returnUrl)
             : RedirectToAction("Index", "Dashboard");
+
+    // AuthController não herda BaseController; replica a regra anti-loop (#619): se o gate
+    // barrou por assinatura bloqueada (ASSINATURA_BLOQUEADA:{sub-code}), manda para a landing
+    // em vez de tratar o 402 como "0 lojas" e cair no wizard de criar loja.
+    private IActionResult? RedirectSeAssinaturaBloqueada<T>(ApiResult<T> r)
+    {
+        if (r.Success || !(r.ErrorCode?.StartsWith("ASSINATURA_BLOQUEADA", StringComparison.Ordinal) ?? false))
+            return null;
+        var code = r.ErrorCode!;
+        TempData["AssinaturaBloqueioCode"] = code.Contains(':') ? code[(code.IndexOf(':') + 1)..] : "TRIAL_EXPIRED";
+        return Redirect("/assinatura/bloqueado");
+    }
 
     private static string ClassifyLoginError(string? errorMessage)
     {

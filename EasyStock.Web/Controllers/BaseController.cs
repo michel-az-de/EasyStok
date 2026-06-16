@@ -117,6 +117,27 @@ public abstract class BaseController(SessionService session) : Controller
         return RedirectToAction("Index", "Assinatura");
     }
 
+    /// <summary>
+    /// True se a API barrou por bloqueio de assinatura (trial vencido/suspenso/cancelado),
+    /// sinalizado pelo ApiClient com code ASSINATURA_BLOQUEADA:{sub-code}.
+    /// </summary>
+    protected static bool IsAssinaturaBloqueada<T>(ApiResult<T> result) =>
+        !result.Success && (result.ErrorCode?.StartsWith("ASSINATURA_BLOQUEADA", StringComparison.Ordinal) ?? false);
+
+    /// <summary>
+    /// Se a assinatura está bloqueada, guarda o sub-code e manda para a landing de bloqueio.
+    /// DEVE ser checado ANTES de <see cref="RedirectIfLimitReached"/>/HasError — senão o fluxo
+    /// "sem lojaId" reabre o loop de criar loja (#619). Mantido separado de LIMITE_PLANO de
+    /// propósito: limite de recurso vai ao upgrade-wall; bloqueio vai à landing trial-vencido.
+    /// </summary>
+    protected IActionResult? RedirectIfAssinaturaBloqueada<T>(ApiResult<T> result)
+    {
+        if (!IsAssinaturaBloqueada(result)) return null;
+        var code = result.ErrorCode ?? string.Empty;
+        TempData["AssinaturaBloqueioCode"] = code.Contains(':') ? code[(code.IndexOf(':') + 1)..] : "TRIAL_EXPIRED";
+        return Redirect("/assinatura/bloqueado");
+    }
+
     public override void OnActionExecuting(ActionExecutingContext context)
     {
         var token = session.GetToken();

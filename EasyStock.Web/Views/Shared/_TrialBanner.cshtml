@@ -4,13 +4,10 @@
     ativo OU quando ja tem plano pago.
 *@
 <div id="trial-banner" class="hidden" data-trial-banner>
-    <div class="px-4 py-2 text-sm flex items-center justify-between gap-3"
+    <div class="px-4 py-2 text-sm flex items-center justify-between gap-3" data-trial-bar
          style="background-color: var(--accent-soft, var(--orange-50)); border-bottom: 1px solid var(--border-soft); color: var(--text-primary);">
-        <span>
-            <strong>Trial:</strong>
-            <span data-trial-msg></span>
-        </span>
-        <a href="/assinatura" class="font-semibold underline">Fazer upgrade</a>
+        <span data-trial-msg></span>
+        <a href="/assinatura" class="font-semibold underline whitespace-nowrap">Assinar agora</a>
     </div>
 </div>
 <script>
@@ -26,9 +23,17 @@
         if (!fim) return;
         var dias = Math.max(0, Math.ceil((fim - new Date()) / 86400000));
         var msg = el.querySelector('[data-trial-msg]');
-        if (msg) msg.textContent = dias === 0
-            ? 'expira hoje. Faça upgrade para continuar.'
-            : 'restam ' + dias + ' dia' + (dias === 1 ? '' : 's') + '. Faça upgrade para ativar mais recursos.';
+        if (msg) {
+            if (dias === 0) msg.innerHTML = '<strong>Último dia de teste grátis.</strong> Assine hoje pra não perder o acesso amanhã.';
+            else if (dias === 1) msg.innerHTML = '<strong>Falta 1 dia</strong> de teste grátis. Garanta sua assinatura e não pare a operação.';
+            else msg.innerHTML = '<strong>Seu teste grátis termina em ' + dias + ' dias.</strong> Garanta sua assinatura e não pare a operação.';
+        }
+        // Urgência nos últimos 3 dias: barra âmbar mais forte que o laranja-suave padrão.
+        var bar = el.querySelector('[data-trial-bar]');
+        if (bar && dias <= 3) {
+            bar.style.backgroundColor = 'var(--warn-50)';
+            bar.style.borderBottomColor = 'var(--warn-200)';
+        }
         el.classList.remove('hidden');
     }
     // BUG-23: cacheia /api/assinatura por 10min em sessionStorage. Sem isso, cada
