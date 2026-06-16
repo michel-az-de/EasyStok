@@ -31,7 +31,19 @@
         </es-card>
     </template>
 
-    <template x-if="empresaId">
+    <template x-if="empresaId && !loaded">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;" aria-hidden="true">
+            <template x-for="i in 8" :key="i">
+                <div class="es-stat-card" style="display:flex; flex-direction:column; gap:10px;">
+                    <es-skeleton variant="title" width="55%" />
+                    <es-skeleton variant="num" width="45%" />
+                    <es-skeleton variant="text" width="75%" />
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <template x-if="empresaId && loaded">
         <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px;">
 
             <div class="es-stat-card">
@@ -135,6 +147,7 @@ function operacaoPage() {
         empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
         lojaId: '@(Model.LojaId?.ToString() ?? "")',
         d: {},
+        loaded: false,
         erro: '',
         ultimaAtualizacao: 0,
         _timer: null,
@@ -156,6 +169,7 @@ function operacaoPage() {
                 this.d = data || {};
                 this.ultimaAtualizacao = Date.now();
                 this.erro = '';
+                this.loaded = true;
             } catch (e) {
                 this.erro = 'Falha ao carregar dashboard: ' + (e.message || e);
             }
