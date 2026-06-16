@@ -40,6 +40,14 @@ public static class UserFacingErrors
         ["AUTH_TOKEN_EXPIRED"] = "Sessão expirada. Faça login novamente.",
         ["LIMITE_PLANO"] = "Limite do seu plano atingido.",
         ["LIMITE_IA"] = "Cota de IA esgotada.",
+        // Bloqueio de assinatura (SubscriptionGate da Api). Mensagens fallback caso a Api
+        // devolva so o code — a landing de assinatura usa textos proprios mais ricos.
+        ["ASSINATURA_BLOQUEADA"] = "Sua assinatura está bloqueada. Regularize para continuar.",
+        ["TRIAL_EXPIRED"] = "Seu período de teste terminou. Assine um plano para continuar.",
+        ["NO_SUBSCRIPTION"] = "Sua conta está sem uma assinatura ativa.",
+        ["SUBSCRIPTION_SUSPENDED"] = "Assinatura suspensa por pagamento pendente.",
+        ["SUBSCRIPTION_CANCELLED"] = "Assinatura cancelada. Reative para continuar.",
+        ["SUBSCRIPTION_EXPIRED"] = "Assinatura expirada. Reative para continuar.",
         ["TIMEOUT"] = "O servidor demorou para responder. Tente novamente.",
         ["NETWORK_ERROR"] = "Não foi possível conectar ao servidor. Verifique sua conexão.",
         ["SERVER_ERROR"] = "Erro interno no servidor. Tente novamente em instantes."
