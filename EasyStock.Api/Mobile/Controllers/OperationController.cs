@@ -59,20 +59,20 @@ public class OperationController(
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
 
+        var now = DateTime.UtcNow;
         var (todayStart, _) = HorarioBrasil.JanelaDiaUtc();
 
-        // Pedidos abertos (não entregue/cancelado)
+        // Pedidos abertos (não entregue/cancelado) — criterio compartilhado com a frota.
         var openOrdersQ = _db.Set<Order>().AsNoTracking()
-            .Where(o => o.EmpresaId == empresaId &&
-                        o.Status != "entregue" && o.Status != "cancelado");
+            .Where(o => o.EmpresaId == empresaId)
+            .Where(OperacaoCriterios.Aberto());
         if (lojaId.HasValue) openOrdersQ = openOrdersQ.Where(o => o.LojaId == lojaId);
         var openOrders = await openOrdersQ.ToListAsync(ct);
 
-        // Pedidos entregues hoje (vendas do dia, somatório)
+        // Pedidos entregues hoje (vendas do dia, somatório) — criterio compartilhado.
         var deliveredQ = _db.Set<Order>().AsNoTracking()
-            .Where(o => o.EmpresaId == empresaId &&
-                        o.Status == "entregue" &&
-                        o.UpdatedAt >= todayStart);
+            .Where(o => o.EmpresaId == empresaId)
+            .Where(OperacaoCriterios.EntregueHoje(todayStart));
         if (lojaId.HasValue) deliveredQ = deliveredQ.Where(o => o.LojaId == lojaId);
         var delivered = await deliveredQ.ToListAsync(ct);
 
@@ -93,21 +93,17 @@ public class OperationController(
         var sold = delivered.Sum(o => o.Total);
         var saldo = sold + cashIn - cashOut;
 
-        // Devices ativos (last seen <30min)
-        var devicesActiveSince = DateTime.UtcNow.AddMinutes(-30);
+        // Devices ativos (last seen <30min) — criterio compartilhado com a frota.
         var devicesQ = _db.Set<MobileDevice>().AsNoTracking()
-            .Where(d => d.EmpresaId == empresaId && !d.Revoked);
+            .Where(d => d.EmpresaId == empresaId)
+            .Where(OperacaoCriterios.DeviceContavel());
         if (lojaId.HasValue) devicesQ = devicesQ.Where(d => d.LojaId == lojaId);
         var devices = await devicesQ.ToListAsync(ct);
-        var activeDevices = devices.Count(d => d.LastSeenAt.HasValue && d.LastSeenAt >= devicesActiveSince);
+        var activeDevices = devices.Count(OperacaoCriterios.DeviceAtivo(now).Compile());
 
-        // Pedidos travados (preparando há >30min) — UX premium do app já tem isso
-        var stuckThreshold = DateTime.UtcNow.AddMinutes(-30);
-        var stuck = openOrders.Count(o => o.Status == "preparando" &&
-                                          (o.UpdatedAt < stuckThreshold || o.CreatedAt < stuckThreshold));
-
-        // Conferência pendente (pronto sem confirmedAt)
-        var conferPending = openOrders.Count(o => o.Status == "pronto" && o.ConfirmedAt == null);
+        // Pedidos travados (preparando há >30min) e conferência pendente — mesmos criterios da frota.
+        var stuck = openOrders.Count(OperacaoCriterios.Travado(now).Compile());
+        var conferPending = openOrders.Count(OperacaoCriterios.ConferenciaPendente().Compile());
 
         // Divergências de estoque (linkados onde mobile.Stock != ERP.Quantidade)
         // Faz uma estimativa rápida — full check fica em /produtos-mobile/divergencias
@@ -149,8 +145,8 @@ public class OperationController(
             CaixaSaidas: cashOut,
             // Pedidos
             PedidosAbertos: openOrders.Count,
-            PedidosPreparando: openOrders.Count(o => o.Status == "preparando"),
-            PedidosProntos: openOrders.Count(o => o.Status == "pronto"),
+            PedidosPreparando: openOrders.Count(o => o.Status == OperacaoCriterios.StatusPreparando),
+            PedidosProntos: openOrders.Count(o => o.Status == OperacaoCriterios.StatusPronto),
             PedidosTravados: stuck,
             ConferenciaPendente: conferPending,
             // Producao
