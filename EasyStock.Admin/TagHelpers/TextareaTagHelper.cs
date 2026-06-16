@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
 namespace EasyStock.Admin.TagHelpers;
@@ -22,6 +24,18 @@ public sealed class TextareaTagHelper : TagHelper
     public string? Placeholder { get; set; }
     public string? Helper { get; set; }
     public string? Error { get; set; }
+
+    /// <summary>asp-for: liga name/value e erro do ModelState quando presente. Aditivo — usos com name= nao mudam.</summary>
+    [HtmlAttributeName("asp-for")]
+    public ModelExpression? For { get; set; }
+
+    [HtmlAttributeName("help-text")]
+    public string? HelpText { get; set; }
+
+    [HtmlAttributeNotBound]
+    [ViewContext]
+    public ViewContext ViewContext { get; set; } = default!;
+
     public bool Required { get; set; }
     public bool Disabled { get; set; }
     public bool Readonly { get; set; }
@@ -36,6 +50,22 @@ public sealed class TextareaTagHelper : TagHelper
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
+        // asp-for (aditivo): deriva name/value e erro do ModelExpression + ModelState quando presente.
+        if (For != null)
+        {
+            Name ??= For.Name;
+            if (string.IsNullOrWhiteSpace(Value)) Value = For.Model?.ToString();
+            var modelState = ViewContext?.ViewData?.ModelState;
+            if (modelState != null && modelState.TryGetValue(For.Name, out var entry) && entry != null)
+            {
+                if (string.IsNullOrWhiteSpace(Error) && entry.Errors.Count > 0)
+                    Error = entry.Errors[0].ErrorMessage;
+                if (string.IsNullOrWhiteSpace(Value) && entry.AttemptedValue != null)
+                    Value = entry.AttemptedValue;
+            }
+        }
+        Helper ??= HelpText;
+
         output.TagName = "div";
         output.TagMode = TagMode.StartTagAndEndTag;
 
