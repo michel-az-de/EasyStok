@@ -11,6 +11,10 @@ namespace EasyStock.Admin.UnitTests;
 /// guardando que o HTML servidor-side nao tem double-encoding e que o empty-state
 /// renderiza. Renderiza as paginas reais (OnGet vazio, sem API) e assere o HTML
 /// emitido pelo servidor. Reusa a factory de XssRenderTests.
+///
+/// NOTA (issue 623): /Operacao deixou de ter empty-state "Selecione um cliente" —
+/// virou o Centro de Comando da Frota (carrega sozinho). O guard de double-encoding
+/// dessa rota vive agora em FleetMissionControlRenderTests.
 /// </summary>
 public class EmptyStateEncodingTests : IClassFixture<XssRenderTests.AdminFactory>
 {
@@ -19,7 +23,6 @@ public class EmptyStateEncodingTests : IClassFixture<XssRenderTests.AdminFactory
 
     [Theory]
     [InlineData("/Dispositivos")]
-    [InlineData("/Operacao")]
     public async Task EmptyState_sem_entidade_html_dupla_escapada(string rota)
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

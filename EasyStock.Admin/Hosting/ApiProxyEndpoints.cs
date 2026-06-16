@@ -119,6 +119,31 @@ public static class ApiProxyEndpoints
             }
         });
 
+        // Proxy do Centro de Comando da Frota (issue 623) — rollup operacional cross-tenant.
+        // Polling JS a cada ~25s; o Api ja faz cache curto. GetAsync desempacota o envelope data.
+        app.MapGet("/api-proxy/admin/operacao/fleet", async (
+            EasyStock.Admin.Services.AdminApiClient api,
+            EasyStock.Admin.Services.AdminSessionService session,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrEmpty(session.GetToken()))
+                return Results.Unauthorized();
+            try
+            {
+                var data = await api.GetAsync<JsonElement>("api/admin/operacao/fleet");
+                return Results.Ok(data);
+            }
+            catch (EasyStock.Admin.Services.SessionExpiredException)
+            {
+                return Results.Unauthorized();
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Proxy operacao/fleet: falha ao consultar API");
+                return Results.Json(new { error = "upstream_unavailable" }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
         // Proxy endpoint para exportaÃ§Ã£o CSV de Audit Logs
         app.MapGet("/api-proxy/audit-logs-csv", async (
             EasyStock.Admin.Services.AdminApiClient api,
