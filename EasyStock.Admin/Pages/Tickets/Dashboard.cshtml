@@ -6,103 +6,117 @@
     var maxNivel = Model.PorNivel.Values.DefaultIfEmpty(1).Max();
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+@* Fase 3: painel helpdesk no padrao deck (issue #626). Server-rendered. *@
+<header class="deck-head deck-rise" style="--deck-i:0; margin-bottom:20px;">
     <div>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Tickets">Tickets</es-breadcrumb-item>
             <es-breadcrumb-item>Painel</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">Painel Helpdesk</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">SLA, fila de criticidade e distribuição por nível</p>
+        <div class="deck-eyebrow deck-accent-underline" style="margin-top:8px;">Helpdesk</div>
+        <h1>Painel Helpdesk</h1>
+        <p>SLA, fila de criticidade e distribuição por nível</p>
     </div>
-    <es-button variant="ghost" href="/Tickets" icon="arrow-left">Lista de tickets</es-button>
-</div>
+    <div class="deck-head-actions">
+        <es-button variant="ghost" href="/Tickets" icon="arrow-left">Lista de tickets</es-button>
+    </div>
+</header>
 
-<!-- KPIs (6 cards) -->
-<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:20px;">
-    <div class="es-stat-card">
-        <div class="es-stat-label">Abertos</div>
-        <div class="es-stat-value">@Model.Abertos</div>
+<!-- KPIs (6) -->
+<section class="deck-rise" style="--deck-i:1; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:20px;">
+    <div class="deck-panel deck-tile">
+        <div class="deck-eyebrow">Abertos</div>
+        <div class="deck-kpi">@Model.Abertos</div>
     </div>
-    <div class="es-stat-card">
-        <div class="es-stat-label">Em atendimento</div>
-        <div class="es-stat-value" style="color:var(--orange-500);">@Model.EmAtendimento</div>
+    <div class="deck-panel deck-tile">
+        <div class="deck-eyebrow">Em atendimento</div>
+        <div class="deck-kpi" style="color:var(--orange-500);">@Model.EmAtendimento</div>
     </div>
-    <div class="es-stat-card">
-        <div class="es-stat-label">Aguard. cliente</div>
-        <div class="es-stat-value" style="color:var(--warn-600);">@Model.AguardandoCliente</div>
+    <div class="deck-panel deck-tile">
+        <div class="deck-eyebrow">Aguard. cliente</div>
+        <div class="deck-kpi" style="color:var(--warn-600);">@Model.AguardandoCliente</div>
     </div>
-    <div class="es-stat-card">
-        <div class="es-stat-label">Resolvidos hoje</div>
-        <div class="es-stat-value" style="color:var(--ok-600);">@Model.ResolvidosHoje</div>
+    <div class="deck-panel deck-tile">
+        <div class="deck-eyebrow">Resolvidos hoje</div>
+        <div class="deck-kpi" style="color:var(--ok-600);">@Model.ResolvidosHoje</div>
     </div>
-    <div class="es-stat-card" style="background:rgba(240,184,74,.08); border-color:rgba(240,184,74,.30);">
-        <div class="es-stat-label">SLA em risco</div>
-        <div class="es-stat-value" style="color:var(--warn-600);">@Model.SlaRisco</div>
+    <div class="deck-panel deck-tile">
+        <div class="deck-eyebrow">SLA em risco</div>
+        <div class="deck-kpi" style="color:var(--warn-600);">@Model.SlaRisco</div>
     </div>
-    <div class="es-stat-card" style="background:rgba(192,59,42,.08); border-color:rgba(192,59,42,.30);">
-        <div class="es-stat-label">SLA violado</div>
-        <div class="es-stat-value" style="color:var(--crit-600);">@Model.SlaViolado</div>
+    <div class="deck-panel deck-tile">
+        <div class="deck-eyebrow">SLA violado</div>
+        <div class="deck-kpi" style="color:var(--crit-600);">@Model.SlaViolado</div>
     </div>
-</div>
+</section>
 
-<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
+<section class="deck-rise" style="--deck-i:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
 
-    <es-card title="Fila de criticidade" description="Top 10 tickets críticos ordenados por SLA" card-class="" >
+    <article class="deck-panel">
+        <div class="deck-panel-head">
+            <h3>Fila de criticidade</h3>
+            <span class="deck-sub">Top 10 críticos por SLA</span>
+        </div>
         @if (!Model.FilaCriticidade.Any())
         {
-            <es-empty-state icon="check-circle" title="Sem tickets críticos" description="A fila está em dia." />
-        }
-        else
-        {
-            <div style="margin:-20px;">
-                <table class="es-data-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Ticket</th>
-                            <th scope="col">Empresa</th>
-                            <th scope="col">Prio</th>
-                            <th scope="col">Nível</th>
-                            <th scope="col">SLA</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var t in Model.FilaCriticidade)
-                        {
-                            var tid = t.TryGetProperty("id", out var tidP) ? tidP.GetString() : "";
-                            var titulo = t.TryGetProperty("titulo", out var titP) ? titP.GetString() : "";
-                            var empresa = t.TryGetProperty("empresaNome", out var empP) ? empP.GetString() : "—";
-                            var pri = t.TryGetProperty("prioridade", out var priP) ? priP.GetString() : "";
-                            var nivel = t.TryGetProperty("nivel", out var nvP) ? nvP.GetString() : "";
-                            var slaRespV = t.TryGetProperty("slaRespostaViolado", out var sv) && sv.GetBoolean();
-                            var prazoResp = t.TryGetProperty("prazoResposta", out var pp) && pp.ValueKind != JsonValueKind.Null ? pp.GetString() : null;
-                            DateTime.TryParse(prazoResp, out var prazoDt);
-                            string slaText = slaRespV ? "VIOLADO" : (prazoDt != default ? $"{(int)(prazoDt - DateTime.UtcNow).TotalMinutes}m" : "—");
-                            string slaVariant = slaRespV ? "crit" : "warn";
-                            var priVariant = pri?.ToLower() switch { "critica" => "crit", "alta" => "warn", _ => "neutral" };
-                            <tr style="cursor:pointer;" onclick="window.location.href='/Tickets/Detail/@tid'">
-                                <td style="color:var(--text-primary); font-weight:500;">@titulo</td>
-                                <td style="color:var(--text-muted); font-size:13px;">@empresa</td>
-                                <td><es-badge variant="@priVariant">@pri</es-badge></td>
-                                <td style="font-family:var(--font-mono); font-weight:700; color:var(--orange-500);">@nivel</td>
-                                <td><es-badge variant="@slaVariant">@slaText</es-badge></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+            <div style="padding:8px var(--s-5) 28px;">
+                <es-empty-state icon="check-circle" title="Sem tickets críticos" description="A fila está em dia." />
             </div>
         }
-    </es-card>
+        else
+        {
+            <table class="deck-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Ticket</th>
+                        <th scope="col">Empresa</th>
+                        <th scope="col">Prio</th>
+                        <th scope="col">Nível</th>
+                        <th scope="col">SLA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.FilaCriticidade)
+                    {
+                        var tid = t.TryGetProperty("id", out var tidP) ? tidP.GetString() : "";
+                        var titulo = t.TryGetProperty("titulo", out var titP) ? titP.GetString() : "";
+                        var empresa = t.TryGetProperty("empresaNome", out var empP) ? empP.GetString() : "—";
+                        var pri = t.TryGetProperty("prioridade", out var priP) ? priP.GetString() : "";
+                        var nivel = t.TryGetProperty("nivel", out var nvP) ? nvP.GetString() : "";
+                        var slaRespV = t.TryGetProperty("slaRespostaViolado", out var sv) && sv.GetBoolean();
+                        var prazoResp = t.TryGetProperty("prazoResposta", out var pp) && pp.ValueKind != JsonValueKind.Null ? pp.GetString() : null;
+                        DateTime.TryParse(prazoResp, out var prazoDt);
+                        string slaText = slaRespV ? "VIOLADO" : (prazoDt != default ? $"{(int)(prazoDt - DateTime.UtcNow).TotalMinutes}m" : "—");
+                        string slaVariant = slaRespV ? "crit" : "warn";
+                        var priVariant = pri?.ToLower() switch { "critica" => "crit", "alta" => "warn", _ => "neutral" };
+                        <tr style="cursor:pointer;" onclick="window.location.href='/Tickets/Detail/@tid'">
+                            <td><a href="/Tickets/Detail/@tid">@titulo</a></td>
+                            <td style="color:var(--text-muted); font-size:13px;">@empresa</td>
+                            <td><es-badge variant="@priVariant">@pri</es-badge></td>
+                            <td style="font-family:var(--font-mono); font-weight:700; color:var(--orange-500);">@nivel</td>
+                            <td><es-badge variant="@slaVariant">@slaText</es-badge></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </article>
 
-    <es-card title="Tickets ativos por nível" description="Distribuição da carga de trabalho">
+    <article class="deck-panel">
+        <div class="deck-panel-head">
+            <h3>Tickets ativos por nível</h3>
+            <span class="deck-sub">Distribuição da carga</span>
+        </div>
         @if (!Model.PorNivel.Any())
         {
-            <es-empty-state icon="trending-up" title="Sem dados" description="Não há tickets ativos no momento." />
+            <div style="padding:8px var(--s-5) 28px;">
+                <es-empty-state icon="trending-up" title="Sem dados" description="Não há tickets ativos no momento." />
+            </div>
         }
         else
         {
-            <div style="display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; flex-direction:column; gap:14px; padding:var(--s-2) var(--s-5) var(--s-5);">
                 @foreach (var (nivel, count) in Model.PorNivel)
                 {
                     var pct = maxNivel == 0 ? 0 : (count * 100 / maxNivel);
@@ -118,5 +132,5 @@
                 }
             </div>
         }
-    </es-card>
-</div>
+    </article>
+</section>
