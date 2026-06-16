@@ -38,7 +38,7 @@ public sealed class BackgroundJobOptions
     /// 1x/dia (09:00 UTC) processando notificacoes D-3, D-1 e marcando faturas
     /// como Vencida no D+0+. Default true em producao — recomendado.
     /// </summary>
-    public bool EnableFaturaVencimentoJob { get; set; }
+    public bool EnableFaturaVencimentoJob { get; set; } = true;
 
     /// <summary>
     /// Quando <c>true</c>, CobrancaAssinaturaJob envia emails de cobrança/dunning
