@@ -85,10 +85,23 @@
                         var pri = t.TryGetProperty("prioridade", out var priP) ? priP.GetString() : "";
                         var nivel = t.TryGetProperty("nivel", out var nvP) ? nvP.GetString() : "";
                         var slaRespV = t.TryGetProperty("slaRespostaViolado", out var sv) && sv.GetBoolean();
+                        var slaResolV = t.TryGetProperty("slaResolucaoViolado", out var srv) && srv.GetBoolean();
                         var prazoResp = t.TryGetProperty("prazoResposta", out var pp) && pp.ValueKind != JsonValueKind.Null ? pp.GetString() : null;
                         DateTime.TryParse(prazoResp, out var prazoDt);
-                        string slaText = slaRespV ? "VIOLADO" : (prazoDt != default ? $"{(int)(prazoDt - DateTime.UtcNow).TotalMinutes}m" : "—");
-                        string slaVariant = slaRespV ? "crit" : "warn";
+                        // BUG-07 (issue #631): guarda de negativo + le slaResolucaoViolado.
+                        // Antes imprimia minuto cru negativo (ex.: "-11252m") quando o ticket entrava
+                        // na fila por violacao de RESOLUCAO (slaRespV=false) com prazoResposta vencido.
+                        // Espelha o formatador por-ticket de Tickets/Index.cshtml.
+                        string slaText; string slaVariant;
+                        if (slaRespV || slaResolV) { slaVariant = "crit"; slaText = "VIOLADO"; }
+                        else if (prazoDt != default)
+                        {
+                            var restante = prazoDt.ToUniversalTime() - DateTime.UtcNow;
+                            if (restante.TotalMinutes < 0) { slaVariant = "crit"; slaText = "ATRASO"; }
+                            else if (restante.TotalMinutes < 60) { slaVariant = "warn"; slaText = $"{(int)restante.TotalMinutes}m"; }
+                            else { slaVariant = "warn"; slaText = $"{(int)restante.TotalHours}h"; }
+                        }
+                        else { slaVariant = "neutral"; slaText = "—"; }
                         var priVariant = pri?.ToLower() switch { "critica" => "crit", "alta" => "warn", _ => "neutral" };
                         <tr style="cursor:pointer;" onclick="window.location.href='/Tickets/Detail/@tid'">
                             <td><a href="/Tickets/Detail/@tid">@titulo</a></td>
