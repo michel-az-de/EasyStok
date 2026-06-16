@@ -1,0 +1,152 @@
+@model CardapioIndexViewModel
+@using System.Globalization
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Cardápio";
+    var ptBR = new CultureInfo("pt-BR");
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/cardapio.css" asp-append-version="true" />
+}
+
+<div class="flex items-start justify-between gap-4 mb-2 flex-wrap">
+    <div class="pg-hd">
+        <h1>Cardápio</h1>
+        <p>O que aparece na sua vitrine online.</p>
+    </div>
+    @if (Model.TemVitrine)
+    {
+        <div class="cdp-head-actions">
+            @if (!string.IsNullOrEmpty(Model.ImprimirUrl))
+            {
+                <a class="btn btn-ghost" href="@Model.ImprimirUrl" target="_blank" rel="noopener">Imprimir cardápio</a>
+            }
+            <es-button variant="primary" icon="plus" href="/cardapio/novo">Adicionar item</es-button>
+        </div>
+    }
+</div>
+
+@if (Model.TemVitrine)
+{
+    <p class="cdp-vitrine-tag mb-5">
+        @if (Model.VitrineAtiva)
+        {
+            <es-badge variant="ok" dot="true">Vitrine no ar</es-badge>
+        }
+        else
+        {
+            <es-badge variant="warn" dot="true">Vitrine ainda não publicada</es-badge>
+        }
+        <span>@Model.Total @(Model.Total == 1 ? "item" : "itens")</span>
+    </p>
+}
+
+@if (!Model.TemVitrine)
+{
+    <div class="ws text-center py-12">
+        <p class="text-lg font-semibold" style="color: var(--text-secondary, var(--ink-700));">Sua vitrine ainda não está pronta</p>
+        <p class="text-sm mt-2 max-w-md mx-auto" style="color: var(--text-muted, var(--ink-500));">
+            Assim que sua loja online for criada, seu cardápio aparece aqui. Fale com o suporte se precisar de ajuda.
+        </p>
+    </div>
+}
+else if (Model.Total == 0)
+{
+    <div class="ws anim-fadeInUp" style="border-left: 4px solid var(--orange-600); margin-bottom: 16px;">
+        <p class="font-semibold" style="color: var(--text-primary, var(--ink-900));">Vamos montar seu cardápio?</p>
+        <p class="text-sm mt-1" style="color: var(--text-muted, var(--ink-500));">
+            Cada item que você publicar aparece na sua vitrine online na hora.
+        </p>
+    </div>
+    <div class="text-center py-10">
+        <p class="text-lg font-semibold" style="color: var(--text-secondary, var(--ink-700));">Seu cardápio ainda está vazio</p>
+        <p class="text-sm mt-2 mb-5 max-w-sm mx-auto" style="color: var(--text-muted, var(--ink-500));">
+            Adicione o primeiro item — ele aparece na sua vitrine assim que você publicar.
+        </p>
+        <es-button variant="primary" icon="plus" href="/cardapio/novo">Adicionar primeiro item</es-button>
+    </div>
+}
+else
+{
+    @foreach (var grupo in Model.Grupos)
+    {
+        <section class="cdp-cat">
+            <header class="cdp-cat__hd">
+                <span class="cdp-cat__title">@grupo.Categoria</span>
+                <span class="cdp-cat__count">@grupo.Itens.Count @(grupo.Itens.Count == 1 ? "item" : "itens")</span>
+            </header>
+            <div class="cdp-grid">
+                @foreach (var item in grupo.Itens)
+                {
+                    var nomeJson = JsonSerializer.Serialize(item.NomeEfetivo);
+                    <article class="cdp-card"
+                             data-item-id="@item.Id"
+                             data-ordem="@item.OrdemExibicao.ToString(CultureInfo.InvariantCulture)"
+                             data-rascunho="@(item.Visivel ? "false" : "true")"
+                             data-esgotado="@(item.Disponivel ? "false" : "true")"
+                             x-data="cardapioCard({ id: '@item.Id', nome: @Html.Raw(nomeJson), visivel: @(item.Visivel ? "true" : "false"), disponivel: @(item.Disponivel ? "true" : "false") })"
+                             :data-rascunho="!visivel"
+                             :data-esgotado="!disponivel">
+                        <div class="cdp-card__photo">
+                            @if (!string.IsNullOrEmpty(item.FotoUrl))
+                            {
+                                <img src="@item.FotoUrl" alt="@item.NomeEfetivo" loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="cdp-card__ph">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                        <path d="M21 15l-5-5L5 21" />
+                                    </svg>
+                                    <span>Sem foto</span>
+                                </div>
+                            }
+                            <div class="cdp-card__badges">
+                                <span class="cdp-chip cdp-chip--rascunho" x-show="!visivel" x-cloak>Rascunho</span>
+                                <span class="cdp-chip cdp-chip--esgotado" x-show="!disponivel" x-cloak>Esgotado</span>
+                                @if (item.Avulso)
+                                {
+                                    <span class="cdp-chip cdp-chip--avulso" data-tooltip="Item sem ligação com o estoque do sistema.">avulso</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="cdp-card__body">
+                            <span class="cdp-card__nome">@item.NomeEfetivo</span>
+                            <span class="cdp-card__preco">@item.PrecoEfetivo.ToString("C", ptBR)</span>
+                            @if (!string.IsNullOrEmpty(item.PesoExibicao))
+                            {
+                                <span class="cdp-card__peso">@item.PesoExibicao</span>
+                            }
+                        </div>
+
+                        <div class="cdp-card__actions">
+                            <button type="button" class="cdp-act cdp-act--primary" @@click="togglePublicar()" :aria-busy="busy"
+                                    :aria-label="(visivel ? 'Voltar a rascunho: ' : 'Publicar: ') + @Html.Raw(nomeJson)">
+                                <span x-text="visivel ? 'Rascunho' : 'Publicar'">@(item.Visivel ? "Rascunho" : "Publicar")</span>
+                            </button>
+                            <button type="button" class="cdp-act" @@click="toggleDisponivel()" :aria-busy="busy"
+                                    :aria-label="(disponivel ? 'Marcar esgotado: ' : 'Marcar disponível: ') + @Html.Raw(nomeJson)">
+                                <span x-text="disponivel ? 'Esgotar' : 'Disponível'">@(item.Disponivel ? "Esgotar" : "Disponível")</span>
+                            </button>
+                            <a class="cdp-act" href="/cardapio/@item.Id/editar" aria-label="Editar @item.NomeEfetivo">Editar</a>
+                            <span class="cdp-act-spacer"></span>
+                            <span class="cdp-move" role="group" aria-label="Reordenar @item.NomeEfetivo">
+                                <button type="button" class="cdp-act" data-move="up" @@click="mover('up')" aria-label="Mover @item.NomeEfetivo para cima">↑</button>
+                                <button type="button" class="cdp-act" data-move="down" @@click="mover('down')" aria-label="Mover @item.NomeEfetivo para baixo">↓</button>
+                            </span>
+                            <button type="button" class="cdp-act cdp-act--danger" @@click="remover()" aria-label="Remover @item.NomeEfetivo">Remover</button>
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+}
+
+@section Scripts {
+    <script src="~/js/cardapio.js" asp-append-version="true"></script>
+}

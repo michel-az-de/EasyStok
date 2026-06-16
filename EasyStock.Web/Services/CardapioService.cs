@@ -16,49 +16,81 @@ public class CardapioService(ApiClient api)
     public Task<ApiResult<CardapioListaApi>> ListarAsync() =>
         api.GetAsync<CardapioListaApi>("minha-vitrine/cardapio");
 
-    public Task<ApiResult<object>> CriarAvulsoAsync(
-        string nome, decimal preco, string? categoria, string? fotoUrl, string? descricao, bool publicar) =>
-        api.PostAsync<object>("minha-vitrine/cardapio", new
+    /// <summary>Detalhe completo de um item — prefill do formulário de edição (GET-by-id).</summary>
+    public Task<ApiResult<CardapioItemDetalheApi>> ObterItemAsync(Guid itemId) =>
+        api.GetAsync<CardapioItemDetalheApi>($"minha-vitrine/cardapio/{itemId}");
+
+    /// <summary>
+    /// Cria item avulso (ProdutoId null) ou vinculado. A foto sobe DEPOIS, via
+    /// <see cref="UploadFotoAsync"/> (o item precisa existir primeiro). Para avulso o
+    /// NomePublico é obrigatório (validado no formulário antes do POST).
+    /// </summary>
+    public Task<ApiResult<CardapioCriarResultApi>> CriarAsync(CardapioItemFormApi f) =>
+        api.PostAsync<CardapioCriarResultApi>("minha-vitrine/cardapio", new
         {
-            produtoId = (Guid?)null,
-            nomePublico = nome,
-            categoriaTexto = categoria,
+            produtoId = f.ProdutoId,
+            nomePublico = f.NomePublico,
+            categoriaTexto = f.CategoriaTexto,
             ordemExibicao = 0.0,
-            visivel = publicar,
-            descricaoPublica = descricao,
-            fotoUrl,
-            precoStorefront = preco,
+            visivel = f.Visivel,
+            descricaoPublica = f.DescricaoPublica,
+            ingredientes = f.Ingredientes,
+            alergenos = f.Alergenos,
+            sugestaoMolho = f.SugestaoMolho,
+            tempoPreparo = f.TempoPreparo,
+            fotoUrl = (string?)null,        // foto sobe via endpoint dedicado após criar
+            precoStorefront = f.PrecoStorefront,
+            tag = f.Tag,
+            pesoExibicao = f.PesoExibicao,
+            filtrosJson = (string?)null,
         });
 
-    public Task<ApiResult<object>> CriarVinculadoAsync(
-        Guid produtoId, decimal? precoOverride, string? categoria, bool publicar) =>
-        api.PostAsync<object>("minha-vitrine/cardapio", new
-        {
-            produtoId,
-            nomePublico = (string?)null,
-            categoriaTexto = categoria,
-            ordemExibicao = 0.0,
-            visivel = publicar,
-            precoStorefront = precoOverride,
-        });
-
-    public Task<ApiResult<object>> EditarAsync(
-        Guid itemId, string? nome, decimal? preco, string? categoria, string? fotoUrl, string? descricao) =>
+    /// <summary>
+    /// Edição completa (PUT). Contrato do backend: <c>""</c> limpa o campo, <c>null</c> mantém.
+    /// FotoUrl segue null aqui (a foto só muda via <see cref="UploadFotoAsync"/>); FiltrosJson
+    /// também null pois não há controle no formulário v1 (null preserva o valor existente).
+    /// </summary>
+    public Task<ApiResult<object>> EditarAsync(Guid itemId, CardapioItemFormApi f) =>
         api.PutAsync<object>($"minha-vitrine/cardapio/{itemId}", new
         {
-            nomePublico = nome,
-            categoriaTexto = categoria,
-            descricaoPublica = descricao,
-            fotoUrl,
-            precoStorefront = preco,
+            nomePublico = f.NomePublico,
+            categoriaTexto = f.CategoriaTexto,
+            descricaoPublica = f.DescricaoPublica,
+            ingredientes = f.Ingredientes,
+            alergenos = f.Alergenos,
+            sugestaoMolho = f.SugestaoMolho,
+            tempoPreparo = f.TempoPreparo,
+            fotoUrl = (string?)null,
+            precoStorefront = f.PrecoStorefront,
+            tag = f.Tag,
+            pesoExibicao = f.PesoExibicao,
+            filtrosJson = (string?)null,
         });
 
-    public Task<ApiResult<object>> TogglePublicarAsync(Guid itemId) =>
-        api.PostAsync<object>($"minha-vitrine/cardapio/{itemId}/toggle-visivel", new { });
+    public Task<ApiResult<ToggleVisivelResultApi>> TogglePublicarAsync(Guid itemId) =>
+        api.PostAsync<ToggleVisivelResultApi>($"minha-vitrine/cardapio/{itemId}/toggle-visivel", new { });
 
-    public Task<ApiResult<object>> ToggleDisponivelAsync(Guid itemId) =>
-        api.PostAsync<object>($"minha-vitrine/cardapio/{itemId}/toggle-disponivel", new { });
+    public Task<ApiResult<ToggleDisponivelResultApi>> ToggleDisponivelAsync(Guid itemId) =>
+        api.PostAsync<ToggleDisponivelResultApi>($"minha-vitrine/cardapio/{itemId}/toggle-disponivel", new { });
 
     public Task<ApiResult<object>> ReordenarAsync(Guid itemId, double novaOrdem) =>
         api.PostAsync<object>($"minha-vitrine/cardapio/{itemId}/reordenar", new { novaOrdem });
+
+    public Task<ApiResult<bool>> RemoverAsync(Guid itemId) =>
+        api.DeleteAsync($"minha-vitrine/cardapio/{itemId}");
+
+    /// <summary>
+    /// Sobe a foto do item (multipart). O backend resolve a vitrine pelo token e fecha IDOR;
+    /// retorna a URL pública. Não força Content-Type do form — o boundary é do HttpClient.
+    /// </summary>
+    public async Task<ApiResult<CardapioFotoResultApi>> UploadFotoAsync(Guid itemId, IFormFile foto)
+    {
+        using var form = new MultipartFormDataContent();
+        await using var stream = foto.OpenReadStream();
+        var sc = new StreamContent(stream);
+        sc.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            foto.ContentType ?? "application/octet-stream");
+        form.Add(sc, "file", foto.FileName);
+        return await api.PostMultipartAsync<CardapioFotoResultApi>($"uploads/cardapio-item/{itemId}/foto", form);
+    }
 }

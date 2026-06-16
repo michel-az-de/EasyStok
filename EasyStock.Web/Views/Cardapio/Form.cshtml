@@ -1,0 +1,191 @@
+@model CardapioItemFormViewModel
+@using System.Globalization
+@using System.Text.Json
+@{
+    ViewData["Title"] = Model.EhEdicao ? "Editar item" : "Novo item";
+    var ptBR = new CultureInfo("pt-BR");
+    var categorias = ViewBag.Categorias as List<string> ?? new List<string>();
+    var vinculados = ViewBag.ProdutosVinculados as List<string> ?? new List<string>();
+    var precoStr = Model.PrecoStorefront?.ToString("0.##", ptBR);
+    var actionUrl = Model.EhEdicao ? $"/cardapio/{Model.Id}/atualizar" : "/cardapio/criar";
+    string? precoEfetivo = ViewBag.PrecoEfetivo is decimal pe ? pe.ToString("C", ptBR) : null;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/cardapio.css" asp-append-version="true" />
+}
+
+<div class="pg-hd mb-5">
+    <h1>@(Model.EhEdicao ? "Editar item" : "Adicionar item")</h1>
+    <p>O que aparece na sua vitrine online.</p>
+</div>
+
+<form id="cardapio-form" method="post" class="cdp-form"
+      x-data="cardapioForm({
+        modo: '@Model.Modo',
+        ehEdicao: @(Model.EhEdicao ? "true" : "false"),
+        itemId: '@(Model.Id?.ToString() ?? "")',
+        actionUrl: '@actionUrl',
+        produtoId: '@(Model.ProdutoId?.ToString() ?? "")',
+        produtoNome: @Html.Raw(JsonSerializer.Serialize(Model.ProdutoNome ?? "")),
+        fotoUrl: @Html.Raw(JsonSerializer.Serialize(Model.FotoUrl ?? "")),
+        publicar: @(Model.Publicar ? "true" : "false"),
+        descLen: @(Model.DescricaoPublica?.Length ?? 0),
+        vinculados: @Html.Raw(JsonSerializer.Serialize(vinculados))
+      })"
+      x-init="init($el)">
+
+    <input type="hidden" name="Modo" :value="modo" />
+
+    @* ── Modo (só na criação) ── *@
+    @if (!Model.EhEdicao)
+    {
+        <fieldset>
+            <legend class="block text-sm font-medium mb-2">Como você quer cadastrar?</legend>
+            <div class="cdp-modo">
+                <label class="cdp-modo__opt" :data-on="modo==='avulso'">
+                    <input type="radio" name="_modo" value="avulso" x-model="modo" class="mt-1" />
+                    <span><h4>Item novo</h4><p>Você digita nome e preço. Para quem não usa o estoque do sistema.</p></span>
+                </label>
+                <label class="cdp-modo__opt" :data-on="modo==='vinculado'">
+                    <input type="radio" name="_modo" value="vinculado" x-model="modo" class="mt-1" />
+                    <span><h4>Usar produto do estoque</h4><p>Puxa nome e preço do que você já tem cadastrado.</p></span>
+                </label>
+            </div>
+        </fieldset>
+    }
+
+    @* ── Produto (vinculado) ── *@
+    <div class="cdp-typeahead" x-show="modo==='vinculado'" x-cloak @@click.outside="taOpen=false">
+        <label class="block text-sm font-medium mb-1">Produto do estoque <span aria-hidden="true">*</span></label>
+        @if (Model.EhEdicao)
+        {
+            <input class="ui-field" value="@Model.ProdutoNome" readonly aria-readonly="true" />
+            <input type="hidden" name="ProdutoId" :value="produtoId" />
+            <p class="text-xs mt-1" style="color: var(--text-muted, var(--ink-500));">O produto vinculado não muda na edição.</p>
+        }
+        else
+        {
+            <input class="ui-field" type="text" x-model="taQuery" @@input.debounce.300ms="taSearch()" @@keydown="taKey($event)"
+                   placeholder="Busque pelo nome…" autocomplete="off" role="combobox" :aria-expanded="taOpen" aria-controls="cdp-ta-list" />
+            <input type="hidden" name="ProdutoId" :value="produtoId" />
+            <div class="cdp-typeahead__list" id="cdp-ta-list" role="listbox" x-show="taOpen" x-cloak>
+                <template x-for="(p, idx) in taResults" :key="p.id">
+                    <div class="cdp-typeahead__opt" role="option" :data-active="idx===taActive"
+                         @@mousedown.prevent="taPick(p)" x-text="p.nome"></div>
+                </template>
+            </div>
+            <p class="text-xs mt-1" x-show="produtoNome" x-cloak style="color: var(--ok-600);">
+                Selecionado: <span x-text="produtoNome"></span>
+            </p>
+        }
+    </div>
+
+    @* ── Nome (avulso) ── *@
+    <div x-show="modo==='avulso'" x-cloak>
+        <label for="cdp-nome" class="block text-sm font-medium mb-1">Nome do item <span aria-hidden="true">*</span></label>
+        <input id="cdp-nome" name="NomePublico" class="ui-field" value="@Model.NomePublico"
+               placeholder="Ex: Lasanha à bolonhesa (família)" maxlength="200" autocomplete="off" />
+        <p class="text-xs mt-1" style="color: var(--text-muted, var(--ink-500));">Como aparece na sua vitrine. Obrigatório.</p>
+        <p class="text-xs mt-1" role="alert" x-show="erroNome" x-cloak x-text="erroNome" style="color: var(--crit-600);"></p>
+    </div>
+
+    @* ── Preço ── *@
+    <div>
+        <label for="cdp-preco" class="block text-sm font-medium mb-1">
+            Preço (R$) <span x-show="modo==='avulso'" x-cloak aria-hidden="true">*</span>
+        </label>
+        <input id="cdp-preco" name="PrecoStorefront" class="ui-field" value="@precoStr"
+               inputmode="decimal" placeholder="0,00" autocomplete="off" />
+        <p class="text-xs mt-1" style="color: var(--text-muted, var(--ink-500));">
+            Quanto o cliente paga por este item.
+            <span x-show="modo==='vinculado'" x-cloak>Deixe em branco para usar o preço do produto@(precoEfetivo != null ? $" ({precoEfetivo})" : "").</span>
+        </p>
+        <p class="text-xs mt-1" role="alert" x-show="erroPreco" x-cloak x-text="erroPreco" style="color: var(--crit-600);"></p>
+    </div>
+
+    @* ── Categoria ── *@
+    <div>
+        <label for="cdp-cat" class="block text-sm font-medium mb-1">Categoria</label>
+        <input id="cdp-cat" name="CategoriaTexto" class="ui-field" value="@Model.CategoriaTexto"
+               list="cdp-categorias" placeholder="Ex: Massas" maxlength="100" autocomplete="off" />
+        <datalist id="cdp-categorias">
+            @foreach (var c in categorias)
+            {
+                <option value="@c"></option>
+            }
+        </datalist>
+        <p class="text-xs mt-1" style="color: var(--text-muted, var(--ink-500));">Agrupa os itens na vitrine (ex: Massas, Sobremesas).</p>
+    </div>
+
+    @* ── Foto ── *@
+    <div>
+        <label for="cdp-foto" class="block text-sm font-medium mb-1">Foto</label>
+        <div class="cdp-uploader">
+            <div class="cdp-uploader__preview">
+                <img x-show="fotoUrl" x-cloak :src="fotoUrl" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />
+                <span x-show="!fotoUrl">sem foto</span>
+            </div>
+            <div>
+                <input id="cdp-foto" type="file" name="foto" accept="image/jpeg,image/png,image/webp"
+                       @@change="onPickFoto($event)" class="ui-field" />
+                <p class="cdp-uploader__hint">JPG, PNG ou WebP, até 6 MB.@(Model.EhEdicao ? " A nova foto substitui a anterior." : "")</p>
+            </div>
+        </div>
+    </div>
+
+    @* ── Descrição ── *@
+    <div>
+        <label for="cdp-desc" class="block text-sm font-medium mb-1">Descrição</label>
+        <textarea id="cdp-desc" name="DescricaoPublica" class="ui-field" rows="3" maxlength="240"
+                  @@input="onDesc($event)" placeholder="Conte o que torna o item especial.">@Model.DescricaoPublica</textarea>
+        <div class="cdp-counter" :data-over="descLen>240"><span x-text="descLen">@(Model.DescricaoPublica?.Length ?? 0)</span>/240</div>
+    </div>
+
+    @* ── Publicar ── *@
+    <div>
+        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" name="Publicar" value="true" x-model="publicar" class="ui-checkbox" />
+            <span class="text-sm font-medium">Publicar agora</span>
+        </label>
+        <p class="text-xs mt-1" style="color: var(--text-muted, var(--ink-500));">Desmarcado, fica como rascunho e só você vê.</p>
+    </div>
+
+    @* ── Detalhes para o cliente (opcional) ── *@
+    <details class="ws" style="padding: 16px 18px;">
+        <summary class="text-sm font-semibold cursor-pointer" style="color: var(--text-primary, var(--ink-900));">Detalhes para o cliente (opcional)</summary>
+        <div class="grid gap-4 mt-4">
+            <div>
+                <label for="cdp-ingr" class="block text-sm font-medium mb-1">Ingredientes</label>
+                <input id="cdp-ingr" name="Ingredientes" class="ui-field" value="@Model.Ingredientes" maxlength="500" placeholder="Farinha, ovos, espinafre…" />
+            </div>
+            <div>
+                <label for="cdp-aler" class="block text-sm font-medium mb-1">Contém (alergênicos)</label>
+                <input id="cdp-aler" name="Alergenos" class="ui-field" value="@Model.Alergenos" maxlength="200" placeholder="Glúten, leite" />
+            </div>
+            <div>
+                <label for="cdp-molho" class="block text-sm font-medium mb-1">Sugestão de molho</label>
+                <input id="cdp-molho" name="SugestaoMolho" class="ui-field" value="@Model.SugestaoMolho" maxlength="200" placeholder="Ao sugo, branco…" />
+            </div>
+            <div>
+                <label for="cdp-tempo" class="block text-sm font-medium mb-1">Tempo de preparo</label>
+                <input id="cdp-tempo" name="TempoPreparo" class="ui-field" value="@Model.TempoPreparo" maxlength="50" placeholder="20 min no forno" />
+            </div>
+            <div>
+                <label for="cdp-peso" class="block text-sm font-medium mb-1">Peso ou porção</label>
+                <input id="cdp-peso" name="PesoExibicao" class="ui-field" value="@Model.PesoExibicao" maxlength="50" placeholder="500 g · serve 2-3" />
+            </div>
+        </div>
+    </details>
+
+    <div class="cdp-form-footer">
+        <a class="btn btn-ghost" href="/cardapio">Cancelar</a>
+        <button type="submit" class="btn btn-primary" :aria-busy="saving" :disabled="saving">
+            <span x-text="ehEdicao ? 'Salvar alterações' : (publicar ? 'Publicar item' : 'Salvar rascunho')">@(Model.EhEdicao ? "Salvar alterações" : (Model.Publicar ? "Publicar item" : "Salvar rascunho"))</span>
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/cardapio.js" asp-append-version="true"></script>
+}

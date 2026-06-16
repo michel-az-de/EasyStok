@@ -60,6 +60,8 @@ public static class MenuDefinition
                 new[] { "Caixa", "CaixaMobile" }),
             new MenuItem("clientes", "Clientes", "users", "/clientes",
                 new[] { "Clientes", "ClientesMobile" }),
+            new MenuItem("cardapio", "Cardápio", "store", "/cardapio",
+                new[] { "Cardapio" }),
         }),
         new MenuGroup("producao-estoque", "Produção e estoque", "boxes", new[]
         {
