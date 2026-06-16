@@ -174,9 +174,9 @@ function mobileSyncHealth(tenantId) {
     </div>
 
     <!-- Modal Suspender -->
-    <div x-show="modal === 'suspender'" x-cloak class="modal-overlay" @@click.self="modal = null">
+    <div x-show="modal === 'suspender'" x-cloak class="modal-overlay" @@click.self="modal = null" @@keydown.escape.window="modal = null" x-trap.inert.noscroll="modal === 'suspender'" role="dialog" aria-modal="true" aria-labelledby="modal-suspender-title">
         <div class="modal-box" @@click.stop>
-            <h3 class="text-es-ink font-semibold mb-4">Suspender Tenant</h3>
+            <h3 id="modal-suspender-title" class="text-es-ink font-semibold mb-4">Suspender Tenant</h3>
             <form method="post" asp-page-handler="Suspender">
                 @Html.AntiForgeryToken()
                 <div class="mb-4">
@@ -197,9 +197,9 @@ function mobileSyncHealth(tenantId) {
     </div>
 
     <!-- Modal Trocar Plano -->
-    <div x-show="modal === 'plano'" x-cloak class="modal-overlay" @@click.self="modal = null">
+    <div x-show="modal === 'plano'" x-cloak class="modal-overlay" @@click.self="modal = null" @@keydown.escape.window="modal = null" x-trap.inert.noscroll="modal === 'plano'" role="dialog" aria-modal="true" aria-labelledby="modal-plano-title">
         <div class="modal-box" @@click.stop>
-            <h3 class="text-es-ink font-semibold mb-4">Trocar Plano</h3>
+            <h3 id="modal-plano-title" class="text-es-ink font-semibold mb-4">Trocar Plano</h3>
             <form method="post" asp-page-handler="TrocarPlano">
                 @Html.AntiForgeryToken()
                 <div class="mb-4">
@@ -559,10 +559,10 @@ function mobileSyncHealth(tenantId) {
         </div>
 
         <!-- Modal Sessões -->
-        <div x-show="sessoesUserId" x-cloak class="modal-overlay" @@click.self="sessoesUserId = null" @@keydown.escape.window="sessoesUserId = null">
+        <div x-show="sessoesUserId" x-cloak class="modal-overlay" @@click.self="sessoesUserId = null" @@keydown.escape.window="sessoesUserId = null" x-trap.inert.noscroll="sessoesUserId" role="dialog" aria-modal="true" aria-labelledby="modal-sessoes-title">
             <div class="modal-box max-w-2xl" @@click.stop>
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-es-ink font-semibold">Sessões ativas</h3>
+                    <h3 id="modal-sessoes-title" class="text-es-ink font-semibold">Sessões ativas</h3>
                     <button type="button" @@click="sessoesUserId = null" class="text-es-ink-mute hover:text-es-ink">✕</button>
                 </div>
                 <div x-show="sessoesLoading" x-cloak class="text-es-ink-mute text-sm py-6 text-center">Carregando sessões…</div>
@@ -602,7 +602,7 @@ function mobileSyncHealth(tenantId) {
         <!-- Modal Adicionar usuário ao tenant -->
         <div x-show="modalNovoUsuario" x-cloak class="modal-overlay"
              @@click.self="modalNovoUsuario = false" @@keydown.escape.window="modalNovoUsuario = false"
-             role="dialog" aria-modal="true" aria-labelledby="modal-novo-usuario-title">
+             x-trap.inert.noscroll="modalNovoUsuario" role="dialog" aria-modal="true" aria-labelledby="modal-novo-usuario-title">
             <div class="modal-box max-w-md" x-data="{ motivoNovo: '', submitting: false }" @@click.stop>
                 <div class="flex items-start justify-between gap-3 mb-1">
                     <div>
@@ -675,12 +675,13 @@ function mobileSyncHealth(tenantId) {
         <!-- Modal Editar usuário (com diff before/after) -->
         <div x-data="editarUsuarioModal()" x-init="init()"
              x-show="open" x-cloak class="modal-overlay"
-             @@click.self="close()" @@keydown.escape.window="close()">
+             @@click.self="close()" @@keydown.escape.window="close()"
+             x-trap.inert.noscroll="open" role="dialog" aria-modal="true" aria-labelledby="modal-editar-usuario-title">
             <div class="modal-box max-w-md" @@click.stop>
                 <div class="flex items-start gap-3 mb-4">
                     <div class="text-2xl">✏️</div>
                     <div class="flex-1">
-                        <h3 class="text-es-ink font-semibold">Editar dados do usuário</h3>
+                        <h3 id="modal-editar-usuario-title" class="text-es-ink font-semibold">Editar dados do usuário</h3>
                         <p class="text-es-ink-dim text-xs mt-1">As alterações são auditadas com seu nome.</p>
                     </div>
                 </div>
@@ -799,12 +800,13 @@ function mobileSyncHealth(tenantId) {
 
         <!-- Modal global PII reveal — escuta `open-pii-reveal` -->
         <div x-data="piiRevealModal()" x-init="init()" x-show="open" x-cloak
-             class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()">
+             class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()"
+             x-trap.inert.noscroll="open" role="dialog" aria-modal="true" aria-labelledby="modal-pii-title">
             <div class="modal-box max-w-md" @@click.stop>
                 <div class="flex items-start gap-3 mb-4">
                     <div class="text-2xl">👁</div>
                     <div class="flex-1">
-                        <h3 class="text-es-ink font-semibold">Visualizar dado pessoal</h3>
+                        <h3 id="modal-pii-title" class="text-es-ink font-semibold">Visualizar dado pessoal</h3>
                         <p class="text-es-ink-dim text-xs mt-1">
                             Você está prestes a visualizar <b x-text="cfg.campo"></b> em texto-claro.
                             Esta visualização será registrada no log LGPD com seu nome.
@@ -884,12 +886,13 @@ function mobileSyncHealth(tenantId) {
         <!-- Modal Anonimizar (LGPD double-confirm) -->
         @{ var afLgpd = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken; }
         <div x-data="anonimizarModal()" x-init="init()" x-show="open" x-cloak
-             class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()">
+             class="modal-overlay" @@click.self="close()" @@keydown.escape.window="close()"
+             x-trap.inert.noscroll="open" role="dialog" aria-modal="true" aria-labelledby="modal-anonimizar-title">
             <div class="modal-box max-w-lg" @@click.stop>
                 <div class="flex items-start gap-3 mb-4">
                     <div class="text-2xl">⚠️</div>
                     <div class="flex-1">
-                        <h3 class="text-red-400 font-bold">Anonimizar usuário</h3>
+                        <h3 id="modal-anonimizar-title" class="text-red-400 font-bold">Anonimizar usuário</h3>
                         <p class="text-es-ink-dim text-xs mt-1">
                             <strong class="text-red-400">Operação irreversível.</strong> Os dados pessoais
                             (nome, email, avatar) serão pseudonimizados; senha será apagada; sessões e
@@ -1043,9 +1046,9 @@ function mobileSyncHealth(tenantId) {
         }
 
         <!-- Modal Nova Loja -->
-        <div x-show="novaOpen" x-cloak class="modal-overlay" @@click.self="novaOpen = false" @@keydown.escape.window="novaOpen = false">
+        <div x-show="novaOpen" x-cloak class="modal-overlay" @@click.self="novaOpen = false" @@keydown.escape.window="novaOpen = false" x-trap.inert.noscroll="novaOpen" role="dialog" aria-modal="true" aria-labelledby="modal-nova-loja-title">
             <div class="modal-box max-w-md" @@click.stop>
-                <h3 class="text-es-ink font-semibold mb-4">Nova loja</h3>
+                <h3 id="modal-nova-loja-title" class="text-es-ink font-semibold mb-4">Nova loja</h3>
                 <form method="post" action="/Tenants/Detail/@Model.Id?handler=CriarLoja" x-data="esField({ required: true, minLength: 10 })">
                     <input type="hidden" name="__RequestVerificationToken" value="@afLojas" />
                     <div class="mb-3"><label class="form-label">Nome *</label>
@@ -1076,11 +1079,11 @@ function mobileSyncHealth(tenantId) {
         </div>
 
         <!-- Modal Editar Loja -->
-        <div x-show="editandoLoja" x-cloak class="modal-overlay" @@click.self="editandoLoja = null" @@keydown.escape.window="editandoLoja = null">
+        <div x-show="editandoLoja" x-cloak class="modal-overlay" @@click.self="editandoLoja = null" @@keydown.escape.window="editandoLoja = null" x-trap.inert.noscroll="editandoLoja" role="dialog" aria-modal="true" aria-labelledby="modal-editar-loja-title">
             <div class="modal-box max-w-md" @@click.stop x-show="editandoLoja">
                 <template x-if="editandoLoja">
                     <div>
-                        <h3 class="text-es-ink font-semibold mb-4">Editar loja: <span x-text="editandoLoja.nome"></span></h3>
+                        <h3 id="modal-editar-loja-title" class="text-es-ink font-semibold mb-4">Editar loja: <span x-text="editandoLoja.nome"></span></h3>
                         <form method="post" :action="'/Tenants/Detail/@Model.Id?handler=AtualizarLoja&lojaId=' + editandoLoja.id" x-data="esField({ required: true, minLength: 10 })">
                             <input type="hidden" name="__RequestVerificationToken" value="@afLojas" />
                             <div class="mb-3"><label class="form-label">Nome *</label>
