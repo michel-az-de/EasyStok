@@ -152,8 +152,25 @@ else
 <!-- Modal Novo Cupom -->
 <es-modal id="novo-cupom" title="Novo cupom" description="Configure os detalhes do desconto." size="md">
     <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;"
-          x-data="{ loading: false }" x-on:submit="loading = true">
+          x-data="{ loading: false, erro: '' }"
+          x-on:submit="
+            erro = '';
+            let bloquear = false;
+            try {
+                const f = $event.target;
+                const tipo = f.tipoDesconto ? f.tipoDesconto.value : '';
+                const valor = f.valor ? parseFloat(f.valor.value) : NaN;
+                if (tipo === 'Percentual' && !isNaN(valor) && valor > 100) { erro = 'Desconto percentual nao pode passar de 100%.'; bloquear = true; }
+                else if (f.validoAte && f.validoAte.value) { const d = new Date(f.validoAte.value + 'T00:00:00'); const hoje = new Date(); hoje.setHours(0,0,0,0); if (d < hoje) { erro = 'Data de validade nao pode estar no passado.'; bloquear = true; } }
+            } catch (e) { }
+            if (bloquear) { $event.preventDefault(); } else { loading = true; }
+          ">
         @Html.AntiForgeryToken()
+        @* BUG-09 (issue #632): valida cross-field no cliente (percentual maior que 100, data passada) *@
+        @* pra nao perder os dados digitados num RedirectToPage; o servidor segue validando como backstop. *@
+        <div x-show="erro" x-cloak
+             style="background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.40); border-radius:8px; padding:8px 12px; font-size:13px; color:var(--text-primary);"
+             x-text="erro"></div>
         <es-input name="codigo" label="Código" placeholder="PROMO10" required="true"
                   pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="50"
                   helper="3 a 50 caracteres: letras, números, hífen e underscore." input-class="uppercase" />
