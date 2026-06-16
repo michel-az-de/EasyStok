@@ -7,18 +7,20 @@
     string FmtNumber(int v) => v.ToString("N0", new System.Globalization.CultureInfo("pt-BR"));
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+@* Fase 3: painel financeiro no padrao deck (issue #625). Server-rendered. *@
+<header class="deck-head deck-rise" style="--deck-i:0; margin-bottom:20px;">
     <div>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Faturas">Faturas</es-breadcrumb-item>
             <es-breadcrumb-item>Painel financeiro</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">Painel financeiro</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Receita, churn e inadimplência por período</p>
+        <div class="deck-eyebrow deck-accent-underline" style="margin-top:8px;">Financeiro</div>
+        <h1>Painel financeiro</h1>
+        <p>Receita, churn e inadimplência por período</p>
     </div>
-    <form method="get" style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.06em;">Janela</span>
+    <form method="get" class="deck-head-actions">
+        <span class="deck-eyebrow">Janela</span>
         <select name="dias" onchange="this.form.submit()" class="es-form-select" style="width:auto;">
             <option value="7" selected="@(Model.Dias == 7)">7 dias</option>
             <option value="30" selected="@(Model.Dias == 30)">30 dias</option>
@@ -27,7 +29,7 @@
             <option value="365" selected="@(Model.Dias == 365)">12 meses</option>
         </select>
     </form>
-</div>
+</header>
 
 @if (Model.Carregada)
 {
@@ -36,111 +38,113 @@
     var totalCohort = ativas + canceladas;
     var churnPct = totalCohort > 0 ? Math.Round((decimal)canceladas / totalCohort * 100m, 1) : 0m;
 
-    <!-- Linha 1: receita -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:14px;">
-        <div class="es-stat-card">
-            <div class="es-stat-label">MRR</div>
-            <div class="es-stat-value">@FmtCurrency(Model.Dec("mrr"))</div>
-            <div class="es-stat-meta"><span>Receita recorrente mensal</span></div>
+    <!-- Linha 1: receita (hero numerals) -->
+    <section class="deck-rise" style="--deck-i:1; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:14px;">
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">MRR</div>
+            <div class="deck-kpi">@FmtCurrency(Model.Dec("mrr"))</div>
+            <div class="deck-meta">Receita recorrente mensal</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">ARR</div>
-            <div class="es-stat-value">@FmtCurrency(Model.Dec("arr"))</div>
-            <div class="es-stat-meta"><span>MRR × 12</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">ARR</div>
+            <div class="deck-kpi">@FmtCurrency(Model.Dec("arr"))</div>
+            <div class="deck-meta">MRR × 12</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Receita no período</div>
-            <div class="es-stat-value" style="color:var(--ok-600);">@FmtCurrency(Model.Dec("receitaPeriodo"))</div>
-            <div class="es-stat-meta"><span>@Model.Int("faturasPagasPeriodo") fatura(s) paga(s)</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Receita no período</div>
+            <div class="deck-kpi" style="color:var(--ok-600);">@FmtCurrency(Model.Dec("receitaPeriodo"))</div>
+            <div class="deck-meta">@Model.Int("faturasPagasPeriodo") fatura(s) paga(s)</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Em atraso</div>
-            <div class="es-stat-value" style="color:var(--crit-600);">@FmtCurrency(Model.Dec("valorVencido"))</div>
-            <div class="es-stat-meta"><span>@Model.Int("faturasVencidas") fatura(s) vencida(s)</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Em atraso</div>
+            <div class="deck-kpi" style="color:var(--crit-600);">@FmtCurrency(Model.Dec("valorVencido"))</div>
+            <div class="deck-meta">@Model.Int("faturasVencidas") fatura(s) vencida(s)</div>
         </div>
-    </div>
+    </section>
 
     <!-- Linha 2: assinaturas -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:14px;">
-        <div class="es-stat-card">
-            <div class="es-stat-label">Assinaturas ativas</div>
-            <div class="es-stat-value es-stat-value-sm">@FmtNumber(Model.Int("assinaturasAtivas"))</div>
+    <section class="deck-rise" style="--deck-i:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:14px;">
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Assinaturas ativas</div>
+            <div class="deck-kpi" style="font-size:26px;">@FmtNumber(Model.Int("assinaturasAtivas"))</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Suspensas</div>
-            <div class="es-stat-value es-stat-value-sm" style="color:var(--warn-600);">@FmtNumber(Model.Int("assinaturasSuspensas"))</div>
-            <div class="es-stat-meta"><span>Inadimplência provável</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Suspensas</div>
+            <div class="deck-kpi" style="font-size:26px; color:var(--warn-600);">@FmtNumber(Model.Int("assinaturasSuspensas"))</div>
+            <div class="deck-meta">Inadimplência provável</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Canceladas</div>
-            <div class="es-stat-value es-stat-value-sm" style="color:var(--text-muted);">@FmtNumber(Model.Int("assinaturasCanceladas"))</div>
-            <div class="es-stat-meta"><span>Acumulado histórico</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Canceladas</div>
+            <div class="deck-kpi" style="font-size:26px; color:var(--text-muted);">@FmtNumber(Model.Int("assinaturasCanceladas"))</div>
+            <div class="deck-meta">Acumulado histórico</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Churn aprox.</div>
-            <div class="es-stat-value es-stat-value-sm" style="color:@(churnPct > 10m ? "var(--crit-600)" : "var(--text-primary)");">@churnPct.ToString("0.0")%</div>
-            <div class="es-stat-meta"><span>Cancel / (Ativa + Cancel)</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Churn aprox.</div>
+            <div class="deck-kpi" style="font-size:26px; color:@(churnPct > 10m ? "var(--crit-600)" : "var(--text-primary)");">@churnPct.ToString("0.0")%</div>
+            <div class="deck-meta">Cancel / (Ativa + Cancel)</div>
         </div>
-    </div>
+    </section>
 
     <!-- Linha 3: KPIs operacionais -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:24px;">
-        <div class="es-stat-card">
-            <div class="es-stat-label">Conversão</div>
-            <div class="es-stat-value es-stat-value-sm">@Model.Dec("taxaConversao").ToString("0.0")%</div>
-            <div class="es-stat-meta"><span>Pagas / Emitidas</span></div>
+    <section class="deck-rise" style="--deck-i:3; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:24px;">
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Conversão</div>
+            <div class="deck-kpi" style="font-size:26px;">@Model.Dec("taxaConversao").ToString("0.0")%</div>
+            <div class="deck-meta">Pagas / Emitidas</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Ticket médio</div>
-            <div class="es-stat-value es-stat-value-sm">@FmtCurrency(Model.Dec("ticketMedio"))</div>
-            <div class="es-stat-meta"><span>Receita / Pagas</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Ticket médio</div>
+            <div class="deck-kpi" style="font-size:26px;">@FmtCurrency(Model.Dec("ticketMedio"))</div>
+            <div class="deck-meta">Receita / Pagas</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Atraso médio</div>
-            <div class="es-stat-value es-stat-value-sm" style="color:@(Model.Dbl("atrasoMedioDias") > 30d ? "var(--crit-600)" : "var(--text-primary)");">@Model.Dbl("atrasoMedioDias").ToString("0.0") d</div>
-            <div class="es-stat-meta"><span>Vencidas em aberto</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Atraso médio</div>
+            <div class="deck-kpi" style="font-size:26px; color:@(Model.Dbl("atrasoMedioDias") > 30d ? "var(--crit-600)" : "var(--text-primary)");">@Model.Dbl("atrasoMedioDias").ToString("0.0") d</div>
+            <div class="deck-meta">Vencidas em aberto</div>
         </div>
-        <div class="es-stat-card">
-            <div class="es-stat-label">Faturas no período</div>
-            <div class="es-stat-value es-stat-value-sm">@FmtNumber(Model.Int("faturasEmitidasPeriodo"))</div>
-            <div class="es-stat-meta"><span>Paga + Emitida + Vencida</span></div>
+        <div class="deck-panel deck-tile">
+            <div class="deck-eyebrow">Faturas no período</div>
+            <div class="deck-kpi" style="font-size:26px;">@FmtNumber(Model.Int("faturasEmitidasPeriodo"))</div>
+            <div class="deck-meta">Paga + Emitida + Vencida</div>
         </div>
-    </div>
+    </section>
 
     @if (Model.TopInadimplentes.Any())
     {
-        <es-card title="Top inadimplentes" description="Empresas com maior valor vencido em aberto">
-            <div style="margin:-20px;">
-                <table class="es-data-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Empresa</th>
-                            <th scope="col" class="es-data-table-td-numeric">Vencidas</th>
-                            <th scope="col" class="es-data-table-td-numeric">Valor total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var t in Model.TopInadimplentes)
-                        {
-                            var empId = t.TryGetProperty("empresaId", out var eid) ? eid.GetString() : "";
-                            var empNome = t.TryGetProperty("empresaNome", out var en) && en.ValueKind != JsonValueKind.Null ? en.GetString() : "(sem nome)";
-                            var qtd = t.TryGetProperty("quantidadeVencidas", out var q) ? q.GetInt32() : 0;
-                            var valor = t.TryGetProperty("valorTotalVencido", out var v) ? v.GetDecimal() : 0m;
-                            <tr>
-                                <td><a href="/Tenants/Detail/@empId" style="color:var(--orange-500); text-decoration:none; font-weight:500;">@empNome</a></td>
-                                <td class="es-data-table-td-numeric" style="color:var(--crit-600); font-weight:600;">@qtd</td>
-                                <td class="es-data-table-td-numeric" style="color:var(--crit-600); font-weight:600;">@FmtCurrency(valor)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        <article class="deck-panel deck-rise" style="--deck-i:4;">
+            <div class="deck-panel-head">
+                <h3>Top inadimplentes</h3>
+                <span class="deck-sub">maior valor vencido em aberto</span>
             </div>
-        </es-card>
+            <table class="deck-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Empresa</th>
+                        <th scope="col" style="text-align:right">Vencidas</th>
+                        <th scope="col" style="text-align:right">Valor total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.TopInadimplentes)
+                    {
+                        var empId = t.TryGetProperty("empresaId", out var eid) ? eid.GetString() : "";
+                        var empNome = t.TryGetProperty("empresaNome", out var en) && en.ValueKind != JsonValueKind.Null ? en.GetString() : "(sem nome)";
+                        var qtd = t.TryGetProperty("quantidadeVencidas", out var q) ? q.GetInt32() : 0;
+                        var valor = t.TryGetProperty("valorTotalVencido", out var v) ? v.GetDecimal() : 0m;
+                        <tr>
+                            <td><a href="/Tenants/Detail/@empId">@empNome</a></td>
+                            <td style="text-align:right; color:var(--crit-600); font-weight:600;">@qtd</td>
+                            <td style="text-align:right; color:var(--crit-600); font-weight:600;">@FmtCurrency(valor)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </article>
     }
 }
 else
 {
-    <es-card>
+    <div class="deck-panel" style="padding:8px var(--s-5) 28px;">
         <es-empty-state icon="trending-up" title="Carregando dados financeiros..." description="O dashboard será exibido em instantes." />
-    </es-card>
+    </div>
 }
