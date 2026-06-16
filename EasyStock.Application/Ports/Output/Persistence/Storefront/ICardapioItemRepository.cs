@@ -19,6 +19,9 @@ public interface ICardapioItemRepository
     Task AddAsync(CardapioItem item, CancellationToken ct = default);
     Task UpdateAsync(CardapioItem item, CancellationToken ct = default);
 
+    /// <summary>Remove (hard delete) o item. Seguro: sem FK de pedido/checkout para cardapio_item.</summary>
+    Task RemoveAsync(CardapioItem item, CancellationToken ct = default);
+
     /// <summary>Conta items (visíveis ou não) no storefront — admin listagem.</summary>
     Task<int> ContarPorStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
 

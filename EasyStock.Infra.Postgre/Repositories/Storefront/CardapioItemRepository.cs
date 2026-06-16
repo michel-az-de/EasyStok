@@ -64,6 +64,12 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
         return Task.CompletedTask;
     }
 
+    public Task RemoveAsync(CardapioItem item, CancellationToken ct = default)
+    {
+        db.CardapioItens.Remove(item);
+        return Task.CompletedTask;
+    }
+
     public Task<int> ContarPorStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
         db.CardapioItens.CountAsync(c => c.StorefrontId == storefrontId, ct);
 

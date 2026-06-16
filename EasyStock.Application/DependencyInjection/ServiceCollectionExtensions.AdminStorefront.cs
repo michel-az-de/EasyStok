@@ -6,6 +6,8 @@ using EasyStock.Application.UseCases.Admin.Storefront.AtivarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ObterCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.RemoverCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
@@ -36,11 +38,13 @@ public static partial class ServiceCollectionExtensions
 
         // Cardápio CRUD
         services.AddScoped<ListarCardapioAdminUseCase>();
+        services.AddScoped<ObterCardapioItemAdminUseCase>();
         services.AddScoped<AdicionarCardapioItemAdminUseCase>();
         services.AddScoped<EditarCardapioItemAdminUseCase>();
         services.AddScoped<ToggleVisibilidadeCardapioItemAdminUseCase>();
         services.AddScoped<ToggleDisponibilidadeCardapioItemAdminUseCase>();
         services.AddScoped<ReordenarCardapioItemAdminUseCase>();
+        services.AddScoped<RemoverCardapioItemAdminUseCase>();
 
         return services;
     }

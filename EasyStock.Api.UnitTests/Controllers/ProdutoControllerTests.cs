@@ -2,6 +2,7 @@ using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Common;
@@ -87,6 +88,8 @@ public class ProdutoControllerTests
             _produtoRepository,
             _usuarioRepository,
             _lojaRepository,
+            Substitute.For<IStorefrontRepository>(),
+            Substitute.For<ICardapioItemRepository>(),
             _unitOfWork);
 
         var salvarFichaTecnicaUseCase = new SalvarFichaTecnicaUseCase(

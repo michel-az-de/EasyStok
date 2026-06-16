@@ -2,6 +2,8 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ObterCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.RemoverCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
@@ -27,11 +29,13 @@ namespace EasyStock.Api.Controllers.Storefront;
 public class TenantVitrineCardapioController(
     IStorefrontRepository storefrontRepository,
     ListarCardapioAdminUseCase listar,
+    ObterCardapioItemAdminUseCase obter,
     AdicionarCardapioItemAdminUseCase adicionar,
     EditarCardapioItemAdminUseCase editar,
     ToggleVisibilidadeCardapioItemAdminUseCase toggleVisivel,
     ToggleDisponibilidadeCardapioItemAdminUseCase toggleDisponivel,
     ReordenarCardapioItemAdminUseCase reordenar,
+    RemoverCardapioItemAdminUseCase remover,
     ICurrentUserAccessor currentUser,
     ILogger<TenantVitrineCardapioController> logger) : EasyStockControllerBase, IActionFilter
 {
@@ -110,6 +114,21 @@ public class TenantVitrineCardapioController(
 
         var result = await listar.ExecuteAsync(new ListarCardapioAdminCommand(sf.Id, EmpresaId));
         return DataOk(result);
+    }
+
+    /// <summary>Detalhe completo de um item — alimenta o prefill do formulário de edição no Web.</summary>
+    [HttpGet("cardapio/{itemId:guid}")]
+    public async Task<IActionResult> ObterItem(Guid itemId)
+    {
+        var sf = await ResolverStorefrontAsync();
+        if (sf is null) return DataNotFound(SemVitrine);
+
+        try
+        {
+            var result = await obter.ExecuteAsync(new ObterCardapioItemAdminCommand(sf.Id, itemId, EmpresaId));
+            return DataOk(result);
+        }
+        catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
     }
 
     [HttpPost("cardapio")]
@@ -233,5 +252,20 @@ public class TenantVitrineCardapioController(
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+    }
+
+    [HttpDelete("cardapio/{itemId:guid}")]
+    public async Task<IActionResult> Remover(Guid itemId)
+    {
+        var sf = await ResolverStorefrontAsync();
+        if (sf is null) return DataNotFound(SemVitrine);
+
+        try
+        {
+            var result = await remover.ExecuteAsync(
+                new RemoverCardapioItemAdminCommand(sf.Id, itemId, EmpresaId));
+            return DataOk(result);
+        }
+        catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
     }
 }

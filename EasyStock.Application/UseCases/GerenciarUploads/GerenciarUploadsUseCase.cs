@@ -1,5 +1,7 @@
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarProduto;
+using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.GerenciarUploads;
 
@@ -16,6 +18,8 @@ public sealed class GerenciarUploadsUseCase(
     IProdutoRepository produtoRepository,
     IUsuarioRepository usuarioRepository,
     ILojaRepository lojaRepository,
+    IStorefrontRepository storefrontRepository,
+    ICardapioItemRepository cardapioItemRepository,
     IUnitOfWork unitOfWork,
     ICacheService? cacheService = null)
 {
@@ -149,6 +153,48 @@ public sealed class GerenciarUploadsUseCase(
         await unitOfWork.CommitAsync();
 
         await TryDeletePreviousAsync(logoAntigo, cancellationToken);
+
+        return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
+    }
+
+    /// <summary>
+    /// Foto de um item de cardápio da vitrine (ADR-0031). 1 foto por item: grava a nova
+    /// com nome novo e remove a anterior best-effort (igual avatar/logo) — sem órfão no replace.
+    /// Escopo de tenant fechado por construção: resolve o storefront pela empresa do token e
+    /// busca o item via <c>GetByIdAndScopeAsync</c> (item de outra empresa → 404, não vaza).
+    /// </summary>
+    public async Task<UploadedFileResult> UploadFotoCardapioItemAsync(
+        Guid empresaId, Guid itemId, string fileName, string contentType, byte[] content,
+        CancellationToken cancellationToken = default)
+    {
+        ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
+
+        var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, cancellationToken)
+            ?? throw new UseCaseValidationException("Sua vitrine ainda nao foi criada.");
+
+        var item = await cardapioItemRepository.GetByIdAndScopeAsync(storefront.Id, itemId, empresaId, cancellationToken)
+            ?? throw new CardapioItemNaoEncontradoException(storefront.Id, itemId);
+
+        var (optimized, optContentType, optExt) = await Task.Run(
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            cancellationToken);
+
+        var stored = await fileStorage.UploadAsync(
+            new FileUploadRequest(
+                $"cardapios/{empresaId}/{storefront.Id}/{itemId}",
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
+            cancellationToken);
+
+        var fotoAntiga = item.FotoUrl;
+        item.AtualizarMetadata(fotoUrl: stored.Url);
+
+        await cardapioItemRepository.UpdateAsync(item, cancellationToken);
+        await unitOfWork.CommitAsync();
+
+        // Best-effort: remove a foto anterior só depois de persistir a nova.
+        await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
