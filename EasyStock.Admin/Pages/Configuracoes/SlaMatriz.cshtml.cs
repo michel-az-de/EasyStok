@@ -25,11 +25,16 @@ public class SlaMatrizModel(AdminApiClient api, AdminSessionService session, ILo
         try
         {
             var itens = new List<object>();
+            var invalidas = 0;
             for (int i = 0; i < (form.Prioridades?.Count ?? 0); i++)
             {
                 if (form.MinutosResposta is null || form.MinutosResolucao is null) break;
                 if (i >= form.MinutosResposta.Count || i >= form.MinutosResolucao.Count) break;
-                if (form.MinutosResposta[i] <= 0 || form.MinutosResolucao[i] <= 0) continue;
+                if (form.MinutosResposta[i] <= 0 || form.MinutosResolucao[i] <= 0)
+                {
+                    invalidas++;
+                    continue;
+                }
 
                 itens.Add(new
                 {
@@ -39,6 +44,15 @@ public class SlaMatrizModel(AdminApiClient api, AdminSessionService session, ILo
                     minutosResposta = form.MinutosResposta[i],
                     minutosResolucao = form.MinutosResolucao[i]
                 });
+            }
+
+            // BUG-06 (issue #630): nao reportar "salva" quando ha valor invalido.
+            // Antes o loop pulava a linha em silencio e SetSucesso era incondicional,
+            // dando ao operador a falsa impressao de que a matriz foi gravada.
+            if (invalidas > 0)
+            {
+                SetErro($"Valores de SLA precisam ser positivos (minutos > 0). {invalidas} linha(s) invalida(s) — nenhuma alteracao foi salva.");
+                return RedirectToPage();
             }
 
             await api.PutRawAsync("api/admin/sla", new { itens });
