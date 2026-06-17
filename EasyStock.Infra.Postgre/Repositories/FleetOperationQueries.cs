@@ -1,46 +1,46 @@
-using System.Linq.Expressions;
 using EasyStock.Application.Common;
 using EasyStock.Application.Operacao;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 
 /// <summary>
-/// Implementacao Postgre do read model do Centro de Comando da Frota (issue 623).
-/// Rollup operacional cross-tenant das lojas ATIVAS, computado com agregacoes
-/// pre-filtradas (GROUP BY EmpresaId) unidas em memoria por empresa — sem
-/// somas condicionais (evita falha de traducao do EF) e sem N+1 (nao chama o
-/// cockpit por tenant). Os predicados de "entregue hoje", "aberto", "travado",
-/// "conferencia" e "device ativo" vem de <see cref="OperacaoCriterios"/>, a mesma
-/// fonte usada pelo cockpit, garantindo PARIDADE com /operacao por loja.
+/// Read model da tela Operação (issue 623, reescrita) — combina a CONTA do cliente
+/// (assinatura/MRR/tickets/faturas) com a VENDA REAL do ERP (<c>db.Vendas</c>), cross-tenant.
+///
+/// Vendas/itens são protegidos por RLS; como é uma leitura cross-tenant deliberada de
+/// SuperAdmin, abrimos com <see cref="EasyStockDbContext.UseRowLevelSecurityBypass"/> (mesmo
+/// mecanismo dos jobs/seeds). A agregação de "vendas de hoje" espelha o padrão canônico de
+/// <c>GetVendasHojeQuery</c> (janela <see cref="HorarioBrasil.JanelaDiaUtc"/>, soma de
+/// <c>ValorTotal.Valor</c>). A situação de cada cliente vem de <see cref="FleetHealthScoring"/>.
 /// </summary>
 public sealed class FleetOperationQueries(EasyStockDbContext db) : IFleetOperationQueries
 {
     public async Task<FleetOperationSummary> ObterAsync(DateTime nowUtc, int maxLinhas, CancellationToken ct = default)
     {
-        var (inicioDiaUtc, _) = HorarioBrasil.JanelaDiaUtc();
+        // Leitura cross-tenant deliberada (SuperAdmin) — abre o RLS p/ ler vendas de todos.
+        using var _ = db.UseRowLevelSecurityBypass();
 
-        // Escopo: tenants com assinatura ATIVA. Carrega cru e resolve nome/plano por
-        // dicionario — sem navegar em projecao (portavel InMemory/Npgsql, evita INNER JOIN
-        // que descartava linhas e nao depende de fixup de navegacao).
-        var ativosRaw = await db.AssinaturasEmpresa.AsNoTracking()
-            .Where(a => a.Status == StatusAssinatura.Ativa)
-            .Select(a => new { a.EmpresaId, a.PlanoId, a.TrialFim })
+        var (inicioDiaUtc, fimDiaUtc) = HorarioBrasil.JanelaDiaUtc();
+
+        // Escopo: clientes Ativos ou Suspensos (suspenso = precisa de atenção). Cancelados fora.
+        var contas = await db.AssinaturasEmpresa.AsNoTracking()
+            .Where(a => a.Status == StatusAssinatura.Ativa || a.Status == StatusAssinatura.Suspensa)
+            .Select(a => new { a.EmpresaId, a.PlanoId, a.Status, a.TrialFim })
             .ToListAsync(ct);
 
-        var suspensos = await db.AssinaturasEmpresa.CountAsync(a => a.Status == StatusAssinatura.Suspensa, ct);
+        var suspensos = contas.Count(c => c.Status == StatusAssinatura.Suspensa);
 
-        if (ativosRaw.Count == 0)
+        if (contas.Count == 0)
         {
             return new FleetOperationSummary(nowUtc, 0,
-                new FleetTotals(0, 0m, 0, 0, 0, 0, 0m, 0m, suspensos),
+                new FleetTotals(0, 0, 0m, 0m, 0, 0m, suspensos),
                 Array.Empty<FleetTenantRow>());
         }
 
-        var empresaIds = ativosRaw.Select(a => a.EmpresaId).Distinct().ToList();
-        var planoIds = ativosRaw.Select(a => a.PlanoId).Distinct().ToList();
+        var empresaIds = contas.Select(c => c.EmpresaId).Distinct().ToList();
+        var planoIds = contas.Select(c => c.PlanoId).Distinct().ToList();
 
         var nomes = await db.Empresas.AsNoTracking()
             .Where(e => empresaIds.Contains(e.Id))
@@ -52,32 +52,28 @@ public sealed class FleetOperationQueries(EasyStockDbContext db) : IFleetOperati
             .Select(p => new { p.Id, p.Nome, p.PrecoMensal })
             .ToDictionaryAsync(p => p.Id, ct);
 
-        var ativos = ativosRaw.Select(a =>
-        {
-            planos.TryGetValue(a.PlanoId, out var pl);
-            nomes.TryGetValue(a.EmpresaId, out var nome);
-            return new AtivoLinha(a.EmpresaId, nome ?? "", pl?.Nome, pl?.PrecoMensal ?? 0m, a.TrialFim);
-        }).ToList();
-
-        // Vendas entregues hoje por empresa (valor + count).
-        var vendasList = await db.Set<Order>().AsNoTracking()
-            .Where(o => o.EmpresaId != null && empresaIds.Contains(o.EmpresaId.Value))
-            .Where(OperacaoCriterios.EntregueHoje(inicioDiaUtc))
-            .GroupBy(o => o.EmpresaId)
-            .Select(g => new { g.Key, Valor = g.Sum(o => o.Total), Count = g.Count() })
+        // Vendas REAIS do dia (ERP): valor + contagem por empresa. Somar o value-object owned
+        // (ValorTotal.Valor) dentro de um GroupBy NÃO traduz no Npgsql (o otimizador colapsa a
+        // pré-projeção de volta) — pegou no teste Postgres; InMemory mascara. Então materializa
+        // a projeção plana (só seleciona coluna, traduz) e agrupa em memória. Vendas de um único
+        // dia são poucas, então o custo é baixo.
+        var vendasHojeRaw = await db.Vendas.AsNoTracking()
+            .Where(v => empresaIds.Contains(v.EmpresaId) && v.DataVenda >= inicioDiaUtc && v.DataVenda < fimDiaUtc)
+            .Select(v => new { v.EmpresaId, Valor = v.ValorTotal.Valor })
             .ToListAsync(ct);
-        var vendas = vendasList.ToDictionary(x => x.Key!.Value, x => (x.Valor, x.Count));
+        var vendasHoje = vendasHojeRaw
+            .GroupBy(x => x.EmpresaId)
+            .ToDictionary(g => g.Key, g => (Valor: g.Sum(x => x.Valor), Count: g.Count()));
 
-        // Contagens de pedidos por empresa, cada uma pre-filtrada (sem soma condicional).
-        var abertos = await ContarOrdersAsync(OperacaoCriterios.Aberto());
-        var travados = await ContarOrdersAsync(OperacaoCriterios.Travado(nowUtc));
-        var conferencia = await ContarOrdersAsync(OperacaoCriterios.ConferenciaPendente());
+        // Última venda (sinal de atividade) por empresa — Max sobre coluna pura (DataVenda) traduz.
+        var ultimaVendaList = await db.Vendas.AsNoTracking()
+            .Where(v => empresaIds.Contains(v.EmpresaId))
+            .GroupBy(v => v.EmpresaId)
+            .Select(g => new { g.Key, Ultima = g.Max(v => v.DataVenda) })
+            .ToListAsync(ct);
+        var ultimaVenda = ultimaVendaList.ToDictionary(x => x.Key, x => x.Ultima);
 
-        // Devices: total (contavel) e ativos por empresa.
-        var devicesTotal = await ContarDevicesAsync(OperacaoCriterios.DeviceContavel());
-        var devicesAtivos = await ContarDevicesAsync(OperacaoCriterios.DeviceAtivo(nowUtc));
-
-        // Tickets abertos e com SLA violado por empresa.
+        // Tickets em aberto e com SLA violado (mesma definição do AdminDashboard).
         var ticketsAbertos = await db.AdminTickets.AsNoTracking()
             .Where(t => empresaIds.Contains(t.EmpresaId)
                         && t.Status != TicketStatus.Fechado && t.Status != TicketStatus.Resolvido)
@@ -101,85 +97,62 @@ public sealed class FleetOperationQueries(EasyStockDbContext db) : IFleetOperati
             .ToListAsync(ct);
         var faturas = faturasList.ToDictionary(x => x.Key, x => (x.Count, x.Valor));
 
-        var rows = new List<FleetTenantRow>(ativos.Count);
-        foreach (var a in ativos)
+        var rows = new List<FleetTenantRow>(contas.Count);
+        foreach (var c in contas)
         {
-            vendas.TryGetValue(a.EmpresaId, out var venda);
-            var devAtivos = devicesAtivos.GetValueOrDefault(a.EmpresaId);
-            var devTotal = devicesTotal.GetValueOrDefault(a.EmpresaId);
-            var pedTravados = travados.GetValueOrDefault(a.EmpresaId);
-            var tkSla = ticketsSla.GetValueOrDefault(a.EmpresaId);
-            var faturaVencida = faturas.TryGetValue(a.EmpresaId, out var fat) && fat.Count > 0;
+            planos.TryGetValue(c.PlanoId, out var pl);
+            nomes.TryGetValue(c.EmpresaId, out var nome);
+            vendasHoje.TryGetValue(c.EmpresaId, out var vh);
+            faturas.TryGetValue(c.EmpresaId, out var fat);
+            var temVenda = ultimaVenda.TryGetValue(c.EmpresaId, out var uv);
+            var tkAbertos = ticketsAbertos.GetValueOrDefault(c.EmpresaId);
+            var tkSla = ticketsSla.GetValueOrDefault(c.EmpresaId);
 
-            var health = FleetHealthScoring.Compute(new FleetHealthSignals(
-                VendasCount: venda.Count,
-                PedidosTravados: pedTravados,
-                DevicesAtivos: devAtivos,
-                DevicesTotal: devTotal,
+            var aval = FleetHealthScoring.Avaliar(new FleetHealthSignals(
+                Suspensa: c.Status == StatusAssinatura.Suspensa,
+                VendasHojeCount: vh.Count,
+                UltimaVendaEm: temVenda ? uv : null,
+                TicketsAbertos: tkAbertos,
                 TicketsSlaViolado: tkSla,
-                FaturaVencida: faturaVencida,
-                TrialFim: a.TrialFim), nowUtc);
+                FaturasVencidasCount: fat.Count,
+                TrialFim: c.TrialFim), nowUtc);
 
             rows.Add(new FleetTenantRow(
-                EmpresaId: a.EmpresaId,
-                Nome: a.Nome,
-                Plano: a.Plano,
-                HealthScore: health.Score,
-                HealthBand: health.Band,
-                VendasHoje: venda.Valor,
-                VendasCount: venda.Count,
-                PedidosAbertos: abertos.GetValueOrDefault(a.EmpresaId),
-                PedidosTravados: pedTravados,
-                ConferenciaPendente: conferencia.GetValueOrDefault(a.EmpresaId),
-                DevicesAtivos: devAtivos,
-                DevicesTotal: devTotal,
-                TicketsAbertos: ticketsAbertos.GetValueOrDefault(a.EmpresaId),
+                EmpresaId: c.EmpresaId,
+                Nome: nome ?? "(sem nome)",
+                Plano: pl?.Nome,
+                Mrr: pl?.PrecoMensal ?? 0m,
+                StatusAssinatura: c.Status.ToString(),
+                StatusBand: aval.Band,
+                Motivos: aval.Motivos,
+                VendasHoje: vh.Valor,
+                VendasHojeCount: vh.Count,
+                TicketsAbertos: tkAbertos,
                 TicketsSlaViolado: tkSla,
-                FaturaVencida: faturaVencida,
-                TrialFim: a.TrialFim,
-                RiscoFlags: health.Flags));
+                FaturasVencidasCount: fat.Count,
+                FaturasVencidasValor: fat.Valor,
+                UltimaVendaEm: temVenda ? uv : null,
+                TrialFim: c.TrialFim,
+                Severidade: aval.Severidade));
         }
 
         var totals = new FleetTotals(
-            TenantsOnline: rows.Count(r => r.DevicesAtivos > 0),
+            ClientesAtivos: contas.Count(c => c.Status == StatusAssinatura.Ativa),
+            PrecisamAtencao: rows.Count(r => r.StatusBand != FleetHealthScoring.BandOk),
             VendasHojeTotal: rows.Sum(r => r.VendasHoje),
-            PedidosTravados: rows.Sum(r => r.PedidosTravados),
-            TenantsEmRisco: rows.Count(r => r.HealthScore < FleetHealthScoring.LimiarRisco),
+            MrrAtivo: contas.Where(c => c.Status == StatusAssinatura.Ativa)
+                            .Sum(c => planos.TryGetValue(c.PlanoId, out var p) ? p.PrecoMensal : 0m),
             TicketsSlaViolado: rows.Sum(r => r.TicketsSlaViolado),
-            FaturasVencidasCount: rows.Count(r => r.FaturaVencida),
             FaturasVencidasValor: faturas.Values.Sum(x => x.Valor),
-            MrrAtivo: ativos.Sum(a => a.PrecoMensal),
             Suspensos: suspensos);
 
-        // Pior-primeiro (menor health), capada server-side; TotalTenants = escopo completo.
         var ordenadas = rows
-            .OrderBy(r => r.HealthScore)
+            .OrderByDescending(r => r.Severidade)
+            .ThenByDescending(r => r.FaturasVencidasValor)
             .ThenByDescending(r => r.VendasHoje)
             .Take(maxLinhas)
             .ToList();
 
-        return new FleetOperationSummary(nowUtc, ativos.Count, totals, ordenadas);
-
-        // --- locais ---
-        async Task<Dictionary<Guid, int>> ContarOrdersAsync(Expression<Func<Order, bool>> filtro)
-        {
-            var lista = await db.Set<Order>().AsNoTracking()
-                .Where(o => o.EmpresaId != null && empresaIds.Contains(o.EmpresaId.Value))
-                .Where(filtro)
-                .GroupBy(o => o.EmpresaId)
-                .Select(g => new { g.Key, Count = g.Count() })
-                .ToListAsync(ct);
-            return lista.ToDictionary(x => x.Key!.Value, x => x.Count);
-        }
-
-        Task<Dictionary<Guid, int>> ContarDevicesAsync(Expression<Func<MobileDevice, bool>> filtro)
-            => db.Set<MobileDevice>().AsNoTracking()
-                .Where(d => empresaIds.Contains(d.EmpresaId))
-                .Where(filtro)
-                .GroupBy(d => d.EmpresaId)
-                .Select(g => new { g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        return new FleetOperationSummary(nowUtc, contas.Count, totals, ordenadas);
     }
-
-    private sealed record AtivoLinha(Guid EmpresaId, string Nome, string? Plano, decimal PrecoMensal, DateTime? TrialFim);
 }

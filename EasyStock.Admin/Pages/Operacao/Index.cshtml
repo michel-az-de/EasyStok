@@ -6,410 +6,204 @@
 
 <link rel="stylesheet" href="~/css/operacao.css" asp-append-version="true" />
 
-<div x-data="operacaoMissionControl()" x-init="init()" class="op-mc">
+<div x-data="operacaoClientes()" x-init="init()" class="op">
 
-    @* ===================== FROTA (Centro de Comando) ===================== *@
-    <template x-if="!empresaId">
+    <header class="op-head">
         <div>
-            <div class="deck-telemetry op-telemetry">
-                <span class="deck-tele-item op-eyebrow">
-                    <span class="deck-dot is-ok deck-pulse"></span>
-                    Operação · Centro de Comando
-                </span>
-                <span class="op-tele-summary" x-show="!loading" x-cloak>
-                    <strong x-text="(totals.tenantsOnline||0)"></strong>/<span x-text="totalTenants"></span> online
-                    · <strong x-text="(totals.tenantsEmRisco||0)"></strong> em risco
-                    · <strong x-text="anomalias.length"></strong> anomalias
-                    · MRR <strong x-text="brl(totals.mrrAtivo)"></strong>
-                    <span x-show="(totals.suspensos||0) > 0">· <a class="op-link-muted" href="/Tenants?status=Suspensa"><span x-text="totals.suspensos"></span> suspenso(s)</a></span>
-                </span>
-                <span class="op-tele-right">
-                    <span class="op-updated" x-show="ultimaAtualizacao" x-cloak>atualizado <span x-text="formatLastUpdate()"></span></span>
-                    <button type="button" class="op-refresh" x-on:click="fetchFleet()" title="Atualizar agora" aria-label="Atualizar">
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                    </button>
-                </span>
-            </div>
-
-            @* chips de filtro (mesmo conjunto canônico dos tiles) *@
-            <div class="op-chips" role="tablist" aria-label="Filtros da frota">
-                <template x-for="c in chips" :key="c.k">
-                    <button type="button" class="op-chip" :class="{ 'is-active': filtro === c.k }"
-                            x-on:click="setFiltro(c.k)" x-text="c.label"></button>
-                </template>
-            </div>
-
-            @* vitais — 6 tiles, cada um foca seu filtro *@
-            <div class="op-vitals">
-                <button type="button" class="deck-panel op-vital" x-on:click="setFiltro('offline')">
-                    <span class="op-vital-label">Lojas online</span>
-                    <span class="deck-kpi op-vital-num"><span x-text="(totals.tenantsOnline||0)"></span><span class="op-vital-den">/<span x-text="totalTenants"></span></span></span>
-                    <span class="op-vital-meta" x-text="offlineCount + ' offline'"></span>
-                </button>
-                <button type="button" class="deck-panel op-vital" x-on:click="setFiltro('sem-vendas')">
-                    <span class="op-vital-label">Vendas hoje</span>
-                    <span class="deck-kpi op-vital-num op-vital-money" x-text="brl(totals.vendasHojeTotal)"></span>
-                    <span class="op-vital-meta">frota</span>
-                </button>
-                <button type="button" class="deck-panel op-vital" x-on:click="setFiltro('travados')">
-                    <span class="op-vital-label">Pedidos travados</span>
-                    <span class="deck-kpi op-vital-num" :class="{ 'op-warn': (totals.pedidosTravados||0) > 0 }" x-text="(totals.pedidosTravados||0)"></span>
-                    <span class="op-vital-meta">+30 min preparando</span>
-                </button>
-                <button type="button" class="deck-panel op-vital" x-on:click="setFiltro('em-risco')">
-                    <span class="op-vital-label">Tenants em risco</span>
-                    <span class="deck-kpi op-vital-num" :class="{ 'op-crit': (totals.tenantsEmRisco||0) > 0 }" x-text="(totals.tenantsEmRisco||0)"></span>
-                    <span class="op-vital-meta">health &lt; 70</span>
-                </button>
-                <button type="button" class="deck-panel op-vital" x-on:click="setFiltro('sla')">
-                    <span class="op-vital-label">Tickets SLA violado</span>
-                    <span class="deck-kpi op-vital-num" :class="{ 'op-crit': (totals.ticketsSlaViolado||0) > 0 }" x-text="(totals.ticketsSlaViolado||0)"></span>
-                    <span class="op-vital-meta">resposta/resolução</span>
-                </button>
-                <button type="button" class="deck-panel op-vital" x-on:click="setFiltro('fatura-vencida')">
-                    <span class="op-vital-label">Faturas vencidas</span>
-                    <span class="deck-kpi op-vital-num op-vital-money" :class="{ 'op-warn': (totals.faturasVencidasCount||0) > 0 }" x-text="brl(totals.faturasVencidasValor)"></span>
-                    <span class="op-vital-meta"><span x-text="(totals.faturasVencidasCount||0)"></span> em aberto</span>
-                </button>
-            </div>
-
-            @* skeleton no load *@
-            <div class="op-split" x-show="loading" x-cloak>
-                <div class="deck-panel op-radar"><div class="skeleton op-skel"></div></div>
-                <div class="deck-panel op-pulse"><div class="skeleton op-skel"></div></div>
-            </div>
-
-            <div class="op-split" x-show="!loading" x-cloak>
-                @* ---- Radar de Risco (board) ---- *@
-                <section class="deck-panel op-radar">
-                    <header class="op-panel-head">
-                        <div>
-                            <div class="op-eyebrow">Radar de Risco</div>
-                            <h3 class="op-panel-title">Frota por saúde operacional</h3>
-                        </div>
-                        <span class="op-panel-sub" x-text="'mostrando ' + linhas.length + ' de ' + totalTenants"></span>
-                    </header>
-
-                    <template x-if="linhas.length === 0">
-                        <div class="op-empty-row">Nenhuma loja neste filtro.</div>
-                    </template>
-
-                    <div class="op-board">
-                        <template x-for="t in linhas" :key="t.empresaId">
-                            <div class="op-row" :class="'op-row-' + t.healthBand">
-                                @* anel de saúde + glyph (2º canal além da cor) *@
-                                <div class="op-health">
-                                    <svg class="op-ring" viewBox="0 0 36 36" aria-hidden="true">
-                                        <circle class="op-ring-track" cx="18" cy="18" r="15.9155"></circle>
-                                        <circle class="op-ring-fill" :class="'op-ring-' + t.healthBand" cx="18" cy="18" r="15.9155"
-                                                pathLength="100" :stroke-dasharray="t.healthScore + ' 100'"></circle>
-                                    </svg>
-                                    <span class="op-ring-num" x-text="t.healthScore"></span>
-                                    <span class="op-band-glyph" :class="'op-band-' + t.healthBand"
-                                          :aria-label="bandLabel(t.healthBand)" x-text="bandGlyph(t.healthBand)"></span>
-                                </div>
-
-                                <div class="op-row-main">
-                                    <div class="op-row-top">
-                                        <a class="op-row-name" :href="'/Operacao?empresaId=' + t.empresaId" x-text="t.nome"></a>
-                                        <span class="op-row-plano" x-show="t.plano" x-text="t.plano"></span>
-                                    </div>
-                                    <div class="op-flags" x-show="t.riscoFlags && t.riscoFlags.length">
-                                        <template x-for="f in t.riscoFlags" :key="f">
-                                            <span class="op-flag" :class="'op-flag-' + f" x-text="flagLabel(f)"></span>
-                                        </template>
-                                    </div>
-                                    <div class="op-metrics">
-                                        <span class="op-metric"><span class="op-metric-v" x-text="brl(t.vendasHoje)"></span><span class="op-metric-k">vendas</span></span>
-                                        <span class="op-metric"><span class="op-metric-v" x-text="t.pedidosAbertos"></span><span class="op-metric-k">abertos</span></span>
-                                        <span class="op-metric" :class="{ 'op-warn': t.pedidosTravados > 0 }"><span class="op-metric-v" x-text="t.pedidosTravados"></span><span class="op-metric-k">travados</span></span>
-                                        <span class="op-metric" :class="{ 'op-crit': matches(t, 'offline') }"><span class="op-metric-v"><span x-text="t.devicesAtivos"></span>/<span x-text="t.devicesTotal"></span></span><span class="op-metric-k">devices</span></span>
-                                        <span class="op-metric" :class="{ 'op-crit': t.ticketsSlaViolado > 0 }"><span class="op-metric-v" x-text="t.ticketsAbertos"></span><span class="op-metric-k">tickets</span></span>
-                                    </div>
-                                </div>
-
-                                <div class="op-actions">
-                                    <a class="op-action" :href="'/Operacao?empresaId=' + t.empresaId" title="Abrir cockpit" aria-label="Abrir cockpit">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                                    </a>
-                                    <a class="op-action" :href="'/Dispositivos?empresaId=' + t.empresaId" title="Dispositivos" aria-label="Dispositivos">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                                    </a>
-                                    <a class="op-action" :href="'/Tickets?empresaId=' + t.empresaId" title="Tickets" aria-label="Tickets">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg>
-                                    </a>
-                                    <a class="op-action" :href="'/Tenants/Detail/' + t.empresaId" title="Abrir tenant" aria-label="Abrir tenant">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
-                                    </a>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </section>
-
-                @* ---- Pulso ao vivo (anomalias) ---- *@
-                <aside class="deck-panel op-pulse">
-                    <header class="op-panel-head">
-                        <div>
-                            <div class="op-eyebrow"><span class="deck-dot is-warn deck-pulse"></span> Pulso ao vivo</div>
-                            <h3 class="op-panel-title">Anomalias acionáveis</h3>
-                        </div>
-                    </header>
-
-                    <template x-if="anomalias.length === 0">
-                        <div class="op-pulse-clean">
-                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                            <p>Tudo limpo. Nenhuma anomalia agora.</p>
-                        </div>
-                    </template>
-
-                    <div class="op-anoms">
-                        <template x-for="a in anomalias" :key="a.k">
-                            <a class="op-anom" :class="'op-anom-s' + a.sev" :href="a.href">
-                                <span class="op-anom-dot"></span>
-                                <span class="op-anom-body">
-                                    <span class="op-anom-tipo" x-text="a.tipo"></span>
-                                    <span class="op-anom-nome" x-text="a.nome"></span>
-                                </span>
-                                <span class="op-anom-count" x-text="a.count"></span>
-                            </a>
-                        </template>
-                    </div>
-                </aside>
-            </div>
-
-            <p class="op-erro" x-show="erro" x-cloak x-text="erro"></p>
+            <h2 class="admin-page-title">Operação</h2>
+            <p class="op-sub">Como estão os seus clientes agora: vendas do dia, assinatura, suporte e cobrança. A lista atualiza sozinha e mostra primeiro quem precisa de atenção.</p>
         </div>
-    </template>
+        <span class="op-updated" x-show="atualizadoEm" x-cloak>
+            <span class="op-dot op-dot-ok"></span> atualizado <span x-text="formatAtualizado()"></span>
+        </span>
+    </header>
 
-    @* ===================== COCKPIT (drill-down de 1 loja) ===================== *@
-    <template x-if="empresaId">
+    @* ---- resumo (números com rótulo) ---- *@
+    <div class="op-resumo" x-show="!carregando" x-cloak>
+        <div class="op-kpi">
+            <span class="op-kpi-num" x-text="totais.clientesAtivos || 0"></span>
+            <span class="op-kpi-label">clientes ativos</span>
+        </div>
+        <div class="op-kpi" :class="{ 'op-kpi-alerta': (totais.precisamAtencao || 0) > 0 }">
+            <span class="op-kpi-num" x-text="totais.precisamAtencao || 0"></span>
+            <span class="op-kpi-label">precisam de atenção</span>
+        </div>
+        <div class="op-kpi">
+            <span class="op-kpi-num" x-text="brl(totais.vendasHojeTotal)"></span>
+            <span class="op-kpi-label">vendido hoje (todos)</span>
+        </div>
+        <div class="op-kpi">
+            <span class="op-kpi-num" x-text="brl(totais.mrrAtivo)"></span>
+            <span class="op-kpi-label">receita mensal (MRR)</span>
+        </div>
+    </div>
+
+    @* ---- filtro simples ---- *@
+    <label class="op-filtro" x-show="!carregando && clientes.length > 0" x-cloak>
+        <input type="checkbox" x-model="soAtencao" />
+        Mostrar só quem precisa de atenção
+    </label>
+
+    @* ---- carregando ---- *@
+    <div class="op-lista" x-show="carregando" x-cloak>
+        <div class="op-card op-skel"></div>
+        <div class="op-card op-skel"></div>
+        <div class="op-card op-skel"></div>
+    </div>
+
+    @* ---- erro ---- *@
+    <div class="op-aviso op-aviso-erro" x-show="erro" x-cloak>
         <div>
-            <div class="op-cockpit-head">
-                <div>
-                    <a class="op-back" href="/Operacao">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-                        voltar à frota
-                    </a>
-                    <h2 class="admin-page-title">Cockpit da loja</h2>
-                    <p class="op-cockpit-sub">KPIs do dia · atualiza a cada 15s</p>
-                </div>
-                <span class="op-updated" x-show="ultimaAtualizacao" x-cloak>
-                    <span class="deck-dot is-ok deck-pulse"></span> atualizado <span x-text="formatLastUpdate()"></span>
-                </span>
-            </div>
-
-            <div class="op-cockpit-grid">
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Vendas hoje</div>
-                    <div class="es-stat-value" x-text="brl(d.vendasHojeValor)"></div>
-                    <div class="es-stat-meta"><span><strong x-text="d.vendasHojeCount || 0"></strong> pedido(s) entregue(s)</span></div>
-                </div>
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Saldo do caixa</div>
-                    <div class="es-stat-value" x-text="brl(d.caixaSaldoHoje)"></div>
-                    <div class="es-stat-meta op-stat-meta-sm">+<span x-text="brl(d.caixaEntradasExtras)"></span> entradas · -<span x-text="brl(d.caixaSaidas)"></span> saídas</div>
-                </div>
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Pedidos abertos</div>
-                    <div class="es-stat-value" x-text="d.pedidosAbertos || 0"></div>
-                    <div class="es-stat-meta"><span><strong x-text="d.pedidosPreparando || 0"></strong> preparando · <strong x-text="d.pedidosProntos || 0"></strong> prontos</span></div>
-                </div>
-                <a class="es-stat-card is-link card-interactive" :href="'/Dispositivos?empresaId=' + empresaId">
-                    <div class="es-stat-label">Dispositivos ativos</div>
-                    <div class="es-stat-value"><span x-text="d.devicesAtivos || 0"></span><span class="op-stat-den"> / <span x-text="d.devicesTotal || 0"></span></span></div>
-                    <div class="es-stat-meta"><span class="op-stat-link">gerenciar →</span></div>
-                </a>
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Pedidos travados</div>
-                    <div class="es-stat-value" :class="{ 'op-warn': (d.pedidosTravados || 0) > 0 }" x-text="d.pedidosTravados || 0"></div>
-                    <div class="es-stat-meta"><span>preparando há +30 min</span></div>
-                </div>
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Conferência pendente</div>
-                    <div class="es-stat-value" x-text="d.conferenciaPendente || 0"></div>
-                    <div class="es-stat-meta"><span>prontos sem confirmar</span></div>
-                </div>
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Lotes hoje</div>
-                    <div class="es-stat-value" x-text="d.lotesHoje || 0"></div>
-                </div>
-                <div class="es-stat-card">
-                    <div class="es-stat-label">Divergências estoque</div>
-                    <div class="es-stat-value" :class="{ 'op-warn': (d.divergenciasEstoque || 0) > 0 }" x-text="d.divergenciasEstoque || 0"></div>
-                    <div class="es-stat-meta"><span>PWA × ERP</span></div>
-                </div>
-            </div>
-
-            <template x-if="tk.total > 0">
-                <es-card padding="none">
-                    <header class="es-card-header op-tk-head">
-                        <div>
-                            <h3 class="es-card-title">Tickets críticos</h3>
-                            <div class="es-card-desc">SLA violado ou prioridade Alta/Crítica · atualiza a cada 60s</div>
-                        </div>
-                        <div class="op-tk-stats">
-                            <span class="op-tk-sla"><span x-text="tk.slaViolados"></span> SLA</span>
-                            <span class="op-tk-alta"><span x-text="tk.altaOuCritica"></span> alta/crit</span>
-                            <a class="op-stat-link" :href="'/Tickets?empresaId=' + empresaId + '&slaStatus=violado'">ver todos →</a>
-                        </div>
-                    </header>
-                    <div class="op-tk-list">
-                        <template x-for="t in tk.top" :key="t.id">
-                            <div class="op-tk-row">
-                                <es-badge :variant="t.prioridade === 'Critica' ? 'crit' : 'warn'" x-text="t.prioridade"></es-badge>
-                                <a class="op-tk-title" :href="'/Tickets/Detail/' + t.id" x-text="t.titulo"></a>
-                                <span class="op-tk-status" x-text="t.status"></span>
-                            </div>
-                        </template>
-                    </div>
-                </es-card>
-            </template>
-
-            <p class="op-erro" x-show="erro" x-cloak x-text="erro"></p>
+            <strong>Não foi possível carregar a operação agora.</strong>
+            <p x-text="erro"></p>
         </div>
-    </template>
+        <button type="button" class="btn btn-secondary" x-on:click="carregar()">Tentar de novo</button>
+    </div>
+
+    @* ---- sem clientes ---- *@
+    <div class="op-vazio" x-show="!carregando && !erro && clientes.length === 0" x-cloak>
+        <h3>Você ainda não tem clientes ativos</h3>
+        <p>Quando um cliente assinar, ele aparece aqui com as vendas do dia e o que precisa de atenção.</p>
+        <a class="btn btn-primary" href="/Tenants">Ver clientes</a>
+    </div>
+
+    @* ---- tudo tranquilo (todos ok) ---- *@
+    <div class="op-aviso op-aviso-ok" x-show="!carregando && !erro && clientes.length > 0 && (totais.precisamAtencao || 0) === 0" x-cloak>
+        <span class="op-dot op-dot-ok"></span>
+        <span>Tudo tranquilo. Nenhum cliente precisa de atenção agora.</span>
+    </div>
+
+    @* ---- lista de clientes ---- *@
+    <div class="op-lista" x-show="!carregando && !erro && clientes.length > 0" x-cloak>
+        <template x-for="c in clientesVisiveis" :key="c.empresaId">
+            <article class="op-card" :class="'op-card-' + c.statusBand">
+                <div class="op-card-topo">
+                    <div class="op-card-id">
+                        <span class="op-status" :class="'op-status-' + c.statusBand" x-text="statusLabel(c.statusBand)"></span>
+                        <h3 class="op-nome" x-text="c.nome"></h3>
+                        <span class="op-plano" x-show="c.plano" x-text="c.plano"></span>
+                        <span class="op-suspensa" x-show="c.statusAssinatura === 'Suspensa'">assinatura suspensa</span>
+                    </div>
+                    <a class="btn btn-secondary btn-sm op-abrir" :href="'/Tenants/Detail/' + c.empresaId">Abrir cliente</a>
+                </div>
+
+                <p class="op-motivos" x-show="c.motivos && c.motivos.length > 0">
+                    <template x-for="(m, i) in c.motivos" :key="m">
+                        <span><span x-show="i > 0"> · </span><span x-text="motivoTexto(m, c)"></span></span>
+                    </template>
+                </p>
+
+                <dl class="op-numeros">
+                    <div class="op-num">
+                        <dt>Vendas hoje</dt>
+                        <dd><span x-text="brl(c.vendasHoje)"></span> <span class="op-num-sub" x-text="'· ' + (c.vendasHojeCount || 0) + ' venda(s)'"></span></dd>
+                    </div>
+                    <div class="op-num">
+                        <dt>Mensalidade</dt>
+                        <dd x-text="brl(c.mrr)"></dd>
+                    </div>
+                    <div class="op-num">
+                        <dt>Última venda</dt>
+                        <dd x-text="ultimaVendaTexto(c.ultimaVendaEm)"></dd>
+                    </div>
+                    <div class="op-num" x-show="c.ticketsAbertos > 0">
+                        <dt>Chamados</dt>
+                        <dd><a :href="'/Tickets?empresaId=' + c.empresaId" x-text="c.ticketsAbertos + ' em aberto'"></a></dd>
+                    </div>
+                    <div class="op-num" x-show="c.faturasVencidasCount > 0">
+                        <dt>Faturas vencidas</dt>
+                        <dd><a :href="'/Faturas?empresaId=' + c.empresaId" x-text="brl(c.faturasVencidasValor)"></a></dd>
+                    </div>
+                </dl>
+            </article>
+        </template>
+
+        <p class="op-rodape" x-show="totalClientes > clientes.length" x-cloak
+           x-text="'Mostrando ' + clientes.length + ' de ' + totalClientes + ' clientes.'"></p>
+    </div>
 </div>
 
 @section Scripts {
 <script>
-function operacaoMissionControl() {
+function operacaoClientes() {
     return {
-        empresaId: '@(Model.EmpresaId?.ToString() ?? "")',
-        lojaId: '@(Model.LojaId?.ToString() ?? "")',
-        // frota
-        loading: true,
+        carregando: true,
         erro: '',
-        totals: {},
-        tenants: [],
-        totalTenants: 0,
-        filtro: 'todas',
-        ultimaAtualizacao: 0,
-        chips: [
-            { k: 'todas', label: 'Todas' },
-            { k: 'em-risco', label: 'Em risco' },
-            { k: 'offline', label: 'Offline' },
-            { k: 'sem-vendas', label: 'Sem vendas' },
-            { k: 'travados', label: 'Travados' },
-            { k: 'sla', label: 'SLA' },
-            { k: 'fatura-vencida', label: 'Fatura vencida' }
-        ],
+        totais: {},
+        clientes: [],
+        totalClientes: 0,
+        soAtencao: false,
+        atualizadoEm: 0,
         _timer: null,
-        // cockpit
-        d: {},
-        tk: {},
-        _timerCk: null,
 
         async init() {
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) return;
-                if (this.empresaId) this.fetchCockpit(); else this.fetchFleet();
-            });
-            if (this.empresaId) {
-                await this.fetchCockpit();
-                this._timerCk = setInterval(() => { if (!document.hidden) this.fetchCockpit(); }, 15000);
-            } else {
-                await this.fetchFleet();
-                this._timer = setInterval(() => { if (!document.hidden) this.fetchFleet(); }, 25000);
-            }
+            await this.carregar();
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.carregar(); });
+            this._timer = setInterval(() => { if (!document.hidden) this.carregar(); }, 30000);
         },
 
-        // -------- frota --------
-        async fetchFleet() {
+        async carregar() {
             try {
                 const r = await fetch('/api-proxy/admin/operacao/fleet', { credentials: 'same-origin' });
                 if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
-                if (!r.ok) throw new Error('HTTP ' + r.status);
+                if (!r.ok) throw new Error('Erro ' + r.status + ' ao falar com o servidor.');
                 const data = await r.json();
-                this.totals = data.totals || {};
-                this.tenants = data.tenants || [];
-                this.totalTenants = data.totalTenants || 0;
-                this.ultimaAtualizacao = Date.now();
+                this.totais = data.totais || {};
+                this.clientes = data.clientes || [];
+                this.totalClientes = data.totalClientes || 0;
+                this.atualizadoEm = Date.now();
                 this.erro = '';
-                this.loading = false;
+                this.carregando = false;
             } catch (e) {
-                this.erro = 'Falha ao carregar a frota: ' + (e.message || e);
-                this.loading = false;
+                this.erro = (e && e.message) ? e.message : 'Falha de conexão.';
+                this.carregando = false;
             }
         },
 
-        setFiltro(f) { this.filtro = (this.filtro === f && f !== 'todas') ? 'todas' : f; },
+        get clientesVisiveis() {
+            return this.soAtencao ? this.clientes.filter(c => c.statusBand !== 'ok') : this.clientes;
+        },
 
-        matches(t, f) {
-            switch (f) {
-                case 'em-risco': return t.healthScore < 70;
-                case 'offline': return t.devicesTotal > 0 && t.devicesAtivos === 0;
-                case 'sem-vendas': return (t.vendasCount || 0) === 0;
-                case 'travados': return t.pedidosTravados > 0;
-                case 'sla': return t.ticketsSlaViolado > 0;
-                case 'fatura-vencida': return t.faturaVencida === true;
-                default: return true;
+        statusLabel(band) {
+            return ({ ok: 'Tudo certo', warn: 'Atenção', crit: 'Crítico' })[band] || band;
+        },
+
+        motivoTexto(m, c) {
+            const n = c.faturasVencidasCount || 0;
+            const tk = c.ticketsSlaViolado || 0;
+            const ab = c.ticketsAbertos || 0;
+            switch (m) {
+                case 'suspensa': return 'Assinatura suspensa';
+                case 'fatura-vencida': return (n === 1 ? 'Fatura vencida' : n + ' faturas vencidas') + ' (' + this.brl(c.faturasVencidasValor) + ')';
+                case 'sla-violado': return tk + (tk === 1 ? ' chamado' : ' chamados') + ' sem resposta no prazo';
+                case 'trial-vencendo': return 'Período de teste acabando';
+                case 'sem-vendas': return c.ultimaVendaEm ? ('Sem vendas há ' + this.diasDesde(c.ultimaVendaEm) + ' dias') : 'Ainda não registrou vendas';
+                case 'ticket-aberto': return ab + (ab === 1 ? ' chamado' : ' chamados') + ' em aberto';
+                default: return m;
             }
         },
 
-        get linhas() { return this.tenants.filter(t => this.matches(t, this.filtro)); },
-
-        get offlineCount() { return this.tenants.filter(t => t.devicesTotal > 0 && t.devicesAtivos === 0).length; },
-
-        get anomalias() {
-            const out = [];
-            for (const t of this.tenants) {
-                if (t.devicesTotal > 0 && t.devicesAtivos === 0)
-                    out.push({ k: t.empresaId + '-off', nome: t.nome, tipo: 'Dispositivos offline', count: t.devicesTotal, sev: 3, href: '/Dispositivos?empresaId=' + t.empresaId });
-                if (t.ticketsSlaViolado > 0)
-                    out.push({ k: t.empresaId + '-sla', nome: t.nome, tipo: 'SLA violado', count: t.ticketsSlaViolado, sev: 3, href: '/Tickets?empresaId=' + t.empresaId + '&slaStatus=violado' });
-                if (t.pedidosTravados > 0)
-                    out.push({ k: t.empresaId + '-trv', nome: t.nome, tipo: 'Pedidos travados', count: t.pedidosTravados, sev: 2, href: '/Operacao?empresaId=' + t.empresaId });
-                if (t.conferenciaPendente > 0)
-                    out.push({ k: t.empresaId + '-cf', nome: t.nome, tipo: 'Conferência pendente', count: t.conferenciaPendente, sev: 1, href: '/Operacao?empresaId=' + t.empresaId });
-            }
-            return out.sort((a, b) => (b.sev - a.sev) || (b.count - a.count)).slice(0, 40);
+        ultimaVendaTexto(iso) {
+            if (!iso) return 'ainda não vendeu';
+            const d = this.diasDesde(iso);
+            if (d <= 0) return 'hoje';
+            if (d === 1) return 'ontem';
+            return 'há ' + d + ' dias';
         },
 
-        flagLabel(f) {
-            return ({
-                'devices-offline': 'devices off',
-                'sem-vendas-hoje': 'sem vendas',
-                'pedidos-travados': 'travados',
-                'sla-violado': 'SLA',
-                'fatura-vencida': 'fatura vencida',
-                'trial-vencendo': 'trial vencendo'
-            })[f] || f;
-        },
-        bandGlyph(b) { return ({ ok: '✓', warn: '!', crit: '!!' })[b] || '?'; },
-        bandLabel(b) { return ({ ok: 'saudável', warn: 'atenção', crit: 'crítico' })[b] || ''; },
-
-        // -------- cockpit --------
-        async fetchCockpit() {
-            try {
-                let url = '/api-proxy/mobile/operacao/dashboard?empresaId=' + this.empresaId;
-                if (this.lojaId) url += '&lojaId=' + this.lojaId;
-                const r = await fetch(url, { credentials: 'same-origin' });
-                if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                this.d = (await r.json()) || {};
-                this.ultimaAtualizacao = Date.now();
-                this.erro = '';
-                this.fetchTickets();
-            } catch (e) {
-                this.erro = 'Falha ao carregar cockpit: ' + (e.message || e);
-            }
-        },
-        async fetchTickets() {
-            try {
-                const r = await fetch('/api-proxy/admin/tickets/criticos-resumo?empresaId=' + this.empresaId, { credentials: 'same-origin' });
-                if (r.ok) this.tk = (await r.json()) || {};
-            } catch (e) { /* widget opcional */ }
+        diasDesde(iso) {
+            const ms = Date.now() - new Date(iso).getTime();
+            return Math.max(0, Math.floor(ms / 86400000));
         },
 
-        // -------- format --------
         brl(v) {
             const n = Number(v || 0);
             try { return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
             catch (e) { return 'R$ ' + n.toFixed(2); }
         },
-        formatLastUpdate() {
-            const s = Math.floor((Date.now() - this.ultimaAtualizacao) / 1000);
+
+        formatAtualizado() {
+            const s = Math.floor((Date.now() - this.atualizadoEm) / 1000);
             if (s < 5) return 'agora';
             if (s < 60) return s + 's atrás';
             return Math.floor(s / 60) + ' min atrás';

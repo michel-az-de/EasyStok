@@ -1,11 +1,10 @@
-using EasyStock.Application.Common;
 using EasyStock.Application.Operacao;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
-using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Data.Interceptors;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -14,62 +13,59 @@ using NSubstitute;
 namespace EasyStock.Infra.Postgre.IntegrationTests.Operacao;
 
 /// <summary>
-/// Gate de tradução SQL do Centro de Comando da Frota (issue 623) contra Postgres REAL
-/// (Testcontainers) — o que o InMemory NAO cobre: as agregações GROUP BY EmpresaId tem
-/// que traduzir no Npgsql, e a agregação de faturas (mapeamento owned/json) so existe
-/// aqui. Seed cross-tenant via bypass RLS; query num contexto SuperAdmin (abre o filtro
-/// EF) + bypass (abre a policy do Postgres), espelhando como o endpoint admin roda.
+/// Gate de produção da tela Operação (issue 623) contra Postgres REAL (Testcontainers).
+/// Prova o que quebrava em prod: a VENDA do ERP (db.Vendas) é protegida por RLS, e a query
+/// só a enxerga cross-tenant porque chama <c>UseRowLevelSecurityBypass</c> e o interceptor
+/// emite <c>SET app.bypass_rls</c>. Sem isso, VendasHojeTotal volta 0 (o sintoma do bug).
 /// </summary>
 public class FleetOperationQueriesPostgresTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
     [SkippableFact]
-    public async Task Rollup_da_frota_traduz_e_agrega_em_postgres_real()
+    public async Task Le_venda_real_do_ERP_cross_tenant_via_bypass_de_RLS()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
 
         var now = DateTime.UtcNow;
-        var alpha = Guid.NewGuid();   // ativo, saudavel
-        var bravo = Guid.NewGuid();   // ativo, sem vendas + fatura vencida
-        var delta = Guid.NewGuid();   // suspenso (fora do board)
+        var alpha = Guid.NewGuid();   // ativo, vendeu hoje -> saudável
+        var bravo = Guid.NewGuid();   // ativo, sem vendas + fatura vencida -> crítico
 
-        await SeedAsync(now, alpha, bravo, delta);
+        await SeedAsync(now, alpha, bravo);
 
-        // Contexto de consulta: SuperAdmin (abre o HasQueryFilter) + bypass RLS na conexao.
+        // Contexto de consulta: SuperAdmin (abre o filtro EF) + interceptor (pra o bypass
+        // de RLS chamado dentro da query realmente emitir SET app.bypass_rls).
         var superAdmin = Substitute.For<ICurrentUserAccessor>();
         superAdmin.IsAuthenticated.Returns(true);
         superAdmin.Nivel.Returns(NivelAcesso.SuperAdmin);
 
         var options = new DbContextOptionsBuilder<EasyStockDbContext>()
             .UseNpgsql(fixture.RlsClientConnectionString)
+            .AddInterceptors(new SetTenantOnConnectionInterceptor())
             .Options;
         await using var ctx = new EasyStockDbContext(options, superAdmin);
-        await ctx.Database.OpenConnectionAsync();
-        await ctx.Database.ExecuteSqlRawAsync("SET app.bypass_rls = 'true'");
 
         var r = await new FleetOperationQueries(ctx).ObterAsync(now, maxLinhas: 100);
 
-        r.TotalTenants.Should().Be(2);            // alpha + bravo (delta suspenso fora)
-        r.Totals.Suspensos.Should().Be(1);
-        r.Totals.MrrAtivo.Should().Be(300m);      // 100 + 200
-        r.Totals.VendasHojeTotal.Should().Be(100m);
-        r.Totals.FaturasVencidasCount.Should().Be(1);
-        r.Totals.FaturasVencidasValor.Should().Be(300m);
+        r.TotalClientes.Should().Be(2);
+        r.Totais.ClientesAtivos.Should().Be(2);
+        r.Totais.MrrAtivo.Should().Be(300m);              // 100 + 200
+        r.Totais.VendasHojeTotal.Should().Be(500m);       // <- prova o bypass: venda do ERP cross-tenant
+        r.Totais.FaturasVencidasValor.Should().Be(300m);
 
-        // pior-primeiro: bravo (penalizado por fatura/sem-vendas) antes de alpha.
-        r.Tenants.Select(t => t.Nome).Should().ContainInOrder("Bravo", "Alpha");
+        // pior-primeiro: Bravo (crítico por fatura vencida) antes de Alpha (ok).
+        r.Clientes.Select(c => c.Nome).Should().ContainInOrder("Bravo", "Alpha");
 
-        var rb = r.Tenants.Single(t => t.Nome == "Bravo");
-        rb.FaturaVencida.Should().BeTrue();
-        rb.RiscoFlags.Should().Contain(FleetHealthScoring.FlagFaturaVencida);
+        var rb = r.Clientes.Single(c => c.Nome == "Bravo");
+        rb.StatusBand.Should().Be(FleetHealthScoring.BandCrit);
+        rb.FaturasVencidasCount.Should().Be(1);
+        rb.Motivos.Should().Contain(FleetHealthScoring.MotivoFaturaVencida);
 
-        var ra = r.Tenants.Single(t => t.Nome == "Alpha");
-        ra.VendasHoje.Should().Be(100m);
-        ra.VendasCount.Should().Be(2);
-        ra.DevicesAtivos.Should().Be(1);
+        var ra = r.Clientes.Single(c => c.Nome == "Alpha");
+        ra.StatusBand.Should().Be(FleetHealthScoring.BandOk);
+        ra.VendasHoje.Should().Be(500m);
     }
 
-    private async Task SeedAsync(DateTime now, Guid alpha, Guid bravo, Guid delta)
+    private async Task SeedAsync(DateTime now, Guid alpha, Guid bravo)
     {
         await fixture.ResetDatabaseAsync();
 
@@ -79,20 +75,22 @@ public class FleetOperationQueriesPostgresTests(PostgreSqlDatabaseFixture fixtur
 
         var pAlpha = new Plano { Id = Guid.NewGuid(), Nome = "Starter", PrecoMensal = 100m, Ativo = true, CriadoEm = now };
         var pBravo = new Plano { Id = Guid.NewGuid(), Nome = "Plus", PrecoMensal = 200m, Ativo = true, CriadoEm = now };
-        var pDelta = new Plano { Id = Guid.NewGuid(), Nome = "Starter", PrecoMensal = 99m, Ativo = true, CriadoEm = now };
-        seed.Planos.AddRange(pAlpha, pBravo, pDelta);
+        seed.Planos.AddRange(pAlpha, pBravo);
 
-        seed.Empresas.AddRange(Empresa(alpha, "Alpha"), Empresa(bravo, "Bravo"), Empresa(delta, "Delta"));
+        seed.Empresas.AddRange(Empresa(alpha, "Alpha"), Empresa(bravo, "Bravo"));
         seed.AssinaturasEmpresa.AddRange(
-            Assinatura(alpha, pAlpha.Id, StatusAssinatura.Ativa, now),
-            Assinatura(bravo, pBravo.Id, StatusAssinatura.Ativa, now),
-            Assinatura(delta, pDelta.Id, StatusAssinatura.Suspensa, now));
+            Assinatura(alpha, pAlpha.Id, now),
+            Assinatura(bravo, pBravo.Id, now));
 
-        // Alpha: 2 vendas hoje (R$100) + 1 device ativo.
-        seed.Set<Order>().AddRange(
-            Pedido(alpha, OperacaoCriterios.StatusEntregue, 50m, now),
-            Pedido(alpha, OperacaoCriterios.StatusEntregue, 50m, now));
-        seed.Set<MobileDevice>().Add(Device(alpha, now));
+        // Alpha: venda real do ERP hoje (R$500).
+        seed.Vendas.Add(new Venda
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = alpha,
+            ValorTotal = Dinheiro.FromDecimal(500m),
+            DataVenda = now,
+            CriadoEm = now,
+        });
 
         // Bravo: sem vendas + fatura vencida (R$300).
         var fatura = Fatura.Criar(bravo, "2026-000900",
@@ -114,38 +112,14 @@ public class FleetOperationQueriesPostgresTests(PostgreSqlDatabaseFixture fixtur
         AlteradoEm = DateTime.UtcNow,
     };
 
-    private static AssinaturaEmpresa Assinatura(Guid empresaId, Guid planoId, StatusAssinatura status, DateTime now) => new()
+    private static AssinaturaEmpresa Assinatura(Guid empresaId, Guid planoId, DateTime now) => new()
     {
         Id = Guid.NewGuid(),
         EmpresaId = empresaId,
         PlanoId = planoId,
-        Status = status,
+        Status = StatusAssinatura.Ativa,
         DataInicio = now.AddDays(-30),
         CriadoEm = now.AddDays(-30),
         AlteradoEm = now,
-    };
-
-    private static Order Pedido(Guid empresaId, string status, decimal total, DateTime updatedAt) => new()
-    {
-        Id = Guid.NewGuid().ToString("N"),
-        ClientSnapshotName = "Cliente",
-        Status = status,
-        Total = total,
-        EmpresaId = empresaId,
-        LojaId = Guid.NewGuid(),
-        CreatedAt = updatedAt,
-        UpdatedAt = updatedAt,
-    };
-
-    private static MobileDevice Device(Guid empresaId, DateTime lastSeenAt) => new()
-    {
-        Id = Guid.NewGuid().ToString("N"),
-        ApiKeyHash = "hash-" + Guid.NewGuid().ToString("N")[..8],
-        EmpresaId = empresaId,
-        LojaId = Guid.NewGuid(),
-        LastSeenAt = lastSeenAt,
-        Revoked = false,
-        CreatedAt = lastSeenAt,
-        UpdatedAt = lastSeenAt,
     };
 }
