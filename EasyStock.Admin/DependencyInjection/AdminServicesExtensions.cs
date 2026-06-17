@@ -19,6 +19,11 @@ public static class AdminServicesExtensions
         var services = builder.Services;
 
         services.AddRazorPages();
+        // BUG-02 (#634): <input type=number> submete decimal com ponto, mas o Admin roda em
+        // pt-BR e o binder padrão lança em "19.90" -> decimal cai em 0 e o save corrompe/bloqueia.
+        // Liga decimal/double/float com InvariantCulture (cobre criação e edição de todos os forms).
+        services.Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(options =>
+            options.ModelBinderProviders.Insert(0, new ModelBinding.InvariantDecimalModelBinderProvider()));
         services.AddHttpContextAccessor();
 
         // Session

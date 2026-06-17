@@ -102,7 +102,7 @@ else
                             <es-input name="limiteProdutos" type="number" min="-1" label="Limite Produtos" value="@limProdutos" required="true" />
                             <es-input name="limiteGeracoesIaMensais" type="number" min="-1" label="Limite IA/mês" value="@limIa" required="true" />
                         </div>
-                        <es-input name="precoMensal" type="number" min="0" label="Preço mensal" value="@preco" step="0.01" prefix="R$" required="true" />
+                        <es-input name="precoMensal" type="number" min="0" label="Preço mensal" value="@preco.ToString(System.Globalization.CultureInfo.InvariantCulture)" step="0.01" prefix="R$" required="true" />
                         <es-button type="submit" variant="primary" icon="check" block="true">Salvar alterações</es-button>
                     </form>
                 </div>

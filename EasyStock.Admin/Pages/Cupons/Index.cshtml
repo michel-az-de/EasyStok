@@ -107,7 +107,7 @@ else
                             <option value="ValorFixo" selected="@(tipo == "ValorFixo")">Valor fixo (R$)</option>
                             <option value="MesesGratis" selected="@(tipo == "MesesGratis")">Meses grátis</option>
                         </es-select>
-                        <es-input name="valor" type="number" label="Valor" value="@valor" step="0.01" required="true" />
+                        <es-input name="valor" type="number" label="Valor" value="@valor.ToString(System.Globalization.CultureInfo.InvariantCulture)" step="0.01" required="true" />
                         <es-input name="limiteUsos" type="number" label="Limite de usos" value="@(limiteUsos?.ToString() ?? "")" min="1" label-optional="true" />
                         <es-input name="validoAte" type="date" label="Válido até" value="@(validoAte != null ? validoAteDt.ToString("yyyy-MM-dd") : "")" label-optional="true" />
                         <es-select name="planoId" label="Restringir a plano" label-optional="true">
