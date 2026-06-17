@@ -60,4 +60,11 @@ public sealed class BackgroundJobOptions
     /// parcelas CR com Pix ativo. Default true em producao.
     /// </summary>
     public bool EnableContaReceberPixReconciliacaoJob { get; set; } = true;
+
+    /// <summary>
+    /// Quando <c>true</c>, registra o <c>CaixaEsquecidoJob</c> que roda 1x/dia (10:00 UTC ≈
+    /// 07:00 BRT) detectando caixas abertos não fechados de dias anteriores e notificando in-app
+    /// (só notifica, não fecha — ADR-0034 / issue #641). Default true em producao.
+    /// </summary>
+    public bool EnableCaixaEsquecidoJob { get; set; } = true;
 }

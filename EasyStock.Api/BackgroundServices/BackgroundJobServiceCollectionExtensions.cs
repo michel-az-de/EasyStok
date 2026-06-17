@@ -78,6 +78,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableContaReceberPixReconciliacaoJob)
             services.AddHostedService<ContaReceberPixReconciliacaoJob>();
 
+        // CaixaEsquecidoJob (#641) — diario 10:00 UTC, detecta caixas abertos nao fechados de
+        // dias anteriores e notifica in-app (so notifica, nao fecha).
+        if (options.EnableCaixaEsquecidoJob)
+            services.AddHostedService<CaixaEsquecidoJob>();
+
         return services;
     }
 }

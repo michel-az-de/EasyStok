@@ -43,4 +43,10 @@ public static class LockKeys
     /// confia que a primeira concluiu antes do health check passar.
     /// </summary>
     public const long StartupMigrationsAndSeed = 0x426F_6F74_5365_6564L;
+
+    /// <summary>
+    /// Varredura diária de caixas esquecidos abertos (CaixaEsquecidoJob).
+    /// Serializa entre réplicas pra não notificar 2x. "CaixEsq" em hex ASCII.
+    /// </summary>
+    public const long CaixaEsquecidoMonitor = 0x4361_6978_4573_7100L;
 }
