@@ -98,6 +98,11 @@ public sealed class ContaFinanceiraVencimentoJob(
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // RLS: job cross-tenant sem JWT — a policy tenant_isolation zeraria as parcelas
+        // (CurrentTenantId=Guid.Empty). IgnoreQueryFilters desliga só o filtro EF; o bypass
+        // cobre a camada do banco. Scope fresco → liga ANTES da 1a query (interceptor lê a flag
+        // em ConnectionOpened). Espelha FaturaReconciliacaoJob (issue 644).
+        using var _rls = db.UseRowLevelSecurityBypass();
         var notificador = scope.ServiceProvider.GetService<INotificadorService>();
         var hoje = DateTime.UtcNow.Date;
 

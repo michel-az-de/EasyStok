@@ -74,6 +74,11 @@ public sealed class FaturaBackfillJob(
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // RLS: job cross-tenant sem JWT — a policy tenant_isolation zeraria as cobrancas
+        // (CurrentTenantId=Guid.Empty). IgnoreQueryFilters desliga só o filtro EF; o bypass
+        // cobre a camada do banco. Scope fresco → liga ANTES da 1a query. Espelha
+        // FaturaReconciliacaoJob (issue 644). O comentário "SuperAdmin" abaixo era aspiracional.
+        using var _rls = db.UseRowLevelSecurityBypass();
         var assinaturaRepo = scope.ServiceProvider.GetRequiredService<IAssinaturaEmpresaRepository>();
         var planoRepo = scope.ServiceProvider.GetRequiredService<IPlanoRepository>();
         var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
