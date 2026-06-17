@@ -28,6 +28,18 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// lógica de "último evento" do dashboard (AnalyticsRepository.ResumoDia) — issue #596.</summary>
         Task<MovimentoCaixa?> GetAberturaPendenteAsync(Guid empresaId, Guid? lojaId = null);
 
+        /// <summary>
+        /// Aberturas pendentes (sem fechamento posterior na mesma empresa/loja) de TODOS os
+        /// tenants cujo instante é anterior a <paramref name="limiteInferiorUtc"/> (00:00 BRT de
+        /// hoje em UTC) e cujo dia operacional BRT é anterior a hoje — i.e. caixas esquecidos
+        /// abertos de dias anteriores. Usado pelo CaixaEsquecidoJob.
+        /// <para>REQUER que o caller ligue <c>UseRowLevelSecurityBypass()</c> ANTES de abrir a
+        /// conexão (cross-tenant; ver CaixaEsquecidoCrossTenantRlsTests). NÃO usar em request HTTP.
+        /// Agrupa por (empresa, loja) — difere do null-loja loja-agnóstico de
+        /// <see cref="GetAberturaPendenteAsync"/> (ADR-0034).</para>
+        /// </summary>
+        Task<IReadOnlyList<MovimentoCaixa>> GetAberturasEsquecidasAsync(DateTime limiteInferiorUtc, CancellationToken ct = default);
+
         Task AddMovimentoAsync(MovimentoCaixa movimento);
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 

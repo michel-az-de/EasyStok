@@ -72,6 +72,31 @@ namespace EasyStock.Infra.Postgre.Repositories
             return ultimo?.Tipo == "abertura" ? ultimo : null;
         }
 
+        // Aberturas (não estornadas) sem fechamento posterior na MESMA empresa/loja = sessão em
+        // aberto. Cross-tenant: o caller (CaixaEsquecidoJob) liga UseRowLevelSecurityBypass() ANTES
+        // de abrir a conexão (camada RLS) e este método desliga o filtro EF com IgnoreQueryFilters
+        // (camada EF) — defesa em profundidade (ver CaixaEsquecidoCrossTenantRlsTests). Pré-filtra
+        // no SQL por instante < limite (00:00 BRT de hoje em UTC) via anti-join EXISTS (traduz no
+        // Npgsql, ao contrário de GroupBy().First()), e refina o dia operacional BRT em memória — a
+        // conversão de fuso vive em HorarioBrasil e não traduz pra SQL. Agrupa por (empresa, loja).
+        public async Task<IReadOnlyList<MovimentoCaixa>> GetAberturasEsquecidasAsync(
+            DateTime limiteInferiorUtc, CancellationToken ct = default)
+        {
+            var candidatas = await db.MovimentosCaixa.AsNoTracking().IgnoreQueryFilters()
+                .Where(a => a.Tipo == "abertura" && a.EstornadoEm == null
+                         && a.DataMovimento < limiteInferiorUtc
+                         && !db.MovimentosCaixa.Any(f =>
+                                f.Tipo == "fechamento" && f.EstornadoEm == null
+                                && f.EmpresaId == a.EmpresaId && f.LojaId == a.LojaId
+                                && f.DataMovimento > a.DataMovimento))
+                .ToListAsync(ct);
+
+            var hoje = HorarioBrasil.Hoje();
+            return candidatas
+                .Where(a => HorarioBrasil.DataOperacional(a.DataMovimento) < hoje)
+                .ToList();
+        }
+
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
         public Task UpdateMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Update(m); return Task.CompletedTask; }
 
