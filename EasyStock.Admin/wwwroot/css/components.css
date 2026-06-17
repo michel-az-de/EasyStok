@@ -166,13 +166,43 @@ button:focus-visible {
     var(--es-bg);
 }
 
+/* BUG-03 (issue 492): tokens da sidebar, theme-aware. Os valores DARK sao
+   visualmente equivalentes aos literais originais (drifts de alpha sub-pixel em
+   algumas bordas); o tema escuro permanece praticamente intacto. Os valores LIGHT
+   tornam a sidebar uma superficie clara coerente com o tema claro — antes a sidebar
+   era #07132d fixo nos dois temas e "sumia" no tema claro.
+   --app-topbar-h: altura do header sticky, usada pela faixa de telemetria (BUG-12). */
+:root {
+  --sidebar-bg: var(--bg-surface);
+  --sidebar-border: var(--border-soft);
+  --sidebar-ink: var(--text-primary);
+  --sidebar-ink-muted: var(--text-muted);
+  --sidebar-hover-bg: rgba(10, 21, 48, 0.05);
+  --sidebar-soft-bg: rgba(10, 21, 48, 0.04);
+  --sidebar-soft-border: rgba(10, 21, 48, 0.10);
+  --sidebar-section-ink: var(--text-muted);
+  --sidebar-kbd-bg: var(--surface-sunken);
+  --app-topbar-h: 64px;
+}
+:root[data-theme="dark"] {
+  --sidebar-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 180px),
+    #07132d;
+  --sidebar-border: rgba(247, 242, 232, 0.10);
+  --sidebar-ink: #F2F4F9;
+  --sidebar-ink-muted: rgba(226, 232, 240, 0.62);
+  --sidebar-hover-bg: rgba(247, 242, 232, 0.055);
+  --sidebar-soft-bg: rgba(247, 242, 232, 0.07);
+  --sidebar-soft-border: rgba(247, 242, 232, 0.10);
+  --sidebar-section-ink: rgba(226, 232, 240, 0.58);
+  --sidebar-kbd-bg: #202b42;
+}
+
 /* Sidebar (desktop expanded) */
 .sidebar {
   width: 256px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 180px),
-    #07132d;
-  border-right: 1px solid rgba(247, 242, 232, 0.10);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -181,22 +211,21 @@ button:focus-visible {
   transition: width var(--duration-base) var(--ease-out),
               transform var(--duration-base) var(--ease-out);
 }
-/* BUG-006: a sidebar tem fundo fixo escuro (#07132d) nos dois temas, mas o texto
-   da marca ("Easy") e do usuario usa os tokens de tema (--es-ink / --text-primary),
-   que ficam escuros no tema claro e somem sobre o fundo escuro. Fixa os tokens de
-   texto em tom claro DENTRO da sidebar; no tema escuro ja sao claros (no-op). */
+/* BUG-03 (issue 492): os tokens de texto da sidebar seguem --sidebar-ink
+   (theme-aware): claro sobre o navy no tema escuro, escuro sobre a superficie clara
+   no tema claro. Substitui o antigo override fixo (era BUG-006). */
 .sidebar {
-  --text-primary: #F2F4F9;
-  --text-muted: rgba(226, 232, 240, 0.62);
-  --es-ink: #F2F4F9;
-  --es-ink-mute: rgba(226, 232, 240, 0.62);
+  --text-primary: var(--sidebar-ink);
+  --text-muted: var(--sidebar-ink-muted);
+  --es-ink: var(--sidebar-ink);
+  --es-ink-mute: var(--sidebar-ink-muted);
 }
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.125rem;
-  border-bottom: 1px solid rgba(247, 242, 232, 0.08);
+  border-bottom: 1px solid var(--sidebar-border);
   flex: none;
 }
 .sidebar-brand-pill {
@@ -337,7 +366,7 @@ button:focus-visible {
 .sidebar-link:hover,
 .sidebar-link:focus-visible {
   color: var(--text-primary);
-  background: rgba(247, 242, 232, 0.055);
+  background: var(--sidebar-hover-bg);
   transform: translateX(1px);
 }
 .sidebar-link.is-active {
@@ -362,7 +391,7 @@ button:focus-visible {
   min-width: 1.65rem;
   padding: 0.12rem 0.45rem;
   border-radius: 999px;
-  background: rgba(247, 242, 232, 0.07);
+  background: var(--sidebar-soft-bg);
   color: var(--text-secondary);
   font: 800 10px/1.35 var(--font-mono);
   text-align: center;
@@ -374,18 +403,20 @@ button:focus-visible {
 
 /* Sidebar — botão de busca/cmdk (sintaxe: dashed border + atalho) */
 .sidebar-search {
-  background: rgba(247, 242, 232, 0.055);
-  border: 1px solid rgba(247, 242, 232, 0.10);
+  /* base = tom mais sutil; hover = mais visivel (no dark, soft-bg 0.07 > hover-bg
+     0.055 — restaura a direcao original do hover, que estava invertida). */
+  background: var(--sidebar-hover-bg);
+  border: 1px solid var(--sidebar-soft-border);
   color: var(--text-muted);
 }
 .sidebar-search:hover {
-  background: rgba(247, 242, 232, 0.07);
+  background: var(--sidebar-soft-bg);
 }
 .sidebar-search-kbd {
   font: 600 10px / 1 var(--font-mono);
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--es-surface-2);
+  background: var(--sidebar-kbd-bg);
   color: var(--text-muted);
   margin-left: auto;
 }
@@ -397,12 +428,12 @@ button:focus-visible {
   font: 800 9.5px/1 var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(226, 232, 240, 0.58);
+  color: var(--sidebar-section-ink);
 }
 .sidebar-group {
   margin-top: 0.65rem;
   padding-top: 0.7rem;
-  border-top: 1px solid rgba(247, 242, 232, 0.06);
+  border-top: 1px solid var(--sidebar-border);
 }
 .sidebar-group:first-of-type {
   margin-top: 0.2rem;
@@ -412,7 +443,7 @@ button:focus-visible {
 .sidebar-external {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
-  border-top: 1px solid rgba(247, 242, 232, 0.08);
+  border-top: 1px solid var(--sidebar-border);
 }
 
 /* Topbar (sticky) */
@@ -1386,6 +1417,21 @@ button:focus-visible {
   text-align: right;
   white-space: nowrap;
 }
+/* BUG-09 (issue 471): a coluna de acoes cola na borda direita (sticky) para nao ser
+   cortada/escondida pelo overflow-x da tabela em viewports estreitos. Fundo solido +
+   sombra de profundidade para destacar o limite quando ha scroll. */
+.es-data-table th.es-data-table-td-actions,
+.es-data-table td.es-data-table-td-actions {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  /* fundo OPACO nos dois temas: --surface-sunken e semi-transparente no dark
+     (rgba .04) e deixaria o conteudo das outras colunas vazar por baixo no
+     scroll horizontal. --bg-surface e opaco em claro e escuro. */
+  background: var(--bg-surface);
+  box-shadow: -8px 0 8px -8px rgba(10, 21, 48, 0.18);
+}
+.es-data-table tbody tr:hover td.es-data-table-td-actions { background: var(--bg-surface); }
 .es-data-table th.es-data-table-th-bulk,
 .es-data-table td.es-data-table-td-bulk {
   width: 40px;
@@ -1477,6 +1523,10 @@ button:focus-visible {
   .es-data-table.table-stack td.es-data-table-td-actions {
     text-align: center;
     justify-content: flex-end;
+    /* no reflow de cards o sticky/sombra do desktop nao se aplicam: anula-os
+       para nao pintar uma sombra parasita na linha de acoes de cada card. */
+    position: static;
+    box-shadow: none;
   }
 }
 
