@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdm
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ObterCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.RemoverCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
+using EasyStock.Application.UseCases.Admin.Storefront.CriarStorefrontAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Common;
@@ -28,6 +29,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [Authorize(Policy = "Admin")]   // SuperAdmin | Admin; SuperAdmin sem empresa → 404 (use o painel admin)
 public class TenantVitrineCardapioController(
     IStorefrontRepository storefrontRepository,
+    CriarStorefrontAdminUseCase criarStorefront,
     ListarCardapioAdminUseCase listar,
     ObterCardapioItemAdminUseCase obter,
     AdicionarCardapioItemAdminUseCase adicionar,
@@ -54,6 +56,8 @@ public class TenantVitrineCardapioController(
     void IActionFilter.OnActionExecuted(ActionExecutedContext context) { }
 
     public sealed record VitrineResumoResponse(Guid StorefrontId, string Slug, string TituloPublico, bool Ativo);
+
+    public sealed record CriarVitrineRequest(string TituloPublico, string Slug, decimal? PedidoMinimoEntrega);
 
     public sealed record AdicionarItemRequest(
         Guid? ProdutoId,
@@ -104,6 +108,29 @@ public class TenantVitrineCardapioController(
         var sf = await ResolverStorefrontAsync();
         if (sf is null) return DataNotFound(SemVitrine);
         return DataOk(new VitrineResumoResponse(sf.Id, sf.Slug, sf.TituloPublico, sf.Ativo));
+    }
+
+    /// <summary>
+    /// Cria a vitrine do próprio tenant (self-service). 1 por empresa; o slug é o endereço
+    /// público (único global). Defaults seguros da factory: Ativo=false (publica depois).
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CriarVitrine([FromBody] CriarVitrineRequest req)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.TituloPublico) || string.IsNullOrWhiteSpace(req.Slug))
+            return DataBadRequest("Informe o nome e o endereço da vitrine.");
+
+        try
+        {
+            var result = await criarStorefront.ExecuteAsync(new CriarStorefrontAdminCommand(
+                EmpresaId, req.Slug, req.TituloPublico, req.PedidoMinimoEntrega ?? 0m));
+
+            return DataCreated("/api/minha-vitrine", new { storefrontId = result.StorefrontId, slug = result.Slug });
+        }
+        catch (EmpresaJaTemStorefrontException) { return DataBadRequest("Você já tem uma vitrine."); }
+        catch (StorefrontSlugDuplicadoException) { return DataBadRequest("Esse endereço já está em uso. Escolha outro."); }
+        catch (RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
     }
 
     [HttpGet("cardapio")]

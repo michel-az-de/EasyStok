@@ -84,6 +84,21 @@ public class CardapioController(
         return View(vm);
     }
 
+    public sealed record CriarVitrineForm(string? Titulo, string? Slug);
+
+    [HttpPost("/cardapio/criar-vitrine")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CriarVitrine([FromBody] CriarVitrineForm form)
+    {
+        if (form is null || string.IsNullOrWhiteSpace(form.Titulo) || string.IsNullOrWhiteSpace(form.Slug))
+            return JsonFail("Informe o nome e o endereço da vitrine.");
+
+        var r = await svc.CriarVitrineAsync(form.Titulo.Trim(), form.Slug.Trim().ToLowerInvariant(), null);
+        if (!r.Success)
+            return JsonFail(MensagemErro(r.ErrorMessage, r.ErrorCode));
+        return JsonOk();
+    }
+
     [HttpGet("/cardapio/novo")]
     public async Task<IActionResult> Novo()
     {

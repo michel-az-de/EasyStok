@@ -13,6 +13,15 @@ public class CardapioService(ApiClient api)
     public Task<ApiResult<VitrineResumoApi>> ObterVitrineAsync() =>
         api.GetAsync<VitrineResumoApi>("minha-vitrine");
 
+    /// <summary>Cria a vitrine do tenant (self-service). Slug = endereço público único.</summary>
+    public Task<ApiResult<object>> CriarVitrineAsync(string titulo, string slug, decimal? pedidoMinimo) =>
+        api.PostAsync<object>("minha-vitrine", new
+        {
+            tituloPublico = titulo,
+            slug,
+            pedidoMinimoEntrega = pedidoMinimo ?? 0m,
+        });
+
     public Task<ApiResult<CardapioListaApi>> ListarAsync() =>
         api.GetAsync<CardapioListaApi>("minha-vitrine/cardapio");
 

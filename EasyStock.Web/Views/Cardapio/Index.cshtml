@@ -44,11 +44,30 @@
 
 @if (!Model.TemVitrine)
 {
-    <div class="ws text-center py-12">
-        <p class="text-lg font-semibold" style="color: var(--text-secondary, var(--ink-700));">Sua vitrine ainda não está pronta</p>
-        <p class="text-sm mt-2 max-w-md mx-auto" style="color: var(--text-muted, var(--ink-500));">
-            Assim que sua loja online for criada, seu cardápio aparece aqui. Fale com o suporte se precisar de ajuda.
+    var lojaNome = (ViewBag.LojaAtualNome as string) ?? string.Empty;
+    <div class="ws" style="max-width: 520px; margin: 24px auto;"
+         x-data="cardapioVitrine({ titulo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(lojaNome)) })">
+        <h2 class="text-xl font-semibold mb-1" style="font-family: var(--font-display, var(--font-sans)); color: var(--text-primary, var(--ink-900));">
+            Crie sua vitrine online
+        </h2>
+        <p class="text-sm mb-5" style="color: var(--text-muted, var(--ink-500));">
+            É o link público onde seus clientes veem o cardápio e fazem pedidos. Nada vai ao ar sem você publicar — dá pra ajustar tudo depois.
         </p>
+
+        <div class="mb-4">
+            <label for="cv-titulo" class="block text-sm font-medium mb-1">Nome da vitrine</label>
+            <input id="cv-titulo" class="ui-field" x-model="titulo" @@input="onTitulo()" maxlength="120" placeholder="Ex: Casa da Babá" autocomplete="off" />
+        </div>
+        <div class="mb-2">
+            <label for="cv-slug" class="block text-sm font-medium mb-1">Endereço (link)</label>
+            <div class="flex items-center gap-1">
+                <span class="text-sm" style="color: var(--text-muted, var(--ink-500));">app/</span>
+                <input id="cv-slug" class="ui-field flex-1" x-model="slug" @@input="onSlug()" maxlength="40" placeholder="minha-loja" autocomplete="off" />
+            </div>
+            <p class="text-xs mt-1" style="color: var(--text-muted, var(--ink-500));">3 a 40 caracteres: minúsculas, números e hífen.</p>
+        </div>
+
+        <button type="button" class="btn btn-primary mt-3" @@click="criar()" :aria-busy="busy" :disabled="busy">Criar minha vitrine</button>
     </div>
 }
 else if (Model.Total == 0)

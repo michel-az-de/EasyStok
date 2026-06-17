@@ -26,6 +26,42 @@
     return { ok: res.ok && !!json && json.ok !== false, status: res.status, json: json };
   }
 
+  // slug público: minúsculas, sem acento, só [a-z0-9-], sem hífen nas pontas, máx 40.
+  function slugify(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  }
+
+  // ── Criar vitrine (estado "sem vitrine") ─────────────────────────────────
+  window.cardapioVitrine = function (cfg) {
+    return {
+      titulo: cfg.titulo || '',
+      slug: slugify(cfg.titulo || ''),
+      slugTouched: false,
+      busy: false,
+      onTitulo() { if (!this.slugTouched) this.slug = slugify(this.titulo); },
+      onSlug() { this.slugTouched = true; },
+      async criar() {
+        if (this.busy) return;
+        const t = (this.titulo || '').trim();
+        const s = slugify(this.slug);
+        if (!t) { toast('Dê um nome à vitrine.', 'error'); return; }
+        if (s.length < 3) { toast('O endereço precisa de ao menos 3 caracteres (minúsculas, números e hífen).', 'error'); return; }
+        this.slug = s;
+        this.busy = true;
+        try {
+          const r = await window.api.post('/cardapio/criar-vitrine', { titulo: t, slug: s });
+          if (!r || r.ok === false) { toast((r && r.erro) || 'Não foi possível criar a vitrine agora.', 'error'); this.busy = false; return; }
+          toast('Vitrine criada! Agora é só adicionar o primeiro item.');
+          window.location.href = '/cardapio';
+        } catch (e) {
+          toast('Não foi possível criar a vitrine agora. Tente de novo.', 'error');
+          this.busy = false;
+        }
+      },
+    };
+  };
+
   // ── Card da galeria ─────────────────────────────────────────────────────
   window.cardapioCard = function (init) {
     return {
