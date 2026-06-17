@@ -47,5 +47,8 @@ public enum TipoEventoNotificacao
     ContaPagarVencida = 33,
     ContaReceberVencendo = 34,
     ContaReceberVencida = 35,
-    ParcelaRecebida = 36
+    ParcelaRecebida = 36,
+
+    // Caixa esquecido aberto de um dia anterior (CaixaEsquecidoJob — só notifica, não fecha).
+    CaixaAbertoEsquecido = 37
 }

@@ -49,6 +49,11 @@ namespace EasyStock.Domain.Entities
 
         public DateTime CriadoEm { get; set; }
 
+        /// <summary>Quando este movimento de "abertura" já foi notificado como caixa esquecido
+        /// aberto (dedup do CaixaEsquecidoJob — 1 aviso por sessão, não 1/dia). Null = ainda não
+        /// notificado. Só faz sentido para Tipo=="abertura".</summary>
+        public DateTime? NotificadoEsquecidoEm { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
@@ -79,6 +84,10 @@ namespace EasyStock.Domain.Entities
             EstornadoPorNome = userNome;
             MotivoEstorno = motivo;
         }
+
+        /// <summary>Carimba esta abertura como já notificada (caixa esquecido). Idempotente —
+        /// preserva o primeiro carimbo. Kind=Utc para a coluna timestamptz.</summary>
+        public void MarcarNotificadoEsquecido() => NotificadoEsquecidoEm ??= DateTime.UtcNow;
 
         /// <summary>Sinal financeiro do movimento (positivo = entra no caixa, negativo = sai).</summary>
         public decimal SinalNoCaixa => Tipo switch
