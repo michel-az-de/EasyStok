@@ -26,7 +26,7 @@
     };
 </script>
 
-@* Tira de telemetria: dado real (stack health, tickets criticos, MRR). Dot CINZA/
+@* Tira de telemetria: dado real (stack health, tickets críticos, MRR). Dot CINZA/
    indeterminado quando stackStatus ainda null, NUNCA verde otimista. *@
 <div class="deck-telemetry deck-rise" style="--deck-i:0" role="status" aria-live="polite" aria-label="Telemetria operacional">
     <span class="deck-tele-item">
@@ -36,11 +36,11 @@
     <span class="deck-tele-sep"></span>
     <span class="deck-tele-item">
         <span class="deck-dot" :class="dash.ticketsCriticos > 0 ? 'is-crit' : 'is-ok'"></span>
-        tickets criticos <strong x-text="dash.ticketsCriticos">@Model.TicketsCriticos</strong>
+        tickets críticos <strong x-text="dash.ticketsCriticos">@Model.TicketsCriticos</strong>
     </span>
     <span class="deck-tele-ticker deck-tele-item">
         MRR <strong>R$&nbsp;<span x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })">@Model.ReceitaMensal.ToString("N2")</span></strong>
-        · <span x-text="dashSecsAgo > 0 ? 'ha ' + dashSecsAgo + 's' : 'agora'"></span>
+        · <span x-text="dashSecsAgo > 0 ? 'há ' + dashSecsAgo + 's' : 'agora'"></span>
     </span>
 </div>
 
@@ -48,8 +48,8 @@
 <header class="deck-head deck-rise" style="--deck-i:1">
     <div>
         <div class="deck-eyebrow deck-accent-underline">Central de controle</div>
-        <h1>Visao geral</h1>
-        <p>Clientes, tickets, receita e saude operacional em tempo real.</p>
+        <h1>Visão geral</h1>
+        <p>Clientes, tickets, receita e saúde operacional em tempo real.</p>
     </div>
     <div class="deck-head-actions">
         <es-button variant="ghost" href="/Tenants" icon="building-2">Clientes</es-button>
@@ -65,13 +65,13 @@
     </span>
     <div style="flex:1; min-width:240px;">
         <h3 style="margin:0 0 4px; color:var(--text-primary); font-weight:700; font-size:15px;">Banco vazio — nada pra testar</h3>
-        <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.5;">Ainda nao ha tenants. Popule o ambiente com cenarios de teste (tenants, tickets, audit logs).</p>
+        <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.5;">Ainda não há tenants. Popule o ambiente com cenários de teste (tenants, tickets, audit logs).</p>
     </div>
     <es-button variant="primary" icon="zap" href="/Diagnostico?tab=operacoes">Popular ambiente</es-button>
 </div>
 
-@* Hero assimetrico: tile-feature de receita (Fraunces) + rail de indicadores secundarios *@
-<section class="deck-hero" aria-label="Receita e indicadores secundarios">
+@* Hero assimetrico: tile-feature de receita (Fraunces) + rail de indicadores secundários *@
+<section class="deck-hero" aria-label="Receita e indicadores secundários">
     <article class="deck-panel deck-feature deck-rise" style="--deck-i:2">
         <div class="deck-eyebrow">Receita mensal recorrente</div>
         <div>
@@ -79,8 +79,8 @@
         </div>
         <div class="deck-eyebrow" style="color:var(--text-muted)">estimativa mensal · assinaturas ativas</div>
     </article>
-    <aside class="deck-panel deck-rail deck-rise" style="--deck-i:3" aria-label="Indicadores secundarios">
-        <div class="deck-rail-item"><span class="deck-rail-label">Usuarios ativos</span><span class="deck-rail-value" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</span></div>
+    <aside class="deck-panel deck-rail deck-rise" style="--deck-i:3" aria-label="Indicadores secundários">
+        <div class="deck-rail-item"><span class="deck-rail-label">Usuários ativos</span><span class="deck-rail-value" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</span></div>
         <div class="deck-rail-item"><span class="deck-rail-label">Logins (24h)</span><span class="deck-rail-value" x-text="dash.logins24h">@Model.Logins24h</span></div>
         <div class="deck-rail-item"><span class="deck-rail-label">Em atendimento</span><span class="deck-rail-value" :style="dash.ticketsEmAtendimento > 0 ? 'color:var(--warn-500)' : ''" x-text="dash.ticketsEmAtendimento">@Model.TicketsEmAtendimento</span></div>
         <div class="deck-rail-item"><span class="deck-rail-label">Tenants novos (30d)</span><span class="deck-rail-value" x-text="dash.tenantsNovos">@Model.TenantsNovos</span></div>
@@ -103,29 +103,29 @@
         <div class="deck-eyebrow">Tickets abertos</div>
         <div class="deck-kpi" x-text="dash.ticketsAbertos">@Model.TicketsAbertos</div>
         <div class="deck-meta">
-            <span class="deck-crit" x-show="dash.ticketsCriticos > 0" x-cloak><span class="deck-dot is-crit"></span> <span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> criticos</span>
-            <span x-show="!dash.ticketsCriticos">sem criticos</span>
+            <span class="deck-crit" x-show="dash.ticketsCriticos > 0" x-cloak><span class="deck-dot is-crit"></span> <span x-text="dash.ticketsCriticos">@Model.TicketsCriticos</span> críticos</span>
+            <span x-show="!dash.ticketsCriticos">sem críticos</span>
         </div>
     </a>
 </section>
 
 @* Tabelas lado a lado *@
-<section class="deck-panels" aria-label="Tickets criticos e tenants recentes">
+<section class="deck-panels" aria-label="Tickets críticos e tenants recentes">
     <article class="deck-panel deck-rise" style="--deck-i:5">
         <div class="deck-panel-head">
-            <h3>Tickets criticos</h3>
+            <h3>Tickets críticos</h3>
             <es-button variant="ghost" size="xs" href="/Tickets?prioridade=Critica" icon-trailing="arrow-right">Ver todos</es-button>
         </div>
         @if (!Model.UltimosTicketsCriticos.Any())
         {
             <div style="padding:8px var(--s-5) 28px;">
-                <es-empty-state icon="check-circle" title="Nenhum ticket critico" description="A fila esta em dia." />
+                <es-empty-state icon="check-circle" title="Nenhum ticket crítico" description="A fila está em dia." />
             </div>
         }
         else
         {
             <table class="deck-table">
-                <thead><tr><th scope="col">Titulo</th><th scope="col">Empresa</th><th scope="col">Status</th></tr></thead>
+                <thead><tr><th scope="col">Título</th><th scope="col">Empresa</th><th scope="col">Status</th></tr></thead>
                 <tbody>
                     @foreach (var t in Model.UltimosTicketsCriticos)
                     {
@@ -160,7 +160,7 @@
         @if (!Model.TenantsRecentes.Any())
         {
             <div style="padding:8px var(--s-5) 28px;">
-                <es-empty-state icon="building-2" title="Nenhum tenant novo" description="Sem cadastros nos ultimos 30 dias." />
+                <es-empty-state icon="building-2" title="Nenhum tenant novo" description="Sem cadastros nos últimos 30 dias." />
             </div>
         }
         else
