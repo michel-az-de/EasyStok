@@ -114,7 +114,8 @@ public class CaixaUseCasesTests
     public async Task FecharCaixa_DeveCalcularSaldoFinal_SomandoAberturaVendasEntradasMenosSaidas()
     {
         var empresaId = Guid.NewGuid();
-        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Dia operacional em Brasilia: o UC resolve o dia a partir da abertura pendente.
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
 
         var movimentos = new[]
         {
@@ -123,6 +124,9 @@ public class CaixaUseCasesTests
             MovimentoCaixa.Criar(empresaId, "entrada", 30m),
             MovimentoCaixa.Criar(empresaId, "saida", 20m),
         };
+        // Sessão aberta de hoje: GetAberturaPendenteAsync é a fonte de verdade do dia-alvo.
+        _repo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m));
         _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
         _repo.GetMovimentosDoDiaAsync(empresaId, data, null).Returns(movimentos);
         _repo.GetTotalVendasDoDiaAsync(empresaId, data, null).Returns(500m);
@@ -153,7 +157,9 @@ public class CaixaUseCasesTests
         // Npgsql rejeita em coluna timestamptz, abortando o CommitAsync (o caixa nao fechava).
         // O marcador de fechamento deve gravar DataMovimento em UTC.
         var empresaId = Guid.NewGuid();
-        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        _repo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m));
         _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
         _repo.GetMovimentosDoDiaAsync(empresaId, data, null)
             .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
@@ -167,6 +173,53 @@ public class CaixaUseCasesTests
 
         await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m =>
             m.Tipo == "fechamento" && m.DataMovimento.Kind == DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public async Task FecharCaixa_DeveLancar_QuandoNaoHaSessaoAbertaNemSnapshot()
+    {
+        // Guard (#640): sem abertura pendente e sem snapshot, NÃO fabricar um fechamento
+        // de hoje — isso reintroduziria o bug (bloquearia a abertura de hoje).
+        var empresaId = Guid.NewGuid();
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns((MovimentoCaixa?)null);
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new FecharCaixaCommand(empresaId));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*Não há caixa aberto*");
+        await _repo.DidNotReceive().AddFechamentoAsync(Arg.Any<FechamentoCaixa>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task FecharCaixa_DeveDatarNoDiaDaAbertura_QuandoSessaoCrossDay()
+    {
+        // #640: fechar (sem data, como a UI faz) uma sessão aberta ontem grava o snapshot
+        // datado em ONTEM — liberando o caixa de hoje. Mock prova a resolução do dia-alvo;
+        // a integração em Postgres real prova que a sessão é vista como encerrada.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var ontem = hoje.AddDays(-1);
+        var aberturaOntem = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-1));
+
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(aberturaOntem);
+        _repo.GetFechamentoDoDiaAsync(empresaId, ontem, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, ontem, null).Returns(new[] { aberturaOntem });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, ontem, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, ontem, null).Returns(0m);
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        var result = await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId));
+
+        result.Data.Should().Be(ontem);
+        await _repo.Received(1).AddFechamentoAsync(Arg.Is<FechamentoCaixa>(f => f.Data == ontem));
+        await _uow.Received(1).CommitAsync();
     }
 
     // ════════════════════════════════════════════════════════════════════
