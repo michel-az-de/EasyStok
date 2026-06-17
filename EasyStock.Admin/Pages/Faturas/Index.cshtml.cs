@@ -28,6 +28,29 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
     public async Task<IActionResult> OnGetExportCsvAsync(CancellationToken ct)
     {
+        // BUG-08 (#636): mesma guarda de intervalo invertido da listagem antes de exportar.
+        // Preserva os filtros do operador no redirect (route values -> query string), em vez de
+        // cair numa /Faturas com o formulario vazio.
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if ((ValorMin is >= 0 && ValorMax is > 0 && ValorMin.Value > ValorMax.Value)
+            || (VencimentoDe.HasValue && VencimentoAte.HasValue && VencimentoDe.Value > VencimentoAte.Value))
+        {
+            SetErro(ValorMin is >= 0 && ValorMax is > 0 && ValorMin.Value > ValorMax.Value
+                ? "Intervalo de valor inválido: o valor mínimo é maior que o máximo. Ajuste os campos."
+                : "Período inválido: a data inicial é posterior à data final. Ajuste os campos.");
+            return RedirectToPage(new
+            {
+                Status,
+                Origem,
+                EmpresaId,
+                Busca,
+                vencimentoDe = VencimentoDe?.ToString("yyyy-MM-dd"),
+                vencimentoAte = VencimentoAte?.ToString("yyyy-MM-dd"),
+                valorMin = ValorMin?.ToString(inv),
+                valorMax = ValorMax?.ToString(inv),
+            });
+        }
+
         // Reusa exatamente os mesmos filtros bind-pelo-Get da listagem.
         var qs = new List<string>();
         if (!string.IsNullOrWhiteSpace(Status) && StatusValidos.Contains(Status))
@@ -66,6 +89,21 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     {
         if (Page < 1) Page = 1;
         if (Page > 10000) Page = 10000;
+
+        // BUG-08 (#636): intervalo invertido (min>max) retornaria "0 faturas" silenciosamente.
+        // Avisa via toast (TempData -> _Toast) em vez de enganar o operador. So compara quando
+        // ambos os limites estao na faixa efetiva do filtro (min>=0 e max>0), igual ao pipeline
+        // de query abaixo — evita falso-positivo em entradas degeneradas (ex.: max=0).
+        if (ValorMin is >= 0 && ValorMax is > 0 && ValorMin.Value > ValorMax.Value)
+        {
+            SetErro("Intervalo de valor inválido: o valor mínimo é maior que o máximo. Ajuste os campos.");
+            return;
+        }
+        if (VencimentoDe.HasValue && VencimentoAte.HasValue && VencimentoDe.Value > VencimentoAte.Value)
+        {
+            SetErro("Período inválido: a data inicial é posterior à data final. Ajuste os campos.");
+            return;
+        }
 
         try
         {
