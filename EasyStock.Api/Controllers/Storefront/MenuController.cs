@@ -62,7 +62,7 @@ public sealed class MenuController(
         Summary = "Cardápio público do storefront",
         Description = "Endpoint anônimo. Retorna apenas items com Visivel=true. Cache HTTP 5min (browser + edge). " +
                       "Suporta ETag/If-None-Match para 304 Not Modified.")]
-    [ProducesResponseType(typeof(IReadOnlyList<CardapioItemPublicoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MenuPublicoResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [HttpGet]
@@ -75,7 +75,13 @@ public sealed class MenuController(
             var result = await listarCardapioUseCase.ExecuteAsync(
                 new ListarCardapioPublicoInput(slug), ct);
 
-            var json = JsonSerializer.SerializeToUtf8Bytes(result.Itens, PublicJsonOptions);
+            // Envelope { itens, tituloPublico, slug } — contrato canônico (menu-publico.contract.md)
+            // que a vitrine Casa da Babá consome (menu.js exige Array.isArray(data.itens)).
+            // Serialização MANUAL com PublicJsonOptions é load-bearing: o ETag tem que ser o hash
+            // dos BYTES EXATOS servidos. NÃO trocar por Ok(response) — Ok() delega a serialização ao
+            // framework (opções globais do MVC, não PublicJsonOptions) e o hash deixaria de bater.
+            var response = new MenuPublicoResponse(result.Itens, result.TituloPublico, result.Slug);
+            var json = JsonSerializer.SerializeToUtf8Bytes(response, PublicJsonOptions);
             var etag = ComputarETag(json);
 
             // Sempre seta cache-headers, mesmo no 304 (proxies precisam pra TTL).

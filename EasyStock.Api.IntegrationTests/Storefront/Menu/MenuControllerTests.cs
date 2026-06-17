@@ -200,7 +200,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
         resp.Headers.ETag!.Tag.Should().StartWith("\"").And.EndWith("\"");
 
         var json = await resp.Content.ReadAsStringAsync();
-        var itens = JsonSerializer.Deserialize<List<MenuItemDto>>(json, JsonOpts)!;
+        var envelope = JsonSerializer.Deserialize<MenuEnvelope>(json, JsonOpts)!;
+        envelope.TituloPublico.Should().Be("Casa da Babá", "o envelope carrega o título público do storefront");
+        envelope.Slug.Should().Be(seed.Storefront.Slug);
+        var itens = envelope.Itens;
         itens.Should().HaveCount(1, "apenas o item Visivel=true deve aparecer");
         var dto = itens[0];
         dto.Id.Should().Be(seed.ItemVisivel.Id);
@@ -208,6 +211,61 @@ public sealed class MenuControllerTests : IAsyncLifetime
         dto.PrecoCentavos.Should().Be(4250);
         dto.Categoria.Should().Be("Pratos principais");
         dto.ImagemUrl.Should().Be("https://cdn/lasanha.jpg");
+    }
+
+    // ── Contrato envelope (guard de forma — #643) ──────────────────────
+
+    [SkippableFact]
+    public async Task GetMenu_RespostaEhEnvelopeObjeto_NaoArrayNu()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+        var seed = await SeedCardapioAsync(factory, slug: "casa-da-baba-envelope");
+
+        var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        doc.RootElement.ValueKind.Should().Be(JsonValueKind.Object,
+            "contrato canônico é envelope { itens, ... }, NÃO array nu (menu.js exige Array.isArray(data.itens))");
+        doc.RootElement.TryGetProperty("itens", out var itens).Should().BeTrue("envelope tem 'itens'");
+        itens.ValueKind.Should().Be(JsonValueKind.Array);
+        doc.RootElement.TryGetProperty("tituloPublico", out var titulo).Should().BeTrue("envelope tem 'tituloPublico'");
+        titulo.GetString().Should().Be("Casa da Babá");
+        doc.RootElement.TryGetProperty("slug", out _).Should().BeTrue("envelope tem 'slug'");
+    }
+
+    [SkippableFact]
+    public async Task GetMenu_ItemTemExatamenteAs10Chaves_InclusiveNulls()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+        // Avulso (Pão de Alho): descricao/imagemUrl/tag null, estoqueAtual null — prova que nulls
+        // são EMITIDOS (PublicJsonOptions.DefaultIgnoreCondition = Never), não omitidos.
+        var seed = await SeedComAvulsoAsync(factory, slug: "casa-da-baba-paridade");
+
+        var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var avulso = doc.RootElement.GetProperty("itens").EnumerateArray()
+            .Single(i => i.GetProperty("id").GetGuid() == seed.Avulso.Id);
+
+        var chaves = avulso.EnumerateObject().Select(p => p.Name).OrderBy(n => n).ToArray();
+        chaves.Should().BeEquivalentTo(new[]
+        {
+            "categoria", "descricao", "disponivel", "estoqueAtual", "id",
+            "imagemUrl", "nome", "ordem", "precoCentavos", "tag",
+        }, "exatamente as 10 chaves camelCase do contrato, inclusive as null");
+
+        avulso.GetProperty("descricao").ValueKind.Should().Be(JsonValueKind.Null);
+        avulso.GetProperty("imagemUrl").ValueKind.Should().Be(JsonValueKind.Null);
+        avulso.GetProperty("estoqueAtual").ValueKind.Should().Be(JsonValueKind.Null, "avulso não tem snapshot de estoque");
+        avulso.GetProperty("tag").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     // ── ETag / 304 ─────────────────────────────────────────────────────
@@ -428,8 +486,8 @@ public sealed class MenuControllerTests : IAsyncLifetime
         var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var itens = JsonSerializer.Deserialize<List<MenuItemDto>>(
-            await resp.Content.ReadAsStringAsync(), JsonOpts)!;
+        var itens = JsonSerializer.Deserialize<MenuEnvelope>(
+            await resp.Content.ReadAsStringAsync(), JsonOpts)!.Itens;
         var avulso = itens.Single(i => i.Id == seed.Avulso.Id);
         avulso.Nome.Should().Be("pão de alho", "NomePublico avulso é lowercase (text-transform no front)");
         avulso.PrecoCentavos.Should().Be(1800);
@@ -454,8 +512,8 @@ public sealed class MenuControllerTests : IAsyncLifetime
         // traduz para LEFT JOIN com NULLs (item avulso) sem NRE contra Postgres real — exatamente
         // a classe de risco do #567 que o mock LINQ-to-Objects não pega (ADR-0031 §3).
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var itens = JsonSerializer.Deserialize<List<MenuItemDto>>(
-            await resp.Content.ReadAsStringAsync(), JsonOpts)!;
+        var itens = JsonSerializer.Deserialize<MenuEnvelope>(
+            await resp.Content.ReadAsStringAsync(), JsonOpts)!.Itens;
         itens.Should().HaveCount(2);
         itens.Select(i => i.Id).Should().Contain(new[] { seed.Vinculado.Id, seed.Avulso.Id });
     }
@@ -475,4 +533,9 @@ public sealed class MenuControllerTests : IAsyncLifetime
         double Ordem,
         bool Disponivel,
         string? Tag);
+
+    private sealed record MenuEnvelope(
+        List<MenuItemDto> Itens,
+        string TituloPublico,
+        string Slug);
 }

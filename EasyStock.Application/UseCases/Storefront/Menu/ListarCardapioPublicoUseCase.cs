@@ -62,6 +62,12 @@ public sealed class ListarCardapioPublicoUseCase(
             // Sentinela empurra itens sem categoria para o fim.
             .OrderBy(i => i.CategoriaEfetiva() ?? SemCategoriaSentinela, StringComparer.Ordinal)
             .ThenBy(i => i.OrdemExibicao)
+            // Desempate determinístico (CriadoEm → Id): itens nascem OrdemExibicao=0 (factory),
+            // então um menu nunca-reordenado é todo-empate; sem desempate a ordem do array varia
+            // entre queries/instâncias → o ETag (hash do payload) fica instável → 304-thrash em vez
+            // de cache-hit. CriadoEm preserva ordem-de-inserção; Id fecha o determinismo total.
+            .ThenBy(i => i.CriadoEm)
+            .ThenBy(i => i.Id)
             .Select(i => new CardapioItemPublicoDto(
                 Id: i.Id,
                 Nome: i.NomeEfetivo() ?? string.Empty,

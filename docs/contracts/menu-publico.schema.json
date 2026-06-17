@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easystok.app/contracts/menu-publico.schema.json",
+  "title": "Cardapio publico do storefront",
+  "description": "Resposta de GET /api/storefront/{slug}/menu. Fonte-unica: EasyStok (issue 643). Consumido pela vitrine Casa da Baba (src/api/menu.js exige Array.isArray(data.itens)). A vitrine deve vendorar este arquivo e validar fixtures + resposta real contra ele.",
+  "type": "object",
+  "required": ["itens", "tituloPublico", "slug"],
+  "additionalProperties": false,
+  "properties": {
+    "itens": {
+      "type": "array",
+      "description": "Lista vazia e valida (storefront ativo sem itens visiveis).",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "tituloPublico": { "type": "string" },
+    "slug": { "type": "string" }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "description": "Todas as 10 chaves sao obrigatorias (presentes mesmo quando null): PublicJsonOptions.DefaultIgnoreCondition = Never.",
+      "required": [
+        "id", "nome", "descricao", "precoCentavos", "imagemUrl",
+        "estoqueAtual", "categoria", "ordem", "disponivel", "tag"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "nome": { "type": "string" },
+        "descricao": { "type": ["string", "null"] },
+        "precoCentavos": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Centavos (long) — evita float no transito."
+        },
+        "imagemUrl": { "type": ["string", "null"] },
+        "estoqueAtual": {
+          "type": ["integer", "null"],
+          "description": "null para item avulso (sem ERP); snapshot eventual para vinculado. Nao usar para decisao de compra."
+        },
+        "categoria": { "type": ["string", "null"] },
+        "ordem": { "type": "number" },
+        "disponivel": { "type": "boolean" },
+        "tag": {
+          "type": ["string", "null"],
+          "enum": ["assinatura", "novo", "vegetariano", null],
+          "description": "Vocabulario fechado pelo dominio (TagsPermitidas). 'Novidade'/'Sem gluten' das fixtures aspiracionais sao inalcancaveis."
+        }
+      }
+    }
+  }
+}
