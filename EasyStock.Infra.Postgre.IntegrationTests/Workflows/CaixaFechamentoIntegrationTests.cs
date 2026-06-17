@@ -231,8 +231,10 @@ public class CaixaFechamentoIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(config);
         services.AddLogging();
+        services.AddMemoryCache(); // SubscriptionStatusCache (infra DI) depende de IMemoryCache.
         services.AddHttpContextAccessor();
         services.AddSingleton(Substitute.For<ICurrentUserAccessor>());
+        services.AddSingleton(Substitute.For<ICacheService>()); // ProdutoCacheInvalidator depende de ICacheService.
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
         return services.BuildServiceProvider();
