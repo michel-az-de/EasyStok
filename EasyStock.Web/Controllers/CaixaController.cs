@@ -46,10 +46,20 @@ public class CaixaController(CaixaService svc, SessionService session) : BaseCon
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Fechar(string? observacoes)
     {
+        // Não enviar data: o servidor é autoritativo e fecha a sessão aberta (que pode ser de
+        // um dia anterior), datando o snapshot no dia da abertura — libera o caixa de hoje (#640).
         var result = await svc.FecharAsync(null, observacoes);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
-        Toast("success", $"Caixa fechado. Saldo final: {result.Data?.SaldoFinal:C}.");
+        var fech = result.Data;
+        // Toast usa a data efetivamente fechada pelo servidor (não um palpite do cliente).
+        // Toast() grava uma única chave em TempData → emitir um só toast (aviso engloba sucesso).
+        var temAviso = fech?.Observacoes?.Contains("nao foram incluidos", StringComparison.OrdinalIgnoreCase) == true;
+        if (temAviso)
+            Toast("warning", $"Caixa de {fech?.Data:dd/MM/yyyy} fechado (saldo {fech?.SaldoFinal:C}). " +
+                "Atenção: há lançamentos em dias anteriores não incluídos — revise no histórico.");
+        else
+            Toast("success", $"Caixa de {fech?.Data:dd/MM/yyyy} fechado. Saldo final: {fech?.SaldoFinal:C}.");
         return RedirectToAction(nameof(Index));
     }
 

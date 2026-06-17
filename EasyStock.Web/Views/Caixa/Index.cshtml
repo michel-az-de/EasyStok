@@ -424,8 +424,16 @@ else
             @Html.AntiForgeryToken()
             <header class="fm-header">
                 <div>
-                    <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa do dia?</h2>
-                    <p class="fm-header__subtitle">Após o fechamento, novos lançamentos vão pro caixa de amanhã. Esta ação não pode ser desfeita.</p>
+                    @if (d.AberturaPendenteCrossDay)
+                    {
+                        <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa de @(d.AbertoDesde?.ToString("dd/MM/yyyy"))?</h2>
+                        <p class="fm-header__subtitle">Esta sessão foi aberta em @(d.AbertoDesde?.ToString("dd/MM/yyyy")) e segue aberta. O fechamento será registrado nesse dia — o caixa de hoje continua livre para abrir. Esta ação não pode ser desfeita.</p>
+                    }
+                    else
+                    {
+                        <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa do dia?</h2>
+                        <p class="fm-header__subtitle">Após o fechamento, novos lançamentos vão pro caixa de amanhã. Esta ação não pode ser desfeita.</p>
+                    }
                 </div>
                 <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
             </header>
