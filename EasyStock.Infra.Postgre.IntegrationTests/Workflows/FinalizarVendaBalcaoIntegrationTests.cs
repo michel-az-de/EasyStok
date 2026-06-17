@@ -3,7 +3,6 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.FinalizarVendaBalcao;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
-using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using FluentAssertions;
