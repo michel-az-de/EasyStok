@@ -450,6 +450,15 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.PedidoAgendadoEm10Minutos,
             assuntoTemplate: "Pedido em 10 minutos",
             corpoTemplate: "Pedido de {{ clienteNome }} em 10 minutos — prepare-se ({{ scheduledFor }}).");
+
+        // ===== Caixa esquecido aberto (#641) =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "caixa_esquecido_aberto_inapp_v1",
+            nome: "Caixa Esquecido Aberto — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.CaixaAbertoEsquecido,
+            assuntoTemplate: "Caixa aberto desde {{ data_abertura }}",
+            corpoTemplate: "O caixa segue aberto desde {{ data_abertura }} (saldo de abertura {{ valor_abertura }}). Feche-o para nao acumular vendas no dia errado.");
     }
 
     private static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
@@ -608,6 +617,11 @@ public static class NotificacoesGlobaisSeed
 
         yield return MakeRotina("pedido_agendado_10min_global", "Pedido agendado em 10 minutos",
             TipoEventoNotificacao.PedidoAgendadoEm10Minutos, "pedido_agendado_10min_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        // ===== Caixa esquecido aberto (#641) =====
+        yield return MakeRotina("caixa_esquecido_aberto_global", "Caixa Esquecido Aberto",
+            TipoEventoNotificacao.CaixaAbertoEsquecido, "caixa_esquecido_aberto_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
     }
 
