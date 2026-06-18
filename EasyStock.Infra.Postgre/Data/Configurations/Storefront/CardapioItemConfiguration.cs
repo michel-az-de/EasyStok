@@ -80,5 +80,12 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
             .HasForeignKey(c => c.ProdutoId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // FK Secao — SET NULL: apagar uma seção solta os itens (não os apaga). (ADR-0035)
+        builder.HasOne(c => c.Secao)
+            .WithMany()
+            .HasForeignKey(c => c.SecaoId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -111,6 +111,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.Subtotal).HasColumnType("numeric(14,2)");
             b.Property(x => x.Observacao).HasColumnType("text");
 
+            // Rastreabilidade storefront (ADR-0035): snapshot, sem FK p/ refs storefront.
+            // Os Guid? (CardapioItemId, CardapioItemVariacaoId, ProdutoVariacaoId) são colunas
+            // escalares (sem navegação → sem relacionamento EF). Só os snapshots de texto têm tamanho.
+            b.Property(x => x.VariacaoRotuloSnapshot).HasMaxLength(60);
+            b.Property(x => x.SkuSnapshot).HasMaxLength(100);
+
             b.HasOne(x => x.Produto)
                 .WithMany()
                 .HasForeignKey(x => x.ProdutoId)

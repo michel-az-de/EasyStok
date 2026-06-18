@@ -61,6 +61,13 @@ public class CardapioItem
     /// </summary>
     public string? CategoriaTexto { get; private set; }
 
+    /// <summary>
+    /// FK opcional para <see cref="CardapioSecao"/> (ADR-0035). Null = item sem seção.
+    /// Quando presente, é a 1ª fonte de <see cref="CategoriaEfetiva"/> (antes de
+    /// <see cref="CategoriaTexto"/> e de <c>Produto.Categoria.Nome</c>).
+    /// </summary>
+    public Guid? SecaoId { get; private set; }
+
     public bool Visivel { get; private set; }
     public bool Disponivel { get; private set; }
 
@@ -94,6 +101,15 @@ public class CardapioItem
 
     /// <summary>Navegação para Produto. EF carrega via <c>Include</c>.</summary>
     public Produto? Produto { get; set; }
+
+    /// <summary>Navegação para a seção do cardápio (ADR-0035). EF carrega via <c>Include</c>.</summary>
+    public CardapioSecao? Secao { get; set; }
+
+    /// <summary>
+    /// Opções selecionáveis do item guarda-chuva (ADR-0035). Vazio = item de preço único
+    /// (comportamento legado preservado). EF carrega via <c>Include</c>.
+    /// </summary>
+    public ICollection<CardapioItemVariacao> Variacoes { get; private set; } = new List<CardapioItemVariacao>();
 
     // EF Core ctor sem parâmetros
     private CardapioItem() { }
@@ -191,9 +207,10 @@ public class CardapioItem
     public string? NomeEfetivo() => NomePublico ?? Produto?.Nome;
 
     /// <summary>
-    /// Categoria efetiva: <see cref="CategoriaTexto"/> override OU <c>Produto.Categoria.Nome</c>.
+    /// Categoria efetiva (ADR-0035): <see cref="Secao"/>.Nome OU <see cref="CategoriaTexto"/> override
+    /// OU <c>Produto.Categoria.Nome</c>. Itens sem seção mantêm o comportamento anterior.
     /// </summary>
-    public string? CategoriaEfetiva() => CategoriaTexto ?? Produto?.Categoria?.Nome;
+    public string? CategoriaEfetiva() => Secao?.Nome ?? CategoriaTexto ?? Produto?.Categoria?.Nome;
 
     /// <summary>
     /// Preço efetivo: <see cref="PrecoStorefront"/> override OU
@@ -362,6 +379,90 @@ public class CardapioItem
     {
         if (Tag is null) return;
         Tag = null;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    // ── Item guarda-chuva: opções / variações (ADR-0035) ────────────────
+
+    /// <summary>True se o item tem ao menos uma opção (item guarda-chuva).</summary>
+    public bool TemVariacoes() => Variacoes.Count > 0;
+
+    /// <summary>
+    /// Opção exibida como "padrão" no card: a marcada <see cref="CardapioItemVariacao.EhPadrao"/>
+    /// (se disponível); senão a mais barata disponível; senão a mais barata absoluta (todas esgotadas);
+    /// senão null (item sem opções). Determinística (desempate por ordem → id).
+    /// </summary>
+    public CardapioItemVariacao? VariacaoPadrao()
+    {
+        if (Variacoes.Count == 0) return null;
+
+        var padrao = Variacoes.FirstOrDefault(v => v.EhPadrao && v.Disponivel);
+        if (padrao is not null) return padrao;
+
+        var disponiveis = Variacoes.Where(v => v.Disponivel).ToList();
+        var pool = disponiveis.Count > 0 ? disponiveis : Variacoes;
+
+        return pool
+            .OrderBy(v => v.PrecoStorefront)
+            .ThenBy(v => v.OrdemExibicao)
+            .ThenBy(v => v.Id)
+            .First();
+    }
+
+    /// <summary>
+    /// Preço "a partir de": preço da <see cref="VariacaoPadrao"/> quando há opções;
+    /// senão <see cref="PrecoEfetivo"/> (item de preço único — comportamento legado).
+    /// </summary>
+    public decimal PrecoAPartirDe() => VariacaoPadrao()?.PrecoStorefront ?? PrecoEfetivo();
+
+    /// <summary>
+    /// Há disponibilidade para venda: item sem opções segue <see cref="Disponivel"/>;
+    /// item guarda-chuva precisa de ao menos uma opção disponível.
+    /// </summary>
+    public bool TemDisponibilidade() => !TemVariacoes() || Variacoes.Any(v => v.Disponivel);
+
+    /// <summary>Associa/desassocia a seção do item (null = sem seção).</summary>
+    public void DefinirSecao(Guid? secaoId)
+    {
+        if (SecaoId == secaoId) return;
+        SecaoId = secaoId;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>Adiciona uma opção. Se vier marcada como padrão, zera o padrão das irmãs (≤1 por item).</summary>
+    public void AdicionarVariacao(CardapioItemVariacao variacao)
+    {
+        if (variacao is null)
+            throw new RegraDeDominioVioladaException("Variação é obrigatória.");
+
+        if (variacao.EhPadrao)
+            foreach (var v in Variacoes) v.DefinirPadrao(false);
+
+        Variacoes.Add(variacao);
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>Remove uma opção pelo Id (no-op se não existir).</summary>
+    public void RemoverVariacao(Guid variacaoId)
+    {
+        var alvo = Variacoes.FirstOrDefault(v => v.Id == variacaoId);
+        if (alvo is null) return;
+        Variacoes.Remove(alvo);
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Define a opção padrão garantindo a invariante ≤1 por item (zera as demais).
+    /// Sem índice de banco — a unicidade do padrão é responsabilidade do agregado (ADR-0035).
+    /// </summary>
+    public void DefinirVariacaoPadrao(Guid variacaoId)
+    {
+        var alvo = Variacoes.FirstOrDefault(v => v.Id == variacaoId)
+            ?? throw new RegraDeDominioVioladaException("Variação não pertence a este item.");
+
+        foreach (var v in Variacoes)
+            v.DefinirPadrao(v.Id == alvo.Id);
+
         AlteradoEm = DateTime.UtcNow;
     }
 

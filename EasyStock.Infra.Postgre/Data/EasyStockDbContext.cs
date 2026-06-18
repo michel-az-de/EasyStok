@@ -150,6 +150,8 @@ namespace EasyStock.Infra.Postgre.Data
         // Storefront aggregates (ver ADR-0002 multi-tenancy, ADR-0014 vaga lifecycle)
         public DbSet<EasyStock.Domain.Entities.Storefront.Storefront> Storefronts { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.CardapioItem> CardapioItens { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.CardapioItemVariacao> CardapioItemVariacoes { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Storefront.CardapioSecao> CardapioSecoes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.FreteZona> FreteZonas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.JanelaEntrega> JanelasEntrega { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.BloqueioEntrega> BloqueiosEntrega { get; set; } = null!;

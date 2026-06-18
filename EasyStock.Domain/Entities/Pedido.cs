@@ -251,6 +251,20 @@ namespace EasyStock.Domain.Entities
         public string? Observacao { get; set; }
         public DateTime CriadoEm { get; set; }
 
+        // ── Rastreabilidade storefront (ADR-0035) — snapshot, SEM FK ──────────
+        // As refs do storefront são trace puro (sem FK): a opção é editável/deletável
+        // pelo admin; FK quebraria pedidos históricos (23503). Tudo congelado no pedido.
+        /// <summary>CardapioItem guarda-chuva escolhido (trace, sem FK).</summary>
+        public Guid? CardapioItemId { get; set; }
+        /// <summary>Opção (CardapioItemVariacao) escolhida (trace, sem FK).</summary>
+        public Guid? CardapioItemVariacaoId { get; set; }
+        /// <summary>Variação do ERP quando a opção era vinculada. Copiada p/ ItemVenda na consolidação Pedido→Venda.</summary>
+        public Guid? ProdutoVariacaoId { get; set; }
+        /// <summary>Rótulo da opção congelado no momento do pedido (ex.: "800g").</summary>
+        public string? VariacaoRotuloSnapshot { get; set; }
+        /// <summary>SKU da opção congelado no momento do pedido.</summary>
+        public string? SkuSnapshot { get; set; }
+
         public Pedido? Pedido { get; set; }
         public Produto? Produto { get; set; }
 
