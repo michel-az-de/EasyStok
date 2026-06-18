@@ -83,7 +83,8 @@ public sealed class ListarCardapioPublicoUseCase(
                 Categoria: FormatarExibicao(i.CategoriaEfetiva()),
                 Ordem: i.OrdemExibicao,
                 Disponivel: i.Disponivel,
-                Tag: i.Tag))
+                Tag: i.Tag,
+                PesoExibicao: i.PesoExibicao))
             .ToList();
 
         return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);

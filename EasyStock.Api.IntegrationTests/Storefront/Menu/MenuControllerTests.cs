@@ -259,8 +259,8 @@ public sealed class MenuControllerTests : IAsyncLifetime
         chaves.Should().BeEquivalentTo(new[]
         {
             "categoria", "descricao", "disponivel", "estoqueAtual", "id",
-            "imagemUrl", "nome", "ordem", "precoCentavos", "tag",
-        }, "exatamente as 10 chaves camelCase do contrato, inclusive as null");
+            "imagemUrl", "nome", "ordem", "pesoExibicao", "precoCentavos", "tag",
+        }, "exatamente as 11 chaves camelCase do contrato, inclusive as null");
 
         avulso.GetProperty("descricao").ValueKind.Should().Be(JsonValueKind.Null);
         avulso.GetProperty("imagemUrl").ValueKind.Should().Be(JsonValueKind.Null);
@@ -532,7 +532,8 @@ public sealed class MenuControllerTests : IAsyncLifetime
         string? Categoria,
         double Ordem,
         bool Disponivel,
-        string? Tag);
+        string? Tag,
+        string? PesoExibicao);
 
     private sealed record MenuEnvelope(
         List<MenuItemDto> Itens,

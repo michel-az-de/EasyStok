@@ -21,7 +21,7 @@
       "description": "Todas as 10 chaves sao obrigatorias (presentes mesmo quando null): PublicJsonOptions.DefaultIgnoreCondition = Never.",
       "required": [
         "id", "nome", "descricao", "precoCentavos", "imagemUrl",
-        "estoqueAtual", "categoria", "ordem", "disponivel", "tag"
+        "estoqueAtual", "categoria", "ordem", "disponivel", "tag", "pesoExibicao"
       ],
       "additionalProperties": false,
       "properties": {
@@ -45,6 +45,10 @@
           "type": ["string", "null"],
           "enum": ["assinatura", "novo", "vegetariano", null],
           "description": "Vocabulario fechado pelo dominio (TagsPermitidas). 'Novidade'/'Sem gluten' das fixtures aspiracionais sao inalcancaveis."
+        },
+        "pesoExibicao": {
+          "type": ["string", "null"],
+          "description": "Unidade/porcao exibida junto ao preco na vitrine (ex: 'por kg', '300g / 800g'). Texto livre, max 50."
         }
       }
     }

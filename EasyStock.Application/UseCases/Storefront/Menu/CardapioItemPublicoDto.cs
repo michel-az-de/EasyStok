@@ -28,4 +28,5 @@ public sealed record CardapioItemPublicoDto(
     string? Categoria,
     double Ordem,
     bool Disponivel,
-    string? Tag);
+    string? Tag,
+    string? PesoExibicao);   // unidade/porção exibida junto ao preço (ex: "por kg", "300g / 800g")
