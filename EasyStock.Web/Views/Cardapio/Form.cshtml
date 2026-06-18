@@ -38,7 +38,7 @@
       @* x-data é atributo com aspas DUPLAS: JsonSerializer emite aspas duplas, então deixamos
          o Razor HTML-encodá-las (&quot;) — NÃO usar @@Html.Raw aqui (raw fecha o atributo no 1º "
          e trunca o x-data em 'produtoNome:', quebrando todo o form). Ver incidente 2026-06-18. *@
-      x-init="init($el)">
+      x-init="setup($el)">
 
     <input type="hidden" name="Modo" :value="modo" />
 

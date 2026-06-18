@@ -166,11 +166,16 @@
       vinculados: cfg.vinculados || [],
       $form: null,
 
-      init(el) {
-        this.$form = el;
+      // NÃO renomear para 'init': 'init' é auto-invocado pelo Alpine SEM args, e aí 'el' vinha
+      // undefined → TypeError 'addEventListener' → o handler de submit nunca registrava → o form
+      // caía no POST nativo sem token CSRF → 400 ao criar/editar (bug crítico r3, QA 2026-06-18).
+      // 'setup' não é hook do Alpine: roda só via x-init="setup($el)" (uma vez, com o form).
+      setup(el) {
+        const root = el || this.$el;   // x-init passa $el; fallback defensivo
+        this.$form = root;
         const self = this;
         // FormTagHelper descarta @submit.prevent — o handler vai via addEventListener (gotcha recorrente).
-        el.addEventListener('submit', function (e) { e.preventDefault(); self.submit(); });
+        root.addEventListener('submit', function (e) { e.preventDefault(); self.submit(); });
       },
 
       onDesc(e) { this.descLen = (e.target.value || '').length; },
