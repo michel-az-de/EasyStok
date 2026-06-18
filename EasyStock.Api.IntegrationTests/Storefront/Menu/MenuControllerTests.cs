@@ -489,10 +489,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
         var itens = JsonSerializer.Deserialize<MenuEnvelope>(
             await resp.Content.ReadAsStringAsync(), JsonOpts)!.Itens;
         var avulso = itens.Single(i => i.Id == seed.Avulso.Id);
-        avulso.Nome.Should().Be("pão de alho", "NomePublico avulso é lowercase (text-transform no front)");
+        avulso.Nome.Should().Be("Pão de Alho", "NomePublico avulso (minúsculo no banco) é title-cased pt-BR na projeção pública");
         avulso.PrecoCentavos.Should().Be(1800);
         avulso.EstoqueAtual.Should().BeNull("avulso (ProdutoId null) não tem snapshot de estoque do ERP");
-        avulso.Categoria.Should().Be("acompanhamentos");
+        avulso.Categoria.Should().Be("Acompanhamentos", "CategoriaTexto avulsa também é title-cased pra exibição");
         avulso.Disponivel.Should().BeTrue("front usa Disponivel, não EstoqueAtual, para 'Esgotado'");
     }
 

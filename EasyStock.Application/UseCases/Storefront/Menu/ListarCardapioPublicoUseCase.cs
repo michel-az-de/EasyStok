@@ -70,19 +70,64 @@ public sealed class ListarCardapioPublicoUseCase(
             .ThenBy(i => i.Id)
             .Select(i => new CardapioItemPublicoDto(
                 Id: i.Id,
-                Nome: i.NomeEfetivo() ?? string.Empty,
+                // Avulsos têm NomePublico/CategoriaTexto em minúsculo (factory). Capitaliza pra
+                // exibição na vitrine (title-case pt-BR); nomes de Produto (vinculado, já
+                // capitalizados) são preservados pelo guard de FormatarExibicao.
+                Nome: FormatarExibicao(i.NomeEfetivo()) ?? string.Empty,
                 Descricao: i.DescricaoPublica,
                 PrecoCentavos: (long)Math.Round(i.PrecoEfetivo() * 100m, MidpointRounding.AwayFromZero),
                 ImagemUrl: i.FotoUrl,
                 // Avulso: null (frontend usa disponivel; estoqueAtual não se aplica).
                 // Vinculado: 0 por ora — snapshot eventual fora deste escopo (TASK-EZ-MENU-001).
                 EstoqueAtual: i.ProdutoId.HasValue ? 0 : null,
-                Categoria: i.CategoriaEfetiva(),
+                Categoria: FormatarExibicao(i.CategoriaEfetiva()),
                 Ordem: i.OrdemExibicao,
                 Disponivel: i.Disponivel,
                 Tag: i.Tag))
             .ToList();
 
         return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);
+    }
+
+    /// <summary>Preposições/conjunções que ficam minúsculas no meio do título (pt-BR).</summary>
+    private static readonly HashSet<string> PalavrasMinusculas = new(StringComparer.Ordinal)
+    {
+        "de", "da", "do", "das", "dos", "e", "com", "a", "o", "ao", "aos",
+        "à", "às", "em", "no", "na", "nos", "nas", "para", "sem", "por", "ou",
+    };
+
+    /// <summary>
+    /// Title-case pt-BR para exibição na vitrine. <c>NomePublico</c>/<c>CategoriaTexto</c> de
+    /// itens avulsos são armazenados em minúsculo (factory). Capitaliza a 1ª letra de cada
+    /// palavra (e após hífen), deixando preposições do meio minúsculas. <strong>Guard:</strong>
+    /// só transforma se o valor vier TODO minúsculo — preserva nomes de Produto (itens
+    /// vinculados) que já vêm capitalizados.
+    /// </summary>
+    private static string? FormatarExibicao(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return s;
+        if (s != s.ToLowerInvariant()) return s; // já tem maiúscula → preserva (ex: nome de Produto)
+
+        var palavras = s.Split(' ');
+        for (var i = 0; i < palavras.Length; i++)
+        {
+            var p = palavras[i];
+            if (p.Length == 0) continue;
+            if (i > 0 && PalavrasMinusculas.Contains(p)) continue;
+
+            var arr = p.ToCharArray();
+            var capitalizar = true;
+            for (var j = 0; j < arr.Length; j++)
+            {
+                if (arr[j] == '-') { capitalizar = true; continue; }
+                if (capitalizar && char.IsLetter(arr[j]))
+                {
+                    arr[j] = char.ToUpperInvariant(arr[j]);
+                    capitalizar = false;
+                }
+            }
+            palavras[i] = new string(arr);
+        }
+        return string.Join(' ', palavras);
     }
 }
