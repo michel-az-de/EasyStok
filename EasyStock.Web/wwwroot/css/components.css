@@ -197,6 +197,15 @@ button:focus-visible {
 .text-warn { color: var(--warn-700); }
 .text-crit { color: var(--crit-700); }
 .text-info { color: var(--navy-700); }
+/* Cor de borda semantica (barras de acento, ex: severidade) — substitui border-red-500
+   etc. crus. So a cor; a largura (border-l-4) continua vindo do utilitario Tailwind. */
+.border-ok   { border-color: var(--ok-600); }
+.border-warn { border-color: var(--warn-600); }
+.border-crit { border-color: var(--crit-600); }
+.border-info { border-color: var(--navy-600); }
+/* Hover de acao destrutiva em botao-icone (substitui hover:text-red-500/hover:bg-red-50
+   crus, que o utilitario arbitrario nao cobre sem rebuild do Tailwind). */
+.icon-action-danger:hover { color: var(--crit-600); background-color: var(--crit-50); }
 
 /* ---------- Tabela financeira (UX-005 / issue #474) ----------
    Escopada em .fin-table (ContasAReceber/ContasAPagar). NAO afeta .tbl/.tbl-full

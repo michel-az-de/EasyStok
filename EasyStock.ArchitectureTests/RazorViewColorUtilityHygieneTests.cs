@@ -84,7 +84,6 @@ public class RazorViewColorUtilityHygieneTests
         "NotasFiscais/Detalhes.cshtml",
         "NotasFiscais/Emitir.cshtml",
         "NotasFiscais/Index.cshtml",
-        "Notificacoes/Index.cshtml",
         "Onboarding/Index.cshtml",
         "OperacaoMobile/Index.cshtml",
         "Pedidos/Detail.cshtml",
