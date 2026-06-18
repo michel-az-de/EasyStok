@@ -90,9 +90,12 @@
     font-family: var(--font-display, var(--font-sans));
     font-size: 1.02rem; font-weight: 600; line-height: 1.25;
     color: var(--text-primary, var(--ink-900));
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    /* até 2 linhas + tooltip (title) p/ o resto — nomes longos não somem (UX-002) */
+    overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
 }
-.cdp-card__preco { font-size: 1rem; font-weight: 700; color: var(--navy-700); }
+/* preço: token theme-aware (antes --navy-700 fixo = azul-escuro ilegível no tema escuro, UX-001) */
+.cdp-card__preco { font-size: 1.05rem; font-weight: 700; color: var(--text-primary, var(--ink-900)); }
 .cdp-card__peso { font-size: .76rem; color: var(--text-muted, var(--ink-500)); }
 
 /* Ações */

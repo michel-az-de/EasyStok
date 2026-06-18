@@ -104,7 +104,7 @@ else
                              data-ordem="@item.OrdemExibicao.ToString(CultureInfo.InvariantCulture)"
                              data-rascunho="@(item.Visivel ? "false" : "true")"
                              data-esgotado="@(item.Disponivel ? "false" : "true")"
-                             x-data="cardapioCard({ id: '@item.Id', nome: @Html.Raw(nomeJson), visivel: @(item.Visivel ? "true" : "false"), disponivel: @(item.Disponivel ? "true" : "false") })"
+                             x-data="cardapioCard({ id: '@item.Id', nome: @nomeJson, visivel: @(item.Visivel ? "true" : "false"), disponivel: @(item.Disponivel ? "true" : "false") })"
                              :data-rascunho="!visivel"
                              :data-esgotado="!disponivel">
                         <div class="cdp-card__photo">
@@ -134,7 +134,7 @@ else
                         </div>
 
                         <div class="cdp-card__body">
-                            <span class="cdp-card__nome">@item.NomeEfetivo</span>
+                            <span class="cdp-card__nome" title="@item.NomeEfetivo">@item.NomeEfetivo</span>
                             <span class="cdp-card__preco">@item.PrecoEfetivo.ToString("C", ptBR)</span>
                             @if (!string.IsNullOrEmpty(item.PesoExibicao))
                             {
@@ -144,11 +144,11 @@ else
 
                         <div class="cdp-card__actions">
                             <button type="button" class="cdp-act cdp-act--primary" @@click="togglePublicar()" :aria-busy="busy"
-                                    :aria-label="(visivel ? 'Voltar a rascunho: ' : 'Publicar: ') + @Html.Raw(nomeJson)">
+                                    :aria-label="(visivel ? 'Voltar a rascunho: ' : 'Publicar: ') + @nomeJson">
                                 <span x-text="visivel ? 'Rascunho' : 'Publicar'">@(item.Visivel ? "Rascunho" : "Publicar")</span>
                             </button>
                             <button type="button" class="cdp-act" @@click="toggleDisponivel()" :aria-busy="busy"
-                                    :aria-label="(disponivel ? 'Marcar esgotado: ' : 'Marcar disponível: ') + @Html.Raw(nomeJson)">
+                                    :aria-label="(disponivel ? 'Marcar esgotado: ' : 'Marcar disponível: ') + @nomeJson">
                                 <span x-text="disponivel ? 'Esgotar' : 'Disponível'">@(item.Disponivel ? "Esgotar" : "Disponível")</span>
                             </button>
                             <a class="cdp-act" href="/cardapio/@item.Id/editar" aria-label="Editar @item.NomeEfetivo">Editar</a>

@@ -6,7 +6,7 @@
     var ptBR = new CultureInfo("pt-BR");
     var categorias = ViewBag.Categorias as List<string> ?? new List<string>();
     var vinculados = ViewBag.ProdutosVinculados as List<string> ?? new List<string>();
-    var precoStr = Model.PrecoStorefront?.ToString("0.##", ptBR);
+    var precoStr = Model.PrecoStorefront?.ToString("0.00", ptBR);   // sempre 2 casas (49,90, não 49,9) — BUG-002
     var actionUrl = Model.EhEdicao ? $"/cardapio/{Model.Id}/atualizar" : "/cardapio/criar";
     string? precoEfetivo = ViewBag.PrecoEfetivo is decimal pe ? pe.ToString("C", ptBR) : null;
 }
@@ -27,12 +27,15 @@
         itemId: '@(Model.Id?.ToString() ?? "")',
         actionUrl: '@actionUrl',
         produtoId: '@(Model.ProdutoId?.ToString() ?? "")',
-        produtoNome: @Html.Raw(JsonSerializer.Serialize(Model.ProdutoNome ?? "")),
-        fotoUrl: @Html.Raw(JsonSerializer.Serialize(Model.FotoUrl ?? "")),
+        produtoNome: @(JsonSerializer.Serialize(Model.ProdutoNome ?? "")),
+        fotoUrl: @(JsonSerializer.Serialize(Model.FotoUrl ?? "")),
         publicar: @(Model.Publicar ? "true" : "false"),
         descLen: @(Model.DescricaoPublica?.Length ?? 0),
-        vinculados: @Html.Raw(JsonSerializer.Serialize(vinculados))
+        vinculados: @(JsonSerializer.Serialize(vinculados))
       })"
+      @* x-data é atributo com aspas DUPLAS: JsonSerializer emite aspas duplas, então deixamos
+         o Razor HTML-encodá-las (&quot;) — NÃO usar @@Html.Raw aqui (raw fecha o atributo no 1º "
+         e trunca o x-data em 'produtoNome:', quebrando todo o form). Ver incidente 2026-06-18. *@
       x-init="init($el)">
 
     <input type="hidden" name="Modo" :value="modo" />
