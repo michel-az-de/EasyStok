@@ -60,6 +60,10 @@
 }
 .cdp-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cdp-card[data-esgotado="true"] .cdp-card__photo img { filter: grayscale(.65) brightness(.96); }
+/* Esgotado: estado claro no card inteiro (não só o chip) — espelha o tratamento de rascunho (issue 633, #7 QA) */
+.cdp-card[data-esgotado="true"] .cdp-card__ph { filter: grayscale(.6); opacity: .8; }
+.cdp-card[data-esgotado="true"] .cdp-card__nome,
+.cdp-card[data-esgotado="true"] .cdp-card__preco { opacity: .55; }
 .cdp-card__ph {
     position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -125,6 +129,13 @@
 /* Reordenar (acessível por teclado) */
 .cdp-move { display: inline-flex; gap: 2px; }
 .cdp-move .cdp-act { min-width: 30px; padding: 5px; }
+/* Desabilita ↑ no 1º card e ↓ no último da categoria — clicar ali não fazia nada (issue 633, #6 QA).
+   :first/:last-child seguem o DOM, então continuam corretos após reordenar (mover usa insertBefore). */
+.cdp-grid > .cdp-card:first-child [data-move="up"],
+.cdp-grid > .cdp-card:last-child [data-move="down"] {
+    opacity: .35;
+    pointer-events: none;
+}
 
 /* ── Formulário ───────────────────────────────────────────────────────── */
 .cdp-form { display: grid; gap: var(--s-5, 20px); max-width: 720px; }
