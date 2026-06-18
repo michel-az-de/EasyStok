@@ -122,7 +122,16 @@ public class CardapioItem
 
         if (precoEmReais <= 0m)
             throw new RegraDeDominioVioladaException(
-                $"Preço deve ser positivo (recebido: {precoEmReais:C}).");
+                // BUG-011: :C com cultura invariante imprime '¤'/formato contábil EN — usa R$ + número simples.
+                $"Preço deve ser positivo (recebido: R$ {precoEmReais:0.00}).");
+
+        // BUG-004: teto p/ não estourar a coluna decimal(10,2) (erro técnico vazado ao cliente).
+        if (precoEmReais > 999_999.99m)
+            throw new RegraDeDominioVioladaException(
+                "Preço acima do limite permitido (máximo R$ 999.999,99).");
+
+        // BUG-010: moeda com no máximo 2 casas (a coluna decimal(10,2) arredonda; tornamos explícito).
+        precoEmReais = Math.Round(precoEmReais, 2, MidpointRounding.AwayFromZero);
 
         if (categoria is not null)
             ValidarTamanho(categoria, max: 100, nome: "Categoria");
@@ -315,7 +324,11 @@ public class CardapioItem
         {
             if (precoStorefront.Value < 0m)
                 throw new RegraDeDominioVioladaException(
-                    $"Preço do storefront não pode ser negativo (recebido: {precoStorefront.Value:C}).");
+                    // BUG-011: evita '¤'/formato contábil EN do :C com cultura invariante.
+                    $"Preço do storefront não pode ser negativo (recebido: R$ {precoStorefront.Value:0.00}).");
+            if (precoStorefront.Value > 999_999.99m)
+                throw new RegraDeDominioVioladaException(
+                    "Preço acima do limite permitido (máximo R$ 999.999,99).");
             PrecoStorefront = precoStorefront.Value;
         }
 

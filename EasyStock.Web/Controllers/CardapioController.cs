@@ -158,6 +158,10 @@ public class CardapioController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar([FromForm] CardapioItemFormViewModel vm, IFormFile? foto)
     {
+        // BUG-005: modo 'vinculado' sem produto caía em 'avulso' ("Nome obrigatório") em vez de pedir o produto.
+        if (string.Equals(vm.Modo, "vinculado", StringComparison.OrdinalIgnoreCase) && !vm.ProdutoId.HasValue)
+            return JsonFail("Selecione um produto do estoque para vincular.");
+
         var r = await svc.CriarAsync(MapToFormApi(vm));
         if (!r.Success || r.Data is null)
             return JsonFail(MensagemErro(r.ErrorMessage, r.ErrorCode));
@@ -189,7 +193,9 @@ public class CardapioController(
 
     [HttpPost("/cardapio/{id:guid}/foto")]
     [ValidateAntiForgeryToken]
-    [RequestSizeLimit(6 * 1024 * 1024)]
+    // BUG-013: folga acima de 6MB pro request CHEGAR na action e devolver JSON amigável
+    // (com o limite exato de 6MB o framework rejeitava com 400 vazio antes da action rodar).
+    [RequestSizeLimit(8 * 1024 * 1024)]
     public async Task<IActionResult> UploadFoto(Guid id, IFormFile foto)
     {
         if (foto is null || foto.Length == 0)
@@ -223,13 +229,16 @@ public class CardapioController(
         return JsonOk(new { disponivel = r.Data.DisponivelAgora });
     }
 
-    public sealed record ReordenarRequest(double NovaOrdem);
+    public sealed record ReordenarRequest(double? NovaOrdem);
 
     [HttpPost("/cardapio/{id:guid}/reordenar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reordenar(Guid id, [FromBody] ReordenarRequest req)
     {
-        var r = await svc.ReordenarAsync(id, req.NovaOrdem);
+        // BUG-007/008: 'novaOrdem' ausente caía em default 0 (reordenação silenciosa); e sem teto.
+        if (req?.NovaOrdem is not { } ordem || double.IsNaN(ordem) || ordem < 0 || ordem > 1_000_000)
+            return JsonFail("Ordem inválida.");
+        var r = await svc.ReordenarAsync(id, ordem);
         if (!r.Success)
             return JsonFail(MensagemErro(r.ErrorMessage, r.ErrorCode));
         return JsonOk();

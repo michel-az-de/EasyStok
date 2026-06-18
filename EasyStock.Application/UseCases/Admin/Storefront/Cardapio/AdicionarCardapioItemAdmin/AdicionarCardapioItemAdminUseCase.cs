@@ -63,9 +63,10 @@ public class AdicionarCardapioItemAdminUseCase(
             // ── Modo VINCULADO: item ligado a um Produto do ERP ──────────────
             // Tenant isolation: produto deve pertencer à mesma empresa do storefront.
             var produto = await produtoRepository.GetByIdAsync(storefront.EmpresaId, command.ProdutoId.Value)
+                // BUG-006: não vazar o EmpresaId (UUID interno multi-tenant) na mensagem ao cliente.
                 ?? throw new UseCaseValidationException(
                     "PRODUTO_INEXISTENTE",
-                    $"Produto {command.ProdutoId.Value} não encontrado para a empresa {storefront.EmpresaId}.");
+                    "Produto não encontrado nesta loja. Atualize a lista e selecione um produto válido.");
 
             var jaUsados = await cardapioRepository.GetProdutoIdsDoStorefrontAsync(command.StorefrontId);
             if (jaUsados.Contains(produto.Id))

@@ -20,7 +20,9 @@
     <p>O que aparece na sua vitrine online.</p>
 </div>
 
-<form id="cardapio-form" method="post" class="cdp-form"
+@* BUG-002: sem action o submit nativo ia pra /cardapio/novo (GET-only) → 405. Aponta pro handler
+   POST real (@actionUrl = /cardapio/criar ou /{id}/atualizar). O Alpine intercepta via AJAX; isto é fallback. *@
+<form id="cardapio-form" method="post" action="@actionUrl" class="cdp-form"
       x-data="cardapioForm({
         modo: '@Model.Modo',
         ehEdicao: @(Model.EhEdicao ? "true" : "false"),
