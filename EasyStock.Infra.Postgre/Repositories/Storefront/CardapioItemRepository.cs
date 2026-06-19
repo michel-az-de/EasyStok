@@ -13,8 +13,12 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
 
     public Task<CardapioItem?> GetByIdAndScopeAsync(Guid storefrontId, Guid itemId, Guid? empresaId, CancellationToken ct = default)
     {
+        // ADR-0035: admin (Obter/Editar) precisa enxergar as opções e a seção do item.
         var query = db.CardapioItens
+            .AsSplitQuery()
             .Include(c => c.Produto)
+            .Include(c => c.Variacoes)
+            .Include(c => c.Secao)
             .Where(c => c.StorefrontId == storefrontId && c.Id == itemId);
 
         // Escopo de tenant: só itens cujo Storefront pertence à empresa. SuperAdmin (null) ignora.
@@ -34,11 +38,20 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
     }
 
     public async Task<IReadOnlyList<CardapioItem>> GetVisiveisDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        // ADR-0035: carrega as opções (item guarda-chuva) e a seção + ancestrais (até 3 níveis,
+        // CHECK nivel<=2) para o categoriaPath. AsSplitQuery evita produto cartesiano com a
+        // coleção Variacoes. A ordenação determinística final (ETag estável) é feita in-memory
+        // no ListarCardapioPublicoUseCase — o OrderBy aqui é só pré-ordenação SQL.
         await db.CardapioItens
             .IgnoreQueryFilters()
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(c => c.Produto)
                 .ThenInclude(p => p!.Categoria)
+            .Include(c => c.Variacoes)
+            .Include(c => c.Secao)
+                .ThenInclude(s => s!.SecaoPai)
+                    .ThenInclude(s => s!.SecaoPai)
             .Where(c => c.StorefrontId == storefrontId && c.Visivel)
             .OrderBy(c => c.Produto!.Categoria!.Nome)
             .ThenBy(c => c.OrdemExibicao)
