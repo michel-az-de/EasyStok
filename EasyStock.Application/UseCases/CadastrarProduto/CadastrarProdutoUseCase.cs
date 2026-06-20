@@ -1,3 +1,4 @@
+using EasyStock.Application.Validators;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.CadastrarProduto
@@ -265,6 +266,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             UseCaseGuards.EnsureNotEmpty(command.CategoriaId, "CategoriaId");
             if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
             UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do produto");
+            // PROD-02: teto de sanidade de preco/custo (ponto unico — ver LimitesProduto).
+            LimitesProduto.EnsurePreco(command.PrecoReferencia, "Preço de referência");
+            LimitesProduto.EnsurePreco(command.CustoReferencia, "Custo de referência");
             if ((command.Embalagens ?? []).Count(e => e.Padrao) > 1) throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
 
             var skus = (command.Variacoes ?? [])

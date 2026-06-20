@@ -230,4 +230,80 @@ public class GerenciarProdutoUseCaseTests
         await _produtoRepository.Received(1).UpdateAsync(Arg.Is<Produto>(p =>
             p.Id == produtoId && p.AtributosJson == fichaJsonOriginal));
     }
+
+    [Fact]
+    public async Task Atualizar_rejeita_preco_acima_do_teto_quando_muda()
+    {
+        // PROD-02: fat-finger novo na edicao (R$142M) e barrado.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto",
+            Status = StatusProduto.Ativo,
+            PrecoReferencia = Dinheiro.FromDecimal(100m)
+        });
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Produto",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, 142_857_142.84m, null, null, StatusProduto.Ativo,
+            null, null, null);
+
+        var act = () => useCase.AtualizarAsync(command);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*99.999.999,99*");
+        await _produtoRepository.DidNotReceive().UpdateAsync(Arg.Any<Produto>());
+    }
+
+    [Fact]
+    public async Task Atualizar_preserva_legado_acima_do_teto_quando_preco_nao_muda()
+    {
+        // PROD-02 (on-change): registro legado acima do teto pode editar outros campos
+        // sem ser bloqueado — o teto so incide quando o preco muda.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        const decimal precoLegado = 150_000_000m; // acima do teto, dado legado
+
+        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto Legado",
+            Status = StatusProduto.Ativo,
+            PrecoReferencia = Dinheiro.FromDecimal(precoLegado)
+        });
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Produto Legado Renomeado",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, precoLegado, null, null, StatusProduto.Ativo,
+            null, null, null);
+
+        await useCase.AtualizarAsync(command); // nao lanca
+
+        await _produtoRepository.Received(1).UpdateAsync(Arg.Any<Produto>());
+    }
 }

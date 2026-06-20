@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyStock.Application.Validators;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.GerenciarProduto.Comandos;
@@ -51,6 +52,13 @@ public sealed class AtualizarProdutoUseCase(
         var skuAntes = produto.SkuBase?.Value;
         var codigoBarrasAntes = produto.CodigoBarras;
         var observacaoAntes = produto.ObservacaoInterna;
+
+        // PROD-02 (on-change): teto de preco/custo validado SO quando o valor muda — preserva
+        // registro legado acima do teto intocado, mas barra fat-finger novo na edicao.
+        if (command.PrecoReferencia != precoAntes)
+            LimitesProduto.EnsurePreco(command.PrecoReferencia, "Preço de referência");
+        if (command.CustoReferencia != custoAntes)
+            LimitesProduto.EnsurePreco(command.CustoReferencia, "Custo de referência");
 
         var categoria = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaId)
             ?? throw new UseCaseValidationException("Categoria nao encontrada.");
