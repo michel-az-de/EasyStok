@@ -9,6 +9,16 @@
     var precoStr = Model.PrecoStorefront?.ToString("0.00", ptBR);   // sempre 2 casas (49,90, não 49,9) — BUG-002
     var actionUrl = Model.EhEdicao ? $"/cardapio/{Model.Id}/atualizar" : "/cardapio/criar";
     string? precoEfetivo = ViewBag.PrecoEfetivo is decimal pe ? pe.ToString("C", ptBR) : null;
+    // ADR-0035: opções p/ o editor Alpine (prefill). Serializado e HTML-encodado pelo Razor (igual a vinculados).
+    var opcoesJson = JsonSerializer.Serialize(Model.Opcoes.Select(o => new
+    {
+        id = o.Id,
+        rotulo = o.Rotulo,
+        preco = o.PrecoStorefront,
+        disponivel = o.Disponivel,
+        ehPadrao = o.EhPadrao,
+        peso = o.PesoExibicao,
+    }));
 }
 
 @section Styles {
@@ -33,7 +43,8 @@
         fotoUrl: @(JsonSerializer.Serialize(Model.FotoUrl ?? "")),
         publicar: @(Model.Publicar ? "true" : "false"),
         descLen: @(Model.DescricaoPublica?.Length ?? 0),
-        vinculados: @(JsonSerializer.Serialize(vinculados))
+        vinculados: @(JsonSerializer.Serialize(vinculados)),
+        opcoes: @opcoesJson
       })"
       @* x-data é atributo com aspas DUPLAS: JsonSerializer emite aspas duplas, então deixamos
          o Razor HTML-encodá-las (&quot;) — NÃO usar @@Html.Raw aqui (raw fecha o atributo no 1º "
@@ -181,6 +192,35 @@
                 <input id="cdp-peso" name="PesoExibicao" class="ui-field" value="@Model.PesoExibicao" maxlength="50" placeholder="500 g · serve 2-3" />
             </div>
         </div>
+    </details>
+
+    @* ── Opções e tamanhos (item guarda-chuva, ADR-0035) ── *@
+    <details class="ws" style="padding: 16px 18px;" :open="opcoes.length > 0">
+        <summary class="text-sm font-semibold cursor-pointer" style="color: var(--text-primary, var(--ink-900));">
+            Opções e tamanhos (opcional)
+        </summary>
+        <p class="text-xs mt-2" style="color: var(--text-muted, var(--ink-500));">
+            Para itens com tamanhos (ex: 300g e 800g): o cliente escolhe e o preço muda. O "Preço (R$)"
+            acima é o preço-base; a vitrine mostra "a partir de" a opção mais barata disponível.
+        </p>
+        <div class="grid gap-2 mt-3">
+            <template x-for="(op, idx) in opcoes" :key="op._uid">
+                <div style="display:grid; grid-template-columns: 1fr 7rem auto auto; gap:8px; align-items:center;">
+                    <input type="hidden" :name="'Opcoes[' + idx + '].Id'" :value="op.id" />
+                    <input type="hidden" :name="'Opcoes[' + idx + '].EhPadrao'" :value="op.ehPadrao" />
+                    <input type="hidden" :name="'Opcoes[' + idx + '].Disponivel'" :value="op.disponivel" />
+                    <input class="ui-field" :name="'Opcoes[' + idx + '].Rotulo'" x-model="op.rotulo"
+                           placeholder="Rótulo (ex: 300g)" maxlength="60" autocomplete="off" />
+                    <input class="ui-field" :name="'Opcoes[' + idx + '].PrecoStorefront'" x-model="op.preco"
+                           inputmode="decimal" placeholder="0,00" autocomplete="off" />
+                    <label class="inline-flex items-center gap-1 text-xs cursor-pointer" title="Pré-selecionada na vitrine">
+                        <input type="radio" name="cdp-opcao-padrao" :checked="op.ehPadrao" @@change="setPadrao(idx)" /> padrão
+                    </label>
+                    <button type="button" class="btn btn-ghost" style="padding:6px 10px;" @@click="removeOpcao(idx)" aria-label="Remover opção">✕</button>
+                </div>
+            </template>
+        </div>
+        <button type="button" class="btn btn-ghost mt-3" @@click="addOpcao()">+ Adicionar opção</button>
     </details>
 
     <div class="cdp-form-footer">

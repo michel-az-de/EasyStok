@@ -165,6 +165,20 @@
       taActive: -1,
       vinculados: cfg.vinculados || [],
       $form: null,
+      // ADR-0035: opções do item guarda-chuva (editor tamanho/preço). _uid = :key estável p/ o
+      // x-for não reembaralhar os bindings ao remover linha do meio.
+      opcoes: (cfg.opcoes || []).map(function (o, i) {
+        return {
+          _uid: 'o' + i,
+          id: o.id || '',
+          rotulo: o.rotulo || '',
+          preco: (o.preco != null ? o.preco : ''),
+          disponivel: o.disponivel !== false,
+          ehPadrao: !!o.ehPadrao,
+          peso: o.peso || '',
+        };
+      }),
+      _uidN: (cfg.opcoes || []).length,
 
       // NÃO renomear para 'init': 'init' é auto-invocado pelo Alpine SEM args, e aí 'el' vinha
       // undefined → TypeError 'addEventListener' → o handler de submit nunca registrava → o form
@@ -229,6 +243,19 @@
         else if (e.key === 'ArrowUp') { e.preventDefault(); this.taActive = Math.max(this.taActive - 1, 0); }
         else if (e.key === 'Enter') { if (this.taActive >= 0) { e.preventDefault(); this.taPick(this.taResults[this.taActive]); } }
         else if (e.key === 'Escape') { this.taOpen = false; }
+      },
+
+      // ── Opções (ADR-0035) ──────────────────────────────────────────────
+      addOpcao() {
+        this.opcoes.push({ _uid: 'o' + (this._uidN++), id: '', rotulo: '', preco: '', disponivel: true, ehPadrao: this.opcoes.length === 0, peso: '' });
+      },
+      removeOpcao(i) {
+        const eraPadrao = this.opcoes[i] && this.opcoes[i].ehPadrao;
+        this.opcoes.splice(i, 1);
+        if (eraPadrao && this.opcoes.length > 0) this.opcoes[0].ehPadrao = true;   // mantém 1 padrão
+      },
+      setPadrao(i) {
+        this.opcoes.forEach(function (o, idx) { o.ehPadrao = (idx === i); });
       },
 
       _validate() {

@@ -38,6 +38,7 @@ public class CardapioService(ApiClient api)
         api.PostAsync<CardapioCriarResultApi>("minha-vitrine/cardapio", new
         {
             produtoId = f.ProdutoId,
+            opcoes = MapOpcoes(f.Opcoes),
             nomePublico = f.NomePublico,
             categoriaTexto = f.CategoriaTexto,
             ordemExibicao = 0.0,
@@ -62,6 +63,7 @@ public class CardapioService(ApiClient api)
     public Task<ApiResult<object>> EditarAsync(Guid itemId, CardapioItemFormApi f) =>
         api.PutAsync<object>($"minha-vitrine/cardapio/{itemId}", new
         {
+            opcoes = MapOpcoes(f.Opcoes),
             nomePublico = f.NomePublico,
             categoriaTexto = f.CategoriaTexto,
             descricaoPublica = f.DescricaoPublica,
@@ -102,4 +104,19 @@ public class CardapioService(ApiClient api)
         form.Add(sc, "file", foto.FileName);
         return await api.PostMultipartAsync<CardapioFotoResultApi>($"uploads/cardapio-item/{itemId}/foto", form);
     }
+
+    // ADR-0035: mapeia as opções p/ o corpo JSON (camelCase) que o backend liga a CardapioItemVariacaoInput.
+    // null = não toca nas opções; [] = reconcilia para zero (remove todas).
+    private static object? MapOpcoes(IReadOnlyList<CardapioOpcaoApi>? opcoes) =>
+        opcoes?.Select(o => new
+        {
+            id = o.Id,
+            rotulo = o.Rotulo,
+            precoStorefront = o.PrecoStorefront,
+            disponivel = o.Disponivel,
+            ehPadrao = o.EhPadrao,
+            pesoExibicao = o.PesoExibicao,
+            sku = o.Sku,
+            ordemExibicao = o.OrdemExibicao,
+        }).ToList();
 }

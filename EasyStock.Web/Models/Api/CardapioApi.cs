@@ -56,11 +56,27 @@ public record CardapioItemDetalheApi(
     string? Alergenos,
     string? SugestaoMolho,
     string? TempoPreparo,
-    string FiltrosJson)
+    string FiltrosJson,
+    IReadOnlyList<CardapioOpcaoApi> Opcoes)   // ADR-0035: opções p/ prefill da edição (vazio = preço único)
 {
     /// <summary>Item sem ligação com o estoque do sistema (ProdutoId nulo).</summary>
     public bool Avulso => ProdutoId is null;
 }
+
+/// <summary>
+/// Opção do item guarda-chuva (ADR-0035) — espelha CardapioItemVariacaoInput (envio) e
+/// CardapioItemVariacaoAdmin (prefill). <see cref="Id"/> null = opção nova (na edição,
+/// dirige a reconciliação keyed-by-Id no backend).
+/// </summary>
+public record CardapioOpcaoApi(
+    Guid? Id,
+    string Rotulo,
+    decimal PrecoStorefront,
+    bool Disponivel,
+    bool EhPadrao,
+    string? PesoExibicao,
+    string? Sku,
+    double OrdemExibicao);
 
 /// <summary>
 /// Payload de criação/edição vindo do formulário. Convenção espelhada do backend:
@@ -80,7 +96,8 @@ public record CardapioItemFormApi(
     string? TempoPreparo,
     string? PesoExibicao,
     string? Tag,
-    bool Visivel);
+    bool Visivel,
+    IReadOnlyList<CardapioOpcaoApi>? Opcoes);   // ADR-0035: opções do item guarda-chuva
 
 /// <summary>Id do item recém-criado — espelha AdicionarCardapioItemAdminResult.</summary>
 public record CardapioCriarResultApi(Guid ItemId);

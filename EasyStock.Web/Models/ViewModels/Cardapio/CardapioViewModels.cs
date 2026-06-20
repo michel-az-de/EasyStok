@@ -49,5 +49,19 @@ public class CardapioItemFormViewModel
     public string? FotoUrl { get; set; }
     public bool Disponivel { get; set; } = true;
 
+    /// <summary>Opções do item guarda-chuva (ADR-0035). Vazio = item de preço único.</summary>
+    public List<CardapioOpcaoForm> Opcoes { get; set; } = new();
+
     public bool EhEdicao => Id.HasValue;
+}
+
+/// <summary>Linha do editor de opções (tamanho → preço). Model-bind dos inputs <c>Opcoes[i].*</c>.</summary>
+public class CardapioOpcaoForm
+{
+    public Guid? Id { get; set; }
+    public string? Rotulo { get; set; }
+    public decimal? PrecoStorefront { get; set; }
+    public bool Disponivel { get; set; } = true;
+    public bool EhPadrao { get; set; }
+    public string? PesoExibicao { get; set; }
 }

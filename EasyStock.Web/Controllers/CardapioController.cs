@@ -146,6 +146,15 @@ public class CardapioController(
             FotoUrl = d.FotoUrl,
             Disponivel = d.Disponivel,
             Publicar = d.Visivel,
+            Opcoes = d.Opcoes.Select(o => new CardapioOpcaoForm
+            {
+                Id = o.Id,
+                Rotulo = o.Rotulo,
+                PrecoStorefront = o.PrecoStorefront,
+                Disponivel = o.Disponivel,
+                EhPadrao = o.EhPadrao,
+                PesoExibicao = o.PesoExibicao,
+            }).ToList(),
         };
 
         ViewBag.NomeEfetivo = d.NomeEfetivo;
@@ -289,7 +298,21 @@ public class CardapioController(
             TempoPreparo: vm.TempoPreparo,
             PesoExibicao: vm.PesoExibicao,
             Tag: null,
-            Visivel: vm.Publicar);
+            Visivel: vm.Publicar,
+            // ADR-0035: opções do guarda-chuva. Ordem = posição na lista; rótulos vazios são ignorados.
+            // SKU por opção fica para follow-up. [] = sem opções (item de preço único).
+            Opcoes: vm.Opcoes
+                .Where(o => !string.IsNullOrWhiteSpace(o.Rotulo))
+                .Select((o, idx) => new CardapioOpcaoApi(
+                    o.Id,
+                    o.Rotulo!.Trim(),
+                    o.PrecoStorefront ?? 0m,
+                    o.Disponivel,
+                    o.EhPadrao,
+                    string.IsNullOrWhiteSpace(o.PesoExibicao) ? null : o.PesoExibicao!.Trim(),
+                    null,
+                    idx))
+                .ToList());
     }
 
     // Categorias existentes (sugestões do datalist) — distintas dos itens atuais da vitrine.
