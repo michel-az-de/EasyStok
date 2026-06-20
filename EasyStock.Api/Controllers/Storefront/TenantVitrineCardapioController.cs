@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
@@ -74,7 +75,9 @@ public class TenantVitrineCardapioController(
         decimal? PrecoStorefront,
         string? Tag,
         string? PesoExibicao,
-        string? FiltrosJson);
+        string? FiltrosJson,
+        List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652)
+        Guid? SecaoId);
 
     public sealed record EditarItemRequest(
         string? NomePublico,
@@ -88,7 +91,9 @@ public class TenantVitrineCardapioController(
         decimal? PrecoStorefront,
         string? Tag,
         string? PesoExibicao,
-        string? FiltrosJson);
+        string? FiltrosJson,
+        List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652)
+        Guid? SecaoId);
 
     public sealed record ReordenarRequest(double NovaOrdem);
 
@@ -183,15 +188,19 @@ public class TenantVitrineCardapioController(
                 req.Tag,
                 req.PesoExibicao,
                 req.FiltrosJson,
-                EmpresaId));
+                EmpresaId,
+                req.Opcoes,
+                req.SecaoId));
 
             return DataCreated($"/api/minha-vitrine/cardapio/{result.ItemId}", result);
         }
         catch (StorefrontNaoEncontradoException) { return DataNotFound(SemVitrine); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo") { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
         catch (PostgresException ex) when (ex.SqlState == "23505") { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
         catch (PostgresException ex) when (ex.SqlState == "23514") { return DataBadRequest("Nome é obrigatório para itens sem produto vinculado."); }
+        catch (PostgresException ex) when (ex.SqlState == "23503") { return DataBadRequest("Seção informada não existe."); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item à vitrine {StorefrontId}", sf.Id);
@@ -222,12 +231,18 @@ public class TenantVitrineCardapioController(
                 req.Tag,
                 req.PesoExibicao,
                 req.FiltrosJson,
-                EmpresaId));
+                EmpresaId,
+                req.Opcoes,
+                req.SecaoId));
 
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo") { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
+        catch (PostgresException ex) when (ex.SqlState == "23505") { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
+        catch (PostgresException ex) when (ex.SqlState == "23503") { return DataBadRequest("Seção informada não existe."); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao editar item {ItemId} da vitrine", itemId);

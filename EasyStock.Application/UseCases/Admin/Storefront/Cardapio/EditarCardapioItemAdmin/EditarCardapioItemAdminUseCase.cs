@@ -24,7 +24,11 @@ public sealed record EditarCardapioItemAdminCommand(
     string? PesoExibicao,
     string? FiltrosJson,
     // EmpresaId: null = SuperAdmin; com valor = escopo do tenant (ADR-0031 §3, fecha IDOR).
-    Guid? EmpresaId = null) : ICommand;
+    Guid? EmpresaId = null,
+    // ADR-0035 (#652): opções do item guarda-chuva (reconciliação keyed-by-Id) e seção.
+    // Opcoes null = não mexe; lista (mesmo vazia) = reconcilia. SecaoId null = não muda.
+    IReadOnlyList<CardapioItemVariacaoInput>? Opcoes = null,
+    Guid? SecaoId = null) : ICommand;
 
 public sealed record EditarCardapioItemAdminResult(Guid ItemId);
 
@@ -58,6 +62,12 @@ public class EditarCardapioItemAdminUseCase(
             tag: string.IsNullOrEmpty(command.Tag) ? null : command.Tag,
             filtrosJson: command.FiltrosJson,
             pesoExibicao: command.PesoExibicao);
+
+        // ADR-0035 (#652): seção + reconciliação keyed-by-Id das opções (item rastreado via
+        // GetByIdAndScope, que já inclui Variacoes — F3). null = não mexe.
+        if (command.SecaoId.HasValue)
+            item.DefinirSecao(command.SecaoId);
+        CardapioVariacaoSync.Reconciliar(item, command.Opcoes);
 
         await cardapioRepository.UpdateAsync(item);
         await unitOfWork.CommitAsync();

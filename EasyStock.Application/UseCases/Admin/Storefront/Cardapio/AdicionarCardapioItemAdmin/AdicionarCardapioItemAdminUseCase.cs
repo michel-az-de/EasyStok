@@ -36,7 +36,10 @@ public sealed record AdicionarCardapioItemAdminCommand(
     string? FiltrosJson,
     // EmpresaId: null = SuperAdmin; com valor = escopo do tenant (storefront de outra
     // empresa → StorefrontNaoEncontradoException = 404). Fecha IDOR cross-tenant (ADR-0031 §3).
-    Guid? EmpresaId = null) : ICommand;
+    Guid? EmpresaId = null,
+    // ADR-0035 (#652): opções do item guarda-chuva e seção. Opcionais (null = não usa).
+    IReadOnlyList<CardapioItemVariacaoInput>? Opcoes = null,
+    Guid? SecaoId = null) : ICommand;
 
 public sealed record AdicionarCardapioItemAdminResult(Guid ItemId, Guid StorefrontId, Guid? ProdutoId);
 
@@ -149,6 +152,11 @@ public class AdicionarCardapioItemAdminUseCase(
                 filtrosJson: command.FiltrosJson,
                 pesoExibicao: command.PesoExibicao);
         }
+
+        // ADR-0035 (#652): seção + opções do item guarda-chuva (item recém-criado → tudo insert).
+        if (command.SecaoId.HasValue)
+            item.DefinirSecao(command.SecaoId);
+        CardapioVariacaoSync.Reconciliar(item, command.Opcoes);
 
         await cardapioRepository.AddAsync(item);
         await unitOfWork.CommitAsync();

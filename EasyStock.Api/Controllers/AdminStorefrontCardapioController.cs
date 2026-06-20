@@ -1,4 +1,5 @@
-﻿using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
+﻿using EasyStock.Application.UseCases.Admin.Storefront.Cardapio;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ReordenarCardapioItemAdmin;
@@ -65,6 +66,8 @@ public class AdminStorefrontCardapioController(
         string? Tag,
         string? PesoExibicao,
         string? FiltrosJson,
+        List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652): opções do item guarda-chuva
+        Guid? SecaoId,                              // ADR-0035: seção (null até existir CRUD de seções)
         string? Motivo);
 
     public sealed record EditarItemRequest(
@@ -80,6 +83,8 @@ public class AdminStorefrontCardapioController(
         string? Tag,
         string? PesoExibicao,
         string? FiltrosJson,
+        List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652): reconciliação keyed-by-Id
+        Guid? SecaoId,
         string? Motivo);
 
     public sealed record ReordenarRequest(double NovaOrdem);
@@ -117,7 +122,9 @@ public class AdminStorefrontCardapioController(
                 req.Tag,
                 req.PesoExibicao,
                 req.FiltrosJson,
-                EscopoEmpresa()));
+                EscopoEmpresa(),
+                req.Opcoes,
+                req.SecaoId));
 
             await audit.LogAsync(
                 "AdminAdicionouCardapioItem",
@@ -133,10 +140,14 @@ public class AdminStorefrontCardapioController(
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
         // Tradução de violações de constraint do Postgres → 400 amigável (ADR-0031)
+        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo")
+            { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
         catch (PostgresException ex) when (ex.SqlState == "23505")
             { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
         catch (PostgresException ex) when (ex.SqlState == "23514")
             { return DataBadRequest("Nome é obrigatório para itens sem produto vinculado."); }
+        catch (PostgresException ex) when (ex.SqlState == "23503")
+            { return DataBadRequest("Seção informada não existe."); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item ao cardápio {StorefrontId}", storefrontId);
@@ -164,7 +175,9 @@ public class AdminStorefrontCardapioController(
                 req.Tag,
                 req.PesoExibicao,
                 req.FiltrosJson,
-                EscopoEmpresa()));
+                EscopoEmpresa(),
+                req.Opcoes,
+                req.SecaoId));
 
             await audit.LogAsync(
                 "AdminEditouCardapioItem",
@@ -175,7 +188,14 @@ public class AdminStorefrontCardapioController(
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
+        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo")
+            { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+            { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
+        catch (PostgresException ex) when (ex.SqlState == "23503")
+            { return DataBadRequest("Seção informada não existe."); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao editar item {ItemId}", itemId);
