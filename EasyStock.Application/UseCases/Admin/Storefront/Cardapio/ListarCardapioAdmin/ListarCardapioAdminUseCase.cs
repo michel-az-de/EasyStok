@@ -19,7 +19,9 @@ public sealed record CardapioItemAdminListItem(
     string? Tag,
     string? FotoUrl,
     string? PesoExibicao,
-    string? CategoriaTexto);  // categoria de exibição (avulso ou override de vinculado)
+    string? CategoriaTexto,   // categoria de exibição (avulso ou override de vinculado)
+    int QtdOpcoes,            // ADR-0035: nº de opções (item guarda-chuva); 0 = preço único
+    decimal PrecoAPartirDe);  // ADR-0035: menor opção disponível, ou PrecoEfetivo se sem opções
 
 public sealed record ListarCardapioAdminResult(
     Guid StorefrontId,
@@ -58,7 +60,9 @@ public class ListarCardapioAdminUseCase(
             i.Tag,
             i.FotoUrl,
             i.PesoExibicao,
-            i.CategoriaEfetiva())).ToList();
+            i.CategoriaEfetiva(),
+            i.Variacoes.Count,
+            i.PrecoAPartirDe())).ToList();
 
         return new ListarCardapioAdminResult(s.Id, s.Slug, s.TituloPublico, itens);
     }

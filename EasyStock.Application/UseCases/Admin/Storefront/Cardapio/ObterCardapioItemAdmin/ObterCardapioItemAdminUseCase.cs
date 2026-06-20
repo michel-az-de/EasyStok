@@ -14,6 +14,17 @@ public sealed record ObterCardapioItemAdminCommand(Guid StorefrontId, Guid ItemI
 /// existe um GET-by-id dedicado: o prefill da edição não depende da projeção de
 /// listagem (sem acoplamento, 404 natural; ADR-0031 §3).
 /// </summary>
+/// <summary>Opção do item guarda-chuva para o prefill da edição (ADR-0035).</summary>
+public sealed record CardapioItemVariacaoAdmin(
+    Guid Id,
+    string Rotulo,
+    decimal PrecoStorefront,
+    bool Disponivel,
+    bool EhPadrao,
+    string? PesoExibicao,
+    string? Sku,
+    double OrdemExibicao);
+
 public sealed record CardapioItemDetalheAdmin(
     Guid Id,
     Guid? ProdutoId,
@@ -33,7 +44,9 @@ public sealed record CardapioItemDetalheAdmin(
     string? Alergenos,
     string? SugestaoMolho,
     string? TempoPreparo,
-    string FiltrosJson);
+    string FiltrosJson,
+    Guid? SecaoId,                                     // ADR-0035: seção do item
+    IReadOnlyList<CardapioItemVariacaoAdmin> Opcoes);  // ADR-0035: opções (vazio = preço único)
 
 public class ObterCardapioItemAdminUseCase(ICardapioItemRepository cardapioRepository)
     : IUseCase<ObterCardapioItemAdminCommand, CardapioItemDetalheAdmin>
@@ -62,6 +75,13 @@ public class ObterCardapioItemAdminUseCase(ICardapioItemRepository cardapioRepos
             item.Alergenos,
             item.SugestaoMolho,
             item.TempoPreparo,
-            item.FiltrosJson);
+            item.FiltrosJson,
+            item.SecaoId,
+            item.Variacoes
+                .OrderBy(v => v.OrdemExibicao).ThenBy(v => v.Id)
+                .Select(v => new CardapioItemVariacaoAdmin(
+                    v.Id, v.Rotulo, v.PrecoStorefront, v.Disponivel, v.EhPadrao,
+                    v.PesoExibicao, v.Sku?.Value, v.OrdemExibicao))
+                .ToList());
     }
 }

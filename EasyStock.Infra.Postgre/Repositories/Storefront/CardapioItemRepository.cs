@@ -58,9 +58,14 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<CardapioItem>> GetTodosDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        // ADR-0035: inclui opções (p/ badge "N opções · a partir de") e seção. AsSplitQuery evita
+        // produto cartesiano com a coleção Variacoes.
         await db.CardapioItens
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(c => c.Produto)
+            .Include(c => c.Variacoes)
+            .Include(c => c.Secao)
             .Where(c => c.StorefrontId == storefrontId)
             .OrderBy(c => c.OrdemExibicao)
             .ToListAsync(ct);
