@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easystok.app/contracts/menu-publico.v2.schema.json",
+  "title": "Cardapio publico do storefront (v2 - ADR-0035)",
+  "description": "Resposta de GET /api/storefront/{slug}/menu. v2 (ADR-0035, epico 645): aditiva sobre a v1 (menu-publico.v1.schema.json). Item ganha 'opcoes' (item guarda-chuva: tamanho->preco) e 'categoriaPath' (secoes hierarquicas); envelope ganha 'schemaVersion'. Todos OPCIONAIS aqui de proposito: esta v2 valida TANTO a resposta atual (sem as chaves novas) QUANTO a futura (com elas) -- a vitrine adota esta v2 ANTES de a API passar a emitir (rollout em fases; senao o additionalProperties:false quebra a vitrine em runtime). IMPORTANTE: para o preco 'a partir de' o consumidor usa SEMPRE o 'precoCentavos' do item (= opcao mais barata disponivel), NUNCA opcoes[0] (a ordem de opcoes e de exibicao, nao de preco).",
+  "type": "object",
+  "required": ["itens", "tituloPublico", "slug"],
+  "additionalProperties": false,
+  "properties": {
+    "itens": {
+      "type": "array",
+      "description": "Lista vazia e valida (storefront ativo sem itens visiveis).",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "tituloPublico": { "type": "string" },
+    "slug": { "type": "string" },
+    "schemaVersion": {
+      "type": "integer",
+      "description": "Versao do contrato (2). Opcional na transicao; a vitrine pode ramificar nele. Sinal de conveniencia, NAO a garantia de compat (a garantia e o back-compat por opcao padrao em precoCentavos)."
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "description": "As 11 chaves da v1 seguem obrigatorias (presentes mesmo quando null). 'opcoes' e 'categoriaPath' sao OPCIONAIS na v2 (a API pode ainda nao emiti-las). Para item guarda-chuva (com opcoes): precoCentavos = opcao mais barata DISPONIVEL ('a partir de'); estoqueAtual = null; disponivel = true se qualquer opcao disponivel; pesoExibicao = peso da opcao exibida (ou null).",
+      "required": [
+        "id", "nome", "descricao", "precoCentavos", "imagemUrl",
+        "estoqueAtual", "categoria", "ordem", "disponivel", "tag", "pesoExibicao"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "nome": { "type": "string" },
+        "descricao": { "type": ["string", "null"] },
+        "precoCentavos": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Centavos (long). Item simples: o preco. Item guarda-chuva: a opcao mais barata DISPONIVEL ('a partir de')."
+        },
+        "imagemUrl": { "type": ["string", "null"] },
+        "estoqueAtual": {
+          "type": ["integer", "null"],
+          "description": "null para avulso e para item guarda-chuva (estoque e por opcao); snapshot eventual para vinculado simples. Nao usar para decisao de compra."
+        },
+        "categoria": { "type": ["string", "null"] },
+        "ordem": { "type": "number" },
+        "disponivel": { "type": "boolean" },
+        "tag": {
+          "type": ["string", "null"],
+          "enum": ["assinatura", "novo", "vegetariano", null],
+          "description": "Vocabulario fechado pelo dominio (TagsPermitidas)."
+        },
+        "pesoExibicao": {
+          "type": ["string", "null"],
+          "description": "Unidade/porcao exibida junto ao preco (ex: 'por kg'). Item guarda-chuva: peso da opcao exibida ou null (o peso por-opcao vai em opcoes[].peso)."
+        },
+        "opcoes": {
+          "type": ["array", "null"],
+          "description": "Opcoes selecionaveis do item guarda-chuva (ex: 300g / 800g). null ou [] = item de preco unico. Ordem = exibicao (NAO ordem de preco). ADR-0035.",
+          "items": { "$ref": "#/$defs/opcao" }
+        },
+        "categoriaPath": {
+          "type": ["array", "null"],
+          "description": "Caminho de secao raiz->folha (ex: ['Massas'] ou ['Eletronicos','Celulares','Smartphones']). null = sem categoria. Permite agrupar/breadcrumb sem depender da string plana 'categoria'.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "opcao": {
+      "type": "object",
+      "required": ["id", "rotulo", "precoCentavos", "disponivel"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "description": "Id estavel da opcao -- carregado p/ o carrinho/pedido." },
+        "rotulo": { "type": "string", "description": "Ex: '300g', 'P', 'G'. Caixa preservada." },
+        "precoCentavos": { "type": "integer", "minimum": 0, "description": "Preco absoluto da opcao em centavos." },
+        "disponivel": { "type": "boolean" },
+        "peso": { "type": ["string", "null"] },
+        "sku": { "type": ["string", "null"] },
+        "produtoVariacaoId": { "type": ["string", "null"], "format": "uuid" },
+        "ordem": { "type": "number" }
+      }
+    }
+  }
+}
