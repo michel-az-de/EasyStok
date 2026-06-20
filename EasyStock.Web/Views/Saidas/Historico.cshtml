@@ -201,9 +201,10 @@
                                 {
                                     <div title="Usuário ID: @s.UsuarioId" class="font-mono text-[10px]">@(s.UsuarioId.Length > 8 ? s.UsuarioId[..8] : s.UsuarioId)…</div>
                                 }
-                                if (!string.IsNullOrEmpty(s.Ip))
+                                var ipPub = s.Ip.AsIpPublico();
+                                if (!string.IsNullOrEmpty(ipPub))
                                 {
-                                    <div title="@s.UserAgentResumo">IP: @s.Ip</div>
+                                    <div title="@s.UserAgentResumo">IP: @ipPub</div>
                                 }
                                 if (!string.IsNullOrEmpty(s.MotivoEstorno))
                                 {

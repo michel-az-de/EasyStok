@@ -1,4 +1,6 @@
 ﻿using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 
 namespace EasyStock.Web.Helpers;
 
@@ -129,6 +131,42 @@ public static class FormatHelper
 
     public static string AsQuantity(this int value, string unit = "un") =>
         ((decimal)value).AsQuantity(unit);
+
+    /// <summary>
+    /// SAID-01: nao expor IP de infraestrutura interna (bridge docker / rede privada) na UI
+    /// de auditoria. Retorna o IP SOMENTE quando for publico/roteavel; senao null (a view
+    /// oculta). Normaliza IPv4-mapped IPv6 (::ffff:172.18.0.5 -> 172.18.0.5) e lista XFF
+    /// ("a, b" -> primeiro token). Enquanto a captura nao propaga o IP real do cliente
+    /// (Web->API server-to-server, ver issue), a maioria cai como interno e fica oculta.
+    /// </summary>
+    public static string? AsIpPublico(this string? ip)
+    {
+        if (string.IsNullOrWhiteSpace(ip)) return null;
+        var first = ip.Split(',')[0].Trim();
+        if (!IPAddress.TryParse(first, out var addr)) return null;
+        if (addr.IsIPv4MappedToIPv6) addr = addr.MapToIPv4();
+        return EhIpInterno(addr) ? null : addr.ToString();
+    }
+
+    /// <summary>True para loopback e ranges privados/link-local/ULA (RFC 1918 / 4193 / 4291).</summary>
+    private static bool EhIpInterno(IPAddress addr)
+    {
+        if (IPAddress.IsLoopback(addr)) return true;
+        var b = addr.GetAddressBytes();
+        if (addr.AddressFamily == AddressFamily.InterNetwork) // IPv4
+        {
+            return b[0] == 10
+                || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+                || (b[0] == 192 && b[1] == 168)
+                || (b[0] == 169 && b[1] == 254); // link-local
+        }
+        if (b.Length == 16) // IPv6
+        {
+            if ((b[0] & 0xFE) == 0xFC) return true;                 // fc00::/7 (ULA)
+            if (b[0] == 0xFE && (b[1] & 0xC0) == 0x80) return true; // fe80::/10 (link-local)
+        }
+        return false;
+    }
 
     /// <summary>
     /// Texto amigável do badge de validade a partir dos dias até o vencimento
