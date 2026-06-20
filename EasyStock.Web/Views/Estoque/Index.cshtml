@@ -273,7 +273,7 @@
                                         @item.Validade.Value.AsDate()
                                         @if (diasParaVencer <= 7)
                                         {
-                                            <span class="badge-critical ml-1 px-1.5 py-0.5 rounded text-xs font-semibold">@diasParaVencer d</span>
+                                            <span class="badge-critical ml-1 px-1.5 py-0.5 rounded text-xs font-semibold">@diasParaVencer.AsValidadeBadge()</span>
                                         }
                                     </span>
                                 }

@@ -81,7 +81,7 @@
                             @item.Validade.Value.ToString("dd/MM/yyyy")
                             @if (diasParaVencer <= 7)
                             {
-                                <span class="ml-2 badge badge-critical px-2 py-0.5 rounded text-xs">@diasParaVencer dias</span>
+                                <span class="ml-2 badge badge-critical px-2 py-0.5 rounded text-xs">@diasParaVencer.AsValidadeBadge()</span>
                             }
                         </dd>
                     </div>

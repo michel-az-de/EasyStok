@@ -129,4 +129,19 @@ public static class FormatHelper
 
     public static string AsQuantity(this int value, string unit = "un") =>
         ((decimal)value).AsQuantity(unit);
+
+    /// <summary>
+    /// Texto amigável do badge de validade a partir dos dias até o vencimento
+    /// (negativo = já vencido). Corrige o "-2361 d" cru do QA (EST-01):
+    ///   &lt; 0 -> "vencido há N dias" · 0 -> "vence hoje" · &gt; 0 -> "N dias".
+    /// </summary>
+    public static string AsValidadeBadge(this int dias) => dias switch
+    {
+        < 0 => $"vencido há {-dias} {(dias == -1 ? "dia" : "dias")}",
+        0 => "vence hoje",
+        _ => $"{dias} {(dias == 1 ? "dia" : "dias")}",
+    };
+
+    public static string AsValidadeBadge(this int? dias) =>
+        dias.HasValue ? dias.Value.AsValidadeBadge() : "";
 }
