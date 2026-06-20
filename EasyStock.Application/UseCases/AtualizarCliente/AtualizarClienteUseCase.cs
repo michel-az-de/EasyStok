@@ -39,6 +39,14 @@ public class AtualizarClienteUseCase(
         var docNormalizado = Cnpj.TryFrom(cmd.Documento)?.Value ?? cmd.Documento;
         var telNormalizado = Telefone.TryFrom(cmd.Telefone)?.Value ?? cmd.Telefone;
 
+        // CLI-01 (on-change): valida o dígito verificador do CPF só quando o documento muda.
+        // Preserva registro legado intocado — cliente com doc inválido pode editar outros campos
+        // sem ser bloqueado. CNPJ/estrangeiro/legado seguem tolerados (ver DocumentoValidator).
+        var docAtual = string.IsNullOrWhiteSpace(cliente.Documento) ? null : cliente.Documento;
+        var docNovo = string.IsNullOrWhiteSpace(docNormalizado) ? null : docNormalizado;
+        if (!string.Equals(docAtual, docNovo, StringComparison.Ordinal))
+            DocumentoValidator.EnsureValido(cmd.Documento, "Documento do cliente");
+
         // Diff campo-a-campo pra audit log
         var diffs = BuildDiff(cliente, cmd, docNormalizado, telNormalizado);
 

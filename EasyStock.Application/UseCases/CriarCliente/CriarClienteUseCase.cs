@@ -27,6 +27,10 @@ public class CriarClienteUseCase(
         if (!string.IsNullOrWhiteSpace(cmd.Email))
             EmailValidator.EnsureValid(cmd.Email, "Email do cliente");
 
+        // CLI-01: valida dígito verificador quando o documento tem forma de CPF (11 dígitos).
+        // CNPJ/estrangeiro/legado (outros comprimentos) seguem tolerados — ver DocumentoValidator.
+        DocumentoValidator.EnsureValido(cmd.Documento, "Documento do cliente");
+
         // Normalização: CPF/CNPJ só dígitos quando válido; senão preserva input
         // (tolera estrangeiros, dados legados).
         var docNormalizado = Cnpj.TryFrom(cmd.Documento)?.Value ?? cmd.Documento;
