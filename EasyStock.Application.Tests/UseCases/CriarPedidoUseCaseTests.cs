@@ -90,6 +90,24 @@ public class CriarPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task DeveLancarValidation_QuandoItemComPrecoZero()
+    {
+        // PED-01: item de pedido "grátis" (preço 0) é rejeitado na origem — impede
+        // pedido entregue com Total R$0. (Frete grátis é item de sistema do checkout
+        // storefront, que não passa por CriarPedido.)
+        var empresaId = Guid.NewGuid();
+        var cmd = new CriarPedidoCommand(empresaId, Itens: new[]
+        {
+            new CriarPedidoItemInput("Pão", Quantidade: 1m, PrecoUnitario: 0m),
+        });
+
+        var act = () => Sut().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
     public async Task DeveLancarValidation_QuandoItemSemNome()
     {
         var empresaId = Guid.NewGuid();

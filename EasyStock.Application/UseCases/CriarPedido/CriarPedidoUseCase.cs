@@ -69,8 +69,11 @@ public class CriarPedidoUseCase(
                     throw new UseCaseValidationException("Item com quantidade <= 0 não é permitido.");
                 if (string.IsNullOrWhiteSpace(i.Nome))
                     throw new UseCaseValidationException("Item sem nome não é permitido.");
-                if (i.PrecoUnitario < 0)
-                    throw new UseCaseValidationException("Item com preço negativo não é permitido.");
+                // PED-01: item de pedido (produto/avulso) deve ter preço > 0 — impede pedido
+                // "grátis" entregue com Total R$0. O frete grátis (R$0) é item de sistema do
+                // checkout storefront (IniciarCheckoutUseCase), que não passa por aqui.
+                if (i.PrecoUnitario <= 0)
+                    throw new UseCaseValidationException("Item de pedido deve ter preço maior que zero.");
             }
         }
 

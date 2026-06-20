@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -84,6 +85,23 @@ public sealed class AdicionarItemPedidoUseCaseTests : IDisposable
         var persistido = await _db.Pedidos.Include(p => p.Itens).FirstAsync(p => p.Id == pedido.Id);
         persistido.Itens.Should().HaveCount(2);
         persistido.Total.Should().Be(Dinheiro.FromDecimal(676m));
+    }
+
+    [Fact]
+    public async Task AdicionarItem_RejeitaPrecoZero()
+    {
+        // PED-01: item com preço 0 é rejeitado na origem (impede pedido entregue com
+        // Total R$0). A validação ocorre antes de tocar o pedido — nem precisa existir.
+        var uc = new AdicionarItemPedidoUseCase(
+            new PedidoRepository(_db),
+            Substitute.For<IProdutoRepository>(),
+            _db,
+            NullLogger<AdicionarItemPedidoUseCase>.Instance);
+
+        var act = () => uc.ExecuteAsync(
+            new AdicionarItemPedidoCommand(_empresaId, Guid.NewGuid(), "grátis", 1m, 0m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
     }
 
     public void Dispose() => _db.Dispose();

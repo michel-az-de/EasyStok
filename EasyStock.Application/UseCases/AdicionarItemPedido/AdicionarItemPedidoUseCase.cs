@@ -33,8 +33,9 @@ public class AdicionarItemPedidoUseCase(
         if (string.IsNullOrWhiteSpace(cmd.Nome))
             throw new UseCaseValidationException("Nome do item é obrigatório.");
 
-        if (cmd.PrecoUnitario < 0)
-            throw new UseCaseValidationException("PrecoUnitario não pode ser negativo.");
+        // PED-01: item de pedido deve ter preço > 0 — impede pedido entregue com Total R$0.
+        if (cmd.PrecoUnitario <= 0)
+            throw new UseCaseValidationException("Preço do item deve ser maior que zero.");
 
         // Tenant isolation: ProdutoId, se informado, precisa pertencer a esta empresa.
         // Sem isso, atacante autenticado pode anexar produto de outro tenant ao pedido.
