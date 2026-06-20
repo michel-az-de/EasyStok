@@ -189,8 +189,11 @@
                                             ? "<br><br>⚠ Esta categoria possui limiares de estoque configurados. Removê-la desativará os alertas associados."
                                             : "";
                                     }
+                                    @* PROD-01: HtmlEncoder (não JS encoder) — o nome cai em x-html (innerHTML) no
+                                       _ConfirmModal; entidades &lt;…&gt; são renderizadas como texto, neutralizando XSS
+                                       armazenado via nome de categoria. *@
                                     <button type="button"
-                                            data-nome="@c.Nome"
+                                            data-nome="@System.Text.Encodings.Web.HtmlEncoder.Default.Encode(c.Nome)"
                                             @@click="$dispatch('confirm-action', {
                                                 titulo: 'Remover categoria',
                                                 mensagem: 'Remover <strong>' + $el.dataset.nome + '</strong>? Produtos nessa categoria ficarão sem categoria.@Html.Raw(avisoExtra)',

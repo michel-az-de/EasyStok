@@ -40,6 +40,11 @@ public sealed class CsvExporter : IReportExporter
             NewLine      = "\r\n",
             Encoding     = encoding,
             HasHeaderRecord = true,
+            // PROD-01: anti CSV/formula injection. Prefixa com ' campos que comecam com
+            // = @ + - TAB CR (InjectionCharacters default do CsvHelper), espelhando o
+            // neutralizador do helper canonico Csv.Field. Sem isso, "=CMD()" no nome de
+            // um produto vira formula no Excel do usuario.
+            InjectionOptions = InjectionOptions.Escape,
             // Quoting RFC 4180: cotar somente quando necessário
             ShouldQuote  = args =>
                 args.Field?.Contains(options.CsvDelimiter) == true ||
