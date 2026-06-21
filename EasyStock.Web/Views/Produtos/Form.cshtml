@@ -473,7 +473,8 @@
                         <input type="text" inputmode="decimal" autocomplete="off"
                                x-effect="syncMoneyInput($el, margem, 1)"
                                @@input="margem = Math.round(parseDecimal($el.value) * 10) / 10; onMargemInput()"
-                               @@blur="$el.value = margem > 0 ? margem.toFixed(1).replace('.', ',') : ''"
+                               @* BUG-10: mostra também margem negativa (prejuízo), coerente com o aviso. *@
+                               @@blur="$el.value = (margem !== null && margem !== 0 && Number.isFinite(margem)) ? margem.toFixed(1).replace('.', ',') : ''"
                                :class="{ 'field-calculated': (lastEdited === 'preco' || lastEdited === 'custo') && margem > 0 }"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
@@ -490,7 +491,7 @@
                             <button type="button" @@click="aplicarMargem(s.pct)"
                                     class="px-2 py-1 text-xs rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors">
                                 <span x-text="s.pct + '%'"></span>
-                                <span class="text-slate-400 ml-1" x-text="'→ R$' + s.preco"></span>
+                                <span class="text-slate-400 ml-1" x-text="'→ R$ ' + s.preco"></span>
                             </button>
                         </template>
                     </div>
@@ -2090,7 +2091,8 @@ async _doDeletePhoto(fotoId) {
                     // Fórmula: margem sobre preço de venda → preço = custo / (1 - pct/100)
                     return [30, 50, 80].map(pct => ({
                         pct,
-                        preco: (this.custo / (1 - pct / 100)).toFixed(2).replace('.', ',')
+                        // BUG-09: formato BR com separador de milhar (igual aos campos principais).
+                        preco: (this.custo / (1 - pct / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     }));
                 },
                 aplicarMargem(pct) {
