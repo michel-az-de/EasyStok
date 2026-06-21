@@ -48,8 +48,7 @@
            x-model="query"
            @@input="onInput()" @@focus="onFocus()" @@blur="onBlur()"
            @@keydown="onKey($event)"
-           placeholder="@phEsc"
-           @(required ? "data-required=\"true\"" : "") />
+           placeholder="@phEsc" />
 
     @* Caret: esconde quando há seleção E allowClear está ligado (o × aparece no lugar) *@
     @if (allowClear)
@@ -63,7 +62,9 @@
         <span class="combobox-caret" aria-hidden="true">▾</span>
     }
 
-    <input type="hidden" name="@name" :value="selected ?? ''" />
+    @* BUG-07: o valor real (selecionado) vive no hidden; data-required aqui faz o
+       form-validate.js contar a categoria vazia como inválida (antes era pulada). *@
+    <input type="hidden" name="@name" :value="selected ?? ''" @(required ? "data-required=\"true\"" : "") />
 
     <div class="combobox-listbox" role="listbox" :id="$id('cbx-list')" x-show="open" x-cloak>
         <template x-for="(item, idx) in filtered" :key="item.value">

@@ -71,7 +71,17 @@
 
     // Retorna {valid, message} para um campo. message vazio quando válido.
     function checkField(el) {
-        if (el.disabled || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') {
+        if (el.disabled || el.type === 'submit' || el.type === 'button') {
+            return { valid: true };
+        }
+
+        // BUG-07: required nativo OU custom (data-required). Componentes como o
+        // _CreatableCombobox guardam o valor selecionado num input hidden e marcam
+        // obrigatoriedade via data-required — o required HTML nativo não se aplica a hidden.
+        const isRequired = el.required || el.dataset.required === 'true';
+
+        // hidden é pulado, exceto quando obrigatório (ex.: o hidden do combobox de categoria).
+        if (el.type === 'hidden' && !isRequired) {
             return { valid: true };
         }
 
@@ -80,7 +90,7 @@
         const customMsg = el.dataset.errorMessage;
 
         // Required
-        if (el.required && !trimmed) {
+        if (isRequired && !trimmed) {
             return { valid: false, message: customMsg || 'Este campo é obrigatório.' };
         }
 
