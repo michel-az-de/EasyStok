@@ -40,10 +40,18 @@ public class AtualizarFornecedorUseCase(
         if (fornecedor is null)
             throw new UseCaseValidationException("Fornecedor nao encontrado.");
 
-        // Normalização via VOs: se o formato for válido, armazena só os dígitos;
-        // se for inválido, mantém o input original (tolerância para dados legados).
+        // Normalização via VOs: documento com forma válida (11/14) vira só dígitos; outros
+        // comprimentos preservam o input.
         var documentoNormalizado = Cnpj.TryFrom(command.Documento)?.Value ?? command.Documento;
         var telefoneNormalizado  = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
+
+        // BUG-01 (on-change): valida o dígito verificador só quando o documento muda — não
+        // bloqueia edição de outros campos em registro legado com doc inválido. Mesma
+        // política de AtualizarClienteUseCase.
+        var docAtual = string.IsNullOrWhiteSpace(fornecedor.Documento) ? null : fornecedor.Documento;
+        var docNovo  = string.IsNullOrWhiteSpace(documentoNormalizado) ? null : documentoNormalizado;
+        if (!string.Equals(docAtual, docNovo, StringComparison.Ordinal))
+            DocumentoValidator.EnsureValido(command.Documento, "CNPJ/CPF do fornecedor");
 
         // Onda P4 — diff campo-a-campo pra audit log.
         var diffs = BuildDiff(fornecedor, command, documentoNormalizado, telefoneNormalizado);

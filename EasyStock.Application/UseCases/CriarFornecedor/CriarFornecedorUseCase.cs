@@ -33,9 +33,13 @@ public class CriarFornecedorUseCase(
         if (!string.IsNullOrWhiteSpace(command.Email))
             EmailValidator.EnsureValid(command.Email, "Email do fornecedor");
 
-        // Normalização via VOs: se o formato for válido, armazena só os dígitos;
-        // se for inválido, mantém o input original (tolerância para dados legados
-        // ou fornecedores estrangeiros que não batem com CPF/CNPJ brasileiro).
+        // BUG-01: valida o dígito verificador quando o documento tem forma de CPF (11) ou
+        // CNPJ (14). Antes só normalizava o formato e deixava passar CNPJ inválido (ex.:
+        // "11111111111111"). Estrangeiro/legado (outros comprimentos) seguem tolerados.
+        DocumentoValidator.EnsureValido(command.Documento, "CNPJ/CPF do fornecedor");
+
+        // Normalização via VOs: documento com forma válida (11/14) vira só dígitos; outros
+        // comprimentos preservam o input. O dígito verificador já foi validado acima (BUG-01).
         var documentoNormalizado = Cnpj.TryFrom(command.Documento)?.Value ?? command.Documento;
         var telefoneNormalizado  = Telefone.TryFrom(command.Telefone)?.Value ?? command.Telefone;
 
