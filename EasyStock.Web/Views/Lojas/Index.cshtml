@@ -94,8 +94,10 @@
                                 </button>
                                 @if (l.Ativa)
                                 {
+                                    @* BUG-06: mensagem cai em x-html (innerHTML) no _ConfirmModal; HtmlEncoder
+                                       neutraliza tags (JavaScriptEncoder não — &#x3C; vira < no innerHTML). *@
                                     <button type="button"
-                                            @@click="$dispatch('confirm-action', { titulo: 'Desativar loja', mensagem: 'Desativar <strong>@System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(l.Nome)</strong>? Itens de estoque nessa loja não aparecerão mais.', textoBotao: 'Desativar', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/lojas/@l.Id/excluir' })"
+                                            @@click="$dispatch('confirm-action', { titulo: 'Desativar loja', mensagem: 'Desativar <strong>@System.Text.Encodings.Web.HtmlEncoder.Default.Encode(l.Nome)</strong>? Itens de estoque nessa loja não aparecerão mais.', textoBotao: 'Desativar', classBotao: 'bg-red-600 hover:bg-red-700', formAction: '/lojas/@l.Id/excluir' })"
                                             class="grid-action-btn grid-action-btn--danger">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-12.728 12.728M6.343 6.343l11.314 11.314" />
