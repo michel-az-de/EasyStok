@@ -28,6 +28,18 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<bool> ExisteProdutosNaCategoriaAsync(Guid categoriaId) =>
             dbContext.Produtos.AnyAsync(p => p.CategoriaId == categoriaId);
 
+        // BUG-08: match exato case-insensitive via lower() — não usa ILike pra não tratar
+        // '%'/'_' de nomes (ex.: "Promo 50%") como curinga.
+        public Task<bool> ExisteNomeAsync(Guid empresaId, string nome, Guid? ignorarId = null)
+        {
+            var n = nome.Trim().ToLower();
+            return dbContext.Categorias
+                .AsNoTracking()
+                .Where(c => c.EmpresaId == empresaId && c.Nome.ToLower() == n)
+                .Where(c => !ignorarId.HasValue || c.Id != ignorarId.Value)
+                .AnyAsync();
+        }
+
         public Task AddAsync(Categoria categoria) =>
             dbContext.Categorias.AddAsync(categoria).AsTask();
 

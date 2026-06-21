@@ -35,6 +35,11 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (string.IsNullOrWhiteSpace(command.Nome))
                 throw new UseCaseValidationException("Nome da categoria é obrigatório.");
 
+            // BUG-08: unicidade case-insensitive por empresa (evita "teste" e "Teste").
+            var nomeTrim = command.Nome.Trim();
+            if (await categoriaRepository.ExisteNomeAsync(command.EmpresaId, nomeTrim))
+                throw new UseCaseValidationException($"Já existe uma categoria chamada \"{nomeTrim}\".");
+
             if (command.CategoriaPaiId.HasValue)
             {
                 var pai = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaPaiId.Value);
@@ -47,7 +52,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = command.EmpresaId,
-                Nome = command.Nome.Trim(),
+                Nome = nomeTrim,
                 Descricao = command.Descricao?.Trim(),
                 CategoriaPaiId = command.CategoriaPaiId,
                 CriadoEm = agora,
@@ -69,6 +74,11 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (categoria == null)
                 throw new UseCaseValidationException("Categoria nao encontrada.");
 
+            // BUG-08: unicidade case-insensitive por empresa, ignorando a própria categoria.
+            var nomeTrim = command.Nome.Trim();
+            if (await categoriaRepository.ExisteNomeAsync(command.EmpresaId, nomeTrim, command.Id))
+                throw new UseCaseValidationException($"Já existe uma categoria chamada \"{nomeTrim}\".");
+
             if (command.CategoriaPaiId.HasValue)
             {
                 if (command.CategoriaPaiId == command.Id)
@@ -78,7 +88,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
                     throw new UseCaseValidationException("Categoria pai nao encontrada ou nao pertence a esta empresa.");
             }
 
-            categoria.Nome = command.Nome.Trim();
+            categoria.Nome = nomeTrim;
             categoria.Descricao = command.Descricao?.Trim();
             categoria.CategoriaPaiId = command.CategoriaPaiId;
             categoria.AlteradoEm = DateTime.UtcNow;
