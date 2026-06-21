@@ -14,7 +14,7 @@ public class MenuResumoController(MenuResumoService svc, SessionService session)
     [HttpGet("/menu/resumo")]
     public async Task<IActionResult> Resumo()
     {
-        var (badges, ok) = await svc.ObterAsync(session.GetEmpresaId(), session.GetLojaId());
+        var (badges, ok) = await svc.ObterAsync(Session.GetEmpresaId(), Session.GetLojaId());
         return Json(new
         {
             criticos = badges.ProdutosCriticos,

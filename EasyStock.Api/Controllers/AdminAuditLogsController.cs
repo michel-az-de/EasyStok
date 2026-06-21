@@ -33,7 +33,7 @@ public class AdminAuditLogsController(IAdminAuditLogQueries auditLogs) : EasySto
             {
                 PiiMaskingHelper.MaskEmail(r.AdminEmail) ?? "",
                 r.Acao ?? "",
-                r.TenantId.ToString(),
+                r.TenantId.ToString() ?? "",
                 r.Detalhes ?? "",
                 PiiMaskingHelper.MaskIpAddress(r.Ip) ?? "",
                 r.CriadoEm.ToString("O")

@@ -16,7 +16,7 @@ public class MenuFavoritosController(PreferenciaMenuService svc, SessionService 
     public async Task<IActionResult> Salvar([FromBody] SalvarFavoritosBody body)
     {
         var normalizada = await svc.SalvarAsync(
-            session.GetUsuarioId(), session.GetLojaId(), body.Favoritos ?? new List<string>());
+            Session.GetUsuarioId(), Session.GetLojaId(), body.Favoritos ?? new List<string>());
 
         return normalizada is null
             ? StatusCode(502, new { ok = false })
