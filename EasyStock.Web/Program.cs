@@ -178,7 +178,20 @@ app.Use(async (context, next) =>
 // /downloads/easystok-*.apk servidos diretamente pelo middleware estático.
 var contentTypes = new FileExtensionContentTypeProvider();
 contentTypes.Mappings[".apk"] = "application/vnd.android.package-archive";
-app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = contentTypes });
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypes,
+    // BUG-11: antes nada era cacheado e cada navegação full-page rebaixava todos os
+    // JS/CSS/fontes locais. Assets fingerprintados (asp-append-version → ?v=hash) podem
+    // cachear forte/immutable; os demais recebem um cache curto.
+    OnPrepareResponse = ctx =>
+    {
+        var versioned = ctx.Context.Request.Query.ContainsKey("v");
+        ctx.Context.Response.Headers["Cache-Control"] = versioned
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+    }
+});
 
 app.UseRouting();
 app.UseSession();           // BEFORE Authentication
