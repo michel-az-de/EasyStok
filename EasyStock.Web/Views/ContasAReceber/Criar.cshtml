@@ -1,7 +1,9 @@
 @model EasyStock.Web.Models.ViewModels.Financeiro.CriarContaViewModel
 @{
-    var hoje   = DateTime.Today.ToString("yyyy-MM-dd");
-    var amanha = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
+    // BUG-03: BrazilTime (não DateTime.Today) — em container UTC o "hoje" do servidor
+    // adianta 1 dia na janela 21:00–23:59 BRT. Mesmo padrão de Financeiro/Index.cshtml.
+    var hoje   = BrazilTime.Today().ToString("yyyy-MM-dd");
+    var amanha = BrazilTime.Today().AddDays(1).ToString("yyyy-MM-dd");
     var inv        = System.Globalization.CultureInfo.InvariantCulture;
     var vValor     = (Model.ValorTotal ?? 0m).ToString(inv);
     var vParcelas  = Model.NumeroParcelas ?? 1;
@@ -60,7 +62,9 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="form-label">Data emissão *</label>
-                <input type="date" name="dataEmissao" required value="@hoje" class="form-input" x-model="emissao" />
+                @* BUG-03: fonte única via x-model (emissao já inicia em vEmissao = hoje BRT).
+                   value="@hoje" duplicado podia divergir do estado Alpine no re-render. *@
+                <input type="date" name="dataEmissao" required class="form-input" x-model="emissao" />
             </div>
             <div>
                 <label class="form-label">Valor total (R$) *</label>
