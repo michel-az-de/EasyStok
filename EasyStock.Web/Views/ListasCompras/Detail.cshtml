@@ -196,14 +196,11 @@
     <!-- Modal: confirmar arquivar lista -->
     <div x-data="arquivarListaModal()"
          x-show="open" x-cloak
-         x-transition:enter="transition duration-150 ease-out"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
          @@keydown.escape.window="close()"
          @@click.self="close()"
          class="fm-overlay"
          role="alertdialog" aria-modal="true" aria-labelledby="fm-arq-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 460px"
+        <form x-ref="panel" class="fm-panel" style="max-width: 460px" x-show="open"
               method="post" action="/listas-compras/@l.Id/arquivar"
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"

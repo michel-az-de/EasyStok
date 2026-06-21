@@ -247,14 +247,11 @@ else
     <!-- Modal: abrir caixa -->
     <div x-data="abrirCaixaModal()"
          x-show="open" x-cloak
-         x-transition:enter="transition duration-150 ease-out"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
          @@keydown.escape.window="close()"
          @@click.self="close()"
          class="fm-overlay"
          role="dialog" aria-modal="true" aria-labelledby="fm-abrir-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 540px"
+        <form x-ref="panel" class="fm-panel" style="max-width: 540px" x-show="open"
               method="post" action="/caixa/abrir" data-validate novalidate
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"
@@ -308,14 +305,11 @@ else
     <!-- Modal: lançar entrada/saída -->
     <div x-data="lancamentoCaixaModal()"
          x-show="open" x-cloak
-         x-transition:enter="transition duration-150 ease-out"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
          @@keydown.escape.window="close()"
          @@click.self="close()"
          class="fm-overlay"
          role="dialog" aria-modal="true" aria-labelledby="fm-mov-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 640px"
+        <form x-ref="panel" class="fm-panel" style="max-width: 640px" x-show="open"
               method="post" action="/caixa/movimentos" data-validate novalidate
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"
@@ -409,14 +403,11 @@ else
     <!-- Modal: fechar caixa -->
     <div x-data="fecharCaixaModal()"
          x-show="open" x-cloak
-         x-transition:enter="transition duration-150 ease-out"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
          @@keydown.escape.window="close()"
          @@click.self="close()"
          class="fm-overlay"
          role="alertdialog" aria-modal="true" aria-labelledby="fm-fechar-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 540px"
+        <form x-ref="panel" class="fm-panel" style="max-width: 540px" x-show="open"
               method="post" action="/caixa/fechar"
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"

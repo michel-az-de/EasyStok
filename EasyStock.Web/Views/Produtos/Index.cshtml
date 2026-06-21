@@ -353,13 +353,15 @@
    Sem <form> (FormTagHelper descartaria @@submit.prevent — BUG-01/02); botoes type=button. *@
 <div x-data="cadastroRapidoModal()"
      x-show="open" x-cloak
-     x-transition.opacity
      @@open-modal-rapido.window="abrir()"
      @@keydown.escape.window="if (open) fechar()"
      class="fm-overlay"
      role="dialog" aria-modal="true" aria-labelledby="cad-rapido-title"
      @@click.self="fechar()">
-    <div x-ref="panel" class="fm-panel" style="max-width: 440px">
+    <div x-ref="panel" class="fm-panel" style="max-width: 440px" x-show="open"
+         x-transition:enter="transition duration-150 ease-out"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100">
         <header class="fm-header">
             <div>
                 <h2 id="cad-rapido-title" class="fm-header__title">Cadastro rápido</h2>

@@ -533,9 +533,6 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
     <!-- Modal: confirmar cancelamento -->
     <div x-data="cancelarPedidoModal()"
          x-show="open" x-cloak
-         x-transition:enter="transition duration-150 ease-out"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
          x-transition:leave="transition duration-100 ease-in"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
@@ -543,7 +540,7 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
          @@click.self="close()"
          class="fm-overlay"
          role="alertdialog" aria-modal="true" aria-labelledby="fm-cancel-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 480px"
+        <form x-ref="panel" class="fm-panel" style="max-width: 480px" x-show="open"
               method="post" action="/pedidos/@p.Id/cancelar"
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"
@@ -590,9 +587,6 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
     <!-- Modal: reportar problema -->
     <div x-data="reportarProblemaModal()"
          x-show="open" x-cloak
-         x-transition:enter="transition duration-150 ease-out"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
          x-transition:leave="transition duration-100 ease-in"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
@@ -600,7 +594,7 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
          @@click.self="close()"
          class="fm-overlay"
          role="alertdialog" aria-modal="true" aria-labelledby="fm-report-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 520px"
+        <form x-ref="panel" class="fm-panel" style="max-width: 520px" x-show="open"
               method="post" action="/pedidos/@p.Id/reportar-problema"
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"

@@ -7,15 +7,17 @@
 
 <div x-data="catModal()"
      x-show="open" x-cloak
-     x-transition.opacity
      @@abrir-cat.window="handle($event.detail)"
      @@open-modal.window="if ($event.detail === 'criar-cat') handle({ mode: 'criar' })"
      @@keydown.escape.window="if (open) fechar()"
      class="fm-overlay"
      role="dialog" aria-modal="true" aria-labelledby="cat-modal-title"
      @@click.self="fechar()">
-    <form x-ref="panel" class="fm-panel" style="max-width: 480px"
-          @@submit.prevent="submit()">
+    <form x-ref="panel" class="fm-panel" style="max-width: 480px" x-show="open"
+          @@submit.prevent="submit()"
+          x-transition:enter="transition duration-150 ease-out"
+          x-transition:enter-start="opacity-0 scale-95"
+          x-transition:enter-end="opacity-100 scale-100">
         <header class="fm-header">
             <div>
                 <h2 id="cat-modal-title" class="fm-header__title"
