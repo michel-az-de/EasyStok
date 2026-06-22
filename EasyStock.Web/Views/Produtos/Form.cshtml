@@ -943,14 +943,14 @@
                     <div class="product-review-card__pricing mt-4 pt-4 border-t border-slate-100">
                         <div class="flex items-end gap-3 flex-wrap">
                             <span class="text-3xl font-black text-slate-900 tracking-tight"
-                                  x-text="preco > 0 ? 'R$ ' + preco.toFixed(2).replace('.', ',') : 'Preço não definido'"
+                                  x-text="preco > 0 ? fmt.money(preco) : 'Preço não definido'"
                                   :class="{ 'text-lg text-slate-300': preco <= 0 }"></span>
                             <span x-show="margemDerivada !== 0 && preco > 0" x-cloak
                                   :class="margemDerivada < 0 ? 'bg-red-100 text-red-700 ring-red-200' : margemDerivada < 10 ? 'bg-red-50 text-red-600 ring-red-100' : margemDerivada < 30 ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'"
                                   class="text-xs font-bold px-2.5 py-1 rounded-full ring-1 mb-1"
                                   x-text="(margemDerivada < 0 ? '⚠ ' : '') + margemDerivada.toFixed(1).replace('.', ',') + '% margem'"></span>
                         </div>
-                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: R$ ' + custo.toFixed(2).replace('.', ',')"></div>
+                        <div x-show="custo > 0" x-cloak class="text-xs text-slate-400 mt-1" x-text="'Custo unitário: ' + fmt.money(custo)"></div>
                     </div>
                 </div>
             </div>
