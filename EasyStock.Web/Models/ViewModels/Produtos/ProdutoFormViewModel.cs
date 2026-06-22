@@ -8,7 +8,10 @@ public class ProdutoFormViewModel
 {
     public string? Id { get; set; }
 
+    // BUG-12: limite espelha a coluna (HasMaxLength(180)) e o command (CadastrarProdutoCommand.Nome).
+    // Antes so o backend barrava >180 (erro tardio); o guard de tags HTML ja existe no use case.
     [Required(ErrorMessage = "Nome é obrigatório")]
+    [MaxLength(180, ErrorMessage = "Nome não pode passar de 180 caracteres.")]
     public string Nome { get; set; } = string.Empty;
 
     public string? SkuBase { get; set; }
