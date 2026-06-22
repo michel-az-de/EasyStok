@@ -42,7 +42,7 @@
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
-    <span class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
+    <span id="ped-status-badge" class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
     <div class="ml-auto flex gap-2">
         <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
             🖨 Recibo
@@ -55,10 +55,15 @@
             var nxt = nextStatus(p.Status);
             if (!string.IsNullOrEmpty(nxt))
             {
-                <form asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post">
+                @* BUG-02: progressivo — sem JS o form posta normal (PRG/reload). Com JS,
+                   @@submit.prevent faz AJAX em status.json e atualiza badge/timeline/botao/toast
+                   sem reload (espelha o cockpit do Index). *@
+                <form id="ped-acao-form" asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                      x-data="pedidoStatusAcao('@p.Id')" @@submit.prevent="avancar($el)" data-noprogress>
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="status" value="@nxt" />
-                    <button type="submit" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">
+                    <button type="submit" :disabled="enviando"
+                            class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg disabled:opacity-60">
                         @nextLabel(p.Status)
                     </button>
                 </form>
@@ -113,14 +118,14 @@
 <!-- Timeline de status -->
 @if (!isCancelado)
 {
-    <div class="ped-timeline mb-6" aria-label="Progresso do pedido">
+    <div id="ped-timeline" class="ped-timeline mb-6" aria-label="Progresso do pedido">
         @for (var i = 0; i < statusOrder.Length; i++)
         {
             var key = statusOrder[i];
             var isCurrent = i == currentIdx;
             var isDone = i < currentIdx;
             var statusClass = isDone ? "ped-timeline__step--done" : isCurrent ? "ped-timeline__step--current" : "ped-timeline__step--future";
-            <div class="ped-timeline__step @statusClass">
+            <div class="ped-timeline__step @statusClass" data-idx="@i">
                 <div class="ped-timeline__dot" aria-hidden="true">
                     @if (isDone) { <span>✓</span> } else { <span>@(i + 1)</span> }
                 </div>
@@ -284,7 +289,7 @@ else
                     <button type="button" @@click="tab = '@key'"
                             :class="tab === '@key' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
                             class="px-3 py-2 text-sm font-medium border-b-2">
-                        @label @if (count >= 0) { <span class="text-xs text-slate-400">(@count)</span> }
+                        @label @if (count >= 0) { <span class="text-xs text-slate-400" id="ped-tab-@(key)-count">(@count)</span> }
                     </button>
                 }
             </div>
@@ -653,6 +658,94 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
 
     @section Scripts {
     <script>
+    // BUG-02: detalhe reativo. Espelha StatusHelper (label/badge) + a ordem da timeline.
+    const PED_STATUS = {
+        aguardando: { label: 'Aguardando', badge: 'badge-warn' },
+        preparando: { label: 'Preparando', badge: 'badge-info' },
+        pronto:     { label: 'Pronto',     badge: 'badge-ok' },
+        entregue:   { label: 'Entregue',   badge: 'badge-neutral' },
+        cancelado:  { label: 'Cancelado',  badge: 'badge-neutral badge-struck' }
+    };
+    const PED_ORDER = ['aguardando', 'preparando', 'pronto', 'entregue'];
+    const PED_NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue' };
+    const PED_NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar como pronto', pronto: 'Confirmar entrega' };
+
+    function pedidoStatusAcao(id) {
+        return {
+            enviando: false,
+            async avancar(form) {
+                if (this.enviando) return;
+                const nxt = form.querySelector('input[name=status]')?.value;
+                if (!nxt) return;
+                const token = form.querySelector('[name=__RequestVerificationToken]')?.value;
+                this.enviando = true;
+                try {
+                    const r = await esFetch('/pedidos/' + id + '/status.json', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                        body: JSON.stringify({ status: nxt })
+                    });
+                    const data = await r.json().catch(() => null);
+                    if (!r.ok || !data || !data.success) {
+                        window.showToast((data && data.error && data.error.message) || 'Não foi possível avançar o pedido.', 'error');
+                        return; // falha -> nada muda na UI (sem update otimista a reverter)
+                    }
+                    aplicarStatusPedido(data.pedido.status);
+                    const info = PED_STATUS[data.pedido.status];
+                    window.showToast('Pedido: ' + (info ? info.label : data.pedido.status)
+                        + (data.pedido.status === 'pronto' ? ' · estoque baixado' : '') + '.', 'success');
+                } catch (e) {
+                    window.showToast('Sem conexão — o pedido não avançou.', 'error');
+                } finally {
+                    this.enviando = false;
+                }
+            }
+        };
+    }
+
+    function aplicarStatusPedido(status) {
+        const idx = PED_ORDER.indexOf(status);
+        const badge = document.getElementById('ped-status-badge');
+        if (badge && PED_STATUS[status]) {
+            badge.className = 'badge ' + PED_STATUS[status].badge;
+            badge.textContent = PED_STATUS[status].label;
+        }
+        document.querySelectorAll('#ped-timeline .ped-timeline__step').forEach(function (step) {
+            const i = parseInt(step.dataset.idx, 10);
+            step.classList.remove('ped-timeline__step--done', 'ped-timeline__step--current', 'ped-timeline__step--future');
+            const dot = step.querySelector('.ped-timeline__dot');
+            if (i < idx) {
+                step.classList.add('ped-timeline__step--done');
+                if (dot) dot.innerHTML = '<span>✓</span>';
+            } else {
+                step.classList.add(i === idx ? 'ped-timeline__step--current' : 'ped-timeline__step--future');
+                if (dot) dot.innerHTML = '<span>' + (i + 1) + '</span>';
+            }
+        });
+        document.querySelectorAll('#ped-timeline .ped-timeline__connector').forEach(function (conn, ci) {
+            conn.classList.toggle('ped-timeline__connector--done', ci < idx);
+        });
+        // proxima acao: atualiza label/destino, ou remove o form em estado terminal (entregue)
+        const acao = document.getElementById('ped-acao-form');
+        if (acao) {
+            const prox = PED_NEXT[status];
+            if (!prox) {
+                acao.remove();
+            } else {
+                const hidden = acao.querySelector('input[name=status]');
+                const btn = acao.querySelector('button[type=submit]');
+                if (hidden) hidden.value = prox;
+                if (btn) btn.textContent = PED_NEXT_LABEL[status] || '';
+            }
+        }
+        // contador da aba Eventos (+1 — a transicao gera exatamente 1 evento)
+        const evCount = document.getElementById('ped-tab-eventos-count');
+        if (evCount) {
+            const n = parseInt((evCount.textContent || '').replace(/\D/g, ''), 10) || 0;
+            evCount.textContent = '(' + (n + 1) + ')';
+        }
+    }
+
     function cancelarPedidoModal() {
         return {
             open: false,
