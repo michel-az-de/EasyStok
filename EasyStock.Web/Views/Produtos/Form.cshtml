@@ -1241,6 +1241,19 @@
                         window.showToast('SKU em uso. Altere antes de continuar.', 'warning');
                         return;
                     }
+                    // BUG-06: ao sair da etapa 3 (Limiares), critico precisa ser < minimo
+                    // (espelha o guard server de ProdutosController.Criar). Antes avancava sem aviso.
+                    if (this.step === 3) {
+                        const minEl = document.getElementById('QuantidadeMinima');
+                        const critEl = document.getElementById('QuantidadeCritica');
+                        const min = minEl && minEl.value !== '' ? parseInt(minEl.value, 10) : null;
+                        const crit = critEl && critEl.value !== '' ? parseInt(critEl.value, 10) : null;
+                        if (min !== null && crit !== null && crit >= min) {
+                            window.showToast('Quantidade crítica precisa ser menor que a mínima.', 'warning');
+                            if (critEl) critEl.focus();
+                            return;
+                        }
+                    }
                     if (this.step < 4) {
                         this.step1AttemptedAdvance = false;
                         this.step++;
@@ -1886,8 +1899,11 @@
                         this.preco = 0;
                         return;
                     }
-                    if (this.custo > 0 && this.margem > 0)
-                        this.preco = +( this.custo / (1 - this.margem / 100) ).toFixed(2);
+                    // BUG-07: calcula o preco tambem com margem negativa (prejuizo: preco < custo),
+                    // em vez de deixar o campo vazio -> "Preco nao definido". Clamp no teto porque o
+                    // clamp do @@input nao roda neste caminho (valor calculado, nao digitado).
+                    if (this.custo > 0 && this.margem !== 0 && this.margem !== null && Number.isFinite(this.margem))
+                        this.preco = Math.min(+( this.custo / (1 - this.margem / 100) ).toFixed(2), 99999999.99);
                     else if (this.preco > 0 && this.margem > 0)
                         this.custo = +( this.preco * (1 - this.margem / 100) ).toFixed(2);
                 },
