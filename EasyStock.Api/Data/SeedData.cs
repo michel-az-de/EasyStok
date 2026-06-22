@@ -73,9 +73,13 @@ public static partial class SeedData
         var context  = services.GetRequiredService<EasyStockDbContext>();
         var agora = ArredondarAoMinuto(DateTime.UtcNow);
 
-        if (await context.Usuarios.AnyAsync())
+        // Guard por EMPRESA (não por usuário): o SuperAdminSeed cria um super-admin global
+        // (EmpresaId=null) ANTES deste seed; se checássemos Usuarios.Any() o seed de empresa
+        // (empresa+loja+admin) nunca rodaria e não haveria login operacional. O corpo é
+        // idempotente (upserts), então re-rodar é seguro.
+        if (await context.Empresas.AnyAsync())
         {
-            logger.LogInformation("Seed minimal: usuário já existe, pulando.");
+            logger.LogInformation("Seed minimal: empresa já existe, pulando.");
             return;
         }
 
