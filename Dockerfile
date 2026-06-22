@@ -62,7 +62,7 @@ WORKDIR /app
 # fuso de Brasilia (source=Iana). Sem ele, HorarioBrasil cai na zona fixa -03:00 (modo
 # degradado) e o StartupHardening.ValidateTimezone recusa subir em producao.
 RUN apt-get update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gosu tzdata \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gosu tzdata curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Criar usuario nao-root
@@ -91,6 +91,6 @@ ENV GIT_SHA=$GIT_SHA
 
 # start-period generoso pra migrations rodarem antes do health check trancar.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-  CMD wget -qO- http://localhost:8080/health || exit 1
+  CMD curl -fsS http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]

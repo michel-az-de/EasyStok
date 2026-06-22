@@ -39,7 +39,7 @@ services:
     environment:
       POSTGRES_DB: easystock
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: EzLocalDev2026
     ports:
       - "5432:5432"
     volumes:
@@ -68,7 +68,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Database__Provider: PostgreSql
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=easystock;Username=postgres;Password=postgres;SSL Mode=Disable"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=easystock;Username=postgres;Password=EzLocalDev2026;SSL Mode=Disable"
       # Redis desativado — usa cache em memória automaticamente
       ConnectionStrings__Redis: ""
       Jwt__Issuer: EasyStock
@@ -91,11 +91,11 @@ services:
     networks:
       - easystock-local
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      start_period: 90s
 
   # ── Web (MVC) ───────────────────────────────────────────────────────────────
   web:

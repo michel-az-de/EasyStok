@@ -35,6 +35,11 @@ RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
+# curl: usado pelo HEALTHCHECK (a imagem aspnet base nao traz wget/curl).
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system --gid 1001 appgroup \
  && adduser  --system --uid 1001 --ingroup appgroup appuser
 
@@ -59,6 +64,6 @@ ARG GIT_SHA=unknown
 ENV GIT_SHA=$GIT_SHA
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:8081/health || exit 1
+  CMD curl -fsS http://localhost:8081/health || exit 1
 
 ENTRYPOINT ["dotnet", "EasyStock.Web.dll"]
