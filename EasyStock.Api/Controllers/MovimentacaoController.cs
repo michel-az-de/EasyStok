@@ -28,6 +28,11 @@ public class MovimentacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
+        // BUG-05: intervalo invertido (de > ate) era aceito e o filtro virava incoerente.
+        // Barra aqui (antes da query) -> resposta deterministica para client e API.
+        if (de.HasValue && ate.HasValue && de.Value.Date > ate.Value.Date)
+            return DataBadRequest("Período inválido: a data inicial não pode ser posterior à data final.");
+
         var (p, ps) = NormalisePage(page, pageSize);
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
             resolvedEmpresaId, de, ate, tipo, natureza, p, ps);
