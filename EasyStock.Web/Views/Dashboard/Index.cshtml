@@ -421,7 +421,9 @@ else if (Model.ResumoApiFalhou)
         <div class="ds-mov-list">
             @foreach (var grupo in agrupado)
             {
-                var hoje = DateOnly.FromDateTime(DateTime.Today);
+                // BUG-03: "hoje" no fuso BR (reusa agoraBrasil). Antes DateTime.Today = UTC do
+                // container -> na janela ~21h-24h BRT rotulava movimentacao de hoje como "Ontem".
+                var hoje = DateOnly.FromDateTime(agoraBrasil);
                 var ontem = hoje.AddDays(-1);
                 string rotuloDia = grupo.Key == hoje ? "Hoje" : grupo.Key == ontem ? "Ontem" : grupo.Key.ToString("dd 'de' MMMM", ptBR);
 

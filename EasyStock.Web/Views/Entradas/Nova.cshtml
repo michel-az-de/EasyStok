@@ -447,7 +447,8 @@
                 },
                 fmtData(iso) {
                     if (!iso) return '';
-                    try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+                    // BUG-03: ultimaEntradaEm e instante UTC; formata no fuso BR p/ nao defasar -1 dia.
+                    try { return new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }); }
                     catch { return ''; }
                 },
                 _setProdutoDetalhe(d) {
