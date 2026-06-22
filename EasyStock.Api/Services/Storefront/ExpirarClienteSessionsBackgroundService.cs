@@ -46,7 +46,7 @@ public class ExpirarClienteSessionsBackgroundService(
     private async Task ExpirarAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Microsoft.EntityFrameworkCore.DbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
 
         var limite = timeProvider.GetUtcNow().UtcDateTime - ClienteSession.SlidingWindow;
 
