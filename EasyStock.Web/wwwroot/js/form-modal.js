@@ -220,6 +220,13 @@
                     this.erroMsg = config.requireMessage || 'Preencha os campos obrigatórios.';
                     return;
                 }
+                // BUG-04: valida TODOS os campos (CPF/email/doc/phone) antes do POST. Antes so o
+                // requireField (nome) era checado e CPF/email invalidos passavam direto ao backend
+                // (que rejeitava depois). validateForm marca os campos + dispara toast e retorna false.
+                if (_formEl && window.EasyValidate && window.EasyValidate.validateForm
+                    && !window.EasyValidate.validateForm(_formEl)) {
+                    return;
+                }
                 this.loading = true;
                 this.erroMsg = '';
                 try {
