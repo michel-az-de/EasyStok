@@ -65,4 +65,28 @@ public class ProdutoCompletudeTests
         vazio.Pendencias.Should().Contain("Foto");
         nulo.Pendencias.Should().Contain("Foto");
     }
+
+    [Fact]
+    public void Produto_totalmente_preenchido_clampa_em_100_nao_110()
+    {
+        // Os pesos somam 110 no máximo (15 base + 95 condicional); um produto 100% preenchido
+        // não pode exibir "110% completo". Regressão do clamp (Math.Min(pct, 100)).
+        var p = new Produto
+        {
+            Nome = "X",
+            CategoriaId = Guid.NewGuid(),
+            Tipo = TipoProduto.Alimento,
+            FotosJson = "[{\"url\":\"a.jpg\"}]",
+            DescricaoBase = "desc",
+            CustoReferencia = Dinheiro.FromDecimal(5m),
+            PrecoReferencia = Dinheiro.FromDecimal(10m),
+            CodigoBarras = "7891234567890",
+            Marca = "Acme",
+            Dimensoes = Dimensoes.From(0.5m, 35m, 25m, 45m),
+            AtributosJson = "{\"kcal\":100}",
+        };
+
+        p.CompletudePercent.Should().Be(100);
+        p.Pendencias.Should().BeEmpty();
+    }
 }

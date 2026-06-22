@@ -90,6 +90,7 @@ namespace EasyStock.Domain.Entities
 
         public void AdicionarItem(ItemVenda item)
         {
+            ArgumentNullException.ThrowIfNull(item); // sem isto, item null entra na lista e RecalcularValorTotal estoura com NRE opaca
             ItensVenda ??= new List<ItemVenda>();
             ItensVenda.Add(item);
             RecalcularValorTotal();

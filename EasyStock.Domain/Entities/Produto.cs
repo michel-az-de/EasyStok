@@ -93,7 +93,9 @@ namespace EasyStock.Domain.Entities
                 if (!string.IsNullOrWhiteSpace(Marca)) pct += 5;
                 if (Dimensoes != null) pct += 5;
                 if (TemFichaTecnica) pct += 10; // ficha tecnica / nutricional
-                return pct;
+                // Os pesos somam 110 no maximo (15 base + 95 condicional); um produto
+                // 100% preenchido nao pode exibir "110% completo". Clampa em 100.
+                return Math.Min(pct, 100);
             }
         }
 

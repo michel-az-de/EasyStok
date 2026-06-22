@@ -25,7 +25,7 @@ namespace EasyStock.Domain.Entities
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaId,
-                Nome = nome,
+                Nome = (nome ?? string.Empty).Trim(), // consistencia com Cliente.Criar/Produto (sem espaco nas pontas)
                 Ativa = true,
                 CriadoEm = agora,
                 AlteradoEm = agora
