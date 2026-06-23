@@ -91,6 +91,11 @@ public class FinalizarVendaBalcaoUseCase(
         {
             var produtoId = it.ProdutoId;
             var ehNovo = (produtoId is null || produtoId == Guid.Empty) && it.NovoProduto;
+            // Contrato: produto existente (ProdutoId) OU produto novo (NovoProduto + CategoriaId).
+            // Sem este guard, a combinacao ProdutoId vazio + NovoProduto=false caía sem validacao
+            // e o item virava avulso silenciosamente em vez de ser rejeitado.
+            if (!ehNovo && (produtoId is null || produtoId == Guid.Empty))
+                throw new UseCaseValidationException($"Item \"{it.Nome}\": selecione um produto existente ou marque como produto novo.");
             if (ehNovo)
             {
                 if (it.CategoriaId is null || it.CategoriaId == Guid.Empty)

@@ -172,10 +172,14 @@ public sealed class FaturaVencimentoJob(
 
             try
             {
-                await notificador.PublicarEventoAsync(
+                // ADR-0030: estagia o evento de notificacao na MESMA UoW do job (sem commit
+                // proprio). Antes, PublicarEventoAsync commitava a notificacao imediatamente e o
+                // marcador de dedup (FaturaEventos) so era salvo no SaveChangesAsync final — uma
+                // falha entre os dois deixava a notificacao publicada sem dedup, duplicando na
+                // proxima execucao. Agora evento + dedup commitam juntos (atomico).
+                await notificador.EnfileirarEventoAsync(
                     tipoEventoNotif,
                     fatura.EmpresaId,
-                    usuarioDestinoId: null,
                     payloadJson: JsonSerializer.Serialize(new
                     {
                         faturaId = fatura.Id,

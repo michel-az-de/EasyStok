@@ -103,8 +103,8 @@ public class CriarPedidoUseCase(
         {
             foreach (var input in cmd.Itens)
             {
-                if (input.Quantidade <= 0)
-                    throw new UseCaseValidationException("Quantidade do item deve ser maior que zero.");
+                // Quantidade ja foi validada no loop de pre-validacao acima (mesma colecao cmd.Itens);
+                // o segundo check era dead-code com mensagem divergente.
 
                 // Valida que o ProdutoId, se informado, pertence à mesma empresa.
                 // Sem isso, item pode referenciar produto de outro tenant via FK direta.

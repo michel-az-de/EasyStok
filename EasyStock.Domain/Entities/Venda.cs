@@ -100,9 +100,10 @@ namespace EasyStock.Domain.Entities
         {
             var total = ItensVenda?.Aggregate(Dinheiro.Zero, (acc, item) => acc.Add(item.PrecoTotal)) ?? Dinheiro.Zero;
             ValorTotal = total;
-            // Subtotal = soma bruta dos itens (antes de descontos).
-            // Para vendas sem desconto aplicado, Subtotal == ValorTotal.
-            Subtotal = total.Add(ValorDesconto ?? Dinheiro.Zero);
+            // Subtotal = soma bruta dos itens (antes de descontos). Sem desconto, Subtotal == ValorTotal;
+            // com desconto, ValorTotal = Subtotal - ValorDesconto. NAO somar o desconto aqui (inflava o
+            // Subtotal: total=100 + desconto=10 dava 110 em vez de 100).
+            Subtotal = total;
         }
     }
 }
