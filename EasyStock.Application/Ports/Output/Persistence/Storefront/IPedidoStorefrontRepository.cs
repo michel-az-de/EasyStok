@@ -78,4 +78,21 @@ public interface IPedidoStorefrontRepository
         Guid clienteId,
         int limit,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Carrega UM pedido storefront do cliente autenticado, com <see cref="Pedido.Itens"/>
+    /// eager-loaded. Mesmo filtro de posse do <see cref="ListarPorClienteAsync"/>:
+    /// <c>Id = @pedidoId</c>, <c>EmpresaId = @empresaId</c>, <c>ClienteId = @clienteId</c>,
+    /// <c>Origem = "storefront"</c>, <c>Status != "rascunho"</c>.
+    ///
+    /// <para>
+    /// Retorna <c>null</c> se o pedido não existe OU não pertence ao cliente — o controller
+    /// devolve 404 nos dois casos (anti-enumeração: não revela pedido de outro cliente).
+    /// </para>
+    /// </summary>
+    Task<Pedido?> ObterDoClienteAsync(
+        Guid empresaId,
+        Guid clienteId,
+        Guid pedidoId,
+        CancellationToken ct = default);
 }

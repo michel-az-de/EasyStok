@@ -50,6 +50,9 @@ public static partial class ServiceCollectionExtensions
         // TASK-EZ-PEDIDOS-001 — listagem do histórico de pedidos do cliente.
         services.AddScoped<ListarPedidosClienteUseCase>();
 
+        // #670 — pedido individual do cliente (tela de acompanhamento).
+        services.AddScoped<ObterPedidoClienteUseCase>();
+
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja
         // protege contra registro duplo se outro componente fizer o mesmo.

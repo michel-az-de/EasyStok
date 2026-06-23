@@ -22,6 +22,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [AllowAnonymous]
 public sealed class PedidosClienteController(
     ListarPedidosClienteUseCase listarUseCase,
+    ObterPedidoClienteUseCase obterUseCase,
     IClienteSessionRepository clienteSessionRepository,
     TimeProvider timeProvider) : EasyStockControllerBase
 {
@@ -74,6 +75,68 @@ public sealed class PedidosClienteController(
                 ct);
 
             // Cache: dado per-cliente, mutável a cada mudança de status.
+            Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+            {
+                Private = true,
+                NoStore = true,
+            };
+            return Ok(result);
+        }
+        catch (StorefrontNaoEncontradoException ex)
+        {
+            return DataNotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Obtém um pedido individual do cliente autenticado (tela de acompanhamento — issue #670).
+    /// 404 se o pedido não existir OU não for do cliente (anti-enumeração).
+    /// </summary>
+    [SwaggerOperation(
+        Summary = "Obter pedido do cliente",
+        Description = "Retorna um pedido do cliente autenticado. Exige cookie de sessão __Host-cdb_session.")]
+    [ProducesResponseType(typeof(ObterPedidoClienteResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{pedidoId:guid}")]
+    public async Task<IActionResult> Obter(
+        [FromRoute] string slug,
+        [FromRoute] Guid pedidoId,
+        CancellationToken ct)
+    {
+        // ── Auth: validar sessão via cookie (mesma regra do Listar) ───────
+        var sessionId = ObterSessionId();
+        if (sessionId is null)
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Sessão necessária",
+                Detail = "Cookie __Host-cdb_session ausente. Faça login via OTP.",
+            });
+
+        var session = await clienteSessionRepository.GetByIdAsync(sessionId.Value, ct);
+        if (session is null || !session.EstaValida(timeProvider))
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Sessão inválida ou expirada",
+                Detail = "Sessão não encontrada ou expirada. Refaça o login.",
+            });
+
+        // ── Executar use case ─────────────────────────────────────────────
+        try
+        {
+            var result = await obterUseCase.ExecuteAsync(
+                new ObterPedidoClienteInput(
+                    Slug: slug,
+                    ClienteId: session.ClienteId,
+                    PedidoId: pedidoId),
+                ct);
+
+            // null = pedido inexistente OU de outro cliente → 404 (anti-enumeração).
+            if (result is null)
+                return DataNotFound("Pedido não encontrado.");
+
             Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
             {
                 Private = true,

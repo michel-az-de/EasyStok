@@ -112,4 +112,24 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
 
         return pedidos;
     }
+
+    public Task<Pedido?> ObterDoClienteAsync(
+        Guid empresaId,
+        Guid clienteId,
+        Guid pedidoId,
+        CancellationToken ct = default)
+    {
+        // Mesmo filtro de posse do ListarPorClienteAsync, mas por Id único.
+        // IgnoreQueryFilters: tenant aplicado manualmente (EmpresaId).
+        return db.Pedidos
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(p => p.Id == pedidoId
+                     && p.EmpresaId == empresaId
+                     && p.ClienteId == clienteId
+                     && p.Origem == "storefront"
+                     && p.Status != StatusPedidoMapper.Rascunho)
+            .Include(p => p.Itens)
+            .FirstOrDefaultAsync(ct);
+    }
 }
