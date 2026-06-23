@@ -346,7 +346,7 @@ public class ListarCardapioPublicoUseCaseTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_AvulsoComCategoria_UsaCategoriaTextoLowercase()
+    public async Task ExecuteAsync_AvulsoComCategoria_AplicaTitleCasePtBr()
     {
         var f = BuildFakes();
         var avulso = CriarItemAvulso(f.Storefront.Id, "Pão de Alho", 18.00m, categoria: "Acompanhamentos");
@@ -355,8 +355,10 @@ public class ListarCardapioPublicoUseCaseTests
 
         var dto = (await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido))).Itens.Single();
 
-        dto.Nome.Should().Be("pão de alho", "NomePublico avulso é armazenado lowercase (text-transform no front)");
-        dto.Categoria.Should().Be("acompanhamentos", "CategoriaTexto avulso vem de CategoriaEfetiva(), lowercase");
+        // NomePublico/CategoriaTexto avulsos são armazenados lowercase (factory); a vitrine
+        // pública aplica title-case pt-BR (5b84447b, #643) — preposição "de" fica minúscula.
+        dto.Nome.Should().Be("Pão de Alho", "avulso lowercase recebe title-case pt-BR na vitrine");
+        dto.Categoria.Should().Be("Acompanhamentos", "CategoriaTexto avulso lowercase recebe title-case na vitrine");
     }
 
     [Fact]
