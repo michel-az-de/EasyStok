@@ -10,6 +10,7 @@ using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -271,5 +272,60 @@ public sealed class AdminCardapioControllerTests : IAsyncLifetime
         // (CardapioItem não tem global query filter; este é o caminho do IDOR item-level, agora fechado.)
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound,
             "escopo item-level bloqueia edição de item de outra empresa contra Postgres real");
+    }
+
+    // ── Regressão ADR-0035 / 434d23fc: editar adicionando opção não pode dar 500 ──
+
+    [SkippableFact]
+    public async Task PUT_EditarAdicionandoOpcao_Persiste_NaoRetorna500()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        var empresaId = Guid.NewGuid();
+        var (_, itemId) = await SeedStorefrontComItemAsync(factory, empresaId, "loja-edit-opcao");
+
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", GerarJwt("Admin", empresaId));
+
+        // Editar adicionando UMA opção nova (id null): a reconciliação cria um CardapioItemVariacao
+        // com Guid client-gen. A regressão: CardapioItemRepository.UpdateAsync fazia db.Update no
+        // agregado tracked, remarcando a opção nova de Added -> Modified -> UPDATE de 0 linhas ->
+        // DbUpdateConcurrencyException -> catch(Exception) do controller -> 500. Agora deve ser 200.
+        var body = new
+        {
+            nomePublico = (string?)null,
+            opcoes = new[]
+            {
+                new
+                {
+                    id = (Guid?)null,
+                    rotulo = "P",
+                    precoStorefront = 18.0m,
+                    disponivel = true,
+                    ehPadrao = true,
+                    ordemExibicao = 0.0,
+                },
+            },
+        };
+
+        var resp = await client.PutAsJsonAsync($"/api/minha-vitrine/cardapio/{itemId}", body);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK,
+            "editar adicionando opção nova deve persistir (não estourar 500)");
+
+        // Persistência real no Postgres: a opção foi INSERIDA, não tentada como UPDATE inexistente.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var _ = db.UseRowLevelSecurityBypass();
+        var item = await db.CardapioItens
+            .Include(c => c.Variacoes)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == itemId);
+
+        item.Should().NotBeNull();
+        item!.Variacoes.Should().HaveCount(1, "a opção nova foi inserida (Added), não UPDATE de linha inexistente");
+        item.Variacoes.Single().PrecoStorefront.Should().Be(18.0m);
     }
 }

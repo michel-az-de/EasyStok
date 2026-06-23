@@ -78,7 +78,15 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
 
     public Task UpdateAsync(CardapioItem item, CancellationToken ct = default)
     {
-        db.CardapioItens.Update(item);
+        // Item carregado TRACKED por GetByIdAndScopeAsync (com Include Variacoes): o change tracker
+        // ja conhece o grafo — opcoes novas em Added, alteradas em Modified, removidas em Deleted — e
+        // o CommitAsync (SaveChanges) persiste tudo. NAO chamar db.Update num agregado tracked: ele
+        // forca o grafo inteiro para Modified e, como a opcao nova nasce com Guid client-gen
+        // (CardapioItemVariacao.Criar -> Guid.NewGuid), vira UPDATE de linha inexistente ->
+        // DbUpdateConcurrencyException -> 500 ao adicionar opcao na edicao (ADR-0035 / 434d23fc).
+        // So usamos Update se a entidade vier destacada (caller que carregou sem tracking).
+        if (db.Entry(item).State == Microsoft.EntityFrameworkCore.EntityState.Detached)
+            db.CardapioItens.Update(item);
         return Task.CompletedTask;
     }
 
