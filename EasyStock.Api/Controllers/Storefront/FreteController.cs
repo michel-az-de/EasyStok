@@ -43,6 +43,7 @@ public sealed class FreteController(
     public async Task<IActionResult> CalcularFrete(
         [FromRoute] string slug,
         [FromQuery] string? cep,
+        [FromQuery] string? numero,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(cep))
@@ -54,7 +55,7 @@ public sealed class FreteController(
         try
         {
             var result = await calcularFreteUseCase.ExecuteAsync(
-                new CalcularFreteInput(slug, cep), ct);
+                new CalcularFreteInput(slug, cep, numero), ct);
 
             SetCacheable();
             return Ok(result);

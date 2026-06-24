@@ -73,11 +73,21 @@ public class CalcularFreteUseCaseTests
         return new Fakes(storefrontRepo, freteZonaRepo, cepLookup, logger, storefront);
     }
 
-    private static CalcularFreteUseCase BuildUseCase(Fakes f) => new(
-        f.StorefrontRepository,
-        f.FreteZonaRepository,
-        f.CepLookupClient,
-        f.Logger);
+    private static CalcularFreteUseCase BuildUseCase(Fakes f)
+    {
+        // Geocoding NoOp: retorna null → sem raio, cai pra zona (estes testes são
+        // de zona; os storefronts aqui não têm config de raio de qualquer forma).
+        var geocoding = Substitute.For<IGeocodingClient>();
+        geocoding.GeocodificarAsync(Arg.Any<GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns((GeocodeResultado?)null);
+
+        return new(
+            f.StorefrontRepository,
+            f.FreteZonaRepository,
+            f.CepLookupClient,
+            geocoding,
+            f.Logger);
+    }
 
     private static CalcularFreteInput Input(string? cep = null) =>
         new(SlugValido, cep ?? CepValido);

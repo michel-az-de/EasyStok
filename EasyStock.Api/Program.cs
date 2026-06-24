@@ -96,6 +96,10 @@ if (!builder.Environment.IsProduction())
 // registra ViaCepLookupClient com timeout 1s.
 builder.Services.AddEasyStockCepLookup(builder.Configuration);
 
+// Storefront — geocoding p/ frete por raio (ADR-0017). Flag ENABLE_NOMINATIM_GEOCODING
+// (default false → NoOp; frete cai pra zona). Liga quando o serviço/self-host subir.
+builder.Services.AddEasyStockGeocoding(builder.Configuration);
+
 builder.Services.Configure<EasyStockConfiguracoes>(
     builder.Configuration.GetSection(ConfigurationKeys.SectionEasyStock));
 

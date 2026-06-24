@@ -10,4 +10,5 @@
 /// </summary>
 public sealed record CalcularFreteInput(
     string Slug,
-    string Cep);
+    string Cep,
+    string? Numero = null);
