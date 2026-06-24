@@ -457,4 +457,75 @@ public class ListarPedidosClienteUseCaseTests
 
         result.Pedidos.Single().InitPointUrl.Should().BeNull();
     }
+
+    // ── Enriquecimentos #671 (pagamento + descrição do item) ─────────────────
+
+    [Fact]
+    public async Task Item_com_variacao_mapeia_descricao()
+    {
+        var pedido = PedidoStub(itens: new[]
+        {
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), ProdutoId = Guid.NewGuid(),
+                Nome = "Lasanha", Quantidade = 1, PrecoUnitario = 84m, Subtotal = 84m,
+                VariacaoRotuloSnapshot = "tamanho família",
+            },
+        });
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Single().Itens.Single().Descricao.Should().Be("tamanho família");
+    }
+
+    [Fact]
+    public async Task Item_sem_variacao_tem_descricao_null()
+    {
+        var pedido = PedidoStub(itens: new[]
+        {
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), ProdutoId = Guid.NewGuid(),
+                Nome = "Bolo", Quantidade = 1, PrecoUnitario = 50m, Subtotal = 50m,
+            },
+        });
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Single().Itens.Single().Descricao.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Pagamento_mais_antigo_mapeia_para_DTO()
+    {
+        var pedido = PedidoStub(status: StatusPedidoMapper.Entregue);
+        var cedo = new DateTime(2026, 6, 21, 9, 0, 0, DateTimeKind.Utc);
+        var tarde = new DateTime(2026, 6, 21, 12, 0, 0, DateTimeKind.Utc);
+        pedido.Pagamentos = new[]
+        {
+            new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 20m, PagoEm = tarde },
+            new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 80m, PagoEm = cedo },
+        };
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        var pag = result.Pedidos.Single().Pagamento;
+        pag.Should().NotBeNull();
+        pag!.Metodo.Should().Be("pix");                 // o mais antigo
+        pag.ConfirmadoEm.Should().Be(cedo);
+    }
+
+    [Fact]
+    public async Task Pedido_sem_pagamento_tem_Pagamento_null()
+    {
+        var pedido = PedidoStub(status: StatusPedidoMapper.AguardandoPagamento);
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Single().Pagamento.Should().BeNull();
+    }
 }

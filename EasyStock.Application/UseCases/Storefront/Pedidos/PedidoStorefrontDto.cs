@@ -21,6 +21,7 @@ namespace EasyStock.Application.UseCases.Storefront.Pedidos;
 /// <param name="Avaliacao">Avaliação do cliente (se Entregue + avaliado). Null caso contrário.</param>
 /// <param name="InitPointUrl">URL do MercadoPago para retomar pagamento. Null no MVP — preference URL não está persistida (ver task TASK-EZ-PEDIDOS-003).</param>
 /// <param name="MotivoCancelamento">Mensagem ao cliente quando status == Cancelado/Recusado. Null caso contrário.</param>
+/// <param name="Pagamento">Pagamento confirmado (método + timestamp). Null se ainda sem pagamento.</param>
 public sealed record PedidoStorefrontDto(
     Guid PedidoId,
     DateTime CriadoEm,
@@ -33,13 +34,19 @@ public sealed record PedidoStorefrontDto(
     PedidoStorefrontEnderecoDto? Endereco,
     PedidoStorefrontAvaliacaoDto? Avaliacao,
     string? InitPointUrl,
-    string? MotivoCancelamento);
+    string? MotivoCancelamento,
+    PedidoStorefrontPagamentoDto? Pagamento);
 
 /// <summary>Item snapshotado do pedido (nome do produto no momento + qtd × preço unitário).</summary>
+/// <param name="Nome">Snapshot do nome no momento da compra.</param>
+/// <param name="Qtd">Quantidade (arredondada pra inteiro).</param>
+/// <param name="PrecoCentavos">Preço unitário em centavos.</param>
+/// <param name="Descricao">Rótulo da variação/opção escolhida (ex: "tamanho família"). Null se item sem variação.</param>
 public sealed record PedidoStorefrontItemDto(
     string Nome,
     int Qtd,
-    long PrecoCentavos);
+    long PrecoCentavos,
+    string? Descricao);
 
 /// <summary>Janela de entrega escolhida — copiada da <c>JanelaEntrega</c> referenciada via <c>VagaOcupada</c>.</summary>
 /// <param name="Data">Data da entrega (yyyy-MM-dd).</param>
@@ -66,3 +73,10 @@ public sealed record PedidoStorefrontEnderecoDto(
 public sealed record PedidoStorefrontAvaliacaoDto(
     int Estrelas,
     string? Comentario);
+
+/// <summary>Pagamento confirmado — o mais antigo de <c>Pedido.Pagamentos</c>. Null se ainda sem pagamento.</summary>
+/// <param name="Metodo">"pix" | "dinheiro" | "credito" | "debito" | "transferencia" | "outro".</param>
+/// <param name="ConfirmadoEm">Timestamp UTC do pagamento (<c>PedidoPagamento.PagoEm</c>).</param>
+public sealed record PedidoStorefrontPagamentoDto(
+    string Metodo,
+    DateTime ConfirmadoEm);

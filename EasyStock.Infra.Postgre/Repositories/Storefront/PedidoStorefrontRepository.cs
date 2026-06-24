@@ -106,6 +106,8 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
                      && p.Origem == "storefront"
                      && p.Status != StatusPedidoMapper.Rascunho)
             .Include(p => p.Itens)
+            .Include(p => p.Pagamentos)
+            .AsSplitQuery()
             .OrderByDescending(p => p.CriadoEm)
             .Take(limit)
             .ToListAsync(ct);
@@ -130,6 +132,8 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
                      && p.Origem == "storefront"
                      && p.Status != StatusPedidoMapper.Rascunho)
             .Include(p => p.Itens)
+            .Include(p => p.Pagamentos)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(ct);
     }
 }

@@ -125,7 +125,8 @@ public sealed class ListarPedidosClienteUseCase(
             .Select(i => new PedidoStorefrontItemDto(
                 Nome: i.Nome,
                 Qtd: (int)Math.Round(i.Quantidade, MidpointRounding.AwayFromZero),
-                PrecoCentavos: ToCentavos(i.PrecoUnitario)))
+                PrecoCentavos: ToCentavos(i.PrecoUnitario),
+                Descricao: i.VariacaoRotuloSnapshot))
             .ToList();
 
         var freteCentavos = itemFrete is null
@@ -164,6 +165,17 @@ public sealed class ListarPedidosClienteUseCase(
                 : pedido.MotivoRecusa;
         }
 
+        // Pagamento confirmado: o mais antigo de Pedido.Pagamentos (Include no repo).
+        // Sem Include / sem pagamento → coleção vazia → null (graceful).
+        PedidoStorefrontPagamentoDto? pagamentoDto = null;
+        var pagamento = pedido.Pagamentos.OrderBy(p => p.PagoEm).FirstOrDefault();
+        if (pagamento is not null)
+        {
+            pagamentoDto = new PedidoStorefrontPagamentoDto(
+                Metodo: pagamento.Metodo,
+                ConfirmadoEm: DateTime.SpecifyKind(pagamento.PagoEm, DateTimeKind.Utc));
+        }
+
         return new PedidoStorefrontDto(
             PedidoId: pedido.Id,
             CriadoEm: DateTime.SpecifyKind(pedido.CriadoEm, DateTimeKind.Utc),
@@ -176,7 +188,8 @@ public sealed class ListarPedidosClienteUseCase(
             Endereco: null,         // MVP: ver TASK-EZ-PEDIDOS-002
             Avaliacao: avaliacaoDto,
             InitPointUrl: null,     // MVP: ver TASK-EZ-PEDIDOS-003
-            MotivoCancelamento: motivoCancelamento);
+            MotivoCancelamento: motivoCancelamento,
+            Pagamento: pagamentoDto);
     }
 
     /// <summary>
