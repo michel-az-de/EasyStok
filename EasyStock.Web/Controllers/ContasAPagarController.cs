@@ -46,6 +46,11 @@ public class ContasAPagarController(FinanceiroService svc, SessionService sessio
         return View(vm);
     }
 
+    // BUG-11 (QA v1.10 #674): /nova e URL previsivel; redireciona 302 p/ /criar (evita 404).
+    // 302 (nao 301) de proposito: 301 fica cacheado no browser pra sempre.
+    [HttpGet("/contas-a-pagar/nova")]
+    public IActionResult Nova() => Redirect("/contas-a-pagar/criar");
+
     [HttpPost("/contas-a-pagar/criar")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CriarPost(

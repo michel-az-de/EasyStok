@@ -32,6 +32,10 @@ public class ContasAReceberController(FinanceiroService svc, SessionService sess
         return View(vm);
     }
 
+    // BUG-11 (QA v1.10 #674): /nova -> 302 p/ /criar (paridade com contas-a-pagar; evita 404).
+    [HttpGet("/contas-a-receber/nova")]
+    public IActionResult Nova() => Redirect("/contas-a-receber/criar");
+
     [HttpGet("/contas-a-receber/criar")]
     public async Task<IActionResult> Criar()
     {
