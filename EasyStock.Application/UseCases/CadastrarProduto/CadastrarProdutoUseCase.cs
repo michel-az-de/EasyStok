@@ -266,6 +266,10 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
             UseCaseGuards.EnsureNotEmpty(command.CategoriaId, "CategoriaId");
             if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
             UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do produto");
+            // BUG-04 (QA v1.10 #674, refs #526): DescricaoBase tambem cai em sinks de UI (preview do
+            // form, anuncio IA) — guarda de tags HTML por consistencia com o Nome (defesa na origem).
+            if (!string.IsNullOrWhiteSpace(command.DescricaoBase))
+                UseCaseGuards.EnsureSemTagsHtml(command.DescricaoBase, "Descrição do produto");
             // PROD-02: teto de sanidade de preco/custo (ponto unico — ver LimitesProduto).
             LimitesProduto.EnsurePreco(command.PrecoReferencia, "Preço de referência");
             LimitesProduto.EnsurePreco(command.CustoReferencia, "Custo de referência");

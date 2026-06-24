@@ -126,6 +126,61 @@ public class CadastrarProdutoUseCaseTests
             .WithMessage("*SKU duplicado*");
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // BUG-04 / BUG-02 (QA v1.10 #674): sanitizacao de tags HTML + teto de preco
+    // ════════════════════════════════════════════════════════════════════
+
+    private static (CadastrarProdutoUseCase uc, Guid empresaId, Guid categoriaId) SetupValido()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var categoriaRepository = Substitute.For<ICategoriaRepository>();
+        var caracteristicaRepository = Substitute.For<IProdutoCaracteristicaRepository>();
+        var embalagemRepository = Substitute.For<IProdutoEmbalagemRepository>();
+        var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
+        var logger = Substitute.For<ILogger<CadastrarProdutoUseCase>>();
+        var uc = new CadastrarProdutoUseCase(produtoRepository, categoriaRepository,
+            caracteristicaRepository, embalagemRepository, variacaoRepository, new FakeUnitOfWork(), logger);
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        categoriaRepository.GetByIdAsync(empresaId, categoriaId)
+            .Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Geral" });
+        return (uc, empresaId, categoriaId);
+    }
+
+    private static CadastrarProdutoCommand CmdBase(Guid empresaId, Guid categoriaId) =>
+        new(empresaId, categoriaId, null, "Produto OK", null, null, TipoProduto.Fisico,
+            null, null, false, null, null, null, null, null, null, null, null, null);
+
+    [Fact] // Characterization: Nome com <script> JA era rejeitado em master fresco -> achado do QA = dado stale.
+    public async Task Deve_rejeitar_nome_com_tags_html()
+    {
+        var (uc, empresaId, categoriaId) = SetupValido();
+        var cmd = CmdBase(empresaId, categoriaId) with { Nome = "<script>alert('xss')</script>" };
+        var act = () => uc.ExecuteAsync(cmd);
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*tags HTML*");
+    }
+
+    [Theory] // Guarda nova: DescricaoBase com payloads de bypass (img/svg/script) rejeitada na origem.
+    [InlineData("<img src=x onerror=alert(1)>")]
+    [InlineData("\"><svg onload=alert(1)>")]
+    [InlineData("<script>alert(1)</script>")]
+    public async Task Deve_rejeitar_descricao_com_tags_html(string payload)
+    {
+        var (uc, empresaId, categoriaId) = SetupValido();
+        var cmd = CmdBase(empresaId, categoriaId) with { DescricaoBase = payload };
+        var act = () => uc.ExecuteAsync(cmd);
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*tags HTML*");
+    }
+
+    [Fact] // Characterization: preco acima do teto JA era rejeitado -> os R$142M do QA = dado stale.
+    public async Task Deve_rejeitar_preco_acima_do_teto()
+    {
+        var (uc, empresaId, categoriaId) = SetupValido();
+        var cmd = CmdBase(empresaId, categoriaId) with { PrecoReferencia = 142_857_142.84m };
+        var act = () => uc.ExecuteAsync(cmd);
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*máximo*");
+    }
+
     [Fact]
     public async Task Deve_cadastrar_produto_com_subcategoria_valida()
     {

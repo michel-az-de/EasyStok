@@ -37,6 +37,9 @@ public sealed class AtualizarProdutoUseCase(
         if (command.CategoriaId == Guid.Empty) throw new UseCaseValidationException("CategoriaId é obrigatório.");
         if (string.IsNullOrWhiteSpace(command.Nome)) throw new UseCaseValidationException("Nome do produto é obrigatório.");
         UseCaseGuards.EnsureSemTagsHtml(command.Nome, "Nome do produto");
+        // BUG-04 (QA v1.10 #674, refs #526): mesma guarda de tags HTML na DescricaoBase, na edicao.
+        if (!string.IsNullOrWhiteSpace(command.DescricaoBase))
+            UseCaseGuards.EnsureSemTagsHtml(command.DescricaoBase, "Descrição do produto");
 
         var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
