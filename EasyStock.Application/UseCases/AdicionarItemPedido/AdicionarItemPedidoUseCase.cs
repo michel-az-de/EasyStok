@@ -44,6 +44,11 @@ public class AdicionarItemPedidoUseCase(
             var produto = await produtoRepo.GetByIdAsync(cmd.EmpresaId, cmd.ProdutoId.Value);
             if (produto is null)
                 throw new UseCaseValidationException("Produto do item não pertence a esta empresa.");
+            // BUG-03 (QA v1.10 #674, refs #561): produto inativo nao pode ser ADICIONADO a pedido.
+            // Escopo deliberado: bloqueia so no ADD. Itens ja existentes (produto que ficou inativo
+            // DEPOIS de entrar no pedido) seguem editaveis/confirmaveis — nao quebra pedido legitimo.
+            if (produto.Status != StatusProduto.Ativo)
+                throw new UseCaseValidationException("Produto inativo não pode ser adicionado ao pedido. Reative-o ou escolha outro produto.");
         }
 
         var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);

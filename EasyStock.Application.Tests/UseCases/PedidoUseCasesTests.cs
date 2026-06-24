@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
+using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
@@ -32,6 +33,73 @@ public class PedidoUseCasesTests
         _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
         Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>());
+    private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, _uow,
+        Substitute.For<ILogger<AdicionarItemPedidoUseCase>>());
+
+    private static Produto ProdutoComStatus(Guid empresaId, Guid id, StatusProduto status) => new()
+    {
+        Id = id, EmpresaId = empresaId, Nome = "Produto X", CategoriaId = Guid.NewGuid(),
+        Status = status, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+    };
+
+    // ════════════════════════════════════════════════════════════════════
+    // BUG-03 (QA v1.10 #674, refs #561): produto inativo / preco zero em pedido
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact] // Characterization: R$0 JA era bloqueado em master fresco -> achado do QA era dado stale.
+    public async Task AdicionarItem_DeveBloquear_QuandoPrecoZero()
+    {
+        var empresaId = Guid.NewGuid();
+        var cmd = new AdicionarItemPedidoCommand(empresaId, Guid.NewGuid(), "ADEFV", 1, 0m);
+        var act = () => AdicionarItemUC().ExecuteAsync(cmd);
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*maior que zero*");
+    }
+
+    [Fact] // Guarda nova: produto inativo nao entra no pedido pela via de adicao de item.
+    public async Task AdicionarItem_DeveBloquear_QuandoProdutoInativo()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Inativo));
+
+        var cmd = new AdicionarItemPedidoCommand(empresaId, Guid.NewGuid(), "ADEFV", 1, 10m, ProdutoId: produtoId);
+        var act = () => AdicionarItemUC().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*inativo*");
+    }
+
+    [Fact] // Produto ativo segue permitido (nao quebra o caminho feliz).
+    public async Task AdicionarItem_DevePermitir_QuandoProdutoAtivo_PassaDaGuardaDeStatus()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Ativo));
+        // Pedido inexistente -> use case retorna null (sem lancar). Prova que a guarda de status
+        // NAO barrou um produto ativo (a barreira aqui passa a ser o pedido, nao o status).
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, Arg.Any<Guid>()).Returns((Pedido?)null);
+
+        var cmd = new AdicionarItemPedidoCommand(empresaId, Guid.NewGuid(), "Item ativo", 1, 10m, ProdutoId: produtoId);
+        var result = await AdicionarItemUC().ExecuteAsync(cmd);
+
+        result.Should().BeNull();
+    }
+
+    [Fact] // Guarda nova: criacao de pedido com item de produto inativo e bloqueada.
+    public async Task CriarPedido_DeveBloquear_QuandoProdutoInativo()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Inativo));
+
+        var act = () => CriarPedidoUC().ExecuteAsync(new CriarPedidoCommand(empresaId,
+            Itens: new[] { new CriarPedidoItemInput("ADEFV", 1, 10, ProdutoId: produtoId) }));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*inativo*");
+        await _pedidoRepo.DidNotReceive().AddAsync(Arg.Any<Pedido>());
+    }
 
     private static Cliente CriarCliente(Guid empresaId, string nome = "Maria") => new()
     {

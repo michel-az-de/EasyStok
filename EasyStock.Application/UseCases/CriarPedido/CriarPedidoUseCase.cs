@@ -113,6 +113,9 @@ public class CriarPedidoUseCase(
                     var produto = await produtoRepo.GetByIdAsync(cmd.EmpresaId, input.ProdutoId.Value);
                     if (produto is null)
                         throw new UseCaseValidationException("Produto do item não pertence a esta empresa.");
+                    // BUG-03 (QA v1.10 #674, refs #561): bloqueia produto inativo na criacao do pedido.
+                    if (produto.Status != StatusProduto.Ativo)
+                        throw new UseCaseValidationException("Produto inativo não pode ser adicionado ao pedido. Reative-o ou escolha outro produto.");
                 }
 
                 var item = new PedidoItem
