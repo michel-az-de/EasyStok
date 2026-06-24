@@ -22,6 +22,7 @@ namespace EasyStock.Application.UseCases.Storefront.Pedidos;
 /// <param name="InitPointUrl">URL do MercadoPago para retomar pagamento. Null no MVP — preference URL não está persistida (ver task TASK-EZ-PEDIDOS-003).</param>
 /// <param name="MotivoCancelamento">Mensagem ao cliente quando status == Cancelado/Recusado. Null caso contrário.</param>
 /// <param name="Pagamento">Pagamento confirmado (método + timestamp). Null se ainda sem pagamento.</param>
+/// <param name="Historico">Mapa stepKey → timestamp (pagamento/aprovacao/preparo/entrega/entregue) derivado dos PedidoEvento. Null se sem eventos relevantes.</param>
 public sealed record PedidoStorefrontDto(
     Guid PedidoId,
     DateTime CriadoEm,
@@ -35,7 +36,8 @@ public sealed record PedidoStorefrontDto(
     PedidoStorefrontAvaliacaoDto? Avaliacao,
     string? InitPointUrl,
     string? MotivoCancelamento,
-    PedidoStorefrontPagamentoDto? Pagamento);
+    PedidoStorefrontPagamentoDto? Pagamento,
+    IReadOnlyDictionary<string, DateTime>? Historico);
 
 /// <summary>Item snapshotado do pedido (nome do produto no momento + qtd × preço unitário).</summary>
 /// <param name="Nome">Snapshot do nome no momento da compra.</param>

@@ -107,6 +107,7 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
                      && p.Status != StatusPedidoMapper.Rascunho)
             .Include(p => p.Itens)
             .Include(p => p.Pagamentos)
+            .Include(p => p.Eventos)
             .AsSplitQuery()
             .OrderByDescending(p => p.CriadoEm)
             .Take(limit)
@@ -133,6 +134,7 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
                      && p.Status != StatusPedidoMapper.Rascunho)
             .Include(p => p.Itens)
             .Include(p => p.Pagamentos)
+            .Include(p => p.Eventos)
             .AsSplitQuery()
             .FirstOrDefaultAsync(ct);
     }

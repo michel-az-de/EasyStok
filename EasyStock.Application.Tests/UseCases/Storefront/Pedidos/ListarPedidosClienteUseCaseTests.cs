@@ -528,4 +528,61 @@ public class ListarPedidosClienteUseCaseTests
 
         result.Pedidos.Single().Pagamento.Should().BeNull();
     }
+
+    // ── Historico #672 (PedidoEvento → stepKey:timestamp) ────────────────────
+
+    [Fact]
+    public async Task Historico_mapeia_eventos_por_step_com_horario()
+    {
+        var pedido = PedidoStub(status: StatusPedidoMapper.Pronto);
+        var t1 = new DateTime(2026, 6, 21, 9, 0, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 6, 21, 9, 5, 0, DateTimeKind.Utc);
+        var t3 = new DateTime(2026, 6, 21, 9, 30, 0, DateTimeKind.Utc);
+        pedido.Eventos = new[]
+        {
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.AguardandoAprovacaoBaba, OcorridoEm = t1 },
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.AprovadoBaba, OcorridoEm = t2 },
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.Pronto, OcorridoEm = t3 },
+        };
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        var hist = result.Pedidos.Single().Historico;
+        hist.Should().NotBeNull();
+        hist!["pagamento"].Should().Be(t1);
+        hist["aprovacao"].Should().Be(t2);
+        hist["entrega"].Should().Be(t3);
+        hist.Should().NotContainKey("preparo");   // sem evento de preparo
+    }
+
+    [Fact]
+    public async Task Historico_primeira_ocorrencia_de_cada_step_vence()
+    {
+        var pedido = PedidoStub(status: StatusPedidoMapper.Preparando);
+        var cedo = new DateTime(2026, 6, 21, 9, 0, 0, DateTimeKind.Utc);
+        var tarde = new DateTime(2026, 6, 21, 10, 0, 0, DateTimeKind.Utc);
+        // Dois eventos que mapeiam pro mesmo step "preparo" (aguardando + preparando).
+        pedido.Eventos = new[]
+        {
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.Aguardando, OcorridoEm = cedo },
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.Preparando, OcorridoEm = tarde },
+        };
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Single().Historico!["preparo"].Should().Be(cedo);
+    }
+
+    [Fact]
+    public async Task Pedido_sem_eventos_tem_Historico_null()
+    {
+        var pedido = PedidoStub();
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Single().Historico.Should().BeNull();
+    }
 }

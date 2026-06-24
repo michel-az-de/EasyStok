@@ -176,6 +176,21 @@ public sealed class ListarPedidosClienteUseCase(
                 ConfirmadoEm: DateTime.SpecifyKind(pagamento.PagoEm, DateTimeKind.Utc));
         }
 
+        // Historico: stepKey -> primeiro OcorridoEm do evento que levou aquele marco.
+        // Sem Include Eventos / sem eventos relevantes → null (graceful).
+        IReadOnlyDictionary<string, DateTime>? historicoDto = null;
+        if (pedido.Eventos.Count > 0)
+        {
+            var hist = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+            foreach (var ev in pedido.Eventos.OrderBy(e => e.OcorridoEm))
+            {
+                var stepKey = StepKeyDoStatus(ev.StatusNovo);
+                if (stepKey is not null && !hist.ContainsKey(stepKey))
+                    hist[stepKey] = DateTime.SpecifyKind(ev.OcorridoEm, DateTimeKind.Utc);
+            }
+            if (hist.Count > 0) historicoDto = hist;
+        }
+
         return new PedidoStorefrontDto(
             PedidoId: pedido.Id,
             CriadoEm: DateTime.SpecifyKind(pedido.CriadoEm, DateTimeKind.Utc),
@@ -189,7 +204,8 @@ public sealed class ListarPedidosClienteUseCase(
             Avaliacao: avaliacaoDto,
             InitPointUrl: null,     // MVP: ver TASK-EZ-PEDIDOS-003
             MotivoCancelamento: motivoCancelamento,
-            Pagamento: pagamentoDto);
+            Pagamento: pagamentoDto,
+            Historico: historicoDto);
     }
 
     /// <summary>
@@ -214,6 +230,22 @@ public sealed class ListarPedidosClienteUseCase(
             _ => statusInterno, // unknown — passa raw pra não esconder bug
         };
     }
+
+    /// <summary>
+    /// Mapeia o status interno (StatusNovo de um <c>PedidoEvento</c>) para a chave do passo
+    /// da timeline do frontend. Null para status sem marco visível (rascunho,
+    /// aguardando_pagamento, cancelado).
+    /// </summary>
+    internal static string? StepKeyDoStatus(string? statusInterno) => statusInterno switch
+    {
+        StatusPedidoMapper.AguardandoAprovacaoBaba => "pagamento",  // pagamento confirmado
+        StatusPedidoMapper.AprovadoBaba => "aprovacao",             // a Babá confirmou
+        StatusPedidoMapper.Aguardando => "preparo",
+        StatusPedidoMapper.Preparando => "preparo",
+        StatusPedidoMapper.Pronto => "entrega",                     // saiu para entrega
+        StatusPedidoMapper.Entregue => "entregue",
+        _ => null,
+    };
 
     /// <summary>Conversão decimal (BRL) → long (centavos). Round half-away (mesma regra do checkout).</summary>
     internal static long ToCentavos(decimal valor) =>
