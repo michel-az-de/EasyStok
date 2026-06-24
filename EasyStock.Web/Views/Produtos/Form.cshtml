@@ -1845,6 +1845,9 @@
                 custo: @(Model.CustoReferencia?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"),
                 margem: @(Model.MargemEstimada?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"),
                 lastEdited: 'none',
+                // BUG-01 (QA v1.10 issue 674): marca que o usuario definiu o custo (inclusive 0),
+                // para nao sobrescrever um custo=0 digitado ao editar a margem.
+                custoTocado: @(Model.CustoReferencia.HasValue ? "true" : "false"),
 
                 parseDecimal(val) {
                     if (typeof val === 'number') return val;
@@ -1883,6 +1886,7 @@
                 },
                 onCustoInput() {
                     this.lastEdited = 'custo';
+                    this.custoTocado = true; // BUG-01: custo definido pelo usuario (inclusive 0).
                     // Prioridade: se margem está definida, recalcula preço (preserva margem desejada pelo usuário).
                     // Caso contrário, recalcula margem a partir do preço existente.
                     if (this.custo > 0 && this.margem > 0 && this.margem < 100)
@@ -1902,7 +1906,10 @@
                     // BUG-07: calcula o preco tambem com margem negativa (prejuizo: preco < custo),
                     // em vez de deixar o campo vazio -> "Preco nao definido". Clamp no teto porque o
                     // clamp do @@input nao roda neste caminho (valor calculado, nao digitado).
-                    if (this.custo > 0 && this.margem !== 0 && this.margem !== null && Number.isFinite(this.margem))
+                    // BUG-01 (issue 674): se o usuario definiu o custo (custoTocado, inclusive 0),
+                    // editar a margem recalcula o PRECO — nunca sobrescreve o custo digitado. Antes,
+                    // custo=0 caia na derivacao preco->custo e o 0 virava ex. R$63,34.
+                    if ((this.custoTocado || this.custo > 0) && this.margem !== 0 && this.margem !== null && Number.isFinite(this.margem))
                         this.preco = Math.min(+( this.custo / (1 - this.margem / 100) ).toFixed(2), 99999999.99);
                     else if (this.preco > 0 && this.margem > 0)
                         this.custo = +( this.preco * (1 - this.margem / 100) ).toFixed(2);
