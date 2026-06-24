@@ -272,4 +272,7 @@ public class DashboardFinanceiroApi
     public int QtdContasPagarAbertas { get; set; }
     public int QtdContasReceberAbertas { get; set; }
     public int QtdParcelasVencidasHoje { get; set; }
+    // BUG-08 (QA v1.10 #674): contas com parcela a vencer na janela 30d — alinhado ao valor do card.
+    public int QtdContasPagarAVencer30d { get; set; }
+    public int QtdContasReceberAVencer30d { get; set; }
 }

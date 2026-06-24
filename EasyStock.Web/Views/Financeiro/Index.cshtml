@@ -29,12 +29,15 @@
 
     // delta-meta: "N em aberto · vs 30d" so quando ha base de comparacao (deltas.*Delta != null);
     // sem base, mostra so a contagem (nao inventa "vs 30d" sem delta por tras).
+    // BUG-08 (QA v1.10 issue 674): o card "A Pagar/Receber 30d" mostra o VALOR a vencer em 30d; o contador
+    // tem que descrever o MESMO conjunto. Antes usava QtdContas*Abertas (todas em aberto, qualquer
+    // data) -> "R$0,00 / 1 em aberto". Agora usa contas a vencer NA janela 30d (R$0 -> 0 a vencer).
     string MetaReceber = deltas.ReceberDelta is null
-        ? $"{d.QtdContasReceberAbertas} em aberto"
-        : $"{d.QtdContasReceberAbertas} em aberto · vs 30d";
+        ? $"{d.QtdContasReceberAVencer30d} a vencer"
+        : $"{d.QtdContasReceberAVencer30d} a vencer · vs 30d";
     string MetaPagar = deltas.PagarDelta is null
-        ? $"{d.QtdContasPagarAbertas} em aberto"
-        : $"{d.QtdContasPagarAbertas} em aberto · vs 30d";
+        ? $"{d.QtdContasPagarAVencer30d} a vencer"
+        : $"{d.QtdContasPagarAVencer30d} a vencer · vs 30d";
 
     // Nome acessivel por card: rotulo + valor lidos como um todo (o card vira <a>/<div>;
     // sem aria-label o leitor de tela anunciaria texto solto). Tambem vai em title= p/ tooltip.
@@ -73,7 +76,7 @@
                       delta-meta="@MetaReceber"
                       sparkline="@deltas.ReceberSerie"
                       href="@hrefReceber"
-                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{TextHelpers.Plural(d.QtdContasReceberAbertas, "conta", "contas")} em aberto. Abrir recebíveis do período.")" />
+                      title="@Aria("A Receber nos próximos 30 dias", d.TotalAVencer30dReceber.AsMoney(), $"{TextHelpers.Plural(d.QtdContasReceberAVencer30d, "conta", "contas")} a vencer no período. Abrir recebíveis do período.")" />
 
         <es-stat-card label="A Pagar 30d"
                       value="@d.TotalAVencer30dPagar.AsMoney()"
@@ -82,7 +85,7 @@
                       delta-meta="@MetaPagar"
                       sparkline="@deltas.PagarSerie"
                       href="@hrefPagar"
-                      title="@Aria("A Pagar nos próximos 30 dias", d.TotalAVencer30dPagar.AsMoney(), $"{TextHelpers.Plural(d.QtdContasPagarAbertas, "conta", "contas")} em aberto. Abrir pagáveis do período.")" />
+                      title="@Aria("A Pagar nos próximos 30 dias", d.TotalAVencer30dPagar.AsMoney(), $"{TextHelpers.Plural(d.QtdContasPagarAVencer30d, "conta", "contas")} a vencer no período. Abrir pagáveis do período.")" />
 
         @{ var metaVenc = TextHelpers.PluralWord(d.QtdParcelasVencidasHoje, "atrasada", "atrasadas"); }
         <es-stat-card label="Vencidas"

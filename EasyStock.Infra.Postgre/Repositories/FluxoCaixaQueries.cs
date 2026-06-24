@@ -80,12 +80,21 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
             await parcelasPagarVivas.CountAsync(p => p.DataVencimento < hoje, ct)
             + await parcelasReceberVivas.CountAsync(p => p.DataVencimento < hoje, ct);
 
+        // BUG-08 (QA v1.10 #674): contas DISTINTAS com parcela viva a vencer na janela 30d do VALOR.
+        var qtdCpAVencer30 = await parcelasPagarVivas
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .Select(p => p.ContaPagarId).Distinct().CountAsync(ct);
+        var qtdCrAVencer30 = await parcelasReceberVivas
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .Select(p => p.ContaReceberId).Distinct().CountAsync(ct);
+
         return new DashboardFinanceiroDto(
             aVencerPagar, aVencerReceber,
             vencidoPagar, vencidoReceber,
             pagoMes, recebidoMes,
             qtdCpAbertas, qtdCrAbertas,
-            qtdParcelasVencidasHoje);
+            qtdParcelasVencidasHoje,
+            qtdCpAVencer30, qtdCrAVencer30);
     }
 
     public async Task<IReadOnlyList<FluxoBucketDto>> FluxoBucketsAsync(

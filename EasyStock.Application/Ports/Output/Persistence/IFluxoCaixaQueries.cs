@@ -28,7 +28,11 @@ public sealed record DashboardFinanceiroDto(
     decimal TotalRecebidoMes,
     int QtdContasPagarAbertas,
     int QtdContasReceberAbertas,
-    int QtdParcelasVencidasHoje);
+    int QtdParcelasVencidasHoje,
+    // BUG-08 (QA v1.10 #674): contas DISTINTAS com parcela a vencer na MESMA janela 30d do valor.
+    // Default 0 mantem compat com qualquer construtor posicional existente.
+    int QtdContasPagarAVencer30d = 0,
+    int QtdContasReceberAVencer30d = 0);
 
 public sealed record FluxoBucketDto(
     DateTime InicioBucket,
