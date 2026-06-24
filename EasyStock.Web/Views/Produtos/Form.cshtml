@@ -482,9 +482,10 @@
                     @* Margem positiva: indica saude (baixa/moderada/saudavel). Margem negativa
                        (preco abaixo do custo): alerta de prejuizo, antes ficava silenciosa. *@
                     <template x-if="margem !== null && margem !== 0">
+                        @* BUG-02 (QA v1.10 issue 674): margem >= 90% (preco >= 10x o custo) nao e "saudavel" — sinaliza valor extremo. *@
                         <span class="text-xs mt-1 block font-medium"
-                              :class="margem >= 100 ? 'text-red-600 font-bold' : margem < 0 ? 'text-red-600 font-bold' : margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : 'text-emerald-500'"
-                              x-text="margem >= 100 ? '⚠ Margem inválida: deve ser menor que 100% (sobre preço de venda)' : margem < 0 ? '⚠ Prejuízo: preço abaixo do custo (' + margem.toFixed(1).replace('.', ',') + '%)' : margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : 'Margem saudável'"></span>
+                              :class="margem >= 100 ? 'text-red-600 font-bold' : margem < 0 ? 'text-red-600 font-bold' : margem < 10 ? 'text-red-500' : margem < 30 ? 'text-amber-500' : margem >= 90 ? 'text-amber-600 font-bold' : 'text-emerald-500'"
+                              x-text="margem >= 100 ? '⚠ Margem inválida: deve ser menor que 100% (sobre preço de venda)' : margem < 0 ? '⚠ Prejuízo: preço abaixo do custo (' + margem.toFixed(1).replace('.', ',') + '%)' : margem < 10 ? 'Margem baixa' : margem < 30 ? 'Margem moderada' : margem >= 90 ? '⚠ Margem muito alta — confira preço e custo' : 'Margem saudável'"></span>
                     </template>
                     <div x-show="margemSugestoes.length > 0" class="flex gap-2 mt-1 flex-wrap">
                         <template x-for="s in margemSugestoes" :key="s.pct">
@@ -1890,7 +1891,9 @@
                     // Prioridade: se margem está definida, recalcula preço (preserva margem desejada pelo usuário).
                     // Caso contrário, recalcula margem a partir do preço existente.
                     if (this.custo > 0 && this.margem > 0 && this.margem < 100)
-                        this.preco = +( this.custo / (1 - this.margem / 100) ).toFixed(2);
+                        // BUG-02 (QA v1.10 issue 674): clampa o preco calculado no teto (igual ao onMargemInput).
+                        // Antes custo alto + margem extrapolava o teto sem limite (ex: R$142.857.142,84).
+                        this.preco = Math.min(+( this.custo / (1 - this.margem / 100) ).toFixed(2), 99999999.99);
                     else if (this.preco > 0 && this.custo > 0)
                         this.margem = +( ((this.preco - this.custo) / this.preco) * 100 ).toFixed(1);
                 },

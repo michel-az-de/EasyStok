@@ -100,9 +100,8 @@
                       delta-trend="@deltas.SaldoTrend"
                       delta-meta="@(deltas.SaldoDelta is null ? null : "vs 30d")"
                       sparkline="@deltas.SaldoSerie"
-                      title="@Aria("Saldo do mês", saldoMes.AsMoney(), $"Recebido {d.TotalRecebidoMes.AsMoney()}, pago {d.TotalPagoMes.AsMoney()}.")">
-            <span>+@d.TotalRecebidoMes.AsMoney() recebido · -@d.TotalPagoMes.AsMoney() pago</span>
-        </es-stat-card>
+                      title="@Aria("Saldo do mês", saldoMes.AsMoney(), $"Recebido {d.TotalRecebidoMes.AsMoney()}, pago {d.TotalPagoMes.AsMoney()}.")"
+                      sub="+@(d.TotalRecebidoMes.AsMoney()) recebido · -@(d.TotalPagoMes.AsMoney()) pago" />
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

@@ -608,7 +608,10 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
         var result = await svc.BuscarAsync(q, Math.Min(limit, 100));
         if (!result.Success) return Json(Array.Empty<object>());
 
-        var items = result.Data!.Where(p => p is not null).Select(p => new {
+        // BUG-03 (QA v1.10 #674): produto INATIVO (Status != 0) nao deve aparecer no seletor de
+        // itens de pedido/venda — impede selecionar inativo na origem. A guarda no use case so
+        // cobre o add com ProdutoId; o seletor é o ponto onde o inativo realmente aparecia.
+        var items = result.Data!.Where(p => p is not null && p!.Status == 0).Select(p => new {
             id = p!.Id,
             nome = p.Nome,
             sku = p.SkuBase?.Value,

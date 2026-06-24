@@ -510,7 +510,7 @@ else if (Model.ResumoApiFalhou)
     <div class="ws ds-kpi" title="Capital imobilizado (a custo) do estoque vigente — nao inclui lotes vencidos">
         <div class="ds-kpi-lbl">Estoque em R$ (custo)</div>
         <div class="ds-kpi-val text-slate-900">@Model.ValorEstoque.ToString("C", ptBR)</div>
-        <div class="ds-kpi-sub text-slate-400">@TextHelpers.Plural(Model.TotalProdutos, "produto", "produtos") · @Model.QuantidadeTotalEmEstoque unid.</div>
+        <div class="ds-kpi-sub text-slate-400">@TextHelpers.Plural(Model.TotalProdutos, "produto", "produtos") · @Model.QuantidadeTotalEmEstoque unid. vigentes <span class="text-slate-300" title="Exclui lotes vencidos — por isso difere do total de lotes na tela de Estoque.">(exclui vencidos)</span></div>
     </div>
 
     <div class="ws ds-kpi" title="Média de unidades vendidas por dia">
