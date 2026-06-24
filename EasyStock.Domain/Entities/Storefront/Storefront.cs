@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace EasyStock.Domain.Entities.Storefront;
 
@@ -69,6 +70,26 @@ public class Storefront
     /// Default: "Por enquanto a Babá entrega só em determinadas regiões."
     /// </summary>
     public string? MensagemForaArea { get; private set; }
+
+    // ── Frete por raio (ADR-0017) — opcional; null = raio desligado, usa zona ──
+
+    /// <summary>Latitude do ponto fixo da cozinha (origem do raio). Null = raio não configurado.</summary>
+    public double? CozinhaLat { get; private set; }
+
+    /// <summary>Longitude do ponto fixo da cozinha.</summary>
+    public double? CozinhaLng { get; private set; }
+
+    /// <summary>Fator de rota (distanciaRota = haversine × fator). Operacional ~1.4.</summary>
+    public double? FreteFatorRota { get; private set; }
+
+    /// <summary>Até esta distância de rota (metros) o frete é grátis.</summary>
+    public int? FreteFaixaGratisMetros { get; private set; }
+
+    /// <summary>Acima desta distância de rota (metros) = fora de cobertura (retirada).</summary>
+    public int? FreteRaioMaxMetros { get; private set; }
+
+    /// <summary>JSON array das faixas: <c>[{"id","ateMetros","valorCentavos"}]</c>. Null = sem faixas.</summary>
+    public string? FreteFaixasJson { get; private set; }
 
     /// <summary>
     /// Feature flag — emissão automática de NF-e/NFC-e está habilitada.
@@ -169,6 +190,39 @@ public class Storefront
         if (valor is < 0)
             throw new RegraDeDominioVioladaException("Frete grátis acima de valor negativo é inválido.");
         FreteGratisAcima = valor;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Configura o frete por raio (ADR-0017). Coordenada fora de faixa válida ou
+    /// parâmetros não-positivos são rejeitados. Passar tudo null desliga o raio
+    /// (o frete volta pra zona). As faixas vêm como JSON já validado pelo caller.
+    /// </summary>
+    public void ConfigurarFreteRaio(
+        double? cozinhaLat,
+        double? cozinhaLng,
+        double? fatorRota,
+        int? faixaGratisMetros,
+        int? raioMaxMetros,
+        string? faixasJson)
+    {
+        if (cozinhaLat is { } lat && (lat < -90 || lat > 90))
+            throw new RegraDeDominioVioladaException($"Latitude inválida: {lat.ToString(CultureInfo.InvariantCulture)}.");
+        if (cozinhaLng is { } lng && (lng < -180 || lng > 180))
+            throw new RegraDeDominioVioladaException($"Longitude inválida: {lng.ToString(CultureInfo.InvariantCulture)}.");
+        if (fatorRota is { } fr && fr <= 0)
+            throw new RegraDeDominioVioladaException($"Fator de rota deve ser positivo: {fr.ToString(CultureInfo.InvariantCulture)}.");
+        if (faixaGratisMetros is < 0)
+            throw new RegraDeDominioVioladaException("Faixa grátis (metros) não pode ser negativa.");
+        if (raioMaxMetros is { } rm && rm <= 0)
+            throw new RegraDeDominioVioladaException("Raio máximo (metros) deve ser positivo.");
+
+        CozinhaLat = cozinhaLat;
+        CozinhaLng = cozinhaLng;
+        FreteFatorRota = fatorRota;
+        FreteFaixaGratisMetros = faixaGratisMetros;
+        FreteRaioMaxMetros = raioMaxMetros;
+        FreteFaixasJson = string.IsNullOrWhiteSpace(faixasJson) ? null : faixasJson.Trim();
         AlteradoEm = DateTime.UtcNow;
     }
 
