@@ -179,4 +179,31 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
         produtosB.Should().AllSatisfy(p => p.EmpresaId.Should().Be(empresaB.Id));
         totalB.Should().Be(1);
     }
+
+    [SkippableFact] // BUG-10 (QA v1.10 #674, refs #561): dedup de nome e case-insensitive ("Vassoura"=="vassoura").
+    public async Task ExistsNomeAsync_deve_ser_case_insensitive()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresa = new Empresa { Id = Guid.NewGuid(), Nome = "Empresa", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Limpeza", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        context.Empresas.Add(empresa);
+        context.Categorias.Add(categoria);
+        context.Produtos.Add(new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresa.Id, CategoriaId = categoria.Id,
+            Nome = "Vassoura", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+        context.SetMobileTenantContext(empresa.Id);
+        var repository = new ProdutoRepository(context);
+
+        (await repository.ExistsNomeAsync(empresa.Id, "vassoura")).Should().BeTrue("dedup deve ignorar caixa (minuscula)");
+        (await repository.ExistsNomeAsync(empresa.Id, "VASSOURA")).Should().BeTrue("dedup deve ignorar caixa (maiuscula)");
+        (await repository.ExistsNomeAsync(empresa.Id, "  Vassoura  ")).Should().BeTrue("dedup deve ignorar espacos");
+        (await repository.ExistsNomeAsync(empresa.Id, "Rodo")).Should().BeFalse("nome distinto nao colide");
+    }
 }

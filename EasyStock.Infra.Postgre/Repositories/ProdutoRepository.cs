@@ -58,10 +58,13 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task<bool> ExistsNomeAsync(Guid empresaId, string nome, Guid? ignoreProdutoId = null)
         {
-            var n = nome.Trim();
+            // BUG-10 (QA v1.10 #674, refs #561): dedup de nome case-insensitive. Antes, "Vassoura"
+            // e "vassoura" coexistiam (Postgres compara string case-sensitive por padrao).
+            // p.Nome.ToLower() traduz para LOWER("Nome") no SQL; nLower e constante client-side.
+            var nLower = nome.Trim().ToLower();
             return dbContext.Produtos
                 .AsNoTracking()
-                .Where(p => p.EmpresaId == empresaId && p.Nome == n)
+                .Where(p => p.EmpresaId == empresaId && p.Nome.ToLower() == nLower)
                 .Where(p => !ignoreProdutoId.HasValue || p.Id != ignoreProdutoId.Value)
                 .AnyAsync();
         }
