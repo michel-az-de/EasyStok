@@ -505,7 +505,9 @@ else if (Model.ResumoApiFalhou)
         }
     </div>
 
-    <div class="ws ds-kpi" title="Capital imobilizado (a custo) de todo o estoque atual">
+    @* BUG-06 (QA v1.10 issue 674): o valor exclui lotes vencidos (nao sao capital vendavel), entao
+       a lista de Estoque (que mostra vencidos) soma mais unidades. Rotulo honesto: "estoque vigente". *@
+    <div class="ws ds-kpi" title="Capital imobilizado (a custo) do estoque vigente — nao inclui lotes vencidos">
         <div class="ds-kpi-lbl">Estoque em R$ (custo)</div>
         <div class="ds-kpi-val text-slate-900">@Model.ValorEstoque.ToString("C", ptBR)</div>
         <div class="ds-kpi-sub text-slate-400">@TextHelpers.Plural(Model.TotalProdutos, "produto", "produtos") · @Model.QuantidadeTotalEmEstoque unid.</div>
