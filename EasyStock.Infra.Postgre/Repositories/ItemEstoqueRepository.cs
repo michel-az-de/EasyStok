@@ -154,7 +154,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             else
             {
                 var statusEnum = NormalizarStatusFiltro(status);
-                if (statusEnum.HasValue)
+                // BUG-05 (QA v1.10 #674): "critico" inclui Esgotado (qty 0 e o caso mais critico de
+                // reposicao e nao tem chip proprio). Alinha lista E contadores com a contagem
+                // "estoque critico" do dashboard (DashboardAnalyticsQueries conta Critical+Esgotado).
+                if (statusEnum == StatusItemEstoque.Critical)
+                    query = query.Where(i => i.Status == StatusItemEstoque.Critical || i.Status == StatusItemEstoque.Esgotado);
+                else if (statusEnum.HasValue)
                     query = query.Where(i => i.Status == statusEnum.Value);
             }
 
@@ -197,7 +202,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             else
             {
                 var statusEnum = NormalizarStatusFiltro(status);
-                if (statusEnum.HasValue)
+                // BUG-05 (QA v1.10 #674): "critico" inclui Esgotado (qty 0 e o caso mais critico de
+                // reposicao e nao tem chip proprio). Alinha lista E contadores com a contagem
+                // "estoque critico" do dashboard (DashboardAnalyticsQueries conta Critical+Esgotado).
+                if (statusEnum == StatusItemEstoque.Critical)
+                    query = query.Where(i => i.Status == StatusItemEstoque.Critical || i.Status == StatusItemEstoque.Esgotado);
+                else if (statusEnum.HasValue)
                     query = query.Where(i => i.Status == statusEnum.Value);
             }
 

@@ -62,14 +62,18 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             Quantidade = (int)i.QuantidadeAtual,
             ValorCusto = (decimal)i.CustoUnitario * (int)i.QuantidadeAtual,
             ValorVenda = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual,
-            EstaAbaixoMinimo = (int)i.QuantidadeAtual < i.QuantidadeMinima
+            i.Status
         }).ToListAsync();
 
         var totalSkus = await estoqueQuery.Select(i => i.ProdutoId).Distinct().CountAsync();
         var totalQtd = estoqueData.Sum(e => e.Quantidade);
         var valorCusto = estoqueData.Sum(e => e.ValorCusto);
         var valorVenda = estoqueData.Sum(e => e.ValorVenda);
-        var alertasBaixo = estoqueData.Count(e => e.EstaAbaixoMinimo);
+        // BUG-05 (QA v1.10 #674): "estoque critico" = precisa repor = Critical + Esgotado (qty 0).
+        // Antes contava qty<minima (incluia "Atencao"/Warn), divergindo do filtro /estoque?status=critico
+        // (Critical-only, 4 itens) enquanto somava os Esgotados (6 no dashboard). Agora a contagem casa
+        // com o filtro, que passa a incluir Esgotado (ver ItemEstoqueRepository.GetItensEstoquePaginadosAsync).
+        var alertasBaixo = estoqueData.Count(e => e.Status == StatusItemEstoque.Critical || e.Status == StatusItemEstoque.Esgotado);
 
         // Alertas de validade — janela canonica DiasVencimentoProximo (7d), a mesma do
         // filtro "Vencendo" do Estoque (ItemEstoqueRepository.AplicarFiltroVencendo) e do

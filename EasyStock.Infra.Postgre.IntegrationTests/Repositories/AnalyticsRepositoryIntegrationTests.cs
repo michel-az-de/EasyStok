@@ -104,6 +104,49 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         result.QuantidadeTotalEmEstoque.Should().Be(10);
     }
 
+    [SkippableFact] // BUG-05 (QA v1.10 #674): contagem "estoque critico" do dashboard == filtro /estoque?status=critico.
+    public async Task DashboardEstoqueCritico_BateComFiltroCritico_IncluindoEsgotados()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var dbContext = fixture.CreateDbContext();
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Cat", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = empresaId, CategoriaId = categoriaId, Nome = "P", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+        dbContext.Produtos.Add(produto);
+
+        ItemEstoque Lote(StatusItemEstoque status, int qtd) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(qtd), QuantidadeInicial = Quantidade.From(qtd),
+            CustoUnitario = Dinheiro.FromDecimal(10m), PrecoVendaSugerido = Dinheiro.FromDecimal(15m),
+            EntradaEm = DateTime.UtcNow, Status = status, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        };
+        // 2 Critical + 2 Esgotado(qty0) = 4 "precisa repor"; 1 Vencido + 1 Ok ficam de fora.
+        // Reproduz o cenario do QA (6 no dashboard vs 4 na lista): aqui ambos devem dar 4.
+        dbContext.ItensEstoque.AddRange(
+            Lote(StatusItemEstoque.Critical, 1),
+            Lote(StatusItemEstoque.Critical, 2),
+            Lote(StatusItemEstoque.Esgotado, 0),
+            Lote(StatusItemEstoque.Esgotado, 0),
+            Lote(StatusItemEstoque.Vencido, 5),
+            Lote(StatusItemEstoque.Ok, 50));
+        await dbContext.SaveChangesAsync();
+
+        var analytics = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var estoqueRepo = new Infra.Postgre.Repositories.ItemEstoqueRepository(dbContext);
+
+        var resumo = await analytics.GetDashboardResumoAsync(empresaId, 30);
+        var (_, totalCritico) = await estoqueRepo.GetItensEstoquePaginadosAsync(empresaId, 1, 50, status: "critico");
+
+        resumo.AlertasEstoqueBaixo.Should().Be(4, "dashboard conta Critical + Esgotado");
+        totalCritico.Should().Be(4, "filtro 'critico' passa a incluir Esgotado");
+        resumo.AlertasEstoqueBaixo.Should().Be(totalCritico, "dashboard e filtro usam a MESMA definicao (BUG-05)");
+    }
+
     [SkippableFact]
     public async Task GetMargemPorProdutoAsync_DeveRetornarMargensCorretas()
     {
