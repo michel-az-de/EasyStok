@@ -187,6 +187,10 @@ else
                         <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">Sem cobrança</span>
                     }
                 }
+                else if (p.SemCobranca)
+                {
+                    <span class="text-xs font-medium px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">Sem cobrança</span>
+                }
                 else if (p.Quitado)
                 {
                     <span class="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Quitado</span>
@@ -201,7 +205,7 @@ else
                 }
             </div>
             <div class="text-3xl font-bold @(isCancelado ? "text-slate-400 line-through" : "text-slate-900") mb-1 tabular-nums">@p.Total.AsMoney()</div>
-            @if (!isCancelado)
+            @if (!isCancelado && !p.SemCobranca)
             {
                 <div class="ped-progress" role="progressbar" aria-valuenow="@progressoPagamento" aria-valuemin="0" aria-valuemax="100">
                     <div class="ped-progress__bar @(p.Quitado ? "ped-progress__bar--done" : "")" style="width: @(progressoPagamento)%"></div>

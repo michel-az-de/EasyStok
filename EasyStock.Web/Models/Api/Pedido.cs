@@ -29,6 +29,9 @@ public record Pedido
         && Status != "entregue" && Status != "cancelado";
     public decimal Pendente => Math.Max(0m, Total - TotalPago);
     public bool Quitado => TotalPago >= Total && Total > 0;
+    // #689/BUG-008b: pedido com total R$0 não tem cobrança. Sem isto caía em "Pendente"
+    // (porque Quitado exige Total>0) exibindo "Pendente / Falta R$0,00" — contraditório.
+    public bool SemCobranca => Total == 0m;
 }
 
 public record PedidoDetalhe

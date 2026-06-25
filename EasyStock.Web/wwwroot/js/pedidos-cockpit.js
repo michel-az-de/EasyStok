@@ -86,6 +86,7 @@
       money: money,
       payText: function (p) {
         if (p.status === 'cancelado') return p.totalPago > 0 ? ('Pago · ' + money(p.totalPago)) : 'Sem cobrança';
+        if (p.total === 0) return 'Sem cobrança'; // issue 689 / BUG-008b: total R$0 não é "Pendente"
         if (p.quitado) return 'Quitado';
         if (p.totalPago > 0) return 'Parcial · ' + money(p.totalPago);
         if (p.status === 'entregue') return 'Verificar';
@@ -93,6 +94,7 @@
       },
       payClass: function (p) {
         if (p.status === 'cancelado') return 'stp-neutral';
+        if (p.total === 0) return 'stp-neutral'; // issue 689 / BUG-008b
         if (p.quitado) return 'stp-ok';
         if (p.totalPago > 0) return 'stp-warn';
         if (p.status === 'entregue') return 'stp-neutral';

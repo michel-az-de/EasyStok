@@ -89,6 +89,12 @@ public class FinalizarVendaBalcaoUseCase(
         var itensPedido = new List<CriarPedidoItemInput>(cmd.Itens.Count);
         foreach (var it in cmd.Itens)
         {
+            // #689/BUG-008: venda balcão é o único path de criação de pedido sem a guarda de
+            // preço > 0 (que existe em AdicionarItemPedido/CriarPedido). Sem isto, um item
+            // podia ser vendido por R$0,00. Defesa em profundidade.
+            if (it.PrecoUnitario <= 0)
+                throw new UseCaseValidationException($"Item \"{it.Nome}\": preço unitário deve ser maior que zero.");
+
             var produtoId = it.ProdutoId;
             var ehNovo = (produtoId is null || produtoId == Guid.Empty) && it.NovoProduto;
             // Contrato: produto existente (ProdutoId) OU produto novo (NovoProduto + CategoriaId).
