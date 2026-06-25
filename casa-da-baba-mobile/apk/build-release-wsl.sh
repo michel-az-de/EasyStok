@@ -16,7 +16,7 @@
 # Variaveis de ambiente opcionais:
 #   CDB_KEYSTORE      path do .jks (default: /mnt/c/rep/keystores/casadababa-release.jks)
 #   CDB_KS_README     path do README com senha (default: ao lado do .jks)
-#   CDB_API_BASE_URL  URL da API EasyStok (default: https://easystok-api.onrender.com)
+#   CDB_API_BASE_URL  URL da API EasyStok (default: https://api.20.230.185.203.sslip.io = VM Azure canonica)
 #   CDB_OUT_DIR       pasta destino do APK (default: /mnt/c/rep/keystores/builds)
 #   PAIRING_CODE      opcional: codigo de 6 digitos pra auto-pair no primeiro boot
 #
@@ -37,7 +37,7 @@ DST="$HOME/apk-build-release"
 
 CDB_KEYSTORE="${CDB_KEYSTORE:-/mnt/c/rep/keystores/casadababa-release.jks}"
 CDB_KS_README="${CDB_KS_README:-/mnt/c/rep/keystores/casadababa-release.README.txt}"
-CDB_API_BASE_URL="${CDB_API_BASE_URL:-https://easystok-api.onrender.com}"
+CDB_API_BASE_URL="${CDB_API_BASE_URL:-https://api.20.230.185.203.sslip.io}"
 CDB_OUT_DIR="${CDB_OUT_DIR:-/mnt/c/rep/keystores/builds}"
 KS_ALIAS="${CDB_KS_ALIAS:-casadababa}"
 

@@ -14,7 +14,7 @@
   "plugins": {
     "CapacitorUpdater": {
       "autoUpdate": true,
-      "updateUrl": "https://easystok-api.onrender.com/api/mobile/apk/manifest?appId=casa-da-baba",
+      "updateUrl": "https://api.20.230.185.203.sslip.io/api/mobile/apk/manifest?appId=casa-da-baba",
       "statsUrl": "",
       "directUpdate": "never",
       "responseTimeout": 20,

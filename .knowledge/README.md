@@ -15,12 +15,14 @@ Dono é **Felipe Azevedo** (`@michel-az-de` no GitHub, Avanade Brasil, .NET sên
 
 **Sempre commit + push ao final de cada demanda, sem pedir confirmação** (`feedback_commit.md` na auto-memória).
 
-## Estado atual da infra
+## Estado atual da infra (atualizado 2026-06-25)
 
-- **Render** é o canal único de producao (workflow `.github/workflows/deploy-render.yml` + Blueprint `render.yaml`). Services: `easystok-api`, `easystok-web`, `easystok-admin`, `easystok-worker` em `easystok-*.onrender.com`. Preview Environments por PR habilitados.
-- **Postgres Render** managed e o banco transacional vivo (string em `easystok-secrets` envVarGroup).
-- **Azure App Service descomissionado** em 2026-05-11 junto com workflows `deploy-azure.yml` e `azure-static-web-apps-*.yml`. Plano antigo GCP (`gcp-deploy.md`, `scripts/gcp-deploy.sh`) tambem removido — nunca foi executado.
-- **APK Casa da Baba** publicado pelo CI em `EasyStock.Web/wwwroot/downloads/`; clientes baixam de `https://easystok-web.onrender.com/downloads`. Capacitor Updater poll-a `/downloads/apk/manifest` para OTA.
+- **VM Azure = producao canonica** desde 2026-06-06. `easystok-vm` (RG `easystok-app_group`, IP estatico `20.230.185.203` via sslip.io) roda docker-compose com web+admin+api+postgres+caddy+storefront. Deploy via `scripts/docker/vm-deploy.sh` (manual; NAO ha cron/timer — medido 2026-06-25, 2 crontabs vazios + systemd sem timer). Hosts: `app.`/`admin.`/`api.`/`casa.`/`casadababa.` `20.230.185.203.sslip.io`.
+- **Postgres** roda em container na VM (volume `easystok_postgres-data`). PG 17.10. Backup: baseline manual 2026-06-25 (`docs/runbook/vm-baseline-snapshot-2026-06-25.md`) + hook pre-deploy em `vm-deploy.sh` (snapshot antes de todo `up --build`). Backup recorrente automatizado = pendente (F1).
+- **Render DESLIGADO.** `easystok-*.onrender.com` retorna 404/503 (medido 2026-06-25). Sem dump postumo (Dashboard inacessivel). Dados so-server-side do Render perdidos (a VM comecou vazia + resync, sem transferencia server->server). `render.yaml` + workflows Render = historico. Ver `docs/dev/incidentes/2026-06-24-render-cutover-sem-dump-postumo.md`.
+- **Fly.io DESLIGADO** (descomissionado 2026-06-25). Postgres Fly nao existe mais (`fly postgres list` vazio); `deploy-fly.yml` falhava ha 3+ commits por timeout de conexao. Workflow removido.
+- **Azure App Service / Static Web Apps descomissionados** em 2026-05-11. `azurewebsites.net` morto (timeout). Plano antigo GCP removido — nunca executado.
+- **APK Casa da Baba**: OTA via `capacitor.config.json` `updateUrl` -> `api.20.230.185.203.sslip.io/api/mobile/apk/manifest`. Pareamento/sync do APK aponta pra VM via `build-release-wsl.sh` `CDB_API_BASE_URL`. Convencao: `apiBaseUrl` SEM `/api` (sync.js concatena `/api/mobile`). Gotcha: URL e IP via sslip.io — se o IP da VM mudar, OTA quebra (registrar dominio resolve).
 - **Cloudflared** em `~/bin/cloudflared.exe` como backup pra túnel HTTPS público (dev local).
 
 ## Estado do código
