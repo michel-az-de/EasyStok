@@ -114,6 +114,22 @@ public class ContaPagarTests
     }
 
     [Fact]
+    public void Cancelar_zera_valorTotal_e_pendente()
+    {
+        // #687/BUG-009: conta cancelada nao pode exibir Pendente (espelho do ContaReceber).
+        var c = NovaRascunho();
+        c.AdicionarParcela(1, 555m, DateTime.UtcNow.AddDays(30));
+        c.Emitir();
+        c.Pendente.Should().Be(555m);
+
+        c.Cancelar("erro de lancamento", null);
+
+        c.Status.Should().Be(StatusContaFinanceira.Cancelada);
+        c.ValorTotal.Should().Be(0m);
+        c.Pendente.Should().Be(0m);
+    }
+
+    [Fact]
     public void MarcarVencidaSeAplicavel_marca_quando_ha_parcela_vencida()
     {
         var c = NovaRascunho();

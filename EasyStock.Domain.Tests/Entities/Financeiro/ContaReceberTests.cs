@@ -80,4 +80,35 @@ public class ContaReceberTests
 
         c.Pendente.Should().Be(120m); // 150 - 30
     }
+
+    [Fact]
+    public void Cancelar_zera_valorTotal_e_pendente()
+    {
+        // #687/BUG-009: conta cancelada NAO pode exibir Pendente. Antes, Cancelar() nao
+        // recalculava ValorTotal e a conta cancelada seguia mostrando "Pendente R$ 555".
+        var c = NovaRascunho();
+        c.AdicionarParcela(1, 555m, DateTime.UtcNow.AddDays(30));
+        c.Emitir();
+        c.Pendente.Should().Be(555m);
+
+        c.Cancelar("erro de lancamento", userId: null);
+
+        c.Status.Should().Be(StatusContaFinanceira.Cancelada);
+        c.ValorTotal.Should().Be(0m);
+        c.Pendente.Should().Be(0m);
+    }
+
+    [Fact]
+    public void Pendente_zero_quando_cancelada_mesmo_com_valorTotal_legado()
+    {
+        // Defesa-em-profundidade (#687): registro legado cancelado cujo ValorTotal foi
+        // persistido antes do fix do Cancelar(). O getter defensivo zera o Pendente.
+        var c = NovaRascunho();
+        c.AdicionarParcela(1, 555m, DateTime.UtcNow.AddDays(30));
+        c.Emitir();
+        c.Status = StatusContaFinanceira.Cancelada; // simula legado: status sem recalcular
+
+        c.ValorTotal.Should().Be(555m);  // ValorTotal "sujo" preservado
+        c.Pendente.Should().Be(0m);      // getter respeita o status Cancelada
+    }
 }

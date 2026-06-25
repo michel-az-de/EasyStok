@@ -163,6 +163,10 @@ public class ContaPagar
         foreach (var p in Parcelas.Where(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada))
             p.Cancelar();
 
+        // #687/BUG-009: recalcula ValorTotal apos cancelar as parcelas. Sem isto a conta
+        // cancelada mantinha o ValorTotal antigo e a propriedade Pendente exibia saldo indevido.
+        RecalcularValorTotal();
+
         Status = StatusContaFinanceira.Cancelada;
         CanceladaEm = DateTime.UtcNow;
         CanceladaPorUserId = userId;
@@ -233,6 +237,9 @@ public class ContaPagar
     {
         get
         {
+            // #687/BUG-009: conta cancelada nao tem pendente. Defesa-em-profundidade p/ dados
+            // legados cujo ValorTotal foi persistido antes do RecalcularValorTotal no Cancelar().
+            if (Status == StatusContaFinanceira.Cancelada) return 0m;
             var saldo = ValorTotal - TotalPago;
             return saldo < 0m ? 0m : saldo;
         }
