@@ -11,6 +11,15 @@ public interface IPedidoStorefrontRepository
     Task<Pedido?> GetByIdAsync(Guid pedidoId, CancellationToken ct = default);
 
     /// <summary>
+    /// Igual ao <see cref="GetByIdAsync"/> mas com <c>Include(p =&gt; p.Itens)</c>,
+    /// <c>Pagamentos</c> e <c>Eventos</c>. Usado pelo caminho guest (#684) que
+    /// precisa mostrar a sacola completa no acompanhamento sem login. Sem
+    /// filtro por cliente — caller (controller) ja validou posse via token
+    /// assinado.
+    /// </summary>
+    Task<Pedido?> GetByIdComItensAsync(Guid pedidoId, CancellationToken ct = default);
+
+    /// <summary>
     /// Carrega o pedido com <c>SELECT FOR UPDATE</c> (lock pessimista — ADR-0014).
     /// DEVE ser chamado dentro de <see cref="IUnitOfWork.ExecuteInTransactionAsync"/>:
     /// fora de transação explícita o lock é descartado e a corrida fica aberta.

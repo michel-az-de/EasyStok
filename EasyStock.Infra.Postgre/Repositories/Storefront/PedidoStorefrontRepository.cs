@@ -15,6 +15,14 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(p => p.Id == pedidoId, ct);
 
+    public Task<Pedido?> GetByIdComItensAsync(Guid pedidoId, CancellationToken ct = default) =>
+        db.Pedidos
+            .IgnoreQueryFilters()
+            .Include(p => p.Itens)
+            .Include(p => p.Pagamentos)
+            .Include(p => p.Eventos)
+            .FirstOrDefaultAsync(p => p.Id == pedidoId, ct);
+
     /// <summary>
     /// SELECT FOR UPDATE — lock pessimista no Pedido. ADR-0014 (vaga lifecycle) + TASK-EZ-APROVAR-001.
     /// Falha rápido (InvalidOperationException) se chamado fora de transação ativa para evitar

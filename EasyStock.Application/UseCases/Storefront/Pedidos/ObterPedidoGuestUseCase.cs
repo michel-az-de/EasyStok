@@ -43,7 +43,7 @@ public sealed class ObterPedidoGuestUseCase(
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException(slug);
 
-        var pedido = await pedidoRepository.GetByIdAsync(pedidoId, ct);
+        var pedido = await pedidoRepository.GetByIdComItensAsync(pedidoId, ct);
         if (pedido is null
             || pedido.EmpresaId != storefront.EmpresaId
             || pedido.Origem != OrigemGuest)
