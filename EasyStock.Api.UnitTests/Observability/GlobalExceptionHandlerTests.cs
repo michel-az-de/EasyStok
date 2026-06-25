@@ -93,6 +93,27 @@ public class GlobalExceptionHandlerTests
     }
 
     [Fact]
+    public async Task Deve_retornar_403_para_acesso_nao_autorizado()
+    {
+        var handler = CriarHandler();
+        var context = CriarHttpContext("/api/reports/nfce.livro-saidas/runs", "corr-403");
+
+        var handled = await handler.TryHandleAsync(
+            context,
+            new UnauthorizedAccessException("Sem permissão para o relatório 'nfce.livro-saidas'."),
+            CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+
+        var payload = await LerRespostaAsync(context);
+        var error = payload.RootElement.GetProperty("error");
+        Assert.Equal("FORBIDDEN", error.GetProperty("code").GetString());
+        Assert.Equal("Sem permissão para o relatório 'nfce.livro-saidas'.",
+            error.GetProperty("detail").GetString());
+    }
+
+    [Fact]
     public async Task Deve_retornar_402_para_plano_limite_atingido()
     {
         var handler = CriarHandler();

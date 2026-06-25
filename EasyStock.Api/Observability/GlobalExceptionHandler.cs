@@ -118,6 +118,16 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 ex.Message,
                 false),
 
+            // Falha de autorizacao expressa via UnauthorizedAccessException (reports, SLA,
+            // helpdesk: comentar/atribuir/encaminhar). Sem este case caia no default 500 —
+            // negacao de permissao virava "erro interno" e poluia system_error_logs.
+            UnauthorizedAccessException ex => (
+                StatusCodes.Status403Forbidden,
+                "FORBIDDEN",
+                "Acesso negado",
+                ex.Message,
+                false),
+
             PlanoLimiteAtingidoException ex => (
                 StatusCodes.Status402PaymentRequired,
                 "PLAN_LIMIT_REACHED",
