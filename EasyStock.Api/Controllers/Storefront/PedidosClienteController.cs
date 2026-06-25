@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Pedidos;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.Net.Http.Headers;
@@ -23,6 +24,8 @@ namespace EasyStock.Api.Controllers.Storefront;
 public sealed class PedidosClienteController(
     ListarPedidosClienteUseCase listarUseCase,
     ObterPedidoClienteUseCase obterUseCase,
+    ObterPedidoGuestUseCase obterGuestUseCase,
+    AcompanhamentoTokenService acompanhamentoTokenService,
     IClienteSessionRepository clienteSessionRepository,
     TimeProvider timeProvider) : EasyStockControllerBase
 {
@@ -93,8 +96,9 @@ public sealed class PedidosClienteController(
     /// 404 se o pedido não existir OU não for do cliente (anti-enumeração).
     /// </summary>
     [SwaggerOperation(
-        Summary = "Obter pedido do cliente",
-        Description = "Retorna um pedido do cliente autenticado. Exige cookie de sessão __Host-cdb_session.")]
+        Summary = "Obter pedido (cliente logado OU guest via token)",
+        Description = "Retorna um pedido. Logado: cookie __Host-cdb_session. " +
+                      "Guest (#684): query param t=<jwt> assinado pelo AcompanhamentoTokenService.")]
     [ProducesResponseType(typeof(ObterPedidoClienteResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -102,9 +106,42 @@ public sealed class PedidosClienteController(
     public async Task<IActionResult> Obter(
         [FromRoute] string slug,
         [FromRoute] Guid pedidoId,
+        [FromQuery] string? t,
         CancellationToken ct)
     {
-        // ── Auth: validar sessão via cookie (mesma regra do Listar) ───────
+        // ── Caminho GUEST (#684): token assinado autoriza posse do link ──
+        if (!string.IsNullOrWhiteSpace(t))
+        {
+            try
+            {
+                acompanhamentoTokenService.Validar(t, pedidoId);
+            }
+            catch (AcompanhamentoTokenInvalidoException)
+            {
+                // Anti-enumeracao: token invalido vira 404, nao 401.
+                return DataNotFound("Pedido não encontrado.");
+            }
+
+            try
+            {
+                var result = await obterGuestUseCase.ExecuteAsync(slug, pedidoId, ct);
+                if (result is null)
+                    return DataNotFound("Pedido não encontrado.");
+
+                Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
+                {
+                    Private = true,
+                    NoStore = true,
+                };
+                return Ok(result);
+            }
+            catch (StorefrontNaoEncontradoException ex)
+            {
+                return DataNotFound(ex.Message);
+            }
+        }
+
+        // ── Caminho LOGADO: cookie de sessao (path antigo, inalterado) ────
         var sessionId = ObterSessionId();
         if (sessionId is null)
             return Unauthorized(new ProblemDetails
@@ -123,7 +160,6 @@ public sealed class PedidosClienteController(
                 Detail = "Sessão não encontrada ou expirada. Refaça o login.",
             });
 
-        // ── Executar use case ─────────────────────────────────────────────
         try
         {
             var result = await obterUseCase.ExecuteAsync(

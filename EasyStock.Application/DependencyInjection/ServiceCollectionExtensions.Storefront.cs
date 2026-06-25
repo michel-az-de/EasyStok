@@ -57,6 +57,9 @@ public static partial class ServiceCollectionExtensions
         // #670 — pedido individual do cliente (tela de acompanhamento).
         services.AddScoped<ObterPedidoClienteUseCase>();
 
+        // #684 — pedido GUEST individual via token assinado (acompanhamento sem login).
+        services.AddScoped<ObterPedidoGuestUseCase>();
+
         // TimeProvider: TimeProvider.System como singleton — entities e use cases
         // storefront usam injetado para testes determinísticos. AddSingleton ja
         // protege contra registro duplo se outro componente fizer o mesmo.
