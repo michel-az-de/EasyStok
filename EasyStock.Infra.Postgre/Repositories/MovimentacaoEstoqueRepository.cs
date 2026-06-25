@@ -85,9 +85,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
 
             var totalUnidades = aggregated.Sum(m => m.Quantidade);
-            var receitaTotal = aggregated.Sum(m => m.ValorTotal ?? 0m);
+            // #685/BUG-002: so Venda gera receita. Ajuste/Perda/Prejuizo/Vencimento
+            // NAO inflam a "Receita total" (eram somados indiscriminadamente).
+            var receitaTotal = aggregated
+                .Where(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda)
+                .Sum(m => m.ValorTotal ?? 0m);
             var totalVendas = aggregated.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda);
-            var totalPerdas = aggregated.Count(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda);
+            // #685/BUG-002: card "Perdas / Ajustes" agrega Perda + Prejuizo + Ajuste + Vencimento
+            // (antes contava so Perda, deixando Ajuste invisivel).
+            var totalPerdas = aggregated.Count(m =>
+                m.Natureza == NaturezaMovimentacaoEstoque.Perda ||
+                m.Natureza == NaturezaMovimentacaoEstoque.Prejuizo ||
+                m.Natureza == NaturezaMovimentacaoEstoque.Ajuste ||
+                m.Natureza == NaturezaMovimentacaoEstoque.Vencimento);
 
             return new KpisMovimentacao(totalUnidades, receitaTotal, totalVendas, totalPerdas);
         }
@@ -101,7 +111,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId);
+                .Where(m => m.EmpresaId == empresaId)
+                // #685/BUG-003: movimentacao estornada nao e deletada (so marca EstornadaEm).
+                // Excluir do historico de Saidas (lista, contagem e KPIs) para que o estorno
+                // reverta Receita/Unidades/registros. O rastro do estorno fica no registro
+                // de contrapartida (Tipo=Entrada/Natureza=Estorno) e no proprio EstornadaEm.
+                .Where(m => m.EstornadaEm == null);
 
             if (de.HasValue)
                 query = query.Where(m => m.DataMovimentacao >= DateTime.SpecifyKind(de.Value, DateTimeKind.Utc));
