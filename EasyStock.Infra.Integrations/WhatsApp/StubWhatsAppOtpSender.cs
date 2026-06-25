@@ -1,27 +1,29 @@
 ﻿using EasyStock.Application.Ports.Output.Messaging;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Integrations.WhatsApp;
 
 /// <summary>
-/// Implementação stub de <see cref="IWhatsAppOtpSender"/> para Development.
+/// Implementação stub de <see cref="IWhatsAppOtpSender"/> que loga o código OTP
+/// em vez de enviar via WhatsApp/SMS real.
 ///
 /// <para>
-/// <strong>Comportamento</strong>: loga o código OTP em <c>LogDebug</c> (apenas
-/// em Development — produção bloqueia). Permite testar o fluxo de autenticação
-/// end-to-end sem custo de SMS/WhatsApp real e sem dependência de Meta Business
-/// Verification (TASK-HUM-001).
+/// <strong>Comportamento</strong>: por default loga em <c>LogDebug</c>
+/// (visivel em Development). Em Production com <c>Otp:UseStub=true</c> opt-in
+/// (issue #677), loga em <c>LogInformation</c> pra ficar visível no nível
+/// padrão dos containers (sem precisar baixar o LogLevel global). Em ambos os
+/// modos o código fica APENAS no log — nunca volta no response HTTP.
 /// </para>
 ///
 /// <para>
-/// <strong>Segurança</strong>: o stub NUNCA roda em Production — checa
-/// <see cref="IHostEnvironment"/> no construtor e lança
-/// <see cref="OtpProviderException"/> caso alguém o registre por engano lá.
-/// O DI é cuidadoso em registrá-lo só em Development (ver
-/// <c>IntegrationsServiceCollectionExtensions.AddEasyStockWhatsAppStub</c>),
-/// mas defense-in-depth.
+/// <strong>Segurança</strong>: o stub bloqueia em Production por default
+/// (checa <see cref="IHostEnvironment"/> no construtor e lança
+/// <see cref="OtpProviderException"/>). A flag <c>Otp:UseStub</c> é opt-in
+/// explícito do operador — sem ela, prod fail-fast no boot. Esquema temporário
+/// até TASK-EZ-WA-001 (provider real Meta Cloud API) entrar.
 /// </para>
 ///
 /// <para>
@@ -33,34 +35,47 @@ namespace EasyStock.Infra.Integrations.WhatsApp;
 public sealed class StubWhatsAppOtpSender : IWhatsAppOtpSender
 {
     private readonly ILogger<StubWhatsAppOtpSender> _logger;
+    private readonly bool _logEmInformation;
 
     public StubWhatsAppOtpSender(
         IHostEnvironment hostEnvironment,
+        IConfiguration configuration,
         ILogger<StubWhatsAppOtpSender> logger)
     {
         ArgumentNullException.ThrowIfNull(hostEnvironment);
+        ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(logger);
 
-        if (hostEnvironment.IsProduction())
+        var useStubOptIn = configuration.GetValue<bool>("Otp:UseStub");
+        if (hostEnvironment.IsProduction() && !useStubOptIn)
         {
             throw new OtpProviderException(
-                "StubWhatsAppOtpSender NÃO pode rodar em Production. " +
-                "Registre WhatsAppCloudApiOtpSender (TASK-EZ-WA-001) no DI.");
+                "StubWhatsAppOtpSender NÃO pode rodar em Production sem Otp:UseStub=true. " +
+                "Registre WhatsAppCloudApiOtpSender (TASK-EZ-WA-001) no DI ou habilite " +
+                "Otp:UseStub explicitamente (issue #677).");
         }
 
+        // Em Production com opt-in: loga Information pra ficar visível no
+        // docker logs sem precisar baixar o LogLevel global. Em Development:
+        // LogDebug pra manter o console limpo (level já é Debug normalmente).
+        _logEmInformation = hostEnvironment.IsProduction() && useStubOptIn;
         _logger = logger;
     }
 
     public Task EnviarOtpAsync(string telefoneE164, string codigo, CancellationToken ct = default)
     {
-        // LogDebug deliberado: em Development a saída é visível no console;
-        // qualquer environment acima (Staging/Production) costuma rodar em
-        // Information ou superior, então o código não escapa para logs
-        // persistidos. Ainda assim, o stub só roda em ambiente que NÃO é
-        // Production (guarda no ctor).
-        _logger.LogDebug(
-            "[STUB-WA] Enviando OTP. telefone={Telefone} codigo={Codigo}",
-            telefoneE164, codigo);
+        if (_logEmInformation)
+        {
+            _logger.LogInformation(
+                "[STUB-WA] Enviando OTP (opt-in Otp:UseStub). telefone={Telefone} codigo={Codigo}",
+                telefoneE164, codigo);
+        }
+        else
+        {
+            _logger.LogDebug(
+                "[STUB-WA] Enviando OTP. telefone={Telefone} codigo={Codigo}",
+                telefoneE164, codigo);
+        }
         return Task.CompletedTask;
     }
 }
