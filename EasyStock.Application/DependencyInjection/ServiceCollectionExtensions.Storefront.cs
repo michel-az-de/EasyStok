@@ -43,6 +43,10 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IniciarCheckoutUseCase>();
         services.AddScoped<LiberarVagaOnPedidoCanceladoHandler>();
 
+        // #680 — checkout GUEST sem login + token de acompanhamento.
+        services.AddScoped<AcompanhamentoTokenService>();
+        services.AddScoped<IniciarCheckoutGuestUseCase>();
+
         // TASK-EZ-APROVAR-001 — use cases Babá aprovar/recusar pedido.
         services.AddScoped<AprovarPedidoStorefrontUseCase>();
         services.AddScoped<RecusarPedidoStorefrontUseCase>();

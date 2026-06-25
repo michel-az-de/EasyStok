@@ -21,6 +21,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [AllowAnonymous]
 public sealed class CheckoutController(
     IniciarCheckoutUseCase iniciarCheckoutUseCase,
+    IniciarCheckoutGuestUseCase iniciarCheckoutGuestUseCase,
     IClienteSessionRepository clienteSessionRepository,
     TimeProvider timeProvider) : EasyStockControllerBase
 {
@@ -171,6 +172,81 @@ public sealed class CheckoutController(
         }
     }
 
+    /// <summary>
+    /// Inicia checkout GUEST (sem login) — cadastra Pedido em
+    /// <c>aguardando_aprovacao_baba</c>, retorna PedidoId + token de
+    /// acompanhamento. Babá agenda janela manualmente via WhatsApp depois.
+    /// </summary>
+    [SwaggerOperation(
+        Summary = "Iniciar checkout guest (sem login)",
+        Description = "Cadastra Pedido sem cookie de sessao. Cliente identificado " +
+                      "por telefoneHash. Issue #680.")]
+    [ProducesResponseType(typeof(IniciarCheckoutGuestResult), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [HttpPost("guest")]
+    public async Task<IActionResult> IniciarCheckoutGuest(
+        [FromRoute] string slug,
+        [FromBody] CheckoutGuestRequestBody body,
+        CancellationToken ct)
+    {
+        if (body is null)
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Body ausente",
+                Detail = "Corpo da requisicao e obrigatorio.",
+            });
+
+        var input = new IniciarCheckoutGuestInput(
+            Slug: slug,
+            Nome: body.Nome,
+            Telefone: body.Telefone,
+            Cep: body.Cep,
+            Numero: body.Numero,
+            Items: (body.Items ?? Array.Empty<CheckoutItemRequestBody>())
+                .Select(i => new CheckoutItemInput(i.CardapioItemId, i.Qtd))
+                .ToList(),
+            Observacoes: body.Observacoes);
+
+        try
+        {
+            var result = await iniciarCheckoutGuestUseCase.ExecuteAsync(input, ct);
+            Response.GetTypedHeaders().CacheControl =
+                new CacheControlHeaderValue { NoStore = true, NoCache = true };
+            return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (TelefoneInvalidoException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Telefone invalido",
+                Detail = ex.Message,
+            });
+        }
+        catch (CepInvalidoException ex)
+        {
+            return DataBadRequest(ex.Message);
+        }
+        catch (StorefrontNaoEncontradoException ex)
+        {
+            return DataNotFound(ex.Message);
+        }
+        catch (RegraDeDominioVioladaException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status422UnprocessableEntity,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status422UnprocessableEntity,
+                    Title = "Dados invalidos",
+                    Detail = ex.Message,
+                });
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private Guid? ObterSessionId()
@@ -223,3 +299,12 @@ public sealed record CheckoutRequestBody(
     string? Observacoes = null);
 
 public sealed record CheckoutItemRequestBody(Guid CardapioItemId, int Qtd);
+
+/// <summary>Body do POST /checkout/guest (issue #680).</summary>
+public sealed record CheckoutGuestRequestBody(
+    string Nome,
+    string Telefone,
+    string Cep,
+    string? Numero,
+    IReadOnlyList<CheckoutItemRequestBody> Items,
+    string? Observacoes = null);
