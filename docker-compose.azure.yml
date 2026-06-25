@@ -83,6 +83,11 @@ services:
       # Seed de dados demo (PastaBella/Cantina/CasaDaBaba) — opt-in via .env; default off.
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
       SEED_DEMO_VOLUME: ${SEED_DEMO_VOLUME:-small}
+      # Storefront Casa da Baba — OTP stub em prod (issue #677) + JWT secrets de tokens
+      # de avaliacao (#TASK-EZ-AVAL-001) e acompanhamento guest (#684).
+      Otp__UseStub: ${Otp__UseStub:-false}
+      Acompanhamento__JwtSecret: ${Acompanhamento__JwtSecret}
+      Avaliacao__JwtSecret: ${Avaliacao__JwtSecret}
     volumes:
       - uploads-data:/app/uploaded-files
     networks: [easystock-net]
