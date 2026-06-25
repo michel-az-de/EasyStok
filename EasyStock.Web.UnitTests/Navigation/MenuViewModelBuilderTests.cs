@@ -177,7 +177,8 @@ public class MenuViewModelBuilderTests
     public void Flag_kds_off_remove_itens_de_producao_dos_grupos()
     {
         var operacao = Build(kds: false).Groups.Single(g => g.Group.Key == "operacao");
-        operacao.Items.Select(i => i.Key).Should().Equal("pedidos", "caixa", "clientes");
+        // cardapio (IsProducaoKds=false) permanece; so kds-operacao e kds-visor saem com a flag off.
+        operacao.Items.Select(i => i.Key).Should().Equal("pedidos", "caixa", "clientes", "cardapio");
     }
 
     [Fact]

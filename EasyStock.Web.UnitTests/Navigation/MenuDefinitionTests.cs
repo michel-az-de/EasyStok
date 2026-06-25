@@ -40,11 +40,11 @@ public class MenuDefinitionTests
     }
 
     [Fact]
-    public void Operacao_contem_pedidos_kds_visor_caixa_clientes()
+    public void Operacao_contem_pedidos_kds_visor_caixa_clientes_cardapio()
     {
         var operacao = MenuDefinition.Groups.Single(g => g.Key == "operacao");
         operacao.Items.Select(i => i.Key).Should().Equal(
-            "pedidos", "kds-operacao", "kds-visor", "caixa", "clientes");
+            "pedidos", "kds-operacao", "kds-visor", "caixa", "clientes", "cardapio");
     }
 
     [Fact]
