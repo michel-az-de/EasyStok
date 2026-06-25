@@ -1242,6 +1242,13 @@
                         window.showToast('SKU em uso. Altere antes de continuar.', 'warning');
                         return;
                     }
+                    // issue 688 / BUG-005: ao sair da etapa 2 (Preços), margem >= 100% é inválida —
+                    // o preço de venda fica indefinido (custo/(1-margem) diverge). Antes o aviso
+                    // era só visual e o wizard avançava até "Criar produto" com "Preço não definido".
+                    if (this.step === 2 && this.margem !== null && this.margem !== '' && Number(this.margem) >= 100) {
+                        window.showToast('Margem inválida: deve ser menor que 100% (sobre o preço de venda).', 'warning');
+                        return;
+                    }
                     // BUG-06: ao sair da etapa 3 (Limiares), critico precisa ser < minimo
                     // (espelha o guard server de ProdutosController.Criar). Antes avancava sem aviso.
                     if (this.step === 3) {

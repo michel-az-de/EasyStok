@@ -39,6 +39,22 @@ namespace EasyStock.Domain.ValueObjects
             Altura == 0m &&
             Comprimento == 0m;
 
+        /// <summary>
+        /// Valida coerência para PERSISTÊNCIA (write path). NÃO é chamado em <see cref="From"/>,
+        /// que permanece leniente para não quebrar a desserialização de dados legados (#688/BUG-010a).
+        /// Regra: as três dimensões lineares andam juntas — ou todas &gt; 0 (uma caixa) ou todas
+        /// zero (sem caixa). Algo como 10 × 0 × 0 cm é incoerente. O peso é independente
+        /// (produto vendido por peso pode não ter caixa).
+        /// </summary>
+        public void EnsureCoerente()
+        {
+            var temAlgumaLinear = Largura > 0m || Altura > 0m || Comprimento > 0m;
+            var todasLineares = Largura > 0m && Altura > 0m && Comprimento > 0m;
+            if (temAlgumaLinear && !todasLineares)
+                throw new RegraDeDominioVioladaException(
+                    "Dimensões incompletas: informe largura, altura e comprimento (todas maiores que zero) ou deixe as três em branco.");
+        }
+
         public override string ToString() =>
             $"P:{Peso:F3} L:{Largura:F2} A:{Altura:F2} C:{Comprimento:F2}";
 

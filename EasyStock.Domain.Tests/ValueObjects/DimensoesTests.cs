@@ -102,4 +102,41 @@ public class DimensoesTests
 
         str.Should().Be("P:1.234 L:10.55 A:5.67 C:20.89");
     }
+
+    // ─── #688/BUG-010a: coerência de dimensões lineares no write path ───
+
+    [Fact]
+    public void From_continua_leniente_para_nao_quebrar_leitura_de_legado()
+    {
+        // 10 x 0 x 0 é incoerente, mas From() NÃO lança (preserva desserialização de legado).
+        var act = () => Dimensoes.From(0, 10, 0, 0);
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(0, 10, 0, 0)]   // só largura
+    [InlineData(0, 10, 5, 0)]   // largura + altura, sem comprimento
+    [InlineData(2, 0, 5, 0)]    // peso + altura, lineares parciais
+    public void EnsureCoerente_rejeita_dimensoes_lineares_parciais(decimal peso, decimal largura, decimal altura, decimal comprimento)
+    {
+        var dimensoes = Dimensoes.From(peso, largura, altura, comprimento);
+
+        var act = () => dimensoes.EnsureCoerente();
+
+        act.Should().Throw<RegraDeDominioVioladaException>()
+            .WithMessage("*incompletas*");
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 0)]      // sem caixa (tudo zero) — válido
+    [InlineData(10, 0, 0, 0)]     // só peso, sem caixa — válido
+    [InlineData(1, 10, 5, 20)]    // caixa completa — válido
+    public void EnsureCoerente_aceita_vazio_so_peso_ou_caixa_completa(decimal peso, decimal largura, decimal altura, decimal comprimento)
+    {
+        var dimensoes = Dimensoes.From(peso, largura, altura, comprimento);
+
+        var act = () => dimensoes.EnsureCoerente();
+
+        act.Should().NotThrow();
+    }
 }
