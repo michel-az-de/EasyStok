@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 
 namespace EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 
@@ -20,6 +21,7 @@ public sealed record RegistrarMovimentoCaixaCommand(
 public class RegistrarMovimentoCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
+    ObterCaixaDiaUseCase obterCaixaDia,
     ILogger<RegistrarMovimentoCaixaUseCase> logger)
 {
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
@@ -78,16 +80,14 @@ public class RegistrarMovimentoCaixaUseCase(
         return AbrirCaixaUseCase.Map(mov);
     }
 
-    // Saldo esperado do dia (mesma fórmula do ObterCaixaDiaUseCase): saldo inicial (abertura)
-    // + vendas + pagamentos de pedidos + entradas extras - saídas extras.
+    // #686/BUG-004: a validacao anti-negativo precisa usar EXATAMENTE o mesmo saldo exibido
+    // no card "Saldo esperado" e no modal de fechamento — incluindo a resolucao cross-day de
+    // sessao aberta em dia anterior (#596). Reusa o ObterCaixaDiaUseCase como FONTE UNICA em
+    // vez de recalcular. Antes este metodo agregava so a janela civil de hoje e divergia (card
+    // R$4.514 vs validacao R$0), bloqueando saidas legitimas em sessao que atravessa a meia-noite.
     private async Task<decimal> CalcularSaldoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId)
     {
-        var movs = (await repo.GetMovimentosDoDiaAsync(empresaId, data, lojaId)).ToList();
-        var saldoInicial = movs.Where(m => m.Tipo == "abertura").Sum(m => m.Valor);
-        var entradas = movs.Where(m => m.Tipo == "entrada").Sum(m => m.Valor);
-        var saidas = movs.Where(m => m.Tipo == "saida").Sum(m => m.Valor);
-        var vendas = await repo.GetTotalVendasDoDiaAsync(empresaId, data, lojaId);
-        var pagamentos = await repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, data, lojaId);
-        return saldoInicial + vendas + pagamentos + entradas - saidas;
+        var dia = await obterCaixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, data, lojaId));
+        return dia.SaldoEsperado;
     }
 }

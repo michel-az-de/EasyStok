@@ -234,6 +234,7 @@ public class CaixaUseCasesTests
     public async Task RegistrarMovimento_DeveLancarValidation_QuandoTipoNaoEEntradaNemSaida(string tipo)
     {
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var act = () => useCase.ExecuteAsync(
@@ -249,6 +250,7 @@ public class CaixaUseCasesTests
     public async Task RegistrarMovimento_DeveLancarValidation_QuandoValorMenorOuIgualAZero(decimal valor)
     {
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var act = () => useCase.ExecuteAsync(
@@ -268,6 +270,7 @@ public class CaixaUseCasesTests
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var act = () => useCase.ExecuteAsync(
@@ -286,6 +289,7 @@ public class CaixaUseCasesTests
             .Returns((FechamentoCaixa?)null);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var result = await useCase.ExecuteAsync(
@@ -312,6 +316,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Saída de R$500 num caixa com R$100 → bloqueia (FIN-003).
@@ -335,6 +340,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var result = await useCase.ExecuteAsync(
@@ -353,6 +359,7 @@ public class CaixaUseCasesTests
         _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Saída web sem método/descrição → bloqueia (rastro de auditoria, FIN-003).
@@ -370,6 +377,7 @@ public class CaixaUseCasesTests
         _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Mobile promove fato já registrado no device — não passa pela guarda de saldo (FIN-003).
@@ -377,6 +385,38 @@ public class CaixaUseCasesTests
             new RegistrarMovimentoCaixaCommand(empresaId, "saida", 500m, Origem: "mobile"));
 
         result.Tipo.Should().Be("saida");
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_PermiteSaida_QuandoSaldoVemDeSessaoCrossDay()
+    {
+        // #686/BUG-004: sessão aberta ONTEM (hoje não há abertura nem movimento). A exibição
+        // (ObterCaixaDia) resolve cross-day e mostra saldo R$4.514; a validação ANTIGA só
+        // olhava a janela civil de hoje (R$0) e bloqueava a saída legítima. Agora a validação
+        // reusa ObterCaixaDia, então enxerga o mesmo R$4.514.
+        var empresaId = Guid.NewGuid();
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(Array.Empty<MovimentoCaixa>());
+        var aberturaOntem = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-1));
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(aberturaOntem);
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { aberturaOntem });
+        _repo.GetTotalVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(4414m);
+        _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
+
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(_repo),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
+
+        // Saída de R$500 contra saldo esperado R$4.514 (100 + 4414) → deve PERMITIR.
+        var result = await useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(empresaId, "saida", 500m,
+                Descricao: "Sangria", Metodo: "dinheiro"));
+
+        result.Tipo.Should().Be("saida");
+        result.Valor.Should().Be(500m);
         await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
