@@ -2,6 +2,14 @@
 @model EasyStock.Admin.Pages.Dispositivos.IndexModel
 @{
     ViewData["Title"] = "Dispositivos";
+
+    // IMP-001: picker de tenant no empty-state (navega pra ?empresaId=GUID, que init() le).
+    var empresaPickerVd = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(ViewData)
+    {
+        ["Mode"] = "navigate",
+        ["NavigateBase"] = "/Dispositivos",
+        ["Label"] = "Cliente"
+    };
 }
 
 <div x-data="dispositivosPage()" x-init="init()" style="display:flex; flex-direction:column; gap:20px;">
@@ -26,8 +34,10 @@
         <es-card>
             <es-empty-state icon="building-2"
                             title="Selecione um cliente"
-                            description="Os dispositivos são pareados por cliente. Escolha um cliente para ver e gerenciar os aparelhos dele.">
-                <es-button variant="primary" href="/Tenants" icon="building-2">Escolher cliente</es-button>
+                            description="Os dispositivos são pareados por cliente. Busque um cliente por nome ou CNPJ para ver e gerenciar os aparelhos dele.">
+                <div style="max-width:360px; margin:0 auto; text-align:left;">
+                    <partial name="Components/_EmpresaPicker" view-data="empresaPickerVd" />
+                </div>
             </es-empty-state>
         </es-card>
     </template>

@@ -4,6 +4,17 @@
     ViewData["Title"] = "Emitir fatura avulsa";
     var amanha = DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd");
     var hojeDateMin = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+    // IMP-001: picker de tenant por nome/CNPJ no lugar de colar GUID. Em re-render
+    // (erro de validacao) so temos o GUID cru — o picker mostra o id ate trocar.
+    var empresaPickerVd = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(ViewData)
+    {
+        ["Mode"] = "field",
+        ["Name"] = "empresaId",
+        ["InitialId"] = Model.EmpresaIdRaw,
+        ["Required"] = true,
+        ["Label"] = "Empresa cliente"
+    };
 }
 
 <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
@@ -23,15 +34,8 @@
     @Html.AntiForgeryToken()
 
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
-        <es-card title="Empresa (tenant)" description="GUID da empresa cliente">
-            <es-input name="empresaId"
-                      label="Empresa ID"
-                      required="true"
-                      value="@Model.EmpresaIdRaw"
-                      placeholder="00000000-0000-0000-0000-000000000000"
-                      pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-                      input-class="font-mono"
-                      helper="Cole o GUID da página /Tenants." />
+        <es-card title="Empresa (tenant)" description="Busque por nome ou CNPJ">
+            <partial name="Components/_EmpresaPicker" view-data="empresaPickerVd" />
         </es-card>
 
         <es-card title="Dados do faturado" description="Quem aparece na fatura como destinatário">

@@ -1,0 +1,68 @@
+@*
+    Picker de empresa (tenant) reutilizavel — IMP-001.
+    Typeahead Alpine sobre /api-proxy/buscar-global (debounce 200ms, >=2 chars),
+    substitui o "cole o GUID da pagina /Tenants". Logica derivada do typeahead ja
+    provado em Tickets/Index (modal Novo ticket).
+
+    Parametros via ViewData (passe com Html.Partial("Components/_EmpresaPicker", null, viewData)):
+      Name         (string, default "empresaId")  — name do <input hidden> no modo "field"
+      Mode         ("field" | "navigate", default "field")
+                     field    -> mantem <input hidden name=Name> com o GUID selecionado (forms)
+                     navigate -> ao selecionar, vai pra NavigateBase?empresaId=GUID (paginas com filtro por query)
+      NavigateBase (string) — rota base no modo navigate (ex: "/Dispositivos")
+      InitialId/InitialNome/InitialDoc (string) — empresa pre-selecionada (re-render / deep-link)
+      Label        (string, default "Empresa")
+      Required     (bool, default false) — marca o label; validacao real e no backend
+*@
+@{
+    var name = ViewData["Name"] as string ?? "empresaId";
+    var mode = ViewData["Mode"] as string ?? "field";
+    var navBase = ViewData["NavigateBase"] as string ?? "";
+    var initialId = ViewData["InitialId"] as string ?? "";
+    var initialNome = ViewData["InitialNome"] as string ?? "";
+    var initialDoc = ViewData["InitialDoc"] as string ?? "";
+    var label = ViewData["Label"] as string ?? "Empresa";
+    var required = ViewData["Required"] as bool? ?? false;
+    string J(string s) => System.Text.Json.JsonSerializer.Serialize(s ?? "");
+}
+<div x-data="empresaPicker({ mode: @Html.Raw(J(mode)), navBase: @Html.Raw(J(navBase)), id: @Html.Raw(J(initialId)), nome: @Html.Raw(J(initialNome)), doc: @Html.Raw(J(initialDoc)) })">
+    <label class="es-form-label@(required ? " es-form-label-required" : "")">@label</label>
+
+    @if (mode == "field")
+    {
+        <input type="hidden" name="@name" :value="sel ? sel.id : ''" />
+    }
+
+    <template x-if="!sel">
+        <div style="position:relative;">
+            <input type="text" x-model="busca" placeholder="Digite o nome ou CNPJ..." class="es-form-input"
+                   autocomplete="off" aria-label="@label"
+                   @@input="onInput()" />
+            <div x-show="resultados.length > 0" x-cloak
+                 style="position:absolute; z-index:50; margin-top:4px; width:100%; background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--r-md); box-shadow:var(--elev-3); max-height:240px; overflow-y:auto;">
+                <template x-for="emp in resultados" :key="emp.id">
+                    <button type="button" @@click="selecionar(emp)"
+                            style="display:block; width:100%; text-align:left; padding:8px 12px; background:transparent; border:0; cursor:pointer; color:var(--text-primary); font-size:13px;">
+                        <span x-text="emp.nome"></span>
+                        <span style="color:var(--text-muted); font-size:11px; margin-left:8px;" x-text="emp.documento || ''"></span>
+                    </button>
+                </template>
+            </div>
+            <p x-show="erro" x-cloak style="color:var(--crit-600); font-size:12px; margin-top:4px;" x-text="erro"></p>
+        </div>
+    </template>
+
+    <template x-if="sel">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:rgba(232,88,20,.10); border:1px solid rgba(232,88,20,.30); border-radius:var(--r-md);">
+            <div style="min-width:0;">
+                <div style="font-size:13px; font-weight:500; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" x-text="sel.nome"></div>
+                <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono);" x-text="sel.documento || ''"></div>
+            </div>
+            <es-button variant="ghost" size="xs" x-on:click="trocar()">Trocar</es-button>
+        </div>
+    </template>
+</div>
+@* O factory window.empresaPicker vive em ~/js/empresa-picker.js (carregado no _Layout
+   antes do alpine.js). NAO inline aqui: este partial pode ser renderizado dentro de
+   <template x-if> (ex: empty-state de Dispositivos) e <script> em template clonado nao
+   executa — o factory precisa ser global. *@
