@@ -311,6 +311,7 @@ else
          role="dialog" aria-modal="true" aria-labelledby="fm-mov-title">
         <form x-ref="panel" class="fm-panel" style="max-width: 640px" x-show="open"
               method="post" action="/caixa/movimentos" data-validate novalidate
+              @@submit="validarSubmit($event)"
               x-transition:enter="transition duration-150 ease-out"
               x-transition:enter-start="opacity-0 scale-95"
               x-transition:enter-end="opacity-100 scale-100">
@@ -384,6 +385,8 @@ else
                         </div>
                     </div>
                 </fieldset>
+                <p x-show="erroSaldo" x-cloak x-text="erroSaldo" role="alert"
+                   class="text-sm text-red-600 font-medium mt-3 px-1"></p>
             </div>
             <footer class="fm-footer">
                 <button type="button" @@click="close()"
@@ -503,7 +506,24 @@ function abrirCaixaModal()       { return _caixaModalBase('abrir-caixa'); }
 function fecharCaixaModal()      { return _caixaModalBase('fechar-caixa'); }
 function lancamentoCaixaModal()  {
     return Object.assign(_caixaModalBase('lancar-mov'), {
-        tipo: 'entrada'
+        tipo: 'entrada',
+        // BUG-07 (QA v1.10 issue 674): valida saida > saldo no cliente -> feedback IMEDIATO no
+        // modal. Antes, o backend rejeitava (toast no reload) mas o usuario perdia o toast ao
+        // o modal fechar. O backend continua autoritativo (saldo concorrente).
+        saldoDisponivel: @(d is null ? "0" : d.SaldoEsperado.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        erroSaldo: '',
+        validarSubmit(ev) {
+            this.erroSaldo = '';
+            if (this.tipo !== 'saida') return;
+            const inp = ev.target.querySelector('input[name=valor]');
+            const v = parseFloat(String((inp && inp.value) || '0').replace(',', '.')) || 0;
+            if (v > this.saldoDisponivel) {
+                ev.preventDefault();
+                const f = n => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                this.erroSaldo = 'Saída de ' + f(v) + ' é maior que o saldo disponível (' + f(this.saldoDisponivel) + '). O caixa não pode ficar negativo.';
+                if (inp) inp.focus();
+            }
+        }
     });
 }
 
