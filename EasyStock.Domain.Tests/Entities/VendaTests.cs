@@ -67,6 +67,8 @@ public class VendaTests
 
         // Subtotal = bruto (100), NÃO 110: o bug somava o ValorDesconto ao Subtotal.
         venda.ValorTotal.Valor.Should().Be(100m);
-        venda.Subtotal.Valor.Should().Be(100m);
+        // Subtotal e sempre preenchido por Criar()/RecalcularValorTotal (Venda.cs:81,106);
+        // null-forgive reflete o invariant de runtime sem mascarar NRE real (CI usa -warnaserror).
+        venda.Subtotal!.Valor.Should().Be(100m);
     }
 }
