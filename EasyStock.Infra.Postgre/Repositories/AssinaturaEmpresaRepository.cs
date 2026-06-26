@@ -44,11 +44,16 @@ public sealed class AssinaturaEmpresaRepository(EasyStockDbContext dbContext) : 
         return Task.CompletedTask;
     }
 
+    // NOTA (issue 694): estes 3 metodos sao chamados SO pelo CobrancaAssinaturaJob, que roda
+    // cross-tenant sem JWT. IgnoreQueryFilters desliga o filtro EF de tenant; o job tambem
+    // precisa de db.UseRowLevelSecurityBypass() (camada RLS do Postgres). Sem os dois, a query
+    // retorna 0 linhas (CurrentTenantId=Guid.Empty) e o job vira no-op.
     public async Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencendoEmAsync(int diasAte, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
         var limite = now.AddDays(diasAte);
         return await dbContext.AssinaturasEmpresa
+            .IgnoreQueryFilters()
             .Include(a => a.Empresa)
             .Where(a => a.Status == StatusAssinatura.Ativa &&
                 ((a.TrialFim != null && a.TrialFim >= now && a.TrialFim <= limite) ||
@@ -56,13 +61,30 @@ public sealed class AssinaturaEmpresaRepository(EasyStockDbContext dbContext) : 
             .ToListAsync(ct);
     }
 
+    // Planos PAGOS vencidos -> suspensao (inadimplencia). Antes incluia (TrialFim < now), o que
+    // suspenderia clientes pagantes com TrialFim no passado (TrialFim nunca e limpo na conversao).
+    // Agora so pega lapso de plano pago (DataFim no passado); trial nao convertido vai para
+    // GetTrialsExpiradosAsync.
     public async Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencidasAsync(CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
         return await dbContext.AssinaturasEmpresa
-            .Where(a => a.Status == StatusAssinatura.Ativa &&
-                ((a.TrialFim != null && a.TrialFim < now) ||
-                 (a.DataFim != null && a.DataFim < now)))
+            .IgnoreQueryFilters()
+            .Where(a => a.Status == StatusAssinatura.Ativa
+                     && a.DataFim != null && a.DataFim < now)
+            .ToListAsync(ct);
+    }
+
+    // Trial vencido SEM nenhum plano pago (DataFim nulo): teste nao convertido -> Expirada.
+    // Plano pago vigente (DataFim >= now) nunca e pego aqui.
+    public async Task<IEnumerable<AssinaturaEmpresa>> GetTrialsExpiradosAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        return await dbContext.AssinaturasEmpresa
+            .IgnoreQueryFilters()
+            .Where(a => a.Status == StatusAssinatura.Ativa
+                     && a.DataFim == null
+                     && a.TrialFim != null && a.TrialFim < now)
             .ToListAsync(ct);
     }
 
@@ -70,6 +92,7 @@ public sealed class AssinaturaEmpresaRepository(EasyStockDbContext dbContext) : 
     {
         var limite = DateTime.UtcNow.AddDays(-diasMinimos);
         return await dbContext.AssinaturasEmpresa
+            .IgnoreQueryFilters()
             .Where(a => a.Status == StatusAssinatura.Suspensa
                      && ((a.SuspensaEm != null && a.SuspensaEm < limite)
                       || (a.SuspensaEm == null && a.AlteradoEm < limite)))

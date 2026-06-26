@@ -13,7 +13,10 @@ public interface IAssinaturaEmpresaRepository
     Task AddAsync(AssinaturaEmpresa assinatura);
     Task UpdateAsync(AssinaturaEmpresa assinatura);
     Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencendoEmAsync(int diasAte, CancellationToken ct = default);
+    /// <summary>Planos PAGOS vencidos (DataFim no passado): trilha de suspensao por inadimplencia.</summary>
     Task<IEnumerable<AssinaturaEmpresa>> GetAtivasVencidasAsync(CancellationToken ct = default);
+    /// <summary>Trials vencidos sem nenhum plano pago (DataFim nulo): teste nao convertido (issue 694).</summary>
+    Task<IEnumerable<AssinaturaEmpresa>> GetTrialsExpiradosAsync(CancellationToken ct = default);
     Task<IEnumerable<AssinaturaEmpresa>> GetSuspensasAntigasAsync(int diasMinimos, CancellationToken ct = default);
 
     /// <summary>

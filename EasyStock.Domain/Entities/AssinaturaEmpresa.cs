@@ -60,6 +60,21 @@ namespace EasyStock.Domain.Entities
             AlteradoEm = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Transiciona um teste (trial) vencido sem plano pago vigente para
+        /// <see cref="StatusAssinatura.Expirada"/>. Idempotente: só age sobre Ativa.
+        /// O SubscriptionGate ja bloqueia o acesso; isto alinha o status persistido
+        /// (issue 694). Distinto de <see cref="Suspender"/>, que e a trilha de
+        /// inadimplencia de plano PAGO (dunning + cancelamento).
+        /// </summary>
+        public void ExpirarPorTrial()
+        {
+            if (Status != StatusAssinatura.Ativa)
+                return;
+            Status = StatusAssinatura.Expirada;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void AplicarCupom(Cupom cupom)
         {
             CupomCodigo = cupom.Codigo;
