@@ -31,7 +31,10 @@ public sealed class AdminDashboardQueries(EasyStockDbContext db) : IAdminDashboa
             && t.Prioridade == TicketPrioridade.Critica, ct);
         var ticketsEmAtendimento = await db.AdminTickets.CountAsync(t => t.Status == TicketStatus.EmAtendimento, ct);
 
-        var totalUsuariosAtivos = await db.Usuarios.CountAsync(u => u.Ativo, ct);
+        // "Usuários ativos" = usuários ativos vinculados a algum tenant (espelha a contagem
+        // por-tenant). Exclui SuperAdmin/OPS internos, que não têm vínculo UsuarioEmpresa e
+        // por isso inflavam o número do dashboard sem aparecer na soma dos tenants (ADM-005, issue 695).
+        var totalUsuariosAtivos = await db.Usuarios.CountAsync(u => u.Ativo && u.Empresas.Any(), ct);
         var logins24h = await db.AuditLogs.CountAsync(a => a.DataHora >= h24 && a.Acao == "Login" && a.Sucesso, ct);
 
         var ticketsComNovaMensagem = await db.AdminTickets
