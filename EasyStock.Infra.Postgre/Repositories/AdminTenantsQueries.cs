@@ -160,6 +160,11 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
             assinatura.DataFim,
             assinatura.TrialFim,
             assinatura.TrialAtivo,
+            // ADM-004 (#694): trial vencido sem plano pago vigente — espelha
+            // SubscriptionGateMiddleware.TrialExpiradoSemPlanoAtivo. Status efetivo p/ o Admin.
+            assinatura.Status == StatusAssinatura.Ativa
+                && assinatura.TrialFim.HasValue && assinatura.TrialFim.Value < DateTime.UtcNow
+                && !(assinatura.DataFim.HasValue && assinatura.DataFim.Value >= DateTime.UtcNow),
             assinatura.CupomCodigo,
             assinatura.DescontoAplicado,
             assinatura.Plano is null ? null : new TenantPlanoInfo(

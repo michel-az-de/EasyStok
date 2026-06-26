@@ -70,6 +70,8 @@ public sealed record TenantAssinaturaInfo(
     DateTime? DataFim,
     DateTime? TrialFim,
     bool TrialAtivo,
+    /// <summary>Status efetivo (#694): trial vencido sem plano pago vigente — Admin nao deve exibir "Ativa".</summary>
+    bool TrialExpiradoSemPlano,
     string? CupomCodigo,
     decimal? DescontoAplicado,
     TenantPlanoInfo? Plano);

@@ -7,7 +7,13 @@
 
     var assinaturaStatus = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
         && Model.Assinatura.TryGetProperty("status", out var sp) ? sp.GetString() : null;
-    var statusClass = assinaturaStatus?.ToLower() switch {
+    // ADM-004 (issue 694): status efetivo — trial vencido sem plano pago vigente nao deve
+    // exibir "Ativa" (o SubscriptionGate ja bloqueia; o job transiciona no proximo ciclo).
+    var trialExpiradoSemPlano = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
+        && Model.Assinatura.TryGetProperty("trialExpiradoSemPlano", out var tesp)
+        && tesp.ValueKind == System.Text.Json.JsonValueKind.True;
+    var statusDisplay = trialExpiradoSemPlano ? "Trial expirado" : (assinaturaStatus ?? "Sem assinatura");
+    var statusClass = trialExpiradoSemPlano ? "badge-expirada" : assinaturaStatus?.ToLower() switch {
         "ativa" => "badge-ativa",
         "suspensa" => "badge-suspensa",
         "cancelada" => "badge-cancelada",
@@ -162,7 +168,7 @@ function operacaoErp(tenantId) {
         <div>
             <div class="flex items-center gap-3 mb-1">
                 <h2 class="text-es-ink text-xl font-bold">@nome</h2>
-                <span class="status-badge @statusClass">@(assinaturaStatus ?? "Sem assinatura")</span>
+                <span class="status-badge @statusClass">@statusDisplay</span>
             </div>
             @{
                 var doc = Model.Empresa.TryGetProperty("documento", out var dp) ? dp.GetString() : null;
