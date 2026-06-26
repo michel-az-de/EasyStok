@@ -49,4 +49,14 @@ public class CupomValidacaoTests
     [Fact]
     public void ValidarValor_valorFixo_acima_de_100_e_permitido()
         => CupomValidacao.ValidarValor(TipoDesconto.ValorFixo, 150m).Should().BeNull();
+
+    // ADM-003 (#693): valor acima da precisao da coluna decimal(10,2) era aceito na
+    // validacao e so estourava no INSERT (DbUpdateException), virando falha silenciosa.
+    [Fact]
+    public void ValidarValor_rejeita_valor_acima_do_teto_da_coluna()
+        => CupomValidacao.ValidarValor(TipoDesconto.ValorFixo, 999_999_999m).Should().NotBeNull();
+
+    [Fact]
+    public void ValidarValor_aceita_valor_no_limite_da_coluna()
+        => CupomValidacao.ValidarValor(TipoDesconto.ValorFixo, 99_999_999.99m).Should().BeNull();
 }

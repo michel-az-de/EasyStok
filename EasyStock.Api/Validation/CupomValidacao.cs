@@ -8,6 +8,9 @@ namespace EasyStock.Api.Validation;
 /// </summary>
 public static class CupomValidacao
 {
+    /// <summary>Teto do valor de desconto = precisao da coluna Cupom.Valor decimal(10,2).</summary>
+    private const decimal MaxValorDesconto = 99_999_999.99m;
+
     public static string? ValidarCodigo(string codigoUpper)
     {
         if (codigoUpper.Length is < 3 or > 50)
@@ -24,6 +27,10 @@ public static class CupomValidacao
             return "Valor do desconto deve ser maior que zero.";
         if (tipo == TipoDesconto.Percentual && valor > 100)
             return "Desconto percentual nao pode passar de 100%.";
+        // Teto = precisao da coluna decimal(10,2). Acima disso o INSERT estourava com
+        // DbUpdateException, virando falha silenciosa no Admin (QA ADM-003, issue 693).
+        if (valor > MaxValorDesconto)
+            return "Valor do desconto é muito alto. Máximo permitido: 99.999.999,99.";
         return null;
     }
 }

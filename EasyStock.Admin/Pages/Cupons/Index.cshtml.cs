@@ -175,6 +175,13 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             erro = "Desconto percentual não pode passar de 100%.";
             return false;
         }
+        // Teto = precisão da coluna Cupom.Valor decimal(10,2) no backend. Valida aqui pra
+        // mostrar mensagem clara (canal SetErro) em vez da falha silenciosa do INSERT (#693).
+        if (valor > 99_999_999.99m)
+        {
+            erro = "Valor do desconto é muito alto. Máximo permitido: 99.999.999,99.";
+            return false;
+        }
         if (limiteUsos is < 1)
         {
             erro = "Limite de usos deve ser maior que zero.";
