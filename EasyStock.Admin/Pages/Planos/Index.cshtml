@@ -59,19 +59,19 @@ else
                 <ul style="list-style:none; padding:16px 20px; margin:0; display:flex; flex-direction:column; gap:8px; font-size:13px; color:var(--text-secondary);">
                     <li style="display:flex; align-items:center; gap:8px;">
                         <es-icon name="check-circle" size="14" />
-                        <span><strong style="color:var(--text-primary);">@(limLojas == -1 ? "∞" : limLojas.ToString())</strong> loja(s)</span>
+                        <span><strong style="color:var(--text-primary);">@(limLojas == -1 ? "∞" : limLojas.ToString())</strong> @(limLojas == 1 ? "loja" : "lojas")</span>
                     </li>
                     <li style="display:flex; align-items:center; gap:8px;">
                         <es-icon name="check-circle" size="14" />
-                        <span><strong style="color:var(--text-primary);">@(limUsuarios == -1 ? "∞" : limUsuarios.ToString())</strong> usuário(s)</span>
+                        <span><strong style="color:var(--text-primary);">@(limUsuarios == -1 ? "∞" : limUsuarios.ToString())</strong> @(limUsuarios == 1 ? "usuário" : "usuários")</span>
                     </li>
                     <li style="display:flex; align-items:center; gap:8px;">
                         <es-icon name="check-circle" size="14" />
-                        <span><strong style="color:var(--text-primary);">@(limProdutos == -1 ? "∞" : limProdutos.ToString())</strong> produtos</span>
+                        <span><strong style="color:var(--text-primary);">@(limProdutos == -1 ? "∞" : limProdutos.ToString())</strong> @(limProdutos == 1 ? "produto" : "produtos")</span>
                     </li>
                     <li style="display:flex; align-items:center; gap:8px;">
                         <es-icon name="check-circle" size="14" />
-                        <span><strong style="color:var(--text-primary);">@(limIa == -1 ? "∞" : limIa.ToString())</strong> gerações de IA/mês</span>
+                        <span><strong style="color:var(--text-primary);">@(limIa == -1 ? "∞" : limIa.ToString())</strong> @(limIa == 1 ? "geração de IA/mês" : "gerações de IA/mês")</span>
                     </li>
                 </ul>
 
