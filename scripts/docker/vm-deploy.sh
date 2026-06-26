@@ -30,7 +30,10 @@ set -euo pipefail
 REPO="${EASYSTOK_REPO:-/home/azureuser/easystok}"
 COMPOSE="$REPO/docker-compose.azure.yml"
 BRANCH="${EASYSTOK_BRANCH:-master}"
-BACKUP_ROOT="${EASYSTOK_BACKUP_ROOT:-/var/backups/easystok}"
+# /home/azureuser e gravavel pelo cron (azureuser); /var/backups e root-only e o
+# mkdir do snapshot falhava com Permission denied, abortando TODO deploy (incidente
+# 2026-06-26: VM travada em 4c7f1b1b). Override com EASYSTOK_BACKUP_ROOT se quiser /var.
+BACKUP_ROOT="${EASYSTOK_BACKUP_ROOT:-/home/azureuser/easystok-backups}"
 PG_CONTAINER="${EASYSTOK_PG_CONTAINER:-easystok-postgres}"
 RETENTION_DAYS="${EASYSTOK_BACKUP_RETENTION_DAYS:-7}"
 
@@ -77,12 +80,18 @@ main() {
   fi
 
   echo "[vm-deploy] atualizando ${local_sha:0:8} -> ${remote_sha:0:8} ..."
+
+  # F0.1 (fix 2026-06-26): snapshot ANTES do git pull. A copia unica do banco e
+  # identica antes e depois do pull (o pull so reescreve codigo, nao toca o banco),
+  # entao backup-primeiro nao perde nada — e garante que uma FALHA de snapshot nao
+  # avance o HEAD local. Antes o pull vinha primeiro: se o snapshot falhasse, o
+  # HEAD ja estava avancado e o proximo cron via local==remote => "nada a fazer",
+  # travando o deploy permanentemente (foi o que congelou a VM em 4c7f1b1b).
+  snapshot_predeploy
+
   git pull --ff-only origin "$BRANCH"
   local sha
   sha="$(git rev-parse HEAD)"
-
-  # F0.1: snapshot ANTES do build (a API migra no boot — banco de copia unica).
-  snapshot_predeploy
 
   echo "[vm-deploy] rebuildando stack (GIT_SHA=${sha:0:8}) ..."
   GIT_SHA="$sha" docker compose -f "$COMPOSE" up -d --build
