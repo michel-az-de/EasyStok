@@ -94,6 +94,7 @@ public sealed class CobrancaAssinaturaJob(
                 {
                     await ProcessarCobrancasAsync(ct);
                     await SuspenderVencidasAsync(ct);
+                    await ExpirarTrialsExpiradosAsync(ct);
                     await DunningAsync(ct);
                     await CancelarSuspensasAntigasAsync(ct);
                 }, stoppingToken);
@@ -110,6 +111,12 @@ public sealed class CobrancaAssinaturaJob(
         }
     }
 
+    // NOTA (issue 694): este passo (Pix proativo) e o DunningAsync NAO receberam o
+    // UseRowLevelSecurityBypass de proposito. Eles dependem de cobrancaRepo.ExistePendenteAsync /
+    // GetPendentesParaDunningAsync (entidade Cobranca, EF-filtrada): habilitar so a visibilidade
+    // sem corrigir esse dedup geraria Pix DUPLICADO. A visibilidade do billing fica para uma
+    // issue dedicada (toca dinheiro real). Aqui so o ciclo de vida (suspender/expirar/cancelar)
+    // foi habilitado, que resolve o ADM-004 (status do Admin) sem efeito de cobranca.
     private async Task ProcessarCobrancasAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
@@ -225,6 +232,10 @@ public sealed class CobrancaAssinaturaJob(
         using var scope = serviceProvider.CreateScope();
         var assinaturaRepo = scope.ServiceProvider.GetRequiredService<IAssinaturaEmpresaRepository>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        // Job cross-tenant sem JWT: liga o bypass de RLS no DbContext deste scope (mesma
+        // instancia que o repo usa) ANTES da 1a query. Sem isso + IgnoreQueryFilters no repo,
+        // a query zeraria as linhas (CurrentTenantId=Guid.Empty) e nada seria suspenso (issue 694).
+        using var _rls = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().UseRowLevelSecurityBypass();
 
         var vencidas = await assinaturaRepo.GetAtivasVencidasAsync(ct);
 
@@ -239,6 +250,38 @@ public sealed class CobrancaAssinaturaJob(
             catch (Exception ex)
             {
                 logger.LogError(ex, "Erro ao suspender assinatura {Id}", assinatura.Id);
+            }
+        }
+
+        await unitOfWork.CommitAsync();
+    }
+
+    /// <summary>
+    /// Expira trials vencidos sem nenhum plano pago (DataFim nulo): teste nao convertido ->
+    /// <see cref="StatusAssinatura.Expirada"/>. Distinto de <see cref="SuspenderVencidasAsync"/>,
+    /// que e a trilha de inadimplencia de plano PAGO. O SubscriptionGate ja bloqueia o acesso;
+    /// isto alinha o status persistido para o Admin nao exibir "ATIVA" (issue 694).
+    /// </summary>
+    private async Task ExpirarTrialsExpiradosAsync(CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var assinaturaRepo = scope.ServiceProvider.GetRequiredService<IAssinaturaEmpresaRepository>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        using var _rls = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().UseRowLevelSecurityBypass();
+
+        var trialsExpirados = await assinaturaRepo.GetTrialsExpiradosAsync(ct);
+
+        foreach (var assinatura in trialsExpirados)
+        {
+            try
+            {
+                assinatura.ExpirarPorTrial();
+                await assinaturaRepo.UpdateAsync(assinatura);
+                logger.LogInformation("Assinatura expirada por trial vencido. EmpresaId: {EmpresaId}", assinatura.EmpresaId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Erro ao expirar trial da assinatura {Id}", assinatura.Id);
             }
         }
 
@@ -305,6 +348,7 @@ public sealed class CobrancaAssinaturaJob(
         using var scope = serviceProvider.CreateScope();
         var assinaturaRepo = scope.ServiceProvider.GetRequiredService<IAssinaturaEmpresaRepository>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        using var _rls = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().UseRowLevelSecurityBypass();
 
         var todasSuspensas = (await assinaturaRepo.GetSuspensasAntigasAsync(30, ct)).ToList();
 
