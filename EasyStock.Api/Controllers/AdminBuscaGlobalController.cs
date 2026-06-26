@@ -15,6 +15,11 @@ public class AdminBuscaGlobalController(
     IAdminBuscaGlobalQueries buscaQueries,
     AdminAuditService audit) : EasyStockControllerBase
 {
+    // Mínimo de dígitos para acionar a busca por documento (CNPJ). Evita que 1-2 dígitos
+    // avulsos (ex: extraídos de um payload com caracteres especiais) casem com quase todos
+    // os CNPJs via ILIKE (QA ADM-008, issue 698).
+    private const int MinDigitosBuscaDocumento = 3;
+
     [HttpGet]
     public async Task<IActionResult> Buscar([FromQuery] string q, [FromQuery] int limit = 8, CancellationToken ct = default)
     {
@@ -31,7 +36,9 @@ public class AdminBuscaGlobalController(
         // CNPJ sem pontuação: também tenta match com o termo só-dígitos. Em produção
         // adicionaria coluna desnormalizada `documento_limpo` indexada.
         var termoSoDigitos = new string(termo.Where(char.IsDigit).ToArray());
-        var padraoDigitos = string.IsNullOrEmpty(termoSoDigitos) ? null : $"%{termoSoDigitos}%";
+        // Só busca por documento quando há dígitos suficientes. Antes, um único dígito
+        // (ex: o "1" de "<img ...alert(1)>") virava ILIKE %1% e casava qualquer CNPJ com "1".
+        var padraoDigitos = termoSoDigitos.Length >= MinDigitosBuscaDocumento ? $"%{termoSoDigitos}%" : null;
 
         var resultado = await buscaQueries.BuscarAsync(padrao, padraoDigitos, lim, ct);
 
