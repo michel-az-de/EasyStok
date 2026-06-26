@@ -89,6 +89,26 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         }
     }
 
+    /// <summary>
+    /// ADM-001 — Handler AJAX para o card "Operação (ERP)" no Detail. Proxy pro endpoint
+    /// GetOperacaoErp: counts REAIS do ERP (pedidos/clientes/produtos/lotes) + saldo de caixa,
+    /// distinto do card de Sincronização Mobile (que conta tabelas mobile_*).
+    /// </summary>
+    public async Task<IActionResult> OnGetOperacaoErpAsync()
+    {
+        try
+        {
+            var data = await api.GetAsync<JsonElement>($"api/admin/tenants/{Id}/operacao-erp");
+            return new JsonResult(data);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Falha ao carregar operacao-erp do tenant {TenantId}", Id);
+            return new JsonResult(new { error = ex.Message });
+        }
+    }
+
     public async Task<IActionResult> OnPostSuspenderAsync(string motivo)
     {
         var motivoT = (motivo ?? "").Trim();

@@ -19,6 +19,7 @@ public class AdminTenantsController(
     IPlanoRepository planoRepo,
     ICupomRepository cupomRepo,
     IAuditLogRepository auditLogRepo,
+    IAnalyticsRepository analyticsRepo,
     IUnitOfWork unitOfWork,
     ICurrentUserAccessor currentUser,
     IConfiguration configuration,
@@ -186,6 +187,34 @@ public class AdminTenantsController(
             products = new { total = totalProducts, pending = pendingProducts },
             batches  = new { total = totalBatches,  pending = pendingBatches },
             cash     = new { total = totalCash,     pending = pendingCash }
+        });
+    }
+
+    /// <summary>
+    /// KPIs operacionais REAIS do tenant (ERP), para a Visão Geral do detalhe. Distinto do
+    /// card de Sincronização Mobile (que conta tabelas mobile_*): aqui contamos Pedido /
+    /// Cliente / Produto / Lote do ERP e o saldo de caixa. SuperAdmin já bypassa o filtro de
+    /// tenant e a RLS; IgnoreQueryFilters reforça e o EmpresaId escopa o tenant (issue 691).
+    /// </summary>
+    [HttpGet("{id:guid}/operacao-erp")]
+    public async Task<IActionResult> GetOperacaoErp(Guid id)
+    {
+        var pedidos  = await db.Pedidos.IgnoreQueryFilters().CountAsync(p => p.EmpresaId == id);
+        var clientes = await db.Clientes.IgnoreQueryFilters().CountAsync(c => c.EmpresaId == id);
+        var produtos = await db.Produtos.IgnoreQueryFilters().CountAsync(p => p.EmpresaId == id);
+        var lotes    = await db.Lotes.IgnoreQueryFilters().CountAsync(l => l.EmpresaId == id);
+
+        // Caixa: reutiliza a lógica canônica do dashboard do tenant (cross-day, Pix, pagamentos
+        // de pedidos) em vez de re-derivar — evita divergência com o que o cliente vê.
+        var resumo = await analyticsRepo.GetResumoDiaAsync(id);
+
+        return DataOk(new
+        {
+            pedidos,
+            clientes,
+            produtos,
+            lotes,
+            caixa = new { saldo = resumo.SaldoCaixaAtual, aberta = resumo.CaixaAbertaHoje }
         });
     }
 
