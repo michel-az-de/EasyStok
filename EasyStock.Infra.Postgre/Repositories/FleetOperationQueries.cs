@@ -73,17 +73,18 @@ public sealed class FleetOperationQueries(EasyStockDbContext db) : IFleetOperati
             .ToListAsync(ct);
         var ultimaVenda = ultimaVendaList.ToDictionary(x => x.Key, x => x.Ultima);
 
-        // Tickets em aberto e com SLA violado (mesma definição do AdminDashboard).
+        // Tickets em aberto e com SLA violado. Predicado canônico compartilhado (issue 692)
+        // — é a fonte da definição que Dashboard e Diagnóstico agora também usam.
         var ticketsAbertos = await db.AdminTickets.AsNoTracking()
-            .Where(t => empresaIds.Contains(t.EmpresaId)
-                        && t.Status != TicketStatus.Fechado && t.Status != TicketStatus.Resolvido)
+            .Where(AdminTicketFilters.EmAberto)
+            .Where(t => empresaIds.Contains(t.EmpresaId))
             .GroupBy(t => t.EmpresaId)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
 
         var ticketsSla = await db.AdminTickets.AsNoTracking()
+            .Where(AdminTicketFilters.EmAberto)
             .Where(t => empresaIds.Contains(t.EmpresaId)
-                        && t.Status != TicketStatus.Fechado && t.Status != TicketStatus.Resolvido
                         && (t.SlaRespostaViolado || t.SlaResolucaoViolado))
             .GroupBy(t => t.EmpresaId)
             .Select(g => new { g.Key, Count = g.Count() })

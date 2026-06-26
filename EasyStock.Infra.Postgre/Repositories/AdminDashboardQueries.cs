@@ -23,7 +23,9 @@ public sealed class AdminDashboardQueries(EasyStockDbContext db) : IAdminDashboa
 
         var tenantsNovos = await db.Empresas.CountAsync(e => e.CriadoEm >= d30, ct);
 
-        var ticketsAbertos = await db.AdminTickets.CountAsync(t => t.Status == TicketStatus.Aberto, ct);
+        // "Em aberto" = predicado canônico compartilhado (issue 692): tudo que não é
+        // Resolvido nem Fechado. Mantém paridade com Diagnóstico e Operação/Fleet.
+        var ticketsAbertos = await db.AdminTickets.CountAsync(AdminTicketFilters.EmAberto, ct);
         var ticketsCriticos = await db.AdminTickets.CountAsync(t =>
             t.Status != TicketStatus.Fechado && t.Status != TicketStatus.Resolvido
             && t.Prioridade == TicketPrioridade.Critica, ct);

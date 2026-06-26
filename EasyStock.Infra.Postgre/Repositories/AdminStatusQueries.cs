@@ -47,8 +47,9 @@ public sealed class AdminStatusQueries(
             .Where(x => x.Ano == nowUtc.Year && x.Mes == nowUtc.Month)
             .SumAsync(x => (int?)x.TotalGeracoes, ct) ?? 0;
 
+        // Mesma definição canônica de "em aberto" do Dashboard/Operação (issue 692).
         var ticketsAbertos = await db.AdminTickets
-            .CountAsync(x => x.Status == TicketStatus.Aberto, ct);
+            .CountAsync(AdminTicketFilters.EmAberto, ct);
 
         var errosRecentes = await db.AuditLogs
             .Where(x => !x.Sucesso)
