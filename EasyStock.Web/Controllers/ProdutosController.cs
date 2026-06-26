@@ -178,7 +178,14 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
         {
             var erro = result.ErrorMessage ?? "Erro ao salvar produto.";
             if (isFetch)
+            {
+                // issue 690 / BUG-007: 401 da Api (sessao expirada) volta como 401 ao browser,
+                // para o es-fetch.js redirecionar ao login imediatamente. Antes virava 400 e o
+                // usuario ficava preso em "Salvando..." ate o timeout, com toast generico.
+                if (result.HttpStatus == 401 || result.ErrorCode == "AUTH_TOKEN_EXPIRED")
+                    return Unauthorized(new { erro });
                 return BadRequest(new { erro });
+            }
             HasError(result);
             await LoadCategoriasAsync();
             return View("Form", vm);
@@ -305,7 +312,12 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
         {
             var msg = result.ErrorMessage ?? "Ocorreu um erro inesperado.";
             if (isFetch)
+            {
+                // issue 690 / BUG-007: 401 da Api volta como 401 ao browser (es-fetch redireciona).
+                if (result.HttpStatus == 401 || result.ErrorCode == "AUTH_TOKEN_EXPIRED")
+                    return Unauthorized(new { erro = msg });
                 return BadRequest(new { erro = msg });
+            }
             Toast("error", msg);
             await LoadCategoriasAsync();
             return View("Form", vm);

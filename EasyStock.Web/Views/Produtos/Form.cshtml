@@ -1314,7 +1314,8 @@
                     const self = this;
                     self.saving = true;
                     console.log('[EasyStock] submitForm iniciado, action=', this.$el?.action);
-                    try { sessionStorage.removeItem(this._draftKey); } catch(e) {}
+                    // issue 690 / BUG-006: NAO descartar o rascunho aqui (antes do POST). Se a sessao
+                    // expirou (401) ou der erro, o rascunho precisa sobreviver — so removemos apos sucesso.
 
                     // Belt-and-suspenders: reseta após 20s independente do que aconteça
                     const savingGuard = setTimeout(() => {
@@ -1378,6 +1379,9 @@
                             window.showToast(msg, 'error');
                             return;
                         }
+
+                        // === Sucesso confirmado: agora é seguro descartar o rascunho (issue 690 / BUG-006) ===
+                        try { sessionStorage.removeItem(this._draftKey); } catch(e) {}
 
                         // === Sucesso: extrair productId ===
                         // Em edição já temos o ID; em criação, extraímos da URL de redirect

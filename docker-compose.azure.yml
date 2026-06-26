@@ -44,6 +44,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Redis — cache distribuido da sessao Web (tokens de auth) ─────────────────
+  # Sem ele a sessao e in-process e o auto-deploy a cada 5 min (cron) zera os tokens
+  # => logout geral (issue 690 / BUG-006). Container separado: sobrevive ao redeploy
+  # do web/api. Cache efemero (sem persistencia em disco) — sessao nao precisa durar
+  # alem do restart do proprio redis.
+  redis:
+    image: redis:7-alpine
+    container_name: easystok-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [easystock-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── API (.NET 9) — aplica migrations + seeds no startup ──────────────────────
   api:
     build:
@@ -108,11 +125,15 @@ services:
     image: easystok-web:latest
     container_name: easystok-web
     restart: unless-stopped
-    depends_on: [api]
+    depends_on: [api, redis]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ApiSettings__BaseUrl: "http://api:8080/api"
       ApiSettings__TimeoutSeconds: "30"
+      # issue 690 / BUG-006: sessao Web no Redis (persiste entre deploys do cron */5).
+      # Sem isto a sessao e in-process e cada redeploy zera os tokens => logout geral.
+      # O codigo usa Redis automaticamente quando ConnectionStrings:Redis existe.
+      ConnectionStrings__Redis: "redis:6379"
       # URL PUBLICA da API (browser) p/ o link do KDS/PWA no _Sidebar (BUG-13).
       # ${API_HOST} vem do .env (api.<ip>.sslip.io). NAO confundir com ApiSettings__BaseUrl
       # (interno, http://api:8080, usado nas chamadas server-side da Web).
