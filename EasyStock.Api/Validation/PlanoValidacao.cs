@@ -28,14 +28,14 @@ public static class PlanoValidacao
     public static string? ValidarLimite(int valor, string campo)
     {
         if (valor < SemLimite)
-            return $"{campo} deve ser -1 (ilimitado) ou um valor nao-negativo.";
+            return $"{campo} deve ser -1 (ilimitado) ou um valor não-negativo.";
         return null;
     }
 
     public static string? ValidarPreco(decimal preco)
     {
         if (preco < 0)
-            return "Preco mensal nao pode ser negativo.";
+            return "Preço mensal não pode ser negativo.";
         return null;
     }
 }

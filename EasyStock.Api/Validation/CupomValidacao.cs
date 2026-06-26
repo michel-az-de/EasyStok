@@ -26,7 +26,7 @@ public static class CupomValidacao
         if (valor <= 0)
             return "Valor do desconto deve ser maior que zero.";
         if (tipo == TipoDesconto.Percentual && valor > 100)
-            return "Desconto percentual nao pode passar de 100%.";
+            return "Desconto percentual não pode passar de 100%.";
         // Teto = precisao da coluna decimal(10,2). Acima disso o INSERT estourava com
         // DbUpdateException, virando falha silenciosa no Admin (QA ADM-003, issue 693).
         if (valor > MaxValorDesconto)
