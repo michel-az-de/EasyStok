@@ -78,7 +78,7 @@
                         <tr>
                             <td><input type="text" name="itemDescricao" x-model="item.descricao" class="es-form-input" required minlength="2" maxlength="300" /></td>
                             <td><input type="number" name="itemQuantidade" x-model.number="item.quantidade" step="0.001" min="0.001" class="es-form-input" style="text-align:right;" x-on:focus="$event.target.select()" required /></td>
-                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="es-form-input" style="text-align:right;" placeholder="0,00" x-on:focus="$event.target.select()" required /></td>
+                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="es-form-input" style="text-align:right;" :style="{ 'border-color': Number(item.precoUnitario) < 0 ? 'var(--crit-600)' : '' }" placeholder="0,00" x-on:focus="$event.target.select()" required /></td>
                             <td>
                                 <select name="itemTipo" x-model="item.tipo" class="es-form-select">
                                     <option value="Servico">Serviço</option>
@@ -99,7 +99,8 @@
                 <tfoot>
                     <tr style="background:var(--surface-sunken);">
                         <td colspan="3" style="text-align:right; font-weight:600; color:var(--text-primary); padding:12px 14px;">Subtotal estimado</td>
-                        <td colspan="2" style="font-family:var(--font-mono); font-weight:700; color:var(--orange-500); padding:12px 14px;" x-text="formatCurrency(subtotal)"></td>
+                        @* UX-003: laranja (cor de alerta) so quando negativo; positivo/zero usa cor neutra. *@
+                        <td colspan="2" style="font-family:var(--font-mono); font-weight:700; padding:12px 14px;" :style="{ color: subtotal < 0 ? 'var(--crit-600)' : 'var(--text-primary)' }" x-text="formatCurrency(subtotal)"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -118,6 +119,8 @@
         </es-card>
     </div>
 
+    <div x-show="erro" x-cloak role="alert" style="color:var(--crit-600); font-size:13px; font-weight:500; text-align:right;" x-text="erro"></div>
+
     <div style="display:flex; justify-content:flex-end; gap:8px;">
         <es-button variant="ghost" href="/Faturas">Cancelar</es-button>
         <es-button type="submit" variant="primary" icon="check">Emitir fatura</es-button>
@@ -134,6 +137,7 @@
         catch (e) { iniciais = []; }
         return {
             itens: iniciais,
+            erro: '',
             addItem() {
                 // precoUnitario null (campo vazio com placeholder) evita o '0' inicial
                 // concatenar ao digitar (BUG-04). Subtotal usa Number(...)||0.
@@ -152,6 +156,23 @@
                 return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
             },
             onSubmit(e) {
+                this.erro = '';
+                // NEW-001: bloqueia preco unitario negativo e subtotal negativo — fatura de cobranca
+                // nao pode ter valor negativo. O backend tambem valida; aqui evita o round-trip e da
+                // feedback claro sem perder o preenchimento.
+                const idxNeg = this.itens.findIndex(i => Number(i.precoUnitario) < 0);
+                if (idxNeg >= 0) {
+                    e.preventDefault();
+                    this.erro = 'Preço unitário não pode ser negativo.';
+                    const campo = e.target.querySelectorAll('input[name="itemPrecoUnitario"]')[idxNeg];
+                    if (campo) { campo.scrollIntoView({ block: 'center', behavior: 'smooth' }); campo.focus(); }
+                    return;
+                }
+                if (this.subtotal < 0) {
+                    e.preventDefault();
+                    this.erro = 'O subtotal não pode ser negativo. Revise os itens de Desconto.';
+                    return;
+                }
                 // IMP-03: rola/foca o 1o campo invalido (em vez de so o balao nativo solto).
                 if (!e.target.checkValidity()) {
                     e.preventDefault();
