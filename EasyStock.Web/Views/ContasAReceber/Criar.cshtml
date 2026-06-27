@@ -68,7 +68,8 @@
             </div>
             <div>
                 <label class="form-label">Valor total (R$) *</label>
-                <input type="number" name="valorTotal" required min="0.01" step="0.01" data-error-message="Informe um valor maior que zero." class="form-input" x-model.number="valor" />
+                @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                <input type="text" inputmode="decimal" name="valorTotal" required data-validate-money data-error-message="Informe um valor maior que zero." class="form-input" x-model.number="valor" />
             </div>
         </div>
 

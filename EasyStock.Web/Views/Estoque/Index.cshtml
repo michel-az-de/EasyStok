@@ -150,7 +150,8 @@
                         <span x-show="natureza === 'venda'">Valor unitário (R$) <span class="text-red-500">*</span></span>
                         <span x-show="natureza === 'prejuizo'" x-cloak>Custo perdido por unidade (R$, opcional)</span>
                     </label>
-                    <input type="number" x-model.number="valor" step="0.01" min="0.01"
+                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                    <input type="text" inputmode="decimal" x-model.number="valor"
                            placeholder="0,00"
                            :class="natureza === 'venda' && semPreco ? 'border-amber-400 focus:ring-amber-300' : 'border-slate-300 dark:border-slate-600 focus:ring-indigo-300'"
                            class="w-full px-3 py-2 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 border" />

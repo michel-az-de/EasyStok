@@ -863,44 +863,52 @@
                     <div class="grid grid-cols-2 gap-3">
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Porção (g)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="porcaoG"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="porcaoG"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                                    placeholder="ex: 100" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Calorias (kcal)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="kcal"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="kcal"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                                    placeholder="ex: 250" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Carboidratos (g)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="carbsG"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="carbsG"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Proteínas (g)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="proteinaG"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="proteinaG"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Gorduras totais (g)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="gorduraG"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="gorduraG"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Gorduras saturadas (g)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="gorduraSaturadaG"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="gorduraSaturadaG"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Fibras (g)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="fibrasG"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="fibrasG"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         </label>
                         <label class="block">
                             <span class="text-xs font-semibold text-slate-600 mb-1 block">Sódio (mg)</span>
-                            <input type="number" min="0" max="9999" step="0.01" x-model.number="sodioMg"
+                            @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                            <input type="text" inputmode="decimal" x-model.number="sodioMg"
                                    class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                         </label>
                     </div>

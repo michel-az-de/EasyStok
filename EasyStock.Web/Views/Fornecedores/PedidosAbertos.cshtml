@@ -239,7 +239,8 @@ else
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Valor estimado (R$)</label>
-                    <input type="number" name="valorEstimado" min="0" step="0.01" placeholder="0,00"
+                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                    <input type="text" inputmode="decimal" name="valorEstimado" placeholder="0,00"
                            class="ui-field" />
                 </div>
                 <div>

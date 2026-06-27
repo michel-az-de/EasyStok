@@ -621,22 +621,26 @@
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-xs text-slate-600 mb-1">Peso (kg)</label>
-                        <input name="DimensoesPeso" type="number" step="0.001" min="0.001" value="@Model.DimensoesPeso"
+                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                        <input name="DimensoesPeso" type="text" inputmode="decimal" value="@Model.DimensoesPeso"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
                     <div>
                         <label class="block text-xs text-slate-600 mb-1">Largura (cm)</label>
-                        <input name="DimensoesLargura" type="number" step="0.01" min="0.01" value="@Model.DimensoesLargura"
+                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                        <input name="DimensoesLargura" type="text" inputmode="decimal" value="@Model.DimensoesLargura"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
                     <div>
                         <label class="block text-xs text-slate-600 mb-1">Altura (cm)</label>
-                        <input name="DimensoesAltura" type="number" step="0.01" min="0.01" value="@Model.DimensoesAltura"
+                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                        <input name="DimensoesAltura" type="text" inputmode="decimal" value="@Model.DimensoesAltura"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
                     <div>
                         <label class="block text-xs text-slate-600 mb-1">Comprimento (cm)</label>
-                        <input name="DimensoesComprimento" type="number" step="0.01" min="0.01" value="@Model.DimensoesComprimento"
+                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                        <input name="DimensoesComprimento" type="text" inputmode="decimal" value="@Model.DimensoesComprimento"
                                class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                     </div>
                 </div>
@@ -820,22 +824,26 @@
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Peso (kg)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Peso'" x-model.number="e.peso" step="0.001" min="0"
+                                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                                    <input type="text" inputmode="decimal" :name="'Embalagens[' + i + '].Peso'" x-model.number="e.peso"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Largura (cm)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Largura'" x-model.number="e.largura" step="0.01" min="0"
+                                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                                    <input type="text" inputmode="decimal" :name="'Embalagens[' + i + '].Largura'" x-model.number="e.largura"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Altura (cm)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Altura'" x-model.number="e.altura" step="0.01" min="0"
+                                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                                    <input type="text" inputmode="decimal" :name="'Embalagens[' + i + '].Altura'" x-model.number="e.altura"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                                 <div>
                                     <label class="block text-xs text-slate-600 mb-1">Comprimento (cm)</label>
-                                    <input type="number" :name="'Embalagens[' + i + '].Comprimento'" x-model.number="e.comprimento" step="0.01" min="0"
+                                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                                    <input type="text" inputmode="decimal" :name="'Embalagens[' + i + '].Comprimento'" x-model.number="e.comprimento"
                                            class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                                 </div>
                             </div>

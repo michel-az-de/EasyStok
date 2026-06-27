@@ -124,7 +124,8 @@
                                     @Html.AntiForgeryToken()
                                     <div>
                                         <label class="form-label text-xs">Valor (R$) *</label>
-                                        <input type="number" name="valor" required step="0.01" min="0.01" max="@p.Saldo.AsInputDecimal()" value="@p.Saldo.AsInputDecimal()" class="form-input" />
+                                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                                        <input type="text" inputmode="decimal" name="valor" required value="@p.Saldo.AsInputDecimal()" class="form-input" />
                                     </div>
                                     <div>
                                         <label class="form-label text-xs">Método *</label>

@@ -271,7 +271,8 @@ else
                             <label class="fm-field__label" for="abrir-saldo">
                                 Saldo inicial em dinheiro<span class="fm-field__required" aria-hidden="true">*</span>
                             </label>
-                            <input id="abrir-saldo" type="number" name="saldoInicial" step="0.01" min="0" required
+                            @* BUG-001: text+inputmode=decimal (nao type=number, que parseia por locale e colapsa "1.50" em pt-BR). min nativo -> data-validate-min-num (form-validate.js, parse BR). *@
+                            <input id="abrir-saldo" type="text" inputmode="decimal" name="saldoInicial" data-validate-min-num="0" required
                                    placeholder="0,00"
                                    data-error-message="Informe um saldo inicial igual ou maior que zero."
                                    class="ui-field w-full text-sm" />
@@ -347,7 +348,8 @@ else
                             <label class="fm-field__label" for="mov-valor">
                                 Valor<span class="fm-field__required" aria-hidden="true">*</span>
                             </label>
-                            <input id="mov-valor" type="number" name="valor" step="0.01" min="0.01" required
+                            @* BUG-001: text+inputmode=decimal; min=0.01 nativo -> data-validate-money (>0, parse BR) no form-validate.js. *@
+                            <input id="mov-valor" type="text" inputmode="decimal" name="valor" data-validate-money required
                                    placeholder="0,00"
                                    data-error-message="Informe um valor maior que zero."
                                    class="ui-field w-full text-sm text-right" />

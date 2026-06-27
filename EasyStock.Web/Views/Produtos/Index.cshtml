@@ -267,7 +267,8 @@
                                     <p class="text-sm text-slate-500 mb-4">@p.Nome</p>
                                     <div class="mb-4">
                                         <label class="block text-xs text-slate-500 mb-1">Preço de referência (R$)</label>
-                                        <input type="number" step="0.01" min="0" x-model="precoVal" @@click.stop
+                                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                                        <input type="text" inputmode="decimal" x-model="precoVal" @@click.stop
                                                @@keydown.enter.prevent="if(precoVal > 0) $refs.btnSalvarPreco_@(p.Id.ToString().Replace("-","")).click()"
                                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
                                                placeholder="0,00" autofocus />
@@ -405,7 +406,8 @@
                     <label class="fm-field__label" for="cad-rapido-preco">
                         Preço de venda <span class="text-slate-400 font-normal">(opcional)</span>
                     </label>
-                    <input id="cad-rapido-preco" type="number" step="0.01" min="0" inputmode="decimal"
+                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
+                    <input id="cad-rapido-preco" type="text" inputmode="decimal"
                            x-model="form.precoReferencia" placeholder="0,00" class="ui-field w-full text-sm" />
                     <span class="fm-field__hint">Sem preço, o produto entra como Incompleto e você define depois.</span>
                 </div>
