@@ -124,8 +124,10 @@ public sealed class PostgresRlsFixture : IAsyncLifetime
     /// </summary>
     public async Task ResetDatabaseAsync()
     {
-        if (!IsAvailable) return;
-
+        // Precondicao: chamado so com infra disponivel (InitializeAsync apos setar
+        // IsAvailable=true; testes apos Skip.If). Sem guard de no-op-skip aqui de
+        // proposito (ADR-0023/#394 bane o padrao); se mal-usado, CreateSuperuserDbContext
+        // falha alto em vez de virar no-op silencioso.
         await using var ctx = CreateSuperuserDbContext();
         await ctx.Database.ExecuteSqlRawAsync("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
         await ctx.Database.MigrateAsync();

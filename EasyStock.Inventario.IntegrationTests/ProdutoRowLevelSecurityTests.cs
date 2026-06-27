@@ -20,16 +20,17 @@ namespace EasyStock.Inventario.IntegrationTests;
 [Collection("PostgresRlsCollection")]
 public class ProdutoRowLevelSecurityTests(PostgresRlsFixture fixture)
 {
-    [Fact]
+    [SkippableFact]
     public void Harness_executa_de_verdade_quando_env_var_presente()
     {
-        // Guarda anti-falso-verde: em CI a env var existe, entao se o harness estiver
-        // indisponivel (fiacao YAML->processo quebrada) os SkippableFact abaixo SKIPariam
-        // e o gate ficaria verde-vazio. Aqui isso vira VERMELHO. Localmente sem a env var
-        // (sem service container) a guarda nao se aplica.
+        // Guarda anti-falso-verde: em CI a env var existe, entao este teste NAO pula —
+        // se o harness estiver indisponivel (fiacao YAML->processo quebrada) os
+        // SkippableFact abaixo SKIPariam e o gate ficaria verde-vazio; aqui isso vira
+        // VERMELHO. Localmente sem a env var, SKIPa visivel (Skip.If em vez de no-op
+        // silencioso; ADR-0023/#394).
         var envPresente = !string.IsNullOrWhiteSpace(
             Environment.GetEnvironmentVariable("EASYSTOCK_IT_PG"));
-        if (!envPresente) return;
+        Skip.If(!envPresente, "EASYSTOCK_IT_PG ausente (rodada local sem service container).");
 
         fixture.IsAvailable.Should().BeTrue(
             "EASYSTOCK_IT_PG setada (CI) mas o harness Postgres esta indisponivel: "
