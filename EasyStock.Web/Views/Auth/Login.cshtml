@@ -16,7 +16,7 @@
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
-            const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
             document.documentElement.dataset.theme = theme;
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
@@ -36,11 +36,11 @@
     <div class="auth-prem-shell" x-data="loginForm()">
         <div class="auth-prem-layout auth-prem-enter">
 
-            <!-- ============ FACE DA MARCA (esquerda) ============ -->
-            <section class="auth-prem-brand">
-                <div>
-                    <div class="auth-prem-wordmark">
-                        <span class="auth-prem-cube" aria-hidden="true">
+            <!-- ============ FACE ESQUERDA: OPERAÇÃO AO VIVO ============ -->
+            <section class="auth-prem-brand" aria-hidden="true">
+                <div class="auth-prem-topbar">
+                    <span class="auth-prem-wordmark">
+                        <span class="auth-prem-cube">
                             <svg viewBox="0 0 64 64" fill="none">
                                 <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
                                 <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
@@ -48,32 +48,60 @@
                             </svg>
                         </span>
                         <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
+                    </span>
+                    <span class="auth-prem-livechip"><span class="auth-prem-livedot"></span>ao vivo</span>
+                </div>
+
+                <div class="auth-op">
+                    <div class="auth-op-caixa">
+                        <div>
+                            <div class="auth-op-caixa-lbl">Caixa aberto · 07:42</div>
+                            <div class="auth-op-caixa-who">Padaria do Centro · Operador Léo</div>
+                        </div>
+                        <div class="auth-op-caixa-val"><b>R$ 1.284,50</b><span>em caixa</span></div>
                     </div>
 
-                    <p class="auth-prem-eyebrow">Painel de operação</p>
-                    <h1 class="auth-prem-headline">Estoque, caixa e validade no mesmo ritmo.</h1>
-                    <p class="auth-prem-lede">Entre para acompanhar entradas, saídas e o caixa do dia — com a leitura rápida de quem fica no balcão o tempo todo.</p>
+                    <div class="auth-op-sec"><h4>Estoque · atenção</h4><span>ver tudo</span></div>
+                    <div class="auth-op-grid">
+                        <div class="auth-op-card">
+                            <div class="nm">Leite integral 1L</div>
+                            <div class="sku">SKU-0421 · lote 88A</div>
+                            <div class="row"><div class="qt">14<small>un</small></div><span class="auth-op-badge is-crit">vence em 2d</span></div>
+                        </div>
+                        <div class="auth-op-card">
+                            <div class="nm">Presunto fatiado</div>
+                            <div class="sku">SKU-1190 · lote 12C</div>
+                            <div class="row"><div class="qt">3,2<small>kg</small></div><span class="auth-op-badge is-warn">vence em 5d</span></div>
+                        </div>
+                        <div class="auth-op-card">
+                            <div class="nm">Pão de forma</div>
+                            <div class="sku">SKU-0033 · lote 45F</div>
+                            <div class="row"><div class="qt">6<small>un</small></div><span class="auth-op-badge is-crit">saldo baixo</span></div>
+                        </div>
+                        <div class="auth-op-card">
+                            <div class="nm">Café torrado 500g</div>
+                            <div class="sku">SKU-0777 · lote 09B</div>
+                            <div class="row"><div class="qt">28<small>un</small></div><span class="auth-op-badge is-ok">ok</span></div>
+                        </div>
+                    </div>
 
-                    <div class="auth-prem-proof-list">
-                        <div class="auth-prem-proof">
-                            <span class="auth-prem-proof-key">Estoque</span>
-                            <span class="auth-prem-proof-val">Saldo, lotes e validade sempre atualizados.</span>
-                        </div>
-                        <div class="auth-prem-proof">
-                            <span class="auth-prem-proof-key">Caixa</span>
-                            <span class="auth-prem-proof-val">Abertura, conferência e fechamento auditável.</span>
-                        </div>
-                        <div class="auth-prem-proof">
-                            <span class="auth-prem-proof-key">Integrado</span>
-                            <span class="auth-prem-proof-val">Pedidos, vitrine e nota fiscal num lugar só.</span>
-                        </div>
+                    <div class="auth-op-alert">
+                        <span class="ic">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                        </span>
+                        <span class="tx"><b>2 itens vencem esta semana.</b> Registre a baixa ou crie uma promoção antes de fechar o caixa.</span>
+                    </div>
+
+                    <div class="auth-op-kpis">
+                        <div class="auth-op-kpi"><div class="k">Vendas hoje</div><div class="v">R$ 3.940 <i>+12%</i></div></div>
+                        <div class="auth-op-kpi"><div class="k">Pedidos abertos</div><div class="v">07 <i class="is-dn">2 atras.</i></div></div>
                     </div>
                 </div>
 
-                <div class="auth-prem-brand-bottom">Sistema estável · v2026</div>
+                <div class="auth-op-foot">Operação em tempo real · v2026</div>
             </section>
 
-            <!-- ============ FACE DO FORMULÁRIO (direita) ============ -->
+            <!-- ============ FACE DIREITA: FORMULÁRIO ============ -->
             <section class="auth-prem-panel">
                 <div class="auth-prem-card auth-prem-enter-2">
 
@@ -88,49 +116,39 @@
                         <span class="auth-prem-mobilehead-text">Easy<span class="stok">Stok</span></span>
                     </div>
 
-                    <h2 class="auth-prem-card-title" x-show="!returningUser" x-cloak>Entrar</h2>
-                    <h2 class="auth-prem-card-title" x-show="returningUser" x-cloak>
-                        Bem-vindo de volta<span x-show="emailHint" x-cloak>, <span x-text="emailHint"></span></span>
-                    </h2>
-                    <p class="auth-prem-card-subtitle" x-show="!returningUser" x-cloak>Acesse o painel da sua operação.</p>
+                    <p class="auth-prem-card-eyebrow">Entrar no turno</p>
+                    <h1 class="auth-prem-card-title" x-show="!returningUser" x-cloak>Sua operação já está rodando.</h1>
+                    <h1 class="auth-prem-card-title" x-show="returningUser" x-cloak>
+                        Bem-vindo de volta<span x-show="emailHint" x-cloak>, <span x-text="emailHint"></span></span>.
+                    </h1>
+                    <p class="auth-prem-card-subtitle" x-show="!returningUser" x-cloak>Entre para assumir o caixa e tocar o dia.</p>
                     <p class="auth-prem-card-subtitle" x-show="returningUser" x-cloak>Confirme sua senha para continuar.</p>
 
                     @if (logoutSuccess)
                     {
                         <div class="auth-prem-alert auth-prem-alert--ok" role="status" aria-live="polite">
-                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                            </svg>
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                             <span>Você saiu com segurança. Entre novamente quando quiser.</span>
                         </div>
                     }
-
                     @if (sessionExpired)
                     {
                         <div class="auth-prem-alert auth-prem-alert--warn" role="status" aria-live="polite">
-                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm-.75 7a.875.875 0 100-1.75.875.875 0 000 1.75z" clip-rule="evenodd"/>
-                            </svg>
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm-.75 7a.875.875 0 100-1.75.875.875 0 000 1.75z" clip-rule="evenodd"/></svg>
                             <span>Sua sessão expirou. Entre novamente para continuar.</span>
                         </div>
                     }
-
                     @if (apiUnavailable)
                     {
                         <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
-                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
-                            </svg>
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
                             <span>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</span>
                         </div>
                     }
-
                     @if (!ViewData.ModelState.IsValid)
                     {
                         <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
-                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
-                            </svg>
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
                             <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
                         </div>
                     }
@@ -142,87 +160,69 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="returnUrl" value="@returnUrl" />
 
-                        <!-- Email -->
                         <div class="auth-prem-field">
                             <label asp-for="Email" class="auth-prem-field-label">E-mail</label>
                             <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+                                </span>
                                 <input asp-for="Email" type="email" autocomplete="email" required
-                                       x-model="email"
-                                       x-ref="emailInput"
-                                       @@input="onEmailInput"
-                                       class="auth-prem-input auth-prem-input--with-icon-right"
-                                       placeholder="voce@empresa.com.br"
-                                       :disabled="loading" />
+                                       x-model="email" x-ref="emailInput" @@input="onEmailInput"
+                                       class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right"
+                                       placeholder="voce@suaempresa.com.br" :disabled="loading" />
                                 <span class="auth-prem-input-check" :class="emailValid ? 'is-show' : ''" aria-hidden="true">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                                        <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </span>
                             </div>
                             <span asp-validation-for="Email" class="auth-prem-field-error"></span>
                         </div>
 
-                        <!-- Senha -->
                         <div class="auth-prem-field">
                             <div class="flex items-center justify-between" style="margin-bottom: 7px;">
                                 <label asp-for="Senha" class="auth-prem-field-label" style="margin-bottom: 0;">Senha</label>
                                 <a href="/auth/esqueci-senha" class="auth-prem-link" style="font-size: 12px;">Esqueci minha senha</a>
                             </div>
                             <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                </span>
                                 <input asp-for="Senha" autocomplete="current-password" required
                                        x-bind:type="showPass ? 'text' : 'password'"
-                                       @@keyup="onPasswordKey($event)"
-                                       @@keydown="onPasswordKey($event)"
-                                       class="auth-prem-input auth-prem-input--with-icon-right"
-                                       placeholder="Sua senha"
-                                       :disabled="loading" />
-                                <button type="button"
-                                        @@click="showPass = !showPass"
-                                        class="auth-prem-icon-btn"
-                                        tabindex="-1"
+                                       @@keyup="onPasswordKey($event)" @@keydown="onPasswordKey($event)"
+                                       class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right"
+                                       placeholder="Sua senha" :disabled="loading" />
+                                <button type="button" @@click="showPass = !showPass" class="auth-prem-icon-btn" tabindex="-1"
                                         :aria-label="showPass ? 'Ocultar senha' : 'Mostrar senha'">
-                                    <svg x-show="!showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                    </svg>
-                                    <svg x-show="showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-                                    </svg>
+                                    <svg x-show="!showPass" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <svg x-show="showPass" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                                 </button>
                             </div>
                             <span asp-validation-for="Senha" class="auth-prem-field-error"></span>
                             <span class="auth-prem-caps" :class="capsOn ? 'is-show' : ''" role="status">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                                    <path d="M12 3l8 9h-5v6h-6v-6H4l8-9z" fill="currentColor"/>
-                                </svg>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 9h-5v6h-6v-6H4l8-9z" fill="currentColor"/></svg>
                                 Caps Lock ativado
                             </span>
                         </div>
 
-                        <!-- Manter conectado -->
-                        <div style="margin: 20px 0 24px;">
+                        <div style="margin: 18px 0 22px;">
                             <label for="ManterLogado" class="auth-prem-check">
-                                <input asp-for="ManterLogado" type="checkbox" id="ManterLogado"
-                                       x-model="manterLogado" />
+                                <input asp-for="ManterLogado" type="checkbox" id="ManterLogado" x-model="manterLogado" />
                                 <span class="auth-prem-check-indicator" aria-hidden="true">
-                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                                        <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
+                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                                 </span>
                                 <span>Manter conectado neste dispositivo por 30 dias</span>
                             </label>
                         </div>
 
-                        <button type="submit"
-                                :disabled="loading"
-                                :aria-busy="loading ? 'true' : 'false'"
-                                class="auth-prem-launch">
+                        <button type="submit" :disabled="loading" :aria-busy="loading ? 'true' : 'false'" class="auth-prem-launch">
                             <span x-show="!loading" x-text="returningUser ? 'Continuar' : 'Entrar'">Entrar</span>
                             <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
                                 <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
                                 Entrando…
                             </span>
-                            <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                            <span class="auth-prem-launch-arrow" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </span>
                         </button>
                     </form>
 
@@ -243,75 +243,35 @@
         function loginForm() {
             const STORAGE_EMAIL = 'easystock-login-email';
             const STORAGE_KEEP = 'easystock-login-manter';
-
             return {
-                loading: false,
-                showPass: false,
-                email: '',
-                emailValid: false,
-                emailHint: '',
-                returningUser: false,
-                manterLogado: false,
-                capsOn: false,
+                loading: false, showPass: false, email: '', emailValid: false,
+                emailHint: '', returningUser: false, manterLogado: false, capsOn: false,
 
                 init() {
-                    // Auto-preenche email salvo (so se nao tiver erro de validacao server-side).
                     const serverEmail = this.$refs.emailInput?.value || '';
                     if (!serverEmail) {
                         const saved = localStorage.getItem(STORAGE_EMAIL) || '';
-                        if (saved) {
-                            this.email = saved;
-                            this.emailHint = saved.split('@@')[0];
-                            this.returningUser = true;
-                        }
-                    } else {
-                        this.email = serverEmail;
-                    }
+                        if (saved) { this.email = saved; this.emailHint = saved.split('@@')[0]; this.returningUser = true; }
+                    } else { this.email = serverEmail; }
                     this.emailValid = this.isValidEmail(this.email);
-
                     const keep = localStorage.getItem(STORAGE_KEEP);
                     if (keep === 'true') this.manterLogado = true;
-
-                    // Foco inteligente: tem email salvo → vai pra senha; senao → email.
                     this.$nextTick(() => {
-                        if (this.email) {
-                            const senha = document.querySelector('input[name="Senha"]');
-                            senha?.focus();
-                        } else {
-                            this.$refs.emailInput?.focus();
-                        }
+                        if (this.email) { document.querySelector('input[name="Senha"]')?.focus(); }
+                        else { this.$refs.emailInput?.focus(); }
                     });
                 },
-
-                isValidEmail(v) {
-                    if (!v) return false;
-                    return /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(v.trim());
-                },
-
-                onEmailInput() {
-                    this.emailValid = this.isValidEmail(this.email);
-                    this.returningUser = false;
-                },
-
-                onPasswordKey(e) {
-                    if (e.getModifierState) {
-                        this.capsOn = e.getModifierState('CapsLock');
-                    }
-                },
-
+                isValidEmail(v) { if (!v) return false; return /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(v.trim()); },
+                onEmailInput() { this.emailValid = this.isValidEmail(this.email); this.returningUser = false; },
+                onPasswordKey(e) { if (e.getModifierState) { this.capsOn = e.getModifierState('CapsLock'); } },
                 handleSubmit() {
                     if (this.loading) return;
                     const form = this.$refs.form;
-                    if (!form.checkValidity()) {
-                        form.reportValidity();
-                        return;
-                    }
-
+                    if (!form.checkValidity()) { form.reportValidity(); return; }
                     try {
                         if (this.email) localStorage.setItem(STORAGE_EMAIL, this.email);
                         localStorage.setItem(STORAGE_KEEP, this.manterLogado ? 'true' : 'false');
-                    } catch { /* localStorage off / privado */ }
-
+                    } catch { /* localStorage off */ }
                     this.loading = true;
                     form.submit();
                 }

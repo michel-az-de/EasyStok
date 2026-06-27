@@ -12,7 +12,7 @@
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
-            const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
             document.documentElement.dataset.theme = theme;
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
@@ -26,18 +26,17 @@
     <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
     <style>
         [x-cloak] { display: none !important; }
-        .registrar-card-wide { max-width: 480px; }
     </style>
 </head>
 <body class="font-[Inter] antialiased">
     <div class="auth-prem-shell" x-data="registrarForm()">
         <div class="auth-prem-layout auth-prem-enter">
 
-            <!-- ============ FACE DA MARCA ============ -->
+            <!-- ============ FACE ESQUERDA: EDITORIAL ============ -->
             <section class="auth-prem-brand">
-                <div>
-                    <div class="auth-prem-wordmark">
-                        <span class="auth-prem-cube" aria-hidden="true">
+                <div class="auth-prem-topbar">
+                    <span class="auth-prem-wordmark">
+                        <span class="auth-prem-cube">
                             <svg viewBox="0 0 64 64" fill="none">
                                 <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
                                 <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
@@ -45,32 +44,34 @@
                             </svg>
                         </span>
                         <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
-                    </div>
+                    </span>
+                </div>
 
+                <div class="auth-prem-editorial">
                     <p class="auth-prem-eyebrow">Teste grátis · 14 dias · sem cartão</p>
-                    <h1 class="auth-prem-headline">Comece a operar hoje mesmo.</h1>
+                    <h1 class="auth-prem-headline">Comece a operar <span class="ink">hoje mesmo</span>.</h1>
                     <p class="auth-prem-lede">Crie a conta, cadastre a primeira loja e registre a primeira venda no mesmo dia. Sem instalação, sem cartão.</p>
 
                     <ul class="auth-prem-bullets">
                         <li class="auth-prem-bullet">
-                            <span class="auth-prem-bullet-mark">✓</span>
+                            <span class="auth-prem-bullet-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
                             <span>Cadastro de estoque guiado, passo a passo</span>
                         </li>
                         <li class="auth-prem-bullet">
-                            <span class="auth-prem-bullet-mark">✓</span>
+                            <span class="auth-prem-bullet-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
                             <span>Toda a equipe inclusa durante o teste</span>
                         </li>
                         <li class="auth-prem-bullet">
-                            <span class="auth-prem-bullet-mark">✓</span>
+                            <span class="auth-prem-bullet-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
                             <span>Você só decide pagar quando fizer sentido</span>
                         </li>
                     </ul>
-                </div>
 
-                <div class="auth-prem-brand-bottom">Primeiro acesso · v2026</div>
+                    <div class="auth-prem-editorial-foot">Primeiro acesso · v2026</div>
+                </div>
             </section>
 
-            <!-- ============ FACE DO FORMULÁRIO ============ -->
+            <!-- ============ FACE DIREITA: FORMULÁRIO ============ -->
             <section class="auth-prem-panel">
                 <div class="auth-prem-card auth-prem-enter-2 registrar-card-wide">
 
@@ -85,33 +86,33 @@
                         <span class="auth-prem-mobilehead-text">Easy<span class="stok">Stok</span></span>
                     </div>
 
-                    <h2 class="auth-prem-card-title">Crie sua conta</h2>
+                    <p class="auth-prem-card-eyebrow">Sua conta grátis</p>
+                    <h1 class="auth-prem-card-title">Crie sua conta</h1>
                     <p class="auth-prem-card-subtitle">Leva uns 3 minutos — e já dá pra usar.</p>
 
                     @if (!ViewData.ModelState.IsValid)
                     {
                         <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
-                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
-                            </svg>
+                            <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
                             <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
                         </div>
                     }
 
                     <form asp-action="Registrar" asp-controller="Auth" method="post"
-                          x-ref="form"
-                          :aria-busy="loading ? 'true' : 'false'"
-                          @@submit="handleSubmit">
+                          x-ref="form" :aria-busy="loading ? 'true' : 'false'" @@submit="handleSubmit">
                         @Html.AntiForgeryToken()
 
                         <p class="auth-prem-section">Sua empresa</p>
 
                         <div class="auth-prem-field">
                             <label asp-for="NomeEmpresa" class="auth-prem-field-label">Nome da empresa *</label>
-                            <input asp-for="NomeEmpresa" type="text" autocomplete="organization" required maxlength="150"
-                                   class="auth-prem-input"
-                                   placeholder="Ex: Minha Loja Ltda"
-                                   :disabled="loading" />
+                            <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 13v.01M9 17v.01"/></svg>
+                                </span>
+                                <input asp-for="NomeEmpresa" type="text" autocomplete="organization" required maxlength="150"
+                                       class="auth-prem-input auth-prem-input--with-icon-left" placeholder="Ex: Minha Loja Ltda" :disabled="loading" />
+                            </div>
                             <span asp-validation-for="NomeEmpresa" class="auth-prem-field-error"></span>
                         </div>
 
@@ -120,12 +121,12 @@
                                 CNPJ / CPF <span style="color: var(--text-muted); font-weight: 400;">(opcional)</span>
                             </label>
                             <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h2M15 9h2M15 13h2"/></svg>
+                                </span>
                                 <input asp-for="Documento" id="reg-doc" type="text" maxlength="30"
-                                       class="auth-prem-input"
-                                       placeholder="00.000.000/0001-00"
-                                       :disabled="loading"
-                                       @@blur="checkDoc"
-                                       x-model="documento" />
+                                       class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right" placeholder="00.000.000/0001-00"
+                                       :disabled="loading" @@blur="checkDoc" x-model="documento" />
                                 <span x-show="docChecking" x-cloak class="auth-prem-spinner-inline" aria-hidden="true"></span>
                             </div>
                             <span class="auth-prem-field-help">Usado nas notas fiscais. Pode adicionar depois.</span>
@@ -139,22 +140,25 @@
 
                         <div class="auth-prem-field">
                             <label asp-for="NomeAdmin" class="auth-prem-field-label">Seu nome *</label>
-                            <input asp-for="NomeAdmin" type="text" autocomplete="name" required maxlength="100"
-                                   class="auth-prem-input"
-                                   placeholder="Nome completo"
-                                   :disabled="loading" />
+                            <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/></svg>
+                                </span>
+                                <input asp-for="NomeAdmin" type="text" autocomplete="name" required maxlength="100"
+                                       class="auth-prem-input auth-prem-input--with-icon-left" placeholder="Nome completo" :disabled="loading" />
+                            </div>
                             <span asp-validation-for="NomeAdmin" class="auth-prem-field-error"></span>
                         </div>
 
                         <div class="auth-prem-field">
                             <label asp-for="Email" class="auth-prem-field-label">E-mail *</label>
                             <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+                                </span>
                                 <input asp-for="Email" id="reg-email" type="email" autocomplete="email" required
-                                       class="auth-prem-input"
-                                       placeholder="voce@empresa.com.br"
-                                       :disabled="loading"
-                                       @@blur="checkEmail"
-                                       x-model="emailVal" />
+                                       class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right" placeholder="voce@suaempresa.com.br"
+                                       :disabled="loading" @@blur="checkEmail" x-model="emailVal" />
                                 <span x-show="emailChecking" x-cloak class="auth-prem-spinner-inline" aria-hidden="true"></span>
                             </div>
                             <span asp-validation-for="Email" class="auth-prem-field-error"></span>
@@ -167,18 +171,15 @@
                         <div class="auth-prem-field">
                             <label asp-for="Senha" class="auth-prem-field-label">Senha *</label>
                             <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                </span>
                                 <input asp-for="Senha" type="password" autocomplete="new-password" minlength="8" required
-                                       x-model="senha"
-                                       @@input="onSenhaInput"
-                                       class="auth-prem-input"
-                                       placeholder="Mínimo 8 caracteres"
-                                       :disabled="loading" />
+                                       x-model="senha" @@input="onSenhaInput"
+                                       class="auth-prem-input auth-prem-input--with-icon-left" placeholder="Mínimo 8 caracteres" :disabled="loading" />
                             </div>
                             <div class="auth-prem-strength" :data-level="senhaLevel" aria-hidden="true">
-                                <span class="auth-prem-strength-bar"></span>
-                                <span class="auth-prem-strength-bar"></span>
-                                <span class="auth-prem-strength-bar"></span>
-                                <span class="auth-prem-strength-bar"></span>
+                                <span class="auth-prem-strength-bar"></span><span class="auth-prem-strength-bar"></span><span class="auth-prem-strength-bar"></span><span class="auth-prem-strength-bar"></span>
                             </div>
                             <span class="auth-prem-strength-label" :data-level="senhaLevel" x-text="senhaLabel" x-show="senha.length > 0" x-cloak></span>
                             <span class="auth-prem-field-help" x-show="senha.length === 0">Misture letras, números e símbolos para uma senha forte.</span>
@@ -188,33 +189,28 @@
                         <div class="auth-prem-field">
                             <label asp-for="ConfirmarSenha" class="auth-prem-field-label">Confirmar senha *</label>
                             <div class="auth-prem-input-wrap">
+                                <span class="auth-prem-field-ic" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                </span>
                                 <input asp-for="ConfirmarSenha" type="password" autocomplete="new-password" minlength="8" required
                                        x-model="senhaConf"
-                                       class="auth-prem-input auth-prem-input--with-icon-right"
-                                       placeholder="Repita a senha"
-                                       :disabled="loading" />
-                                <span class="auth-prem-input-check"
-                                      :class="senhaConf.length > 0 && senhaConf === senha ? 'is-show' : ''"
-                                      aria-hidden="true">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                                        <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
+                                       class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right" placeholder="Repita a senha" :disabled="loading" />
+                                <span class="auth-prem-input-check" :class="senhaConf.length > 0 && senhaConf === senha ? 'is-show' : ''" aria-hidden="true">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </span>
                             </div>
                             <span asp-validation-for="ConfirmarSenha" class="auth-prem-field-error"></span>
                         </div>
 
-                        <button type="submit"
-                                :disabled="loading"
-                                :aria-busy="loading ? 'true' : 'false'"
-                                class="auth-prem-launch"
-                                style="margin-top: 10px;">
+                        <button type="submit" :disabled="loading" :aria-busy="loading ? 'true' : 'false'" class="auth-prem-launch" style="margin-top: 10px;">
                             <span x-show="!loading">Criar conta e começar</span>
                             <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
                                 <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
                                 Criando…
                             </span>
-                            <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                            <span class="auth-prem-launch-arrow" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                            </span>
                         </button>
                     </form>
 
@@ -234,17 +230,9 @@
     <script>
         function registrarForm() {
             return {
-                loading: false,
-                senha: '',
-                senhaConf: '',
-                senhaLevel: 0,
-                senhaLabel: '',
-                emailVal: '',
-                emailOk: null,
-                emailChecking: false,
-                documento: '',
-                docOk: null,
-                docChecking: false,
+                loading: false, senha: '', senhaConf: '', senhaLevel: 0, senhaLabel: '',
+                emailVal: '', emailOk: null, emailChecking: false,
+                documento: '', docOk: null, docChecking: false,
 
                 onSenhaInput() {
                     const v = this.senha || '';
@@ -256,26 +244,17 @@
                     this.senhaLevel = score;
                     this.senhaLabel = ['Muito curta', 'Fraca', 'Razoável', 'Boa', 'Forte'][score];
                 },
-
                 async checkEmail() {
                     const v = (this.emailVal || '').trim();
-                    if (!v || !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(v)) {
-                        this.emailOk = null;
-                        return;
-                    }
+                    if (!v || !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(v)) { this.emailOk = null; return; }
                     this.emailChecking = true;
                     try {
                         const r = await fetch('/api/empresas/email-disponivel?email=' + encodeURIComponent(v), { credentials: 'same-origin' });
                         if (!r.ok) { this.emailOk = null; return; }
                         const json = await r.json();
                         this.emailOk = !!(json && json.data && json.data.disponivel);
-                    } catch (e) {
-                        this.emailOk = null;
-                    } finally {
-                        this.emailChecking = false;
-                    }
+                    } catch (e) { this.emailOk = null; } finally { this.emailChecking = false; }
                 },
-
                 async checkDoc() {
                     const v = (this.documento || '').trim();
                     if (!v) { this.docOk = null; return; }
@@ -285,18 +264,9 @@
                         if (!r.ok) { this.docOk = null; return; }
                         const json = await r.json();
                         this.docOk = !!(json && json.data && json.data.disponivel);
-                    } catch (e) {
-                        this.docOk = null;
-                    } finally {
-                        this.docChecking = false;
-                    }
+                    } catch (e) { this.docOk = null; } finally { this.docChecking = false; }
                 },
-
-                handleSubmit() {
-                    if (this.loading) return;
-                    this.loading = true;
-                    // form segue submit normal
-                }
+                handleSubmit() { if (this.loading) return; this.loading = true; }
             };
         }
     </script>

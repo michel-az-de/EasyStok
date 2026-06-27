@@ -13,7 +13,7 @@
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
-            const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
             document.documentElement.dataset.theme = theme;
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
@@ -33,11 +33,11 @@
     <div class="auth-prem-shell" x-data="{ loading: false }">
         <div class="auth-prem-layout auth-prem-enter">
 
-            <!-- ============ FACE DA MARCA ============ -->
+            <!-- ============ FACE ESQUERDA: EDITORIAL ============ -->
             <section class="auth-prem-brand">
-                <div>
-                    <div class="auth-prem-wordmark">
-                        <span class="auth-prem-cube" aria-hidden="true">
+                <div class="auth-prem-topbar">
+                    <span class="auth-prem-wordmark">
+                        <span class="auth-prem-cube">
                             <svg viewBox="0 0 64 64" fill="none">
                                 <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
                                 <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
@@ -45,17 +45,30 @@
                             </svg>
                         </span>
                         <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
-                    </div>
-
-                    <p class="auth-prem-eyebrow">Recuperação de acesso</p>
-                    <h1 class="auth-prem-headline">Esqueceu a senha? A gente resolve.</h1>
-                    <p class="auth-prem-lede">Informe seu e-mail e enviamos um link seguro para você criar uma nova senha e voltar à operação.</p>
+                    </span>
                 </div>
 
-                <div class="auth-prem-brand-bottom">Suporte · Segurança · v2026</div>
+                <div class="auth-prem-editorial">
+                    <p class="auth-prem-eyebrow">Recuperação de acesso</p>
+                    <h1 class="auth-prem-headline">Esqueceu a senha? <span class="ink">A gente resolve</span>.</h1>
+                    <p class="auth-prem-lede">Informe seu e-mail e enviamos um link seguro para você criar uma nova senha e voltar à operação.</p>
+
+                    <ul class="auth-prem-bullets">
+                        <li class="auth-prem-bullet">
+                            <span class="auth-prem-bullet-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                            <span>Link seguro, válido por 1 hora</span>
+                        </li>
+                        <li class="auth-prem-bullet">
+                            <span class="auth-prem-bullet-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                            <span>Sua operação continua intacta</span>
+                        </li>
+                    </ul>
+
+                    <div class="auth-prem-editorial-foot">Suporte · Segurança · v2026</div>
+                </div>
             </section>
 
-            <!-- ============ FACE DO FORMULÁRIO ============ -->
+            <!-- ============ FACE DIREITA: FORMULÁRIO ============ -->
             <section class="auth-prem-panel">
                 <div class="auth-prem-card auth-prem-enter-2">
 
@@ -74,61 +87,59 @@
                     {
                         <div style="text-align: center;">
                             <div class="auth-prem-success-icon" aria-hidden="true">
-                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-                                    <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M3 7l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 7l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </div>
-                            <h2 class="auth-prem-card-title">Confira seu e-mail</h2>
+                            <h1 class="auth-prem-card-title">Confira seu e-mail</h1>
                             <p class="auth-prem-card-subtitle" style="margin-bottom: 22px;">
                                 Se houver uma conta com esse e-mail, o link de recuperação já está a caminho. Olhe a <strong>caixa de entrada</strong> — e o spam, por garantia. O link vale por <strong>1 hora</strong>.
                             </p>
                             <a href="/auth/login" class="auth-prem-launch" style="text-decoration: none;">
                                 <span>Voltar ao login</span>
-                                <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                                <span class="auth-prem-launch-arrow" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                                </span>
                             </a>
                         </div>
                     }
                     else
                     {
-                        <h2 class="auth-prem-card-title">Recuperar acesso</h2>
+                        <p class="auth-prem-card-eyebrow">Recuperar acesso</p>
+                        <h1 class="auth-prem-card-title">Vamos recuperar sua senha</h1>
                         <p class="auth-prem-card-subtitle">Digite o e-mail da sua conta. Enviamos um link para criar uma nova senha.</p>
 
                         @if (!ViewData.ModelState.IsValid)
                         {
                             <div class="auth-prem-alert auth-prem-alert--error" role="alert" aria-live="assertive">
-                                <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
-                                </svg>
+                                <svg class="auth-prem-alert-icon" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
                                 <div>@Html.ValidationSummary(false, "", new { @class = "" })</div>
                             </div>
                         }
 
                         <form asp-action="EsqueciSenha" asp-controller="Auth" method="post"
-                              :aria-busy="loading ? 'true' : 'false'"
-                              @@submit="loading = true">
+                              :aria-busy="loading ? 'true' : 'false'" @@submit="loading = true">
                             @Html.AntiForgeryToken()
 
                             <div class="auth-prem-field">
                                 <label asp-for="Email" class="auth-prem-field-label">E-mail</label>
-                                <input asp-for="Email" type="email" autocomplete="email" required autofocus
-                                       class="auth-prem-input"
-                                       placeholder="voce@empresa.com.br"
-                                       :disabled="loading" />
+                                <div class="auth-prem-input-wrap">
+                                    <span class="auth-prem-field-ic" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+                                    </span>
+                                    <input asp-for="Email" type="email" autocomplete="email" required autofocus
+                                           class="auth-prem-input auth-prem-input--with-icon-left" placeholder="voce@suaempresa.com.br" :disabled="loading" />
+                                </div>
                                 <span asp-validation-for="Email" class="auth-prem-field-error"></span>
                             </div>
 
-                            <button type="submit"
-                                    :disabled="loading"
-                                    :aria-busy="loading ? 'true' : 'false'"
-                                    class="auth-prem-launch"
-                                    style="margin-top: 8px;">
+                            <button type="submit" :disabled="loading" :aria-busy="loading ? 'true' : 'false'" class="auth-prem-launch" style="margin-top: 8px;">
                                 <span x-show="!loading">Enviar link de recuperação</span>
                                 <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
                                     <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
                                     Enviando…
                                 </span>
-                                <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
+                                <span class="auth-prem-launch-arrow" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                                </span>
                             </button>
                         </form>
 
