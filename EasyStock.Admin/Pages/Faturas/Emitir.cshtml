@@ -173,6 +173,18 @@
                     this.erro = 'O subtotal não pode ser negativo. Revise os itens de Desconto.';
                     return;
                 }
+                // NEW-002: data de vencimento no passado (backend ja valida; aqui da feedback antes do submit).
+                const dv = e.target.querySelector('input[name="dataVencimento"]');
+                if (dv && dv.value) {
+                    const d = new Date(dv.value + 'T00:00:00');
+                    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+                    if (d < hoje) {
+                        e.preventDefault();
+                        this.erro = 'Data de vencimento não pode estar no passado.';
+                        dv.scrollIntoView({ block: 'center', behavior: 'smooth' }); dv.focus();
+                        return;
+                    }
+                }
                 // IMP-03: rola/foca o 1o campo invalido (em vez de so o balao nativo solto).
                 if (!e.target.checkValidity()) {
                     e.preventDefault();
