@@ -1,0 +1,52 @@
+# Current State: greenfield (no product-analytics tracking detected)
+# Scanned: 2026-06-27
+# SDK: none
+#
+# No product-analytics SDK (Segment, Amplitude, Mixpanel, PostHog, Accoil,
+# RudderStack, Heap, Pendo, GA/gtag) was found in any .csproj, in client-side
+# JS (Web/PWA/Mobile), or in configuration. No track()/identify()/group()/
+# capture() call sites exist anywhere in the codebase.
+#
+# Adjacent systems exist but are NOT product-engagement telemetry — recorded
+# here only as factual context for the design phase (where instrumentation
+# could be wired in), not as events to be inventoried:
+#
+#   adjacent_systems:
+#     - name: OpenTelemetry
+#       type: operational-observability
+#       detail: >
+#         OTel 1.15 in EasyStock.Api (AspNetCore + Http + Runtime instrumentation,
+#         OTLP + Console exporters). Traces/metrics for ops, not user behavior.
+#         A 5xx failure counter was activated (ADR-0036).
+#     - name: Serilog
+#       type: logging
+#       detail: Structured logs with a RedactingTextFormatter that masks PII.
+#     - name: compliance-audit-log
+#       type: forensic-audit
+#       detail: >
+#         AuditLog, EntityAlteracao, AdminAuditLog, AdminAcessoPiiLog, and
+#         impersonation logs. Governance/forensic trails written to Postgres,
+#         not forwarded to any analytics destination.
+#     - name: internal-bi
+#       type: in-house-analytics
+#       detail: >
+#         AnalyticsController / InteligenciaController + IAnalyticsRepository
+#         compute dashboards (reposicao, alertas, receita, movimentacoes) by
+#         querying the tenant database. No event stream; read-only aggregation.
+#     - name: last-access-timestamp
+#       type: domain-field
+#       detail: Usuario.UltimoAcessoEm / AtualizarUltimoAcesso() — a login recency field.
+#
+# Identity hook points already present (useful for design's identify/group):
+#   - Auth flow: EasyStock.Api/Controllers/AuthController.cs (JWT 8h + refresh 30d)
+#   - Account context: Empresa (tenant) and Loja resolvable on every authenticated request
+#   - Server-side, multi-tenant (RLS) — events would be emitted server-side with
+#     reliable Empresa/Loja/Usuario context.
+
+events: []
+identity:
+  identify_calls: []
+  group_calls: []
+patterns:
+  naming_style: n/a
+  centralized: n/a
