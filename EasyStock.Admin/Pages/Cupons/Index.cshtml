@@ -160,7 +160,8 @@ else
                 const f = $event.target;
                 const tipo = f.tipoDesconto ? f.tipoDesconto.value : '';
                 const valor = f.valor ? parseFloat(f.valor.value) : NaN;
-                if (tipo === 'Percentual' && !isNaN(valor) && valor > 100) { erro = 'Desconto percentual não pode passar de 100%.'; bloquear = true; }
+                if (!isNaN(valor) && valor > 99999999.99) { erro = 'Valor do desconto é muito alto. Máximo permitido: 99.999.999,99.'; bloquear = true; }
+                else if (tipo === 'Percentual' && !isNaN(valor) && valor > 100) { erro = 'Desconto percentual não pode passar de 100%.'; bloquear = true; }
                 else if (f.validoAte && f.validoAte.value) { const d = new Date(f.validoAte.value + 'T00:00:00'); const hoje = new Date(); hoje.setHours(0,0,0,0); if (d < hoje) { erro = 'Data de validade não pode estar no passado.'; bloquear = true; } }
             } catch (e) { }
             if (bloquear) { $event.preventDefault(); } else { loading = true; }
