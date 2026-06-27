@@ -1,4 +1,4 @@
-﻿@model RegisterViewModel
+@model RegisterViewModel
 @{
     Layout = null;
     ViewBag.Title = "Criar conta";
@@ -12,7 +12,7 @@
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
-            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
             document.documentElement.dataset.theme = theme;
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
@@ -26,59 +26,67 @@
     <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
     <style>
         [x-cloak] { display: none !important; }
-        .registrar-card-wide { max-width: 520px; }
+        .registrar-card-wide { max-width: 480px; }
     </style>
 </head>
 <body class="font-[Inter] antialiased">
     <div class="auth-prem-shell" x-data="registrarForm()">
         <div class="auth-prem-layout auth-prem-enter">
 
-            <!-- ============ BRAND PANEL ============ -->
+            <!-- ============ FACE DA MARCA ============ -->
             <section class="auth-prem-brand">
                 <div>
                     <div class="auth-prem-wordmark">
-                        <div class="auth-prem-cube" aria-hidden="true">
+                        <span class="auth-prem-cube" aria-hidden="true">
                             <svg viewBox="0 0 64 64" fill="none">
                                 <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
                                 <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
                                 <path d="M56 18 L32 30 L32 58 L56 46 Z" style="fill:var(--navy-900)"/>
                             </svg>
-                        </div>
+                        </span>
                         <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
                     </div>
 
-                    <p class="auth-prem-eyebrow">TRIAL · 14 DIAS · SEM CARTÃO</p>
+                    <p class="auth-prem-eyebrow">Teste grátis · 14 dias · sem cartão</p>
+                    <h1 class="auth-prem-headline">Comece a operar hoje mesmo.</h1>
+                    <p class="auth-prem-lede">Crie a conta, cadastre a primeira loja e registre a primeira venda no mesmo dia. Sem instalação, sem cartão.</p>
 
-                    <h1 class="auth-prem-headline">Comece em 3 minutos. Sem cartão.</h1>
-                    <p class="auth-prem-lede">Cadastre sua empresa, configure sua primeira loja e comece a operar no mesmo dia.</p>
-
-                    <ul class="auth-prem-bullets" style="margin-top: 28px;">
+                    <ul class="auth-prem-bullets">
                         <li class="auth-prem-bullet">
                             <span class="auth-prem-bullet-mark">✓</span>
-                            <span>Cadastro do estoque guiado, passo a passo</span>
+                            <span>Cadastro de estoque guiado, passo a passo</span>
                         </li>
                         <li class="auth-prem-bullet">
                             <span class="auth-prem-bullet-mark">✓</span>
-                            <span>Equipe inteira inclusa no plano trial</span>
+                            <span>Toda a equipe inclusa durante o teste</span>
                         </li>
                         <li class="auth-prem-bullet">
                             <span class="auth-prem-bullet-mark">✓</span>
-                            <span>Sem cobrança até você decidir continuar</span>
+                            <span>Você só decide pagar quando fizer sentido</span>
                         </li>
                     </ul>
                 </div>
 
-                <div class="auth-prem-brand-bottom">
-                    PRIMEIRO ACESSO · v2026
-                </div>
+                <div class="auth-prem-brand-bottom">Primeiro acesso · v2026</div>
             </section>
 
-            <!-- ============ FORM PANEL ============ -->
+            <!-- ============ FACE DO FORMULÁRIO ============ -->
             <section class="auth-prem-panel">
                 <div class="auth-prem-card auth-prem-enter-2 registrar-card-wide">
 
-                    <h2 class="auth-prem-card-title">Sua conta gratuita</h2>
-                    <p class="auth-prem-card-subtitle">Em 3 minutos você já está operando.</p>
+                    <div class="auth-prem-mobilehead" aria-hidden="true">
+                        <span class="auth-prem-cube">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
+                                <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
+                                <path d="M56 18 L32 30 L32 58 L56 46 Z" style="fill:var(--navy-900)"/>
+                            </svg>
+                        </span>
+                        <span class="auth-prem-mobilehead-text">Easy<span class="stok">Stok</span></span>
+                    </div>
+
+                    <h2 class="auth-prem-card-title">Crie sua conta</h2>
+                    <p class="auth-prem-card-subtitle">Leva uns 3 minutos — e já dá pra usar.</p>
 
                     @if (!ViewData.ModelState.IsValid)
                     {
@@ -96,7 +104,7 @@
                           @@submit="handleSubmit">
                         @Html.AntiForgeryToken()
 
-                        <p class="auth-prem-eyebrow" style="color: var(--text-muted); letter-spacing: 0.18em; margin: 4px 0 12px;">Sua Empresa</p>
+                        <p class="auth-prem-section">Sua empresa</p>
 
                         <div class="auth-prem-field">
                             <label asp-for="NomeEmpresa" class="auth-prem-field-label">Nome da empresa *</label>
@@ -120,14 +128,14 @@
                                        x-model="documento" />
                                 <span x-show="docChecking" x-cloak class="auth-prem-spinner-inline" aria-hidden="true"></span>
                             </div>
-                            <span class="auth-prem-field-help">Usado em notas fiscais. Você pode adicionar depois.</span>
+                            <span class="auth-prem-field-help">Usado nas notas fiscais. Pode adicionar depois.</span>
                             <span class="auth-prem-inline-feedback"
                                   :class="docOk === true ? 'auth-prem-inline-feedback--ok' : 'auth-prem-inline-feedback--err'"
                                   x-show="docOk !== null && !docChecking" x-cloak
                                   x-text="docOk ? 'CNPJ/CPF disponível.' : 'CNPJ/CPF já em uso.'"></span>
                         </div>
 
-                        <p class="auth-prem-eyebrow" style="color: var(--text-muted); letter-spacing: 0.18em; margin: 22px 0 12px;">Seu acesso</p>
+                        <p class="auth-prem-section auth-prem-section--gap">Seu acesso</p>
 
                         <div class="auth-prem-field">
                             <label asp-for="NomeAdmin" class="auth-prem-field-label">Seu nome *</label>
@@ -143,7 +151,7 @@
                             <div class="auth-prem-input-wrap">
                                 <input asp-for="Email" id="reg-email" type="email" autocomplete="email" required
                                        class="auth-prem-input"
-                                       placeholder="seu@email.com"
+                                       placeholder="voce@empresa.com.br"
                                        :disabled="loading"
                                        @@blur="checkEmail"
                                        x-model="emailVal" />
@@ -173,7 +181,7 @@
                                 <span class="auth-prem-strength-bar"></span>
                             </div>
                             <span class="auth-prem-strength-label" :data-level="senhaLevel" x-text="senhaLabel" x-show="senha.length > 0" x-cloak></span>
-                            <span class="auth-prem-field-help" x-show="senha.length === 0">Use letras, números e símbolos para uma senha forte.</span>
+                            <span class="auth-prem-field-help" x-show="senha.length === 0">Misture letras, números e símbolos para uma senha forte.</span>
                             <span asp-validation-for="Senha" class="auth-prem-field-error"></span>
                         </div>
 
@@ -200,8 +208,8 @@
                                 :disabled="loading"
                                 :aria-busy="loading ? 'true' : 'false'"
                                 class="auth-prem-launch"
-                                style="margin-top: 8px;">
-                            <span x-show="!loading">Começar agora</span>
+                                style="margin-top: 10px;">
+                            <span x-show="!loading">Criar conta e começar</span>
                             <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
                                 <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
                                 Criando…
