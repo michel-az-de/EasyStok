@@ -140,14 +140,8 @@ public class AdminStorefrontCardapioController(
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
         // Tradução de violações de constraint do Postgres → 400 amigável (ADR-0031)
-        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo")
-            { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
-        catch (PostgresException ex) when (ex.SqlState == "23505")
-            { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
-        catch (PostgresException ex) when (ex.SqlState == "23514")
-            { return DataBadRequest("Nome é obrigatório para itens sem produto vinculado."); }
-        catch (PostgresException ex) when (ex.SqlState == "23503")
-            { return DataBadRequest("Seção informada não existe."); }
+        catch (PostgresException ex) when (CardapioPostgresErrors.Traduzir(ex) is { } msg)
+            { return DataBadRequest(msg); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item ao cardápio {StorefrontId}", storefrontId);
@@ -190,12 +184,9 @@ public class AdminStorefrontCardapioController(
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
-        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo")
-            { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
-        catch (PostgresException ex) when (ex.SqlState == "23505")
-            { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
-        catch (PostgresException ex) when (ex.SqlState == "23503")
-            { return DataBadRequest("Seção informada não existe."); }
+        // Editar preserva o comportamento original: 23514 não é tratado aqui (segue p/ 500).
+        catch (PostgresException ex) when (ex.SqlState != "23514" && CardapioPostgresErrors.Traduzir(ex) is { } msg)
+            { return DataBadRequest(msg); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao editar item {ItemId}", itemId);

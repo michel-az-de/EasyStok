@@ -25,6 +25,12 @@ public interface ICardapioItemRepository
     /// <summary>Conta items (visíveis ou não) no storefront — admin listagem.</summary>
     Task<int> ContarPorStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Conta items por storefront para vários storefronts numa única query (evita N+1 na
+    /// listagem admin). Storefronts sem nenhum item não aparecem no dicionário (use default 0).
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, int>> ContarPorStorefrontsAsync(IReadOnlyCollection<Guid> storefrontIds, CancellationToken ct = default);
+
     /// <summary>ProdutoIds já em uso pelo storefront — filtra dropdown ao adicionar.</summary>
     Task<IReadOnlyCollection<Guid>> GetProdutoIdsDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
 }

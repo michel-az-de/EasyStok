@@ -43,12 +43,14 @@ public class ListarStorefrontsAdminUseCase(
             command.BuscaSlug,
             command.Ativo);
 
-        // N+1 controlado — listagem normalmente ≤ 100 storefronts, COUNT é cheap.
-        // Em escala maior, agregamos em 1 query single via GROUP BY.
+        // Counts de cardápio em 1 query (GROUP BY) em vez de N COUNTs (era N+1).
+        // Storefronts sem item não vêm no dicionário → default 0 no lookup.
+        var ids = storefronts.Select(s => s.Id).ToList();
+        var counts = await cardapioRepository.ContarPorStorefrontsAsync(ids);
+
         var itens = new List<StorefrontAdminListItem>(storefronts.Count);
         foreach (var s in storefronts)
         {
-            var count = await cardapioRepository.ContarPorStorefrontAsync(s.Id);
             itens.Add(new StorefrontAdminListItem(
                 s.Id,
                 s.EmpresaId,
@@ -56,7 +58,7 @@ public class ListarStorefrontsAdminUseCase(
                 s.TituloPublico,
                 s.DominioCustom,
                 s.Ativo,
-                count,
+                counts.GetValueOrDefault(s.Id, 0),
                 s.CriadoEm));
         }
 

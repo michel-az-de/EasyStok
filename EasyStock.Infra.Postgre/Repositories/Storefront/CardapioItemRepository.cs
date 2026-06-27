@@ -99,6 +99,21 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
     public Task<int> ContarPorStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
         db.CardapioItens.CountAsync(c => c.StorefrontId == storefrontId, ct);
 
+    // Mesmo escopo do ContarPorStorefrontAsync (mesmo db, sem IgnoreQueryFilters; CardapioItem
+    // não tem EmpresaId logo não recebe filtro de tenant — o escopo é puramente por StorefrontId).
+    // 1 query GROUP BY no lugar de N COUNTs. Storefronts sem item somem do resultado (default 0).
+    public async Task<IReadOnlyDictionary<Guid, int>> ContarPorStorefrontsAsync(
+        IReadOnlyCollection<Guid> storefrontIds, CancellationToken ct = default)
+    {
+        if (storefrontIds.Count == 0) return new Dictionary<Guid, int>();
+
+        return await db.CardapioItens
+            .Where(c => storefrontIds.Contains(c.StorefrontId))
+            .GroupBy(c => c.StorefrontId)
+            .Select(g => new { StorefrontId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.StorefrontId, x => x.Count, ct);
+    }
+
     public async Task<IReadOnlyCollection<Guid>> GetProdutoIdsDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
         await db.CardapioItens
             .AsNoTracking()

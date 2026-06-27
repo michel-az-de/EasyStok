@@ -109,7 +109,12 @@ public class MarcarEtiquetasImpressasUseCase(
             if (doc.RootElement.TryGetProperty("id", out var idEl))
                 return idEl.TryGetGuid(out var g) && g == templateId;
         }
-        catch { }
+        catch (JsonException)
+        {
+            // Snapshot malformado = tratado como "não-igual" (segue o fluxo de divergência).
+            // Só JsonException é engolida (no try, apenas Parse lança); qualquer outra exceção
+            // propaga em vez de ser silenciada.
+        }
         return false;
     }
 }

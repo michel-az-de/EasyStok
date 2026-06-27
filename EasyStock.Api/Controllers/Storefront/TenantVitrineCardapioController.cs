@@ -197,10 +197,7 @@ public class TenantVitrineCardapioController(
         catch (StorefrontNaoEncontradoException) { return DataNotFound(SemVitrine); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
-        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo") { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
-        catch (PostgresException ex) when (ex.SqlState == "23505") { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
-        catch (PostgresException ex) when (ex.SqlState == "23514") { return DataBadRequest("Nome é obrigatório para itens sem produto vinculado."); }
-        catch (PostgresException ex) when (ex.SqlState == "23503") { return DataBadRequest("Seção informada não existe."); }
+        catch (PostgresException ex) when (CardapioPostgresErrors.Traduzir(ex) is { } msg) { return DataBadRequest(msg); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item à vitrine {StorefrontId}", sf.Id);
@@ -240,9 +237,9 @@ public class TenantVitrineCardapioController(
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
-        catch (PostgresException ex) when (ex.SqlState == "23505" && ex.ConstraintName == "uq_cardapio_item_variacao_rotulo") { return DataBadRequest("Há opções com o mesmo rótulo neste item."); }
-        catch (PostgresException ex) when (ex.SqlState == "23505") { return DataBadRequest("Já existe um item com esse nome no cardápio."); }
-        catch (PostgresException ex) when (ex.SqlState == "23503") { return DataBadRequest("Seção informada não existe."); }
+        // Editar preserva o comportamento original: 23514 (nome obrigatório) NÃO é tratado aqui
+        // e segue para o handler genérico (500) — mesmo padrão do Admin. As demais violações viram 400.
+        catch (PostgresException ex) when (ex.SqlState != "23514" && CardapioPostgresErrors.Traduzir(ex) is { } msg) { return DataBadRequest(msg); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao editar item {ItemId} da vitrine", itemId);
