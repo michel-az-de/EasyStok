@@ -39,3 +39,14 @@
 		reverse_proxy storefront:8080
 	}
 }
+
+# casadababa.com (dominio real) - host explicito; mesma config do storefront sslip.
+# handle /api/* -> api; resto -> storefront (mesma origem, sem CORS). Cert LE via HTTP-01. refs #703
+casadababa.com, www.casadababa.com {
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+	handle {
+		reverse_proxy storefront:8080
+	}
+}
