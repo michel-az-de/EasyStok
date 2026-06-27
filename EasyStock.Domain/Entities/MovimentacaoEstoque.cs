@@ -154,6 +154,56 @@ namespace EasyStock.Domain.Entities
                 UserAgent = auditoria?.UserAgent,
                 DispositivoId = auditoria?.DispositivoId
             };
+
+        /// <summary>
+        /// Movimentacao-espelho de um ajuste de contagem fisica (ADR Inventario, D3): a
+        /// provenance autoritativa e <see cref="Entities.AjusteInventario"/>; esta linha
+        /// mantem a timeline de movimentos do lote e os relatorios coerentes.
+        /// <see cref="Quantidade"/> e SEM sinal: a direcao vem do <see cref="Tipo"/>
+        /// (precedente: estorno usa Entrada, ver <see cref="CriarEstorno"/>). delta &gt; 0
+        /// (sobra / lote novo) = Entrada; delta &lt; 0 (falta / zerado) = Saida (VendaId null).
+        /// Natureza = Ajuste (terceiro Tipo, != Saida/Entrada — honra a trava). DocumentoReferencia
+        /// liga a contagem.
+        /// </summary>
+        public static MovimentacaoEstoque CriarAjusteContagem(
+            Guid id,
+            Guid empresaId,
+            ItemEstoque item,
+            decimal delta,
+            Dinheiro custoUnitario,
+            DateTime dataMovimentacao,
+            Guid contagemId,
+            string? descricao,
+            DateTime criadoEm,
+            AuditoriaContexto? auditoria = null)
+        {
+            if (delta == 0m)
+                throw new Exceptions.RegraDeDominioVioladaException("Ajuste de contagem exige delta != 0.");
+
+            var quantidade = Quantidade.From(Math.Abs(delta));
+            return new()
+            {
+                Id = id,
+                EmpresaId = empresaId,
+                ItemEstoqueId = item.Id,
+                ProdutoId = item.ProdutoId,
+                ProdutoVariacaoId = item.ProdutoVariacaoId,
+                VendaId = null,
+                Tipo = delta > 0m ? TipoMovimentacaoEstoque.Entrada : TipoMovimentacaoEstoque.Saida,
+                Natureza = NaturezaMovimentacaoEstoque.Ajuste,
+                Quantidade = quantidade,
+                ValorUnitario = custoUnitario,
+                ValorTotal = Dinheiro.FromDecimal(custoUnitario.Valor * quantidade.Value),
+                DataMovimentacao = dataMovimentacao,
+                Descricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao.Trim(),
+                DocumentoReferencia = $"contagem:{contagemId}",
+                CriadoEm = criadoEm,
+                UsuarioId = auditoria?.UsuarioId,
+                Ip = auditoria?.Ip,
+                UserAgent = auditoria?.UserAgent,
+                DispositivoId = auditoria?.DispositivoId
+            };
+        }
     }
 
     /// <summary>

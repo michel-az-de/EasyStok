@@ -228,6 +228,44 @@ namespace EasyStock.Domain.Entities
             RecalcularIndicadores(alteradoEm);
         }
 
+        /// <summary>
+        /// Aplica um ajuste de contagem fisica (ADR Inventario): muta a quantidade por
+        /// DELTA relativo ao saldo ATUAL, nao por valor absoluto. delta = contado -
+        /// esperadoNoMomento (a divergencia achada no instante da contagem). Aplicar
+        /// relativo ao atual preserva vendas concorrentes ocorridas entre contar e aplicar.
+        /// Se o resultado ficar negativo (oversell concorrente), pisa em 0 e registra o
+        /// excedente em <see cref="QuantidadeDescoberta"/> (#540). A contagem fisica e a
+        /// verdade: a QuantidadeDescoberta previa e zerada antes de aplicar. NAO barra por
+        /// status (reconciliacao, nao saida); Vencido permanece Vencido no recalc.
+        /// </summary>
+        public Quantidade AplicarAjusteContagem(
+            Quantidade qtdContada,
+            Quantidade qtdEsperadaNoMomento,
+            DateTime dataAjuste,
+            DateTime alteradoEm)
+        {
+            var delta = qtdContada.Value - qtdEsperadaNoMomento.Value;
+
+            // A contagem reconcilia a realidade; a divida sintetica de oversell anterior se resolve.
+            QuantidadeDescoberta = Quantidade.Zero;
+
+            var alvo = QuantidadeAtual.Value + delta;
+            if (alvo >= 0)
+            {
+                QuantidadeAtual = Quantidade.From(alvo);
+            }
+            else
+            {
+                QuantidadeDescoberta = Quantidade.From(-alvo);
+                QuantidadeAtual = Quantidade.Zero;
+            }
+
+            UltimaMovimentacaoEm = dataAjuste;
+            AlteradoEm = alteradoEm;
+            RecalcularIndicadores(dataAjuste);
+            return QuantidadeAtual;
+        }
+
         public void AtualizarVelocidadeSaida(decimal velocidadeSaidaDiaria, DateTime dataReferencia)
         {
             VelocidadeSaidaDiaria = Math.Max(0m, decimal.Round(velocidadeSaidaDiaria, 2));
