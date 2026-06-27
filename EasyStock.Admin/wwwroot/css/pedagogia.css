@@ -127,3 +127,79 @@
         transition: none;
     }
 }
+
+/* === es-page-header (cabeçalho pedagógico unificado de página) =========== */
+/* Eyebrow (mono) + título (Fraunces) + descrição pedagógica, ações à direita
+   e breadcrumb acima. Reaproveita a escala tipográfica do .deck-head. O gatilho
+   de ajuda (es-help) ao lado do título reusa o estilo da seção es-help acima. */
+
+.es-page-header {
+    display: block;
+    margin-bottom: var(--s-6);
+}
+
+.es-page-header-breadcrumb {
+    margin-bottom: var(--s-3);
+}
+
+.es-page-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: var(--s-4);
+}
+
+.es-page-header-text {
+    min-width: 0;
+}
+
+.es-page-header-eyebrow {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--deck-eyebrow);
+    margin: 0;
+}
+
+.es-page-header-title-line {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+}
+
+.es-page-header-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 3vw, 42px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    margin: var(--s-1) 0 0;
+    text-wrap: balance;
+}
+
+.es-page-header-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: var(--s-2) 0 0;
+    max-width: 54ch;
+    text-wrap: pretty;
+}
+
+.es-page-header-actions {
+    display: inline-flex;
+    gap: var(--s-2);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+    .es-page-header-title {
+        font-size: clamp(24px, 7vw, 32px);
+    }
+}
