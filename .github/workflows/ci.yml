@@ -24,6 +24,25 @@ jobs:
     name: Build + dotnet test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Postgres efemero para os testes de integracao (EasyStock.Inventario.IntegrationTests,
+    # ADR Inventario/Fatia 0). O fixture le a conn string de EASYSTOCK_IT_PG (setada no
+    # step Test) e cria o role NOSUPERUSER rls_test_client sujeito a RLS. Sem este service,
+    # os testes [SkippableFact] SKIPam; o guard nao-skip Harness_executa... vira o gate
+    # vermelho se a env var estiver setada mas o banco indisponivel. Bloco espelha
+    # restore-test-rotulos.yml.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: easystock_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +67,11 @@ jobs:
         run: dotnet build EasyStok.CI.slnf -c Release --no-restore -warnaserror
 
       - name: Test
+        env:
+          # Conn string do service postgres (superuser). SSL Mode=Disable: o container
+          # oficial nao tem TLS e o Npgsql 9.x tentaria handshake. O fixture deriva dela
+          # o login NOSUPERUSER rls_test_client para exercer a RLS de verdade.
+          EASYSTOCK_IT_PG: "Host=localhost;Port=5432;Database=easystock_ci;Username=postgres;Password=postgres;SSL Mode=Disable"
         run: >-
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore

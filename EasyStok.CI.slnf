@@ -20,7 +20,8 @@
       "EasyStock.Web.UnitTests\\EasyStock.Web.UnitTests.csproj",
       "EasyStock.Admin.UnitTests\\EasyStock.Admin.UnitTests.csproj",
       "EasyStock.Infra.Async.UnitTests\\EasyStock.Infra.Async.UnitTests.csproj",
-      "EasyStock.Infra.Integrations.UnitTests\\EasyStock.Infra.Integrations.UnitTests.csproj"
+      "EasyStock.Infra.Integrations.UnitTests\\EasyStock.Infra.Integrations.UnitTests.csproj",
+      "EasyStock.Inventario.IntegrationTests\\EasyStock.Inventario.IntegrationTests.csproj"
     ]
   }
 }
