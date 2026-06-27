@@ -1,4 +1,4 @@
-﻿@model ForgotPasswordViewModel
+@model ForgotPasswordViewModel
 @{
     Layout = null;
     ViewBag.Title = "Esqueci minha senha";
@@ -13,7 +13,7 @@
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
-            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
             document.documentElement.dataset.theme = theme;
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
@@ -27,71 +27,61 @@
     <link rel="stylesheet" href="~/css/auth-premium.css" asp-append-version="true" />
     <style>
         [x-cloak] { display: none !important; }
-        .esq-success-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: var(--ok-50);
-            color: var(--ok-700);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin: 4px auto 16px;
-            border: 1px solid var(--ok-200);
-        }
-        [data-theme="dark"] .esq-success-icon {
-            background: rgba(14, 107, 61, 0.22);
-            color: var(--ok-300);
-            border-color: rgba(34, 197, 94, 0.35);
-        }
     </style>
 </head>
 <body class="font-[Inter] antialiased">
     <div class="auth-prem-shell" x-data="{ loading: false }">
         <div class="auth-prem-layout auth-prem-enter">
 
-            <!-- ============ BRAND PANEL ============ -->
+            <!-- ============ FACE DA MARCA ============ -->
             <section class="auth-prem-brand">
                 <div>
                     <div class="auth-prem-wordmark">
-                        <div class="auth-prem-cube" aria-hidden="true">
+                        <span class="auth-prem-cube" aria-hidden="true">
                             <svg viewBox="0 0 64 64" fill="none">
                                 <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
                                 <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
                                 <path d="M56 18 L32 30 L32 58 L56 46 Z" style="fill:var(--navy-900)"/>
                             </svg>
-                        </div>
+                        </span>
                         <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
                     </div>
 
-                    <p class="auth-prem-eyebrow">RECUPERAÇÃO DE ACESSO</p>
-
-                    <h1 class="auth-prem-headline">Recupere o acesso em segundos.</h1>
-                    <p class="auth-prem-lede">Enviamos um link de redefinição direto para o seu e-mail. Você cria uma nova senha e volta para a operação.</p>
+                    <p class="auth-prem-eyebrow">Recuperação de acesso</p>
+                    <h1 class="auth-prem-headline">Esqueceu a senha? A gente resolve.</h1>
+                    <p class="auth-prem-lede">Informe seu e-mail e enviamos um link seguro para você criar uma nova senha e voltar à operação.</p>
                 </div>
 
-                <div class="auth-prem-brand-bottom">
-                    SUPORTE · SEGURANÇA · v2026
-                </div>
+                <div class="auth-prem-brand-bottom">Suporte · Segurança · v2026</div>
             </section>
 
-            <!-- ============ FORM PANEL ============ -->
+            <!-- ============ FACE DO FORMULÁRIO ============ -->
             <section class="auth-prem-panel">
                 <div class="auth-prem-card auth-prem-enter-2">
+
+                    <div class="auth-prem-mobilehead" aria-hidden="true">
+                        <span class="auth-prem-cube">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
+                                <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
+                                <path d="M56 18 L32 30 L32 58 L56 46 Z" style="fill:var(--navy-900)"/>
+                            </svg>
+                        </span>
+                        <span class="auth-prem-mobilehead-text">Easy<span class="stok">Stok</span></span>
+                    </div>
 
                     @if (sent)
                     {
                         <div style="text-align: center;">
-                            <div class="esq-success-icon" aria-hidden="true">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                                    <path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <div class="auth-prem-success-icon" aria-hidden="true">
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
                                     <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M16 14l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M3 7l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                             </div>
-                            <h2 class="auth-prem-card-title">Verifique seu e-mail</h2>
-                            <p class="auth-prem-card-subtitle" style="margin-bottom: 18px;">
-                                Se este e-mail estiver cadastrado, enviamos um link de recuperação. <strong>Verifique sua caixa de entrada</strong> — e a pasta de spam, por garantia. O link expira em 30 minutos.
+                            <h2 class="auth-prem-card-title">Confira seu e-mail</h2>
+                            <p class="auth-prem-card-subtitle" style="margin-bottom: 22px;">
+                                Se houver uma conta com esse e-mail, o link de recuperação já está a caminho. Olhe a <strong>caixa de entrada</strong> — e o spam, por garantia. O link vale por <strong>1 hora</strong>.
                             </p>
                             <a href="/auth/login" class="auth-prem-launch" style="text-decoration: none;">
                                 <span>Voltar ao login</span>
@@ -102,7 +92,7 @@
                     else
                     {
                         <h2 class="auth-prem-card-title">Recuperar acesso</h2>
-                        <p class="auth-prem-card-subtitle">Informe seu e-mail. Enviamos um link para criar uma nova senha.</p>
+                        <p class="auth-prem-card-subtitle">Digite o e-mail da sua conta. Enviamos um link para criar uma nova senha.</p>
 
                         @if (!ViewData.ModelState.IsValid)
                         {
@@ -123,7 +113,7 @@
                                 <label asp-for="Email" class="auth-prem-field-label">E-mail</label>
                                 <input asp-for="Email" type="email" autocomplete="email" required autofocus
                                        class="auth-prem-input"
-                                       placeholder="seu@email.com"
+                                       placeholder="voce@empresa.com.br"
                                        :disabled="loading" />
                                 <span asp-validation-for="Email" class="auth-prem-field-error"></span>
                             </div>

@@ -1,4 +1,4 @@
-﻿@model ResetPasswordViewModel
+@model ResetPasswordViewModel
 @{
     Layout = null;
     ViewBag.Title = "Redefinir senha";
@@ -12,7 +12,7 @@
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');
-            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
             document.documentElement.dataset.theme = theme;
             document.documentElement.classList.toggle('theme-dark', theme === 'dark');
         })();
@@ -32,29 +32,28 @@
     <div class="auth-prem-shell" x-data="redefinirForm()">
         <div class="auth-prem-layout auth-prem-enter">
 
-            <!-- ============ BRAND PANEL ============ -->
+            <!-- ============ FACE DA MARCA ============ -->
             <section class="auth-prem-brand">
                 <div>
                     <div class="auth-prem-wordmark">
-                        <div class="auth-prem-cube" aria-hidden="true">
+                        <span class="auth-prem-cube" aria-hidden="true">
                             <svg viewBox="0 0 64 64" fill="none">
                                 <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
                                 <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
                                 <path d="M56 18 L32 30 L32 58 L56 46 Z" style="fill:var(--navy-900)"/>
                             </svg>
-                        </div>
+                        </span>
                         <span class="auth-prem-wordmark-text">Easy<span class="stok">Stok</span></span>
                     </div>
 
-                    <p class="auth-prem-eyebrow">NOVA SENHA</p>
+                    <p class="auth-prem-eyebrow">Nova senha</p>
+                    <h1 class="auth-prem-headline">Defina uma senha forte e siga em frente.</h1>
+                    <p class="auth-prem-lede">Misture letras, números e símbolos: uma senha forte protege a operação da sua loja.</p>
 
-                    <h1 class="auth-prem-headline">Crie uma senha forte. Você no controle.</h1>
-                    <p class="auth-prem-lede">Combine letras maiúsculas, números e símbolos para garantir o acesso da sua operação.</p>
-
-                    <ul class="auth-prem-bullets" style="margin-top: 28px;">
+                    <ul class="auth-prem-bullets">
                         <li class="auth-prem-bullet">
                             <span class="auth-prem-bullet-mark">✓</span>
-                            <span>Ao menos 8 caracteres</span>
+                            <span>Pelo menos 8 caracteres</span>
                         </li>
                         <li class="auth-prem-bullet">
                             <span class="auth-prem-bullet-mark">✓</span>
@@ -67,17 +66,26 @@
                     </ul>
                 </div>
 
-                <div class="auth-prem-brand-bottom">
-                    SEGURANÇA · v2026
-                </div>
+                <div class="auth-prem-brand-bottom">Segurança · v2026</div>
             </section>
 
-            <!-- ============ FORM PANEL ============ -->
+            <!-- ============ FACE DO FORMULÁRIO ============ -->
             <section class="auth-prem-panel">
                 <div class="auth-prem-card auth-prem-enter-2">
 
-                    <h2 class="auth-prem-card-title">Defina sua nova senha</h2>
-                    <p class="auth-prem-card-subtitle">Sua nova senha precisa ter 8+ caracteres. Letras, números e símbolos garantem mais segurança.</p>
+                    <div class="auth-prem-mobilehead" aria-hidden="true">
+                        <span class="auth-prem-cube">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <path d="M32 6 L56 18 L32 30 L8 18 Z" style="fill:var(--orange-600)"/>
+                                <path d="M8 18 L32 30 L32 58 L8 46 Z" style="fill:var(--navy-700)"/>
+                                <path d="M56 18 L32 30 L32 58 L56 46 Z" style="fill:var(--navy-900)"/>
+                            </svg>
+                        </span>
+                        <span class="auth-prem-mobilehead-text">Easy<span class="stok">Stok</span></span>
+                    </div>
+
+                    <h2 class="auth-prem-card-title">Criar nova senha</h2>
+                    <p class="auth-prem-card-subtitle">Ela precisa ter no mínimo 8 caracteres.</p>
 
                     @if (!ViewData.ModelState.IsValid)
                     {
@@ -173,10 +181,10 @@
                                 :aria-busy="loading ? 'true' : 'false'"
                                 class="auth-prem-launch"
                                 style="margin-top: 8px;">
-                            <span x-show="!loading">Salvar senha</span>
+                            <span x-show="!loading">Salvar nova senha</span>
                             <span x-show="loading" x-cloak style="display: inline-flex; align-items: center; gap: 10px;">
                                 <span class="auth-prem-launch-spinner" aria-hidden="true"></span>
-                                Redefinindo…
+                                Salvando…
                             </span>
                             <span class="auth-prem-launch-arrow" aria-hidden="true">→</span>
                         </button>
