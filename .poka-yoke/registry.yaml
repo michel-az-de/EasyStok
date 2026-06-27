@@ -3,7 +3,7 @@
 # Mantido vivo: ampliar com evidencia medida (PS1). NAO editar sem atualizar o ADR.
 version: 1
 adr: docs/adr/0029-camada-poka-yoke-frugalidade-tokens.md
-updated: "2026-06-08"
+updated: "2026-06-27"
 
 # Arquivos gerados/copiados em build: editar a copia e sempre-erro (a fonte manda).
 # severity block = hook PreToolUse nega Edit/Write (Fatia 4).
@@ -89,6 +89,37 @@ traps:
     detector: "teste estatico: o dispatchEvent existe"
     status: active
     evidence: "#497 commit 941d7821"
+  # Armadilhas Alpine do Admin (issue #705). O AlpineHygieneTests so lia o Web (ReadWebFile);
+  # cada um destes JA derrubou o Admin em producao e nao tinha guard estatico. Detector:
+  # EasyStock.ArchitectureTests/AdminAlpineHygieneTests (Category=Architecture, no gate do Husky).
+  - id: admin-alpine-script-order
+    class: E
+    desc: "core Alpine (vendor/alpine/alpine.js) carregado ANTES das factories window.es* (admin-components.js) -> 'esTabs is not defined', /Configuracoes inerte"
+    fix_in_code: "EasyStock.Admin/Pages/_Layout.cshtml (core por ultimo, L46; aviso L33-40)"
+    detector: "AdminAlpineHygieneTests.CoreAlpine_DeveCarregarDepoisDasFactories"
+    status: active
+    evidence: "#469, sha 56953688; issue #705"
+  - id: admin-alpine-double-init
+    class: E
+    desc: "<body x-data='adminApp()'> com x-init='init()' redundante (Alpine v3 auto-invoca init()) -> polling/fetch dobrado em TODA rota (esta no layout)"
+    fix_in_code: "EasyStock.Admin/Pages/_Layout.cshtml:57 (body sem x-init)"
+    detector: "AdminAlpineHygieneTests.Body_NaoDeveTerXInitRedundante"
+    status: active
+    evidence: "BUG-003 #463, sha f1fe49d9; issue #705"
+  - id: admin-alpine-xfor-key-null
+    class: E
+    desc: "x-for :key sem fallback no command palette -> grupo.titulo:null vira key objeto -> 'x-for key cannot be an object'"
+    fix_in_code: "EasyStock.Admin/Pages/Shared/Components/_CommandPalette.cshtml:98 (:key grupo.titulo || 'resultados')"
+    detector: "AdminAlpineHygieneTests.CommandPalette_XForKey_DeveTerFallback"
+    status: active
+    evidence: "BUG-011 #463, sha 2b9345d6; issue #705"
+  - id: admin-alpine-sri-cdn
+    class: E
+    desc: "<script> de Alpine com integrity= (SRI) ou cdn.jsdelivr.net -> SRI quebrado + CDN bloqueado mata o Alpine SEM logar no console"
+    fix_in_code: "EasyStock.Admin/Pages/_Layout.cshtml (self-hosted ~/js/vendor/alpine/, sem integrity)"
+    detector: "AdminAlpineHygieneTests.Alpine_DeveSerSelfHosted_SemSriNemCdn"
+    status: active
+    evidence: "incidente 2026-06-02 (docs/dev/incidentes/2026-06-02-alpine-sri-firewall-interatividade-morta.md); issue #705"
   - id: generated-copy-edit
     class: A
     desc: "editar a copia gerada em vez da fonte; revertido no proximo build"

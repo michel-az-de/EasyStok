@@ -81,8 +81,18 @@ Fatias (cada uma commit build-verde em master, fecha com `closes #N`), rastreada
 - Hooks Claude Code são por-`settings.json`: não impedem um humano fora do Claude Code de editar a cópia gerada. Daí a defesa em profundidade (hook + header GENERATED + teste de CI cópia==fonte).
 - Classes H/I/L de alta frequência ficam para depois (backlog).
 
+## Atualizações
+
+**2026-06-27 (#705) — paridade de higiene de design no Admin.** A Fatia 5 (Classe E) e os guards de higiene de CSS/views nasceram cobrindo só o `EasyStock.Web` (os arch-tests liam paths hardcoded do Web; o próprio comentário do `CssHexHygieneTests` previa "o .css do Admin pode entrar numa extensão futura"). O `EasyStock.Admin` — cujo "Deck de Operações" é o trabalho visual mais forte do repo — só era coberto pelo `TokensCssDriftTests`. Estendido ao Admin via 3 arch-tests-espelho aditivos (`Category=Architecture`, mesmo gate), com allowlists medidas por forense adversarial:
+
+- `AdminCssHexHygieneTests` — hex hardcoded em `EasyStock.Admin/wwwroot/css` (espelho do `CssHexHygieneTests`).
+- `AdminRazorViewColorUtilityHygieneTests` — cor semântica crua do Tailwind em `EasyStock.Admin/Pages` (espelho do guard de views do Web).
+- `AdminAlpineHygieneTests` — 4 traps de runtime que **já derrubaram o Admin** e não tinham guard estático: ordem de script (#469), double-init (BUG-003/#463), `x-for :key` nulo (BUG-011/#463), SRI/CDN bloqueado (incidente 2026-06-02). Registrados no manifesto como `admin-alpine-*` (Classe E). O trap `init(param)` não existe no Admin (varredura vazia → sem guard).
+
+Continua dentro do arcabouço da ADR-0025 (meta-lint estático, sem browser/E2E). Não altera a decisão original; só amplia a cobertura do Pilar 1 (manifesto) e do Pilar 4 (gates) ao segundo frontend.
+
 ## Referências
-- #530 (épico), #531 (Fatia 1).
+- #530 (épico), #531 (Fatia 1), #705 (paridade Admin).
 - Fase 0 (2026-06-08): forense de git, auditoria de gates, leitura de `.csproj`/`.husky`/CI.
 - ADR-0022 (master-first), ADR-0023 (testes), ADR-0024 (padrão arch-test anti-regressão), ADR-0025 (frontend Alpine).
 - Memória do agente: `local-env-autocommit-sweeps-staged-files`, `web-etiqueta-assets-build-copied-from-api`, `web-topbar-dropdown-xshow-cloak-gotcha`, `ci-coverage-render-red-maui`.
