@@ -203,3 +203,77 @@
         font-size: clamp(24px, 7vw, 32px);
     }
 }
+
+/* === es-section-nav (sub-navegação única ENTRE páginas: pills com link) === */
+/* Convenção: sub-seções entre páginas usam es-section-nav; abas na mesma
+   página usam es-tabs. Item ativo = var(--deck-accent) + aria-current=page. */
+
+.es-section-nav {
+    display: block;
+    margin-bottom: var(--s-5);
+}
+
+.es-section-nav-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    list-style: none;
+    margin: 0;
+    padding: var(--s-1);
+    background: var(--deck-panel);
+    border: 1px solid var(--deck-hairline);
+    border-radius: var(--r-pill);
+}
+
+.es-section-nav-item {
+    display: flex;
+    margin: 0;
+    padding: 0;
+}
+
+.es-section-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-4);
+    border-radius: var(--r-pill);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+}
+
+.es-section-nav-link:hover {
+    background: var(--deck-accent-soft);
+    color: var(--text-primary);
+}
+
+.es-section-nav-link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring-orange);
+}
+
+.es-section-nav-link.is-active,
+.es-section-nav-link.is-active:hover {
+    /* mantém o destaque do item da página atual mesmo no hover */
+    background: var(--deck-accent);
+    color: var(--intent-action-fg);
+}
+
+.es-section-nav-link .es-icon {
+    flex: 0 0 auto;
+}
+
+.es-section-nav-text {
+    display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .es-section-nav-link {
+        transition: none;
+    }
+}
