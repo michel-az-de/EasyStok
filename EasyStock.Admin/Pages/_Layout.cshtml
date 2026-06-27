@@ -463,7 +463,10 @@
                 // Seed do dashboard via window.__initialDash (definido inline em /Index.cshtml).
                 if (typeof window.__initialDash === 'object' && window.__initialDash !== null) {
                     Object.assign(this.dash, window.__initialDash);
-                    this.dash.ticketsBadge = (this.dash.ticketsComNovaMensagem ?? 0) + (this.dash.ticketsCriticos ?? 0);
+                    // Mesma definicao "em aberto" do polling (fetchDashBadges) e do dashboard.
+                    // Antes somava criticos+novaMensagem aqui no seed, divergindo no load inicial
+                    // e ficando preso nesse numero se o polling falhasse (502/401). (ADM-002/UX-006)
+                    this.dash.ticketsBadge = (this.dash.ticketsAbertos ?? 0);
                 }
                 await this.fetchDashBadges();
                 // BUG-014: so faz o poll quando a aba esta visivel. Evita requisicoes
