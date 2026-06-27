@@ -1,0 +1,129 @@
+/* ==========================================================================
+   pedagogia.css — camada pedagógica do Admin (ajuda contextual, cabeçalhos,
+   sub-navegação). TOKEN-ONLY: use var(--token) do tokens.css; nunca cor hex.
+   Cada fatia da Fase 1 faz APPEND da sua seção neste arquivo.
+   Carregado via <link> após admin-premium.css em _Layout.cshtml.
+   ========================================================================== */
+
+/* === es-help (ajuda contextual: gatilho "?" + popover) =================== */
+/* Componente: <es-help term="..."> / <es-help title="...">conteúdo</es-help>.
+   Estado e dismiss via factory Alpine esHelp() (admin-components.js). */
+
+.es-help {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
+}
+
+/* ── Gatilho "?" ───────────────────────────────────────────── */
+.es-help-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin-inline-start: var(--s-1);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--r-pill);
+    background: var(--surface-sunken);
+    color: var(--text-muted);
+    cursor: help;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: color var(--duration-fast) var(--ease-out),
+                background var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+}
+
+.es-help-trigger:hover,
+.es-help-trigger:focus-visible {
+    color: var(--intent-action);
+    border-color: var(--border-strong);
+    background: var(--bg-surface);
+}
+
+.es-help-trigger:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring-orange);
+}
+
+.es-help-trigger .es-icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* ── Popover ───────────────────────────────────────────────── */
+.es-help-popover {
+    position: absolute;
+    top: calc(100% + var(--s-2));
+    inset-inline-start: 0;
+    z-index: var(--z-dropdown);
+    width: max-content;
+    max-width: 280px;
+    padding: var(--s-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    background: var(--bg-elevated);
+    box-shadow: var(--elev-3);
+    /* hairline interno para reforçar a borda no tema escuro */
+    outline: 1px solid var(--deck-hairline);
+    outline-offset: -1px;
+    text-align: start;
+    white-space: normal;
+    transition: opacity var(--duration-base) var(--ease-out),
+                transform var(--duration-base) var(--ease-spring);
+}
+
+.es-help-title {
+    display: block;
+    margin-bottom: var(--s-1);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.es-help-body {
+    display: block;
+}
+
+.es-help-text {
+    display: block;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.es-help-text + .es-help-text {
+    margin-top: var(--s-2);
+}
+
+.es-help-more {
+    display: inline-block;
+    margin-top: var(--s-2);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--intent-action);
+    text-decoration: none;
+}
+
+.es-help-more:hover,
+.es-help-more:focus-visible {
+    color: var(--intent-action-hover);
+    text-decoration: underline;
+}
+
+.es-help-more:focus-visible {
+    outline: none;
+    border-radius: var(--r-sm);
+    box-shadow: var(--focus-ring-orange);
+}
+
+/* prefers-reduced-motion: sem transição/movimento */
+@media (prefers-reduced-motion: reduce) {
+    .es-help-trigger,
+    .es-help-popover {
+        transition: none;
+    }
+}

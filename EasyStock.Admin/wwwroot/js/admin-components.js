@@ -225,4 +225,56 @@
         };
     };
 
+    // ── Ajuda contextual: estado do par gatilho+popover do <es-help> ──
+    // Abre em hover E foco; fecha em Esc (devolvendo foco ao gatilho) e clique-fora.
+    // NAO se chama 'init' — o metodo init() interno e auto-invocado pelo Alpine.
+    window.esHelp = function () {
+        return {
+            open: false,
+            _hideTimer: null,
+            _onDocPointer: null,
+
+            init() {
+                // Fecha ao clicar/tocar fora do componente.
+                this._onDocPointer = (e) => {
+                    if (this.open && this.$el && !this.$el.contains(e.target)) {
+                        this.open = false;
+                    }
+                };
+                document.addEventListener('pointerdown', this._onDocPointer, true);
+            },
+
+            destroy() {
+                if (this._onDocPointer) {
+                    document.removeEventListener('pointerdown', this._onDocPointer, true);
+                    this._onDocPointer = null;
+                }
+                if (this._hideTimer) { clearTimeout(this._hideTimer); this._hideTimer = null; }
+            },
+
+            show() {
+                if (this._hideTimer) { clearTimeout(this._hideTimer); this._hideTimer = null; }
+                this.open = true;
+            },
+
+            // Pequeno atraso: deixa o cursor "atravessar" o gap gatilho->popover sem fechar.
+            scheduleHide() {
+                if (this._hideTimer) clearTimeout(this._hideTimer);
+                this._hideTimer = setTimeout(() => { this.open = false; this._hideTimer = null; }, 120);
+            },
+
+            toggle() {
+                this.open ? (this.open = false) : this.show();
+            },
+
+            onKeydown(event) {
+                if (event.key === 'Escape' && this.open) {
+                    this.open = false;
+                    // Devolve o foco ao gatilho para nao perder o contexto de teclado.
+                    if (this.$refs.trigger) this.$refs.trigger.focus();
+                }
+            }
+        };
+    };
+
 })();
