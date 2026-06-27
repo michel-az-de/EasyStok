@@ -336,8 +336,10 @@ public sealed class OrderLinker(
         }
     }
 
-    /// <summary>F7-A/F8-C: garante 1 PedidoPagamento default + MovimentoCaixa de entrada
-    /// para pedido entregue. Idempotente via AnyAsync check.</summary>
+    /// <summary>F7-A: garante 1 PedidoPagamento default para pedido entregue. Idempotente via
+    /// AnyAsync check. NAO cria MovimentoCaixa "entrada" espelho: ele duplicava o pagamento no
+    /// resumo do caixa e no dashboard (double-count #564 / QA BUG-004). O fluxo web/balcao nunca
+    /// criou esse espelho — o mobile agora fica consistente.</summary>
     private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
     {
         var pedido = await db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
@@ -361,26 +363,16 @@ public sealed class OrderLinker(
             Observacao = "Auto-registrado pelo F7-A (mobile→ERP). Refine método no admin se necessário."
         });
 
-        var refKey = "pedido-pagamento:" + pagamentoId;
-        var jaExisteMov = await db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
-            .AnyAsync(m => m.Referencia == refKey);
-        if (!jaExisteMov)
-        {
-            var mov = MovimentoCaixa.Criar(pedido.EmpresaId, "entrada", pedido.Total.Valor,
-                dataMovimento: mobileO.UpdatedAt, lojaId: pedido.LojaId);
-            mov.Descricao = "Pagamento pedido " + (pedido.Id.ToString().Substring(0, 8)) +
-                            (string.IsNullOrEmpty(pedido.ClienteNome) ? "" : " — " + pedido.ClienteNome);
-            mov.Metodo = "dinheiro";
-            mov.Categoria = "pedido";
-            mov.Origem = "mobile-payment";
-            mov.Referencia = refKey;
-            mov.RegistradoPorNome = mobileO.LastOperatorName;
-            db.Add(mov);
-        }
+        // BUG-004/#564: NAO criar MovimentoCaixa "entrada" espelho aqui. Ele duplicava o
+        // PedidoPagamento acima — o resumo do caixa (totalPagamentosPedidos) e o card do dashboard
+        // (pagamentosNoSaldo) ja somam esse pagamento, entao o espelho fazia o mesmo dinheiro contar
+        // 2x. O fluxo web/balcao (RegistrarPagamentoPedidoUseCase) nunca criou o espelho. Espelhos
+        // historicos sao limpos por SQL idempotente separado (movimentos_caixa Referencia LIKE
+        // 'pedido-pagamento:%').
 
         await db.SaveChangesAsync();
         log.LogInformation(
-            "F7-A/F8-C Pagamento+MovCaixa CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro",
+            "F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} metodo=dinheiro",
             pedido.Id, pedido.Total.Valor);
     }
 }
