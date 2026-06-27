@@ -118,6 +118,18 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
             saldoCaixa += pagamentosNoSaldo.Sum(p => p.Valor);
 
+            // BUG-004: vendas diretas (POS/NFC-e, tabela Vendas) tambem compoem o caixa. O card do
+            // dashboard somava so os pagamentos de pedidos e ignorava as Vendas, divergindo da tela
+            // de Caixa, cujo saldoEsperado = saldoInicial + totalVendas + totalPagamentosPedidos +
+            // entradas - saidas (ObterCaixaDiaUseCase). Mesma janela [saldoInicio, hojeFim) e mesma
+            // regra de ValorTotal de CaixaRepository.GetTotalVendasNoIntervaloAsync — fonte unica.
+            var vendasNoSaldo = await dbContext.Vendas.AsNoTracking()
+                .Where(v => v.EmpresaId == empresaId
+                         && (lojaId == null || v.LojaId == lojaId)
+                         && v.DataVenda >= saldoInicio && v.DataVenda < hojeFim)
+                .ToListAsync();
+            saldoCaixa += vendasNoSaldo.Sum(v => v.ValorTotal == null ? 0m : v.ValorTotal.Valor);
+
             // Pix recebidos hoje — SO PedidoPagamento (decisao explicita pra evitar
             // double-count com MovimentoCaixa.Metodo=pix). Considera apenas hoje
             // (nao cross-day): "Pix de hoje" e metrica de dia, nao de caixa.
