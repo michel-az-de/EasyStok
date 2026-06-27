@@ -11,6 +11,12 @@ namespace EasyStock.Infra.Postgre.Migrations
     /// Idempotente via ON CONFLICT DO NOTHING — re-roda sem efeito colateral.
     /// Sem Down() — seed n.ao desfaz (politica do repo).
     ///
+    /// Guarda WHERE EXISTS(storefront 3e4842d9): o storefront e app-seeded, nao criado
+    /// por migration. Em DB limpo (migrate-from-scratch: CI, novo ambiente, restore-DR)
+    /// ele ainda nao existe, entao o seed simplesmente NAO insere — sem violar a FK
+    /// frete_zona->storefront. Em prod, onde o storefront ja existe, insere normal.
+    /// (Bug exposto pela suite EasyStock.Inventario.IntegrationTests; ver issue #704.)
+    ///
     /// Frete por raio (ADR-0017) fica pra issue separada: precisa subir
     /// container Nominatim self-host na VM (ADR-0023). Enquanto isso, zona
     /// faz o trabalho.
@@ -31,7 +37,8 @@ INSERT INTO frete_zona (
     ""TempoEstimadoMinutos"", ""Ativa"", ""TipoCobertura"",
     ""CepInicio"", ""CepFim"", ""BairrosJson"",
     ""CriadoEm"", ""AlteradoEm""
-) VALUES (
+)
+SELECT
     '8c5f5e10-0000-4000-8000-c0a5ada00001',
     '3e4842d9-2994-47cb-b86c-870fe248ff4d',
     0,
@@ -45,14 +52,16 @@ INSERT INTO frete_zona (
     NULL,
     now() AT TIME ZONE 'UTC',
     now() AT TIME ZONE 'UTC'
-) ON CONFLICT (""Id"") DO NOTHING;
+WHERE EXISTS (SELECT 1 FROM storefront WHERE ""Id"" = '3e4842d9-2994-47cb-b86c-870fe248ff4d')
+ON CONFLICT (""Id"") DO NOTHING;
 
 INSERT INTO frete_zona (
     ""Id"", ""StorefrontId"", ""Ordem"", ""Label"", ""Valor"",
     ""TempoEstimadoMinutos"", ""Ativa"", ""TipoCobertura"",
     ""CepInicio"", ""CepFim"", ""BairrosJson"",
     ""CriadoEm"", ""AlteradoEm""
-) VALUES (
+)
+SELECT
     '8c5f5e10-0000-4000-8000-c0a5ada00002',
     '3e4842d9-2994-47cb-b86c-870fe248ff4d',
     10,
@@ -66,7 +75,8 @@ INSERT INTO frete_zona (
     NULL,
     now() AT TIME ZONE 'UTC',
     now() AT TIME ZONE 'UTC'
-) ON CONFLICT (""Id"") DO NOTHING;
+WHERE EXISTS (SELECT 1 FROM storefront WHERE ""Id"" = '3e4842d9-2994-47cb-b86c-870fe248ff4d')
+ON CONFLICT (""Id"") DO NOTHING;
 ");
         }
 
