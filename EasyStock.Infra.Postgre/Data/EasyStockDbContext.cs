@@ -168,6 +168,12 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<ItemVenda> ItensVenda { get; set; } = null!;
         public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
         public DbSet<MovimentacaoEstoqueAlteracao> MovimentacaoEstoqueAlteracoes { get; set; } = null!;
+
+        // Inventario (Contagem Fisica) — ADR / #704
+        public DbSet<Contagem> Contagens { get; set; } = null!;
+        public DbSet<ItemContagem> ItensContagem { get; set; } = null!;
+        public DbSet<AjusteInventario> AjustesInventario { get; set; } = null!;
+        public DbSet<AjusteInventarioLinha> AjustesInventarioLinha { get; set; } = null!;
         public DbSet<Notificacao> Notificacoes { get; set; } = null!;
         public DbSet<Loja> Lojas { get; set; } = null!;
         public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
