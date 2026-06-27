@@ -251,7 +251,7 @@
             </select>
             <label class="ped-pay-label" for="ped-pay-valor">Valor</label>
             <div class="ped-pay-valor">
-                <input id="ped-pay-valor" type="number" step="0.01" min="0" class="ui-field"
+                <input id="ped-pay-valor" type="text" inputmode="decimal" class="ui-field"
                        x-ref="payValor" x-model="pay.valor" @@keydown.enter.prevent="submitPay()" />
                 <button type="button" class="ped-pay-quick" @@click="payFill('pendente')">Pendente</button>
                 <button type="button" class="ped-pay-quick" @@click="payFill('total')">Total</button>
@@ -647,15 +647,15 @@
                                     </ul>
                                 </div>
                                 <div class="ped-item__qtd">
-                                    <input type="number" x-model.number="it.quantidade"
-                                           step="0.01" min="0.01" placeholder="Qtd"
+                                    <input type="text" inputmode="decimal" x-model.number="it.quantidade"
+                                           placeholder="Qtd"
                                            :class="it.quantidade < 0 ? 'border-red-400 ring-1 ring-red-200' : ''"
                                            class="ui-field text-sm w-full text-right" required />
                                 </div>
                                 <div class="ped-item__preco">
                                     <span class="ped-item__preco-prefix">R$</span>
-                                    <input type="number" x-model.number="it.precoUnitario"
-                                           step="0.01" min="0" placeholder="0,00"
+                                    <input type="text" inputmode="decimal" x-model.number="it.precoUnitario"
+                                           placeholder="0,00"
                                            :class="it.precoUnitario < 0 ? 'border-red-400 ring-1 ring-red-200' : ''"
                                            class="ui-field text-sm w-full text-right" required />
                                 </div>
@@ -718,7 +718,7 @@
                                     </div>
                                     <div class="ped-prod-cadastro__field">
                                         <label>Custo (opcional)</label>
-                                        <input type="number" step="0.01" min="0" x-model.number="it.custoCadastro"
+                                        <input type="text" inputmode="decimal" x-model.number="it.custoCadastro"
                                                placeholder="R$" class="ui-field text-sm w-full" />
                                     </div>
                                 </div>
