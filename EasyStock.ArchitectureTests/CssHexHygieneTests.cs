@@ -14,8 +14,8 @@ namespace EasyStock.ArchitectureTests;
 /// (o teste falha se um arquivo allowlistado nao tem mais hex, forcando a limpeza).
 ///
 /// Assim, um .css NOVO nao pode introduzir hex sem decisao consciente, e o debito so
-/// diminui. (Escopo Web por ora, espelhando o foco do RazorViewHygieneTests; o .css do
-/// Admin pode entrar numa extensao futura.)
+/// diminui. (O .css do Admin tem seu espelho em AdminCssHexHygieneTests; issue #705. As
+/// views .cshtml do Admin idem em AdminRazorViewColorUtilityHygieneTests.)
 /// </summary>
 [Trait("Category", "Architecture")]
 public class CssHexHygieneTests
