@@ -520,7 +520,10 @@
                     }
                     const d = await r.json();
                     Object.assign(this.dash, d);
-                    this.dash.ticketsBadge = (d.ticketsComNovaMensagem ?? 0) + (d.ticketsCriticos ?? 0);
+                    // Badge usa a MESMA definicao do dashboard/diagnostico/operacao: tickets "em aberto"
+                    // (qualquer status != Resolvido/Fechado, via AdminTicketFilters.EmAberto). Antes somava
+                    // criticos + com-nova-mensagem, divergindo do numero do dashboard (ADM-002/UX-006).
+                    this.dash.ticketsBadge = (d.ticketsAbertos ?? 0);
                     this._lastFetch = Date.now();
                     this.dashSecsAgo = 0;
                 } catch (e) {
