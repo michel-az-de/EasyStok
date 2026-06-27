@@ -37,7 +37,7 @@ public class AdminAlpineHygieneTests
     [Fact]
     public void CoreAlpine_DeveCarregarDepoisDasFactories()
     {
-        var layout = ReadAdminFileSemComentarios("Pages", "_Layout.cshtml");
+        var layout = LayoutSemComentarios();
         var idxFactories = layout.IndexOf("admin-components.js", StringComparison.Ordinal);
         var idxCore = layout.IndexOf("vendor/alpine/alpine.js", StringComparison.Ordinal);
 
@@ -51,7 +51,7 @@ public class AdminAlpineHygieneTests
     [Fact]
     public void Body_NaoDeveTerXInitRedundante()
     {
-        var layout = ReadAdminFileSemComentarios("Pages", "_Layout.cshtml");
+        var layout = LayoutSemComentarios();
         var bodyTag = Regex.Match(layout, @"<body\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
         bodyTag.Success.Should().BeTrue("o _Layout deve ter a tag <body>.");
@@ -63,7 +63,8 @@ public class AdminAlpineHygieneTests
     [Fact]
     public void CommandPalette_XForKey_DeveTerFallback()
     {
-        var cmdk = ReadAdminFileSemComentarios("Pages", "Shared", "Components", "_CommandPalette.cshtml");
+        var cmdk = CommentRegex.Replace(
+            ArchTestPaths.ReadAppFile("EasyStock.Admin", "Pages", "Shared", "Components", "_CommandPalette.cshtml"), " ");
         cmdk.Should().MatchRegex(@":key=""grupo\.titulo\s*\|\|",
             "o :key do x-for de grupos deve ter fallback (grupo.titulo || '...'); sem ele, titulo:null " +
             "vira key objeto -> 'x-for key cannot be an object' (BUG-011/#463).");
@@ -72,7 +73,7 @@ public class AdminAlpineHygieneTests
     [Fact]
     public void Alpine_DeveSerSelfHosted_SemSriNemCdn()
     {
-        var layout = ReadAdminFileSemComentarios("Pages", "_Layout.cshtml");
+        var layout = LayoutSemComentarios();
 
         layout.Should().NotContainEquivalentOf("jsdelivr",
             "o Alpine do Admin deve ser self-hosted (~/js/vendor/alpine/), nao via cdn.jsdelivr.net " +
@@ -85,22 +86,6 @@ public class AdminAlpineHygieneTests
             .Should().BeFalse("idem (integrity declarado antes do src do alpine).");
     }
 
-    private static string ReadAdminFileSemComentarios(params string[] relative) =>
-        CommentRegex.Replace(ReadAdminFile(relative), " ");
-
-    private static string ReadAdminFile(params string[] relative)
-    {
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !root.GetFiles("*.sln").Any())
-            root = root.Parent;
-        if (root is null)
-            throw new InvalidOperationException("Raiz da solucao nao encontrada a partir de AppContext.BaseDirectory.");
-
-        var parts = new List<string> { root.FullName, "EasyStock.Admin" };
-        parts.AddRange(relative);
-        var path = Path.Combine(parts.ToArray());
-        if (!File.Exists(path))
-            throw new InvalidOperationException($"Arquivo Admin nao encontrado: {path}");
-        return File.ReadAllText(path);
-    }
+    private static string LayoutSemComentarios() =>
+        CommentRegex.Replace(ArchTestPaths.ReadAppFile("EasyStock.Admin", "Pages", "_Layout.cshtml"), " ");
 }

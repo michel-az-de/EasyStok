@@ -72,17 +72,7 @@ public class TokensCssDriftTests
 
     private static string TokensPath(string project)
     {
-        var root = LocateSolutionRoot();
+        var root = ArchTestPaths.SolutionRoot();
         return Path.Combine(root, project, "wwwroot", "css", "tokens.css");
-    }
-
-    private static string LocateSolutionRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !current.GetFiles("*.sln").Any())
-            current = current.Parent;
-        if (current is null)
-            throw new InvalidOperationException("Nao foi possivel localizar a raiz da solucao.");
-        return current.FullName;
     }
 }

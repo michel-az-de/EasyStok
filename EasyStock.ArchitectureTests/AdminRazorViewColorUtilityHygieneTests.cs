@@ -58,13 +58,13 @@ public class AdminRazorViewColorUtilityHygieneTests
     [Fact]
     public void Pages_NaoDevemUsarUtilitarioDeCorSemanticaForaDaAllowlist()
     {
-        var pagesDir = LocateAdminPagesDirectory();
+        var pagesDir = ArchTestPaths.AppDirectory("EasyStock.Admin", "Pages");
         var allCshtml = Directory.GetFiles(pagesDir.FullName, "*.cshtml", SearchOption.AllDirectories);
 
         var offenders = new List<string>();
         foreach (var path in allCshtml)
         {
-            var relative = ToRelativePagePath(pagesDir, path);
+            var relative = ArchTestPaths.ToRelative(pagesDir, path);
             if (DebtAllowlist.Contains(relative)) continue;
             if (FileContainsSemanticColorUtility(path))
                 offenders.Add(relative);
@@ -80,7 +80,7 @@ public class AdminRazorViewColorUtilityHygieneTests
     [Fact]
     public void DebtAllowlist_NaoDeveConterArquivosJaLimpos()
     {
-        var pagesDir = LocateAdminPagesDirectory();
+        var pagesDir = ArchTestPaths.AppDirectory("EasyStock.Admin", "Pages");
         var stale = new List<string>();
         foreach (var entry in DebtAllowlist)
         {
@@ -101,25 +101,5 @@ public class AdminRazorViewColorUtilityHygieneTests
         var content = File.ReadAllText(path);
         content = CommentRegex.Replace(content, " "); // cor em comentario nao renderiza
         return SemanticColorUtilityRegex.IsMatch(content);
-    }
-
-    private static DirectoryInfo LocateAdminPagesDirectory()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !current.GetFiles("*.sln").Any())
-            current = current.Parent;
-        if (current is null)
-            throw new InvalidOperationException("Nao foi possivel localizar a raiz da solucao.");
-
-        var pages = new DirectoryInfo(Path.Combine(current.FullName, "EasyStock.Admin", "Pages"));
-        if (!pages.Exists)
-            throw new InvalidOperationException($"Pasta Pages nao encontrada em {pages.FullName}");
-        return pages;
-    }
-
-    private static string ToRelativePagePath(DirectoryInfo pagesDir, string fullPath)
-    {
-        var rel = Path.GetRelativePath(pagesDir.FullName, fullPath);
-        return rel.Replace(Path.DirectorySeparatorChar, '/');
     }
 }

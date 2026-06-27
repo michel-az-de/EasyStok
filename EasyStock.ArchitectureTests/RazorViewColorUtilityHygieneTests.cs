@@ -108,13 +108,13 @@ public class RazorViewColorUtilityHygieneTests
     [Fact]
     public void Views_NaoDevemUsarUtilitarioDeCorSemanticaForaDaAllowlist()
     {
-        var viewsDir = LocateViewsDirectory();
+        var viewsDir = ArchTestPaths.AppDirectory("EasyStock.Web", "Views");
         var allCshtml = Directory.GetFiles(viewsDir.FullName, "*.cshtml", SearchOption.AllDirectories);
 
         var offenders = new List<string>();
         foreach (var path in allCshtml)
         {
-            var relative = ToRelativeViewPath(viewsDir, path);
+            var relative = ArchTestPaths.ToRelative(viewsDir, path);
             if (DebtAllowlist.Contains(relative)) continue;
             if (FileContainsSemanticColorUtility(path))
                 offenders.Add(relative);
@@ -130,7 +130,7 @@ public class RazorViewColorUtilityHygieneTests
     [Fact]
     public void DebtAllowlist_NaoDeveConterArquivosJaLimpos()
     {
-        var viewsDir = LocateViewsDirectory();
+        var viewsDir = ArchTestPaths.AppDirectory("EasyStock.Web", "Views");
         var stale = new List<string>();
         foreach (var entry in DebtAllowlist)
         {
@@ -151,25 +151,5 @@ public class RazorViewColorUtilityHygieneTests
         var content = File.ReadAllText(path);
         content = CommentRegex.Replace(content, " "); // cor em comentario nao renderiza
         return SemanticColorUtilityRegex.IsMatch(content);
-    }
-
-    private static DirectoryInfo LocateViewsDirectory()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !current.GetFiles("*.sln").Any())
-            current = current.Parent;
-        if (current is null)
-            throw new InvalidOperationException("Nao foi possivel localizar a raiz da solucao.");
-
-        var views = new DirectoryInfo(Path.Combine(current.FullName, "EasyStock.Web", "Views"));
-        if (!views.Exists)
-            throw new InvalidOperationException($"Pasta Views nao encontrada em {views.FullName}");
-        return views;
-    }
-
-    private static string ToRelativeViewPath(DirectoryInfo viewsDir, string fullPath)
-    {
-        var rel = Path.GetRelativePath(viewsDir.FullName, fullPath);
-        return rel.Replace(Path.DirectorySeparatorChar, '/');
     }
 }

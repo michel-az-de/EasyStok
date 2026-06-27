@@ -56,7 +56,7 @@ public class CssHexHygieneTests
     [Fact]
     public void Css_NaoDeveIntroduzirHexHardcoded_ForaDaAllowlist()
     {
-        var cssDir = LocateWebCssDirectory();
+        var cssDir = ArchTestPaths.AppDirectory("EasyStock.Web", "wwwroot", "css");
         var offenders = new List<string>();
         foreach (var path in Directory.GetFiles(cssDir.FullName, "*.css", SearchOption.AllDirectories))
         {
@@ -75,7 +75,7 @@ public class CssHexHygieneTests
     [Fact]
     public void DebtAllowlist_NaoDeveConterArquivosJaLimpos()
     {
-        var cssDir = LocateWebCssDirectory();
+        var cssDir = ArchTestPaths.AppDirectory("EasyStock.Web", "wwwroot", "css");
         var stale = new List<string>();
         foreach (var entry in DebtAllowlist)
         {
@@ -93,18 +93,4 @@ public class CssHexHygieneTests
 
     private static bool FileContainsHexColor(string path) =>
         HexColorRegex.IsMatch(File.ReadAllText(path));
-
-    private static DirectoryInfo LocateWebCssDirectory()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !current.GetFiles("*.sln").Any())
-            current = current.Parent;
-        if (current is null)
-            throw new InvalidOperationException("Nao foi possivel localizar a raiz da solucao.");
-
-        var css = new DirectoryInfo(Path.Combine(current.FullName, "EasyStock.Web", "wwwroot", "css"));
-        if (!css.Exists)
-            throw new InvalidOperationException($"Pasta css nao encontrada em {css.FullName}");
-        return css;
-    }
 }

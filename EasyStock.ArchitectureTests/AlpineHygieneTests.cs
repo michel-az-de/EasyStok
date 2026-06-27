@@ -28,7 +28,7 @@ public class AlpineHygieneTests
     [Fact]
     public void Dropdown_NaoDeveTerRegraDisplayNonePersistente()
     {
-        var css = ReadWebFile("wwwroot", "css", "app.css");
+        var css = ArchTestPaths.ReadAppFile("EasyStock.Web","wwwroot", "css", "app.css");
         AppDropdownDisplayNone.IsMatch(css).Should().BeFalse(
             "o anti-flash de dropdown Alpine deve ser [x-cloak]{display:none}, nao uma regra " +
             "persistente .app-dropdown{display:none} -- isso mata os menus do topbar (regrediu em #103/#479).");
@@ -37,7 +37,7 @@ public class AlpineHygieneTests
     [Fact]
     public void FormModal_DeveManterListenerDeSubmitProgramatico()
     {
-        var js = ReadWebFile("wwwroot", "js", "form-modal.js");
+        var js = ArchTestPaths.ReadAppFile("EasyStock.Web","wwwroot", "js", "form-modal.js");
         js.Should().MatchRegex(@"addEventListener\(\s*['""]submit['""]",
             "form-modal.js deve interceptar o submit programaticamente (FormTagHelper descarta " +
             "@submit.prevent); sem isso os modais submetem nativo e nao persistem (#481).");
@@ -46,26 +46,11 @@ public class AlpineHygieneTests
     [Fact]
     public void FormModal_DeveDispararInputEChangeAposPreenchimentoProgramatico()
     {
-        var js = ReadWebFile("wwwroot", "js", "form-modal.js");
+        var js = ArchTestPaths.ReadAppFile("EasyStock.Web","wwwroot", "js", "form-modal.js");
         js.Should().MatchRegex(@"new Event\(\s*['""]input['""]",
             "form-modal.js deve disparar Event('input') p/ sincronizar x-model apos preenchimento programatico/autofill (#497).");
         js.Should().MatchRegex(@"new Event\(\s*['""]change['""]",
             "form-modal.js deve disparar Event('change') idem (#497).");
     }
 
-    private static string ReadWebFile(params string[] relative)
-    {
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !root.GetFiles("*.sln").Any())
-            root = root.Parent;
-        if (root is null)
-            throw new InvalidOperationException("Raiz da solucao nao encontrada a partir de AppContext.BaseDirectory.");
-
-        var parts = new List<string> { root.FullName, "EasyStock.Web" };
-        parts.AddRange(relative);
-        var path = Path.Combine(parts.ToArray());
-        if (!File.Exists(path))
-            throw new InvalidOperationException($"Arquivo Web nao encontrado: {path}");
-        return File.ReadAllText(path);
-    }
 }
