@@ -213,7 +213,8 @@
         @if (Model.Status != "Fechado")
         {
             <div class="card" x-data="{ interno: false }">
-                <form method="post" asp-page-handler="Responder" class="space-y-3">
+                <form method="post" asp-page-handler="Responder" class="space-y-3"
+                      x-on:submit="const t = $event.target.conteudo; if (!t.value.trim()) { $event.preventDefault(); t.setCustomValidity('Escreva uma resposta antes de enviar.'); t.reportValidity(); t.setCustomValidity(''); }">
                     @Html.AntiForgeryToken()
                     <div class="flex items-center justify-between">
                         <label class="form-label mb-0">Resposta</label>
@@ -231,7 +232,7 @@
                                 x-text="interno ? 'Salvar comentário interno' : 'Enviar resposta'">Enviar resposta</button>
                     </div>
                 </form>
-                <p class="text-es-ink-mute text-xs mt-3">📎 Anexos: use a API <code>POST /api/admin/tickets/@Model.Id/anexos</code> (drag &amp; drop em breve).</p>
+                <p class="text-es-ink-mute text-xs mt-3">📎 Anexos: arraste e solte (em breve).</p>
             </div>
         }
     </div>
