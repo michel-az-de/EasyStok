@@ -33,7 +33,10 @@ public sealed record TenantListItem(
     int TotalLojas,
     string? PlanoNome,
     StatusAssinatura? StatusAssinatura,
-    DateTime? DataRenovacao);
+    DateTime? DataRenovacao,
+    /// <summary>Status efetivo (#694): trial vencido sem plano pago vigente — a lista
+    /// nao deve exibir "Ativa". Espelha o flag do detalhe (TenantAssinaturaInfo).</summary>
+    bool TrialExpiradoSemPlano);
 
 /// <summary>Filtro da exportação de tenants. Ids não vazio &gt; Search/Status.</summary>
 public sealed record TenantExportFiltro(

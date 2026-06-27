@@ -92,7 +92,12 @@
             var lojas = t.TryGetProperty("totalLojas", out var lP) ? lP.GetInt32() : 0;
             var criado = t.TryGetProperty("criadoEm", out var cP) ? cP.GetString() : "";
             DateTime.TryParse(criado, out var criadoDt);
-            var statusVariant = status?.ToLower() switch {
+            // ADM-004 (#694): trial vencido sem plano pago nao deve aparecer como "Ativa" na lista
+            // (espelha o detalhe). O status bruto continua "Ativa" no banco ate o job transicionar.
+            var trialExpirado = t.TryGetProperty("trialExpiradoSemPlano", out var teP)
+                && teP.ValueKind == System.Text.Json.JsonValueKind.True;
+            var statusDisplay = trialExpirado ? "Trial expirado" : (status ?? "—");
+            var statusVariant = trialExpirado ? "crit" : status?.ToLower() switch {
                 "ativa" => "ok",
                 "suspensa" => "warn",
                 "cancelada" => "crit",
@@ -111,7 +116,7 @@
                 <td data-label="Documento" style="color:var(--text-secondary); font-family:var(--font-mono); font-size:12px;"><span data-fmt="doc">@(doc ?? "—")</span></td>
                 <td data-label="Plano" style="color:var(--text-secondary); font-size:13px;">@(plano ?? "—")</td>
                 <td data-label="Status">
-                    <es-badge variant="@statusVariant" with-dot="true">@(status ?? "—")</es-badge>
+                    <es-badge variant="@statusVariant" with-dot="true">@statusDisplay</es-badge>
                 </td>
                 <td data-label="Usuários" class="es-data-table-td-numeric" style="font-weight:500;">@usuarios</td>
                 <td data-label="Lojas" class="es-data-table-td-numeric" style="font-weight:500;">@lojas</td>

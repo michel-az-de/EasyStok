@@ -20,6 +20,10 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
 
         var total = await query.CountAsync();
 
+        // ADM-004 (#694): mesmo predicado do detalhe (TenantAssinaturaInfo) para "trial vencido
+        // sem plano pago vigente". Hoisted p/ ser parametrizado uma vez na traducao SQL.
+        var agora = DateTime.UtcNow;
+
         var items = await query
             .OrderByDescending(e => e.CriadoEm)
             .Skip((page - 1) * pageSize)
@@ -45,6 +49,13 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
                     .Where(a => a.EmpresaId == e.Id)
                     .OrderByDescending(a => a.DataInicio)
                     .Select(a => a.DataFim)
+                    .FirstOrDefault(),
+                db.AssinaturasEmpresa
+                    .Where(a => a.EmpresaId == e.Id)
+                    .OrderByDescending(a => a.DataInicio)
+                    .Select(a => a.Status == StatusAssinatura.Ativa
+                        && a.TrialFim.HasValue && a.TrialFim.Value < agora
+                        && !(a.DataFim.HasValue && a.DataFim.Value >= agora))
                     .FirstOrDefault()))
             .ToListAsync();
 
