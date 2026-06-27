@@ -170,6 +170,13 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ReporEstoqueUseCase>();
         services.AddScoped<BuscarEstoqueInteligenteUseCase>();
 
+        // Inventario (Contagem Fisica) — ADR / #704
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.CriarContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.IniciarContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.RegistrarItemContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.FinalizarContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.CancelarContagemUseCase>();
+
         // IA para Anúncios
         services.AddScoped<GerarSugestaoDescricaoAnuncioUseCase>();
         services.AddScoped<GerarAnuncioStreamingUseCase>();
