@@ -1,12 +1,15 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Diagnostics;
 
 namespace EasyStock.Api.Observability;
 
-public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
+public class GlobalExceptionHandler(
+    ILogger<GlobalExceptionHandler> logger,
+    IOperationalMetrics metrics) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
@@ -35,6 +38,12 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 "Erro tratado na API. CorrelationId: {CorrelationId} | {Method} {Path} | {ExceptionType}: {ExceptionMessage}",
                 correlationId, requestMethod, requestPath,
                 exception.GetType().FullName, exception.Message);
+
+        // Métrica de falha de operação: só 5xx (erros realmente inesperados/infra), rotulada
+        // pelo `code` mapeado — domínio fechado em 5xx ({INTERNAL_ERROR, NOT_SUPPORTED}), sem
+        // explosão de cardinalidade. Único ponto de emissão (fora de transação/retry).
+        if (statusCode >= 500)
+            metrics.IncrementFalhasOperacao(code);
 
         // Persiste erros 5xx no SystemErrorLog para rastreabilidade na tela de Diagnóstico.
         // Fire-and-forget: não bloqueia a resposta HTTP.

@@ -1,5 +1,6 @@
 using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
+using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -358,6 +359,7 @@ public static class ApiServiceCollectionExtensions
         IWebHostEnvironment environment)
     {
         services.AddSingleton<MetricsService>();
+        services.AddSingleton<IOperationalMetrics>(sp => sp.GetRequiredService<MetricsService>());
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -387,6 +389,7 @@ public static class ApiServiceCollectionExtensions
             .WithMetrics(metrics =>
             {
                 metrics
+                    .AddMeter(MetricNames.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddRuntimeInstrumentation()
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);

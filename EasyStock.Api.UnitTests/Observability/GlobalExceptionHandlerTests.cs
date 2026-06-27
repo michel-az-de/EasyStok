@@ -1,11 +1,13 @@
 using System.Text.Json;
 using EasyStock.Api.Observability;
+using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Observability;
 
@@ -168,8 +170,47 @@ public class GlobalExceptionHandlerTests
         payload.RootElement.TryGetProperty("status", out _).Should().BeFalse();
     }
 
-    private static GlobalExceptionHandler CriarHandler() =>
-        new(NullLogger<GlobalExceptionHandler>.Instance);
+    [Fact]
+    public async Task Deve_incrementar_falhas_operacao_com_code_INTERNAL_ERROR_em_5xx()
+    {
+        var metrics = Substitute.For<IOperationalMetrics>();
+        var handler = CriarHandler(metrics);
+        var context = CriarHttpContext("/api/qualquer", "corr-metric-500");
+
+        await handler.TryHandleAsync(context, new Exception("falhou"), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
+        metrics.Received(1).IncrementFalhasOperacao("INTERNAL_ERROR");
+    }
+
+    [Fact]
+    public async Task Deve_incrementar_falhas_operacao_com_code_NOT_SUPPORTED_em_501()
+    {
+        var metrics = Substitute.For<IOperationalMetrics>();
+        var handler = CriarHandler(metrics);
+        var context = CriarHttpContext("/api/qualquer", "corr-metric-501");
+
+        await handler.TryHandleAsync(context, new NotSupportedException("indisponível"), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status501NotImplemented, context.Response.StatusCode);
+        metrics.Received(1).IncrementFalhasOperacao("NOT_SUPPORTED");
+    }
+
+    [Fact]
+    public async Task Nao_deve_incrementar_falhas_operacao_em_erro_4xx()
+    {
+        var metrics = Substitute.For<IOperationalMetrics>();
+        var handler = CriarHandler(metrics);
+        var context = CriarHttpContext("/api/qualquer", "corr-metric-400");
+
+        await handler.TryHandleAsync(context, new UseCaseValidationException("inválido"), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        metrics.DidNotReceive().IncrementFalhasOperacao(Arg.Any<string>());
+    }
+
+    private static GlobalExceptionHandler CriarHandler(IOperationalMetrics? metrics = null) =>
+        new(NullLogger<GlobalExceptionHandler>.Instance, metrics ?? Substitute.For<IOperationalMetrics>());
 
     private static DefaultHttpContext CriarHttpContext(string path, string correlationId)
     {
