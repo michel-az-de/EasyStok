@@ -1,0 +1,30 @@
+@page
+@using EasyStock.Admin.Glossario
+@model EasyStock.Admin.Pages.Ajuda.IndexModel
+@{
+    ViewData["Title"] = "Central de Ajuda";
+}
+
+<es-page-header eyebrow="Ajuda"
+                titulo="Central de Ajuda"
+                descricao="Glossário dos termos do painel. Os ícones de ajuda (?) nas telas trazem você direto para o verbete certo aqui.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Ajuda</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
+
+<div style="max-width:760px; display:flex; flex-direction:column; gap:10px;">
+    @foreach (var t in GlossarioTermos.Termos.Values.OrderBy(x => x.Termo))
+    {
+        <div id="@t.Ancora" style="scroll-margin-top:84px;">
+            <es-card padding="md">
+                <h3 style="margin:0 0 6px; font-size:15px; font-weight:600; color:var(--text-primary);">@t.Termo</h3>
+                <p style="margin:0 0 8px; color:var(--text-secondary); font-size:14px; line-height:1.5;">@t.Curto</p>
+                <p style="margin:0; color:var(--text-muted); font-size:13px; line-height:1.6;">@t.Longo</p>
+            </es-card>
+        </div>
+    }
+</div>
