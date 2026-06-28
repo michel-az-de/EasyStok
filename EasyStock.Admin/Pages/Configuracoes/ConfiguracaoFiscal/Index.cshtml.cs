@@ -23,7 +23,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     {
         if (EmpresaId == Guid.Empty)
         {
-            SetErro("EmpresaId obrigatorio.");
+            SetErro("EmpresaId obrigatório.");
             return RedirectToPage("/Tenants/Index");
         }
 
