@@ -6,7 +6,7 @@
     button[role=switch] (estado via Alpine) — os name= são idênticos ao backend.
 *@
 <form asp-action="Salvar" asp-controller="Configuracoes" method="post"
-      class="settings-form" x-data="{ loading: false }" @@submit="loading = true">
+      class="settings-form" x-data="{ loading: false }" x-on:submit="loading = true">
     @Html.AntiForgeryToken()
 
     <div class="cfg-stack">

@@ -38,7 +38,7 @@
         </div>
     </div>
 
-    <form asp-action="SalvarReposicao" asp-controller="Entradas" method="post" x-ref="mainForm" @@submit="submitting = true">
+    <form asp-action="SalvarReposicao" asp-controller="Entradas" method="post" x-ref="mainForm" x-on:submit="submitting = true">
         @Html.AntiForgeryToken()
         <input type="hidden" name="ItemEstoqueId" x-model="itemEstoqueId" />
         <input type="hidden" name="ProdutoId" x-model="produtoId" />

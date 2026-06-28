@@ -212,7 +212,7 @@ else
                 </div>
             </div>
         </div>
-        <form asp-action="CriarPedido" asp-controller="Fornecedores" method="post" x-data="{ loading: false }" @@submit="loading = true">
+        <form asp-action="CriarPedido" asp-controller="Fornecedores" method="post" x-data="{ loading: false }" x-on:submit="loading = true">
             @Html.AntiForgeryToken()
             <div class="pedido-form grid grid-cols-2 gap-4">
                 <div class="col-span-2">
