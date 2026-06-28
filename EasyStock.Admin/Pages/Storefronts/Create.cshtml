@@ -4,19 +4,20 @@
     ViewData["Title"] = "Novo storefront";
 }
 
-<es-breadcrumb>
-    <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-    <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
-    <es-breadcrumb-item>Novo</es-breadcrumb-item>
-</es-breadcrumb>
+<es-page-header eyebrow="Loja virtual"
+                titulo="Novo storefront"
+                descricao="A loja nasce inativa. Depois de criar, publique ao menos 1 item no cardápio, ajuste o branding e deixe frete e Mercado Pago prontos (em outra seção). Só então ative — a ativação não verifica os pré-requisitos automaticamente."
+                help-term="storefront">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+            <es-breadcrumb-item>Novo</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
 
 <es-card padding="lg" card-class="mt-4" style="max-width:640px;">
-    <h2 style="margin:0 0 4px; font-size:18px; font-weight:600; color:var(--text-primary);">Novo storefront</h2>
-    <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">
-        A loja nasce <strong>inativa</strong>. Depois de criar: configure o cardápio e
-        <strong>publique ao menos 1 item</strong>, ajuste o branding, e deixe frete e Mercado Pago
-        prontos (em outra seção). Só então ative — a ativação não verifica os pré-requisitos automaticamente.
-    </p>
 
     <form method="post"
           x-data="{ submitting: false, slugTouched: false }"
