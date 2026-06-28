@@ -20,6 +20,17 @@
         _            => ""
     };
 
+    // Rótulo do tipo de evento (QA v1.10 BUG-015: 'status_changed' aparecia cru). Só
+    // status_changed é canônico-conhecido; os demais são humanizados (snake_case ->
+    // "Snake case") até haver catálogo de eventos no contrato. Status via StatusHelper.
+    string eventoTipoLabel(string? t)
+    {
+        if (string.IsNullOrEmpty(t)) return "Evento";
+        if (t == "status_changed") return "Status alterado";
+        var human = t.Replace('_', ' ');
+        return char.ToUpperInvariant(human[0]) + human.Substring(1);
+    }
+
     // Timeline de status
     var statusOrder = new[] { "aguardando", "preparando", "pronto", "entregue" };
     var statusLabels = new Dictionary<string, string> {
@@ -464,10 +475,10 @@ else
                         <li class="py-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <span class="text-xs text-slate-400 font-mono">@e.OcorridoEm.ParaBrasilia().AsDateTime()</span>
-                                <span class="font-medium text-slate-900">@e.Tipo</span>
+                                <span class="font-medium text-slate-900">@eventoTipoLabel(e.Tipo)</span>
                                 @if (!string.IsNullOrEmpty(e.StatusAntigo) && !string.IsNullOrEmpty(e.StatusNovo))
                                 {
-                                    <span class="text-xs text-slate-500">@e.StatusAntigo → @e.StatusNovo</span>
+                                    <span class="text-xs text-slate-500">@StatusHelper.Label(e.StatusAntigo) → @StatusHelper.Label(e.StatusNovo)</span>
                                 }
                                 @if (!string.IsNullOrEmpty(e.Origem)) { <span class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">@e.Origem</span> }
                             </div>

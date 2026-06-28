@@ -11,10 +11,22 @@
 (function () {
   'use strict';
 
-  var STATUS_LABEL = { aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', entregue: 'Entregue', cancelado: 'Cancelado' };
+  // Espelha StatusPedidoMapper (domínio) — manter em sincronia com StatusHelper.cs e
+  // statusDisplayLabel (SSR em Pedidos/Index.cshtml). Issue #719 / QA v1.10 BUG-003/014.
+  var STATUS_LABEL = {
+    aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', entregue: 'Entregue', cancelado: 'Cancelado',
+    rascunho: 'Rascunho', aguardando_pagamento: 'Aguardando pagamento', aguardando_aprovacao_baba: 'Aguardando aprovação', aprovado_baba: 'Aprovado'
+  };
   var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue' };
   var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega' };
-  var OPEN = ['aguardando', 'preparando', 'pronto'];
+  // "Em aberto" = não-terminais operacionais. Inclui os pós-pagamento do storefront
+  // (aprovacao_baba/aprovado_baba). rascunho/aguardando_pagamento são pré-operacionais
+  // e ficam fora. Incluir aprovacao_baba corrige a subcontagem do BUG-009 (issue #719).
+  var OPEN = ['aguardando', 'preparando', 'pronto', 'aguardando_aprovacao_baba', 'aprovado_baba'];
+
+  // Invariante (issue #719): todo status de OPEN precisa ter rótulo em STATUS_LABEL.
+  // Sem runner de teste no gate JS — esta asserção só fala no console em dev.
+  OPEN.forEach(function (s) { console.assert(s in STATUS_LABEL, '[pedidos-cockpit] OPEN sem STATUS_LABEL: ' + s); });
 
   function token() {
     var el = document.querySelector('[name=__RequestVerificationToken]');
@@ -69,6 +81,9 @@
         if (this.filter === 'agendados') return p.isScheduled;
         if (this.filter === 'atrasados') return p.isAtrasado;
         if (this.filter === '') return true;
+        // "Aguardando" cobre a família de espera do storefront (issue #719): sem isto,
+        // aguardando_aprovacao_baba sumia de todos os tabs exceto "Todos" (BUG-014).
+        if (this.filter === 'aguardando') return p.status === 'aguardando' || p.status === 'aguardando_aprovacao_baba';
         return p.status === this.filter;
       },
       isVisible: function (id) { return this.matches(this.items[id]); },

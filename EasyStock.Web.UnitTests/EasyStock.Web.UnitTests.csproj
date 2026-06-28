@@ -24,6 +24,9 @@
   <ItemGroup>
     <ProjectReference Include="..\EasyStock.Web\EasyStock.Web.csproj" />
     <ProjectReference Include="..\EasyStock.Admin\EasyStock.Admin.csproj" />
+    <!-- Domain só no projeto de TESTE: o poka-yoke de status (issue #719) compara o
+         StatusHelper do Web contra o enum canônico. A Web de produção continua Domain-free. -->
+    <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
   </ItemGroup>
 
 </Project>

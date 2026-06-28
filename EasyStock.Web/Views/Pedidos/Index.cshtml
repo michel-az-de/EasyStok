@@ -19,6 +19,11 @@
         "pronto"     => "Pronto",
         "entregue"   => "Entregue",
         "cancelado"  => "Cancelado",
+        // Fluxo storefront guest (StatusPedidoMapper, issue 719) — espelha StatusHelper.
+        "rascunho"                  => "Rascunho",
+        "aguardando_pagamento"      => "Aguardando pagamento",
+        "aguardando_aprovacao_baba" => "Aguardando aprovação",
+        "aprovado_baba"             => "Aprovado",
         _            => s ?? ""
     };
 
@@ -112,7 +117,7 @@
 <div class="ws mb-6">
     <div class="flex gap-3 flex-wrap items-center">
         <form method="get" class="flex flex-1 min-w-48 gap-3" role="search" aria-label="Buscar pedidos">
-            <input type="search" name="search" value="@Model.Search" placeholder="Buscar por cliente, unidade ou número…"
+            <input type="search" name="search" value="@Model.Search" placeholder="Buscar cliente, unidade ou nº…"
                    aria-label="Buscar pedido" class="ui-field flex-1 min-w-48" />
             <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
         </form>
@@ -235,7 +240,7 @@
 </div>
 </div>@* /.ds-enter *@
 
-@* Popover de pagamento inline (#591) — registra parcial/total sem sair da lista. *@
+@* Popover de pagamento inline (issue 591) — registra parcial/total sem sair da lista. *@
 <div class="ped-pay-overlay" x-show="pay.open" x-cloak @@click.self="closePay()" x-transition.opacity>
     <div class="ped-pay-card" role="dialog" aria-modal="true" aria-label="Registrar pagamento">
         <div class="ped-pay-card__hd">
