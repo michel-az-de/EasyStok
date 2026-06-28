@@ -85,7 +85,7 @@
                     }
                     <form method="post" asp-page-handler="AlterarStatus" class="flex items-center gap-2"
                           x-data="{ submitting: false }"
-                          @@submit="submitting = true">
+                          x-on:submit="submitting = true">
                         @Html.AntiForgeryToken()
                         <select name="status" class="form-input text-sm py-1.5" style="width:160px"
                                 aria-label="Alterar status do ticket"

@@ -675,7 +675,7 @@ function operacaoErp(tenantId) {
                             class="text-es-ink-mute hover:text-es-ink text-xl leading-none">×</button>
                 </div>
 
-                <form method="post" asp-page-handler="CriarUsuario" @@submit="submitting = true" class="mt-4 space-y-3">
+                <form method="post" asp-page-handler="CriarUsuario" x-on:submit="submitting = true" class="mt-4 space-y-3">
                     <input type="hidden" name="__RequestVerificationToken" value="@afEditar" />
 
                     <div>
