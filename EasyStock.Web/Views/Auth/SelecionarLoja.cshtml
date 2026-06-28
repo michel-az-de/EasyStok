@@ -85,7 +85,7 @@
                 </div>
 
                 <form asp-action="Criar" asp-controller="Lojas" method="post" class="space-y-4"
-                      @@submit="if (!podeEnviar) { $event.preventDefault(); }">
+                      x-on:submit="if (!podeEnviar) { $event.preventDefault(); }">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="emoji" :value="emoji" />
 

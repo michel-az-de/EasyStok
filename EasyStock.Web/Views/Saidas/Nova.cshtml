@@ -109,7 +109,7 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Quantidade *</label>
                         <input asp-for="Qty" type="number" min="1"
                                x-model.number="qty"
-                               @@input="calcularTotal()"
+                               x-on:input="calcularTotal()"
                                :class="(produtoId && qty > estoqueAtual) || (qty !== null && qty < 1) ? 'border-red-400 ring-1 ring-red-200' : ''"
                                class="ui-field w-full text-sm" />
                         <span asp-validation-for="Qty" class="text-red-600 text-xs"></span>
@@ -132,7 +132,7 @@
                         @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
                         <input asp-for="Valor" type="text" inputmode="decimal"
                                x-model.number="valorUnit"
-                               @@input="calcularTotal()"
+                               x-on:input="calcularTotal()"
                                placeholder="R$ 0,00"
                                class="ui-field w-full text-sm" />
                     </div>
