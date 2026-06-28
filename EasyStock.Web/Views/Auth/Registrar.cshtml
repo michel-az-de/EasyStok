@@ -99,7 +99,7 @@
                     }
 
                     <form asp-action="Registrar" asp-controller="Auth" method="post"
-                          x-ref="form" :aria-busy="loading ? 'true' : 'false'" @@submit="handleSubmit">
+                          x-ref="form" :aria-busy="loading ? 'true' : 'false'" x-on:submit="handleSubmit">
                         @Html.AntiForgeryToken()
 
                         <p class="auth-prem-section">Sua empresa</p>
@@ -126,7 +126,7 @@
                                 </span>
                                 <input asp-for="Documento" id="reg-doc" type="text" maxlength="30"
                                        class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right" placeholder="00.000.000/0001-00"
-                                       :disabled="loading" @@blur="checkDoc" x-model="documento" />
+                                       :disabled="loading" x-on:blur="checkDoc" x-model="documento" />
                                 <span x-show="docChecking" x-cloak class="auth-prem-spinner-inline" aria-hidden="true"></span>
                             </div>
                             <span class="auth-prem-field-help">Usado nas notas fiscais. Pode adicionar depois.</span>
@@ -158,7 +158,7 @@
                                 </span>
                                 <input asp-for="Email" id="reg-email" type="email" autocomplete="email" required
                                        class="auth-prem-input auth-prem-input--with-icon-left auth-prem-input--with-icon-right" placeholder="voce@suaempresa.com.br"
-                                       :disabled="loading" @@blur="checkEmail" x-model="emailVal" />
+                                       :disabled="loading" x-on:blur="checkEmail" x-model="emailVal" />
                                 <span x-show="emailChecking" x-cloak class="auth-prem-spinner-inline" aria-hidden="true"></span>
                             </div>
                             <span asp-validation-for="Email" class="auth-prem-field-error"></span>
@@ -175,7 +175,7 @@
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                                 </span>
                                 <input asp-for="Senha" type="password" autocomplete="new-password" minlength="8" required
-                                       x-model="senha" @@input="onSenhaInput"
+                                       x-model="senha" x-on:input="onSenhaInput"
                                        class="auth-prem-input auth-prem-input--with-icon-left" placeholder="Mínimo 8 caracteres" :disabled="loading" />
                             </div>
                             <div class="auth-prem-strength" :data-level="senhaLevel" aria-hidden="true">

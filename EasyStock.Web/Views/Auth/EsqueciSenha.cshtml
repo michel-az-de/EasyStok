@@ -116,7 +116,7 @@
                         }
 
                         <form asp-action="EsqueciSenha" asp-controller="Auth" method="post"
-                              :aria-busy="loading ? 'true' : 'false'" @@submit="loading = true">
+                              :aria-busy="loading ? 'true' : 'false'" x-on:submit="loading = true">
                             @Html.AntiForgeryToken()
 
                             <div class="auth-prem-field">
