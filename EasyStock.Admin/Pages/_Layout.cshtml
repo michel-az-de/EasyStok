@@ -229,10 +229,10 @@
                     <es-icon name="settings" size="18" />
                     <span class="text-sm font-medium sidebar-label">Configurações</span>
                 </a>
-                <a href="/Configuracoes/ConfiguracaoFiscal" class="sidebar-link @(ViewContext.RouteData.Values["page"]?.ToString()?.Contains("ConfiguracaoFiscal") == true ? "is-active" : "")">
-                    <es-icon name="file-text" size="18" />
-                    <span class="text-sm font-medium sidebar-label">Config. Fiscal</span>
-                </a>
+                @* Config. Fiscal removido do menu (QA BUG-001 / issue 729): a página exige
+                   EmpresaId e o link não o passava -> sempre erro ("EmpresaId obrigatorio."
+                   + redirect). Continua acessível via deep-link ?EmpresaId=. O ponto de
+                   entrada definitivo (global vs por-tenant) aguarda ADR. *@
             </div>
 
             <div class="sidebar-external">
