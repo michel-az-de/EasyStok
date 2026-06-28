@@ -76,12 +76,28 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
 
     // ── Handlers ───────────────────────────────────────────────────────────
 
-    public async Task OnGetAsync()
+    public async Task<IActionResult> OnGetAsync()
     {
+        // A rota aceita o Guid interno OU o numero legivel (ex.: 2026-000001). O numero nao
+        // bate no bind de Guid (Id fica Empty); resolvemos via a busca da listagem admin
+        // (FaturaRepository casa `busca` em Numero) e canonicalizamos para a URL por Guid.
+        // Antes a rota era {id:guid} e /Faturas/Detail/{numero} dava 404 (links de email/externos).
         if (Id == Guid.Empty)
         {
-            Erro = "Id invalido.";
-            return;
+            var chave = (RouteData.Values.TryGetValue("id", out var rv) ? rv?.ToString() : null)?.Trim();
+            if (string.IsNullOrWhiteSpace(chave))
+            {
+                Erro = "Id invalido.";
+                return Page();
+            }
+
+            var resolvido = await ResolverPorNumeroAsync(chave);
+            if (resolvido is null)
+            {
+                Erro = "Fatura nao encontrada.";
+                return Page();
+            }
+            return RedirectToPage(new { id = resolvido.Value });
         }
 
         try
@@ -98,6 +114,37 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
         {
             log.LogError(ex, "Falha ao carregar fatura {FaturaId}", Id);
             Erro = "Falha ao carregar a fatura. Tente recarregar.";
+        }
+        return Page();
+    }
+
+    /// <summary>
+    /// Resolve o numero legivel (ex.: 2026-000001) para o Guid da fatura via a busca da
+    /// listagem admin (a query `busca` casa em Numero no repositorio). A busca e Contains,
+    /// entao filtramos por match EXATO no cliente. Retorna null se nao houver match exato.
+    /// </summary>
+    private async Task<Guid?> ResolverPorNumeroAsync(string numero)
+    {
+        try
+        {
+            var raw = await api.GetRawAsync($"api/admin/faturas?busca={Uri.EscapeDataString(numero)}&pageSize=50");
+            if (!raw.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+                return null;
+
+            foreach (var f in data.EnumerateArray())
+            {
+                var num = f.TryGetProperty("numero", out var nv) ? nv.GetString() : null;
+                if (string.Equals(num, numero, StringComparison.OrdinalIgnoreCase)
+                    && f.TryGetProperty("id", out var idv) && idv.TryGetGuid(out var gid))
+                    return gid;
+            }
+            return null;
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao resolver fatura por numero {Numero}", numero);
+            return null;
         }
     }
 
