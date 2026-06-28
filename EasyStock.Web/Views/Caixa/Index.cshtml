@@ -121,6 +121,8 @@
 }
 else
 {
+    @* Entrada orquestrada (issue 715): reusa o .ds-enter do dashboard. *@
+    <div class="ds-enter">
     @if (d.AberturaPendenteCrossDay)
     {
         <div class="bg-[var(--warn-50)] border border-[var(--warn-200)] rounded-xl p-4 mb-6 flex items-start gap-3">
@@ -133,9 +135,9 @@ else
     }
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="ws">
-            <h3 class="text-sm font-semibold text-slate-500 mb-1">Saldo esperado</h3>
-            <div class="text-2xl font-bold text-slate-900 tabular-nums">@d.SaldoEsperado.AsMoney()</div>
+        <div class="ws caixa-kpi">
+            <h3 class="caixa-kpi-lbl">Saldo esperado</h3>
+            <div class="caixa-kpi-val tabular-nums">@d.SaldoEsperado.AsMoney()</div>
             <div class="text-xs text-slate-500 mt-1">
                 @(d.Fechado ? "Caixa fechado"
                   : d.AberturaPendenteCrossDay ? ("Aberto desde " + d.AbertoDesde?.ToString("dd/MM"))
@@ -143,14 +145,14 @@ else
                   : "Caixa não aberto")
             </div>
         </div>
-        <div class="ws">
-            <h3 class="text-sm font-semibold text-slate-500 mb-1">Vendas + pagamentos</h3>
-            <div class="text-2xl font-bold text-green-600 tabular-nums">@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</div>
+        <div class="ws caixa-kpi">
+            <h3 class="caixa-kpi-lbl">Vendas + pagamentos</h3>
+            <div class="caixa-kpi-val is-positivo tabular-nums">@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</div>
             <div class="text-xs text-slate-500 mt-1 tabular-nums">Vendas: @d.TotalVendas.AsMoney() · Pagamentos: @d.TotalPagamentosPedidos.AsMoney()</div>
         </div>
-        <div class="ws">
-            <h3 class="text-sm font-semibold text-slate-500 mb-1">Entradas/saídas extras</h3>
-            <div class="text-2xl font-bold text-slate-900 tabular-nums">@((d.TotalEntradasExtras - d.TotalSaidasExtras).AsMoney())</div>
+        <div class="ws caixa-kpi">
+            <h3 class="caixa-kpi-lbl">Entradas/saídas extras</h3>
+            <div class="caixa-kpi-val tabular-nums">@((d.TotalEntradasExtras - d.TotalSaidasExtras).AsMoney())</div>
             <div class="text-xs text-slate-500 mt-1 tabular-nums">Entradas: +@d.TotalEntradasExtras.AsMoney() · Saídas: −@d.TotalSaidasExtras.AsMoney()</div>
         </div>
     </div>
@@ -236,6 +238,8 @@ else
             </div>
         }
     </div>
+
+    </div>@* /.ds-enter *@
 
     @* Modais movidos para o final do arquivo (após if/else completo). *@
 }

@@ -39,6 +39,10 @@
         <!-- Toggle de modo: avulso (padrão) vs vincular produto do ERP -->
         @if (Model.Produtos.Any())
         {
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="font-size:13px; font-weight:500; color:var(--text-primary);">Tipo de item</span>
+                <es-help term="cardapio-item">Avulso: item só da loja, sem ligação com o estoque. Vinculado: puxa o nome e o preço de referência de um produto do seu estoque.</es-help>
+            </div>
             <div role="radiogroup" aria-label="Tipo de item"
                  style="display:flex; gap:8px; margin-bottom:20px; background:var(--surface-2); padding:4px; border-radius:var(--r-md);">
                 <label style="flex:1; cursor:pointer; text-align:center; padding:8px 12px; border-radius:var(--r-sm); font-size:13px; font-weight:500;"

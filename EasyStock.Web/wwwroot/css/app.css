@@ -4998,6 +4998,28 @@ html.theme-dark .ds-kpi-val {
     color: #F1F5F9;
 }
 
+/* KPI cards do Caixa (issue 715) — paridade tipografica com o dashboard.
+   Cor via token theme-aware: NAO uso text-slate-900 (some no dark) nem
+   .ds-kpi-val (cujo override dark mataria o verde do "Vendas"). */
+.caixa-kpi-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--ink-500);
+    margin-bottom: 4px;
+}
+.caixa-kpi-val {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -.02em;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+.caixa-kpi-val.is-positivo { color: var(--ok-600); }
+html.theme-dark .caixa-kpi-val.is-positivo { color: var(--ok-400); }
+
 /* ── Alertas em lista priorizada ───────────────────────────── */
 .ds-alerts-list {
     list-style: none;
