@@ -16,7 +16,7 @@
 </div>
 
 <div class="max-w-5xl min-h-[calc(100vh-14rem)]" x-data="saidaForm()">
-    <form asp-action="Criar" asp-controller="Saidas" method="post" @@submit.prevent="submitSaida()">
+    <form asp-action="Criar" asp-controller="Saidas" method="post" x-on:submit.prevent="submitSaida()">
         @Html.AntiForgeryToken()
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
