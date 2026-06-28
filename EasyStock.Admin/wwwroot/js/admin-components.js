@@ -294,4 +294,18 @@
         return d.toLocaleDateString('pt-BR');
     };
 
+    // ── Mensagem de erro de carga por causa (#730 / TEN-003) ──
+    // Traduz timeout / status HTTP em texto pt-BR acionavel. opts: { timeout, status, code, fallback }.
+    window.msgErroCarga = function (opts) {
+        opts = opts || {};
+        if (opts.timeout) return 'O serviço demorou demais para responder (timeout). Pode estar sobrecarregado.';
+        var s = opts.status || 0;
+        if (s === 404) return 'Dados não encontrados para este cliente.';
+        if (s === 408 || s === 504) return 'O serviço demorou demais para responder (timeout).';
+        if (s === 502 || s === 503) return 'Serviço temporariamente indisponível. Tente em instantes.';
+        if (s >= 500) return 'O serviço retornou um erro (' + s + '). Tente novamente em instantes.';
+        if (s >= 400) return opts.fallback || ('Não foi possível carregar (erro ' + s + ').');
+        return opts.fallback || 'Não foi possível carregar. Tente novamente.';
+    };
+
 })();

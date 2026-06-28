@@ -82,10 +82,15 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             return new JsonResult(data);
         }
         catch (SessionExpiredException) { throw; }
+        catch (ApiException ex)
+        {
+            log.LogWarning(ex, "Falha ao carregar mobile-sync-health do tenant {TenantId} (HTTP {Status})", Id, ex.HttpStatus);
+            return new JsonResult(new { error = ex.Message, status = ex.HttpStatus, code = ex.ErrorCode });
+        }
         catch (Exception ex)
         {
             log.LogWarning(ex, "Falha ao carregar mobile-sync-health do tenant {TenantId}", Id);
-            return new JsonResult(new { error = ex.Message });
+            return new JsonResult(new { error = ex.Message, status = 0, code = "UNKNOWN" });
         }
     }
 
@@ -102,10 +107,15 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             return new JsonResult(data);
         }
         catch (SessionExpiredException) { throw; }
+        catch (ApiException ex)
+        {
+            log.LogWarning(ex, "Falha ao carregar operacao-erp do tenant {TenantId} (HTTP {Status})", Id, ex.HttpStatus);
+            return new JsonResult(new { error = ex.Message, status = ex.HttpStatus, code = ex.ErrorCode });
+        }
         catch (Exception ex)
         {
             log.LogWarning(ex, "Falha ao carregar operacao-erp do tenant {TenantId}", Id);
-            return new JsonResult(new { error = ex.Message });
+            return new JsonResult(new { error = ex.Message, status = 0, code = "UNKNOWN" });
         }
     }
 

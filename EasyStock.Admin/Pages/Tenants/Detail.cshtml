@@ -87,7 +87,7 @@ function alertaBanner(tenantId) {
 // F4: card "Sincronização Mobile" no Detail. Fetch o counts via Razor handler.
 function mobileSyncHealth(tenantId) {
     return {
-        loaded: false, erro: false, healthy: true, totalPending: 0,
+        loaded: false, erro: false, erroMsg: '', tentativas: 0, healthy: true, totalPending: 0,
         devices: 0, lastSyncAt: null, lastSyncFormatado: '',
         entregueSemVenda: 0,
         metricas: [],
@@ -98,10 +98,10 @@ function mobileSyncHealth(tenantId) {
             try {
                 const r = await fetch('/Tenants/Detail/' + tenantId + '?handler=MobileSyncHealth',
                     { credentials: 'same-origin', cache: 'no-store', signal: ctrl.signal });
-                if (!r.ok) { this.erro = true; this.loaded = true; return; }
+                if (!r.ok) { this._falhou({ status: r.status }); return; }
                 const json = await r.json();
                 const d = json.data || json;
-                if (d.error) { this.erro = true; this.loaded = true; return; }
+                if (d.error) { this._falhou({ status: d.status, code: d.code, fallback: d.error }); return; }
                 this.healthy = !!d.healthy;
                 this.totalPending = d.totalPending ?? 0;
                 this.devices = d.devices ?? 0;
@@ -122,9 +122,16 @@ function mobileSyncHealth(tenantId) {
                     else if (diff < 1440) this.lastSyncFormatado = Math.floor(diff/60) + 'h atrás';
                     else this.lastSyncFormatado = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
                 }
+                this.tentativas = 0;
                 this.loaded = true;
-            } catch (e) { this.erro = true; this.loaded = true; }
+            } catch (e) { this._falhou({ timeout: e.name === 'AbortError' }); }
             finally { clearTimeout(timer); }
+        },
+        _falhou(opts) {
+            this.tentativas++;
+            this.erroMsg = window.msgErroCarga(opts);
+            this.erro = true;
+            this.loaded = true;
         }
     };
 }
@@ -133,7 +140,7 @@ function mobileSyncHealth(tenantId) {
 // distinto do mobileSyncHealth (que conta tabelas mobile_*).
 function operacaoErp(tenantId) {
     return {
-        loaded: false, erro: false, caixaAberta: false, metricas: [],
+        loaded: false, erro: false, erroMsg: '', tentativas: 0, caixaAberta: false, metricas: [],
         async carregar() {
             this.erro = false;
             const ctrl = new AbortController();
@@ -141,10 +148,10 @@ function operacaoErp(tenantId) {
             try {
                 const r = await fetch('/Tenants/Detail/' + tenantId + '?handler=OperacaoErp',
                     { credentials: 'same-origin', cache: 'no-store', signal: ctrl.signal });
-                if (!r.ok) { this.erro = true; this.loaded = true; return; }
+                if (!r.ok) { this._falhou({ status: r.status }); return; }
                 const json = await r.json();
                 const d = json.data || json;
-                if (d.error) { this.erro = true; this.loaded = true; return; }
+                if (d.error) { this._falhou({ status: d.status, code: d.code, fallback: d.error }); return; }
                 this.caixaAberta = !!d.caixa?.aberta;
                 const fmt = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
                 this.metricas = [
@@ -154,9 +161,16 @@ function operacaoErp(tenantId) {
                     { label: 'Lotes',    valor: d.lotes    ?? 0 },
                     { label: 'Caixa',    valor: fmt(d.caixa?.saldo) },
                 ];
+                this.tentativas = 0;
                 this.loaded = true;
-            } catch (e) { this.erro = true; this.loaded = true; }
+            } catch (e) { this._falhou({ timeout: e.name === 'AbortError' }); }
             finally { clearTimeout(timer); }
+        },
+        _falhou(opts) {
+            this.tentativas++;
+            this.erroMsg = window.msgErroCarga(opts);
+            this.erro = true;
+            this.loaded = true;
         }
     };
 }
@@ -412,7 +426,14 @@ function operacaoErp(tenantId) {
                 <button type="button" @@click="carregar()" class="text-xs text-es-ink-dim hover:text-es-ink">↻ atualizar</button>
             </div>
             <div x-show="!loaded" class="text-xs text-es-ink-dim">carregando…</div>
-            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">Não foi possível carregar (timeout/erro). Tente ↻ atualizar.</div>
+            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">
+                <p x-text="erroMsg"></p>
+                <div class="mt-1.5 flex items-center gap-3">
+                    <button type="button" @@click="carregar()" class="text-es-ink-dim hover:text-es-ink underline">Tentar novamente</button>
+                    <a href="/Diagnostico?tenant=@Model.Id" class="text-es-ink-dim hover:text-es-ink underline">Abrir diagnóstico</a>
+                </div>
+                <p x-show="tentativas >= 3" x-cloak class="mt-1 text-es-ink-mute">Falhou várias vezes. Considere abrir um ticket de diagnóstico.</p>
+            </div>
             <div x-show="loaded && !erro" x-cloak class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <template x-for="m in metricas" :key="m.label">
                     <div class="rounded-lg p-3" style="background:#0f172a;border:1px solid rgba(247,242,232,0.08)">
@@ -445,7 +466,14 @@ function operacaoErp(tenantId) {
                 <button type="button" @@click="carregar()" class="text-xs text-es-ink-dim hover:text-es-ink">↻ atualizar</button>
             </div>
             <div x-show="!loaded" class="text-xs text-es-ink-dim">carregando…</div>
-            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">Não foi possível carregar (timeout/erro). Tente ↻ atualizar.</div>
+            <div x-show="loaded && erro" x-cloak class="text-xs" style="color:var(--crit-600);">
+                <p x-text="erroMsg"></p>
+                <div class="mt-1.5 flex items-center gap-3">
+                    <button type="button" @@click="carregar()" class="text-es-ink-dim hover:text-es-ink underline">Tentar novamente</button>
+                    <a href="/Diagnostico?tenant=@Model.Id" class="text-es-ink-dim hover:text-es-ink underline">Abrir diagnóstico</a>
+                </div>
+                <p x-show="tentativas >= 3" x-cloak class="mt-1 text-es-ink-mute">Falhou várias vezes. Considere abrir um ticket de diagnóstico.</p>
+            </div>
             <div x-show="loaded && !erro" x-cloak class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <template x-for="m in metricas" :key="m.label">
                     <div class="rounded-lg p-3" style="background:#0f172a;border:1px solid rgba(247,242,232,0.08)">
