@@ -20,6 +20,9 @@ public sealed class BadgeTagHelper : TagHelper
     [HtmlAttributeName("with-dot")]
     public bool WithDot { get; set; }
 
+    /// <summary>Respiracao continua (classe deck-pulse) para estados "verificando/carregando".</summary>
+    public bool Pulse { get; set; }
+
     public string? Icon { get; set; }
     public string? Title { get; set; }
 
@@ -27,7 +30,9 @@ public sealed class BadgeTagHelper : TagHelper
     {
         output.TagName = "span";
         output.TagMode = TagMode.StartTagAndEndTag;
-        output.Attributes.SetAttribute("class", $"badge badge-{Variant}");
+        var cssClass = $"badge badge-{Variant}";
+        if (Pulse) cssClass += " deck-pulse";
+        output.Attributes.SetAttribute("class", cssClass);
         if (!string.IsNullOrEmpty(Title)) output.Attributes.SetAttribute("title", Title);
 
         var content = await output.GetChildContentAsync();

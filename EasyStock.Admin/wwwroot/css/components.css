@@ -1165,6 +1165,10 @@ button:focus-visible {
   color: var(--text-muted);
   margin-bottom: var(--s-1);
 }
+/* Variante de erro (issue 730): icone critico distingue falha de carga de vazio/filtrado. */
+.es-empty-state-icon.is-error {
+  color: var(--crit-600);
+}
 .es-empty-state-title {
   font-size: 16px;
   font-weight: 600;

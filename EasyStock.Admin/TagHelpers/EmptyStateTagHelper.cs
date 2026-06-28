@@ -21,6 +21,12 @@ public sealed class EmptyStateTagHelper : TagHelper
     public string? Title { get; set; }
     public string? Description { get; set; }
 
+    /// <summary>
+    /// "default" (cinza, vazio/filtrado) ou "erro" (icone em cor critica), para distinguir
+    /// falha de carga de um estado vazio legitimo (issue 730).
+    /// </summary>
+    public string Variant { get; set; } = "default";
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = "div";
@@ -32,7 +38,10 @@ public sealed class EmptyStateTagHelper : TagHelper
 
         var sb = new StringBuilder();
         var safeIcon = WebUtility.HtmlEncode(Icon);
-        sb.Append("<div class=\"es-empty-state-icon\">");
+        var iconClass = string.Equals(Variant, "erro", StringComparison.OrdinalIgnoreCase)
+            ? "es-empty-state-icon is-error"
+            : "es-empty-state-icon";
+        sb.Append($"<div class=\"{iconClass}\">");
         sb.Append($"<svg class=\"es-icon\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><use href=\"/icons/sprite.svg#icon-{safeIcon}\"/></svg>");
         sb.Append("</div>");
 

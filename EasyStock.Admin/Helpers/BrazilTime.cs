@@ -48,4 +48,27 @@ public static class BrazilTime
     /// <summary>Overload para <see cref="Nullable{DateTime}"/>: null entra, null sai.</summary>
     public static DateTime? ParaBrasilia(this DateTime? utc)
         => utc.HasValue ? utc.Value.ParaBrasilia() : null;
+
+    /// <summary>
+    /// Tempo relativo em pt-BR para exibicao ("ha 3 min", "ha 2 h", "ha 5 dias"). Acima de
+    /// 7 dias cai para data absoluta dd/MM/yyyy no fuso de Brasilia. Input UTC (Kind Utc ou
+    /// Unspecified, ambos tratados como UTC, espelhando ParaBrasilia). Consolida as copias
+    /// inline que viviam em Detail.cshtml/format.js (issue 730). Faixa de cor (ambar/vermelho
+    /// por idade) e decidida no call-site, nao aqui.
+    /// </summary>
+    public static string FormatRelative(this DateTime utc)
+    {
+        if (utc == default) return string.Empty;
+        var asUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        var delta = DateTime.UtcNow - asUtc;
+        if (delta < TimeSpan.Zero || delta.TotalSeconds < 60) return "agora há pouco";
+        if (delta.TotalMinutes < 60) return $"há {(int)delta.TotalMinutes} min";
+        if (delta.TotalHours < 24) return $"há {(int)delta.TotalHours} h";
+        if (delta.TotalDays < 7) { var d = (int)delta.TotalDays; return $"há {d} {(d == 1 ? "dia" : "dias")}"; }
+        return asUtc.ParaBrasilia().ToString("dd/MM/yyyy");
+    }
+
+    /// <summary>Overload nullable: null devolve string vazia.</summary>
+    public static string FormatRelative(this DateTime? utc)
+        => utc.HasValue ? utc.Value.FormatRelative() : string.Empty;
 }

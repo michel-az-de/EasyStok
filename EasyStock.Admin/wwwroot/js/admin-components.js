@@ -277,4 +277,21 @@
         };
     };
 
+    // ── Tempo relativo pt-BR (#730) ──
+    // Espelha BrazilTime.FormatRelative (server) para dados renderizados via Alpine/fetch
+    // (notas, timeline, recentes). Consolida as copias inline que viviam no Detail.cshtml.
+    // Entrada: ISO string ou Date (instante UTC). No escopo Alpine resolve via window quando
+    // o componente nao define um formatRelativo proprio.
+    window.formatRelativo = function (iso) {
+        if (!iso) return '';
+        const d = (iso instanceof Date) ? iso : new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        const diff = (Date.now() - d.getTime()) / 1000;
+        if (diff < 60) return 'agora há pouco';
+        if (diff < 3600) return 'há ' + Math.floor(diff / 60) + ' min';
+        if (diff < 86400) return 'há ' + Math.floor(diff / 3600) + ' h';
+        if (diff < 604800) { const dias = Math.floor(diff / 86400); return 'há ' + dias + (dias === 1 ? ' dia' : ' dias'); }
+        return d.toLocaleDateString('pt-BR');
+    };
+
 })();

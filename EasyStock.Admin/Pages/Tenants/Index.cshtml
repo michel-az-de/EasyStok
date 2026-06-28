@@ -97,12 +97,7 @@
             var trialExpirado = t.TryGetProperty("trialExpiradoSemPlano", out var teP)
                 && teP.ValueKind == System.Text.Json.JsonValueKind.True;
             var statusDisplay = trialExpirado ? "Trial expirado" : (status ?? "—");
-            var statusVariant = trialExpirado ? "crit" : status?.ToLower() switch {
-                "ativa" => "ok",
-                "suspensa" => "warn",
-                "cancelada" => "crit",
-                _ => "neutral"
-            };
+            var statusVariant = StatusBadgeMap.Variant(status, trialExpirado);
             var initial = !string.IsNullOrEmpty(nome) ? nome.Substring(0, 1).ToUpper() : "?";
 
             <tr>
