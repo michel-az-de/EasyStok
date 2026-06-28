@@ -109,6 +109,11 @@ R13. Em caso de duvida: PARAR, perguntar, esperar confirmacao.
      Felipe prefere 1 pergunta a 1 commit errado.
      (Nao 10 — pergunta uma, decisiva. Sem hesitacao serial.)
 
+R14. Comunicacao SEMPRE em pt-BR. Toda resposta/conversa com o Felipe e em
+     portugues do Brasil, sem excecao e sem precisar pedir. (Codigo,
+     identificadores e mensagens de commit seguem o padrao do repo; a CONVERSA
+     com o usuario e sempre pt-BR.)
+
 ## 2. PROTOCOLO DE STAGE E COMMIT
 
   1. git add <arquivo/especifico>           (NUNCA . ou -A)
