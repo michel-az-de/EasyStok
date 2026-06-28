@@ -184,10 +184,12 @@ html:not(.theme-dark) .app-main::before {
     position: fixed;
     inset: 0;
     pointer-events: none;
+    z-index: -1;
     background:
+        radial-gradient(120% 80% at 50% -10%, rgba(255, 255, 255, .50) 0%, transparent 42%),
+        radial-gradient(70% 60% at 88% 108%, rgba(30, 72, 168, .05) 0%, transparent 60%),
         radial-gradient(circle at 20% 18%, rgba(255, 255, 255, .45) 0%, transparent 20%),
         linear-gradient(180deg, rgba(255, 255, 255, .10) 0%, rgba(255, 255, 255, 0) 16%);
-    z-index: -1;
 }
 
 .app-main > * {
@@ -484,12 +486,20 @@ html.theme-dark .badge-slow {
     content: "";
     position: absolute;
     left: -2px; top: 6px; bottom: 6px; width: 3px;
-    background: var(--orange-600);
+    background: linear-gradient(180deg, var(--orange-400) 0%, var(--orange-600) 55%, var(--orange-600) 100%);
     border-radius: 0 3px 3px 0;
+    transform-origin: center;
+    box-shadow: 0 0 6px -1px rgba(232, 88, 20, .45);
+    animation: es-ni-trail-grow .26s var(--ease-spring) both;
 }
-.es-ni-row.is-active .es-ni-ico svg { color: var(--orange-400); }
-.es-ni-ico { display: inline-flex; flex-shrink: 0; width: 16px; height: 16px; }
+@keyframes es-ni-trail-grow {
+    from { transform: scaleY(0); opacity: 0; }
+    to   { transform: scaleY(1); opacity: 1; }
+}
+.es-ni-row.is-active .es-ni-ico svg { color: var(--orange-400); transition: color .2s var(--ease-smooth); }
+.es-ni-ico { display: inline-flex; flex-shrink: 0; width: 16px; height: 16px; transition: transform .16s var(--ease-spring); }
 .es-ni-ico svg { width: 16px; height: 16px; }
+.es-ni-row:hover:not(.is-active) .es-ni-ico { transform: translateX(1px) scale(1.06); }
 .es-ni-lbl { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Badges (pilula 18px translucida) */
@@ -602,7 +612,12 @@ html.theme-dark .badge-slow {
 .es-star[aria-pressed="true"] svg { fill: currentColor; }
 
 @media (prefers-reduced-motion: reduce) {
-    .es-ni, .es-group-hd, .es-group-chevron, .es-star { transition: none; }
+    .es-ni, .es-group-hd, .es-group-chevron, .es-star,
+    .es-ni-ico, .es-ni-ico svg { transition: none; transform: none; }
+    /* mesma especificidade (0,3,1) da regra de hover -> realmente zera o nudge */
+    .es-ni-row:hover:not(.is-active) .es-ni-ico { transform: none; }
+    .es-ni-row.is-active::before { animation: none; }
+    .app-topbar { transition: none; }
 }
 
 /* ─── Rail (~64px, so icones) — preferencia de DISPOSITIVO (es:rail) ──── */
@@ -984,6 +999,17 @@ html:not(.theme-dark) .app-topbar {
     background: rgba(255, 255, 255, .74);
     border-bottom: 1px solid rgba(255, 255, 255, .45);
     box-shadow: 0 1px 0 rgba(255, 255, 255, .5), 0 8px 24px rgba(15, 23, 42, .04);
+    transition: background var(--motion-base) var(--ease-smooth), box-shadow var(--motion-base) var(--ease-smooth), border-color var(--motion-base) var(--ease-smooth);
+}
+
+/* Estado "rolou" no desktop (a classe e alternada por JS em _Layout; no mobile o
+   tratamento vive em mobile.css). Ao descolar do topo a topbar ganha elevacao. */
+html:not(.theme-dark) .app-topbar.app-topbar--scrolled {
+    background: rgba(255, 255, 255, .86);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .5), 0 14px 34px rgba(15, 23, 42, .09);
+    border-bottom-color: rgba(226, 232, 240, .7);
 }
 
 .app-icon-btn,
@@ -1154,6 +1180,19 @@ html:not(.theme-dark) .app-sidebar {
         linear-gradient(180deg, #1E293B 0%, #182235 42%, #0F172A 100%);
     border-right-color: rgba(148, 163, 184, .18);
     box-shadow: 18px 0 34px rgba(15, 23, 42, .12), inset -1px 0 0 rgba(255, 255, 255, .04);
+}
+
+/* Sheen de luz no topo da sidebar navy (fonte de luz acima) — material iluminado.
+   Fica atras do nav/logo: .app-sidebar > * ja tem z-index:1 (ver bloco acima). */
+html:not(.theme-dark) .app-sidebar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .06) 0%, rgba(255, 255, 255, 0) 24%),
+        radial-gradient(60% 40% at 0% 0%, rgba(255, 255, 255, .04) 0%, transparent 70%);
 }
 
 /* Sidebar sempre dark — regras de tema claro herdadas da base */
@@ -1810,9 +1849,23 @@ html.theme-dark body {
     color: #E5EEF8;
 }
 
-html.theme-dark .app-main::before,
 html.theme-dark .app-sidebar::before {
     display: none;
+}
+
+/* Atmosfera do tema escuro (antes: fundo navy 100% plano). Glow navy no topo
+   + vinheta sutil nos cantos — profundidade sem comprometer legibilidade. */
+html.theme-dark .app-main::before {
+    display: block;
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+        radial-gradient(120% 80% at 50% -12%, rgba(30, 72, 168, .16) 0%, transparent 46%),
+        radial-gradient(80% 70% at 92% 110%, rgba(14, 42, 110, .20) 0%, transparent 62%),
+        radial-gradient(100% 100% at 50% 50%, transparent 58%, rgba(6, 20, 58, .32) 100%);
 }
 
 html.theme-dark header,
@@ -1835,8 +1888,8 @@ html.theme-dark .app-command-panel {
 }
 
 html.theme-dark .app-sidebar {
-    background: #0F172A;
-    box-shadow: 22px 0 44px rgba(2, 6, 23, .35);
+    background: linear-gradient(180deg, #131D33 0%, #0F172A 55%, #0B1120 100%);
+    box-shadow: 22px 0 44px rgba(2, 6, 23, .35), inset -1px 0 0 rgba(148, 163, 184, .07), inset 0 1px 0 rgba(255, 255, 255, .03);
     border-right-color: rgba(71, 85, 105, .45);
 }
 
@@ -1851,6 +1904,15 @@ html.theme-dark .app-topbar {
     background: rgba(15, 17, 23, .82) !important;
     border-bottom: 1px solid rgba(255, 255, 255, .08);
     box-shadow: 0 1px 0 rgba(255, 255, 255, .04);
+    transition: background var(--motion-base) var(--ease-smooth), box-shadow var(--motion-base) var(--ease-smooth), border-color var(--motion-base) var(--ease-smooth);
+}
+
+html.theme-dark .app-topbar.app-topbar--scrolled {
+    background: rgba(9, 17, 31, .94) !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .05), 0 14px 36px rgba(2, 6, 23, .4);
+    /* !important para vencer o border-color !important da regra agrupada dark
+       (html.theme-dark .app-topbar, ...) — sem isto o tom navy do scroll fica inerte. */
+    border-bottom-color: rgba(30, 72, 168, .28) !important;
 }
 
 html.theme-dark .app-search-trigger,
