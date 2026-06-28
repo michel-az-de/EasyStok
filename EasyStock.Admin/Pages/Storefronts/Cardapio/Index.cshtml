@@ -4,24 +4,22 @@
     ViewData["Title"] = $"Cardápio — {Model.StorefrontSlug}";
 }
 
-<es-breadcrumb>
-    <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-    <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
-    <es-breadcrumb-item href="/Storefronts/Detail/@Model.StorefrontId">@Model.StorefrontSlug</es-breadcrumb-item>
-    <es-breadcrumb-item>Cardápio</es-breadcrumb-item>
-</es-breadcrumb>
-
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin:16px 0 24px; flex-wrap:wrap;">
-    <div>
-        <h2 style="margin:0 0 4px; font-size:18px; font-weight:600; color:var(--text-primary);">Cardápio de @Model.StorefrontTitulo</h2>
-        <div style="font-size:13px; color:var(--text-muted);">@(Model.Itens.Count()) item(ns) cadastrado(s)</div>
-    </div>
-    <div>
-        <es-button variant="primary" href="/Storefronts/@Model.StorefrontId/Cardapio/Create" icon="plus">
-            Adicionar item
-        </es-button>
-    </div>
-</div>
+<es-page-header eyebrow="@Model.StorefrontSlug"
+                titulo="Cardápio"
+                descricao="@($"{Model.StorefrontTitulo} · {Model.Itens.Count()} item(ns) cadastrado(s)")"
+                help-term="cardapio-item">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Storefronts/Detail/@Model.StorefrontId">@Model.StorefrontSlug</es-breadcrumb-item>
+            <es-breadcrumb-item>Cardápio</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+    <es-button variant="primary" href="/Storefronts/@Model.StorefrontId/Cardapio/Create" icon="plus">
+        Adicionar item
+    </es-button>
+</es-page-header>
 
 <es-data-table is-empty="@(!Model.Itens.Any())">
     <es-data-table-column key="ordem" label="Ordem" align="right" width="100px" />

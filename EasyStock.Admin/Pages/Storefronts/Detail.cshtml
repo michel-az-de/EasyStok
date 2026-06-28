@@ -33,35 +33,27 @@
 }
 else
 {
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
-        <es-breadcrumb-item>@slug</es-breadcrumb-item>
-    </es-breadcrumb>
-
-    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:16px 0 24px; flex-wrap:wrap;">
-        <div>
-            <h2 style="margin:0 0 4px; font-size:20px; font-weight:600; color:var(--text-primary);">
-                @titulo
-                @if (ativo)
-                {
-                    <es-badge variant="ok" with-dot="true">Ativo</es-badge>
-                }
-                else
-                {
-                    <es-badge variant="neutral" with-dot="true">Inativo</es-badge>
-                }
-            </h2>
-            <div style="color:var(--text-muted); font-size:13px; font-family:var(--font-mono);">@slug</div>
-            <div style="color:var(--text-muted); font-size:13px; margin-top:4px;">
-                Empresa: <strong style="color:var(--text-primary);">@empresaNome</strong> ·
-                Criado em @criadoDt.ParaBrasilia().ToString("dd/MM/yyyy")
-            </div>
-        </div>
-        <div style="display:flex; gap:8px;">
-            <es-button variant="ghost" href="/Storefronts/Edit/@Model.Id" icon="edit">Editar</es-button>
-        </div>
-    </div>
+    <es-page-header eyebrow="Loja virtual"
+                    titulo="@titulo"
+                    descricao="@($"{empresaNome} · {slug} · criada em {criadoDt.ParaBrasilia():dd/MM/yyyy}")"
+                    help-term="storefront">
+        <es-page-header-breadcrumb>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+                <es-breadcrumb-item>@slug</es-breadcrumb-item>
+            </es-breadcrumb>
+        </es-page-header-breadcrumb>
+        @if (ativo)
+        {
+            <es-badge variant="ok" with-dot="true">Ativo</es-badge>
+        }
+        else
+        {
+            <es-badge variant="neutral" with-dot="true">Inativo</es-badge>
+        }
+        <es-button variant="ghost" href="/Storefronts/Edit/@Model.Id" icon="edit">Editar</es-button>
+    </es-page-header>
 
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
         <es-card padding="md">
