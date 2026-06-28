@@ -53,6 +53,21 @@ else
             <es-badge variant="neutral" with-dot="true">Inativo</es-badge>
         }
         <es-button variant="ghost" href="/Storefronts/Edit/@Model.Id" icon="edit">Editar</es-button>
+        @if (ativo)
+        {
+            <form method="post" asp-page-handler="Desativar" style="display:inline;"
+                  onsubmit="return confirm('Desativar a loja? Ela para de receber novos pedidos.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-ghost btn-md">Desativar</button>
+            </form>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="Ativar" style="display:inline;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary btn-md">Ativar storefront</button>
+            </form>
+        }
     </es-page-header>
 
     var pronto = Model.CardapioPublicados >= 1;

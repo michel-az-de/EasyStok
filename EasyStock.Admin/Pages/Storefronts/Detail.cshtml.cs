@@ -1,6 +1,5 @@
 ﻿namespace EasyStock.Admin.Pages.Storefronts;
 
-[IgnoreAntiforgeryToken]
 public class DetailModel(AdminApiClient api, AdminSessionService session, ILogger<DetailModel> log)
     : AdminPageBase(session)
 {
@@ -52,5 +51,37 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
         }
 
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostAtivarAsync(string? motivo)
+    {
+        try
+        {
+            await api.PostAsync<JsonElement>($"api/admin/storefronts/{Id}/ativar", new { motivo });
+            SetSucesso("Storefront ativado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao ativar storefront {Id}", Id);
+            SetErroSeguro(ex, "Ativação");
+        }
+        return RedirectToPage(new { id = Id });
+    }
+
+    public async Task<IActionResult> OnPostDesativarAsync(string? motivo)
+    {
+        try
+        {
+            await api.PostAsync<JsonElement>($"api/admin/storefronts/{Id}/desativar", new { motivo });
+            SetSucesso("Storefront desativado.");
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao desativar storefront {Id}", Id);
+            SetErroSeguro(ex, "Desativação");
+        }
+        return RedirectToPage(new { id = Id });
     }
 }
