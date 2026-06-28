@@ -5372,6 +5372,10 @@ html.theme-dark .ds-shortcut:hover { border-color: rgba(255, 255, 255, .18); }
    inicial durante o delay; ao fim o elemento volta ao estilo natural (sem
    transform residual -> sem stacking context preso). position:relative
    preserva o que .app-main > * dava antes do wrapper. */
+/* .ds-enter é filho direto de .app-main, então pegaria o anim-fadeInUp global
+   (components.css .app-main > *) ALÉM do stagger dos filhos = entrada dupla/pesada.
+   Suprime o fadeInUp só no wrapper; a cascata fica só nos filhos (issue 726). */
+.app-main > .ds-enter { animation: none; }
 .ds-enter > * {
     position: relative;
     animation: ds-enter-rise .5s var(--ease-out) backwards;
