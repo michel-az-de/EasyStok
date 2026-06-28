@@ -5520,7 +5520,10 @@ html.theme-dark .bg-indigo-100 { background-color: rgba(10,31,82,.8)     !import
 /* ── 6. page-heading / page-subheading ── */
 .page-heading {
     font-size: 28px;
-    font-weight: 700;
+    /* Paridade com o título padrão do app (.pg-hd h1, weight 800). O QA v1.10 BUG-022
+       leu o 700 mais fino como "esmaecido"; a cor já era equivalente (near-white nos 2
+       temas) — a divergência real era o peso. */
+    font-weight: 800;
     color: var(--text-primary, #F2F4F9);
     line-height: 1.2;
     letter-spacing: -0.02em;

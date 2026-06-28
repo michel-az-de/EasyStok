@@ -7,6 +7,11 @@
 .stp.stp--sm .ind,
 .stp.stp--sm .stp-dot { width: 6px; height: 6px; }
 
+/* QA v1.10 BUG-006: 8 colunas sem min-width encolhiam pra caber no container e cortavam
+   Pagamento/Criado/Ações. min-width faz o wrapper .overflow-x-auto ROLAR em telas
+   estreitas em vez de espremer; em desktop largo a tabela já passa disso (sem efeito). */
+.ped-table { min-width: 920px; }
+
 /* Linha: acento de atraso à esquerda (crit), sem banho de cor na linha toda. */
 .ped-table td { vertical-align: middle; }
 .ped-row--atrasado td { background: var(--crit-50); }
