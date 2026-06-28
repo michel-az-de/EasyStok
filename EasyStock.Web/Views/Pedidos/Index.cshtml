@@ -59,6 +59,9 @@
 <script type="application/json" id="pedidos-seed">@Html.Raw(seedJson)</script>
 <div class="sr-only" aria-live="polite" x-text="announce"></div>
 
+@* Entrada orquestrada (issue 717): reusa .ds-enter só nas seções de topo
+   (header/KPIs/filtros/tabela); NÃO nas linhas (x-show do filtro as re-animaria). *@
+<div class="ds-enter">
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Pedidos</h1>
@@ -230,6 +233,7 @@
         }
     }
 </div>
+</div>@* /.ds-enter *@
 
 @* Popover de pagamento inline (#591) — registra parcial/total sem sair da lista. *@
 <div class="ped-pay-overlay" x-show="pay.open" x-cloak @@click.self="closePay()" x-transition.opacity>

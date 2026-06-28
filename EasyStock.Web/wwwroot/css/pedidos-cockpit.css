@@ -80,6 +80,16 @@ a.ped-verificar { text-decoration: none; }
 .ped-row--moved td { background: var(--ok-50); transition: background .4s var(--ease-out); }
 html.theme-dark .ped-row--moved td { background: rgba(24, 135, 78, .12); }
 
+/* Hover estado-aware (issue 717): o hover genérico do .tbl-full sobrepunha o tint de
+   estado (--atrasado/--moved), apagando o sinal sob o cursor. No CLARO basta vencer por
+   especificidade (a genérica clara, app.css ~732, não é !important). No ESCURO as
+   genéricas .tbl-full são !important (app.css ~1960/2005/3110) → especificidade não
+   resolve; as regras dark precisam de !important p/ manter o tint (produto é dark-first). */
+.ped-table tbody tr.ped-row--atrasado:hover td { background: var(--crit-100); }
+html.theme-dark .ped-table tbody tr.ped-row--atrasado:hover td { background-color: rgba(192, 59, 42, .18) !important; }
+.ped-table tbody tr.ped-row--moved:hover td { background: var(--ok-100); }
+html.theme-dark .ped-table tbody tr.ped-row--moved:hover td { background-color: rgba(24, 135, 78, .18) !important; }
+
 /* ── Botao "Receber" inline ── */
 .ped-pay-btn {
     margin-left: 8px; font-size: 12.5px; font-weight: 600;
