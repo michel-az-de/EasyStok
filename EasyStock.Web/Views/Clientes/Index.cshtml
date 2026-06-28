@@ -4,6 +4,8 @@
     Layout = "_Layout";
 }
 
+@* Entrada orquestrada (issue 720): reusa .ds-enter. *@
+<div class="ds-enter">
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1>Clientes</h1>
@@ -119,6 +121,7 @@
         </div>
     }
 </div>
+</div>@* /.ds-enter *@
 
 <!-- Modal: novo cliente -->
 <div x-data="formModal({
