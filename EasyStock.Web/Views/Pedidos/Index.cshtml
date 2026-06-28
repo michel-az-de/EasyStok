@@ -217,7 +217,7 @@
                             {
                                 <form asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
                                       class="ped-advance-form" x-show="nextStatus(p.status)"
-                                      @@submit.prevent="advance('@p.Id')">
+                                      x-on:submit.prevent="advance('@p.Id')">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="status" value="@nextStatus(p.Status)" />
                                     <button type="submit" class="ped-advance" :disabled="!!_inflight['@p.Id']"

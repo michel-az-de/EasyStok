@@ -70,7 +70,7 @@
                    @@submit.prevent faz AJAX em status.json e atualiza badge/timeline/botao/toast
                    sem reload (espelha o cockpit do Index). *@
                 <form id="ped-acao-form" asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
-                      x-data="pedidoStatusAcao('@p.Id')" @@submit.prevent="avancar($el)" data-noprogress>
+                      x-data="pedidoStatusAcao('@p.Id')" x-on:submit.prevent="avancar($el)" data-noprogress>
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="status" value="@nxt" />
                     <button type="submit" :disabled="enviando"
