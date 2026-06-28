@@ -56,6 +56,9 @@
     };
 }
 
+@* Wrapper da entrada orquestrada (issue 712): revela as secoes do dashboard em
+   cascata no load. CSS em app.css (.ds-enter), reduced-motion-safe. *@
+<div class="ds-enter">
 @if (Model.TodasApisFalharam)
 {
     <div class="ws ds-api-error mb-6" role="alert">
@@ -542,6 +545,7 @@ else if (Model.ResumoApiFalhou)
 
     </div>
 </div>
+</div>@* /.ds-enter *@
 
 @section Scripts {
     @if (Model.GraficoLabels.Any())

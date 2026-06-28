@@ -5242,6 +5242,15 @@ a.ds-pulse:hover { border-color: var(--navy-200); transform: translateY(-1px); }
     background: var(--ok-500);
     margin-right: 4px;
     vertical-align: 1px;
+    /* "ao vivo": halo verde pulsando como batimento — operacao em andamento. */
+    animation: ds-led-pulse 2.4s var(--ease-in-out) infinite;
+}
+/* rgba(45,163,101) espelha o --ok-500 (box-shadow nao troca alpha via var()).
+   Se --ok-500 mudar, atualizar aqui — CssHexHygiene nao pega rgba. */
+@keyframes ds-led-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(45, 163, 101, .45); }
+    70%  { box-shadow: 0 0 0 5px rgba(45, 163, 101, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(45, 163, 101, 0); }
 }
 .ds-pulse--accent {
     background: var(--orange-50);
@@ -5335,6 +5344,29 @@ html.theme-dark .ds-shortcut:hover { border-color: rgba(255, 255, 255, .18); }
     }
 }
 
+/* ── Entrada orquestrada do dashboard (issue 712) ──────────────
+   Revela as secoes em cascata no load. Escopo: so .ds-enter (wrapper do
+   Dashboard/Index) — NAO afeta outras paginas. `backwards` segura o estado
+   inicial durante o delay; ao fim o elemento volta ao estilo natural (sem
+   transform residual -> sem stacking context preso). position:relative
+   preserva o que .app-main > * dava antes do wrapper. */
+.ds-enter > * {
+    position: relative;
+    animation: ds-enter-rise .5s var(--ease-out) backwards;
+}
+.ds-enter > *:nth-child(1) { animation-delay: .03s; }
+.ds-enter > *:nth-child(2) { animation-delay: .09s; }
+.ds-enter > *:nth-child(3) { animation-delay: .15s; }
+.ds-enter > *:nth-child(4) { animation-delay: .21s; }
+.ds-enter > *:nth-child(5) { animation-delay: .27s; }
+.ds-enter > *:nth-child(6) { animation-delay: .33s; }
+/* Cobre os 6 blocos de topo do dashboard hoje. Um 7o aparece sem cascata
+   (delay 0) — degrada ok; se crescer, adicionar mais uma linha de delay. */
+@keyframes ds-enter-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .ds-kpi,
     .ds-alert,
@@ -5347,6 +5379,8 @@ html.theme-dark .ds-shortcut:hover { border-color: rgba(255, 255, 255, .18); }
     .ds-quick-action:hover {
         transform: none;
     }
+    .ds-enter > * { animation: none; }
+    .ds-pulse-sub .ds-pulse-led { animation: none; }
 }
 
 /* ── Banners de estado de API ──────────────────────────────── */
