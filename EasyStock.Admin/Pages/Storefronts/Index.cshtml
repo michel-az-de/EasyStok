@@ -145,7 +145,8 @@
             <h2 style="margin:0 0 6px; font-size:16px; font-weight:600; color:var(--text-primary);">Ativar storefront?</h2>
             <p style="margin:0 0 14px; color:var(--text-muted); font-size:13px;">
                 <strong x-text="confirmTitulo"></strong> voltará a aceitar pedidos.
-                Verifique antes se cardápio, frete e Mercado Pago estão configurados — ADMIN-002 vai validar tudo automaticamente.
+                Confira antes se o cardápio tem itens <strong>publicados</strong> e se frete e Mercado Pago estão prontos —
+                a ativação <strong>não valida isso automaticamente</strong>, e sem eles a loja fica no ar sem conseguir vender.
             </p>
         </div>
         <form method="post" x-bind:action="confirmAcao === 'desativar' ? '?handler=Desativar' : '?handler=Ativar'"
