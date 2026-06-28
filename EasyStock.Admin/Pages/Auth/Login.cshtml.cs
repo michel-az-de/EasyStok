@@ -16,13 +16,6 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
     [StringLength(200, MinimumLength = 8, ErrorMessage = "Senha deve ter pelo menos 8 caracteres.")]
     public string Senha { get; set; } = "";
 
-    /// <summary>
-    /// EmpresaId selecionado no step-2 do login (ADR-0031).
-    /// Null = tentativa step-1 ou SuperAdmin (sem restrição de empresa).
-    /// </summary>
-    [BindProperty]
-    public Guid? EmpresaId { get; set; }
-
     public string? Erro { get; set; }
     /// <summary>True quando o usuário caiu aqui por sessão expirada (cookie _se_admin).
     /// UI distingue visualmente desse caso (banner amarelo) vs erro de credencial (vermelho).</summary>
@@ -50,7 +43,11 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
 
         try
         {
-            var raw = await api.PostRawAsync("api/auth/login", new { email = Email, senha = Senha, empresaId = EmpresaId });
+            // Login 1-etapa: o backend resolve o escopo sozinho — SuperAdmin entra direto
+            // (sem empresa) e tenant Admin com 1 empresa tem o EmpresaId resolvido no servidor
+            // (ResolveEmpresaIdPadrao) e embutido no claim do JWT. O painel é cross-tenant;
+            // nao ha seletor de empresa na tela de login (regressao do ADR-0031 fatia 6 revertida).
+            var raw = await api.PostRawAsync("api/auth/login", new { email = Email, senha = Senha });
 
             if (raw.TryGetProperty("error", out _))
             {
@@ -76,18 +73,15 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
                 return Page();
             }
 
-            // Aceita SuperAdmin (acesso total) ou Admin com EmpresaId (tenant — ADR-0031).
+            // Aceita SuperAdmin (acesso total cross-tenant) ou Admin de tenant. O escopo do
+            // Admin vem do claim empresaId do JWT (resolvido no backend), nao de input do front:
+            // tenant com 1 empresa entra escopado; com 0/2+ o backend devolve nivel=Visualizador,
+            // que cai na rejeicao abaixo. Sem seletor de empresa = sem dead-end de UX.
             var isSuperAdmin = string.Equals(nivel, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
             var isAdmin = string.Equals(nivel, "Admin", StringComparison.OrdinalIgnoreCase);
             if (!isSuperAdmin && !isAdmin)
             {
                 Erro = "Acesso restrito a administradores.";
-                return Page();
-            }
-            // Admin sem empresa = token sem escopo → rejeitar
-            if (isAdmin && EmpresaId == null)
-            {
-                Erro = "Selecione a empresa antes de entrar.";
                 return Page();
             }
 
