@@ -9,6 +9,8 @@
     var qSearch = System.Uri.EscapeDataString(Model.Search ?? "");
 }
 
+@* Entrada orquestrada (issue 716): reusa o .ds-enter do dashboard. *@
+<div class="ds-enter">
 <div class="flex items-center justify-between mb-6">
     <div class="pg-hd">
         <h1>Estoque</h1>
@@ -396,6 +398,7 @@
         }
     </div>
 </div>
+</div>@* /.ds-enter *@
 
 @section Scripts {
     <script>
