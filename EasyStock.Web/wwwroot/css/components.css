@@ -337,6 +337,30 @@ button:focus-visible {
 .anim-slideDown { animation: anim-slideDown 180ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
 .anim-scaleIn   { animation: anim-scaleIn   180ms var(--ease, cubic-bezier(.4,0,.2,1)) both; }
 
+/* Empty state (Views/Shared/_EmptyState): halo quente sutil atrás da ilustração
+   (issue 718) — calor + profundidade numa superfície árida. Estático (sem motion
+   perpétuo); a ilustração fica acima do halo via z-index. Intensidade tunável aqui. */
+.es-empty-art {
+    position: relative;
+    width: 8rem; height: 8rem;
+    margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+}
+.es-empty-art::before {
+    content: "";
+    position: absolute; inset: -14%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, var(--orange-100) 0%, transparent 65%);
+    opacity: .45;
+    z-index: 0;
+    pointer-events: none;
+}
+html.theme-dark .es-empty-art::before {
+    background: radial-gradient(circle at 50% 45%, rgba(232, 88, 20, .16) 0%, transparent 65%);
+    opacity: 1;
+}
+.es-empty-illus { position: relative; z-index: 1; }
+
 /* ---------- Sortable table headers (T1.8) ---------- */
 .th-sort {
   display: inline-flex; align-items: center; gap: 6px;

@@ -22,7 +22,8 @@
 <div class="text-center py-12 anim-fadeInUp" style="color: var(--text-muted);">
     @if (!string.IsNullOrEmpty(illustration))
     {
-        <svg class="w-32 h-32 mx-auto mb-4 opacity-70" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <div class="es-empty-art">
+        <svg class="es-empty-illus w-32 h-32 opacity-70" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             @switch (illustration)
             {
                 case "search":
@@ -46,6 +47,7 @@
                     break;
             }
         </svg>
+        </div>
     }
     else if (!string.IsNullOrEmpty(iconName))
     {
