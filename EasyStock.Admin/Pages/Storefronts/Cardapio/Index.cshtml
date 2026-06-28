@@ -21,6 +21,18 @@
     </es-button>
 </es-page-header>
 
+@{
+    var itensList = Model.Itens.ToList();
+    var publicados = itensList.Count(i => i.TryGetProperty("visivel", out var pv) && pv.GetBoolean());
+}
+@if (itensList.Count > 0 && publicados == 0)
+{
+    <div style="display:flex; align-items:flex-start; gap:8px; padding:10px 14px; margin-bottom:16px; border:1px solid var(--warn-500); border-radius:var(--r-md); font-size:13px; color:var(--text-secondary);">
+        <span style="color:var(--warn-500); display:inline-flex; flex:none;"><es-icon name="alert-triangle" size="16" /></span>
+        <span><strong style="color:var(--text-primary);">Nenhum item publicado.</strong> A loja não mostra o cardápio até você tornar itens visíveis (botão do olho na coluna "Visível").</span>
+    </div>
+}
+
 <es-data-table is-empty="@(!Model.Itens.Any())">
     <es-data-table-column key="ordem" label="Ordem" align="right" width="100px" />
     <es-data-table-column key="item" label="Item" />

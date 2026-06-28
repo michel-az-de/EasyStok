@@ -9,6 +9,9 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
     public JsonElement Storefront { get; private set; }
     public bool Encontrado { get; private set; }
 
+    /// <summary>Itens de cardápio publicados (visíveis) — sinal de prontidão para ativar.</summary>
+    public int CardapioPublicados { get; private set; }
+
     public async Task<IActionResult> OnGetAsync()
     {
         if (Id == Guid.Empty) return RedirectToPage("/Storefronts/Index");
@@ -27,6 +30,25 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, ILogge
         {
             log.LogError(ex, "Falha ao obter storefront {Id}", Id);
             SetErroSeguro(ex, "Carregamento");
+        }
+
+        // Prontidão: conta itens publicados (visíveis) via o endpoint de cardápio que já existe.
+        // BFF-side (sem tocar o backend); falha aqui não derruba o detalhe.
+        if (Encontrado)
+        {
+            try
+            {
+                var card = await api.GetRawAsync($"api/admin/storefronts/{Id}/cardapio");
+                if (card.TryGetProperty("data", out var cd)
+                    && cd.TryGetProperty("itens", out var itens)
+                    && itens.ValueKind == JsonValueKind.Array)
+                {
+                    CardapioPublicados = itens.EnumerateArray()
+                        .Count(i => i.TryGetProperty("visivel", out var v) && v.GetBoolean());
+                }
+            }
+            catch (SessionExpiredException) { throw; }
+            catch (Exception ex) { log.LogWarning(ex, "Falha ao contar cardápio publicado {Id}", Id); }
         }
 
         return Page();

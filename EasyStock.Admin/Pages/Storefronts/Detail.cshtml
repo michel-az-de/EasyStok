@@ -55,50 +55,43 @@ else
         <es-button variant="ghost" href="/Storefronts/Edit/@Model.Id" icon="edit">Editar</es-button>
     </es-page-header>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+    var pronto = Model.CardapioPublicados >= 1;
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+        <es-card padding="md">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Prontidão para ativar</h3>
+                <es-help>O que a loja precisa para vender depois de ativada. A ativação não bloqueia, mas sem isso a loja fica no ar sem conseguir receber pedidos.</es-help>
+            </div>
+            <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;">
+                <li style="display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--text-secondary);">
+                    @if (pronto)
+                    {
+                        <span style="color:var(--ok-500); display:inline-flex; flex:none;"><es-icon name="check-circle" size="16" /></span>
+                        <span>Cardápio: <strong style="color:var(--text-primary);">@Model.CardapioPublicados</strong> de @cardapioCount item(ns) publicado(s).</span>
+                    }
+                    else
+                    {
+                        <span style="color:var(--crit-500); display:inline-flex; flex:none;"><es-icon name="x-circle" size="16" /></span>
+                        <span><strong style="color:var(--text-primary);">Nenhum item publicado</strong> (@cardapioCount cadastrado(s)) — torne ao menos 1 visível.</span>
+                    }
+                </li>
+                <li style="display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--text-secondary);">
+                    <span style="color:var(--text-muted); display:inline-flex; flex:none;"><es-icon name="info" size="16" /></span>
+                    <span>Frete e Mercado Pago: configurados em outra seção (ainda não integrada neste painel).</span>
+                </li>
+            </ul>
+        </es-card>
+
         <es-card padding="md">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                 <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Cardápio</h3>
                 <es-icon name="utensils" size="18" />
             </div>
             <div style="font-size:28px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">@cardapioCount</div>
-            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">item(ns) cadastrado(s)</div>
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">item(ns) cadastrado(s) · @Model.CardapioPublicados publicado(s)</div>
             <es-button variant="primary" size="sm" href="/Storefronts/@Model.Id/Cardapio" icon="arrow-right">
                 Gerenciar cardápio
             </es-button>
-        </es-card>
-
-        <es-card padding="md">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Frete</h3>
-                <es-icon name="truck" size="18" />
-            </div>
-            <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
-                Zonas de entrega e taxa por CEP.
-            </div>
-            <es-badge variant="warn">Configuração em outra seção</es-badge>
-        </es-card>
-
-        <es-card padding="md">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Janelas de entrega</h3>
-                <es-icon name="calendar" size="18" />
-            </div>
-            <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
-                Horários disponíveis + capacidade por janela.
-            </div>
-            <es-badge variant="warn">Configuração em outra seção</es-badge>
-        </es-card>
-
-        <es-card padding="md">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                <h3 style="margin:0; font-size:14px; font-weight:600; color:var(--text-primary);">Mercado Pago</h3>
-                <es-icon name="credit-card" size="18" />
-            </div>
-            <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
-                Credenciais cifradas AES-256-GCM.
-            </div>
-            <es-badge variant="warn">Configuração em outra seção</es-badge>
         </es-card>
     </div>
 
