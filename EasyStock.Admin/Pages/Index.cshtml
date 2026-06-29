@@ -30,7 +30,7 @@
    indeterminado quando stackStatus ainda null, NUNCA verde otimista. *@
 <div class="deck-telemetry deck-rise" style="--deck-i:0" role="status" aria-live="polite" aria-label="Telemetria operacional">
     <span class="deck-tele-item">
-        <span class="deck-dot" :class="stackStatus==='Healthy' ? 'is-ok deck-pulse' : (stackStatus==='Degraded' ? 'is-warn' : (stackStatus ? 'is-crit' : 'is-unknown'))"></span>
+        <span class="deck-dot" :class="stackStatus==='Healthy' ? 'is-ok deck-pulse' : (stackStatus==='Degraded' ? 'is-warn' : (stackStatus ? 'is-crit' : 'is-unknown deck-pulse'))"></span>
         stack <strong x-text="stackStatus ? (stackStatus==='Healthy' ? 'operacional' : stackStatus) : 'verificando…'">verificando…</strong>
     </span>
     <span class="deck-tele-sep"></span>
@@ -72,13 +72,13 @@
 
 @* Hero assimetrico: tile-feature de receita (Fraunces) + rail de indicadores secundários *@
 <section class="deck-hero" aria-label="Receita e indicadores secundários">
-    <article class="deck-panel deck-feature deck-rise" style="--deck-i:2">
+    <a class="deck-panel deck-feature deck-rise is-interactive" href="/Faturas" style="--deck-i:2; text-decoration:none;">
         <div class="deck-eyebrow">Receita mensal recorrente</div>
         <div>
             <span class="deck-feature-cur">R$</span><span class="deck-kpi" x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })">@Model.ReceitaMensal.ToString("N2")</span>
         </div>
         <div class="deck-eyebrow" style="color:var(--text-muted)">estimativa mensal · assinaturas ativas</div>
-    </article>
+    </a>
     <aside class="deck-panel deck-rail deck-rise" style="--deck-i:3" aria-label="Indicadores secundários">
         <div class="deck-rail-item"><span class="deck-rail-label">Usuários ativos</span><span class="deck-rail-value" x-text="dash.totalUsuariosAtivos">@Model.TotalUsuariosAtivos</span></div>
         <div class="deck-rail-item"><span class="deck-rail-label">Logins (24h)</span><span class="deck-rail-value" x-text="dash.logins24h">@Model.Logins24h</span></div>
