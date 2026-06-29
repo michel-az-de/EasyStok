@@ -128,6 +128,22 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
             return false;
         }
 
+        // ADM-07 (#639): teto de plano gratuito — espelha PlanoValidacao.ValidarPlanoGratuito na API.
+        if (precoMensal == 0)
+        {
+            if (limiteLojas == semLimite || limiteUsuarios == semLimite
+                || limiteProdutos == semLimite || limiteGeracoesIaMensais == semLimite)
+            {
+                erro = "Plano gratuito (R$0) não pode ter limites ilimitados (∞). Defina limites finitos.";
+                return false;
+            }
+            if (limiteLojas > 2 || limiteUsuarios > 10 || limiteProdutos > 1000 || limiteGeracoesIaMensais > 50)
+            {
+                erro = "Plano gratuito (R$0) excede o teto permitido (máx.: 2 lojas, 10 usuários, 1000 produtos, 50 gerações de IA/mês).";
+                return false;
+            }
+        }
+
         return true;
     }
 }

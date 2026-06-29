@@ -5,7 +5,7 @@ namespace EasyStock.Api.Controllers;
 [ApiController]
 [Route("api/admin/planos")]
 [Authorize(Policy = "SuperAdmin")]
-public class AdminPlanosController(IPlanoAdminRepository planos, AdminAuditService audit) : EasyStockControllerBase
+public class AdminPlanosController(IPlanoAdminRepository planos, IEmpresaRepository empresas, AdminAuditService audit) : EasyStockControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetPlanos(CancellationToken ct = default)
@@ -26,6 +26,14 @@ public class AdminPlanosController(IPlanoAdminRepository planos, AdminAuditServi
             return DataBadRequest(erroIa);
         if (PlanoValidacao.ValidarPreco(req.PrecoMensal) is { } erroPreco)
             return DataBadRequest(erroPreco);
+        // ADM-07 (#639): guardrail de plano gratuito (R$0 nao pode ter ilimitado/limites altos).
+        if (PlanoValidacao.ValidarPlanoGratuito(req.PrecoMensal, req.LimiteLojas, req.LimiteUsuarios,
+                req.LimiteProdutos, req.LimiteGeracoesIaMensais) is { } erroGratuito)
+            return DataBadRequest(erroGratuito);
+        // #743: catalogo global nao deve ter nome de cliente.
+        if (PlanoValidacao.ValidarNomeNaoColideComTenant(
+                req.Nome, (await empresas.GetAllAsync()).Select(e => e.Nome)) is { } erroColisao)
+            return DataBadRequest(erroColisao);
 
         var resumo = await planos.CriarAsync(
             new NovoPlano(req.Nome, req.Descricao, req.LimiteLojas, req.LimiteUsuarios,
@@ -51,6 +59,17 @@ public class AdminPlanosController(IPlanoAdminRepository planos, AdminAuditServi
             return DataBadRequest(erroIa);
         if (req.PrecoMensal is { } preco && PlanoValidacao.ValidarPreco(preco) is { } erroPreco)
             return DataBadRequest(erroPreco);
+        // ADM-07 (#639): valida o guardrail de gratuito quando o patch traz preco + os 4 limites
+        // (a edicao pelo Admin sempre envia o conjunto completo). Patch parcial sem todos = ignora.
+        if (req.PrecoMensal is { } precoG && req.LimiteLojas is { } lojasG && req.LimiteUsuarios is { } usuariosG
+            && req.LimiteProdutos is { } produtosG && req.LimiteGeracoesIaMensais is { } iaG
+            && PlanoValidacao.ValidarPlanoGratuito(precoG, lojasG, usuariosG, produtosG, iaG) is { } erroGratuito)
+            return DataBadRequest(erroGratuito);
+        // #743: nome nao pode conter nome de cliente (so consulta tenants se o nome esta mudando).
+        if (req.Nome is not null
+            && PlanoValidacao.ValidarNomeNaoColideComTenant(
+                req.Nome, (await empresas.GetAllAsync()).Select(e => e.Nome)) is { } erroColisao)
+            return DataBadRequest(erroColisao);
 
         var resumo = await planos.AtualizarAsync(id,
             new PatchPlano(req.Nome, req.Descricao, req.LimiteLojas, req.LimiteUsuarios,
