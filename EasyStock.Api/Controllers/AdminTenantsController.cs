@@ -116,6 +116,10 @@ public class AdminTenantsController(
     {
         var detalhe = await tenantsQueries.ObterDetalheAsync(id);
         if (detalhe is null) return DataNotFound("Tenant não encontrado.");
+        // ADM-05 (#742): o detalhe expoe e-mails de usuarios em claro (decisao de produto:
+        // manter visivel). Audita a exibicao de PII pra rastreabilidade LGPD — coerente com a
+        // busca global mascarada. LogAsync lanca: se nao da pra auditar a exposicao, nao expoe.
+        await audit.LogAsync("TenantPiiVisualizado", "Detalhe carregado (inclui e-mails de usuarios em claro).", id);
         return DataOk(detalhe);
     }
 
