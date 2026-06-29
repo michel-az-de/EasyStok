@@ -1510,9 +1510,11 @@ function operacaoErp(tenantId) {
                 <div>
                     <label class="form-label">Texto <span class="text-es-ink-mute">(3..2000 chars)</span></label>
                     <textarea x-model="novoTexto" rows="5" minlength="3" maxlength="2000"
+                              @@focus="notaFocus = true" @@blur="notaFocus = false"
                               placeholder="Ex.: cliente prefere ser atendido por email; confirmar com Maria antes de qualquer cobrança."
                               class="form-input w-full text-sm font-mono"></textarea>
-                    <p class="text-xs text-es-ink-mute mt-1">
+                    <p class="text-xs mt-1" x-show="notaFocus || novoTexto.length > 1600" x-cloak
+                       :style="novoTexto.length > 1900 ? 'color:var(--crit-600)' : (novoTexto.length > 1600 ? 'color:var(--warn-600)' : 'color:var(--text-muted)')">
                         <span x-text="novoTexto.length"></span> / 2000
                     </p>
                 </div>
@@ -1535,6 +1537,7 @@ function operacaoErp(tenantId) {
                 notas: [],
                 novoTexto: '',
                 novoTipo: 'Info',
+                notaFocus: false,
                 editandoId: null,
                 editandoTexto: '',
                 editandoTipo: 'Info',
