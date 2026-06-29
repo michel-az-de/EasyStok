@@ -19,7 +19,7 @@
 
 <es-page-header eyebrow="Helpdesk"
                 titulo="Tickets"
-                descricao="@($"{Model.Total} ticket(s) na fila — acompanhe SLA, prioridade e atendimento.")">
+                descricao="@($"{Model.Total} ticket(s) — acompanhe SLA, prioridade e atendimento.")">
     <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
@@ -36,7 +36,8 @@
     <form method="get" data-autosubmit style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; align-items:end;">
         <es-input name="search" label="Buscar" value="@Model.Search" placeholder="Título…" prefix-icon="search" />
         <es-select name="status" label="Status">
-            <option value="">Todos</option>
+            <option value="EmAberto" selected="@(Model.Status == "EmAberto")">Em aberto</option>
+            <option value="todos" selected="@(Model.Status == "todos")">Todos</option>
             <option value="Aberto" selected="@(Model.Status == "Aberto")">Aberto</option>
             <option value="EmAtendimento" selected="@(Model.Status == "EmAtendimento")">Em Atendimento</option>
             <option value="AguardandoCliente" selected="@(Model.Status == "AguardandoCliente")">Aguard. Cliente</option>

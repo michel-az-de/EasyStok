@@ -16,7 +16,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     public string? Erro { get; private set; }
 
     private static readonly HashSet<string> StatusValidos = new(StringComparer.OrdinalIgnoreCase)
-        { "Aberto", "EmAtendimento", "AguardandoCliente", "Resolvido", "Fechado" };
+        { "EmAberto", "todos", "Aberto", "EmAtendimento", "AguardandoCliente", "Resolvido", "Fechado" };
     private static readonly HashSet<string> PrioridadesValidas = new(StringComparer.OrdinalIgnoreCase)
         { "Baixa", "Normal", "Alta", "Critica" };
     private static readonly HashSet<string> NiveisValidos = new(StringComparer.OrdinalIgnoreCase)
@@ -30,6 +30,9 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     {
         if (Page < 1) Page = 1;
         if (Page > 10000) Page = 10000;
+        // ADM-10 (#745): a Tickets abre como "fila em aberto" por padrao (mesma definicao da
+        // sidebar/Dashboard/Operacao). "Todos" (incl. Resolvido/Fechado) e escolha explicita.
+        if (string.IsNullOrWhiteSpace(Status)) Status = "EmAberto";
 
         try
         {

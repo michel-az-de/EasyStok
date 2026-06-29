@@ -2,6 +2,7 @@ using EasyStock.Api.Services.Helpdesk;
 using EasyStock.Application.UseCases.Admin.ExportarTicketsCsv;
 using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories;
 
 namespace EasyStock.Api.Controllers;
 
@@ -61,8 +62,19 @@ public class AdminTicketsController(
 
         var query = db.AdminTickets.AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<TicketStatus>(status, out var se))
+        // ADM-10 (#745): "EmAberto" e o filtro canonico (exclui Resolvido/Fechado), igual a
+        // Dashboard/Operacao/sidebar (AdminTicketFilters.EmAberto); "todos" lista todos os
+        // status; ausencia de status = em aberto (a Tickets abre como fila por padrao).
+        if (string.Equals(status, "EmAberto", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(AdminTicketFilters.EmAberto);
+        else if (string.Equals(status, "todos", StringComparison.OrdinalIgnoreCase))
+        {
+            // sem filtro de status — lista todos
+        }
+        else if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<TicketStatus>(status, out var se))
             query = query.Where(t => t.Status == se);
+        else if (string.IsNullOrWhiteSpace(status))
+            query = query.Where(AdminTicketFilters.EmAberto);
 
         if (!string.IsNullOrWhiteSpace(prioridade) && Enum.TryParse<TicketPrioridade>(prioridade, out var pe))
             query = query.Where(t => t.Prioridade == pe);
