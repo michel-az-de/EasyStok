@@ -459,6 +459,58 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.CaixaAbertoEsquecido,
             assuntoTemplate: "Caixa aberto desde {{ data_abertura }}",
             corpoTemplate: "O caixa segue aberto desde {{ data_abertura }} (saldo de abertura {{ valor_abertura }}). Feche-o para nao acumular vendas no dia errado.");
+
+        // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
+        // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
+        // ativar o canal em ConfiguracaoCanal (AtivoNoTenant); o objetivo aqui e cobrir o filtro
+        // de canal que antes retornava "Nenhum template". =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "fatura_vencida_sms_v1",
+            nome: "Fatura Vencida — SMS",
+            canal: CanalNotificacao.Sms,
+            tipoEvento: TipoEventoNotificacao.FaturaVencida,
+            assuntoTemplate: "",
+            corpoTemplate: "EasyStok: fatura {{ numero_fatura }} ({{ valor }}) em atraso ha {{ dias_em_atraso }} dia(s). Regularize: {{ link_pagamento }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "fatura_vencida_whatsapp_v1",
+            nome: "Fatura Vencida — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.FaturaVencida,
+            assuntoTemplate: "",
+            corpoTemplate: "Ola {{ nome }}! Sua fatura {{ numero_fatura }} ({{ valor }}) esta em atraso ha {{ dias_em_atraso }} dia(s). Para evitar a suspensao do servico, regularize: {{ link_pagamento }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pagamento_falhou_sms_v1",
+            nome: "Pagamento Falhou — SMS",
+            canal: CanalNotificacao.Sms,
+            tipoEvento: TipoEventoNotificacao.PagamentoFalhou,
+            assuntoTemplate: "",
+            corpoTemplate: "EasyStok: o pagamento de {{ valor }} falhou ({{ motivo }}). Tente novamente: {{ link_retry }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "pagamento_falhou_whatsapp_v1",
+            nome: "Pagamento Falhou — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PagamentoFalhou,
+            assuntoTemplate: "",
+            corpoTemplate: "Ola {{ nome }}! O pagamento de {{ valor }} via {{ metodo }} nao foi concluido ({{ motivo }}). Tente novamente para manter seu plano ativo: {{ link_retry }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "sla_violado_sms_v1",
+            nome: "SLA Violado — SMS",
+            canal: CanalNotificacao.Sms,
+            tipoEvento: TipoEventoNotificacao.SlaViolado,
+            assuntoTemplate: "",
+            corpoTemplate: "EasyStok: SLA {{ tipoSla }} violado no chamado \"{{ titulo }}\" ({{ prioridade }}/{{ nivel }}) - {{ empresaNome }}.");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "sla_violado_whatsapp_v1",
+            nome: "SLA Violado — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.SlaViolado,
+            assuntoTemplate: "",
+            corpoTemplate: "SLA {{ tipoSla }} violado: chamado \"{{ titulo }}\" da {{ empresaNome }} - prioridade {{ prioridade }}, nivel {{ nivel }}. Requer atencao.");
     }
 
     private static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
