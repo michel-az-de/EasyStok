@@ -1255,11 +1255,14 @@ function operacaoErp(tenantId) {
                 <div x-show="erro" x-cloak class="bg-red-500/10 border-b border-red-500/30 text-red-400 text-xs px-4 py-2" x-text="erro"></div>
 
                 <div class="divide-y" style="--tw-divide-opacity:0.05">
-                    <template x-if="!loading && itens.length === 0">
-                        <div class="text-es-ink-mute text-sm text-center py-10">
-                            Sem atividade no período. Tente ampliar os filtros.
-                        </div>
-                    </template>
+                    <div x-show="vazioFiltrado" x-cloak class="py-6">
+                        <es-empty-state icon="search" title="Nenhuma atividade com os filtros aplicados" description="Tente ampliar o período ou limpar os filtros.">
+                            <button type="button" @@click="limparFiltros()" class="btn-secondary text-xs">Limpar filtros</button>
+                        </es-empty-state>
+                    </div>
+                    <div x-show="vazioVirgem" x-cloak class="py-6">
+                        <es-empty-state icon="inbox" title="Este cliente ainda não gerou atividade" description="Logins, vendas e ações do operador aparecem aqui."></es-empty-state>
+                    </div>
                     <template x-for="ev in itens" :key="ev.id">
                         <div class="px-4 py-3 flex items-start gap-3 hover:bg-es-surface-2/30 transition-colors" style="border-top:1px solid rgba(247,242,232,0.05)">
                             <div class="text-xl leading-none mt-0.5" x-text="iconePorAcao(ev.acao, ev.tipo)"></div>
@@ -1333,6 +1336,14 @@ function operacaoErp(tenantId) {
                 pagina: 1,
                 temMais: false,
                 filtros: { tipo: '', periodo: '30', search: '', from: null, to: null },
+
+                // TEN-013: distingue empty filtrado de virgem. "periodo vazio" = Tudo (sem
+                // recorte temporal), entao 0 eventos sem filtro = cliente nunca teve atividade.
+                get temFiltro() {
+                    return this.filtros.tipo !== '' || (this.filtros.search || '').trim() !== '' || this.filtros.periodo !== '';
+                },
+                get vazioFiltrado() { return !this.loading && !this.erro && this.itens.length === 0 && this.temFiltro; },
+                get vazioVirgem() { return !this.loading && !this.erro && this.itens.length === 0 && !this.temFiltro; },
 
                 aplicarPeriodo() {
                     if (!this.filtros.periodo) { this.filtros.from = null; return; }
