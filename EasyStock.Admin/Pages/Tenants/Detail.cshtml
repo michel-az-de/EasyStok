@@ -423,7 +423,7 @@ function operacaoErp(tenantId) {
                 <p x-text="erroMsg"></p>
                 <div class="mt-1.5 flex items-center gap-3">
                     <button type="button" @@click="carregar()" class="text-es-ink-dim hover:text-es-ink underline">Tentar novamente</button>
-                    <a href="/Diagnostico?tenant=@Model.Id" class="text-es-ink-dim hover:text-es-ink underline">Abrir diagnóstico</a>
+                    <a href="/Diagnostico?tab=erros" class="text-es-ink-dim hover:text-es-ink underline">Abrir diagnóstico</a>
                 </div>
                 <p x-show="tentativas >= 3" x-cloak class="mt-1 text-es-ink-mute">Falhou várias vezes. Considere abrir um ticket de diagnóstico.</p>
             </div>
@@ -463,7 +463,7 @@ function operacaoErp(tenantId) {
                 <p x-text="erroMsg"></p>
                 <div class="mt-1.5 flex items-center gap-3">
                     <button type="button" @@click="carregar()" class="text-es-ink-dim hover:text-es-ink underline">Tentar novamente</button>
-                    <a href="/Diagnostico?tenant=@Model.Id" class="text-es-ink-dim hover:text-es-ink underline">Abrir diagnóstico</a>
+                    <a href="/Diagnostico?tab=erros" class="text-es-ink-dim hover:text-es-ink underline">Abrir diagnóstico</a>
                 </div>
                 <p x-show="tentativas >= 3" x-cloak class="mt-1 text-es-ink-mute">Falhou várias vezes. Considere abrir um ticket de diagnóstico.</p>
             </div>
