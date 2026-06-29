@@ -14,7 +14,7 @@
      role="dialog" aria-modal="true" aria-labelledby="cat-modal-title"
      @@click.self="fechar()">
     <form x-ref="panel" class="fm-panel" style="max-width: 480px" x-show="open"
-          @@submit.prevent="submit()"
+          method="post" @@submit.prevent="submit()"
           x-transition:enter="transition duration-150 ease-out"
           x-transition:enter-start="opacity-0 scale-95"
           x-transition:enter-end="opacity-100 scale-100">
@@ -229,6 +229,18 @@ function catModal() {
         erroMsg: '',
         currentId: null,
         form: { nome: '', quantidadeMinima: '', quantidadeCritica: '' },
+
+        // FormTagHelper do Razor descarta @@submit.prevent na renderizacao; sem isto o
+        // <form> faz submit GET nativo e vaza o __RequestVerificationToken na URL (QA BUG-03)
+        // e nao roda submit(), engolindo o erro de duplicata (QA BUG-07). Mesma rede de
+        // seguranca do window.formModal (form-modal.js).
+        init() {
+            const formEl = this.$el.querySelector('form');
+            if (formEl) {
+                formEl.setAttribute('novalidate', '');
+                formEl.addEventListener('submit', (e) => { e.preventDefault(); this.submit(); });
+            }
+        },
 
         handle(d) {
             this.mode = d.mode || 'criar';
