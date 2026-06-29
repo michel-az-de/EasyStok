@@ -36,7 +36,7 @@
 </div>
 
 <es-card padding="md" card-class="mb-4">
-    <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; align-items:end;">
+    <form method="get" data-autosubmit style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; align-items:end;">
         <es-input name="search" label="Buscar" value="@Model.Search" placeholder="Título…" prefix-icon="search" />
         <es-select name="status" label="Status">
             <option value="">Todos</option>
@@ -84,6 +84,14 @@
         </div>
     </form>
 </es-card>
+<script>
+  // TICK-003: filtros de select aplicam ao mudar; a busca textual mantem o botao Filtrar.
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('form[data-autosubmit] select').forEach(function (s) {
+      s.addEventListener('change', function () { (s.form.requestSubmit ? s.form.requestSubmit() : s.form.submit()); });
+    });
+  });
+</script>
 
 <es-filter-bar>
     @if (!string.IsNullOrEmpty(Model.Status))    { <es-filter-chip label="Status"     remove-param="status">@Model.Status</es-filter-chip> }
@@ -153,7 +161,7 @@
             _ => "neutral"
         };
 
-        <tr style="cursor:pointer;" tabindex="0"
+        <tr style="cursor:pointer;@(naoLidos > 0 ? " box-shadow:inset 3px 0 0 var(--orange-500);" : "")" tabindex="0"
             onclick="window.location.href='/Tickets/Detail/@tid'"
             onkeydown="if(event.key==='Enter') window.location.href='/Tickets/Detail/@tid'">
             <td onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><input type="checkbox" name="ids" value="@tid" data-bulk-row aria-label="Selecionar ticket" /></td>
