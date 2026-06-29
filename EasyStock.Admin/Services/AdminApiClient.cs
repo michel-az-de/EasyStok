@@ -283,4 +283,19 @@ public class AdminApiClient(HttpClient httpClient)
         var ct = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
         return (bytes, ct);
     }
+
+    /// <summary>
+    /// POST que devolve bytes crus (download) — espelha <see cref="GetBytesAsync"/> mas com
+    /// corpo JSON. Usado por exportacoes que enviam justificativa/PII no corpo em vez da query
+    /// string (ADM-11 #746: justificativa LGPD nao pode trafegar na URL).
+    /// </summary>
+    public async Task<(byte[] Bytes, string ContentType)> PostBytesAsync(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Post, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var ct = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+        return (bytes, ct);
+    }
 }

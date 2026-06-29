@@ -596,17 +596,17 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
         return RedirectToPage(new { Id, tab = "lgpd" });
     }
 
-    public async Task<IActionResult> OnGetExportarDadosAsync(string motivo)
+    public async Task<IActionResult> OnPostExportarDadosAsync(string motivo)
     {
         var motivoT = (motivo ?? "").Trim();
         if (motivoT.Length < 10) return BadRequest(new { error = "Motivo obrigatório (≥10 caracteres)." });
 
         try
         {
-            // O endpoint da API devolve File JSON. ApiClient.GetBytesAsync busca como bytes
-            // sem tentar deserializar — caminho ideal pra download cru.
-            var (bytes, ct) = await api.GetBytesAsync(
-                $"api/admin/clientes/{Id}/exportar?motivo={Uri.EscapeDataString(motivoT)}");
+            // ADM-11 (#746): POST com motivo no corpo — a justificativa LGPD nao trafega na URL.
+            // PostBytesAsync busca como bytes sem deserializar (download cru de JSON).
+            var (bytes, ct) = await api.PostBytesAsync(
+                $"api/admin/clientes/{Id}/exportar", new { motivo = motivoT });
             var fileName = $"easystock-export-tenant-{Id:N}-{DateTime.UtcNow:yyyyMMddHHmmss}.json";
             return File(bytes, ct, fileName);
         }

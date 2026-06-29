@@ -409,11 +409,13 @@ public class AdminClientesController(
     /// tenant: empresa, lojas, usuários (mascarados), assinatura, contagens. Download
     /// como JSON estruturado. ZIP fica como evolução futura (incluir movimentações).
     /// </summary>
-    [HttpGet("{tenantId:guid}/exportar")]
-    public async Task<IActionResult> ExportarDados(Guid tenantId, [FromQuery] string motivo)
+    [HttpPost("{tenantId:guid}/exportar")]
+    public async Task<IActionResult> ExportarDados(Guid tenantId, [FromBody] ExportarDadosRequest? req)
     {
         if (!TryEnsureNotEmpty(tenantId, "Cliente", out var idErro)) return idErro!;
-        if (!RequestGuards.TryValidarMotivo(motivo, out var motivoT, out var erro)) return DataBadRequest(erro!);
+        // ADM-11 (#746): motivo no corpo (POST) em vez de query string — nao vaza a justificativa
+        // LGPD em logs/historico/referrer. Unico caller e o Admin (BFF), migrado junto.
+        if (!RequestGuards.TryValidarMotivo(req?.Motivo, out var motivoT, out var erro)) return DataBadRequest(erro!);
 
         var empresa = await db.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.Id == tenantId);
         if (empresa is null) return DataNotFound("Cliente não encontrado.");
@@ -474,6 +476,9 @@ public class AdminClientesController(
         var json = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         return File(System.Text.Encoding.UTF8.GetBytes(json), "application/json", fileName);
     }
+
+    /// <summary>Corpo do POST de exportacao LGPD — motivo no body (nao na URL). ADM-11 (#746).</summary>
+    public sealed record ExportarDadosRequest(string? Motivo);
 
     // ─────────────────── Histórico LGPD do tenant ───────────────────
 
