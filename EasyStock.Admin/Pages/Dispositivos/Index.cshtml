@@ -30,7 +30,12 @@
         </div>
     </es-page-header>
 
-    <template x-if="!empresaId">
+    @* ADM-04 (#741): gate server-side em vez de <template x-if>. Aninhar o _EmpresaPicker
+       (que tem seu proprio <template x-if="!sel">) dentro de um <template x-if> impede o
+       Alpine de processar o template interno e o input de busca some. EmpresaId e server-bound
+       (?empresaId=), entao o gate resolve no servidor e o picker renderiza top-level. *@
+    @if (Model.EmpresaId is null)
+    {
         <es-card>
             <es-empty-state icon="building-2"
                             title="Selecione um cliente"
@@ -40,9 +45,9 @@
                 </div>
             </es-empty-state>
         </es-card>
-    </template>
-
-    <template x-if="empresaId">
+    }
+    else
+    {
         <div style="display:flex; flex-direction:column; gap:16px;">
 
             <!-- Toolbar -->
@@ -113,7 +118,7 @@
 
             <p x-show="erro" x-cloak style="color:var(--crit-600); font-size:13px;" x-text="erro"></p>
         </div>
-    </template>
+    }
 
     <!-- Modal: gerar pair-code -->
     <es-modal id="dispositivos-pair" title="Novo código de pareamento" description="Mostre o código pro operador digitar no PWA. Válido por 10 min." size="sm" persistent="true" show-close="false">
