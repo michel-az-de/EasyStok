@@ -151,7 +151,7 @@ public class AuthController(
     [SwaggerOperation(Summary = "Refresh JWT token", Description = "Exchange a valid refresh token for a new JWT access token.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting("auth-refresh")]
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command)
         => DataOk(await refreshTokenUseCase.ExecuteAsync(command));

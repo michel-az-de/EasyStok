@@ -143,14 +143,28 @@ if (args.Contains("--migrate-only"))
 
 // ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
 // X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
-app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+//
+// CRITICO (incidente login-admin / #277 / #657): com KnownNetworks/KnownProxies VAZIOS
+// o middleware NAO confia em nenhum proxy e IGNORA o X-Forwarded-For -> RemoteIpAddress
+// fica sendo o IP do container que abriu a conexao (o Caddy, ou o BFF Web/Admin que chama
+// a API server-side). Resultado: o rate limiter de auth (particionado por IP) e a auditoria
+// de IP colapsam numa unica particao por-container -> 10/min compartilhado por TODOS os
+// admins -> login some em 429. A API so e alcancavel pela rede interna do Docker (nada
+// chega direto), entao confiar nas faixas privadas e seguro e restaura o IP REAL do cliente.
+// ForwardLimit=1: consome apenas a entrada mais a direita do X-Forwarded-For (a que o proxy
+// confiavel anexou) — um X-Forwarded-For forjado pelo cliente fica a esquerda e nao e usado.
+var forwardedHeaders = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
 {
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
-    KnownNetworks = { },
-    KnownProxies = { }
-});
+    ForwardLimit = 1
+};
+forwardedHeaders.KnownNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+foreach (var rede in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8" })
+    forwardedHeaders.KnownNetworks.Add(Microsoft.AspNetCore.HttpOverrides.IPNetwork.Parse(rede));
+app.UseForwardedHeaders(forwardedHeaders);
 
 // ── Migrations + Seed (PostgreSQL only) ───────────────────────────────────────
 await StartupMigrationsAndSeed.RunAsync(app, infraState, databaseProvider, resolvedProvider);

@@ -223,7 +223,9 @@ public static class ApiServiceCollectionExtensions
 
             // Rate limit para endpoints sensíveis de autenticação (login, register,
             // forgot/reset password). Particionado por IP do cliente para dificultar
-            // brute-force e spam de contas.
+            // brute-force e spam de contas. O IP real volta a ser confiavel apos o fix do
+            // ForwardedHeaders (Program.cs) + repasse de X-Forwarded-For pelos BFFs Web/Admin;
+            // antes disso TODOS colapsavam no IP do container e 10/min travava o login geral.
             options.AddPolicy("auth", context =>
             {
                 var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
@@ -231,10 +233,28 @@ public static class ApiServiceCollectionExtensions
                     partitionKey,
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 10,
+                        PermitLimit = 20,
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
+                    });
+            });
+
+            // Refresh de token NAO e vetor de brute-force (exige um refresh token valido) e
+            // e chamado com frequencia pelos handlers de sessao dos BFFs (restore + retry em
+            // 401). Mante-lo no balde "auth" de login fazia o refresh esfomear o login -> 429
+            // (incidente login-admin). Balde proprio e generoso, particionado por IP real.
+            options.AddPolicy("auth-refresh", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 5
                     });
             });
 

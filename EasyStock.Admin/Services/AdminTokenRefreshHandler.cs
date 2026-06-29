@@ -22,6 +22,11 @@ public class AdminTokenRefreshHandler(
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
+        // Repassa o IP REAL do browser para a API em TODA chamada (inclusive /auth/login e
+        // /auth/refresh). O Admin e um BFF: sem isto a API ve so o IP do container admin e o
+        // rate limiter de auth colapsa todos os admins numa unica particao (incidente login-admin).
+        ApplyForwardedFor(request);
+
         var isAuthRoute = request.RequestUri?.PathAndQuery.Contains("/auth/", StringComparison.OrdinalIgnoreCase) == true;
         var token = session.GetToken();
         HttpRequestMessage? retryRequest = null;
@@ -113,6 +118,35 @@ public class AdminTokenRefreshHandler(
         }
     }
 
+    /// <summary>
+    /// Carimba o X-Forwarded-For da request de saida com o IP REAL do browser. O Caddy (edge)
+    /// injeta o X-Forwarded-For ao proxiar pro Admin; a entrada mais a DIREITA e a que o nosso
+    /// proxy confiavel observou (resistente a spoof do cliente, que ficaria a esquerda). Fallback
+    /// pro RemoteIpAddress da conexao. Single-entry: a API (ForwardLimit=1) consome exatamente este IP.
+    /// </summary>
+    private void ApplyForwardedFor(HttpRequestMessage request)
+    {
+        try
+        {
+            var ctx = httpContextAccessor.HttpContext;
+            if (ctx is null) return;
+
+            string? clientIp = null;
+            var xff = ctx.Request.Headers["X-Forwarded-For"].ToString();
+            if (!string.IsNullOrWhiteSpace(xff))
+                clientIp = xff.Split(',').Select(s => s.Trim()).LastOrDefault(s => s.Length > 0);
+            clientIp ??= ctx.Connection.RemoteIpAddress?.ToString();
+            if (string.IsNullOrWhiteSpace(clientIp)) return;
+
+            request.Headers.Remove("X-Forwarded-For");
+            request.Headers.TryAddWithoutValidation("X-Forwarded-For", clientIp);
+        }
+        catch
+        {
+            // Best-effort: nunca quebrar a chamada por causa do header de IP.
+        }
+    }
+
     private async Task<string?> TryRefreshAsync(string refreshToken, CancellationToken ct)
     {
         try
@@ -121,6 +155,9 @@ public class AdminTokenRefreshHandler(
             var content = new StringContent(body, Encoding.UTF8, "application/json");
 
             var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "api/auth/refresh") { Content = content };
+            // Este refresh e enviado via base.SendAsync (nao re-entra em SendAsync), entao
+            // precisa carimbar o X-Forwarded-For explicitamente — senao cai na particao do container.
+            ApplyForwardedFor(refreshRequest);
             var resp = await base.SendAsync(refreshRequest, ct);
 
             if (!resp.IsSuccessStatusCode) return null;

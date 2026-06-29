@@ -16,6 +16,12 @@ public class TokenRefreshHandler(
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
+        // Repassa o IP REAL do browser para a API em TODA chamada (inclusive /auth/login e
+        // /auth/refresh). O Web e um BFF: sem isto a API ve so o IP do container web e o rate
+        // limiter de auth colapsa todos os usuarios numa unica particao (mesma causa do
+        // incidente login-admin). Ver EasyStock.Api/Program.cs (ForwardedHeaders) + #277/#657.
+        ApplyForwardedFor(request);
+
         var isAuthRoute = request.RequestUri?.PathAndQuery.Contains("/auth/", StringComparison.OrdinalIgnoreCase) == true;
         var token = session.GetToken();
         var lojaId = session.GetLojaId();
@@ -79,6 +85,34 @@ public class TokenRefreshHandler(
         return response;
     }
 
+    /// <summary>
+    /// Carimba o X-Forwarded-For da request de saida com o IP REAL do browser (entrada mais a
+    /// direita do X-Forwarded-For que o Caddy injetou — resistente a spoof — com fallback pro
+    /// RemoteIpAddress). Single-entry: a API (ForwardLimit=1) consome exatamente este IP.
+    /// </summary>
+    private void ApplyForwardedFor(HttpRequestMessage request)
+    {
+        try
+        {
+            var ctx = httpContextAccessor.HttpContext;
+            if (ctx is null) return;
+
+            string? clientIp = null;
+            var xff = ctx.Request.Headers["X-Forwarded-For"].ToString();
+            if (!string.IsNullOrWhiteSpace(xff))
+                clientIp = xff.Split(',').Select(s => s.Trim()).LastOrDefault(s => s.Length > 0);
+            clientIp ??= ctx.Connection.RemoteIpAddress?.ToString();
+            if (string.IsNullOrWhiteSpace(clientIp)) return;
+
+            request.Headers.Remove("X-Forwarded-For");
+            request.Headers.TryAddWithoutValidation("X-Forwarded-For", clientIp);
+        }
+        catch
+        {
+            // Best-effort: nunca quebrar a chamada por causa do header de IP.
+        }
+    }
+
     private void MarkSessionExpired()
     {
         try
@@ -111,6 +145,8 @@ public class TokenRefreshHandler(
 
             // Use inner handler directly to avoid re-entering this handler
             var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "auth/refresh") { Content = content };
+            // Enviado via base.SendAsync (nao re-entra em SendAsync) -> carimba o X-Forwarded-For aqui.
+            ApplyForwardedFor(refreshRequest);
             var resp = await base.SendAsync(refreshRequest, ct);
 
             if (!resp.IsSuccessStatusCode) return null;

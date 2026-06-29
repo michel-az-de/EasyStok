@@ -49,9 +49,13 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
             // nao ha seletor de empresa na tela de login (regressao do ADR-0031 fatia 6 revertida).
             var raw = await api.PostRawAsync("api/auth/login", new { email = Email, senha = Senha });
 
-            if (raw.TryGetProperty("error", out _))
+            if (raw.TryGetProperty("error", out var errEl))
             {
-                Erro = "E-mail ou senha incorretos. Verifique e tente novamente.";
+                // Distingue throttling (429) de credencial errada — mostrar "senha incorreta" num
+                // 429 mandava o usuario re-tentar (piorando o flood) e mascarava a causa real.
+                Erro = IsRateLimited(errEl)
+                    ? "Muitas tentativas em sequência. Aguarde alguns segundos e tente novamente."
+                    : "E-mail ou senha incorretos. Verifique e tente novamente.";
                 return Page();
             }
 
@@ -110,6 +114,17 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
             Erro = "Não foi possível concluir o login. Tente novamente em instantes.";
             return Page();
         }
+    }
+
+    // Detecta o envelope de rate-limit (429) da API: { error: { code: "RATE_LIMIT_EXCEEDED" } }
+    // ou o sintetico do PostRawAsync ("HTTP 429 sem corpo.") quando o 429 vem sem corpo.
+    private static bool IsRateLimited(JsonElement errEl)
+    {
+        if (errEl.ValueKind != JsonValueKind.Object) return false;
+        var code = errEl.TryGetProperty("code", out var c) ? c.GetString() : null;
+        if (string.Equals(code, "RATE_LIMIT_EXCEEDED", StringComparison.OrdinalIgnoreCase)) return true;
+        var msg = errEl.TryGetProperty("message", out var m) ? m.GetString() : null;
+        return msg is not null && msg.Contains("429", StringComparison.Ordinal);
     }
 
     private static string MaskEmail(string? email)

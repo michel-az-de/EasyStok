@@ -65,6 +65,15 @@ public class AdminSessionRestoreMiddleware(
             {
                 var resp = await api.PostRawAsync("api/auth/refresh", new { refreshToken });
 
+                // Se a API throttlou (429), NAO adianta re-tentar 3x batendo no mesmo balde —
+                // so amplifica o flood. Back-off imediato preservando o cookie (self-heal numa
+                // request futura). Evita a tempestade que mantinha o rate limiter de auth esgotado.
+                if (IsRateLimited(resp))
+                {
+                    log.LogWarning("Restauracao via _rt_admin: refresh throttled (429). Back-off sem re-tentar; cookie preservado.");
+                    return RestoreOutcome.Transient;
+                }
+
                 var root = resp;
                 if (resp.ValueKind == JsonValueKind.Object && resp.TryGetProperty("data", out var data))
                     root = data;
@@ -114,6 +123,18 @@ public class AdminSessionRestoreMiddleware(
 
     // Backoff curto e crescente entre tentativas de refresh (300ms, 600ms).
     private static int BackoffMs(int attempt) => 300 * attempt;
+
+    // Detecta o envelope de rate-limit (429) que a API devolve: { error: { code: "RATE_LIMIT_EXCEEDED" } }
+    // ou o envelope sintetico do PostRawAsync quando o 429 vem sem corpo ("HTTP 429 sem corpo.").
+    private static bool IsRateLimited(JsonElement resp)
+    {
+        if (resp.ValueKind != JsonValueKind.Object) return false;
+        if (!resp.TryGetProperty("error", out var err) || err.ValueKind != JsonValueKind.Object) return false;
+        var code = err.TryGetProperty("code", out var c) ? c.GetString() : null;
+        if (string.Equals(code, "RATE_LIMIT_EXCEEDED", StringComparison.OrdinalIgnoreCase)) return true;
+        var msg = err.TryGetProperty("message", out var m) ? m.GetString() : null;
+        return msg is not null && msg.Contains("429", StringComparison.Ordinal);
+    }
 
     private CookieOptions RememberCookieOptions() => new()
     {
