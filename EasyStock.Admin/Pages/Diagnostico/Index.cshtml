@@ -1425,9 +1425,15 @@ function diagnosticoPage() {
                 if (val === 'testes' && !this.testes._loadedOnce) this.testes.refresh();
             });
 
-            // Hidrata erros se entrou direto na tab.
+            // Hidrata a tab ativa se o usuario entrou direto nela (?tab=...).
+            // ADM-02 (#740): faltava cobrir stack/infra/performance/testes -> abriam vazias
+            // e o auto-refresh de 30s (stack) so arrancava apos um refresh() manual.
             if (this.tab === 'erros') this.erros.refresh();
             if (this.tab === 'sistema') this.sysErros.refresh();
+            if (this.tab === 'infra' && !this.infra._loadedOnce) this.infra.refresh();
+            if (this.tab === 'performance' && !this.perf._loadedOnce) this.perf.refreshAll();
+            if (this.tab === 'stack' && !this.stack._loadedOnce) this.stack.refresh();
+            if (this.tab === 'testes' && !this.testes._loadedOnce) this.testes.refresh();
         },
 
         setTab(t) { this.tab = t; },
