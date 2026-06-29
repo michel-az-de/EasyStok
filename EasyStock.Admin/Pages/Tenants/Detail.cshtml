@@ -24,14 +24,6 @@
 @{
     var nomeBreadcrumb = nome != null && nome.Length > 40 ? nome.Substring(0, 40) + "…" : nome;
 }
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item href="/Tenants">Clientes</es-breadcrumb-item>
-        <es-breadcrumb-item>@nomeBreadcrumb</es-breadcrumb-item>
-    </es-breadcrumb>
-    <es-button variant="ghost" size="sm" href="/Tenants" icon="arrow-left">Voltar</es-button>
-</div>
 
 @* Banner dourado — senha temporária do tenant ou usuário recém-criado. Some no próximo navigate. *@
 @if (!string.IsNullOrEmpty(Model.NovaSenhaTemporaria))
@@ -177,53 +169,54 @@ function operacaoErp(tenantId) {
 </script>
 
 <!-- Header -->
-<div class="card mb-6" x-data="{ modal: null, motivoSuspender: '' }">
-    <div class="flex items-start justify-between flex-wrap gap-4">
-        <div>
-            <div class="flex items-center gap-3 mb-1">
-                <h2 class="text-es-ink text-xl font-bold">@nome</h2>
-                <span class="status-badge @statusClass">@statusDisplay</span>
-            </div>
-            @{
-                var doc = Model.Empresa.TryGetProperty("documento", out var dp) ? dp.GetString() : null;
-                var criado = Model.Empresa.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : null;
-                DateTime.TryParse(criado, out var criadoDt);
-                var planoNome = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
-                    && Model.Assinatura.TryGetProperty("plano", out var pp) && pp.ValueKind != System.Text.Json.JsonValueKind.Null
-                    && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
-            }
-            <div class="text-es-ink-dim text-sm" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span data-fmt="doc">@(doc ?? "—")</span>
-                @if (!string.IsNullOrEmpty(doc))
-                {
-                    <es-copy value="@doc" label="CNPJ" icon-only="true" />
-                }
-                <span>· Criado em @criadoDt.ParaBrasilia().ToString("dd/MM/yy")</span>
-            </div>
-            <div class="text-es-ink-dim text-sm mt-1">Plano: <span class="text-es-ink font-medium">@planoNome</span></div>
-        </div>
+<div x-data="{ modal: null, motivoSuspender: '' }">
+    @{
+        var doc = Model.Empresa.TryGetProperty("documento", out var dp) ? dp.GetString() : null;
+        var criado = Model.Empresa.TryGetProperty("criadoEm", out var cp) ? cp.GetString() : null;
+        DateTime.TryParse(criado, out var criadoDt);
+        var planoNome = Model.Assinatura.ValueKind != System.Text.Json.JsonValueKind.Undefined
+            && Model.Assinatura.TryGetProperty("plano", out var pp) && pp.ValueKind != System.Text.Json.JsonValueKind.Null
+            && pp.TryGetProperty("nome", out var pnp) ? pnp.GetString() : "—";
+        var docDisplay = string.IsNullOrEmpty(doc) ? "—" : doc;
+    }
+    <es-page-header eyebrow="Cliente"
+                    titulo="@nome"
+                    descricao="@($"{docDisplay} · Criado em {criadoDt.ParaBrasilia():dd/MM/yy} · Plano: {planoNome}")">
+        <es-page-header-breadcrumb>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item href="/Tenants">Clientes</es-breadcrumb-item>
+                <es-breadcrumb-item>@nomeBreadcrumb</es-breadcrumb-item>
+            </es-breadcrumb>
+        </es-page-header-breadcrumb>
 
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <form method="post" asp-page-handler="Impersonar" style="display:inline;">
+        <span class="status-badge @statusClass">@statusDisplay</span>
+        @if (!string.IsNullOrEmpty(doc))
+        {
+            <es-copy value="@doc" label="CNPJ" icon-only="true" />
+        }
+
+        <es-button variant="ghost" size="sm" href="/Tenants" icon="arrow-left">Voltar</es-button>
+
+        <form method="post" asp-page-handler="Impersonar" style="display:inline;">
+            @Html.AntiForgeryToken()
+            <es-button type="submit" variant="ghost" size="sm" icon="external-link">Impersonar</es-button>
+        </form>
+
+        @if (assinaturaStatus == "Ativa")
+        {
+            <es-button variant="danger" size="sm" icon="alert-triangle" x-on:click="modal = 'suspender'">Suspender</es-button>
+        }
+        else if (assinaturaStatus == "Suspensa")
+        {
+            <form method="post" asp-page-handler="Reativar" style="display:inline;">
                 @Html.AntiForgeryToken()
-                <es-button type="submit" variant="ghost" size="sm" icon="external-link">Impersonar</es-button>
+                <es-button type="submit" variant="primary" size="sm" icon="check">Reativar</es-button>
             </form>
+        }
 
-            @if (assinaturaStatus == "Ativa")
-            {
-                <es-button variant="danger" size="sm" icon="alert-triangle" x-on:click="modal = 'suspender'">Suspender</es-button>
-            }
-            else if (assinaturaStatus == "Suspensa")
-            {
-                <form method="post" asp-page-handler="Reativar" style="display:inline;">
-                    @Html.AntiForgeryToken()
-                    <es-button type="submit" variant="primary" size="sm" icon="check">Reativar</es-button>
-                </form>
-            }
-
-            <es-button variant="secondary" size="sm" icon="list-checks" x-on:click="modal = 'plano'">Trocar plano</es-button>
-        </div>
-    </div>
+        <es-button variant="secondary" size="sm" icon="list-checks" x-on:click="modal = 'plano'">Trocar plano</es-button>
+    </es-page-header>
 
     <!-- Modal Suspender -->
     <div x-show="modal === 'suspender'" x-cloak class="modal-overlay" @@click.self="modal = null" @@keydown.escape.window="modal = null" x-trap.inert.noscroll="modal === 'suspender'" role="dialog" aria-modal="true" aria-labelledby="modal-suspender-title">
