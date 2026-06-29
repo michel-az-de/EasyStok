@@ -36,22 +36,19 @@
     var exportHref = "/Faturas?handler=ExportCsv" + (exportQs.StartsWith("?") ? "&" + exportQs.Substring(1) : exportQs);
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Faturamento"
+                titulo="Faturas"
+                descricao="@($"{Model.Total} fatura(s) — emissão, vencimentos e status de pagamento.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item>Faturas</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
-            <strong style="color:var(--text-primary);">@Model.Total</strong> fatura(s)
-        </div>
-    </div>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <es-button variant="ghost" href="/Faturas/Dashboard" icon="trending-up">Dashboard</es-button>
-        <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
-        <es-button variant="primary" href="/Faturas/Emitir" icon="plus">Emitir avulsa</es-button>
-    </div>
-</div>
+    </es-page-header-breadcrumb>
+    <es-button variant="ghost" href="/Faturas/Dashboard" icon="trending-up">Dashboard</es-button>
+    <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
+    <es-button variant="primary" href="/Faturas/Emitir" icon="plus">Emitir avulsa</es-button>
+</es-page-header>
 
 <es-card padding="md" card-class="mb-4">
     <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; align-items:end;">

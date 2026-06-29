@@ -17,23 +17,20 @@
     var exportHref = "/Tickets?handler=ExportCsv" + (qsExport.Count > 0 ? "&" + string.Join("&", qsExport) : "");
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Helpdesk"
+                titulo="Tickets"
+                descricao="@($"{Model.Total} ticket(s) na fila — acompanhe SLA, prioridade e atendimento.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item>Helpdesk</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
-            <strong style="color:var(--text-primary);">@Model.Total</strong> ticket(s)
-        </div>
-    </div>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <es-button variant="ghost" href="/Tickets/Dashboard" icon="trending-up">Dashboard</es-button>
-        <es-button variant="ghost" href="/Configuracoes/SlaMatriz" icon="settings">Matriz SLA</es-button>
-        <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
-        <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-ticket')">Novo ticket</es-button>
-    </div>
-</div>
+    </es-page-header-breadcrumb>
+    <es-button variant="ghost" href="/Tickets/Dashboard" icon="trending-up">Dashboard</es-button>
+    <es-button variant="ghost" href="/Configuracoes/SlaMatriz" icon="settings">Matriz SLA</es-button>
+    <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
+    <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-ticket')">Novo ticket</es-button>
+</es-page-header>
 
 <es-card padding="md" card-class="mb-4">
     <form method="get" data-autosubmit style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; align-items:end;">

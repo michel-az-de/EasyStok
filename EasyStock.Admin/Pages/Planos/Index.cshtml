@@ -4,18 +4,17 @@
     ViewData["Title"] = "Planos";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px;">
-    <div>
+<es-page-header eyebrow="Assinaturas"
+                titulo="Planos"
+                descricao="@($"{Model.Planos.Count()} plano(s) configurados — limites, preços e disponibilidade.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item>Planos</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="margin-top:4px; color: var(--text-muted); font-size: 13px;">
-            <strong style="color: var(--text-primary);">@Model.Planos.Count()</strong> plano(s) configurados
-        </div>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-plano')">Novo plano</es-button>
-</div>
+</es-page-header>
 
 @if (!Model.Planos.Any())
 {

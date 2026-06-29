@@ -8,18 +8,17 @@
     var dir = Request.Query["dir"].FirstOrDefault();
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px;">
-    <div>
+<es-page-header eyebrow="Governança"
+                titulo="Admins"
+                descricao="@($"{Model.Admins.Count()} administrador(es) — acessos ao painel, status e papéis.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item>Admins</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="margin-top:4px; color: var(--text-muted); font-size: 13px;">
-            <strong style="color: var(--text-primary);">@Model.Admins.Count()</strong> administrador(es) ativos
-        </div>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="primary" icon="plus" x-on:click="$dispatch('open-modal-novo-admin')">Novo admin</es-button>
-</div>
+</es-page-header>
 
 @if (!string.IsNullOrEmpty(novaSenha))
 {

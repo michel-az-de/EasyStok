@@ -25,18 +25,17 @@
     if (!string.IsNullOrWhiteSpace(Model.Status)) qsExport.Add($"status={Uri.EscapeDataString(Model.Status)}");
     var exportHref = "/Tenants?handler=ExportCsv" + (qsExport.Count > 0 ? "&" + string.Join("&", qsExport) : "");
 }
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Base de clientes"
+                titulo="Clientes"
+                descricao="@($"{Model.Total} cliente(s) na base — gerencie assinaturas, suspensões, planos e acessos.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item>Clientes</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
-            <strong style="color:var(--text-primary);">@Model.Total</strong> resultado(s)
-        </div>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="ghost" href="@exportHref" icon="download">Exportar CSV</es-button>
-</div>
+</es-page-header>
 
 <es-card padding="md" card-class="mb-4" >
     <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end;">
