@@ -167,7 +167,12 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         }
         if (valor <= 0)
         {
-            erro = "Valor do desconto deve ser maior que zero.";
+            // ADM-01 (#739): mensagem contextual ao tipo (espelha a validacao client do modal).
+            erro = string.Equals(tipoT, "ValorFixo", StringComparison.OrdinalIgnoreCase)
+                    ? "Valor fixo deve ser maior que zero (R$)."
+                : string.Equals(tipoT, "MesesGratis", StringComparison.OrdinalIgnoreCase)
+                    ? "Número de meses deve ser maior que zero."
+                : "Valor do desconto deve ser maior que zero.";
             return false;
         }
         if (string.Equals(tipoT, "Percentual", StringComparison.OrdinalIgnoreCase) && valor > 100)
