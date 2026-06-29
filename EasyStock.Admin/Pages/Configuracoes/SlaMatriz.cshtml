@@ -15,18 +15,18 @@
         || (i.TryGetProperty("planoId", out var pp2) && pp2.ValueKind != JsonValueKind.Null)).ToList();
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Configurações"
+                titulo="Matriz de SLA"
+                descricao="Tempos default de resposta e resolução por prioridade.">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Configuracoes">Configurações</es-breadcrumb-item>
             <es-breadcrumb-item>Matriz SLA</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">Matriz de SLA</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Tempos default de resposta e resolução por prioridade</p>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="ghost" href="/Tickets" icon="arrow-left">Voltar para tickets</es-button>
-</div>
+</es-page-header>
 
 <es-card title="SLAs globais" description="Aplicado a todos os tenants/planos quando não há override específico">
     <form method="post" style="display:flex; flex-direction:column; gap:14px;">

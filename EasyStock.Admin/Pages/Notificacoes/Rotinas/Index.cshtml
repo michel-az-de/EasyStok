@@ -4,18 +4,18 @@
     ViewData["Title"] = "Rotinas de Notificação";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Notificações"
+                titulo="Rotinas"
+                descricao="Configure triggers e canais de fallback para cada evento">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
             <es-breadcrumb-item>Rotinas</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">Rotinas</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Configure triggers e canais de fallback para cada evento</p>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="primary" icon="plus" href="/Notificacoes/Rotinas/Edit">Nova rotina</es-button>
-</div>
+</es-page-header>
 
 <es-card padding="md" card-class="mb-4">
     <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end;">

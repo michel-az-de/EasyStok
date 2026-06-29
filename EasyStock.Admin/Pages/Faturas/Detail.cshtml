@@ -50,22 +50,21 @@
     bool podeCancelar = Model.Status is "Rascunho" or "Emitida" or "ParcialmentePaga" or "Vencida";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:8px; flex-wrap:wrap;">
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item href="/Faturas">Faturas</es-breadcrumb-item>
-        <es-breadcrumb-item>@Model.Numero</es-breadcrumb-item>
-    </es-breadcrumb>
+<es-page-header eyebrow="Faturamento"
+                titulo="@($"Fatura {Model.Numero}")"
+                descricao="Emissão, itens, pagamentos e ações desta fatura.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Faturas">Faturas</es-breadcrumb-item>
+            <es-breadcrumb-item>@Model.Numero</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+    <span class="status-badge @StatusBadge(Model.Status)">@Model.Status</span>
     <es-button variant="ghost" size="sm" href="/Faturas" icon="arrow-left">Voltar</es-button>
-</div>
+</es-page-header>
 
-<div class="flex items-center justify-between mb-4 flex-wrap gap-4">
-    <div class="flex items-center gap-3">
-        <h1 class="text-es-ink text-xl font-semibold">
-            Fatura <span class="font-mono">@Model.Numero</span>
-            <span class="status-badge @StatusBadge(Model.Status) ml-2">@Model.Status</span>
-        </h1>
-    </div>
+<div class="flex items-center justify-end mb-4 flex-wrap gap-4">
     <div class="flex gap-2 flex-wrap" x-data="{ modalPaga:false, modalCancelar:false, modalTicket:false }">
         <a href="/Faturas/Detail/@Model.Id?handler=Pdf" target="_blank" class="btn-secondary text-sm">📄 Baixar PDF</a>
         <button type="button" @@click="modalTicket = true" class="btn-secondary text-sm">💬 Abrir ticket</button>

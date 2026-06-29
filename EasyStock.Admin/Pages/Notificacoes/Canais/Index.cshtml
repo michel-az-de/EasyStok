@@ -4,15 +4,17 @@
     ViewData["Title"] = "Canais de Notificação";
 }
 
-<div style="margin-bottom:20px;">
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
-        <es-breadcrumb-item>Canais</es-breadcrumb-item>
-    </es-breadcrumb>
-    <h2 class="admin-page-title">Canais</h2>
-    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Configuração de provedores e kill-switches globais</p>
-</div>
+<es-page-header eyebrow="Notificações"
+                titulo="Canais"
+                descricao="Configuração de provedores e kill-switches globais.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
+            <es-breadcrumb-item>Canais</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
 
 @if (Model.Configs.HasValue && Model.Configs.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
 {

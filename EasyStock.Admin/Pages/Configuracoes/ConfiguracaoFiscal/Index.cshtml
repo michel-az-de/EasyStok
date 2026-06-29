@@ -4,6 +4,7 @@
     ViewData["Title"] = "Configuracao Fiscal";
     var sucesso = TempData["Sucesso"] as string;
     var erro = TempData["Erro"] as string;
+    var empresaNome = Model.EmpresaNome ?? "—";
 
     var passo1Ok = Model.TemCertificado;
     var passo2Ok = Model.TemCsc;
@@ -13,13 +14,18 @@
 
 <div x-data="{ passo: @(passo1Ok ? (passo2Ok ? (passo3Ok ? 0 : 3) : 2) : 1) }" class="max-w-3xl mx-auto">
 
-    <div class="flex items-center gap-3 mb-6">
-        <a href="/Tenants" class="text-es-ink-mute hover:text-es-ink text-sm">&larr; Tenants</a>
-        <span class="text-es-ink-mute">/</span>
-        <span class="text-es-ink font-medium">@Model.EmpresaNome</span>
-        <span class="text-es-ink-mute">/</span>
-        <span class="text-es-ink font-medium">Configuracao Fiscal</span>
-    </div>
+    <es-page-header eyebrow="Fiscal"
+                    titulo="Configuracao Fiscal"
+                    descricao="@($"Emissao de NFC-e da empresa {empresaNome}.")">
+        <es-page-header-breadcrumb>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item href="/Tenants">Tenants</es-breadcrumb-item>
+                <es-breadcrumb-item>@empresaNome</es-breadcrumb-item>
+                <es-breadcrumb-item>Configuracao Fiscal</es-breadcrumb-item>
+            </es-breadcrumb>
+        </es-page-header-breadcrumb>
+    </es-page-header>
 
     @if (!string.IsNullOrEmpty(sucesso))
     {

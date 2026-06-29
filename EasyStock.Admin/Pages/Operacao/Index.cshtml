@@ -8,15 +8,19 @@
 
 <div x-data="operacaoClientes()" x-init="init()" class="op">
 
-    <header class="op-head">
-        <div>
-            <h2 class="admin-page-title">Operação</h2>
-            <p class="op-sub">Como estão os seus clientes agora: vendas do dia, assinatura, suporte e cobrança. A lista atualiza sozinha e mostra primeiro quem precisa de atenção.</p>
-        </div>
+    <es-page-header eyebrow="Visão operacional"
+                    titulo="Operação"
+                    descricao="Como estão os seus clientes agora: vendas do dia, assinatura, suporte e cobrança. A lista atualiza sozinha e mostra primeiro quem precisa de atenção.">
+        <es-page-header-breadcrumb>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item>Operação</es-breadcrumb-item>
+            </es-breadcrumb>
+        </es-page-header-breadcrumb>
         <span class="op-updated" x-show="atualizadoEm" x-cloak>
             <span class="op-dot op-dot-ok"></span> atualizado <span x-text="formatAtualizado()"></span>
         </span>
-    </header>
+    </es-page-header>
 
     @* ---- resumo (números com rótulo) ---- *@
     <div class="op-resumo" x-show="!carregando" x-cloak>

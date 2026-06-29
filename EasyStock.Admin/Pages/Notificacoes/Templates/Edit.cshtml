@@ -4,29 +4,29 @@
 @{
     ViewData["Title"] = Model.Id.HasValue ? "Editar Template" : "Novo Template";
     var ehNovo = !Model.Id.HasValue;
+    var tituloPagina = ehNovo ? "Novo template" : "Editar template";
     var catalogoJson = System.Text.Json.JsonSerializer.Serialize(
         NotificacoesVariaveisCatalogo.PorEvento.ToDictionary(
             kv => kv.Key,
             kv => kv.Value.Select(v => new { v.Nome, v.Descricao, v.Exemplo })));
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Notificações"
+                titulo="@tituloPagina"
+                descricao="Modelo de mensagem por canal e tipo de evento.">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Notificacoes/Templates">Templates</es-breadcrumb-item>
             <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Novo")</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
-            <h2 class="admin-page-title" style="margin:0;">@ViewData["Title"]</h2>
-            @if (Model.Id.HasValue)
-            {
-                <es-badge variant="warn">Nova versão ao salvar</es-badge>
-            }
-        </div>
-    </div>
+    </es-page-header-breadcrumb>
+    @if (Model.Id.HasValue)
+    {
+        <es-badge variant="warn">Nova versão ao salvar</es-badge>
+    }
     <es-button variant="ghost" href="/Notificacoes/Templates" icon="arrow-left">Voltar</es-button>
-</div>
+</es-page-header>
 
 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:16px;">
     <form method="post" style="display:flex; flex-direction:column; gap:16px;">

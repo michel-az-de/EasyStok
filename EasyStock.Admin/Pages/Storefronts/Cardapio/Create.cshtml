@@ -4,21 +4,22 @@
     ViewData["Title"] = "Adicionar item ao cardápio";
 }
 
-<es-breadcrumb>
-    <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-    <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
-    <es-breadcrumb-item href="/Storefronts/Detail/@Model.StorefrontId">@Model.StorefrontSlug</es-breadcrumb-item>
-    <es-breadcrumb-item href="/Storefronts/@Model.StorefrontId/Cardapio">Cardápio</es-breadcrumb-item>
-    <es-breadcrumb-item>Adicionar</es-breadcrumb-item>
-</es-breadcrumb>
+<es-page-header eyebrow="Cardápio"
+                titulo="Adicionar item ao cardápio"
+                descricao="O item entra como rascunho (só você vê). Publique quando estiver pronto.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Storefronts">Storefronts</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Storefronts/Detail/@Model.StorefrontId">@Model.StorefrontSlug</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Storefronts/@Model.StorefrontId/Cardapio">Cardápio</es-breadcrumb-item>
+            <es-breadcrumb-item>Adicionar</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
 
 <es-card padding="lg" card-class="mt-4" style="max-width:720px;">
-    <h2 style="margin:0 0 4px; font-size:18px; font-weight:600;">Adicionar item ao cardápio</h2>
-    <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">
-        O item entra como <strong>rascunho</strong> (só você vê). Publique quando estiver pronto.
-    </p>
-
-    <form method="post" novalidate
+<form method="post" novalidate
           x-data="{ modo: '@(Model.Input.Modo ?? "avulso")', submitting: false, detalhes: false }"
           x-on:submit="submitting = true">
         @Html.AntiForgeryToken()

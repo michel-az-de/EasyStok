@@ -17,18 +17,18 @@
     };
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Faturamento"
+                titulo="Emitir fatura avulsa"
+                descricao="Configure cliente, itens e vencimento. Número gerado automaticamente.">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Faturas">Faturas</es-breadcrumb-item>
             <es-breadcrumb-item>Emitir avulsa</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">Emitir fatura avulsa</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Configure cliente, itens e vencimento. Número gerado automaticamente.</p>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="ghost" href="/Faturas" icon="arrow-left">Voltar</es-button>
-</div>
+</es-page-header>
 
 <form method="post" x-data="emitirFatura()" x-init="if (itens.length === 0) addItem()" x-on:submit="onSubmit($event)" style="display:flex; flex-direction:column; gap:16px;">
     @Html.AntiForgeryToken()

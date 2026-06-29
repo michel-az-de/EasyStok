@@ -1,20 +1,25 @@
 @page "{id:guid?}"
 @model EasyStock.Admin.Pages.Notificacoes.Rotinas.EditModel
 @{
-    ViewData["Title"] = Model.Id.HasValue ? "Editar Rotina" : "Nova Rotina";
+    var tituloHeader = Model.Id.HasValue ? "Editar Rotina" : "Nova Rotina";
+    ViewData["Title"] = tituloHeader;
+    var descricaoHeader = Model.Id.HasValue
+        ? "Ajuste a configuracao desta rotina de notificacao."
+        : "Crie uma nova rotina de notificacao agendada.";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Notificacoes"
+                titulo="@tituloHeader"
+                descricao="@descricaoHeader">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Notificacoes/Rotinas">Rotinas</es-breadcrumb-item>
             <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Nova")</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">@ViewData["Title"]</h2>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="ghost" href="/Notificacoes/Rotinas" icon="arrow-left">Voltar</es-button>
-</div>
+</es-page-header>
 
 <div style="max-width:720px;">
     <es-card>

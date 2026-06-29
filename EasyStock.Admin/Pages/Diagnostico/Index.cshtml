@@ -16,12 +16,16 @@
       quando ativadas (evita 3 chamadas pesadas no GET).
 *@
 
-<div style="margin-bottom:12px;">
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item>Diagnóstico</es-breadcrumb-item>
-    </es-breadcrumb>
-</div>
+<es-page-header eyebrow="Operação e saúde"
+                titulo="Diagnóstico"
+                descricao="Health-check da infra, erros, seed e telemetria da plataforma em um só lugar.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Diagnóstico</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
 
 @if (Model.Erro != null)
 {

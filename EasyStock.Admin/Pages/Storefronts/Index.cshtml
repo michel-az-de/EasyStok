@@ -4,20 +4,17 @@
     ViewData["Title"] = "Storefronts";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Lojas virtuais"
+                titulo="Storefronts"
+                descricao="@($"{Model.Total} storefront(s) cadastrado(s) — gerencie slugs, domínios e status de cada loja.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item>Storefronts</es-breadcrumb-item>
         </es-breadcrumb>
-        <div style="margin-top:4px; color:var(--text-muted); font-size:13px;">
-            <strong style="color:var(--text-primary);">@Model.Total</strong> resultado(s)
-        </div>
-    </div>
-    <div>
-        <es-button variant="primary" href="/Storefronts/Create" icon="plus">Novo storefront</es-button>
-    </div>
-</div>
+    </es-page-header-breadcrumb>
+    <es-button variant="primary" href="/Storefronts/Create" icon="plus">Novo storefront</es-button>
+</es-page-header>
 
 <es-card padding="md" card-class="mb-4">
     <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; align-items:end;">

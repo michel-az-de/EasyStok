@@ -10,14 +10,16 @@
     var versaoPwa = Model.Get("versao_minima_pwa", "1.0.0");
 }
 
-<div style="margin-bottom:20px;">
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item>Configurações</es-breadcrumb-item>
-    </es-breadcrumb>
-    <h2 class="admin-page-title">Configurações do sistema</h2>
-    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Disponibilidade, onboarding e parâmetros globais do produto</p>
-</div>
+<es-page-header eyebrow="Plataforma"
+                titulo="Configurações do sistema"
+                descricao="Disponibilidade, onboarding e parâmetros globais do produto.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Configurações</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
 
 <es-tabs default-tab="disponibilidade">
 

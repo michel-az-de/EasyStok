@@ -4,15 +4,17 @@
     ViewData["Title"] = "Broadcast — Super Admin";
 }
 
-<div style="margin-bottom:20px; max-width:720px;">
-    <es-breadcrumb>
-        <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-        <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
-        <es-breadcrumb-item>Broadcast</es-breadcrumb-item>
-    </es-breadcrumb>
-    <h2 class="admin-page-title">Broadcast</h2>
-    <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Envio ad-hoc de notificação para usuários selecionados</p>
-</div>
+<es-page-header eyebrow="Notificações"
+                titulo="Broadcast"
+                descricao="Envio ad-hoc de notificação para usuários selecionados.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
+            <es-breadcrumb-item>Broadcast</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+</es-page-header>
 
 <div style="max-width:720px; display:flex; flex-direction:column; gap:16px;">
 

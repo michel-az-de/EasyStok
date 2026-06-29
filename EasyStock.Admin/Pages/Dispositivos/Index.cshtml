@@ -14,21 +14,21 @@
 
 <div x-data="dispositivosPage()" x-init="init()" style="display:flex; flex-direction:column; gap:20px;">
 
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
-        <div>
+    <es-page-header eyebrow="Plataforma"
+                    titulo="Dispositivos"
+                    descricao="PWAs pareados, saúde, comandos remotos e atualização OTA.">
+        <es-page-header-breadcrumb>
             <es-breadcrumb>
                 <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
                 <es-breadcrumb-item>Dispositivos</es-breadcrumb-item>
             </es-breadcrumb>
-            <h2 class="admin-page-title">Dispositivos</h2>
-            <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">PWAs pareados, saúde, comandos remotos e atualização OTA.</p>
-        </div>
+        </es-page-header-breadcrumb>
         <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:11px; color:var(--text-muted);">Bundle:</span>
             <code style="font-family:var(--font-mono); font-size:11px; padding:4px 8px; border-radius:var(--r-sm); background:var(--surface-sunken); color:var(--text-primary);"
                   x-text="serverPwaVersion || '…'"></code>
         </div>
-    </div>
+    </es-page-header>
 
     <template x-if="!empresaId">
         <es-card>

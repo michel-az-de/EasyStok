@@ -5,13 +5,18 @@
 }
 
 <div x-data="diagWhatsApp()" class="space-y-4">
-    <div class="flex items-center justify-between gap-4">
-        <div>
-            <h2 class="text-es-ink text-2xl font-bold tracking-tight">Diagnóstico · WhatsApp</h2>
-            <p class="text-es-ink-mute text-sm">Envia mensagem WhatsApp de teste via Meta Cloud API.</p>
-        </div>
-        <a href="/Diagnostico" class="text-es-accent hover:underline text-sm">← Voltar pro Diagnóstico</a>
-    </div>
+    <es-page-header eyebrow="Diagnóstico"
+                    titulo="Diagnóstico · WhatsApp"
+                    descricao="Envia mensagem WhatsApp de teste via Meta Cloud API.">
+        <es-page-header-breadcrumb>
+            <es-breadcrumb>
+                <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+                <es-breadcrumb-item href="/Diagnostico">Diagnóstico</es-breadcrumb-item>
+                <es-breadcrumb-item>WhatsApp</es-breadcrumb-item>
+            </es-breadcrumb>
+        </es-page-header-breadcrumb>
+        <es-button variant="ghost" href="/Diagnostico" icon="arrow-left">Voltar</es-button>
+    </es-page-header>
 
     <form @@submit.prevent="enviar()" class="rounded-xl p-5 space-y-3" style="background:var(--es-surface);border:1px solid rgba(247,242,232,.08)">
         <div>

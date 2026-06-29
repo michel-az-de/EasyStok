@@ -4,16 +4,18 @@
     ViewData["Title"] = "FAQ — Categorias";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="FAQ"
+                titulo="Categorias"
+                descricao="@($"{Model.Categorias.Count()} categoria(s) — usadas para agrupar os itens da central de ajuda.")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Faq">FAQ</es-breadcrumb-item>
             <es-breadcrumb-item>Categorias</es-breadcrumb-item>
         </es-breadcrumb>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="ghost" href="/Faq" icon="arrow-left">Voltar para itens</es-button>
-</div>
+</es-page-header>
 
 <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
     <es-card title="Categorias existentes" description="@(Model.Categorias.Count() + " categoria(s)")">

@@ -4,18 +4,18 @@
     ViewData["Title"] = "Log de Envios";
 }
 
-<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <div>
+<es-page-header eyebrow="Notificações"
+                titulo="Log de envios"
+                descricao="@($"Histórico de tentativas de envio por canal — {Model.Total} registro(s).")">
+    <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
             <es-breadcrumb-item href="/Notificacoes/Templates">Notificações</es-breadcrumb-item>
             <es-breadcrumb-item>Envios</es-breadcrumb-item>
         </es-breadcrumb>
-        <h2 class="admin-page-title">Log de envios</h2>
-        <p style="margin:4px 0 0; color:var(--text-muted); font-size:13px;">Histórico de tentativas de envio por canal — <strong style="color:var(--text-primary);">@Model.Total</strong> registro(s)</p>
-    </div>
+    </es-page-header-breadcrumb>
     <es-button variant="ghost" icon="download" href="?page=1&status=@Model.Status&canal=@Model.Canal&handler=Export">Exportar CSV</es-button>
-</div>
+</es-page-header>
 
 <es-card padding="md" card-class="mb-4">
     <form method="get" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; align-items:end;">
