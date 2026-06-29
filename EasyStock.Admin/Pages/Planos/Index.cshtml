@@ -112,8 +112,28 @@ else
 
 <!-- Modal Novo Plano -->
 <es-modal id="novo-plano" title="Novo plano" description="Defina nome, limites e preço mensal." size="md">
-    <form method="post" asp-page-handler="Criar" style="display:flex; flex-direction:column; gap:14px;">
+    <form method="post" asp-page-handler="Criar" novalidate style="display:flex; flex-direction:column; gap:14px;"
+          x-data="{ loading: false, erro: '' }"
+          x-on:change="erro = ''"
+          x-on:submit="
+            erro = '';
+            let bloquear = false;
+            try {
+                const f = $event.target;
+                const preco = f.precoMensal ? parseFloat(f.precoMensal.value) : NaN;
+                const limites = ['limiteLojas','limiteUsuarios','limiteProdutos','limiteGeracoesIaMensais']
+                    .map(n => f[n] ? parseInt(f[n].value, 10) : NaN);
+                if (!isNaN(preco) && preco < 0) { erro = 'Preço mensal não pode ser negativo.'; bloquear = true; }
+                else if (limites.some(v => !isNaN(v) && v < -1)) { erro = 'Limites devem ser -1 (∞) ou um valor maior ou igual a zero.'; bloquear = true; }
+            } catch (e) { }
+            if (bloquear) { $event.preventDefault(); } else { loading = true; }
+          ">
         @Html.AntiForgeryToken()
+        @* ADM-06 / #707 NEW-007: banner de erro client-side (preço negativo / limite invalido)
+           espelhando o modal de cupom; o servidor (TryValidatePlano) segue como backstop. *@
+        <div x-show="erro" x-cloak
+             style="background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.40); border-radius:8px; padding:8px 12px; font-size:13px; color:var(--text-primary);"
+             x-text="erro"></div>
         <es-input name="nome" label="Nome" required="true" placeholder="Ex.: Profissional" />
         <es-input name="descricao" label="Descrição" label-optional="true" placeholder="Para empresas em crescimento" />
 
