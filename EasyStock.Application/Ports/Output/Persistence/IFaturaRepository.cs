@@ -61,6 +61,24 @@ public interface IFaturaRepository
         DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Soma <c>Total</c> de faturas de uma <paramref name="origem"/> emitidas no periodo
+    /// [<paramref name="de"/>, <paramref name="ate"/>) (por <c>DataEmissao</c>), excluindo
+    /// Cancelada. Base de <c>mrrFaturado</c> (Origem=Assinatura). Cross-tenant quando
+    /// <paramref name="empresaId"/> nulo (ADR-0037 adendo, issue #754).
+    /// </summary>
+    Task<decimal> SomarTotalEmitidasPorOrigemAsync(
+        DateTime de, DateTime ate, OrigemFatura origem, Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Soma <c>Total</c> de faturas cujo pagamento total (<c>DataPagamentoTotal</c>) ocorreu
+    /// em [<paramref name="de"/>, <paramref name="ate"/>). Base de <c>recebidoMes</c> (caixa
+    /// real do mes, distinto de faturado). Cross-tenant quando <paramref name="empresaId"/>
+    /// nulo (ADR-0037 adendo, issue #754).
+    /// </summary>
+    Task<decimal> SomarRecebidoNoPeriodoAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default);
+
+    /// <summary>
     /// Media de dias de atraso para faturas <c>Vencida</c> ainda em aberto
     /// (DataPagamentoTotal == null). Retorna 0 se nao ha vencidas.
     /// </summary>

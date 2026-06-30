@@ -170,6 +170,40 @@ public sealed class FaturaRepository(EasyStockDbContext db) : IFaturaRepository
         return rows.ToDictionary(r => r.Status, r => r.Sum);
     }
 
+    // ADR-0037 (adendo) / #754 — mrrFaturado: soma Total de faturas de uma origem emitidas no
+    // periodo [de, ate) por DataEmissao, excluindo Cancelada. IgnoreQueryFilters + Where manual
+    // de EmpresaId (mesmo padrao das outras metricas; job/admin rodam sem JWT). (decimal?) cobre
+    // conjunto vazio (SQL SUM retorna NULL).
+    public async Task<decimal> SomarTotalEmitidasPorOrigemAsync(
+        DateTime de, DateTime ate, OrigemFatura origem, Guid? empresaId = null, CancellationToken ct = default)
+    {
+        var q = db.Faturas
+            .IgnoreQueryFilters()
+            .Where(f => f.Origem == origem
+                     && f.DataEmissao >= de && f.DataEmissao < ate
+                     && f.Status != StatusFatura.Cancelada);
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            q = q.Where(f => f.EmpresaId == empresaId.Value);
+
+        return await q.SumAsync(f => (decimal?)f.Total, ct) ?? 0m;
+    }
+
+    // ADR-0037 (adendo) / #754 — recebidoMes: soma Total de faturas cujo pagamento total
+    // (DataPagamentoTotal) ocorreu em [de, ate). Caixa real do mes, distinto de mrrFaturado
+    // (que e por DataEmissao). DataPagamentoTotal != null exclui nao-pagas.
+    public async Task<decimal> SomarRecebidoNoPeriodoAsync(
+        DateTime de, DateTime ate, Guid? empresaId = null, CancellationToken ct = default)
+    {
+        var q = db.Faturas
+            .IgnoreQueryFilters()
+            .Where(f => f.DataPagamentoTotal != null
+                     && f.DataPagamentoTotal >= de && f.DataPagamentoTotal < ate);
+        if (empresaId.HasValue && empresaId.Value != Guid.Empty)
+            q = q.Where(f => f.EmpresaId == empresaId.Value);
+
+        return await q.SumAsync(f => (decimal?)f.Total, ct) ?? 0m;
+    }
+
     public async Task<double> MediaDiasAtrasoVencidasAsync(Guid? empresaId = null, CancellationToken ct = default)
     {
         var hoje = HorarioBrasil.HojeInstanteUtc(); // data civil BRT como midnight UTC
