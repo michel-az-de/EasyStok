@@ -46,6 +46,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<GetDashboardFullUseCase>();
         services.AddScoped<CalcularProjecoesUseCase>();
         services.AddScoped<CalcularReposicaoUseCase>();
+        services.AddScoped<ObterReposicaoUseCase>();
         services.AddScoped<CalcularSazonalidadeUseCase>();
         services.AddScoped<ObterAlertasUseCase>();
         services.AddScoped<ObterDiasAlertaValidadeUseCase>();

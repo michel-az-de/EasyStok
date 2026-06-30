@@ -4,6 +4,7 @@ using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EasyStock.Domain.Reposicao;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 
@@ -346,5 +347,150 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         await SetCachedAsync(cacheKey, (items, totalCount), ProjecaoTtl);
         return (items, totalCount);
+    }
+
+    /// <summary>
+    /// Projeção por-produto da fonte única de reposição (ADR-0039 / issue 748). Em 2 passos
+    /// EF-translatable: agregações no banco -> materializa -> combina em memória partindo de
+    /// TODOS os produtos ativos (LEFT JOIN lógico), de modo que nunca-estocado entra com
+    /// QuantidadeVigente=0. Limiares brutos (produto/categoria/config) vão para a função pura.
+    /// </summary>
+    public async Task<IReadOnlyList<ProdutoReposicaoSnapshot>> GetSnapshotReposicaoAsync(
+        Guid empresaId, Guid? lojaId, int diasHistorico, int leadTimePadraoDias,
+        int? configMinima, int? configCritica, CancellationToken ct = default)
+    {
+        var diasHist = Math.Max(1, diasHistorico);
+        var agora = DateTime.UtcNow;
+        var deVenda = agora.AddDays(-diasHist);
+        var hoje = agora.Date; // "vigente" = lote cuja validade é hoje ou futura.
+
+        // ── Passo 1a: saldo vigente por produto (lotes não vencidos, não bloqueados/descartados) ──
+        var saldoQuery = dbContext.ItensEstoque
+            .AsNoTracking()
+            .Where(i => i.EmpresaId == empresaId
+                && (decimal)i.QuantidadeAtual > 0m
+                && i.Status != StatusItemEstoque.Bloqueado
+                && i.Status != StatusItemEstoque.Descartado
+                && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje));
+        if (lojaId.HasValue)
+            saldoQuery = saldoQuery.Where(i => i.LojaId == lojaId.Value);
+
+        var saldosPorProduto = await saldoQuery
+            .GroupBy(i => i.ProdutoId)
+            .Select(g => new { ProdutoId = g.Key, Total = g.Sum(i => (decimal)i.QuantidadeAtual) })
+            .ToDictionaryAsync(x => x.ProdutoId, x => x.Total, ct);
+
+        // ── Passo 1b: velocidade de venda (Saída + Natureza==Venda) por produto ──
+        // Sum + Min são agregados traduzíveis (sem .Date no SQL); a amplitude do histórico
+        // (dias desde a 1ª venda na janela, que governa a confiança R3) é computada em memória.
+        var vendaQuery = dbContext.MovimentacoesEstoque
+            .AsNoTracking()
+            .Where(m => m.EmpresaId == empresaId
+                && m.Tipo == TipoMovimentacaoEstoque.Saida
+                && m.Natureza == NaturezaMovimentacaoEstoque.Venda
+                && m.DataMovimentacao >= deVenda
+                && m.DataMovimentacao <= agora);
+        if (lojaId.HasValue)
+            vendaQuery = vendaQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+
+        var vendasPorProduto = await vendaQuery
+            .GroupBy(m => m.ProdutoId)
+            .Select(g => new
+            {
+                ProdutoId = g.Key,
+                TotalQtd = g.Sum(m => (decimal)m.Quantidade),
+                PrimeiraVenda = g.Min(m => m.DataMovimentacao)
+            })
+            .ToListAsync(ct);
+
+        var velocidadePorProduto = vendasPorProduto.ToDictionary(
+            x => x.ProdutoId,
+            x => (
+                Velocidade: x.TotalQtd / diasHist,
+                Dias: Math.Max(1, (int)(agora.Date - x.PrimeiraVenda.Date).TotalDays + 1)));
+
+        // ── Passo 1c: lead time / validade média / fornecedor do lote vigente mais recente ──
+        var lotesQuery = dbContext.ItensEstoque
+            .AsNoTracking()
+            .Where(i => i.EmpresaId == empresaId
+                && (decimal)i.QuantidadeAtual > 0m
+                && i.Status != StatusItemEstoque.Bloqueado
+                && i.Status != StatusItemEstoque.Descartado
+                && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje));
+        if (lojaId.HasValue)
+            lotesQuery = lotesQuery.Where(i => i.LojaId == lojaId.Value);
+
+        var lotesRaw = await lotesQuery
+            .GroupJoin(
+                dbContext.Fornecedores.AsNoTracking().Where(f => f.EmpresaId == empresaId),
+                i => i.FornecedorId,
+                f => (Guid?)f.Id,
+                (i, fs) => new { Item = i, Fornecedores = fs })
+            .SelectMany(
+                x => x.Fornecedores.DefaultIfEmpty(),
+                (x, f) => new
+                {
+                    x.Item.ProdutoId,
+                    x.Item.EntradaEm,
+                    x.Item.FornecedorId,
+                    LeadTimeFornecedor = (int?)(f != null ? f.LeadTimeEstimadoDias : null),
+                    Validade = (DateTime?)x.Item.ValidadeEm
+                })
+            .ToListAsync(ct);
+
+        var loteInfoPorProduto = lotesRaw
+            .GroupBy(x => x.ProdutoId)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var recente = g.OrderByDescending(x => x.EntradaEm).First();
+                var comValidade = g.Where(x => x.Validade.HasValue).ToList();
+                int? validadeMedia = comValidade.Count > 0
+                    ? (int)Math.Round(comValidade.Average(x => (x.Validade!.Value.Date - hoje).TotalDays))
+                    : (int?)null;
+                return (LeadTime: recente.LeadTimeFornecedor, FornecedorId: recente.FornecedorId, ValidadeMedia: validadeMedia);
+            });
+
+        // ── Passo 2: parte de TODOS os produtos ativos; nunca-estocado entra com vigente 0 ──
+        var produtos = await dbContext.Produtos
+            .AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.Status == StatusProduto.Ativo)
+            .Select(p => new
+            {
+                p.Id,
+                p.Nome,
+                ProdutoMinima = p.QuantidadeMinima,
+                ProdutoCritica = p.QuantidadeCritica,
+                CategoriaMinima = (int?)(p.Categoria != null ? p.Categoria.QuantidadeMinima : null),
+                CategoriaCritica = (int?)(p.Categoria != null ? p.Categoria.QuantidadeCritica : null)
+            })
+            .ToListAsync(ct);
+
+        var snapshots = new List<ProdutoReposicaoSnapshot>(produtos.Count);
+        foreach (var p in produtos)
+        {
+            var vigente = saldosPorProduto.TryGetValue(p.Id, out var saldo) ? saldo : 0m;
+            var (velocidade, diasHistVel) = velocidadePorProduto.TryGetValue(p.Id, out var v) ? v : (0m, 0);
+            loteInfoPorProduto.TryGetValue(p.Id, out var lote);
+
+            snapshots.Add(new ProdutoReposicaoSnapshot(
+                ProdutoId: p.Id,
+                VariacaoId: null,
+                Nome: p.Nome,
+                QuantidadeVigente: vigente,
+                ProdutoMinima: p.ProdutoMinima,
+                ProdutoCritica: p.ProdutoCritica,
+                CategoriaMinima: p.CategoriaMinima,
+                CategoriaCritica: p.CategoriaCritica,
+                ConfigMinima: configMinima,
+                ConfigCritica: configCritica,
+                VelocidadeMediaDia: velocidade,
+                DiasHistoricoVelocidade: diasHistVel,
+                LeadTimeDias: lote.LeadTime ?? leadTimePadraoDias,
+                TamanhoLote: 1,
+                ValidadeMediaDiasRestantes: lote.ValidadeMedia,
+                FornecedorId: lote.FornecedorId));
+        }
+
+        return snapshots;
     }
 }

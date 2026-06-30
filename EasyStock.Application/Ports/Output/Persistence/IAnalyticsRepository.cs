@@ -1,3 +1,5 @@
+using EasyStock.Domain.Reposicao;
+
 namespace EasyStock.Application.Ports.Output.Persistence
 {
     // DTOs
@@ -444,5 +446,23 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         /// <summary>Novos clientes por mês nos últimos N meses.</summary>
         Task<IReadOnlyList<NovosClientesMes>> GetNovosClientesPorMesAsync(Guid empresaId, int meses = 6, Guid? lojaId = null);
+
+        // ── Reposição (fonte única, ADR-0039) ────────────────────────────
+
+        /// <summary>
+        /// Projeção POR-PRODUTO da fonte única de reposição (ADR-0039 / issue 748). Parte de
+        /// Produtos (FROM Produto) LEFT JOIN agregação de ItensEstoque vigentes, de modo que
+        /// produto nunca-estocado vem com QuantidadeVigente=0 (a função pura o classifica como
+        /// ESGOTADO). Traz os limiares BRUTOS (produto/categoria + os de configuração da loja em
+        /// configMinima/configCritica) para o domínio resolver a hierarquia via LimiarEstoqueResolver.
+        /// </summary>
+        Task<IReadOnlyList<ProdutoReposicaoSnapshot>> GetSnapshotReposicaoAsync(
+            Guid empresaId,
+            Guid? lojaId,
+            int diasHistorico,
+            int leadTimePadraoDias,
+            int? configMinima,
+            int? configCritica,
+            CancellationToken ct = default);
     }
 }

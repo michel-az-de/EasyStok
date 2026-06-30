@@ -4,6 +4,7 @@ using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EasyStock.Domain.Reposicao;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
@@ -149,6 +150,11 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<(IReadOnlyList<ProjecaoRuptura> Items, int TotalCount)> GetProjecaoRupturaAsync(
             Guid empresaId, int diasHistorico = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
             => _estoque.GetProjecaoRupturaAsync(empresaId, diasHistorico, page, pageSize, lojaId);
+
+        public Task<IReadOnlyList<ProdutoReposicaoSnapshot>> GetSnapshotReposicaoAsync(
+            Guid empresaId, Guid? lojaId, int diasHistorico, int leadTimePadraoDias,
+            int? configMinima, int? configCritica, CancellationToken ct = default)
+            => _estoque.GetSnapshotReposicaoAsync(empresaId, lojaId, diasHistorico, leadTimePadraoDias, configMinima, configCritica, ct);
 
     }
 }
