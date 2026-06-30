@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
@@ -234,7 +235,7 @@ public class CaixaUseCasesTests
     public async Task RegistrarMovimento_DeveLancarValidation_QuandoTipoNaoEEntradaNemSaida(string tipo)
     {
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var act = () => useCase.ExecuteAsync(
@@ -250,7 +251,7 @@ public class CaixaUseCasesTests
     public async Task RegistrarMovimento_DeveLancarValidation_QuandoValorMenorOuIgualAZero(decimal valor)
     {
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var act = () => useCase.ExecuteAsync(
@@ -270,7 +271,7 @@ public class CaixaUseCasesTests
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var act = () => useCase.ExecuteAsync(
@@ -289,7 +290,7 @@ public class CaixaUseCasesTests
             .Returns((FechamentoCaixa?)null);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var result = await useCase.ExecuteAsync(
@@ -316,7 +317,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Saída de R$500 num caixa com R$100 → bloqueia (FIN-003).
@@ -340,7 +341,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns(0m);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         var result = await useCase.ExecuteAsync(
@@ -359,7 +360,7 @@ public class CaixaUseCasesTests
         _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Saída web sem método/descrição → bloqueia (rastro de auditoria, FIN-003).
@@ -377,7 +378,7 @@ public class CaixaUseCasesTests
         _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Mobile promove fato já registrado no device — não passa pela guarda de saldo (FIN-003).
@@ -407,7 +408,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
 
         var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
-            new ObterCaixaDiaUseCase(_repo),
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Saída de R$500 contra saldo esperado R$4.514 (100 + 4414) → deve PERMITIR.
@@ -529,7 +530,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalVendasNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
         _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null).Returns(0m);
 
-        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var useCase = new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo));
         var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
 
         result.Aberto.Should().BeTrue();
@@ -554,7 +555,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(0m);
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
 
-        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var useCase = new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo));
         var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
 
         result.Aberto.Should().BeTrue();
@@ -574,7 +575,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalVendasDoDiaAsync(empresaId, ontem, null).Returns(0m);
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, ontem, null).Returns(0m);
 
-        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var useCase = new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo));
         var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, ontem));
 
         result.Aberto.Should().BeFalse();
@@ -594,7 +595,7 @@ public class CaixaUseCasesTests
         _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(0m);
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
 
-        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var useCase = new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo));
         var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
 
         result.Fechado.Should().BeTrue();
@@ -613,12 +614,41 @@ public class CaixaUseCasesTests
         _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(0m);
         _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
 
-        var useCase = new ObterCaixaDiaUseCase(_repo);
+        var useCase = new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo));
         var result = await useCase.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
 
         result.Aberto.Should().BeFalse();
         result.AberturaPendenteCrossDay.Should().BeFalse();
         result.AbertoDesde.Should().BeNull();
         await _repo.Received(1).GetAberturaPendenteAsync(empresaId, null);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // CaixaSaldoCalculator — fonte ÚNICA do saldo (BUG-1)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task CaixaSaldoCalculator_SomaVendas_NoSaldoEsperado()
+    {
+        // Regressão BUG-1: o card "CAIXA" do Dashboard derivava o saldo SEM somar as Vendas
+        // do período, divergindo da tela /caixa exatamente pelo total de vendas. Agora ambas
+        // as telas consomem este calculator — as Vendas SEMPRE entram no saldo.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(new[]
+        {
+            MovimentoCaixa.Criar(empresaId, "abertura", 5454m),
+            MovimentoCaixa.Criar(empresaId, "saida", 1000m),
+        });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, hoje, null).Returns(60m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(0m);
+
+        var b = await new CaixaSaldoCalculator(_repo).CalcularAsync(empresaId, hoje);
+
+        b.TotalVendas.Should().Be(60m);
+        // abertura 5454 − saída 1000 + vendas 60 = 4514 (valor exibido em /caixa).
+        // O bug fazia o Dashboard mostrar 4454 (4514 − 60), por omitir as vendas.
+        b.SaldoEsperado.Should().Be(4514m);
     }
 }

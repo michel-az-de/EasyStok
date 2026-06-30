@@ -1,6 +1,8 @@
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
+using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
@@ -13,7 +15,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -136,7 +138,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
             Lote(StatusItemEstoque.Ok, 50));
         await dbContext.SaveChangesAsync();
 
-        var analytics = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var analytics = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
         var estoqueRepo = new Infra.Postgre.Repositories.ItemEstoqueRepository(dbContext);
 
         var resumo = await analytics.GetDashboardResumoAsync(empresaId, 30);
@@ -152,7 +154,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -225,7 +227,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -303,7 +305,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -373,7 +375,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -428,7 +430,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -483,7 +485,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -538,7 +540,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
@@ -592,7 +594,7 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext);
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
 
         var empresaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();

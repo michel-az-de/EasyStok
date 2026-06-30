@@ -20,6 +20,7 @@ using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.RemoverItemLote;
@@ -98,6 +99,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AlterarAgendamentoPedidoUseCase>();
 
         // Onda P3 — Caixa
+        // Fonte ÚNICA do saldo esperado (consumida por /caixa e pelo Dashboard/Admin via
+        // AnalyticsRepository.ResumoDia) — elimina divergência de saldo entre telas (BUG-1).
+        services.AddScoped<ICaixaSaldoCalculator, CaixaSaldoCalculator>();
         services.AddScoped<AbrirCaixaUseCase>();
         services.AddScoped<FecharCaixaUseCase>();
         services.AddScoped<RegistrarMovimentoCaixaUseCase>();

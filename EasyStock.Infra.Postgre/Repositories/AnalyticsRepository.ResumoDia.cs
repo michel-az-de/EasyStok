@@ -59,28 +59,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 // Senao: ultimo evento foi fechamento de outro dia => "sem caixa hoje"
             }
 
-            // Saldo: desde a abertura (cross-day) se aberta, OU desde hoje 0h
+            // saldoInicio: desde a abertura (cross-day) se aberta, OU desde hoje 0h.
+            // Usado abaixo só para delimitar a janela do Pix do dia (pagamentos de pedido).
             var saldoInicio = aberturaEm ?? hojeIni;
 
-            var movsSaldo = await dbContext.MovimentosCaixa.AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId
-                         && (lojaId == null || m.LojaId == lojaId)
-                         && m.DataMovimento >= saldoInicio && m.DataMovimento < hojeFim
-                         && m.EstornadoEm == null)
-                .Select(m => new { m.Tipo, m.Valor })
-                .ToListAsync();
-
-            decimal saldoCaixa = 0m;
-            foreach (var m in movsSaldo)
-            {
-                saldoCaixa += m.Tipo switch
-                {
-                    "abertura" => +m.Valor,
-                    "entrada" => +m.Valor,
-                    "saida" => -m.Valor,
-                    _ => 0m
-                };
-            }
+            // Saldo esperado do caixa: fonte ÚNICA (CaixaSaldoCalculator), a MESMA consumida
+            // pela tela /caixa. Antes este bloco somava abertura+entrada-saída (+pagamentos) e
+            // OMITIA as Vendas do período, divergindo do /caixa pelo total de vendas (BUG-1).
+            decimal saldoCaixa = (await caixaSaldo.CalcularAsync(empresaId, hojeBrt, lojaId)).SaldoEsperado;
 
             // ── Pedidos ────────────────────────────────────────────────────
             // Entregues hoje (= vendas consolidadas do dia)
@@ -107,8 +93,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             var pedidosPendentes = pendentes.Count;
             var valorPedidosPendentes = pendentes.Sum(t => (decimal)t);
 
-            // ── Pagamentos: somam ao saldo + Pix do dia ─────────────────
+            // ── Pix do dia ──────────────────────────────────────────────
             // PedidoPagamento nao e DbSet — acessa via navigation Pedido.Pagamentos.
+            // Os pagamentos JÁ entram no saldoCaixa via CaixaSaldoCalculator acima; esta query
+            // serve só para destacar o Pix recebido hoje (não soma de novo ao saldo).
             var pagamentosNoSaldo = await dbContext.Pedidos.AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId
                          && (lojaId == null || p.LojaId == lojaId))
@@ -116,7 +104,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(pp => pp.PagoEm >= saldoInicio && pp.PagoEm < hojeFim)
                 .Select(pp => new { pp.PagoEm, pp.Metodo, pp.Valor })
                 .ToListAsync();
-            saldoCaixa += pagamentosNoSaldo.Sum(p => p.Valor);
 
             // Pix recebidos hoje — SO PedidoPagamento (decisao explicita pra evitar
             // double-count com MovimentoCaixa.Metodo=pix). Considera apenas hoje

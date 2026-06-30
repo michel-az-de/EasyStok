@@ -2,6 +2,7 @@ using EasyStock.Application.Common;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AbrirCaixa;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Domain.Entities;
@@ -170,7 +171,7 @@ public class CaixaFechamentoIntegrationTests(PostgreSqlDatabaseFixture fixture)
             (await repo.GetAberturaPendenteAsync(empresaId, lojaId))
                 .Should().BeNull("a sessão foi resolvida (marcador de fechamento é o último evento)");
 
-            var dia = await new ObterCaixaDiaUseCase(repo)
+            var dia = await new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(repo))
                 .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, lojaId));
             dia.AberturaPendenteCrossDay.Should().BeFalse("a sessão de ontem não está mais pendente");
             dia.Aberto.Should().BeFalse();

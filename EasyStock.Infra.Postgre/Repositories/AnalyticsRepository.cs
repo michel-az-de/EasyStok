@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
@@ -10,7 +11,10 @@ namespace EasyStock.Infra.Postgre.Repositories
     /// Implements aggregated analytics queries against PostgreSQL with optional Redis distributed cache (5â€“10 min TTL).
     /// Delegates to specialised query classes; store-intelligence methods live here.
     /// </summary>
-    public sealed partial class AnalyticsRepository(EasyStockDbContext dbContext, IDistributedCache? cache = null)
+    public sealed partial class AnalyticsRepository(
+        EasyStockDbContext dbContext,
+        ICaixaSaldoCalculator caixaSaldo,
+        IDistributedCache? cache = null)
         : IAnalyticsRepository
     {
         // â”€â”€ Specialised query objects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

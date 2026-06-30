@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
@@ -1031,7 +1032,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await using (var ctx = fixture.CreateDbContext())
         {
             ctx.SetMobileTenantContext(empresaId);
-            var analytics = new AnalyticsRepository(ctx);
+            var analytics = new AnalyticsRepository(ctx, new CaixaSaldoCalculator(new CaixaRepository(ctx)));
             var dashboard = await analytics.GetDashboardResumoAsync(empresaId, periodoDias: 30);
 
             dashboard.QuantidadeTotalEmEstoque.Should().Be(6, "dashboard deve mostrar 6 unidades restantes");
@@ -1043,7 +1044,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await using (var ctx = fixture.CreateDbContext())
         {
             ctx.SetMobileTenantContext(empresaId);
-            var analytics = new AnalyticsRepository(ctx);
+            var analytics = new AnalyticsRepository(ctx, new CaixaSaldoCalculator(new CaixaRepository(ctx)));
             var movs = await analytics.GetMovimentacoesResumoAsync(
                 empresaId,
                 de: DateTime.UtcNow.AddDays(-30),
@@ -1058,7 +1059,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await using (var ctx = fixture.CreateDbContext())
         {
             ctx.SetMobileTenantContext(empresaId);
-            var analytics = new AnalyticsRepository(ctx);
+            var analytics = new AnalyticsRepository(ctx, new CaixaSaldoCalculator(new CaixaRepository(ctx)));
             var receita = await analytics.GetReceitaPorPeriodoAsync(empresaId, meses: 12);
 
             receita.Should().Contain(r => r.Ano == dataSaida.Year && r.Mes == dataSaida.Month && r.TotalItensVendidos == 4);
