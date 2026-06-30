@@ -61,19 +61,14 @@
 <div class="ds-enter">
 @if (Model.TodasApisFalharam)
 {
-    <div class="ws ds-api-error mb-6" role="alert">
-        <div class="flex items-start gap-3">
-            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
-            </svg>
-            <div class="flex-1">
-                <h2 class="font-bold text-slate-800">Não conseguimos carregar seus dados agora</h2>
-                <p class="text-sm text-slate-600 mt-1">Pode ser instabilidade na conexão ou no servidor. Tente recarregar a página em alguns segundos.</p>
-                <button type="button" onclick="window.location.reload()" class="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
-                    Recarregar
-                </button>
-            </div>
-        </div>
+    @* Eixo B (issue 753): estado de erro padronizado via _ErrorState (mensagem amigavel + retry). *@
+    <div class="ws ds-api-error mb-6">
+        @await Html.PartialAsync("_ErrorState", null, new ViewDataDictionary(ViewData)
+        {
+            ["ErrorTitle"] = "Não conseguimos carregar seus dados agora",
+            ["ErrorDescription"] = "Pode ser instabilidade na conexão ou no servidor. Tente recarregar a página em alguns segundos.",
+            ["ErrorRetryText"] = "Recarregar"
+        })
     </div>
 }
 else if (Model.ResumoApiFalhou)

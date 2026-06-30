@@ -133,7 +133,7 @@
                 </div>
             </div>
 
-            <div x-show="resultado.length === 0 && !gerando"
+            <div x-show="resultado.length === 0 && !gerando && !erro"
                  class="h-64 flex items-center justify-center" style="color: var(--text-muted);">
                 <div class="text-center">
                     <es-icon name="sparkles" class="mx-auto mb-3" style="width:40px; height:40px;"></es-icon>
@@ -150,6 +150,16 @@
                     </svg>
                     <p class="text-sm">Gerando...</p>
                 </div>
+            </div>
+
+            @* Eixo B (issue 753): estado de erro reativo via _ErrorState — nao polui o resultado, retry re-tenta. *@
+            <div x-show="erro" x-cloak class="h-64 flex items-center justify-center">
+                @await Html.PartialAsync("_ErrorState", null, new ViewDataDictionary(ViewData)
+                {
+                    ["ErrorTitle"] = "Não foi possível gerar o anúncio",
+                    ["ErrorDescriptionBind"] = "erro",
+                    ["ErrorRetryClick"] = "tentarNovamente()"
+                })
             </div>
 
             <div x-show="resultado.length > 0">

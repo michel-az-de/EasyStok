@@ -1,0 +1,42 @@
+@{
+    // Estado de ERRO padronizado (Eixo B, issue 753). Mesmo padrao ViewData do _EmptyState.
+    // Mensagem amigavel (sem jargao) + botao "Tentar de novo". A11y: role=alert + aria-live;
+    // icone + rotulo textual (nao depende so de cor). Retry flexivel:
+    //   - server-side: ErrorRetryOnclick (JS cru; default window.location.reload())
+    //   - reativo: ErrorRetryClick (expressao Alpine p/ @click)
+    // Descricao estatica (ErrorDescription) OU vinculada a estado Alpine (ErrorDescriptionBind -> x-text).
+    var eTitle = ViewData["ErrorTitle"] as string ?? "Não foi possível carregar";
+    var eDesc = ViewData["ErrorDescription"] as string
+        ?? "Pode ser instabilidade na conexão ou no servidor. Tente de novo em alguns segundos.";
+    var eDescBind = ViewData["ErrorDescriptionBind"] as string;
+    var eRetryText = ViewData["ErrorRetryText"] as string ?? "Tentar de novo";
+    var eOnclick = ViewData["ErrorRetryOnclick"] as string;
+    var eClick = ViewData["ErrorRetryClick"] as string;
+    var eWrap = ViewData["ErrorWrapperClass"] as string;
+    var btnClass = "mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold "
+        + "rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors";
+}
+<div class="text-center py-10 @eWrap" role="alert" aria-live="assertive" style="color: var(--text-muted);">
+    <es-icon name="alert-triangle" class="mx-auto mb-3" style="width:44px; height:44px; color: var(--crit-600);" aria-hidden="true"></es-icon>
+    <p class="font-semibold" style="color: var(--text-secondary);">@eTitle</p>
+    @if (!string.IsNullOrEmpty(eDescBind))
+    {
+        <p class="text-sm mt-1 max-w-sm mx-auto" style="color: var(--text-muted);" x-text="@eDescBind"></p>
+    }
+    else
+    {
+        <p class="text-sm mt-1 max-w-sm mx-auto" style="color: var(--text-muted);">@eDesc</p>
+    }
+    @if (!string.IsNullOrEmpty(eClick))
+    {
+        <button type="button" @@click="@eClick" class="@btnClass">
+            <es-icon name="refresh-cw" class="es-icon--sm" aria-hidden="true"></es-icon> @eRetryText
+        </button>
+    }
+    else
+    {
+        <button type="button" onclick="@(eOnclick ?? "window.location.reload()")" class="@btnClass">
+            <es-icon name="refresh-cw" class="es-icon--sm" aria-hidden="true"></es-icon> @eRetryText
+        </button>
+    }
+</div>

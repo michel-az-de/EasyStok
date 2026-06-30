@@ -63,14 +63,17 @@ function anuncioResultado() {
         gerando: false,
         copiado: false,
         salvando: false,
+        erro: '',
         _produtoId: '',
         _instrucoes: '',
         _source: null,
+        _lastDetail: null,
 
         init() {
             window.addEventListener('anuncio-gerar', (e) => {
                 this._produtoId = e.detail.produtoId;
                 this._instrucoes = [e.detail.canal, e.detail.tom, e.detail.foco, e.detail.contexto].filter(Boolean).join('. ');
+                this._lastDetail = e.detail;
                 this.iniciarStream(e.detail);
             });
         },
@@ -82,6 +85,7 @@ function anuncioResultado() {
             }
 
             this.resultado = '';
+            this.erro = '';
             this.gerando = true;
 
             const params = new URLSearchParams({
@@ -95,7 +99,7 @@ function anuncioResultado() {
             esFetch(`/anuncios/gerar?${params}`)
                 .then(res => {
                     if (!res.ok) {
-                        this.resultado = 'Erro ao gerar anúncio. Tente novamente.';
+                        this.erro = 'Não foi possível gerar o anúncio agora. Tente de novo em instantes.';
                         this.gerando = false;
                         window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                         return;
@@ -129,7 +133,8 @@ function anuncioResultado() {
                             }
                             read();
                         }).catch(() => {
-                            this.resultado = 'Erro ao ler resposta do servidor. Tente novamente.';
+                            this.resultado = '';
+                            this.erro = 'A conexão caiu durante a geração. Tente de novo.';
                             this.gerando = false;
                             window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                         });
@@ -138,7 +143,7 @@ function anuncioResultado() {
                     read();
                 })
                 .catch(() => {
-                    this.resultado = 'Erro de conexão. Verifique sua internet e tente novamente.';
+                    this.erro = 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
                     this.gerando = false;
                     window.dispatchEvent(new CustomEvent('anuncio-concluido'));
                 });
@@ -146,6 +151,12 @@ function anuncioResultado() {
             window.addEventListener('anuncio-concluido', () => {
                 window.dispatchEvent(new CustomEvent('anuncio-finalizado'));
             }, { once: true });
+        },
+
+        tentarNovamente() {
+            if (this._lastDetail) {
+                window.dispatchEvent(new CustomEvent('anuncio-gerar', { detail: this._lastDetail }));
+            }
         },
 
         copiar() {
