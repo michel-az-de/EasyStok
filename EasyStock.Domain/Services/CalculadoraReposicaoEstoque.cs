@@ -14,7 +14,7 @@ namespace EasyStock.Domain.Services
         /// </summary>
         public Quantidade CalcularQuantidadeReposicao(
             Quantidade quantidadeAtual,
-            int consumoMedioDiario,
+            decimal consumoMedioDiario,
             int tempoReposicaoDias,
             int estoqueSegurancaDias,
             int tamanhoLote = 1)
@@ -30,8 +30,9 @@ namespace EasyStock.Domain.Services
 
             if (necessario <= 0) return Quantidade.Zero;
 
-            // Arredonda para cima até o próximo múltiplo do tamanho do lote
-            var unidades = ((necessario + tamanhoLote - 1) / tamanhoLote) * tamanhoLote;
+            // Arredonda para cima até o próximo múltiplo do tamanho do lote. Math.Ceiling sobre
+            // decimal (o truque inteiro (n+k-1)/k*k não vale com divisão decimal, que não trunca).
+            var unidades = Math.Ceiling(necessario / tamanhoLote) * tamanhoLote;
 
             return Quantidade.From(unidades);
         }

@@ -15,17 +15,31 @@ public static class LimiarEstoqueResolver
         Produto? produto,
         Categoria? categoria,
         ConfiguracaoLoja? configuracaoLoja)
+        => Resolver(
+            produto?.QuantidadeMinima, produto?.QuantidadeCritica,
+            categoria?.QuantidadeMinima, categoria?.QuantidadeCritica,
+            configuracaoLoja?.QuantidadeMinimaPadrao, configuracaoLoja?.QuantidadeCriticaPadrao);
+
+    /// <summary>
+    /// Overload por valores brutos (sem entidades): mesma hierarquia e mesma normalização.
+    /// Usado pela projeção de reposição (ADR-0039) para resolver o limiar AO VIVO e pela
+    /// função pura <see cref="AnalisadorReposicao"/>, mantendo paridade com o SQL.
+    /// </summary>
+    public static Limiares Resolver(
+        int? produtoMinima, int? produtoCritica,
+        int? categoriaMinima, int? categoriaCritica,
+        int? configMinima, int? configCritica)
     {
         var minima =
-            produto?.QuantidadeMinima
-            ?? categoria?.QuantidadeMinima
-            ?? configuracaoLoja?.QuantidadeMinimaPadrao
+            produtoMinima
+            ?? categoriaMinima
+            ?? configMinima
             ?? OperacionalDefaults.QuantidadeMinima;
 
         var critica =
-            produto?.QuantidadeCritica
-            ?? categoria?.QuantidadeCritica
-            ?? configuracaoLoja?.QuantidadeCriticaPadrao
+            produtoCritica
+            ?? categoriaCritica
+            ?? configCritica
             ?? OperacionalDefaults.QuantidadeCritica;
 
         // Garantia de invariante: critica nunca pode ser >= minima.
