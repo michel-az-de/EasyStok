@@ -65,7 +65,12 @@ public static class MenuDefinition
         }),
         new MenuGroup("producao-estoque", "Produção e estoque", "boxes", new[]
         {
-            new MenuItem("lotes-validade", "Lotes e validade", "layers", "/lotes",
+            // Href aponta p/ /estoque?status=vencido (nao /lotes): o badge BadgeLotesVencidos
+            // conta ItemEstoque vencidos com saldo (visao Posicao de estoque), enquanto /lotes
+            // lista lotes de producao (em_producao/finalizado) — clicar o alerta caia em tela
+            // vazia ("Nenhum lote"). Mesmo href ja usado no Dashboard (alerta de vencidos).
+            // ActiveKeys mantem "Lotes" pra nao orfanizar o alias emitido pelo LotesController.
+            new MenuItem("lotes-validade", "Lotes e validade", "layers", "/estoque?status=vencido",
                 new[] { "Lotes", "LotesMobile" }, BadgeKey: BadgeLotesVencidos),
             new MenuItem("posicao-estoque", "Posição de estoque", "clipboard-list", "/estoque",
                 new[] { "Estoque" }, BadgeKey: BadgeProdutosCriticos),
