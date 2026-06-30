@@ -63,3 +63,49 @@ aplicada faz TODA query 500. A leitura NAO entra no mesmo deploy que a migration
 2. [ ] Job mensal de captura (idempotente por Ano/Mes).
 3. [ ] Endpoint/projeção para DASH-001 (atual + anterior) e DASH-005 (ultimos 6).
 4. [ ] FE: delta no card de MRR; sparkline com `<es-sparkline>` (ja existe).
+
+---
+
+## Adendo (2026-06-30): receita contratado/faturado/recebido ao vivo + emissao recorrente
+
+**Status do adendo:** Proposed. **Refs:** #754 (issue umbrella), #700, #627, #274.
+**Origem:** relatorio de diagnostico Fase A' (2026-06-30).
+
+### Contexto adicional
+
+O `MrrSnapshot` (acima) cobre a SERIE HISTORICA. Faltava a distincao AO VIVO entre receita
+contratada e realizada, e a emissao de fatura por ciclo. Medicao confirmou (arquivo:linha):
+MRR = preco de catalogo em 3 implementacoes divergentes (`AdminDashboardQueries.cs:20-22`,
+`AssinaturaEmpresaRepository.SomarPrecoMensalAtivasAsync`, `FleetOperationQueries.cs:144-145`);
+idempotencia de fatura por-assinatura (`FaturaSaasFactory.cs:105`), nao por ciclo, e a Fatura
+nao tem competencia; `AdminDashboardQueries` agrega cross-tenant SEM
+`UseRowLevelSecurityBypass()` (truncavel em prod sob role sem BYPASSRLS, ver incidente
+2026-05-22), enquanto `FleetOperationQueries.cs:23` usa o bypass.
+
+### Decisao
+
+1. Tres metricas canonicas ao vivo, fonte unica = a DEFINICAO (predicado compartilhado):
+   - `mrrContratado` = SUM(`Plano.PrecoMensal`) das assinaturas Ativa.
+   - `mrrFaturado` = SUM(`Fatura.Total`) de `Origem=Assinatura` no mes (por `DataEmissao`).
+   - `recebidoMes` = SUM por `Fatura.DataPagamentoTotal` no mes (caixa real, nao por emissao).
+2. A agregacao cross-tenant roda na camada Infra sob `db.UseRowLevelSecurityBypass()`
+   (espelha `FleetOperationQueries`), nao em Application puro.
+3. Competencia na Fatura: `DataCompetencia DateTime?` (padrao `ContaPagar`/`ContaReceber`),
+   derivando `(Ano,Mes)` para casar com `MrrSnapshot`. Idempotencia por competencia com indice
+   unico parcial `WHERE Origem='Assinatura' AND Status<>'Cancelada'` + captura de 23505
+   (espelha `IdempotencyKeyRepository`).
+4. Emissao recorrente DESACOPLADA de cobranca: job invoice-only sem Efi/Pix, flag global
+   `EnableRecorrenciaFaturamentoJob` (default false) + dry-run. Cobranca real fica em #627/#700.
+
+### Consequencia para o MrrSnapshot
+
+Quando o job de captura mensal for implementado, ele chama o read-model de receita unico:
+`MrrAtivo <- mrrContratado`; `ReceitaRealizada <- recebidoMes`. Para historico de FATURADO,
+adicionar coluna `MrrFaturado` ao `MrrSnapshot` (a tabela proposta acima nao a possui).
+
+### Itens de acao do adendo
+
+5. [ ] Read-model de receita (Infra, sob RLS bypass) com as 3 metricas, fonte unica.
+6. [ ] Corrigir RLS cross-tenant de `AdminDashboardQueries` + teste de runtime.
+7. [ ] Migration `Fatura.DataCompetencia` + indice unico parcial; emissao recorrente idempotente.
+8. [ ] (futuro) Coluna `MrrFaturado` no `MrrSnapshot` para historico do realizado.
