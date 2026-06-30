@@ -33,6 +33,13 @@ public class AtualizarConfiguracaoLojaUseCase(
         var nova = configuracao is null;
         configuracao ??= Domain.Entities.ConfiguracaoLoja.CriarPadrao(loja.Id);
 
+        // R6 (ADR-0039): bloquear persistir nível crítico >= mínimo. Valida o estado FINAL
+        // (config atual + patch), cobrindo o patch parcial que o validator de comando não enxerga.
+        var minimaFinal = command.QuantidadeMinimaPadrao ?? configuracao.QuantidadeMinimaPadrao;
+        var criticaFinal = command.QuantidadeCriticaPadrao ?? configuracao.QuantidadeCriticaPadrao;
+        if (criticaFinal >= minimaFinal)
+            throw new UseCaseValidationException("O nível crítico deve ser menor que o mínimo de estoque.");
+
         configuracao.Atualizar(
             command.DiasAlertaValidade,
             command.DiasAlertaParado,
