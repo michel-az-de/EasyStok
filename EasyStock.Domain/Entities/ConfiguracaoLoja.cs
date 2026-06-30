@@ -10,6 +10,10 @@ public class ConfiguracaoLoja
     public int DiasAlertaParado { get; set; } = OperacionalDefaults.DiasAlertaParado;
     public int QuantidadeMinimaPadrao { get; set; } = OperacionalDefaults.QuantidadeMinima;
     public int QuantidadeCriticaPadrao { get; set; } = OperacionalDefaults.QuantidadeCritica;
+
+    // Parâmetros da política de reposição (ADR-0039). Configuráveis por loja; defaults a validar.
+    public int DiasCoberturaAlvo { get; set; } = OperacionalDefaults.DiasCoberturaAlvo;
+    public int LeadTimePadraoDias { get; set; } = OperacionalDefaults.LeadTimePadraoDias;
     public bool NotificarEstoqueCritico { get; set; } = true;
     public bool NotificarValidade { get; set; } = true;
     public bool NotificarParado { get; set; } = true;
@@ -60,7 +64,9 @@ public class ConfiguracaoLoja
         bool? gerarContaReceberAutomaticaDePedido = null,
         bool? gerarContaPagarAutomaticaDePedidoFornecedor = null,
         string? statusPedidoQueGeraContaReceber = null,
-        bool? kdsHabilitado = null)
+        bool? kdsHabilitado = null,
+        int? diasCoberturaAlvo = null,
+        int? leadTimePadraoDias = null)
     {
         if (diasAlertaValidade.HasValue) DiasAlertaValidade = diasAlertaValidade.Value;
         if (diasAlertaParado.HasValue) DiasAlertaParado = diasAlertaParado.Value;
@@ -77,6 +83,8 @@ public class ConfiguracaoLoja
         if (gerarContaPagarAutomaticaDePedidoFornecedor.HasValue) GerarContaPagarAutomaticaDePedidoFornecedor = gerarContaPagarAutomaticaDePedidoFornecedor.Value;
         if (!string.IsNullOrWhiteSpace(statusPedidoQueGeraContaReceber)) StatusPedidoQueGeraContaReceber = statusPedidoQueGeraContaReceber.Trim();
         if (kdsHabilitado.HasValue) KdsHabilitado = kdsHabilitado.Value;
+        if (diasCoberturaAlvo.HasValue) DiasCoberturaAlvo = diasCoberturaAlvo.Value;
+        if (leadTimePadraoDias.HasValue) LeadTimePadraoDias = leadTimePadraoDias.Value;
         AlteradoEm = DateTime.UtcNow;
     }
 
@@ -86,6 +94,8 @@ public class ConfiguracaoLoja
         DiasAlertaParado = OperacionalDefaults.DiasAlertaParado;
         QuantidadeMinimaPadrao = OperacionalDefaults.QuantidadeMinima;
         QuantidadeCriticaPadrao = OperacionalDefaults.QuantidadeCritica;
+        DiasCoberturaAlvo = OperacionalDefaults.DiasCoberturaAlvo;
+        LeadTimePadraoDias = OperacionalDefaults.LeadTimePadraoDias;
         NotificarEstoqueCritico = true;
         NotificarValidade = true;
         NotificarParado = true;

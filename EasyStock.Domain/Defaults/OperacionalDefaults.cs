@@ -20,6 +20,20 @@ public static class OperacionalDefaults
     public const int    DiasVencimentoProximo = 7;
     public const int    QuantidadeMinima   = 5;
     public const int    QuantidadeCritica  = 2;
+
+    /// <summary>
+    /// Dias de cobertura-alvo da sugestão de reposição (ADR-0039 / issue 748): a
+    /// quantidade sugerida cobre o lead time mais estes dias de estoque de segurança.
+    /// PREMISSA DE NEGÓCIO A VALIDAR: 7 é um ponto de partida, ainda não medido.
+    /// </summary>
+    public const int    DiasCoberturaAlvo  = 7;
+
+    /// <summary>
+    /// Lead time padrão (dias) usado quando o produto não tem fornecedor com
+    /// LeadTimeEstimadoDias vinculado (ADR-0039). PREMISSA DE NEGÓCIO A VALIDAR.
+    /// </summary>
+    public const int    LeadTimePadraoDias = 7;
+
     public const string Moeda              = "BRL";
     public const string Timezone           = "America/Sao_Paulo";
 
