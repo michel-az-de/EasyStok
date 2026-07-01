@@ -1,54 +1,28 @@
-using System.Diagnostics;
-using EasyStock.Application.Configuration;
+using EasyStock.Application.UseCases.Analytics.Reposicao;
 
 namespace EasyStock.Application.UseCases.Inteligencia.EstoqueBaixo;
 
 public class ObterEstoqueBaixoUseCase(
-    IItemEstoqueRepository itemEstoqueRepository,
-    IConfiguracaoLojaRepository configuracaoRepository,
-    IEasyStockConfiguracoes config,
+    ObterReposicaoUseCase obterReposicao,
     ILogger<ObterEstoqueBaixoUseCase> logger)
 {
     public async Task<(IEnumerable<EstoqueBaixoResult> Items, int Total)> ExecuteAsync(ObterEstoqueBaixoCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
-        var stopwatch = Stopwatch.StartNew();
+        // Fonte única (ADR-0039 / issue 748): "estoque baixo" = itens elegíveis para reposição
+        // (mesma projeção por-produto), no lugar do predicado por-lote GetEstoqueBaixoAsync (qty<=limite).
+        var todos = await obterReposicao.ExecuteAsync(
+            new ObterReposicaoCommand(cmd.EmpresaId, cmd.LojaId)).ConfigureAwait(false);
 
-        var configuracao = cmd.LojaId.HasValue
-            ? await configuracaoRepository.GetByLojaIdAsync(cmd.LojaId.Value).ConfigureAwait(false)
-            : null;
-
-        var limiteEfetivo = cmd.Limite
-            ?? configuracao?.QuantidadeMinimaPadrao
-            ?? config.LimiteEstoqueBaixoDefault;
-
-        var (items, totalCount) = await itemEstoqueRepository.GetEstoqueBaixoAsync(
-            cmd.EmpresaId, limiteEfetivo, cmd.Page, cmd.PageSize, cmd.LojaId).ConfigureAwait(false);
-
-        stopwatch.Stop();
-
-        var resultados = items.Select(item =>
-        {
-            dynamic dinamico = item;
-            return new EstoqueBaixoResult(
-                (Guid)dinamico.Id,
-                (Guid)dinamico.ProdutoId,
-                (string?)dinamico.Produto?.Nome ?? (string?)dinamico.CodigoInterno,
-                (string?)dinamico.CodigoInterno,
-                (decimal)dinamico.QuantidadeAtual,
-                (int)limiteEfetivo);
-        });
+        var mapeados = todos.Select(i => new EstoqueBaixoResult(
+            Guid.Empty, i.ProdutoId, i.Nome, null, i.QuantidadeVigente, i.NivelMinimo)).ToList();
+        var pagina = mapeados.Skip((cmd.Page - 1) * cmd.PageSize).Take(cmd.PageSize).ToList();
 
         logger.LogInformation(
-            "Estoque baixo obtido em {Ms}ms para empresa {EmpresaId} | "
-            + "Limite: {Limite}, Loja: {LojaId}, Total: {Total}",
-            stopwatch.ElapsedMilliseconds,
-            cmd.EmpresaId,
-            limiteEfetivo,
-            cmd.LojaId ?? Guid.Empty,
-            totalCount);
+            "Estoque baixo (fonte unica) para empresa {EmpresaId}, loja {LojaId}: {Total} itens.",
+            cmd.EmpresaId, cmd.LojaId ?? Guid.Empty, mapeados.Count);
 
-        return (resultados, totalCount);
+        return (pagina, mapeados.Count);
     }
 }
