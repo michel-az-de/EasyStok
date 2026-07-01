@@ -73,7 +73,7 @@
 @* Hero assimetrico: tile-feature de receita (Fraunces) + rail de indicadores secundários *@
 <section class="deck-hero" aria-label="Receita e indicadores secundários">
     <a class="deck-panel deck-feature deck-rise is-interactive" href="/Faturas" style="--deck-i:2; text-decoration:none;">
-        <div class="deck-eyebrow">Receita mensal recorrente</div>
+        <div class="deck-eyebrow">Estimativa de MRR</div>
         <div>
             <span class="deck-feature-cur">R$</span><span class="deck-kpi" x-text="(dash.receitaMensalEstimada ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })">@Model.ReceitaMensal.ToString("N2")</span>
         </div>
