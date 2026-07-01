@@ -123,16 +123,23 @@ public static class MobileSchemaInitializer
     /// </summary>
     private static IReadOnlyList<string> SplitSqlStatements(string sql)
     {
-        var pieces = sql.Split(';');
+        // Remove comentarios de linha (-- ate o fim da linha) ANTES do split por ';'.
+        // Comentarios em PT-BR contem ';' ("sem use case ainda; preparada", "silos
+        // hoje; este campo") — splittar primeiro deixava o fragmento pos-';' orfao
+        // (sem o '--') como SQL, causando 42601 syntax error (issue #568). Os .sql do
+        // Mobile so tem DDL simples (sem '--' dentro de string literal), entao cortar
+        // '--' inline e' seguro.
+        var semComentarios = string.Join('\n', sql.Split('\n').Select(line =>
+        {
+            var idx = line.IndexOf("--", StringComparison.Ordinal);
+            return idx >= 0 ? line[..idx] : line;
+        }));
+
+        var pieces = semComentarios.Split(';');
         var result = new List<string>(pieces.Length);
         foreach (var raw in pieces)
         {
-            var trimmed = raw.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed))
-                continue;
-            // Remove linhas de comment puro do statement.
-            var lines = trimmed.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith("--"));
-            var cleaned = string.Join('\n', lines).Trim();
+            var cleaned = raw.Trim();
             if (string.IsNullOrWhiteSpace(cleaned))
                 continue;
             // Pula BEGIN/COMMIT/ROLLBACK explicitos do arquivo — cada statement vira sua propria query.
