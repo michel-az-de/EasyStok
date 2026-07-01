@@ -434,6 +434,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
                     x.Item.EntradaEm,
                     x.Item.FornecedorId,
                     LeadTimeFornecedor = (int?)(f != null ? f.LeadTimeEstimadoDias : null),
+                    CustoUnitario = (decimal)x.Item.CustoUnitario,
                     Validade = (DateTime?)x.Item.ValidadeEm
                 })
             .ToListAsync(ct);
@@ -447,7 +448,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
                 int? validadeMedia = comValidade.Count > 0
                     ? (int)Math.Round(comValidade.Average(x => (x.Validade!.Value.Date - hoje).TotalDays))
                     : (int?)null;
-                return (LeadTime: recente.LeadTimeFornecedor, FornecedorId: recente.FornecedorId, ValidadeMedia: validadeMedia);
+                return (LeadTime: recente.LeadTimeFornecedor, FornecedorId: recente.FornecedorId, ValidadeMedia: validadeMedia, Custo: recente.CustoUnitario);
             });
 
         // ── Passo 2: parte de TODOS os produtos ativos; nunca-estocado entra com vigente 0 ──
@@ -488,7 +489,8 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
                 LeadTimeDias: lote.LeadTime ?? leadTimePadraoDias,
                 TamanhoLote: 1,
                 ValidadeMediaDiasRestantes: lote.ValidadeMedia,
-                FornecedorId: lote.FornecedorId));
+                FornecedorId: lote.FornecedorId,
+                CustoUnitario: lote.Custo));
         }
 
         return snapshots;

@@ -18,4 +18,6 @@ public sealed record ItemReposicao(
     ConfiancaReposicao Confianca,
     string Motivo,
     int? DiasAteRuptura,
-    Guid? FornecedorId);
+    Guid? FornecedorId,
+    decimal VelocidadeMediaDia,
+    decimal CustoEstimadoReposicao);

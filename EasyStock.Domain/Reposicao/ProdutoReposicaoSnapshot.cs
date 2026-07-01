@@ -27,4 +27,5 @@ public sealed record ProdutoReposicaoSnapshot(
     int LeadTimeDias,
     int TamanhoLote,
     int? ValidadeMediaDiasRestantes,
-    Guid? FornecedorId);
+    Guid? FornecedorId,
+    decimal CustoUnitario = 0m);

@@ -44,6 +44,7 @@ public class SnapshotReposicaoIntegrationTests(PostgresRlsFixture fixture)
         var vigente = snapshot.Single(s => s.ProdutoId == vigenteId);
         vigente.QuantidadeVigente.Should().Be(100m);
         vigente.VelocidadeMediaDia.Should().BeGreaterThan(0m, "teve venda nos ultimos 30 dias");
+        vigente.CustoUnitario.Should().Be(10m, "custo do lote vigente mais recente (contrato enriquecido)");
 
         var vencido = snapshot.Single(s => s.ProdutoId == vencidoId);
         vencido.QuantidadeVigente.Should().Be(0m, "lote vencido nao conta como vigente");
@@ -51,6 +52,7 @@ public class SnapshotReposicaoIntegrationTests(PostgresRlsFixture fixture)
         var nunca = snapshot.Single(s => s.ProdutoId == nuncaId);
         nunca.QuantidadeVigente.Should().Be(0m, "produto nunca estocado entra com vigente 0 (ESGOTADO)");
         nunca.VelocidadeMediaDia.Should().Be(0m);
+        nunca.CustoUnitario.Should().Be(0m, "produto sem lote nao tem custo");
     }
 
     private async Task<(Guid EmpresaId, Guid VigenteId, Guid VencidoId, Guid NuncaId)> SeedAsync()

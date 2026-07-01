@@ -73,7 +73,9 @@ public sealed class AnalisadorReposicao
         return new ItemReposicao(
             produto.ProdutoId, produto.VariacaoId, produto.Nome, vigente,
             limiares.QuantidadeMinima, limiares.QuantidadeCritica,
-            estado.Value, sugerida, confianca, motivo, diasAteRuptura, produto.FornecedorId);
+            estado.Value, sugerida, confianca, motivo, diasAteRuptura, produto.FornecedorId,
+            produto.VelocidadeMediaDia,
+            Math.Round(sugerida * produto.CustoUnitario, 2));
     }
 
     // R3: quantidade sugerida = cobre lead time + cobertura, descontando vigente; com fallback e
