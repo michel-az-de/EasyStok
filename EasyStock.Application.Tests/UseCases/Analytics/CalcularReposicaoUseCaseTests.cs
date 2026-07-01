@@ -1,46 +1,47 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Analytics.Reposicao;
+using EasyStock.Domain.Reposicao;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases.Analytics;
 
 public class CalcularReposicaoUseCaseTests
 {
-    private readonly IAnalyticsRepository _repository = Substitute.For<IAnalyticsRepository>();
-    private readonly ILogger<CalcularReposicaoUseCase> _logger = Substitute.For<ILogger<CalcularReposicaoUseCase>>();
+    private readonly IAnalyticsRepository _analytics = Substitute.For<IAnalyticsRepository>();
+    private readonly IConfiguracaoLojaRepository _config = Substitute.For<IConfiguracaoLojaRepository>();
+
+    // Fonte única: CalcularReposicaoUseCase agora orquestra o ObterReposicaoUseCase (concreto),
+    // montado com portas mockadas; o snapshot da IAnalyticsRepository dirige o resultado.
+    private CalcularReposicaoUseCase CriarUseCase()
+    {
+        var reposicao = new ObterReposicaoUseCase(_analytics, _config, Substitute.For<ILogger<ObterReposicaoUseCase>>());
+        return new CalcularReposicaoUseCase(reposicao, Substitute.For<ILogger<CalcularReposicaoUseCase>>());
+    }
 
     [Fact]
     public async Task ExecuteAsync_WithValidCommand_ReturnsReplenishmentSuggestions()
     {
-        // Arrange
         var empresaId = Guid.NewGuid();
-        var reposicoes = new List<ReposicaoSugerida>
-        {
-            new(Guid.NewGuid(), Guid.NewGuid(), "Produto A", "SKU001", 10, 50, 100, 5m, 2, 500m)
-        };
+        // Produto vigente 3, minimo 5, critico 2 -> ATENCAO (elegivel), custo 10.
+        _analytics.GetSnapshotReposicaoAsync(empresaId, null,
+                Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProdutoReposicaoSnapshot>
+            {
+                new(Guid.NewGuid(), null, "Produto A", 3m, 5, 2, null, null, null, null, 0m, 0, 7, 1, null, null, 10m)
+            });
 
-        _repository.GetSugestaoReposicaoDetalhadaAsync(empresaId, 30, 1, 20, null).Returns((reposicoes, 1));
+        var (items, total) = await CriarUseCase().ExecuteAsync(new CalcularReposicaoCommand(empresaId));
 
-        var useCase = new CalcularReposicaoUseCase(_repository, _logger);
-        var cmd = new CalcularReposicaoCommand(empresaId);
-
-        // Act
-        var (items, total) = await useCase.ExecuteAsync(cmd);
-
-        // Assert
         items.Should().HaveCount(1);
         total.Should().Be(1);
-        items.First().QuantidadeSugeridaReposicao.Should().Be(100);
+        items.First().QuantidadeAtual.Should().Be(3);
+        items.First().QuantidadeMinima.Should().Be(5);
     }
 
     [Fact]
     public async Task ExecuteAsync_WithEmptyEmpresaId_ThrowsValidationException()
     {
-        // Arrange
-        var useCase = new CalcularReposicaoUseCase(_repository, _logger);
-        var cmd = new CalcularReposicaoCommand(Guid.Empty);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<UseCaseValidationException>(() => useCase.ExecuteAsync(cmd));
+        var act = () => CriarUseCase().ExecuteAsync(new CalcularReposicaoCommand(Guid.Empty));
+        await act.Should().ThrowAsync<UseCaseValidationException>();
     }
 }

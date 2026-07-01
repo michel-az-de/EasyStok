@@ -49,7 +49,7 @@ public class AnalyticsControllerTests
             new ObterResumoDiaUseCase(_analyticsRepo, NullLogger<ObterResumoDiaUseCase>.Instance),
             new GetDashboardFullUseCase(_analyticsRepo, NullLogger<GetDashboardFullUseCase>.Instance),
             new CalcularProjecoesUseCase(_analyticsRepo, NullLogger<CalcularProjecoesUseCase>.Instance),
-            new CalcularReposicaoUseCase(_analyticsRepo, NullLogger<CalcularReposicaoUseCase>.Instance),
+            new CalcularReposicaoUseCase(new ObterReposicaoUseCase(_analyticsRepo, _confLojaRepo, NullLogger<ObterReposicaoUseCase>.Instance), NullLogger<CalcularReposicaoUseCase>.Instance),
             new CalcularSazonalidadeUseCase(_analyticsRepo, NullLogger<CalcularSazonalidadeUseCase>.Instance),
             new ObterAlertasUseCase(_analyticsRepo, NullLogger<ObterAlertasUseCase>.Instance),
             new ObterDiasAlertaValidadeUseCase(_confLojaRepo, config, NullLogger<ObterDiasAlertaValidadeUseCase>.Instance),
