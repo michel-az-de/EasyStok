@@ -142,6 +142,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAdminDashboardQueries, AdminDashboardQueries>();
             services.AddScoped<IFleetOperationQueries, FleetOperationQueries>();
             services.AddScoped<IRevenueMetricsQueries, RevenueMetricsQueries>(); // ADR-0037 adendo / #754
+            services.AddScoped<IMetricasFinanceirasQueries, MetricasFinanceirasQueries>(); // #762 — bypass condicional a SuperAdmin
             services.AddScoped<IEntityAuditQueries, EntityAuditQueries>();
             services.AddScoped<ICiAutoTicketRepository, CiAutoTicketRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
