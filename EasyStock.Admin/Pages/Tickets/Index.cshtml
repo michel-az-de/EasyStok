@@ -189,11 +189,22 @@
     </es-data-table-bulk-actions>
 
     <es-data-table-empty>
-        <es-empty-state icon="ticket"
-                        title="Nenhum ticket encontrado"
-                        description="Ajuste os filtros ou aguarde novos chamados.">
-            <es-button variant="ghost" href="/Tickets">Limpar filtros</es-button>
-        </es-empty-state>
+        @if (Model.Erro is not null)
+        {
+            <es-empty-state variant="erro" icon="alert-triangle"
+                            title="Não foi possível carregar os tickets"
+                            description="@Model.Erro">
+                <es-button variant="ghost" href="/Tickets" icon="rotate-cw">Tentar novamente</es-button>
+            </es-empty-state>
+        }
+        else
+        {
+            <es-empty-state icon="ticket"
+                            title="Nenhum ticket encontrado"
+                            description="Ajuste os filtros ou aguarde novos chamados.">
+                <es-button variant="ghost" href="/Tickets">Limpar filtros</es-button>
+            </es-empty-state>
+        }
     </es-data-table-empty>
 </es-data-table>
 

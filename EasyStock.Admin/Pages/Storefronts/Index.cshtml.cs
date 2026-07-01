@@ -10,6 +10,8 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
     public JsonElement Data { get; private set; }
     public int Total { get; private set; }
     public int TotalPages { get; private set; }
+    // AD-4: distingue falha de listagem de vazio-real. Non-null => renderiza estado de erro.
+    public string? Erro { get; private set; }
 
     private const int PageSize = 20;
     private const int MaxPage = 10000;
@@ -42,8 +44,9 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
         {
+            // AD-4: falha de listagem vira estado de ERRO inline (com retry), não "0 storefronts".
             log.LogError(ex, "Falha ao listar storefronts");
-            SetErroSeguro(ex, "Listagem");
+            Erro = "Não foi possível carregar os storefronts. Tente recarregar a página.";
         }
     }
 

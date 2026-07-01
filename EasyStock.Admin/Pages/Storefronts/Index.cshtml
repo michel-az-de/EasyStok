@@ -105,7 +105,15 @@
         }
 
         <es-data-table-empty>
-            @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Ativo))
+            @if (Model.Erro is not null)
+            {
+                <es-empty-state variant="erro" icon="alert-triangle"
+                                title="Não foi possível carregar os storefronts"
+                                description="@Model.Erro">
+                    <es-button variant="ghost" href="/Storefronts" icon="rotate-cw">Tentar novamente</es-button>
+                </es-empty-state>
+            }
+            else if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Ativo))
             {
                 <es-empty-state icon="search"
                                 title="Nenhum storefront encontrado"
