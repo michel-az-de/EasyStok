@@ -41,6 +41,19 @@ public record FechamentoCaixa
     public DateTime FechadoEm { get; init; }
 }
 
+/// <summary>Venda ou pagamento de pedido que compõe o saldo do caixa mas não é um
+/// <see cref="MovimentoCaixa"/> manual (vive em outra tabela). Listada junto dos movimentos
+/// para a lista "Movimentos do dia" reconciliar com o saldo (AC-4 / issue #755).</summary>
+public record CaixaLinhaExtra
+{
+    public DateTime Hora { get; init; }
+    public required string Tipo { get; init; }   // "venda" | "pagamento"
+    public decimal Valor { get; init; }
+    public string? Descricao { get; init; }
+    public string? Metodo { get; init; }
+    public required string Origem { get; init; } // "Venda" | "Pedido"
+}
+
 public record CaixaDia
 {
     public DateOnly Data { get; init; }
@@ -61,6 +74,10 @@ public record CaixaDia
     // os totais somam a sessão desde AbertoDesde e o caixa aparece aberto convidando a fechar.
     public bool AberturaPendenteCrossDay { get; init; }
     public DateOnly? AbertoDesde { get; init; }
+
+    // Vendas e pagamentos de pedido do dia, como linhas, para a lista "Movimentos do dia"
+    // reconciliar com o saldo (AC-4 / issue #755): movimentos manuais + estas == saldo esperado.
+    public List<CaixaLinhaExtra> LinhasExtras { get; init; } = new();
 }
 
 public record MobileCashSummary

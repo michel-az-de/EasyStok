@@ -190,10 +190,28 @@ else
         </div>
     </div>
 
-    <!-- Lista de movimentos -->
+    <!-- Lista de movimentos (inclui vendas/pagamentos que compõem o saldo — AC-4 #755) -->
     <div class="ws">
-        <h2 class="font-semibold text-slate-900 mb-4">Movimentos do dia (@d.Movimentos.Count)</h2>
-        @if (!d.Movimentos.Any())
+        @{
+            // Unifica movimentos manuais + vendas/pagamentos numa lista ordenada por hora, para
+            // que a soma das linhas visíveis reconcilie com o saldo esperado (AC-4). Vendas e
+            // pagamentos não têm estorno aqui (vivem no fluxo de vendas/pedidos).
+            var linhasCaixa = d.Movimentos
+                .Select(m => new {
+                    Hora = m.DataMovimento, m.Tipo, m.Valor, IsSaida = m.Tipo == "saida",
+                    m.Descricao, m.Categoria, Origem = m.Origem, Autor = m.RegistradoPorNome,
+                    IsManual = true, Id = (string?)m.Id
+                })
+                .Concat(d.LinhasExtras.Select(x => new {
+                    x.Hora, x.Tipo, x.Valor, IsSaida = false,
+                    x.Descricao, Categoria = (string?)null, Origem = (string?)x.Origem, Autor = (string?)null,
+                    IsManual = false, Id = (string?)null
+                }))
+                .OrderBy(l => l.Hora)
+                .ToList();
+        }
+        <h2 class="font-semibold text-slate-900 mb-4">Movimentos do dia (@linhasCaixa.Count)</h2>
+        @if (linhasCaixa.Count == 0)
         {
             <p class="text-sm text-slate-500">Nenhum movimento registrado ainda.</p>
         }
@@ -203,29 +221,31 @@ else
             <table class="tbl-full">
                 <thead><tr><th>Hora</th><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Categoria</th><th>Origem</th><th></th></tr></thead>
                 <tbody>
-                @foreach (var m in d.Movimentos)
+                @foreach (var l in linhasCaixa)
                 {
-                    string tipoBadge = m.Tipo switch
+                    string tipoBadge = l.Tipo switch
                     {
                         "abertura"   => "bg-blue-100 text-blue-700",
                         "fechamento" => "bg-slate-100 text-slate-600",
                         "entrada"    => "bg-green-100 text-green-700",
                         "saida"      => "bg-red-100 text-red-700",
+                        "venda"      => "bg-green-100 text-green-700",
+                        "pagamento"  => "bg-blue-100 text-blue-700",
                         _            => "bg-slate-100 text-slate-600"
                     };
                     <tr>
-                        <td class="text-xs text-slate-500">@m.DataMovimento.ParaBrasilia().ToString("HH:mm")</td>
-                        <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @tipoBadge">@m.Tipo</span></td>
-                        <td class="font-medium @(m.Tipo == "saida" ? "text-red-700" : "text-slate-900")">
-                            @(m.Tipo == "saida" ? "−" : "+")@m.Valor.AsMoney()
+                        <td class="text-xs text-slate-500">@l.Hora.ParaBrasilia().ToString("HH:mm")</td>
+                        <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @tipoBadge">@l.Tipo</span></td>
+                        <td class="font-medium @(l.IsSaida ? "text-red-700" : "text-slate-900")">
+                            @(l.IsSaida ? "−" : "+")@l.Valor.AsMoney()
                         </td>
-                        <td class="text-sm text-slate-600">@(m.Descricao ?? "—")</td>
-                        <td class="text-xs text-slate-500">@(m.Categoria ?? "—")</td>
-                        <td class="text-xs text-slate-500">@(m.Origem ?? "—") @if (!string.IsNullOrEmpty(m.RegistradoPorNome)) { <div class="text-slate-400">@m.RegistradoPorNome</div> }</td>
+                        <td class="text-sm text-slate-600">@(l.Descricao ?? "—")</td>
+                        <td class="text-xs text-slate-500">@(l.Categoria ?? "—")</td>
+                        <td class="text-xs text-slate-500">@(l.Origem ?? "—") @if (!string.IsNullOrEmpty(l.Autor)) { <div class="text-slate-400">@l.Autor</div> }</td>
                         <td>
-                            @if (m.Tipo != "abertura" && m.Tipo != "fechamento" && !d.Fechado)
+                            @if (l.IsManual && l.Tipo != "abertura" && l.Tipo != "fechamento" && !d.Fechado)
                             {
-                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@m.Id" method="post" data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor será revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor será revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar movimento">Estornar</button>
                                 </form>
