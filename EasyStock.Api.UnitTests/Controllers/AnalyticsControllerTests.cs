@@ -20,6 +20,7 @@ using EasyStock.Application.UseCases.Analytics.Sazonalidade;
 using EasyStock.Application.UseCases.Analytics.Validade;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Reposicao;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -44,8 +45,13 @@ public class AnalyticsControllerTests
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
 
+        // Fonte unica (ADR-0039): o Dashboard consulta a projecao de reposicao; default vazio.
+        _analyticsRepo.GetSnapshotReposicaoAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(),
+                Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProdutoReposicaoSnapshot>());
+
         _controller = new AnalyticsController(
-            new GetDashboardUseCase(_analyticsRepo, NullLogger<GetDashboardUseCase>.Instance),
+            new GetDashboardUseCase(_analyticsRepo, new ObterReposicaoUseCase(_analyticsRepo, _confLojaRepo, NullLogger<ObterReposicaoUseCase>.Instance), NullLogger<GetDashboardUseCase>.Instance),
             new ObterResumoDiaUseCase(_analyticsRepo, NullLogger<ObterResumoDiaUseCase>.Instance),
             new GetDashboardFullUseCase(_analyticsRepo, NullLogger<GetDashboardFullUseCase>.Instance),
             new CalcularProjecoesUseCase(_analyticsRepo, NullLogger<CalcularProjecoesUseCase>.Instance),
