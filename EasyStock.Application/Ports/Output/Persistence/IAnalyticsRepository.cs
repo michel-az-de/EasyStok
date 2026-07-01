@@ -358,14 +358,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>Sazonalidade mensal de saídas para um produto.</summary>
         Task<IReadOnlyList<SazonalidadeMensal>> GetSazonalidadeAsync(Guid empresaId, Guid produtoId, int meses = 12, Guid? lojaId = null);
 
-        /// <summary>Sugestão de reposição para itens abaixo do mínimo.</summary>
-        Task<(IReadOnlyList<ReposicaoSugerida> Items, int TotalCount)> GetSugestaoReposicaoDetalhadaAsync(
-            Guid empresaId,
-            int diasHistorico = 30,
-            int page = 1,
-            int pageSize = 20,
-            Guid? lojaId = null);
-
         /// <summary>Projeção de ruptura de estoque com base na taxa de saída diária.</summary>
         Task<(IReadOnlyList<ProjecaoRuptura> Items, int TotalCount)> GetProjecaoRupturaAsync(
             Guid empresaId,

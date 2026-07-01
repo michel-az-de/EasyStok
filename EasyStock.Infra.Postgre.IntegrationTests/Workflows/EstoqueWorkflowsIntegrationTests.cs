@@ -741,12 +741,6 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             context.SetMobileTenantContext(empresaId);
             var repository = new ItemEstoqueRepository(context);
 
-            // Teste estoque baixo
-            var (baixo, totalBaixo) = await repository.GetEstoqueBaixoAsync(empresaId, 5, 1, 2);
-            baixo.Should().HaveCount(2);
-            totalBaixo.Should().Be(3); // 3 itens com <=5
-            baixo.Should().AllSatisfy(i => i.QuantidadeAtual.Value.Should().BeLessThanOrEqualTo(5));
-
             // Teste próximo vencimento
             var (proximos, totalProximos) = await repository.GetProximoVencimentoAsync(empresaId, 30, 1, 10);
             proximos.Should().ContainSingle();
@@ -758,13 +752,6 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             parados.Should().ContainSingle();
             totalParados.Should().Be(1);
             parados.Single().Should().Match<ItemEstoque>(i => !i.UltimaMovimentacaoEm.HasValue || i.UltimaMovimentacaoEm < DateTime.UtcNow.AddDays(-90));
-
-            // Teste sugestão reposição
-            // Args posicionais: (empresaId, limiteQuantidade=5, page=1, pageSize=10).
-            var (sugestoes, totalSugestoes) = await repository.GetSugestaoReposicaoAsync(empresaId, 5, 1, 10);
-            sugestoes.Should().HaveCount(3);
-            totalSugestoes.Should().Be(3);
-            sugestoes.Should().AllSatisfy(i => i.QuantidadeAtual.Value.Should().BeLessThan(5));
         }
     }
 

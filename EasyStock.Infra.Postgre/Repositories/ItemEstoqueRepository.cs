@@ -63,25 +63,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetEstoqueBaixoAsync(Guid empresaId, int limite, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var query = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual <= limite);
-
-            if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
-
-            var totalCount = await query.CountAsync();
-            var items = await query
-                .OrderBy(i => (int)i.QuantidadeAtual)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return (items, totalCount);
-        }
-
         public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null)
         {
             var cutoff = DateTime.UtcNow.AddDays(dias);
@@ -116,25 +97,6 @@ namespace EasyStock.Infra.Postgre.Repositories
             var totalCount = await query.CountAsync();
             var items = await query
                 .OrderByDescending(i => i.UltimaMovimentacaoEm ?? DateTime.MinValue)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return (items, totalCount);
-        }
-
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetSugestaoReposicaoAsync(Guid empresaId, int limiteQuantidade = 5, int page = 1, int pageSize = 20, Guid? lojaId = null)
-        {
-            var query = dbContext.ItensEstoque
-                .AsNoTracking()
-                .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual < limiteQuantidade);
-
-            if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
-
-            var totalCount = await query.CountAsync();
-            var items = await query
-                .OrderBy(i => (int)i.QuantidadeAtual)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

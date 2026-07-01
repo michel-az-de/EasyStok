@@ -481,61 +481,6 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
     }
 
     [SkippableFact]
-    public async Task GetSugestaoReposicaoDetalhadaAsync_DeveRetornarSugestoesCorretas()
-    {
-        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
-        await using var dbContext = fixture.CreateDbContext();
-        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
-
-        var empresaId = Guid.NewGuid();
-        var categoriaId = Guid.NewGuid();
-        dbContext.SetMobileTenantContext(empresaId);
-
-        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
-        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
-
-        var produto = new Produto
-        {
-            Id = Guid.NewGuid(),
-            EmpresaId = empresaId,
-            CategoriaId = categoriaId,
-            Nome = "Produto Teste",
-            Tipo = TipoProduto.Fisico,
-            SkuBase = CodigoSku.From("SKU123"),
-            Status = StatusProduto.Ativo,
-            CriadoEm = DateTime.UtcNow,
-            AlteradoEm = DateTime.UtcNow
-        };
-        dbContext.Produtos.Add(produto);
-
-        var itemEstoque = new ItemEstoque
-        {
-            Id = Guid.NewGuid(),
-            EmpresaId = empresaId,
-            ProdutoId = produto.Id,
-            QuantidadeAtual = Quantidade.From(2),
-            QuantidadeInicial = Quantidade.From(10),
-            QuantidadeMinima = 5,
-            CustoUnitario = Dinheiro.FromDecimal(50m),
-            PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
-            EntradaEm = DateTime.UtcNow,
-            Status = StatusItemEstoque.Ok,
-            CriadoEm = DateTime.UtcNow,
-            AlteradoEm = DateTime.UtcNow
-        };
-        dbContext.ItensEstoque.Add(itemEstoque);
-
-        await dbContext.SaveChangesAsync();
-
-        // Act
-        var (items, totalCount) = await repo.GetSugestaoReposicaoDetalhadaAsync(empresaId, 30);
-
-        // Assert
-        items.Should().NotBeNull();
-        totalCount.Should().Be(1);
-    }
-
-    [SkippableFact]
     public async Task GetProjecaoRupturaAsync_DeveRetornarProjecoesCorretas()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
