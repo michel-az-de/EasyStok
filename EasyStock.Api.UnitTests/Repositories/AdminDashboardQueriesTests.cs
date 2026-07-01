@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
@@ -17,6 +18,7 @@ namespace EasyStock.Api.UnitTests.Repositories;
 public class AdminDashboardQueriesTests : IDisposable
 {
     private readonly EasyStockDbContext _db;
+    private readonly IAssinaturaEmpresaRepository _assinaturaRepo;
 
     public AdminDashboardQueriesTests()
     {
@@ -31,6 +33,10 @@ public class AdminDashboardQueriesTests : IDisposable
                 .UseInMemoryDatabase($"admin-dashboard-tests-{Guid.NewGuid()}")
                 .Options,
             superAdmin);
+
+        // MRR delega ao predicado canônico (fonte única); mock aqui, prova de runtime
+        // (bypass RLS de verdade) fica no AdminDashboardQueriesPostgresTests.
+        _assinaturaRepo = Substitute.For<IAssinaturaEmpresaRepository>();
     }
 
     [Fact]
@@ -46,9 +52,35 @@ public class AdminDashboardQueriesTests : IDisposable
         _db.Usuarios.Add(ComVinculo("inativo@x.com", ativo: false, empresaId));
         await _db.SaveChangesAsync();
 
-        var data = await new AdminDashboardQueries(_db).ObterAsync(DateTime.UtcNow);
+        var data = await new AdminDashboardQueries(_db, _assinaturaRepo).ObterAsync(DateTime.UtcNow);
 
         data.TotalUsuariosAtivos.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ReceitaMensal_vem_do_predicado_canonico_de_MRR()
+    {
+        // F3 (#754): o dashboard delega o MRR à fonte única SomarPrecoMensalAtivasAsync,
+        // mesma definição de MetricasFinanceirasUseCase e RevenueMetricsQueries. Antes, somava
+        // db.AssinaturasEmpresa inline (predicado divergente) sem passar pela porta.
+        _assinaturaRepo.SomarPrecoMensalAtivasAsync(null, Arg.Any<CancellationToken>())
+            .Returns(149.90m);
+
+        // Isca de regressão: assinatura Ativa com plano de preço DIVERGENTE no db. Se alguém
+        // reintroduzir o SUM inline (db.AssinaturasEmpresa...), o resultado vira 999 e falha.
+        var plano = new Plano { Id = Guid.NewGuid(), Nome = "Isca", PrecoMensal = 999m, Ativo = true, CriadoEm = DateTime.UtcNow };
+        _db.Planos.Add(plano);
+        _db.AssinaturasEmpresa.Add(new AssinaturaEmpresa
+        {
+            Id = Guid.NewGuid(), EmpresaId = Guid.NewGuid(), PlanoId = plano.Id,
+            Status = StatusAssinatura.Ativa, DataInicio = DateTime.UtcNow.AddDays(-30),
+            CriadoEm = DateTime.UtcNow.AddDays(-30), AlteradoEm = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        var data = await new AdminDashboardQueries(_db, _assinaturaRepo).ObterAsync(DateTime.UtcNow);
+
+        data.ReceitaMensalEstimada.Should().Be(149.90m);
     }
 
     private static Usuario SemVinculo(string email, bool ativo) => new()

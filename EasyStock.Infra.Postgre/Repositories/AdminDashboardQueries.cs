@@ -5,11 +5,27 @@ namespace EasyStock.Infra.Postgre.Repositories;
 
 /// <summary>
 /// Implementação Postgre do read model do dashboard Admin (F7).
+///
+/// <para>
+/// Leitura SuperAdmin cross-tenant: abre <see cref="EasyStockDbContext.UseRowLevelSecurityBypass"/>
+/// no escopo inteiro (espelha <see cref="FleetOperationQueries"/>). Sem isso, sob role sem
+/// BYPASSRLS (prod, <c>easystok_user</c>) a policy do Postgres zera as linhas com EmpresaId e
+/// as métricas agregadas (MRR, tickets, etc.) viriam truncadas — o bug F2 do ADR-0037 (adendo,
+/// issue #754). O MRR reusa o predicado canônico
+/// <see cref="IAssinaturaEmpresaRepository.SomarPrecoMensalAtivasAsync"/> (fonte única de
+/// definição, mesma de <c>MetricasFinanceirasUseCase</c> e <c>RevenueMetricsQueries</c>).
+/// </para>
 /// </summary>
-public sealed class AdminDashboardQueries(EasyStockDbContext db) : IAdminDashboardQueries
+public sealed class AdminDashboardQueries(
+    EasyStockDbContext db,
+    IAssinaturaEmpresaRepository assinaturaRepo) : IAdminDashboardQueries
 {
     public async Task<AdminDashboardData> ObterAsync(DateTime nowUtc, CancellationToken ct = default)
     {
+        // Leitura cross-tenant deliberada (SuperAdmin) — abre o RLS p/ não truncar as métricas
+        // agregadas sob role sem BYPASSRLS. Setado ANTES de qualquer query, igual FleetOperationQueries.
+        using var _ = db.UseRowLevelSecurityBypass();
+
         var h24 = nowUtc.AddHours(-24);
         var d30 = nowUtc.AddDays(-30);
 
@@ -17,9 +33,8 @@ public sealed class AdminDashboardQueries(EasyStockDbContext db) : IAdminDashboa
 
         var tenantsAtivos = await db.AssinaturasEmpresa.CountAsync(a => a.Status == StatusAssinatura.Ativa, ct);
         var tenantsSuspensos = await db.AssinaturasEmpresa.CountAsync(a => a.Status == StatusAssinatura.Suspensa, ct);
-        var receitaMensal = await db.AssinaturasEmpresa
-            .Where(a => a.Status == StatusAssinatura.Ativa && a.Plano != null)
-            .SumAsync(a => a.Plano!.PrecoMensal, ct);
+        // MRR = predicado canônico único (Ativa → SUM PrecoMensal), sob o bypass acima.
+        var receitaMensal = await assinaturaRepo.SomarPrecoMensalAtivasAsync(null, ct);
 
         var tenantsNovos = await db.Empresas.CountAsync(e => e.CriadoEm >= d30, ct);
 
