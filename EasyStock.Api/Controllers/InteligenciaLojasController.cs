@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Analytics.Reposicao;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -11,6 +12,7 @@ namespace EasyStock.Api.Controllers;
 [EnableRateLimiting("geral")]
 public class InteligenciaLojasController(
     IAnalyticsRepository analyticsRepository,
+    ObterReposicaoUseCase reposicaoUseCase,
     EasyStock.Application.Ports.Output.ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Cross-store comparison", Description = "Returns health score, KPIs and ranking for all active stores.")]
@@ -108,8 +110,13 @@ public class InteligenciaLojasController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var (items, totalCount) = await analyticsRepository.GetSugestaoReposicaoDetalhadaAsync(resolvedEmpresaId, diasHistorico, page, pageSize, lojaId);
-        return DataPaged(items, totalCount, page, pageSize);
+        // Fonte única (ADR-0039): a projeção por-produto substitui o predicado por-lote antigo;
+        // paginação em memória (a lista é por-produto, limitada pelo catálogo).
+        var todos = await reposicaoUseCase.ExecuteAsync(
+            new ObterReposicaoCommand(resolvedEmpresaId, lojaId, diasHistorico));
+        var mapeados = todos.Select(i => i.ToReposicaoSugerida()).ToList();
+        var pagina = mapeados.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return DataPaged(pagina, mapeados.Count, page, pageSize);
     }
 
     [SwaggerOperation(Summary = "Per-store idle/slow-moving items (paginated)")]
