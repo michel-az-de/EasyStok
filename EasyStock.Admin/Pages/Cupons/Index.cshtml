@@ -59,6 +59,11 @@ else
                             {
                                 <span>Válido até: <strong style="color:var(--text-primary);">@validoAteDt.ParaBrasilia().ToString("dd/MM/yyyy")</strong></span>
                             }
+                            else if (limiteUsos == null)
+                            {
+                                @* AD-16: sem validade E sem limite de usos = desconto perpétuo. Marca de atenção. *@
+                                <es-badge variant="warn" with-dot="true">Sem validade nem limite</es-badge>
+                            }
                             else
                             {
                                 <span>Sem expiração</span>
@@ -97,7 +102,8 @@ else
 
                 <!-- Inline edit -->
                 <div x-show="editingId === '@cid'" x-cloak style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border-soft);">
-                    <form method="post" asp-page-handler="Editar" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; align-items:end;">
+                    <form method="post" asp-page-handler="Editar" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; align-items:end;"
+                          x-on:submit="{ const f = $event.target; if ((!f.validoAte || !f.validoAte.value) && (!f.limiteUsos || !f.limiteUsos.value)) { if (!confirm('Este cupom não tem validade nem limite de usos: o desconto nunca expira. Salvar mesmo assim?')) $event.preventDefault(); } }">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@cid" />
                         <es-input name="codigo" label="Código" value="@codigo" required="true" pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="50" />
@@ -164,6 +170,10 @@ else
                 else if (!isNaN(valor) && valor <= 0) { erro = tipo === 'ValorFixo' ? 'Valor fixo deve ser maior que zero (R$).' : tipo === 'MesesGratis' ? 'Número de meses deve ser maior que zero.' : 'Valor do desconto deve ser maior que zero.'; bloquear = true; }
                 else if (tipo === 'Percentual' && !isNaN(valor) && valor > 100) { erro = 'Desconto percentual não pode passar de 100%.'; bloquear = true; }
                 else if (f.validoAte && f.validoAte.value) { const d = new Date(f.validoAte.value + 'T00:00:00'); const hoje = new Date(); hoje.setHours(0,0,0,0); if (d < hoje) { erro = 'Data de validade não pode estar no passado.'; bloquear = true; } }
+                // AD-16: cupom sem validade E sem limite de usos nunca expira — confirmação explícita.
+                if (!bloquear && (!f.validoAte || !f.validoAte.value) && (!f.limiteUsos || !f.limiteUsos.value)) {
+                    if (!confirm('Este cupom não tem validade nem limite de usos: o desconto nunca expira. Criar mesmo assim?')) { bloquear = true; }
+                }
             } catch (e) { }
             if (bloquear) { $event.preventDefault(); } else { loading = true; }
           ">
