@@ -157,5 +157,33 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             return pagamentos.Sum();
         }
+
+        // ── Linhas para a lista "Movimentos do dia" (BUG-5) ───────────
+        // Mesma seleção das queries de total acima (mesma janela/filtros), mas devolve as linhas
+        // individuais — garante que a soma das linhas exibidas == total somado ao saldo.
+
+        public async Task<IReadOnlyList<Venda>> GetVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
+            var q = db.Vendas.AsNoTracking()
+                .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
+            if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
+            return await q.OrderBy(v => v.DataVenda).ToListAsync();
+        }
+
+        public async Task<IReadOnlyList<PedidoPagamento>> GetPagamentosPedidosListaNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
+            return await db.Set<PedidoPagamento>().AsNoTracking()
+                .Where(pg => pg.PagoEm >= iniUtc && pg.PagoEm < fimUtc)
+                .Join(db.Pedidos.AsNoTracking(),
+                      pg => pg.PedidoId,
+                      p => p.Id,
+                      (pg, p) => new { pg, p })
+                .Where(x => x.p.EmpresaId == empresaId
+                         && x.p.Status != "cancelado"
+                         && (lojaId == null || x.p.LojaId == lojaId))
+                .OrderBy(x => x.pg.PagoEm)
+                .Select(x => x.pg)
+                .ToListAsync();
+        }
     }
 }

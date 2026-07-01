@@ -28,6 +28,10 @@ public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc)
         // o Dashboard/Admin consomem — garante que /caixa e o card "CAIXA" nunca divirjam.
         var b = await calc.CalcularAsync(q.EmpresaId, q.Data, q.LojaId);
 
+        // Vendas e pagamentos de pedido do mesmo intervalo, como linhas, para a lista
+        // "Movimentos do dia" reconciliar com o saldo (BUG-5): movimentos + linhas == saldo.
+        var linhasExtras = await calc.GetLinhasExtrasAsync(q.EmpresaId, b.JanelaInicioUtc, b.JanelaFimUtc, q.LojaId);
+
         FechamentoCaixaResult? fechResult = b.Fechamento == null ? null : new FechamentoCaixaResult(
             b.Fechamento.Id, b.Fechamento.EmpresaId, b.Fechamento.LojaId, b.Fechamento.Data,
             b.Fechamento.SaldoInicial, b.Fechamento.TotalVendas, b.Fechamento.TotalPagamentosPedidos,
@@ -40,6 +44,6 @@ public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc)
             b.SaldoInicial, b.TotalVendas, b.TotalPagamentosPedidos, b.TotalEntradas, b.TotalSaidas,
             b.SaldoEsperado, b.Aberto, b.Fechado, fechResult,
             b.Movimentos.Select(AbrirCaixaUseCase.Map).ToList(),
-            b.AberturaPendenteCrossDay, b.AbertoDesde);
+            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras);
     }
 }

@@ -17,6 +17,15 @@ namespace EasyStock.Application.UseCases.Caixa;
 public interface ICaixaSaldoCalculator
 {
     Task<CaixaSaldoBreakdown> CalcularAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
+
+    /// <summary>
+    /// Vendas e pagamentos de pedido do intervalo como linhas para a lista "Movimentos do dia"
+    /// (BUG-5). Use a janela do breakdown (<see cref="CaixaSaldoBreakdown.JanelaInicioUtc"/>..
+    /// <see cref="CaixaSaldoBreakdown.JanelaFimUtc"/>) para a soma das linhas casar com o saldo.
+    /// Só o /caixa precisa disto — o Dashboard usa apenas o total via <see cref="CalcularAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<CaixaLinhaExtraResult>> GetLinhasExtrasAsync(
+        Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
 }
 
 /// <summary>
@@ -101,5 +110,23 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
             data, saldoInicial, totalVendas, totalPagamentosPedidos, totalEntradas, totalSaidas,
             saldoEsperado, aberto, fechado, aberturaPendenteCrossDay, abertoDesde,
             janelaInicio, fimDia, movList, fechamento);
+    }
+
+    public async Task<IReadOnlyList<CaixaLinhaExtraResult>> GetLinhasExtrasAsync(
+        Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+    {
+        var vendas = await repo.GetVendasNoIntervaloAsync(empresaId, iniUtc, fimUtc, lojaId)
+                     ?? (IReadOnlyList<Venda>)[];
+        var pagamentos = await repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, iniUtc, fimUtc, lojaId)
+                         ?? (IReadOnlyList<PedidoPagamento>)[];
+
+        var linhas = new List<CaixaLinhaExtraResult>(vendas.Count + pagamentos.Count);
+        linhas.AddRange(vendas.Select(v => new CaixaLinhaExtraResult(
+            v.DataVenda, "venda", v.ValorTotal == null ? 0m : v.ValorTotal.Valor,
+            v.Observacoes, v.FormaPagamentoPrincipal, "Venda")));
+        linhas.AddRange(pagamentos.Select(p => new CaixaLinhaExtraResult(
+            p.PagoEm, "pagamento", p.Valor, "Pagamento de pedido", p.Metodo, "Pedido")));
+
+        return linhas.OrderBy(l => l.Hora).ToList();
     }
 }

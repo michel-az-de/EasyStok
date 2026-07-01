@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -650,5 +651,49 @@ public class CaixaUseCasesTests
         // abertura 5454 − saída 1000 + vendas 60 = 4514 (valor exibido em /caixa).
         // O bug fazia o Dashboard mostrar 4454 (4514 − 60), por omitir as vendas.
         b.SaldoEsperado.Should().Be(4514m);
+    }
+
+    [Fact]
+    public async Task GetLinhasExtras_ListaVendasEPagamentos_OrdenadasPorHora_ComSomaIgualAoTotal()
+    {
+        // AC-4 (#755): as Vendas e os Pagamentos de pedido entram no saldo esperado mas viviam
+        // fora da lista "Movimentos do dia" (que só listava MovimentoCaixa manuais). Resultado:
+        // o total do caixa "não batia" com a lista visível. GetLinhasExtras traz essas linhas
+        // do MESMO intervalo, para que a soma das linhas == total que entra no saldo.
+        var empresaId = Guid.NewGuid();
+        var ini = DateTime.UtcNow.Date;
+        var fim = ini.AddDays(1);
+
+        var venda = new Venda
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            DataVenda = ini.AddHours(15),
+            ValorTotal = Dinheiro.FromDecimal(60m),
+            FormaPagamentoPrincipal = "dinheiro",
+            Observacoes = "Venda balcão",
+        };
+        var pagamento = new PedidoPagamento
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = Guid.NewGuid(),
+            Metodo = "pix",
+            Valor = 40m,
+            PagoEm = ini.AddHours(10),   // mais cedo que a venda → deve aparecer primeiro
+        };
+
+        _repo.GetVendasNoIntervaloAsync(empresaId, ini, fim, null)
+            .Returns(new[] { venda });
+        _repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, ini, fim, null)
+            .Returns(new[] { pagamento });
+
+        var linhas = await new CaixaSaldoCalculator(_repo).GetLinhasExtrasAsync(empresaId, ini, fim);
+
+        linhas.Should().HaveCount(2);
+        linhas[0].Tipo.Should().Be("pagamento");  // ordenado por hora: 10h antes de 15h
+        linhas[1].Tipo.Should().Be("venda");
+        linhas.Sum(l => l.Valor).Should().Be(100m); // 60 venda + 40 pagamento == total no saldo
+        linhas.Single(l => l.Tipo == "venda").Metodo.Should().Be("dinheiro");
+        linhas.Single(l => l.Tipo == "pagamento").Origem.Should().Be("Pedido");
     }
 }
