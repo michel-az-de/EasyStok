@@ -39,6 +39,15 @@ public class EditarCardapioItemAdminUseCase(
 {
     public async Task<EditarCardapioItemAdminResult> ExecuteAsync(EditarCardapioItemAdminCommand command)
     {
+        // issue 658: mesmos guards do Adicionar — metadata flui para NF-e/PDF/etiqueta
+        // (sinks sem escaping). No-op para null/vazio; '<'/'>' isolados passam.
+        UseCaseGuards.EnsureSemTagsHtml(command.NomePublico, "Nome público do item");
+        UseCaseGuards.EnsureSemTagsHtml(command.DescricaoPublica, "Descrição pública");
+        UseCaseGuards.EnsureSemTagsHtml(command.Ingredientes, "Ingredientes");
+        UseCaseGuards.EnsureSemTagsHtml(command.Alergenos, "Alérgenos");
+        UseCaseGuards.EnsureSemTagsHtml(command.SugestaoMolho, "Sugestão de molho");
+        UseCaseGuards.EnsureSemTagsHtml(command.Tag, "Tag");
+
         var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 

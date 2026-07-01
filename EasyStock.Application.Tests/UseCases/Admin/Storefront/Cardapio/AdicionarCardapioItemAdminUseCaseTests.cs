@@ -151,6 +151,41 @@ public class AdicionarCardapioItemAdminUseCaseTests
             "storefront de outra empresa retorna 404, não vaza existência");
     }
 
+    // ── Guards anti-XSS de contexto fiscal (issue 658) ─────────────────
+    // Metadata vira NomeSnapshot e flui para NF-e/PDF/etiqueta, sinks sem escaping.
+
+    [Theory]
+    [InlineData("<script>alert('xss')</script>", null)]
+    [InlineData(null, "<img src=x onerror=alert(1)>")]
+    public async Task DeveLancar_QuandoMetadataContemTagHtml(string? nome, string? descricao)
+    {
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-xss", "XSS", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+
+        var act = async () => await Sut().ExecuteAsync(
+            NewCommandAvulso(s.Id, nome: nome ?? "Pão de Alho") with { DescricaoPublica = descricao });
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*tags HTML*");
+        await _cardapioRepo.DidNotReceive().AddAsync(Arg.Any<CardapioItem>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeveAceitar_TextoCulinarioComCaracteresEspeciais()
+    {
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-cul", "CUL", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+
+        var result = await Sut().ExecuteAsync(
+            NewCommandAvulso(s.Id, nome: "Molho & Cia (picante) - d'oro") with
+            {
+                Ingredientes = "Pimenta > média, sal & alho",
+                SugestaoMolho = "Barbecue d'casa",
+            });
+
+        result.ItemId.Should().NotBeEmpty("'&', aspas, hífen, parênteses e '<'/'>' isolados são legítimos");
+    }
+
     private static AdicionarCardapioItemAdminCommand NewCommand(Guid storefrontId, Guid? produtoId = null) =>
         new(storefrontId,
             ProdutoId: produtoId ?? Guid.NewGuid(),

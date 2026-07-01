@@ -52,6 +52,16 @@ public class AdicionarCardapioItemAdminUseCase(
 {
     public async Task<AdicionarCardapioItemAdminResult> ExecuteAsync(AdicionarCardapioItemAdminCommand command)
     {
+        // issue 658: estes campos viram PedidoItem.NomeSnapshot/metadata e fluem para
+        // NF-e (xProd), PDF e etiqueta — sinks fora do escaping do Razor. A defesa é no
+        // input. EnsureSemTagsHtml é no-op para null/vazio e libera '<'/'>' isolados.
+        UseCaseGuards.EnsureSemTagsHtml(command.NomePublico, "Nome público do item");
+        UseCaseGuards.EnsureSemTagsHtml(command.DescricaoPublica, "Descrição pública");
+        UseCaseGuards.EnsureSemTagsHtml(command.Ingredientes, "Ingredientes");
+        UseCaseGuards.EnsureSemTagsHtml(command.Alergenos, "Alérgenos");
+        UseCaseGuards.EnsureSemTagsHtml(command.SugestaoMolho, "Sugestão de molho");
+        UseCaseGuards.EnsureSemTagsHtml(command.Tag, "Tag");
+
         var storefront = await storefrontRepository.GetByIdAsync(command.StorefrontId)
             ?? throw new StorefrontNaoEncontradoException();
 

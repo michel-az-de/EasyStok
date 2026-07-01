@@ -57,4 +57,42 @@ public class EditarCardapioItemAdminUseCaseTests
         item.Ingredientes.Should().BeEmpty();
         await _uow.Received(1).CommitAsync();
     }
+
+    // ── Guards anti-XSS de contexto fiscal (issue 658) ─────────────────
+
+    [Fact]
+    public async Task DeveLancar_QuandoMetadataContemTagHtml()
+    {
+        var storefrontId = Guid.NewGuid();
+        var item = ItemComDetalhes(storefrontId);
+
+        var act = async () => await Sut().ExecuteAsync(new EditarCardapioItemAdminCommand(
+            storefrontId, item.Id,
+            NomePublico: "<script>alert('xss')</script>", CategoriaTexto: null, DescricaoPublica: null,
+            Ingredientes: null, Alergenos: null, SugestaoMolho: null, TempoPreparo: null,
+            FotoUrl: null, PrecoStorefront: null, Tag: null, PesoExibicao: null, FiltrosJson: null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*tags HTML*");
+        item.NomePublico.Should().Be("lasanha", "metadata maliciosa não pode ter sido aplicada");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task DeveAceitar_TextoCulinarioComCaracteresEspeciais()
+    {
+        var storefrontId = Guid.NewGuid();
+        var item = ItemComDetalhes(storefrontId);
+
+        await Sut().ExecuteAsync(new EditarCardapioItemAdminCommand(
+            storefrontId, item.Id,
+            NomePublico: "Molho & Cia (picante) - d'oro", CategoriaTexto: null, DescricaoPublica: null,
+            Ingredientes: "Pimenta > média, sal & alho", Alergenos: null, SugestaoMolho: null,
+            TempoPreparo: null, FotoUrl: null, PrecoStorefront: null, Tag: null,
+            PesoExibicao: null, FiltrosJson: null));
+
+        item.Ingredientes.Should().Be("Pimenta > média, sal & alho",
+            "'&', aspas, hífen, parênteses e '<'/'>' isolados são legítimos");
+        await _uow.Received(1).CommitAsync();
+    }
 }
