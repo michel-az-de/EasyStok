@@ -83,30 +83,12 @@ public sealed class EntityAlteracaoRetentionService : BackgroundService
             totalDeleted += deleted;
         }
 
-        // Cleanup default pra todos os outros tipos
+        // Cleanup default pra todos os outros tipos (fora do dicionario de
+        // retencao especifica). Via SQL raw em lotes — ExecuteDelete do EF nao
+        // suporta OrderBy/Take, e o padrao do DeleteBatchAsync ja resolve isso.
         var defaultThreshold = now.AddDays(-DefaultRetentionDays);
-        var knownTypes = RetentionDays.Keys.ToList();
-
-        // EF translates List<string>.Contains() to SQL NOT IN
-        var defaultDeleted = await db.EntityAlteracoes
-            .Where(a => a.AlteradoEm < defaultThreshold
-                     && !knownTypes.Contains(a.TipoEntidade))
-            .OrderBy(a => a.AlteradoEm)
-            .Take(BatchSize)
-            .ExecuteDeleteAsync(ct);
-        totalDeleted += defaultDeleted;
-
-        // Continue in batches if we hit the limit
-        while (defaultDeleted == BatchSize && !ct.IsCancellationRequested)
-        {
-            defaultDeleted = await db.EntityAlteracoes
-                .Where(a => a.AlteradoEm < defaultThreshold
-                         && !knownTypes.Contains(a.TipoEntidade))
-                .OrderBy(a => a.AlteradoEm)
-                .Take(BatchSize)
-                .ExecuteDeleteAsync(ct);
-            totalDeleted += defaultDeleted;
-        }
+        var knownTypes = RetentionDays.Keys.ToArray();
+        totalDeleted += await DeleteDefaultBatchAsync(db, knownTypes, defaultThreshold, ct);
 
         if (totalDeleted > 0)
             _logger.LogInformation("EntityAlteracaoRetentionService: {Count} entries removidas", totalDeleted);
@@ -124,9 +106,34 @@ public sealed class EntityAlteracaoRetentionService : BackgroundService
                   WHERE ""Id"" IN (
                     SELECT ""Id"" FROM entity_alteracoes
                     WHERE ""TipoEntidade"" = {0} AND ""AlteradoEm"" < {1}
+                    ORDER BY ""AlteradoEm""
                     LIMIT {2}
                   )",
-                tipoEntidade, threshold, BatchSize,
+                new object[] { tipoEntidade, threshold, BatchSize },
+                ct);
+            total += batch;
+        } while (batch == BatchSize && !ct.IsCancellationRequested);
+        return total;
+    }
+
+    // Apaga entries dos tipos FORA do dicionario de retencao especifica
+    // (retention default). SQL raw em lotes pelo mesmo motivo do DeleteBatchAsync.
+    private static async Task<int> DeleteDefaultBatchAsync(
+        EasyStockDbContext db, string[] knownTypes, DateTime threshold, CancellationToken ct)
+    {
+        var total = 0;
+        int batch;
+        do
+        {
+            batch = await db.Database.ExecuteSqlRawAsync(
+                @"DELETE FROM entity_alteracoes
+                  WHERE ""Id"" IN (
+                    SELECT ""Id"" FROM entity_alteracoes
+                    WHERE ""AlteradoEm"" < {0} AND NOT (""TipoEntidade"" = ANY({1}))
+                    ORDER BY ""AlteradoEm""
+                    LIMIT {2}
+                  )",
+                new object[] { threshold, knownTypes, BatchSize },
                 ct);
             total += batch;
         } while (batch == BatchSize && !ct.IsCancellationRequested);
