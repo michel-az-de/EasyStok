@@ -59,6 +59,28 @@ public class EmitirNfceUseCaseTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ComTagHtmlNoNomeSnapshot_LancaUseCaseValidationException()
+    {
+        // issue 658: NomeSnapshot vira xProd na NF-e e texto no PDF (sinks sem escaping).
+        // O guard no input barra qualquer origem (cardapio, pedido, chamada direta da API).
+        var cmd = ValidCommand() with
+        {
+            Itens = new()
+            {
+                new(NomeSnapshot: "<script>alert('xss')</script>", Quantidade: 1m,
+                    PrecoUnitario: 100m, Unidade: "UN", Ncm: "12345678", Cfop: "5102",
+                    ProdutoIdSnapshot: null, OrigemMercadoria: 0, CstOuCsosn: null)
+            }
+        };
+
+        var act = async () => await NewUseCase().ExecuteAsync(cmd);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*tags HTML*");
+        await _nfeRepo.DidNotReceive().FindByIdempotencyKeyAsync(Arg.Any<Guid>(), Arg.Any<string>());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ComIdempotencyKeyVazia_LancaUseCaseValidationException()
     {
         var cmd = ValidCommand() with { IdempotencyKey = "   " };

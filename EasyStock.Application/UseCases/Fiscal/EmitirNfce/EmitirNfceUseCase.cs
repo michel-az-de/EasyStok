@@ -55,6 +55,12 @@ public class EmitirNfceUseCase(
         if (cmd.Itens.Count == 0)
             throw new UseCaseValidationException("Itens obrigatorios.");
 
+        // issue 658: NomeSnapshot vem do request e vira xProd na NF-e / texto no PDF —
+        // sinks sem escaping. Guard aqui fecha TODOS os caminhos de emissao (cardapio,
+        // pedido, chamada direta da API), independente da origem do snapshot.
+        foreach (var item in cmd.Itens)
+            UseCaseGuards.EnsureSemTagsHtml(item.NomeSnapshot, "Nome do item da nota");
+
         // === Defesa em DB (issue #290): consulta antes de reservar numero ===
         // Se o middleware HTTP-level falhou ao persistir o cache (catch WARN),
         // retry chega aqui sem hit no cache. Antes de queimar segundo numero
