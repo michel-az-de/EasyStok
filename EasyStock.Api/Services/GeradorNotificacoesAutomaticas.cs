@@ -1,4 +1,6 @@
 using EasyStock.Application.Common;
+using EasyStock.Application.UseCases.Analytics.Reposicao;
+using EasyStock.Domain.Reposicao;
 
 namespace EasyStock.Api.Services;
 
@@ -7,6 +9,7 @@ public sealed class GeradorNotificacoesAutomaticas(
     ILojaRepository lojaRepository,
     IConfiguracaoLojaRepository configuracaoLojaRepository,
     IItemEstoqueRepository estoqueRepository,
+    ObterReposicaoUseCase reposicaoUseCase,
     INotificacaoRepository notificacaoRepository,
     IPedidoFornecedorRepository pedidoFornecedorRepository,
     IUnitOfWork unitOfWork,
@@ -42,24 +45,28 @@ public sealed class GeradorNotificacoesAutomaticas(
 
             var configuracaoLoja = await configuracaoLojaRepository.GetOrDefaultAsync(loja.Id);
 
+            // Fonte única de reposição (ADR-0039 / issue 748): EstoqueCritico e ReposicaoSugerida
+            // derivam do MESMO cálculo por-produto (ObterReposicaoUseCase), no lugar de dois
+            // predicados por-lote divergentes (GetEstoqueBaixoAsync / GetSugestaoReposicaoAsync).
+            var reposicao = configuracaoLoja.NotificarEstoqueCritico || configuracaoLoja.NotificarReposicao
+                ? await reposicaoUseCase.ExecuteAsync(new ObterReposicaoCommand(empresa.Id, loja.Id), ct)
+                : (IReadOnlyList<ItemReposicao>)Array.Empty<ItemReposicao>();
+
             if (configuracaoLoja.NotificarEstoqueCritico)
             {
-                await ProcessarPaginadoAsync(
-                    page => estoqueRepository.GetEstoqueBaixoAsync(empresa.Id, Math.Max(2, configuracaoLoja.QuantidadeMinimaPadrao), page, 100, loja.Id),
-                    item =>
-                    {
-                        var qty = item.QuantidadeAtual.Value;
-                        var severidade = qty <= 2 ? SeveridadeNotificacao.Critica : SeveridadeNotificacao.Alta;
-                        var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
-                        return CriarSeNaoExisteNoDiaAsync(
-                            empresa.Id,
-                            TipoAlertaEstoque.EstoqueCritico,
-                            "Estoque Crítico",
-                            $"{codigo} com apenas {qty} unidade(s) — minimo configurado: {configuracaoLoja.QuantidadeMinimaPadrao}. Considere repor este item.",
-                            severidade,
-                            item.Id);
-                    },
-                    ct);
+                foreach (var item in reposicao.Where(i => i.Estado is EstadoReposicao.Esgotado or EstadoReposicao.Critico))
+                {
+                    var severidade = item.Estado == EstadoReposicao.Esgotado
+                        ? SeveridadeNotificacao.Critica
+                        : SeveridadeNotificacao.Alta;
+                    await CriarSeNaoExisteNoDiaAsync(
+                        empresa.Id,
+                        TipoAlertaEstoque.EstoqueCritico,
+                        "Estoque Crítico",
+                        $"{item.Nome}: {item.Motivo}. Considere repor este item.",
+                        severidade,
+                        item.ProdutoId);
+                }
             }
 
             if (configuracaoLoja.NotificarValidade)
@@ -124,21 +131,18 @@ public sealed class GeradorNotificacoesAutomaticas(
 
             if (configuracaoLoja.NotificarReposicao)
             {
-                await ProcessarPaginadoAsync(
-                    page => estoqueRepository.GetSugestaoReposicaoAsync(empresa.Id, configuracaoLoja.QuantidadeMinimaPadrao, page, 100, loja.Id),
-                    item =>
-                    {
-                        var previsao = item.PrevisaoZeramentoDias?.ToString() ?? "indefinida";
-                        var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
-                        return CriarSeNaoExisteNoDiaAsync(
-                            empresa.Id,
-                            TipoAlertaEstoque.ReposicaoSugerida,
-                            "Reposição Sugerida",
-                            $"{codigo} precisa de reposição. {qty_context(item)} Previsão de zeramento: {previsao} dia(s).",
-                            SeveridadeNotificacao.Media,
-                            item.Id);
-                    },
-                    ct);
+                foreach (var item in reposicao)
+                {
+                    var previsao = item.DiasAteRuptura?.ToString() ?? "indefinida";
+                    var sugestao = item.QuantidadeSugerida.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                    await CriarSeNaoExisteNoDiaAsync(
+                        empresa.Id,
+                        TipoAlertaEstoque.ReposicaoSugerida,
+                        "Reposição Sugerida",
+                        $"{item.Nome} precisa de reposição ({item.Motivo}). Sugestão: {sugestao} un. Previsão de ruptura: {previsao} dia(s).",
+                        SeveridadeNotificacao.Media,
+                        item.ProdutoId);
+                }
             }
         }
 
