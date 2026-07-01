@@ -1,56 +1,36 @@
-using System.Diagnostics;
-using EasyStock.Application.Configuration;
+using EasyStock.Application.UseCases.Analytics.Reposicao;
 
 namespace EasyStock.Application.UseCases.Inteligencia.SugestaoReposicao;
 
 public class ObterSugestaoReposicaoUseCase(
-    IItemEstoqueRepository itemEstoqueRepository,
-    IConfiguracaoLojaRepository configuracaoRepository,
-    IEasyStockConfiguracoes config,
+    ObterReposicaoUseCase obterReposicao,
     ILogger<ObterSugestaoReposicaoUseCase> logger)
 {
     public async Task<(IEnumerable<SugestaoReposicaoResult> Items, int Total)> ExecuteAsync(ObterSugestaoReposicaoCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
-        var stopwatch = Stopwatch.StartNew();
+        // Fonte única (ADR-0039): a projeção por-produto substitui GetSugestaoReposicaoAsync
+        // (predicado por-lote). ItemEstoqueId é identidade de lote, sem equivalente por-produto:
+        // fica vazio (o fluxo "Gerar" usa NomeProduto/ProdutoId, não o lote).
+        var todos = await obterReposicao.ExecuteAsync(
+            new ObterReposicaoCommand(cmd.EmpresaId, cmd.LojaId)).ConfigureAwait(false);
 
-        var configuracao = cmd.LojaId.HasValue
-            ? await configuracaoRepository.GetByLojaIdAsync(cmd.LojaId.Value).ConfigureAwait(false)
-            : null;
-
-        var limiteEfetivo = cmd.LimiteQuantidade
-            ?? configuracao?.QuantidadeMinimaPadrao
-            ?? config.LimiteEstoqueBaixoDefault;
-
-        var (items, totalCount) = await itemEstoqueRepository.GetSugestaoReposicaoAsync(
-            cmd.EmpresaId, limiteEfetivo, cmd.Page, cmd.PageSize, cmd.LojaId).ConfigureAwait(false);
-
-        stopwatch.Stop();
-
-        var resultados = items.Select(item =>
-        {
-            dynamic dinamico = item;
-            return new SugestaoReposicaoResult(
-                (Guid)dinamico.Id,
-                (Guid)dinamico.ProdutoId,
-                (string?)dinamico.Produto?.Nome ?? (string?)dinamico.CodigoInterno,
-                (string?)dinamico.CodigoInterno,
-                (decimal)dinamico.QuantidadeAtual,
-                (int)limiteEfetivo,
-                (decimal)dinamico.QuantidadeSugerida,
-                (decimal)dinamico.CustoEstimado);
-        });
+        var mapeados = todos.Select(i => new SugestaoReposicaoResult(
+            Guid.Empty,
+            i.ProdutoId,
+            i.Nome,
+            null,
+            i.QuantidadeVigente,
+            i.NivelMinimo,
+            i.QuantidadeSugerida,
+            i.CustoEstimadoReposicao)).ToList();
+        var pagina = mapeados.Skip((cmd.Page - 1) * cmd.PageSize).Take(cmd.PageSize).ToList();
 
         logger.LogInformation(
-            "Sugestão de reposição obtida em {Ms}ms para empresa {EmpresaId} | "
-            + "Limite: {Limite}, Loja: {LojaId}, Total: {Total}",
-            stopwatch.ElapsedMilliseconds,
-            cmd.EmpresaId,
-            limiteEfetivo,
-            cmd.LojaId ?? Guid.Empty,
-            totalCount);
+            "Sugestao de reposicao (fonte unica) para empresa {EmpresaId}, loja {LojaId}: {Total} elegiveis.",
+            cmd.EmpresaId, cmd.LojaId ?? Guid.Empty, mapeados.Count);
 
-        return (resultados, totalCount);
+        return (pagina, mapeados.Count);
     }
 }
