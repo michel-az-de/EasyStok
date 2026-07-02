@@ -2,7 +2,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations;
 
 /// <summary>
 /// F10-C-3 — Configuracao da tabela <c>mobile_processed_mutations</c>.
-/// PK composta (MutationId, DeviceId) garante idempotency.
+/// A PK composta (MutationId, DeviceId) NAO garantia a idempotencia GLOBAL que o
+/// SyncController assume (o pre-check dedupa por MutationId sozinho): dois pushes da
+/// mesma mutation com DeviceIds diferentes (re-pareamento) passavam ambos e aplicavam
+/// a mutation 2x (venda/estoque duplicados). O indice unico em MutationId (#789)
+/// fecha isso no banco.
 /// </summary>
 public class MobileProcessedMutationConfiguration : IEntityTypeConfiguration<MobileProcessedMutation>
 {
@@ -41,5 +45,12 @@ public class MobileProcessedMutationConfiguration : IEntityTypeConfiguration<Mob
         // Retention cleanup index
         builder.HasIndex(m => new { m.EmpresaId, m.CriadoEm })
             .HasDatabaseName("ix_mpm_retention");
+
+        // Idempotencia GLOBAL por MutationId (#789): o pre-check do SyncController dedupa
+        // por MutationId sozinho, mas a PK composta permitia a mesma mutation com DeviceIds
+        // diferentes. Indice unico garante o invariante no banco.
+        builder.HasIndex(m => m.MutationId)
+            .IsUnique()
+            .HasDatabaseName("ux_mpm_mutation_id");
     }
 }
