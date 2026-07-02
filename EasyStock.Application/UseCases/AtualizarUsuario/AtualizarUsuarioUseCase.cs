@@ -7,6 +7,7 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
 
     public class AtualizarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
+        ICurrentUserAccessor currentUser,
         IUnitOfWork unitOfWork,
         ILogger<AtualizarUsuarioUseCase> logger)
     {
@@ -16,6 +17,18 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+
+            // Isolamento multi-tenant: Usuario nao tem EmpresaId (escapa do filtro
+            // global e da RLS), e GetByIdAsync roda com bypass de RLS por ser reusado
+            // no fluxo pre-auth de refresh-token. Sem esta guarda, um Admin de tenant
+            // poderia alterar nome/e-mail (vetor de account takeover) de usuario de
+            // OUTRO tenant via PUT /api/usuarios/{id} (#764). SuperAdmin e cross-tenant
+            // por design. Mesma mensagem do not-found para nao confirmar existencia.
+            if (currentUser.Nivel != NivelAcesso.SuperAdmin &&
+                !usuario.Empresas.Any(ue => ue.EmpresaId == currentUser.EmpresaId))
+            {
+                throw new UseCaseValidationException("Usuario nao encontrado.");
+            }
 
             if (!string.IsNullOrWhiteSpace(command.Email) && command.Email != usuario.Email)
             {
