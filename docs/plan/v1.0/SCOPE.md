@@ -30,7 +30,7 @@ Define quais features de produto fazem parte do release v1.0 (Marco Zero). Tudo 
 
 | Bounded Context | Motivo de exclusão |
 |---|---|
-| NFe / Fiscal | 13 UC em construção, FocusNFe instável em homologação. Risco fiscal real — não soltar sem QA dedicado. |
+| NFe / Fiscal | 13 UC em construção, FocusNFe instável em homologação. Risco fiscal real — não soltar sem QA dedicado. **Gate (#770):** escondido atrás de `Features:FiscalHabilitado` (default false) — atalho do Dashboard some e `/notas-fiscais/*` responde 404. Backend FocusNFe intacto; reativar no piloto = flag `true`. |
 | Etiqueta / Rotulagem P-02 | É Etapa 5 do roadmap (ADR-0021 Accepted 2026-05-24). Pós-v1.0 por decisão explícita. |
 | MAUI Mobile (`EasyStok.Mobile`) | 1.9K LoC, embrionário. App mobile não é blocker do core SaaS. |
 | Analytics avançado | 46 UC mas read-only, sem dashboards prontos. Relatórios básicos no Admin cobrem v1.0. |

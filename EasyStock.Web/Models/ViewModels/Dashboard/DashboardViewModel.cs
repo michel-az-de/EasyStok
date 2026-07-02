@@ -8,6 +8,10 @@ public class DashboardViewModel
     public decimal ReceitaMes { get; set; }
     public decimal MediaVendasDiaria { get; set; }
 
+    // issue #770: fiscal fora do escopo v1.0 (SCOPE.md). Controla o atalho "Emitir NF-e"
+    // no Dashboard — off (default) esconde o atalho ate a homologacao FocusNFe.
+    public bool TemModuloFiscalHabilitado { get; set; }
+
     public int EstoqueCritico { get; set; }
     public int ProximosVencimento { get; set; }
     public int ProdutosParados { get; set; }

@@ -2,10 +2,11 @@ using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Dashboard;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Web.Controllers;
 
-public class DashboardController(ApiClient api, SessionService session) : BaseController(session)
+public class DashboardController(ApiClient api, SessionService session, IOptions<FeaturesOptions> features) : BaseController(session)
 {
     [HttpGet("/dashboard")]
     public async Task<IActionResult> Index()
@@ -16,7 +17,11 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
         var lojas = await api.GetAsync<List<LojaApi>>("lojas");
         ViewBag.Lojas = lojas.Success && lojas.Data is not null ? lojas.Data : new List<LojaApi>();
 
-        var vm = new DashboardViewModel();
+        var vm = new DashboardViewModel
+        {
+            // issue #770: atalho "Emitir NF-e" so aparece com o modulo fiscal habilitado.
+            TemModuloFiscalHabilitado = features.Value.FiscalHabilitado,
+        };
 
         var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
         var diaTask = api.GetAsync<ResumoDiaApi>("analytics/dia");
