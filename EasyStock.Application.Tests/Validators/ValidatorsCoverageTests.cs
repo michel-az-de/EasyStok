@@ -7,6 +7,7 @@ using EasyStock.Application.UseCases.Logout;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Application.Validators;
+using AlterarSenhaUsuarioCommand = EasyStock.Application.UseCases.AlterarSenhaUsuario.AlterarSenhaCommand;
 
 namespace EasyStock.Application.Tests.Validators;
 
@@ -52,6 +53,35 @@ public class AlterarSenhaCommandValidatorTests
         var r = _v.Validate(new AlterarSenhaCommand("MinhaS3nh@!", "MinhaS3nh@!"));
         r.IsValid.Should().BeFalse();
         r.Errors.Should().Contain(e => e.PropertyName == "NovaSenha" && e.ErrorMessage.Contains("diferente"));
+    }
+}
+
+/// <summary>
+/// #767: o caminho PUT /usuarios/{id}/senha (AlterarSenhaUsuario) nao tinha validator
+/// e aceitava senha fraca. Trava a politica de senha forte tambem nesse fluxo.
+/// </summary>
+public class AlterarSenhaUsuarioCommandValidatorTests
+{
+    private readonly AlterarSenhaUsuarioCommandValidator _v = new();
+
+    [Fact]
+    public void IsValid_quando_nova_senha_forte()
+    {
+        var cmd = new AlterarSenhaUsuarioCommand(Guid.NewGuid(), "OldP@ssw0rd", "Nov@Senha2024");
+        _v.Validate(cmd).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("a")]                  // trivial (o bug: era aceita)
+    [InlineData("Fraca123!")]          // 9 chars < 10
+    [InlineData("SemNumeroAA!")]       // sem numero
+    [InlineData("semmaiuscula1!")]     // sem maiuscula
+    [InlineData("SEM MINUSCULA1!")]    // sem minuscula
+    [InlineData("SemEspecial123")]     // sem caractere especial
+    public void Falha_quando_nova_senha_fraca(string senha)
+    {
+        _v.Validate(new AlterarSenhaUsuarioCommand(Guid.NewGuid(), "OldP@ssw0rd", senha))
+            .IsValid.Should().BeFalse();
     }
 }
 

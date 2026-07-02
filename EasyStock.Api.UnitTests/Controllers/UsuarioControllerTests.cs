@@ -7,6 +7,7 @@ using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.ListarUsuarios;
+using EasyStock.Application.Validators;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
@@ -43,7 +44,7 @@ public class UsuarioControllerTests
         var passwordHasher = Substitute.For<IPasswordHasher>();
         _criarUseCase = new CriarUsuarioUseCase(_usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _unitOfWork, passwordHasher, criarLogger);
         _atualizarUseCase = new AtualizarUsuarioUseCase(_usuarioRepository, _currentUser, _unitOfWork, atualizarLogger);
-        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, _unitOfWork, passwordHasher, alterarSenhaLogger);
+        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), _unitOfWork, passwordHasher, alterarSenhaLogger);
         _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
         _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, _unitOfWork, atribuirPerfilLogger);

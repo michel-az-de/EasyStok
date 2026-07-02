@@ -1,3 +1,5 @@
+using FluentValidation;
+
 namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
 {
     public sealed record AlterarSenhaCommand(
@@ -7,6 +9,7 @@ namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
 
     public class AlterarSenhaUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
+        IValidator<AlterarSenhaCommand> validator,
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         ILogger<AlterarSenhaUsuarioUseCase> logger)
@@ -14,6 +17,13 @@ namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
         public async Task ExecuteAsync(AlterarSenhaCommand command)
         {
             logger.LogInformation("Alterando senha do usuario {UsuarioId}", command.UsuarioId);
+
+            // Este caminho (PUT /usuarios/{id}/senha) nao passa por auto-validation MVC
+            // (o command e montado no controller a partir do DTO), entao a politica de
+            // senha e aplicada aqui — antes so o fluxo /auth/change-password validava (#767).
+            var validacao = validator.Validate(command);
+            if (!validacao.IsValid)
+                throw new UseCaseValidationException(validacao.Errors[0].ErrorMessage);
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
