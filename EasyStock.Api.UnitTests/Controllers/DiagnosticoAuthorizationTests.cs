@@ -6,17 +6,20 @@ using Microsoft.AspNetCore.Authorization;
 namespace EasyStock.Api.UnitTests.Controllers;
 
 /// <summary>
-/// Trava a politica de autorizacao dos controllers de diagnostico (issue #442).
-/// <see cref="DiagnosticoController"/> e <see cref="DiagnosticoLogsController"/>
-/// servem dados de PLATAFORMA cross-tenant (logs de arquivo, system-errors,
-/// export, dashboard com logs em modo HTML) e DEVEM exigir <c>SuperAdmin</c> —
-/// nao <c>Admin</c>, que tambem aceita o admin-de-tenant (todo tenant cria seu
-/// usuario primario como <c>NivelAcesso.Admin</c>).
+/// Trava a politica de autorizacao dos controllers de diagnostico (issue #442, #763).
+/// <see cref="DiagnosticoController"/>, <see cref="DiagnosticoLogsController"/> e
+/// <see cref="DiagnosticoInfraController"/> servem dados de PLATAFORMA cross-tenant
+/// (logs de arquivo, system-errors, export, dashboard, enumeracao de empresas via
+/// <c>HealthEmpresas</c>, texto de queries via <c>pg_stat_statements</c>, mutacoes de
+/// estado global) e DEVEM exigir <c>SuperAdmin</c> — nao <c>Admin</c>, que tambem
+/// aceita o admin-de-tenant (todo tenant cria seu usuario primario como
+/// <c>NivelAcesso.Admin</c>).
 ///
 /// <para>
-/// <see cref="DiagnosticoInfraController"/> permanece em <c>Admin</c> de
-/// proposito: e o card de saude per-empresa, escopado por tenant via
-/// <c>ICurrentUserAccessor</c>. Este teste trava o split intencional.
+/// A tabela <c>empresas</c> tem chave <c>Id</c> (nao <c>EmpresaId</c>), logo escapa
+/// tanto do filtro global de tenant quanto da RLS — a autorizacao e a unica barreira.
+/// Ate #763, <see cref="DiagnosticoInfraController"/> estava em <c>Admin</c> sob a
+/// premissa (falsa) de ser escopado por tenant.
 /// </para>
 /// </summary>
 public class DiagnosticoAuthorizationTests
@@ -24,19 +27,12 @@ public class DiagnosticoAuthorizationTests
     [Theory]
     [InlineData(typeof(DiagnosticoController))]
     [InlineData(typeof(DiagnosticoLogsController))]
+    [InlineData(typeof(DiagnosticoInfraController))]
     public void ControllersDeDiagnosticoPlataforma_ExigemSuperAdmin(Type controllerType)
     {
         PolicyDeAutorizacao(controllerType).Should().Be(
             "SuperAdmin",
             $"{controllerType.Name} expoe diagnostico/logs de toda a plataforma e nao pode ser acessivel por admin-de-tenant");
-    }
-
-    [Fact]
-    public void DiagnosticoInfraController_PermaneceEmAdmin()
-    {
-        PolicyDeAutorizacao(typeof(DiagnosticoInfraController)).Should().Be(
-            "Admin",
-            "card de saude per-empresa e escopado por tenant — fica acessivel ao admin do proprio tenant");
     }
 
     private static string? PolicyDeAutorizacao(Type controllerType) =>

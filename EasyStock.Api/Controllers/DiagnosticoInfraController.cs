@@ -10,11 +10,20 @@ namespace EasyStock.Api.Controllers;
 /// <summary>
 /// Endpoints de infraestrutura, operações, SLO, alertas e métricas avançadas.
 /// Separado de <see cref="DiagnosticoController"/> por responsabilidade.
+/// <para>
+/// Exige <c>SuperAdmin</c> (não <c>Admin</c>): expõe dados de PLATAFORMA
+/// cross-tenant que as camadas multi-tenant não cobrem — <c>HealthEmpresas</c>
+/// enumera todas as empresas (a entidade <c>Empresa</c> tem chave <c>Id</c>, não
+/// <c>EmpresaId</c>, logo escapa do filtro global e da RLS), <c>QueriesLentas</c>
+/// expõe o texto de queries via <c>pg_stat_statements</c>, e há mutações de estado
+/// global (zerar histórico, ack de alertas). Alinha com os irmãos
+/// <see cref="DiagnosticoController"/>/<see cref="DiagnosticoLogsController"/> (#763).
+/// </para>
 /// </summary>
 [ApiController]
 [Route("api/diagnostico")]
 [Route("diagnostico")]
-[Authorize(Policy = "Admin")]
+[Authorize(Policy = "SuperAdmin")]
 [ApiExplorerSettings(GroupName = "v1-ptbr")]
 public sealed class DiagnosticoInfraController(
     ResolvedInfrastructureState infraState,
