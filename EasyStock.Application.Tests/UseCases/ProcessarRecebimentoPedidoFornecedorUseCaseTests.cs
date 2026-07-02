@@ -13,6 +13,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
     private readonly IPedidoFornecedorRepository _pedidoRepository;
     private readonly IPedidoFornecedorItemRepository _itemRepository;
     private readonly RegistrarEntradaEstoqueUseCase _entradaUseCase;
+    private readonly IMovimentacaoEstoqueRepository _movimentacaoRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ProcessarRecebimentoPedidoFornecedorUseCase> _logger;
     private readonly IPublicadorEventos _publicador;
@@ -36,6 +37,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(),
             null, null, null, null, null, null);
         _unitOfWork = Substitute.For<IUnitOfWork>();
+        _movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         _logger = Substitute.For<ILogger<ProcessarRecebimentoPedidoFornecedorUseCase>>();
         _publicador = Substitute.For<IPublicadorEventos>();
 
@@ -43,6 +45,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
             _pedidoRepository,
             _itemRepository,
             _entradaUseCase,
+            _movimentacaoRepository,
             _unitOfWork,
             _logger,
             _publicador);
@@ -140,6 +143,47 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
         // Verifica publicação de eventos
         await _publicador.Received(2).PublicarAsync(Arg.Is<PedidoFornecedorItemRecebido>(e => true));
         await _publicador.Received(1).PublicarAsync(Arg.Is<PedidoFornecedorRecebido>(e => e.TotalItensRecebidos == 2));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Idempotente_NaoRecriaEntrada_QuandoReferenciaJaExiste()
+    {
+        // #790: retry apos falha parcial — a movimentacao de referencia ja existe.
+        var pedidoId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var data = new DateTime(2026, 5, 2, 12, 0, 0, DateTimeKind.Utc);
+
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId,
+            DataPedido = data.AddDays(-5), Status = StatusPedidoFornecedor.Aberto,
+            CriadoEm = data.AddDays(-10), AlteradoEm = data.AddDays(-10),
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "F", EmpresaId = _empresaId }
+        };
+        var item = new PedidoFornecedorItem
+        {
+            Id = itemId, PedidoFornecedorId = pedidoId, ProdutoId = _produtoId,
+            Nome = "P", Quantidade = 10, QuantidadeRecebida = 0, CustoUnitario = 100m,
+            CriadoEm = data.AddDays(-10)
+        };
+
+        _pedidoRepository.GetByIdAsync(pedidoId).Returns(pedido);
+        _itemRepository.GetByPedidoIdAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(new[] { item });
+
+        var refDoc = $"{pedidoId}:{itemId}:r10";
+        _movimentacaoRepository
+            .ExisteReferenciaAsync(_empresaId, _produtoId, refDoc, NaturezaMovimentacaoEstoque.Compra, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var comando = new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedidoId, _empresaId, data, new Dictionary<Guid, decimal> { { itemId, 10m } });
+
+        await _useCase.ExecuteAsync(comando);
+
+        // Nao recria a entrada (senao dobra estoque), mas persiste o total recebido.
+        await _entradaUseCase.DidNotReceive().ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>());
+        await _itemRepository.Received(1).UpdateAsync(Arg.Is<PedidoFornecedorItem>(i => i.QuantidadeRecebida == 10m));
+        await _unitOfWork.Received(1).CommitAsync();
     }
 
     [Fact]

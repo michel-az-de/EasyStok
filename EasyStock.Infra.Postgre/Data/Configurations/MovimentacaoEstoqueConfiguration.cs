@@ -51,6 +51,16 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasDatabaseName("ix_movimentacoes_empresa_natureza");
             builder.HasIndex(m => new { m.EmpresaId, m.UsuarioId, m.DataMovimentacao })
                 .HasDatabaseName("ix_movimentacoes_empresa_usuario_data");
+
+            // Idempotencia por referencia de documento (#790): impede movimentacao duplicada
+            // no MESMO (empresa, produto, natureza, documento). O retry de recebimento de
+            // pedido (item aplicado mas QuantidadeRecebida nao persistida) recriava a entrada.
+            // Parcial: so vale quando ha DocumentoReferencia (movimentacoes manuais tem ref
+            // nula, sem restricao). Natureza no indice pois refDoc e reusado por Venda/Estorno.
+            builder.HasIndex(m => new { m.EmpresaId, m.ProdutoId, m.Natureza, m.DocumentoReferencia })
+                .IsUnique()
+                .HasFilter("\"DocumentoReferencia\" IS NOT NULL")
+                .HasDatabaseName("ux_mov_estoque_referencia");
         }
     }
 }

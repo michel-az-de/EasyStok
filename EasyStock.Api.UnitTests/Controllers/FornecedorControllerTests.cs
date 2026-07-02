@@ -54,6 +54,7 @@ public class FornecedorControllerTests
             _pedidoFornecedorRepository,
             Substitute.For<IPedidoFornecedorItemRepository>(),
             entradaUseCase,
+            Substitute.For<IMovimentacaoEstoqueRepository>(),
             _unitOfWork,
             Substitute.For<ILogger<ProcessarRecebimentoPedidoFornecedorUseCase>>());
         var alteracoes = new EasyStock.Application.UseCases.ObterHistoricoAlteracoesFornecedor.ObterHistoricoAlteracoesFornecedorUseCase(_fornecedorRepository);

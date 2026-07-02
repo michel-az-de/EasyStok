@@ -18,6 +18,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
     IPedidoFornecedorRepository pedidoRepository,
     IPedidoFornecedorItemRepository itemRepository,
     RegistrarEntradaEstoqueUseCase entradaUseCase,
+    IMovimentacaoEstoqueRepository movimentacaoRepository,
     IUnitOfWork unitOfWork,
     ILogger<ProcessarRecebimentoPedidoFornecedorUseCase> logger,
     IPublicadorEventos? publicadorEventos = null)
@@ -111,6 +112,24 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                         $"Quantidade fracionaria ({delta}) ainda nao suportada no recebimento. " +
                         "Cadastre delta inteiro ou aguarde suporte a decimal no estoque.");
 
+                // IDEMPOTENCIA (#790): refDoc inclui novoTotalRecebido, entao cada delta e
+                // uma chave unica. Se uma execucao anterior falhou DEPOIS de commitar esta
+                // entrada mas ANTES de persistir QuantidadeRecebida, o retry chegaria aqui
+                // com a MESMA refDoc — checamos e NAO recriamos a entrada (senao dobra o
+                // estoque). So garantimos o total recebido persistido e seguimos. O indice
+                // unico parcial ux_mov_estoque_referencia e o backstop contra retries concorrentes.
+                var refDoc = $"{command.PedidoId}:{item.Id}:r{novoTotalRecebido}";
+                if (await movimentacaoRepository.ExisteReferenciaAsync(
+                        command.EmpresaId, item.ProdutoId.Value, refDoc, NaturezaMovimentacaoEstoque.Compra, ct))
+                {
+                    logger.LogInformation(
+                        "Item {ItemId} (ref {Ref}) ja aplicado — idempotencia, pulando entrada e persistindo total.",
+                        item.Id, refDoc);
+                    item.QuantidadeRecebida = novoTotalRecebido;
+                    await itemRepository.UpdateAsync(item, ct);
+                    continue;
+                }
+
                 // Cria entrada de estoque (REUTILIZA RegistrarEntradaEstoqueUseCase)
                 var entradaCmd = new RegistrarEntradaEstoqueCommand(
                     EmpresaId: command.EmpresaId,
@@ -131,9 +150,8 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                     Validade: null,
                     Observacoes: item.Observacao,
                     DescricaoAnuncio: null,
-                    // IDEMPOTENCIA inclui novoTotalRecebido para permitir
-                    // multiplos recebimentos parciais (cada delta vira chave unica).
-                    DocumentoReferencia: $"{command.PedidoId}:{item.Id}:r{novoTotalRecebido}",
+                    // Mesma refDoc do check de idempotencia acima (#790).
+                    DocumentoReferencia: refDoc,
                     DimensoesReais: null,
                     InstrucoesGeracaoDescricao: null,
                     LojaId: pedido.LojaId);
