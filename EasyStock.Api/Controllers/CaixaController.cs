@@ -50,7 +50,9 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            // Origem server-side (trilha de auditoria), NUNCA do body — o caminho mobile
+            // legitimo abre caixa via MobileCashController. #766
+            Origem = "web"
         });
         return DataCreated($"/api/caixa/movimentos/{result.Id}", result);
     }
@@ -97,7 +99,10 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
+            // Origem server-side, NUNCA do body: origem="mobile" no corpo burlaria as
+            // guardas FIN-003 (metodo/justificativa + anti-caixa-negativo), que so sao
+            // puladas no caminho mobile legitimo (MobileCashController seta "mobile"). #766
+            Origem = "web"
         });
         return DataCreated($"/api/caixa/movimentos/{result.Id}", result);
     }

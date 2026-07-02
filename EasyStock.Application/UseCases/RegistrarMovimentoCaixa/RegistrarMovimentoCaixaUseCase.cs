@@ -71,7 +71,7 @@ public class RegistrarMovimentoCaixaUseCase(
         mov.Referencia = cmd.Referencia;
         mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
         mov.RegistradoPorNome = cmd.RegistradoPorNome;
-        mov.Origem = cmd.Origem;
+        mov.Origem = origem;   // valor normalizado (trim+lower), nao o cru do body
 
         await repo.AddMovimentoAsync(mov);
         await uow.CommitAsync();
