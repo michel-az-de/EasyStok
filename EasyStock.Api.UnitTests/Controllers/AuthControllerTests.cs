@@ -14,6 +14,7 @@ using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -59,10 +60,11 @@ public class AuthControllerTests
         var jwtServiceApp = Substitute.For<EasyStock.Application.Ports.Output.IJwtTokenService>();
 
         var emailTokenRepo = Substitute.For<IEmailConfirmationTokenRepository>();
-        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, passwordHasher, cadastrarLogger);
+        var config = new ConfigurationBuilder().Build();
+        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, passwordHasher, config, cadastrarLogger);
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
-        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, esqueciSenhaLogger);
+        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, config, esqueciSenhaLogger);
         var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, refreshTokenRepo2, usuarioRepo2, auditLogRepo2, unitOfWork2, passwordHasher, resetarSenhaLogger);
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
         var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);

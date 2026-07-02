@@ -2,21 +2,30 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.EsqueciSenha;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases;
 
 public class EsqueciSenhaUseCaseTests
 {
+    private const string HostConfiavel = "https://app.easystock.com";
+
     private readonly IUsuarioRepository _usuarioRepository = Substitute.For<IUsuarioRepository>();
     private readonly IResetTokenRepository _resetTokenRepository = Substitute.For<IResetTokenRepository>();
     private readonly IAuditLogRepository _auditLogRepository = Substitute.For<IAuditLogRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ILogger<EsqueciSenhaUseCase> _logger = Substitute.For<ILogger<EsqueciSenhaUseCase>>();
     private readonly IEmailService _emailService = Substitute.For<IEmailService>();
+    private readonly IConfiguration _config = new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Auth:TrustedLinkOrigins:0"] = HostConfiavel
+        })
+        .Build();
 
     private EsqueciSenhaUseCase CriarUseCase(bool comEmail = true) =>
-        new(_usuarioRepository, _resetTokenRepository, _auditLogRepository, _unitOfWork, _logger,
+        new(_usuarioRepository, _resetTokenRepository, _auditLogRepository, _unitOfWork, _config, _logger,
             comEmail ? _emailService : null);
 
     private static Usuario CriarUsuario(string email = "user@empresa.com") =>
@@ -104,18 +113,35 @@ public class EsqueciSenhaUseCaseTests
     }
 
     [Fact]
-    public async Task DeveIncluirLinkNoEmail_QuandoBaseUrlFornecida()
+    public async Task DeveIncluirLinkNoEmail_QuandoBaseUrlConfiavel()
     {
         var usuario = CriarUsuario("link@empresa.com");
         _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
 
         var useCase = CriarUseCase(comEmail: true);
-        await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, "https://app.easystock.com"));
+        await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, HostConfiavel));
 
         await _emailService.Received(1).SendAsync(
             usuario.Email,
             Arg.Any<string>(),
-            Arg.Is<string>(b => b.Contains("https://app.easystock.com/auth/redefinir-senha?token=")));
+            Arg.Is<string>(b => b.Contains($"{HostConfiavel}/auth/redefinir-senha?token=")));
+    }
+
+    [Fact]
+    public async Task NaoDeveIncluirLink_QuandoBaseUrlNaoConfiavel_PasswordResetPoisoning()
+    {
+        var usuario = CriarUsuario("vitima@empresa.com");
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+
+        var useCase = CriarUseCase(comEmail: true);
+        // Host controlado pelo atacante, fora da allowlist (#765).
+        await useCase.ExecuteAsync(new EsqueciSenhaCommand(usuario.Email, "https://evil.com"));
+
+        // E-mail e enviado, mas SEM link para o host do atacante (cai em token puro).
+        await _emailService.Received(1).SendAsync(
+            usuario.Email,
+            Arg.Any<string>(),
+            Arg.Is<string>(b => !b.Contains("evil.com")));
     }
 
     [Fact]

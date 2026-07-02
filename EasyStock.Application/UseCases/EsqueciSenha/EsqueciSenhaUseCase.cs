@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+
 namespace EasyStock.Application.UseCases.EsqueciSenha;
 
 public sealed class EsqueciSenhaUseCase(
@@ -5,6 +7,7 @@ public sealed class EsqueciSenhaUseCase(
     IResetTokenRepository resetTokenRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
+    IConfiguration configuration,
     ILogger<EsqueciSenhaUseCase> logger,
     IEmailService? emailService = null) : IUseCase<EsqueciSenhaCommand, EsqueciSenhaResult>
 {
@@ -57,11 +60,18 @@ public sealed class EsqueciSenhaUseCase(
         {
             try
             {
-                var resetLink = !string.IsNullOrEmpty(command.BaseUrl)
-                    ? $"{command.BaseUrl.TrimEnd('/')}/auth/redefinir-senha?token={Uri.EscapeDataString(token)}"
+                // Nunca confiar no BaseUrl do corpo da requisicao: so compomos o link
+                // quando o host bate com uma origem confiavel (#765). Host nao-confiavel
+                // (ou ausente) => e-mail com token puro, nunca link para host do atacante.
+                var baseUrlConfiavel = LinkBaseUrlResolver.ResolveTrusted(command.BaseUrl, configuration);
+                if (!string.IsNullOrEmpty(command.BaseUrl) && baseUrlConfiavel is null)
+                    logger.LogWarning("BaseUrl do reset de senha ignorado por nao estar na allowlist de origens confiaveis.");
+
+                var resetLink = baseUrlConfiavel is not null
+                    ? $"{baseUrlConfiavel}/auth/redefinir-senha?token={Uri.EscapeDataString(token)}"
                     : token;
 
-                var hasLink = !string.IsNullOrEmpty(command.BaseUrl);
+                var hasLink = baseUrlConfiavel is not null;
                 var subject = "Recuperação de senha - EasyStock";
                 var body = $"Olá {usuario.Nome},\n\n" +
                            $"Recebemos uma solicitação para redefinir a senha da sua conta.\n\n" +

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+
 namespace EasyStock.Application.UseCases.CadastrarUsuario;
 
 public sealed class CadastrarUsuarioUseCase(
@@ -7,6 +9,7 @@ public sealed class CadastrarUsuarioUseCase(
     IEmailService? emailService,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
+    IConfiguration configuration,
     ILogger<CadastrarUsuarioUseCase> logger) : IUseCase<CadastrarUsuarioCommand, CadastrarUsuarioResult>
 {
     public async Task<CadastrarUsuarioResult> ExecuteAsync(CadastrarUsuarioCommand command)
@@ -42,11 +45,16 @@ public sealed class CadastrarUsuarioUseCase(
         var emailToken = EmailConfirmationToken.Criar(usuario.Id, confirmationTokenHash, null, null);
         await emailTokenRepository.AddAsync(emailToken);
 
-        if (emailService is not null)
+        // Nunca confiar no BaseUrl do corpo: so montamos o link de confirmacao quando
+        // o host bate com uma origem confiavel (#765). Host nao-confiavel => nao envia
+        // link (o token fica persistido; reenvio server-side pode ser disparado depois).
+        var baseUrlConfiavel = LinkBaseUrlResolver.ResolveTrusted(command.BaseUrl, configuration);
+
+        if (emailService is not null && baseUrlConfiavel is not null)
         {
             try
             {
-                var confirmLink = $"{command.BaseUrl.TrimEnd('/')}/auth/confirmar-email?token={Uri.EscapeDataString(confirmationToken)}";
+                var confirmLink = $"{baseUrlConfiavel}/auth/confirmar-email?token={Uri.EscapeDataString(confirmationToken)}";
                 var body = string.Format(
                     EasyStock.Application.Resources.EmailTemplateLoader.LoadBody("cadastro_usuario_confirmacao"),
                     System.Net.WebUtility.HtmlEncode(usuario.Nome),
@@ -59,6 +67,10 @@ public sealed class CadastrarUsuarioUseCase(
             {
                 logger.LogError(ex, "Falha ao enviar email de confirmação para {Email}. Token gerado normalmente.", usuario.Email);
             }
+        }
+        else if (emailService is not null && !string.IsNullOrEmpty(command.BaseUrl))
+        {
+            logger.LogWarning("BaseUrl de confirmação de cadastro ignorado por não estar na allowlist de origens confiáveis. Email de confirmação não enviado para {Email}.", usuario.Email);
         }
 
         await unitOfWork.CommitAsync();
