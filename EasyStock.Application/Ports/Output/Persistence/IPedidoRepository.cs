@@ -28,12 +28,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateAsync(Pedido pedido);
 
         // ── Sub-recursos (1:N) ────────────────────────────────────
+        // Remocao de item/pagamento e feita via grafo rastreado (pedido.Itens.Remove /
+        // pedido.Pagamentos.Remove) nos use cases, para o DELETE participar do mesmo
+        // SaveChanges do recalculo/evento (#768). Nao ha Remove*Async no port.
         Task AddItemAsync(PedidoItem item);
-        Task RemoveItemAsync(Guid empresaId, Guid itemId);
         Task AddEventoAsync(PedidoEvento evento);
         Task<IEnumerable<PedidoEvento>> GetEventosAsync(Guid pedidoId, int max = 200);
         Task AddPagamentoAsync(PedidoPagamento pagamento);
-        Task RemovePagamentoAsync(Guid empresaId, Guid pagamentoId);
 
         /// <summary>
         /// Verifica se existe pedido aberto (status aguardando/preparando/pronto)

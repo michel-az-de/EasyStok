@@ -28,7 +28,9 @@ public class RemoverPagamentoPedidoUseCase(
         var pag = pedido.Pagamentos.FirstOrDefault(p => p.Id == cmd.PagamentoId);
         if (pag == null) return CriarPedidoUseCase.Map(pedido);
 
-        await repo.RemovePagamentoAsync(cmd.EmpresaId, pag.Id);
+        // Remocao rastreada (mesmo motivo do RemoverItemPedidoUseCase, #768): FK
+        // PedidoPagamento->Pedido required+Cascade, o DELETE participa do SaveChanges
+        // do evento — atomico, sem ExecuteDeleteAsync imediato fora do UoW.
         pedido.Pagamentos.Remove(pag);
 
         await repo.AddEventoAsync(new PedidoEvento

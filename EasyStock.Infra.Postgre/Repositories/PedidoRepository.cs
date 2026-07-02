@@ -76,12 +76,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         // ── Sub-recursos ──────────────────────────────────────────
         public Task AddItemAsync(PedidoItem item) { db.Set<PedidoItem>().Add(item); return Task.CompletedTask; }
-        // Defense-in-depth: escopa o DELETE pela empresa dona do pedido (EXISTS).
-        // O use case ja valida posse, mas o repo nao deve deletar item de outro tenant.
-        public Task RemoveItemAsync(Guid empresaId, Guid itemId) =>
-            db.Set<PedidoItem>()
-                .Where(i => i.Id == itemId && db.Pedidos.Any(p => p.Id == i.PedidoId && p.EmpresaId == empresaId))
-                .ExecuteDeleteAsync();
+        // Remocao de item e feita via grafo rastreado (pedido.Itens.Remove) nos use cases,
+        // para o DELETE participar do mesmo SaveChanges do recalculo do total (#768). Nao
+        // ha RemoveItemAsync com ExecuteDeleteAsync imediato — quebrava a atomicidade.
 
         public Task AddEventoAsync(PedidoEvento evento) { db.Set<PedidoEvento>().Add(evento); return Task.CompletedTask; }
 
@@ -92,10 +89,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Take(max).ToListAsync();
 
         public Task AddPagamentoAsync(PedidoPagamento pagamento) { db.Set<PedidoPagamento>().Add(pagamento); return Task.CompletedTask; }
-        public Task RemovePagamentoAsync(Guid empresaId, Guid pagamentoId) =>
-            db.Set<PedidoPagamento>()
-                .Where(pg => pg.Id == pagamentoId && db.Pedidos.Any(p => p.Id == pg.PedidoId && p.EmpresaId == empresaId))
-                .ExecuteDeleteAsync();
+        // Remocao de pagamento via grafo rastreado (pedido.Pagamentos.Remove), #768.
 
         // Strings canônicas dos status "abertos" derivadas da PedidoStateMachine.
         // Materializa em ToArray() pra que o EF Core traduza em IN (...) no SQL.

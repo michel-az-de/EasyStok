@@ -30,7 +30,11 @@ public class RemoverItemPedidoUseCase(
         var item = pedido.Itens.FirstOrDefault(i => i.Id == cmd.ItemId);
         if (item == null) return CriarPedidoUseCase.Map(pedido);
 
-        await repo.RemoveItemAsync(cmd.EmpresaId, item.Id);
+        // Remocao rastreada: o pedido veio tracked de GetByIdWithDetailsAsync e a FK
+        // PedidoItem->Pedido e required+Cascade, entao remover da colecao marca o item
+        // como Deleted e o DELETE sai no MESMO SaveChanges do RecalcularTotal + evento
+        // (atomico). Antes havia um ExecuteDeleteAsync imediato (fora do UoW) que, se o
+        // commit final falhasse, deixava o item apagado com o Total antigo inconsistente. #768
         pedido.Itens.Remove(item);
         pedido.RecalcularTotal();
 
