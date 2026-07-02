@@ -24,6 +24,13 @@ public sealed class NfeRepository(EasyStockDbContext db) : INfeRepository
         db.NfeDocumentos
             .FirstOrDefaultAsync(n => n.EmpresaId == empresaId && n.IdempotencyKey == idempotencyKey, ct);
 
+    public Task<bool> ExisteAtivaPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+        db.NfeDocumentos.AsNoTracking()
+            .AnyAsync(n => n.EmpresaId == empresaId
+                        && n.PedidoId == pedidoId
+                        && n.Status != StatusNfe.Rejeitada
+                        && n.Status != StatusNfe.Inutilizada, ct);
+
     public async Task<(IEnumerable<NfeDocumento> items, int total)> GetByEmpresaAsync(
         Guid empresaId,
         int page,

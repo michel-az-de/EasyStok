@@ -102,5 +102,13 @@ public class NfeDocumentoConfiguration : IEntityTypeConfiguration<NfeDocumento>
 
         builder.HasIndex(n => n.PedidoId)
             .HasDatabaseName("ix_nfe_documentos_pedido");
+
+        // No maximo 1 NFC-e ATIVA por pedido (#791): double-click/corrida emitia 2 notas
+        // na SEFAZ para a mesma venda. Parcial (exclui Rejeitada/Inutilizada) preserva a
+        // re-emissao legitima apos rejeicao. Status e string (HasConversion<string>).
+        builder.HasIndex(n => new { n.EmpresaId, n.PedidoId })
+            .IsUnique()
+            .HasFilter("\"Status\" NOT IN ('Rejeitada', 'Inutilizada')")
+            .HasDatabaseName("ux_nfe_pedido_ativo");
     }
 }

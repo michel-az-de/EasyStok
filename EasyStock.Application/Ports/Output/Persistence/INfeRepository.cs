@@ -52,6 +52,13 @@ public interface INfeRepository
     /// </summary>
     Task<NfeDocumento?> FindByIdempotencyKeyAsync(Guid empresaId, string idempotencyKey, CancellationToken ct = default);
 
+    /// <summary>
+    /// Existe NFC-e ATIVA (status != Rejeitada/Inutilizada) para o pedido? Usado no
+    /// race-resolution do <c>EmitirNfceUseCase</c> quando o perdedor da constraint
+    /// <c>ux_nfe_pedido_ativo</c> (#791) nao tem vencedor por IdempotencyKey.
+    /// </summary>
+    Task<bool> ExisteAtivaPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
     Task<(IEnumerable<NfeDocumento> items, int total)> GetByEmpresaAsync(
         Guid empresaId,
         int page,

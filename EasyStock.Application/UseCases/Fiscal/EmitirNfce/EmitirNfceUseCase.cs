@@ -140,12 +140,22 @@ public class EmitirNfceUseCase(
             // recebe DbUpdateException; o vencedor ja esta gravado. Re-query confirma
             // race (vencedor existe). Se nao existe, e' outro erro real -> propaga.
             var raceWinner = await nfeRepo.FindByIdempotencyKeyAsync(cmd.EmpresaId, cmd.IdempotencyKey);
-            if (raceWinner is null) throw;
+            if (raceWinner is not null)
+            {
+                logger.LogInformation(ex,
+                    "Nfe {Id} race-resolved: outra TX venceu unique constraint IdempotencyKey={Key}.",
+                    raceWinner.Id, cmd.IdempotencyKey);
+                return ToResult(raceWinner);
+            }
 
-            logger.LogInformation(ex,
-                "Nfe {Id} race-resolved: outra TX venceu unique constraint IdempotencyKey={Key}.",
-                raceWinner.Id, cmd.IdempotencyKey);
-            return ToResult(raceWinner);
+            // Corrida por PEDIDO (chaves divergentes, ex.: double-click): o perdedor da nova
+            // constraint ux_nfe_pedido_ativo ve DbUpdateException, mas nao ha vencedor por
+            // IdempotencyKey. Se o pedido ja tem NFC-e ativa, e o mesmo caso do guard do
+            // controller -> 400 "ja possui NFC-e", nao 500 (#791).
+            if (await nfeRepo.ExisteAtivaPorPedidoAsync(cmd.EmpresaId, cmd.PedidoId))
+                throw new UseCaseValidationException("Pedido ja possui NFC-e emitida.");
+
+            throw;
         }
 
         // === HTTP: chamada Focus FORA de transacao (anti-padrao B-052 evitado) ===
