@@ -83,11 +83,26 @@ public class WebhookGatewayController(
         var registro = await webhookRepo.TryRegistrarAsync(validator.Provedor, eventIdExterno, bodyHash, ct);
         if (registro is null)
         {
-            // Duplicado — retorna 200 idempotente sem reprocessar.
-            logger.LogInformation(
-                "Webhook {Provedor} duplicado (eventId={EventId}). Retornando 200 idempotente.",
-                validator.Provedor, eventIdExterno);
-            return Ok();
+            // Dedup bateu: JA existe registro deste evento. Mas so e idempotente de
+            // verdade se a tentativa anterior COMPLETOU COM SUCESSO. Se falhou (deadlock,
+            // timeout, deploy no meio) ou nunca completou (ProcessadoEm null), responder
+            // 200 aqui faz o gateway parar de retentar e o pagamento fica sem baixa (#787).
+            var existente = await webhookRepo.ObterAsync(validator.Provedor, eventIdExterno, ct);
+            if (existente is null || existente.Sucesso)
+            {
+                logger.LogInformation(
+                    "Webhook {Provedor} duplicado ja processado (eventId={EventId}). Retornando 200 idempotente.",
+                    validator.Provedor, eventIdExterno);
+                return Ok();
+            }
+
+            // Tentativa anterior sem sucesso — reprocessa. Os processors tem idempotencia
+            // interna (ex.: EfiPixWebhookProcessor usa SELECT FOR UPDATE + checagem de
+            // status), entao reprocessar e seguro mesmo sob retries concorrentes.
+            logger.LogWarning(
+                "Webhook {Provedor} (eventId={EventId}) com tentativa anterior sem sucesso (ProcessadoEm={ProcessadoEm}) — reprocessando.",
+                validator.Provedor, eventIdExterno, existente.ProcessadoEm);
+            registro = existente;
         }
 
         // 4) Resolve processor

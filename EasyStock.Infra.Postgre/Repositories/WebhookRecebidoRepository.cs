@@ -34,6 +34,10 @@ public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookR
         }
     }
 
+    public Task<WebhookRecebido?> ObterAsync(string provedor, string eventIdExterno, CancellationToken ct = default) =>
+        db.WebhookRecebidos.FirstOrDefaultAsync(
+            w => w.Provedor == provedor && w.EventIdExterno == eventIdExterno, ct);
+
     public async Task MarcarProcessadoAsync(Guid id, bool sucesso, string? erro = null, CancellationToken ct = default)
     {
         var existing = await db.WebhookRecebidos.FirstOrDefaultAsync(w => w.Id == id, ct);
