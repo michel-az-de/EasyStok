@@ -265,6 +265,7 @@ Antes de operar em area sensivel:
 - docs/adr/0019-mobile-controllers-response-pattern.md
 - docs/adr/0022-master-first-trunk-based.md  # ESTE PROTOCOLO v3.0
 - docs/dev/flaky-tests.md
+- docs/plan/consolidacao-v1/README.md  # diagnostico canonico da Consolidacao v1 (epico #786): leitura obrigatoria de sessoes de consolidacao
 
 ## 7. COMPORTAMENTO DE DESENVOLVEDOR SENIOR
 
