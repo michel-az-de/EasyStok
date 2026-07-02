@@ -1,3 +1,4 @@
+using EasyStock.Web.Infrastructure;
 using EasyStock.Web.Models.ViewModels.NotasFiscais;
 using EasyStock.Web.Models.ViewModels.Shared;
 using EasyStock.Web.Services;
@@ -5,6 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EasyStock.Web.Controllers;
 
+// issue #770: modulo fiscal fora do escopo v1.0 (SCOPE.md). Com Features:FiscalHabilitado
+// off (default), todas as actions abaixo respondem 404 ate a homologacao FocusNFe.
+[RequerModuloFiscal]
 public class NotasFiscaisController(NotasFiscaisService svc, SessionService session) : BaseController(session)
 {
     [HttpGet("/notas-fiscais")]
