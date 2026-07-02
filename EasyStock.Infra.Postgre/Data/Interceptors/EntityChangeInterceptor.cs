@@ -147,9 +147,14 @@ public sealed class EntityChangeInterceptor : SaveChangesInterceptor
                             var oldVal = FormatValue(propName, prop.OriginalValue);
                             var newVal = FormatValue(propName, prop.CurrentValue);
 
-                            if (oldVal == newVal) continue; // sem mudanca real
+                            if (oldVal == newVal) continue; // sem mudanca real (compara valores CRUS)
 
-                            changes.Add(new { campo = propName, de = oldVal, para = newVal });
+                            // PII mascarada no JSON consolidado tambem (#788): as entries por-campo
+                            // (abaixo) e o branch Added/Deleted ja mascaravam, mas este AlteracoesJson
+                            // gravava nome/telefone/etc em claro na entity_alteracoes (retida por anos).
+                            // A mascara vem DEPOIS do continue acima: comparar valores mascarados faria
+                            // valores distintos com os mesmos 4 ultimos digitos colidirem e sumirem da trilha.
+                            changes.Add(new { campo = propName, de = MaskIfPii(propName, oldVal), para = MaskIfPii(propName, newVal) });
 
                             context.Add(new EntityAlteracao
                             {
