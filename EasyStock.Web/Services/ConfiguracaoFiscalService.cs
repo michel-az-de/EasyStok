@@ -9,10 +9,8 @@ namespace EasyStock.Web.Services;
 /// Tenant resolvido via <see cref="SessionService.GetEmpresaId"/> e enviado
 /// como <c>?empresaId=...</c>.
 /// </summary>
-public class ConfiguracaoFiscalService(ApiClient api, SessionService session)
+public class ConfiguracaoFiscalService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     private string Q(string path) => $"{path}?empresaId={GetEmpresaId()}";
 

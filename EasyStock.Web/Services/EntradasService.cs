@@ -3,10 +3,8 @@ using EasyStock.Web.Models.ViewModels.Entradas;
 
 namespace EasyStock.Web.Services;
 
-public class EntradasService(ApiClient api, SessionService session)
+public class EntradasService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<PagedResult<Movimentacao>>> HistoricoAsync(
         int page = 1, string? tipo = null, string? periodoInicio = null, string? periodoFim = null)

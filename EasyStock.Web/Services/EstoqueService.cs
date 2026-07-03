@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class EstoqueService(ApiClient api, SessionService session)
+public class EstoqueService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ListarAsync(
         int page = 1, string? status = null, string? categoria = null, string? search = null)

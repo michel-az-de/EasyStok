@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class AnunciosService(ApiClient api, SessionService session)
+public class AnunciosService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<AnuncioIaApi>>> ListarSalvosAsync(string produtoId) =>
         api.GetAsync<List<AnuncioIaApi>>($"ia/anuncios/{produtoId}?empresaId={GetEmpresaId()}");

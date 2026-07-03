@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class FornecedoresService(ApiClient api, SessionService session)
+public class FornecedoresService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<Fornecedor>>> ListarAsync(string? status = null, string? search = null)
     {

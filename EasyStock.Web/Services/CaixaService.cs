@@ -3,18 +3,10 @@ using EasyStock.Web.Models.Api;
 namespace EasyStock.Web.Services;
 
 /// <summary>Onda P3 — UI Web do módulo Caixa (movimentos + fechamento).</summary>
-public class CaixaService(ApiClient api, SessionService session)
+public class CaixaService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    private static ApiResult<T> EmpresaErr<T>() =>
-        ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
-    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500);
-    // agora devolve erro de validacao (o call-site trata como 4xx amigavel).
-    private static ApiResult<T> IdErr<T>() =>
-        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
 
     public Task<ApiResult<CaixaDia>> ObterDiaAsync(DateOnly? data = null) =>
         api.GetAsync<CaixaDia>($"caixa/dia?empresaId={GetEmpresaId()}{(data.HasValue ? $"&data={data:yyyy-MM-dd}" : "")}");

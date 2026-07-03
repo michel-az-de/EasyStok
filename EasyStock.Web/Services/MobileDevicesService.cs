@@ -7,10 +7,8 @@ namespace EasyStock.Web.Services;
 /// Usado pela página <c>/dispositivos</c> pra listar pareamentos, gerar
 /// códigos e revogar dispositivos da empresa atual.
 /// </summary>
-public class MobileDevicesService(ApiClient api, SessionService session)
+public class MobileDevicesService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     private Guid GetLojaId() =>
         Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;

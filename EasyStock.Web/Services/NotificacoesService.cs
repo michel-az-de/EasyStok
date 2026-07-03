@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class NotificacoesService(ApiClient api, SessionService session)
+public class NotificacoesService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<PagedResult<Notificacao>>> ListarAsync(bool? lida = null, string? tipo = null, string? severidade = null)
     {

@@ -2,13 +2,11 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class LojasService(ApiClient api, SessionService session)
+public class LojasService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    public Task<ApiResult<List<LojaApi>>> ListarAsync() =>
-        api.GetAsync<List<LojaApi>>($"lojas?empresaId={GetEmpresaId()}");
+    public Task<ApiResult<List<Loja>>> ListarAsync() =>
+        api.GetAsync<List<Loja>>($"lojas?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<object>> CriarAsync(string nome, string? cidade = null, string? telefone = null, string? descricao = null) =>
         api.PostAsync<object>("lojas", new

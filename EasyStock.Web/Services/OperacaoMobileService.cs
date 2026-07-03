@@ -6,10 +6,8 @@ namespace EasyStock.Web.Services;
 /// Onda 4 — Cliente HTTP pra /api/mobile/operation/* + /devices/{id}/commands.
 /// Usado pelo painel /operacao do Web.
 /// </summary>
-public class OperacaoMobileService(ApiClient api, SessionService session)
+public class OperacaoMobileService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     private Guid? GetLojaIdOrNull()
     {

@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class AnalyticsService(ApiClient api, SessionService session)
+public class AnalyticsService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<DashboardResumoApi>> DashboardAsync() =>
         api.GetAsync<DashboardResumoApi>($"analytics/dashboard?empresaId={GetEmpresaId()}");

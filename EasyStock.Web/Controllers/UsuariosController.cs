@@ -20,7 +20,6 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
         {
             vm.Lojas = lojasResult.Data
                 .Where(l => l.Ativa)
-                .Select(l => new Models.Api.Loja(l.Id.ToString(), l.EmpresaId.ToString(), l.Nome, null, "", ""))
                 .ToList();
         }
 

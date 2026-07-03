@@ -7,10 +7,8 @@ namespace EasyStock.Web.Services;
 /// Painel <c>/produtos-mobile</c> usa pra revisar produtos custom criados
 /// no app e aprovar/linkar com produtos ERP existentes.
 /// </summary>
-public class MobileProductsService(ApiClient api, SessionService session)
+public class MobileProductsService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<MobileProductApi>>> ListarPendentesAsync() =>
         api.GetAsync<List<MobileProductApi>>(

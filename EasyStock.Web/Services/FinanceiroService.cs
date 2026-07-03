@@ -7,13 +7,9 @@ namespace EasyStock.Web.Services;
 /// Service Web pra modulo Financeiro (Contas a Pagar/Receber, Categorias, Centros de Custo).
 /// Consome a API REST com EmpresaId da sessao.
 /// </summary>
-public class FinanceiroService(ApiClient api, SessionService session)
+public class FinanceiroService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    private static ApiResult<T> EmpresaErr<T>() =>
-        ApiResult<T>.Fail("EMPRESA_INVALIDA", "Empresa nao identificada. Selecione uma loja.");
 
     // ── Categorias ────────────────────────────────────────────────────────
 

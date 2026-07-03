@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class InteligenciaService(ApiClient api, SessionService session)
+public class InteligenciaService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<InteligenciaBoardApi>> BoardAsync(int periodo = 30) =>
         api.GetAsync<InteligenciaBoardApi>($"inteligencia/board?empresaId={GetEmpresaId()}&periodo={periodo}");

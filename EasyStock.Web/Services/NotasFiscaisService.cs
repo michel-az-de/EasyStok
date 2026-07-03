@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class NotasFiscaisService(ApiClient api, SessionService session)
+public class NotasFiscaisService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<PagedResult<NfeListItem>>> ListarAsync(
         int page = 1, string? status = null, string? desde = null, string? ate = null, string? search = null)

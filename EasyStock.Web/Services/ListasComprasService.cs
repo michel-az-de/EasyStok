@@ -2,17 +2,10 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class ListasComprasService(ApiClient api, SessionService session)
+public class ListasComprasService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    private static ApiResult<T> EmpresaErr<T>() =>
-        ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada.");
 
-    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500).
-    private static ApiResult<T> IdErr<T>() =>
-        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
 
     public Task<ApiResult<List<ListaCompras>>> ListarAsync(string? status = null) =>
         api.GetAsync<List<ListaCompras>>(

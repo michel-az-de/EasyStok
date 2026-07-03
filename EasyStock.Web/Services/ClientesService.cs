@@ -7,18 +7,10 @@ namespace EasyStock.Web.Services;
 /// <see cref="FornecedoresService"/> usando endpoints de
 /// <c>/api/clientes</c> e <c>/api/mobile/clients</c>.
 /// </summary>
-public class ClientesService(ApiClient api, SessionService session)
+public class ClientesService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
-    private static ApiResult<T> EmpresaErr<T>() =>
-        ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
-    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500);
-    // agora devolve erro de validacao (o call-site trata como 4xx amigavel).
-    private static ApiResult<T> IdErr<T>() =>
-        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
 
     // ── CRUD raiz ──────────────────────────────────────────────────────
 

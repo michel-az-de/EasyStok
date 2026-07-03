@@ -14,8 +14,8 @@ public class DashboardController(ApiClient api, SessionService session, IOptions
         ViewBag.Title = "Dashboard";
         ViewBag.ActiveMenuItem = "Dashboard";
 
-        var lojas = await api.GetAsync<List<LojaApi>>("lojas");
-        ViewBag.Lojas = lojas.Success && lojas.Data is not null ? lojas.Data : new List<LojaApi>();
+        var lojas = await api.GetAsync<List<Loja>>("lojas");
+        ViewBag.Lojas = lojas.Success && lojas.Data is not null ? lojas.Data : new List<Loja>();
 
         var vm = new DashboardViewModel
         {

@@ -2,10 +2,8 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class InteligenciaLojasService(ApiClient api, SessionService session)
+public class InteligenciaLojasService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<LojaComparacaoApi>>> ComparacaoAsync(int periodo = 30) =>
         api.GetAsync<List<LojaComparacaoApi>>($"inteligencia-lojas/comparacao?empresaId={GetEmpresaId()}&periodo={periodo}");

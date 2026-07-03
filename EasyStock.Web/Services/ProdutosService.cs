@@ -3,10 +3,8 @@ using EasyStock.Web.Models.ViewModels.Produtos;
 
 namespace EasyStock.Web.Services;
 
-public class ProdutosService(ApiClient api, SessionService session)
+public class ProdutosService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
-    private Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<PagedResult<ProdutoResumo>>> ListarAsync(
         int page = 1,
