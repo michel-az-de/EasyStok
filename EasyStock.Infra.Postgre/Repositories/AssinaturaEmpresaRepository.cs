@@ -10,8 +10,14 @@ public sealed class AssinaturaEmpresaRepository(EasyStockDbContext dbContext) : 
             .Include(a => a.Plano)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
 
+    // IgnoreQueryFilters (mesma motivacao da issue 694, pego via #822): estes 2 metodos sao
+    // chamados tambem pelos WEBHOOKS Pix (EfiPixWebhookProcessor e WebhookPixController), que
+    // rodam sem JWT -> CurrentTenantId=Guid.Empty -> o filtro global devolvia 0 linhas e a
+    // renovacao de assinatura virava no-op SILENCIOSO (cobranca Paga, vigencia intocada).
+    // Seguro: o predicado explicito por EmpresaId preserva o isolamento nos callers tenant.
     public async Task<IEnumerable<AssinaturaEmpresa>> GetByEmpresaAsync(Guid empresaId) =>
         await dbContext.AssinaturasEmpresa
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(a => a.Plano)
             .Where(a => a.EmpresaId == empresaId)
@@ -19,6 +25,7 @@ public sealed class AssinaturaEmpresaRepository(EasyStockDbContext dbContext) : 
 
     public Task<AssinaturaEmpresa?> GetAtivaAsync(Guid empresaId) =>
         dbContext.AssinaturasEmpresa
+            .IgnoreQueryFilters()
             .Include(a => a.Plano)
             .FirstOrDefaultAsync(a => a.EmpresaId == empresaId && a.Status == StatusAssinatura.Ativa);
 
