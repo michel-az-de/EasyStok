@@ -241,8 +241,7 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
                 ApiResult<T>.Fail("PERMISSAO_INSUFICIENTE", "Você não tem permissão para esta ação.", status, cid),
             HttpStatusCode.NotFound =>
                 ApiResult<T>.Fail("NOT_FOUND", "Recurso não encontrado.", status, cid),
-            HttpStatusCode.TooManyRequests =>
-                ApiResult<T>.Fail("LIMITE_IA", "Cota de IA esgotada.", status, cid),
+            HttpStatusCode.TooManyRequests => ParseTooManyRequests<T>(response, status, cid),
             HttpStatusCode.InternalServerError => await ParseBodyError<T>(response, status, cid),
             HttpStatusCode.BadRequest => await ParseBodyError<T>(response, status, cid),
             HttpStatusCode.Conflict => await ParseBodyError<T>(response, status, cid),
@@ -251,6 +250,19 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             // ParseBodyError já cai em UserFacingErrors.FallbackForStatus.
             _ => await ParseBodyError<T>(response, status, cid)
         };
+    }
+
+    /// <summary>
+    /// 429 só significa "cota de IA" nas rotas ia/* — mapear TODO 429 para LIMITE_IA
+    /// mascarava o rate-limit de auth/login com "Cota de IA esgotada" (issue 799,
+    /// mesma classe do bug do 402). Fora de ia/*, cai na mensagem genérica de 429.
+    /// </summary>
+    private static ApiResult<T> ParseTooManyRequests<T>(HttpResponseMessage response, int status, string? cid)
+    {
+        var path = response.RequestMessage?.RequestUri?.AbsolutePath ?? string.Empty;
+        return path.Contains("/ia/", StringComparison.OrdinalIgnoreCase)
+            ? ApiResult<T>.Fail("LIMITE_IA", "Cota de IA esgotada.", status, cid)
+            : ApiResult<T>.Fail("RATE_LIMITED", UserFacingErrors.FallbackForStatus(429), status, cid);
     }
 
     private async Task<ApiResult<T>> ParseBodyError<T>(HttpResponseMessage response, int status, string? cid = null)
