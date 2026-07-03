@@ -11,7 +11,7 @@ public class OperacaoMobileService(ApiClient api, SessionService session) : Tena
 
     private Guid? GetLojaIdOrNull()
     {
-        var s = session.GetLojaId();
+        var s = Session.GetLojaId();
         return Guid.TryParse(s, out var id) && id != Guid.Empty ? id : null;
     }
 

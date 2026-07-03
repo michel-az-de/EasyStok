@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 using EasyStock.Web.Services;
@@ -121,6 +122,7 @@ public class TokenRefreshHandlerTests
         public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
         public void Remove(string key) => _store.TryRemove(key, out _);
         public void Set(string key, byte[] value) => _store[key] = value;
-        public bool TryGetValue(string key, out byte[]? value) => _store.TryGetValue(key, out value);
+        // [NotNullWhen] casa com a anotacao do ISession — sem isso o CI (-warnaserror) da CS8767.
+        public bool TryGetValue(string key, [NotNullWhen(true)] out byte[]? value) => _store.TryGetValue(key, out value!);
     }
 }

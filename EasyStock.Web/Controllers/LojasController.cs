@@ -62,7 +62,7 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
             {
                 var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nomeTrim, StringComparison.OrdinalIgnoreCase))
                     ?? lojas.Last();
-                Session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId.ToString());
+                Session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId ?? "");
                 return RedirectToAction("Index", "Dashboard");
             }
         }

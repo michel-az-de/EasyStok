@@ -22,7 +22,7 @@ public class ListasComprasService(ApiClient api, SessionService session) : Tenan
         return api.PostAsync<ListaCompras>("listas-compras", new
         {
             empresaId = emp, nome, observacoes,
-            criadaPorNome = session.GetUsuarioNome(),
+            criadaPorNome = Session.GetUsuarioNome(),
             origem = "web"
         });
     }
@@ -34,7 +34,7 @@ public class ListasComprasService(ApiClient api, SessionService session) : Tenan
         return api.PostAsync<ListaCompras>("listas-compras/gerar", new
         {
             empresaId = emp, nome, observacoes,
-            criadaPorNome = session.GetUsuarioNome(),
+            criadaPorNome = Session.GetUsuarioNome(),
             origem = "web",
             itens
         });
@@ -44,7 +44,7 @@ public class ListasComprasService(ApiClient api, SessionService session) : Tenan
     {
         var emp = GetEmpresaId();
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<GerarPedidosResultApi>());
-        var loja = session.GetLojaId();
+        var loja = Session.GetLojaId();
         var lojaParam = string.IsNullOrEmpty(loja) ? "" : $"&lojaId={loja}";
         return api.PostAsync<GerarPedidosResultApi>(
             $"listas-compras/{id}/gerar-pedidos?empresaId={emp}{lojaParam}", new { });
@@ -75,7 +75,7 @@ public class ListasComprasService(ApiClient api, SessionService session) : Tenan
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
         return api.PatchAsync<object>($"listas-compras/{id}/itens/{itemId}", new
         {
-            empresaId = emp, done, usuarioNome = session.GetUsuarioNome()
+            empresaId = emp, done, usuarioNome = Session.GetUsuarioNome()
         });
     }
 

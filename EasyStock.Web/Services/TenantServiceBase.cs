@@ -10,8 +10,12 @@ namespace EasyStock.Web.Services;
 /// </summary>
 public abstract class TenantServiceBase(SessionService session)
 {
+    // Exposta pros derivados: capturar o MESMO parametro no derivado e na base
+    // e CS9107 (erro no CI via -warnaserror, issue 821).
+    protected SessionService Session { get; } = session;
+
     protected Guid GetEmpresaId() =>
-        Guid.TryParse(session.GetEmpresaId(), out var id) ? id : Guid.Empty;
+        Guid.TryParse(Session.GetEmpresaId(), out var id) ? id : Guid.Empty;
 
     protected static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");

@@ -64,7 +64,7 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<BalcaoResultApi>());
-        Guid? lojaId = Guid.TryParse(session.GetLojaId(), out var l) && l != Guid.Empty ? l : (Guid?)null;
+        Guid? lojaId = Guid.TryParse(Session.GetLojaId(), out var l) && l != Guid.Empty ? l : (Guid?)null;
         return api.PostAsync<BalcaoResultApi>("pedidos/balcao", new
         {
             empresaId,

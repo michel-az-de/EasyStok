@@ -341,8 +341,12 @@ public class RowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         // Simula o que o interceptor faria — usado nos testes de policy pra
         // isolar a camada do banco do código C# do interceptor. Também garante
         // que o bypass anterior seja explicitamente desligado.
+        // EF1002 suprimido: SET nao aceita bind param no Postgres e o valor e um
+        // Guid gerado pelo teste (injecao impossivel).
+#pragma warning disable EF1002
         await ctx.Database.ExecuteSqlRawAsync(
             $"SET app.empresa_id = '{tenantId}'; SET app.bypass_rls = 'false';");
+#pragma warning restore EF1002
     }
 
     private static async Task<int> ContarLinhasAsync(EasyStockDbContext ctx, string tabela)

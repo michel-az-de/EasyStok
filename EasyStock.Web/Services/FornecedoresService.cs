@@ -51,7 +51,7 @@ public class FornecedoresService(ApiClient api, SessionService session) : Tenant
             empresaId, nome, documento, contato, email, telefone, leadTimeEstimadoDias,
             tipo, categoria, siteUrl, pedidoMinimo, fretePadrao, observacoes,
             // Onda P4 — audit context (backend escreve em FornecedorAlteracao).
-            alteradoPorNome = session.GetUsuarioNome(),
+            alteradoPorNome = Session.GetUsuarioNome(),
             origem = "web"
         });
     }

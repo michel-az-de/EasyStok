@@ -11,7 +11,7 @@ public class MobileDevicesService(ApiClient api, SessionService session) : Tenan
 {
 
     private Guid GetLojaId() =>
-        Guid.TryParse(session.GetLojaId(), out var id) ? id : Guid.Empty;
+        Guid.TryParse(Session.GetLojaId(), out var id) ? id : Guid.Empty;
 
     public Task<ApiResult<List<MobileDeviceApi>>> ListarAsync() =>
         api.GetAsync<List<MobileDeviceApi>>($"mobile/devices?empresaId={GetEmpresaId()}");
