@@ -110,7 +110,7 @@
 }
 .cdp-act {
     display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-    min-height: 34px; padding: 5px 9px;
+    min-height: 44px; padding: 5px 9px; /* alvo de toque 44px (AAA 2.5.5 / mobile), issue 792 */
     border: 1px solid transparent; border-radius: var(--radius-control, 10px);
     background: transparent; color: var(--text-secondary, var(--ink-700));
     font-size: .78rem; font-weight: 600; cursor: pointer;
@@ -118,9 +118,13 @@
 }
 .cdp-act svg { width: 15px; height: 15px; }
 .cdp-act:hover { background: var(--ink-100); }
-.cdp-act:focus-visible { outline: none; box-shadow: var(--focus-ring-navy, 0 0 0 3px rgba(14, 42, 110, .25)); }
+/* foco: anel local explicito — o :focus-visible global e sobreposto por app.css (outline:none); box-shadow:none mata o anel navy fraco antigo. issue 792 */
+.cdp-act:focus-visible { outline: 2px solid var(--orange-600); outline-offset: 2px; box-shadow: none; }
 .cdp-act--primary { color: var(--navy-700); }
 .cdp-act--primary:hover { background: var(--navy-50); }
+/* --primary legivel no tema escuro: navy-700 e fixo; base ja flipa via --text-secondary. issue 792 */
+[data-theme="dark"] .cdp-act--primary { color: var(--navy-200); }
+[data-theme="dark"] .cdp-act--primary:hover { background: color-mix(in srgb, var(--navy-200) 16%, transparent); }
 .cdp-act--danger { color: var(--crit-600); }
 .cdp-act--danger:hover { background: var(--crit-50, rgba(192, 59, 42, .08)); }
 .cdp-act[aria-busy="true"] { opacity: .6; pointer-events: none; }
@@ -128,7 +132,7 @@
 
 /* Reordenar (acessível por teclado) */
 .cdp-move { display: inline-flex; gap: 2px; }
-.cdp-move .cdp-act { min-width: 30px; padding: 5px; }
+.cdp-move .cdp-act { min-width: 44px; padding: 5px; } /* alvo de toque 44px, issue 792 */
 /* Desabilita ↑ no 1º card e ↓ no último da categoria — clicar ali não fazia nada (issue 633, #6 QA).
    :first/:last-child seguem o DOM, então continuam corretos após reordenar (mover usa insertBefore). */
 .cdp-grid > .cdp-card:first-child [data-move="up"],
