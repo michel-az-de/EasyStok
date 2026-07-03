@@ -644,6 +644,11 @@ public static class ApiProxyEndpoints
                 var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/admin/diagnostico/email/teste", body);
                 return Results.Ok(data);
             }
+            catch (System.Text.Json.JsonException)
+            {
+                // Body invalido e erro do cliente (400), nao indisponibilidade da API (502).
+                return Results.Json(new { error = "Corpo da requisicao invalido (esperado JSON)." }, statusCode: StatusCodes.Status400BadRequest);
+            }
             catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
             catch (Exception ex)
             {
@@ -665,6 +670,11 @@ public static class ApiProxyEndpoints
                 var body = await ctx.Request.ReadFromJsonAsync<System.Text.Json.JsonElement>();
                 var data = await api.PostJsonAsync<System.Text.Json.JsonElement>("api/admin/diagnostico/whatsapp/teste", body);
                 return Results.Ok(data);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // Body invalido e erro do cliente (400), nao indisponibilidade da API (502).
+                return Results.Json(new { error = "Corpo da requisicao invalido (esperado JSON)." }, statusCode: StatusCodes.Status400BadRequest);
             }
             catch (EasyStock.Admin.Services.SessionExpiredException) { return Results.Unauthorized(); }
             catch (Exception ex)

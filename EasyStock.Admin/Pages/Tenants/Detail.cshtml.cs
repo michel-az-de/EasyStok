@@ -20,8 +20,17 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     {
         if (TenantData.ValueKind == JsonValueKind.Undefined || !TenantData.TryGetProperty(key, out var v))
             return def;
-        var result = v.Deserialize<T>();
-        return result is T r ? r : def;
+        try
+        {
+            var result = v.Deserialize<T>();
+            return result is T r ? r : def;
+        }
+        catch (JsonException ex)
+        {
+            // Drift de contrato num campo nao pode derrubar a pagina inteira no render (/Error).
+            log.LogWarning(ex, "Tenant {TenantId}: campo '{Campo}' com tipo inesperado ({ValueKind}); usando default", Id, key, v.ValueKind);
+            return def;
+        }
     }
 
     public JsonElement Empresa => TenantData.ValueKind != JsonValueKind.Undefined && TenantData.TryGetProperty("empresa", out var v) ? v : default;
