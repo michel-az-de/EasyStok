@@ -53,6 +53,14 @@ public class MenuViewModelBuilderTests
     }
 
     [Fact]
+    public void Querystring_desempata_irmaos_do_mesmo_path()
+    {
+        // 596996ab: lotes-validade aponta pra /estoque?status=vencido — mesmo path
+        // do posicao-estoque. A query decide qual dos dois acende.
+        Build(path: "/estoque?status=vencido").ActiveKey.Should().Be("lotes-validade");
+    }
+
+    [Fact]
     public void Matching_e_por_segmento_nao_por_prefixo_de_string()
     {
         // /pedidos NAO pode casar uma rota irma tipo /pedidos-kds (inexistente, sem fallback).

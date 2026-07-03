@@ -84,9 +84,12 @@ public static class MenuViewModelBuilder
 
     /// <summary>
     /// Matching ativo-por-rota: por SEGMENTOS de path (nunca prefixo cru de string),
-    /// case-insensitive, ignora querystring/fragmento e trailing slash; vence o item
-    /// com MAIS segmentos. Sem casamento de href, faz fallback para o ActiveMenuItem
-    /// legado contra os ActiveKeys. Nenhum casamento => null (nada ativo).
+    /// case-insensitive, ignora fragmento e trailing slash; vence o item com MAIS
+    /// segmentos. Querystring so DESEMPATA irmaos com o mesmo path (596996ab deu
+    /// href /estoque?status=vencido ao lotes-validade e /estoque passou a ser
+    /// compartilhado): href cuja query casa com a URL atual ganha; query que nao
+    /// casa perde pro irmao sem query. Sem casamento de href, fallback para o
+    /// ActiveMenuItem legado contra os ActiveKeys. Nenhum casamento => null.
     /// </summary>
     internal static string? ResolveActive(
         IReadOnlyList<MenuItem> navigable, string? currentPath, string? activeMenuItem)
@@ -95,12 +98,12 @@ public static class MenuViewModelBuilder
         if (segs.Length > 0)
         {
             MenuItem? best = null;
-            var bestLen = 0;
+            var bestScore = 0;
             foreach (var item in navigable)
             {
                 if (item.IsExternal) continue;
                 var itemSegs = Segments(item.Href);
-                if (itemSegs.Length == 0 || itemSegs.Length > segs.Length || itemSegs.Length <= bestLen)
+                if (itemSegs.Length == 0 || itemSegs.Length > segs.Length)
                     continue;
 
                 var match = true;
@@ -112,11 +115,14 @@ public static class MenuViewModelBuilder
                         break;
                     }
                 }
+                if (!match) continue;
 
-                if (match)
+                // Segmentos dominam (*4 > bonus de query); a query so decide empates.
+                var score = itemSegs.Length * 4 + QueryScore(item.Href, currentPath);
+                if (score > bestScore)
                 {
                     best = item;
-                    bestLen = itemSegs.Length;
+                    bestScore = score;
                 }
             }
 
@@ -142,5 +148,28 @@ public static class MenuViewModelBuilder
         if (cut >= 0) p = p[..cut];
 
         return p.Split('/', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    // +2 se TODOS os pares da query do href estao na URL atual; -1 se o href tem
+    // query que nao casa; 0 se o href nao tem query.
+    private static int QueryScore(string? href, string? currentPath)
+    {
+        var hrefQuery = QueryPairs(href);
+        if (hrefQuery.Count == 0) return 0;
+        var atual = QueryPairs(currentPath);
+        return hrefQuery.All(atual.Contains) ? 2 : -1;
+    }
+
+    private static HashSet<string> QueryPairs(string? path)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(path)) return set;
+        var q = path.IndexOf('?');
+        if (q < 0 || q == path.Length - 1) return set;
+        var frag = path.IndexOf('#', q);
+        var qs = frag > q ? path[(q + 1)..frag] : path[(q + 1)..];
+        foreach (var par in qs.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            set.Add(par);
+        return set;
     }
 }

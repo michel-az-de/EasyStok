@@ -60,7 +60,16 @@ public class InvariantDecimalModelBinderTests
         ctx.ModelState.ErrorCount.Should().BeGreaterThan(0);
     }
 
-    private static async Task<DefaultModelBindingContext> BindAsync(string? raw)
+    [Fact]
+    public async Task Valor_vazio_em_decimal_nao_nullable_gera_erro_de_obrigatorio()
+    {
+        // Issue 808: vazio em decimal NAO-nullable nao pode virar 0 silencioso.
+        var ctx = await BindAsync("", typeof(decimal));
+        ctx.Result.IsModelSet.Should().BeFalse();
+        ctx.ModelState.ErrorCount.Should().BeGreaterThan(0);
+    }
+
+    private static async Task<DefaultModelBindingContext> BindAsync(string? raw, Type? tipo = null)
     {
         var binder = new InvariantDecimalModelBinder();
         var ctx = new DefaultModelBindingContext
@@ -68,6 +77,9 @@ public class InvariantDecimalModelBinderTests
             ModelName = "valor",
             ModelState = new ModelStateDictionary(),
             ValueProvider = new StubValueProvider("valor", raw),
+            // O branch da issue 808 le ModelType — sem metadata o binder NRE-ava
+            // (apodreceu quando o binder ganhou o branch; pego pelo CI destravado, #822).
+            ModelMetadata = new EmptyModelMetadataProvider().GetMetadataForType(tipo ?? typeof(decimal?)),
         };
         await binder.BindModelAsync(ctx);
         return ctx;
