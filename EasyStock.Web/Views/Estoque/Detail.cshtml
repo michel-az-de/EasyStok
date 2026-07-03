@@ -64,7 +64,7 @@
                 </div>
                 <div class="flex justify-between">
                     <dt class="text-sm text-slate-500">Última movimentação</dt>
-                    <dd class="text-sm font-semibold">@item.LastMov.ToString("dd/MM/yyyy HH:mm")</dd>
+                    <dd class="text-sm font-semibold">@item.LastMov.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</dd>
                 </div>
                 @if (!string.IsNullOrEmpty(item.Lote))
                 {

@@ -38,8 +38,10 @@ public static class FormatHelper
     public static string AsDate(this DateTime? value) =>
         value.HasValue ? value.Value.AsDate() : "";
 
+    // ParaBrasilia, nao LocalDateTime: o TZ do container e UTC, entao LocalDateTime
+    // exibia o dia/hora de UTC (dia errado entre 21h e 23:59 BRT) — issue 804.
     public static string AsDate(this DateTimeOffset value) =>
-        value.LocalDateTime.AsDate();
+        value.ParaBrasilia().AsDate();
 
     public static string AsDate(this DateTimeOffset? value) =>
         value.HasValue ? value.Value.AsDate() : "";
@@ -57,7 +59,7 @@ public static class FormatHelper
         value.HasValue ? value.Value.AsDateTime() : "";
 
     public static string AsDateTime(this DateTimeOffset value) =>
-        value.LocalDateTime.AsDateTime();
+        value.ParaBrasilia().AsDateTime();
 
     public static string AsDateTime(this DateTimeOffset? value) =>
         value.HasValue ? value.Value.AsDateTime() : "";

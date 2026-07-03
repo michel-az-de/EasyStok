@@ -53,7 +53,7 @@
                         <td class="px-4 py-3 text-sm text-slate-700 capitalize">@p.Category</td>
                         <td class="px-4 py-3 text-sm text-slate-700">@p.Stock @(p.Unit ?? "un")</td>
                         <td class="px-4 py-3 text-sm text-slate-700">@(p.LastOperatorName ?? "—")</td>
-                        <td class="px-4 py-3 text-sm text-slate-700">@p.CreatedAt.ToString("dd/MM HH:mm")</td>
+                        <td class="px-4 py-3 text-sm text-slate-700">@p.CreatedAt.ParaBrasilia().ToString("dd/MM HH:mm")</td>
                         <td class="px-4 py-3 text-right space-x-1">
                             <button type="button"
                                     x-data

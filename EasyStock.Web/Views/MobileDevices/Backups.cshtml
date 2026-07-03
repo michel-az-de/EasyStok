@@ -50,7 +50,7 @@ else
                         : "bg-indigo-100 text-indigo-700";
                     <tr>
                         <td class="px-4 py-3">
-                            <div class="font-medium text-slate-900">@b.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="font-medium text-slate-900">@b.CreatedAt.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")</div>
                             <div class="text-xs text-slate-500">@(((DateTime.UtcNow - b.CreatedAt).TotalHours < 1 ? "agora há pouco" : ((int)(DateTime.UtcNow - b.CreatedAt).TotalHours) + "h atrás"))</div>
                         </td>
                         <td class="px-4 py-3 text-sm text-slate-700">@kb KB</td>

@@ -1,3 +1,4 @@
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Anuncios;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -35,7 +36,7 @@ public class AnunciosController(
             id = a.Id,
             titulo = a.Titulo,
             conteudo = a.Conteudo,
-            criadoEm = a.CriadoEm.ToString("dd/MM/yyyy HH:mm")
+            criadoEm = a.CriadoEm.ParaBrasilia().ToString("dd/MM/yyyy HH:mm")
         }));
     }
 
