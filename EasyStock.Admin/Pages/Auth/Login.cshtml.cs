@@ -100,7 +100,8 @@ public class LoginModel(AdminApiClient api, AdminSessionService session, ILogger
                 HttpOnly = true,
                 Secure = !env.IsDevelopment(),
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(30)
+                // 7 dias (decisao 2026-07-03 na issue 819). Em sync com AdminSessionRestoreMiddleware.
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
             return RedirectToPage("/Index");

@@ -51,7 +51,9 @@ public static class AdminServicesExtensions
         services.AddHttpClient<AdminApiClient>(c =>
         {
             c.BaseAddress = new Uri(apiBaseUrl);
-            c.Timeout = TimeSpan.FromSeconds(15);
+            // issue 819: configuravel sem rebuild (historico: API em swap-thrashing na VM
+            // estourava o timeout fixo e nao dava pra ajustar sem novo deploy).
+            c.Timeout = TimeSpan.FromSeconds(builder.Configuration.GetValue<int>("HttpClient:TimeoutSeconds", 15));
         }).AddHttpMessageHandler<AdminTokenRefreshHandler>();
 
         // Session e API services
@@ -95,7 +97,7 @@ public static class AdminServicesExtensions
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[DataProtection] AVISO: '{dpKeysPath}' nao gravavel ({ex.GetType().Name}) — chaves ficarao efemeras. Verifique o volume/permissao (chown 1001).");
+                Console.Error.WriteLine($"[DataProtection] ERRO: '{dpKeysPath}' nao gravavel ({ex.GetType().Name}) — chaves ficarao EFEMERAS: todo deploy/restart desloga TODOS os admins (cookie/antiforgery invalidados). Verifique o volume dataprotection-admin-keys no docker-compose.azure.yml (chown 1001).");
             }
             if (dpWritable)
             {

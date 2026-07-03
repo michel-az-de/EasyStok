@@ -37,7 +37,17 @@ public class AdminTokenRefreshHandler(
             retryRequest = await CloneRequestAsync(request, ct);
         }
 
+        // issue 819: latencia da API vista pelo Admin no log — sem isso o operador nao
+        // distingue "Admin caiu" de "API lenta" (historico: swap-thrashing na VM).
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var response = await base.SendAsync(request, ct);
+        sw.Stop();
+        if (sw.Elapsed.TotalSeconds > 5)
+            log.LogWarning("API lenta: {Method} {Path} levou {Ms}ms (status {Status})",
+                request.Method, request.RequestUri?.AbsolutePath, sw.ElapsedMilliseconds, (int)response.StatusCode);
+        else if (sw.Elapsed.TotalSeconds > 2)
+            log.LogInformation("API acima de 2s: {Method} {Path} levou {Ms}ms",
+                request.Method, request.RequestUri?.AbsolutePath, sw.ElapsedMilliseconds);
 
         try
         {

@@ -58,7 +58,9 @@ public class AdminSessionRestoreMiddleware(
     {
         // NOVO-05: retry com backoff curto bridgia a janela em que a API reinicia junto
         // (mesmo deploy). So o 401 (token rejeitado) e definitivo; o resto e transitorio.
-        const int maxAttempts = 3;
+        // issue 819: 2 tentativas (nao 3) — cada tentativa pode custar o timeout inteiro do
+        // HttpClient com a API fora, e o cookie preservado ja garante self-heal na proxima request.
+        const int maxAttempts = 2;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
@@ -141,7 +143,9 @@ public class AdminSessionRestoreMiddleware(
         HttpOnly = true,
         Secure = !env.IsDevelopment(),
         SameSite = SameSiteMode.Strict,
-        Expires = DateTimeOffset.UtcNow.AddDays(30)
+        // 7 dias (decisao 2026-07-03 na issue 819): admin desligado perde acesso em ate 1
+        // semana; segue cobrindo restart/deploy. Manter em sync com o Login.
+        Expires = DateTimeOffset.UtcNow.AddDays(7)
     };
 
     // Sinaliza pro Login que a sessao expirou (banner amarelo). Mesmo cookie usado
