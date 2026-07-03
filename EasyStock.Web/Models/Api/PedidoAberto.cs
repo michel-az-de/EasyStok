@@ -22,6 +22,7 @@ public record PedidoAberto
         2 => "Em Trânsito",
         3 => "Recebido",
         4 => "Cancelado",
+        5 => "Recebido Parcial",
         _ => Status.ToString()
     };
 
@@ -31,6 +32,7 @@ public record PedidoAberto
         2 => "bg-blue-100 text-blue-700",
         3 => "bg-green-100 text-green-700",
         4 => "bg-red-100 text-red-700",
+        5 => "bg-orange-100 text-orange-700",
         _ => "bg-gray-100 text-gray-600"
     };
 }

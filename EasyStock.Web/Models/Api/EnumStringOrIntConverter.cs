@@ -22,12 +22,13 @@ internal sealed class EnumStringOrIntConverter : JsonConverter<int>
         // NaturezaMovimentacao
         ["Entrada"] = 0,
         ["Saida"] = 1,
-        // StatusPedidoCompra
-        ["Rascunho"] = 0,
-        ["Enviado"] = 1,
-        ["Confirmado"] = 2,
-        ["Entregue"] = 3,
+        // StatusPedidoFornecedor (espelho literal de EasyStock.Domain/Enums/StatusPedidoFornecedor.cs,
+        // 1-based — issue 797: o mapa anterior espelhava um enum que nao existe no Domain)
+        ["Aberto"] = 1,
+        ["EmTransito"] = 2,
+        ["Recebido"] = 3,
         ["Cancelado"] = 4,
+        ["RecebidoParcial"] = 5,
     };
 
     public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -40,6 +41,11 @@ internal sealed class EnumStringOrIntConverter : JsonConverter<int>
             var str = reader.GetString()!;
             if (int.TryParse(str, out var n)) return n;
             if (Map.TryGetValue(str, out var mapped)) return mapped;
+            // Nome fora do Map = espelhamento divergiu do Domain (classe da issue 797).
+            // Trace em vez de throw: quebrar a deserializacao inteira seria pior que um
+            // badge generico; o trace deixa a divergencia visivel em diagnostico.
+            System.Diagnostics.Trace.TraceWarning(
+                $"EnumStringOrIntConverter: nome de enum desconhecido '{str}' — espelho divergiu do Domain (issue 797).");
             return 0;
         }
 

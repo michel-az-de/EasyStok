@@ -21,6 +21,7 @@ public record FornecedorHistoricoItem
         2 => "Em Trânsito",
         3 => "Recebido",
         4 => "Cancelado",
+        5 => "Recebido Parcial",
         _ => Status.ToString()
     };
 
@@ -29,6 +30,7 @@ public record FornecedorHistoricoItem
         3 => "bg-green-100 text-green-700",
         2 => "bg-blue-100 text-blue-700",
         4 => "bg-red-100 text-red-700",
+        5 => "bg-orange-100 text-orange-700",
         _ => "bg-yellow-100 text-yellow-700"
     };
 }

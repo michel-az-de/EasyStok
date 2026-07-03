@@ -90,7 +90,8 @@
                             <td class="text-slate-500 text-sm">@(ped.Canal ?? "-")</td>
                             <td>
                                 <div class="flex items-center gap-2">
-                                    @if (ped.Status == 1 || ped.Status == 2)
+                                    @* Status 5 (RecebidoParcial) permite reprocessar o recebimento ate completar — issue 797 *@
+                                    @if (ped.Status == 1 || ped.Status == 2 || ped.Status == 5)
                                     {
                                         <button type="button" @@click="confirmReceber = true"
                                                 class="grid-action-btn grid-action-btn--success">
