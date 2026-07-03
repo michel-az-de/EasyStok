@@ -2,17 +2,15 @@
    "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
    "tasks": [
       {
-         "name": "rotulagem-architecture-tests",
+         "name": "poka-yoke-gate",
          "group": "pre-commit",
-         "command": "dotnet",
+         "command": "powershell.exe",
          "args": [
-            "test",
-            "EasyStock.ArchitectureTests/EasyStock.ArchitectureTests.csproj",
-            "--filter",
-            "Category=Architecture",
-            "--nologo",
-            "--verbosity",
-            "minimal"
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "scripts/poka-yoke/gate.ps1"
          ]
       }
    ]
