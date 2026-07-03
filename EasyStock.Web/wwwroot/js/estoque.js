@@ -8,8 +8,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     await fetchCategorias();
 });
 
-const CAT_CACHE_KEY = 'easystock_categorias';
 const CAT_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+// Chave com escopo empresa:loja (issue 806): a chave global fazia o sidebar mostrar
+// as categorias da loja ANTERIOR por ate 5 min apos trocar de loja na mesma aba.
+function catCacheKey() {
+    const scope = document.querySelector('meta[name="es-scope"]')?.content || '';
+    return 'easystock_categorias:' + scope;
+}
+
+// Invalidacao p/ fluxos que criam categoria sem recarregar (Produtos/Form, modal de
+// Pedidos) ou antes do reload (tela de Categorias). Exclusao fica so com o TTL:
+// um link de categoria removida por ate 5 min leva a um filtro vazio, inocuo.
+window.esInvalidateCategorias = function () {
+    try { sessionStorage.removeItem(catCacheKey()); } catch { /* nao-critico */ }
+};
 
 async function fetchCategorias() {
     const nav = document.getElementById('cat-nav');
@@ -17,7 +30,7 @@ async function fetchCategorias() {
 
     // Tentar cache primeiro
     try {
-        const cached = sessionStorage.getItem(CAT_CACHE_KEY);
+        const cached = sessionStorage.getItem(catCacheKey());
         if (cached) {
             const { data, ts } = JSON.parse(cached);
             if (Date.now() - ts < CAT_CACHE_TTL && Array.isArray(data) && data.length > 0) {
@@ -36,7 +49,7 @@ async function fetchCategorias() {
 
         // Salvar no cache
         try {
-            sessionStorage.setItem(CAT_CACHE_KEY, JSON.stringify({ data: categorias, ts: Date.now() }));
+            sessionStorage.setItem(catCacheKey(), JSON.stringify({ data: categorias, ts: Date.now() }));
         } catch { /* sessionStorage cheio, não-crítico */ }
 
         renderCategorias(nav, categorias);

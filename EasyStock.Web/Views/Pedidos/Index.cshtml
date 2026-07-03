@@ -1325,6 +1325,7 @@ function novoPedidoModal() {
                     this.erroMsg = 'Não foi possível criar a categoria "' + nome + '": ' + (res.err || 'erro desconhecido');
                     return;
                 }
+                window.esInvalidateCategorias?.();
                 // /categorias/criar-json devolve só { success }; re-lista pra obter o id da nova categoria.
                 let lista = [];
                 try {

@@ -29,18 +29,15 @@
 
     let res;
     try {
-      res = await fetch(url, opts);
+      // Delega ao esFetch (issue 806): injeta X-Requested-With e trata 401,
+      // X-EasyStok-Auth: no-store (selecionar loja) e 402 de assinatura com os
+      // MESMOS redirects do resto do app — antes este wrapper divergia do contrato.
+      const doFetch = window.esFetch || fetch;
+      res = await doFetch(url, opts);
     } catch (netErr) {
       console.error('[api]', method, url, 'network error:', netErr);
       if (window.showToast) window.showToast('Sem conexão. Verifique sua rede.', 'error');
       throw netErr;
-    }
-
-    if (res.status === 401) {
-      // sessão expirou — redireciona pro login preservando a página atual
-      const back = encodeURIComponent(window.location.pathname + window.location.search);
-      window.location.href = '/auth/login?returnUrl=' + back + '&sessionExpired=1';
-      throw new Error('Sessão expirada');
     }
 
     if (!res.ok) {

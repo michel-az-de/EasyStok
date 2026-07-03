@@ -1,4 +1,5 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject EasyStock.Web.Services.SessionService EsSession
 @{
     var theme = (ViewBag.UserTheme as string)?.ToLowerInvariant() == "dark" ? "dark" : "light";
     var antiForgeryToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
@@ -14,6 +15,8 @@
     <link rel="icon" type="image/svg+xml" href="~/img/favicon.svg" asp-append-version="true" />
     <link rel="apple-touch-icon" href="~/img/favicon.svg" />
     <meta name="csrf-token" content="@antiForgeryToken" />
+    @* Escopo do tenant p/ caches client-side (issue 806): trocar de loja nao pode reusar cache da anterior *@
+    <meta name="es-scope" content="@($"{EsSession.GetEmpresaId()}:{EsSession.GetLojaId()}")" />
     <script>
         (function () {
             const stored = localStorage.getItem('easystock-theme');

@@ -2002,6 +2002,7 @@
                             window.showToast(data?.error?.message || 'Nao foi possivel criar a categoria.', 'error');
                             return false;
                         }
+                        window.esInvalidateCategorias?.();
                         const lista = await (await esFetch('/categorias/listar')).json();
                         const nova = lista.find(c => (c.nome || '').trim().toLowerCase() === nome.toLowerCase());
                         if (!nova) { this.step = 1; window.showToast('Categoria criada, mas nao foi possivel seleciona-la. Recarregue.', 'warning'); return false; }

@@ -455,7 +455,8 @@
                         if (cached && (Date.now() - cached.ts) < 30000) {
                             this.resumo = cached.data;
                         } else {
-                            this.resumo = await esFetch('/notificacoes/resumo').then(r => r.json());
+                            const rResumo = await esFetch('/notificacoes/resumo');
+                            if (rResumo.ok) this.resumo = await rResumo.json();
                         }
                     } catch (e) { console.error('[EasyStock]', e); this.items = []; this.erro = true; }
                     this.loading = false;
@@ -463,10 +464,13 @@
                 async marcarTodas() {
                     const token = document.querySelector('meta[name="csrf-token"]')?.content;
                     try {
-                        await esFetch('/notificacoes/marcar-todas', {
+                        const res = await esFetch('/notificacoes/marcar-todas', {
                             method: 'POST',
                             headers: { 'RequestVerificationToken': token || '' }
                         });
+                        // esFetch devolve 4xx/5xx cru (issue 806): sem este guard a UI
+                        // zerava badge/lista num erro e o poll de 45s trazia tudo de volta.
+                        if (!res.ok) { window.showToast && window.showToast('Erro ao marcar notificações.', 'error'); return; }
                         this.items = [];
                         if (this.resumo) this.resumo.totalNaoLidas = 0;
                         const badge = document.getElementById('topbar-notif-badge');
@@ -477,10 +481,11 @@
                 async marcarLida(id) {
                     const token = document.querySelector('meta[name="csrf-token"]')?.content;
                     try {
-                        await esFetch('/notificacoes/' + id + '/lida-ajax', {
+                        const res = await esFetch('/notificacoes/' + id + '/lida-ajax', {
                             method: 'POST',
                             headers: { 'RequestVerificationToken': token || '' }
                         });
+                        if (!res.ok) { window.showToast && window.showToast('Erro ao marcar notificação como lida.', 'error'); return; }
                         this.items = this.items.filter(n => n.id !== id);
                         if (this.resumo) this.resumo.totalNaoLidas = Math.max(0, (this.resumo.totalNaoLidas || 0) - 1);
                         const badge = document.getElementById('topbar-notif-badge');
