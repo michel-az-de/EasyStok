@@ -252,6 +252,36 @@ public class AuthController(
         return View(new RegisterViewModel());
     }
 
+    // Proxies da validacao de disponibilidade do signup (issue 800): o fetch do Registrar
+    // apontava para /api/empresas/* que so existe no host da Api — no host do Web caia no
+    // BFF (404 HTML) e a validacao degradava em silencio. O rate-limit fica na Api
+    // (politica "disponibilidade", por IP real via X-Forwarded-For do TokenRefreshHandler).
+    [AllowAnonymous]
+    [HttpGet("/auth/registrar/email-disponivel.json")]
+    public async Task<IActionResult> EmailDisponivelJson(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return Json(new { data = new { disponivel = false } });
+        var r = await api.GetAsync<DisponibilidadeApi>(
+            $"empresas/email-disponivel?email={Uri.EscapeDataString(email.Trim())}");
+        if (!r.Success || r.Data is null)
+            return StatusCode(r.HttpStatus is >= 400 and < 600 ? r.HttpStatus : 502);
+        return Json(new { data = new { disponivel = r.Data.Disponivel } });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("/auth/registrar/cnpj-disponivel.json")]
+    public async Task<IActionResult> CnpjDisponivelJson(string? doc)
+    {
+        if (string.IsNullOrWhiteSpace(doc))
+            return Json(new { data = new { disponivel = false } });
+        var r = await api.GetAsync<DisponibilidadeApi>(
+            $"empresas/cnpj-disponivel?doc={Uri.EscapeDataString(doc.Trim())}");
+        if (!r.Success || r.Data is null)
+            return StatusCode(r.HttpStatus is >= 400 and < 600 ? r.HttpStatus : 502);
+        return Json(new { data = new { disponivel = r.Data.Disponivel } });
+    }
+
     [AllowAnonymous]
     [HttpPost("/auth/registrar")]
     [ValidateAntiForgeryToken]

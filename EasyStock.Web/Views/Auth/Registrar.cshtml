@@ -249,7 +249,7 @@
                     if (!v || !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(v)) { this.emailOk = null; return; }
                     this.emailChecking = true;
                     try {
-                        const r = await fetch('/api/empresas/email-disponivel?email=' + encodeURIComponent(v), { credentials: 'same-origin' });
+                        const r = await fetch('/auth/registrar/email-disponivel.json?email=' + encodeURIComponent(v), { credentials: 'same-origin' });
                         if (!r.ok) { this.emailOk = null; return; }
                         const json = await r.json();
                         this.emailOk = !!(json && json.data && json.data.disponivel);
@@ -260,7 +260,7 @@
                     if (!v) { this.docOk = null; return; }
                     this.docChecking = true;
                     try {
-                        const r = await fetch('/api/empresas/cnpj-disponivel?doc=' + encodeURIComponent(v), { credentials: 'same-origin' });
+                        const r = await fetch('/auth/registrar/cnpj-disponivel.json?doc=' + encodeURIComponent(v), { credentials: 'same-origin' });
                         if (!r.ok) { this.docOk = null; return; }
                         const json = await r.json();
                         this.docOk = !!(json && json.data && json.data.disponivel);
