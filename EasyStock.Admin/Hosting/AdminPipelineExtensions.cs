@@ -33,6 +33,22 @@ public static class AdminPipelineExtensions
             KnownProxies = { }
         });
 
+        // Headers de seguranca (issue 818). CSP em Report-Only nesta primeira fatia:
+        // o Admin usa Alpine com x-data/x-on inline (exige 'unsafe-eval'/'unsafe-inline'),
+        // entao o enforce so entra depois de observar os reports sem quebrar tela.
+        app.Use(async (ctx, next) =>
+        {
+            var h = ctx.Response.Headers;
+            h["X-Content-Type-Options"] = "nosniff";
+            h["X-Frame-Options"] = "DENY";
+            h["Referrer-Policy"] = "strict-origin-when-cross-origin";
+            h["Content-Security-Policy-Report-Only"] =
+                "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+                "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; " +
+                "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'";
+            await next();
+        });
+
         // ── Middleware ────────────────────────────────────────────────────────────
         if (!app.Environment.IsDevelopment())
         {
