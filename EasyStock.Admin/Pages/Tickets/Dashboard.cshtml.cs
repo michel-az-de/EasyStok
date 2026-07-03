@@ -41,20 +41,28 @@ public class DashboardModel(AdminApiClient api, AdminSessionService session, ILo
                 {
                     if (nivelCounts.ContainsKey(nivel)) nivelCounts[nivel]++;
 
-                    if (slaRespV || slaResolV)
+                    // issue 635: mesma regua ao-vivo do badge da lista (Index.cshtml) — flag
+                    // persistida do worker OU prazo ja estourado agora. Sem isso o dashboard
+                    // fica ate 5 min atras do badge ATRASO e conta prazo vencido como "risco".
+                    var prazoEstourado = false;
+                    TimeSpan? restante = null;
+                    if (t.TryGetProperty("prazoResposta", out var pp) && pp.ValueKind != JsonValueKind.Null
+                        && DateTime.TryParse(pp.GetString(), out var prazoDt))
+                    {
+                        restante = prazoDt.ToUniversalTime() - DateTime.UtcNow;
+                        prazoEstourado = restante < TimeSpan.Zero;
+                    }
+
+                    if (slaRespV || slaResolV || prazoEstourado)
                     {
                         SlaViolado++;
                         fila.Add(t);
                     }
-                    else
+                    else if (restante is { TotalHours: < 4 })
                     {
                         // Em risco se prazo restante < 4h
-                        if (t.TryGetProperty("prazoResposta", out var pp) && pp.ValueKind != JsonValueKind.Null
-                            && DateTime.TryParse(pp.GetString(), out var prazoDt))
-                        {
-                            var rest = prazoDt - DateTime.UtcNow;
-                            if (rest.TotalHours < 4) { SlaRisco++; fila.Add(t); }
-                        }
+                        SlaRisco++;
+                        fila.Add(t);
                     }
                 }
             }
