@@ -16,9 +16,9 @@
 
     Portas (https): API 7039, Web 7010, Admin 7002.
 
-    Chamado pelo hook .husky/pre-push com -Ensure: lanca o que faltar e retorna
-    NA HORA (nao espera health), para nunca travar o push. Sem -Ensure (uso
-    manual) aguarda a API responder e imprime um resumo com URLs e credenciais.
+    Uso manual (o hook .husky/pre-push nao chama mais este script — issue #738):
+    sem -Ensure aguarda a API responder e imprime um resumo com URLs e
+    credenciais. -Ensure lanca o que faltar e retorna NA HORA (nao espera health).
 
 .PARAMETER Ensure
     Modo hook: nao espera health, output minimo. Use no automatico.

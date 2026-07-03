@@ -1,17 +1,13 @@
 #!/bin/sh
-# EasyStok — sobe/garante o ambiente local automatico a cada push.
-#   API+PWA https://localhost:7039 | Web https://localhost:7010 | Admin https://localhost:7002
-#   (dotnet watch + Postgres em Docker)
+# EasyStok — pre-push intencionalmente vazio (issue #738).
 #
-# Non-blocking e non-fatal: o up.ps1 -Ensure lanca os processos destacados e
-# retorna na hora. NUNCA aborta o push — falha em subir o ambiente local de
-# conveniencia nao deve travar o git push (o gate de qualidade e o pre-commit).
+# O ambiente local NAO sobe mais automaticamente no push: com ~19 pushes/dia,
+# o up.ps1 -Ensure (porta-em-LISTEN como verdade + .pid sobrescrito) lancava
+# dotnet watch duplicado a cada janela de porta livre — os orfaos acumularam
+# ate 29 processos / 5,9 GB de RAM e causavam locks MSB3021 em builds.
 #
-# Logs: .build/local-env/<svc>.out.log   |   Encerrar: scripts/local-env/down.ps1
-
-echo "[pre-push] subindo ambiente local (API+PWA, Web, Admin)..."
-# Streams em /dev/null: senao os processos lancados pelo up.ps1 herdam o pipe do
-# git push (Start-Process usa bInheritHandles=true) e o push fica pendurado ate
-# os watch morrerem. Com /dev/null + </dev/null, o push retorna na hora.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/local-env/up.ps1 -Ensure >/dev/null 2>&1 </dev/null || true
+# Subir/derrubar o ambiente e acao manual:
+#   pwsh scripts/local-env/up.ps1            # espera health, imprime URLs/credenciais
+#   pwsh scripts/local-env/down.ps1          # encerra os watchers dos .pid
+#   pwsh scripts/local-env/down.ps1 -Sweep   # + varre watchers orfaos deste repo
 exit 0
