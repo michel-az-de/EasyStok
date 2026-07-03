@@ -34,7 +34,9 @@ public class OperacaoRenderTests : IClassFixture<OperacaoRenderTests.OperacaoFac
             html.Length > 1500 ? html[..1500] : html);
 
         html.Should().Contain("operacaoClientes");
-        html.Should().Contain("Como estão os seus clientes");
+        // O es-page-header (sweep issue 737) HtmlEncoda acentos ("est&#227;o") — decodifica
+        // ANTES de asserir texto pt-BR. As asserções de encoding abaixo usam o html CRU.
+        WebUtility.HtmlDecode(html).Should().Contain("Como estão os seus clientes");
 
         // sem o jargão da versão anterior
         html.Should().NotContain("Centro de Comando");
