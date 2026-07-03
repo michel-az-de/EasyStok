@@ -71,9 +71,14 @@
         const fmt = formatters[type];
         if (!fmt) return;
         const handler = () => {
+            // Guarda de reentrada: o dispatch de 'input' abaixo re-chama este handler
+            // (esta funcao E o listener de input); sem a guarda, recursao infinita.
+            if (el._masking) return;
             const start = el.selectionStart;
             const before = el.value;
             const formatted = fmt(before);
+            if (formatted === before) { el.dataset.raw = onlyDigits(formatted); return; }
+            el._masking = true;
             el.value = formatted;
             // raw value for submit / programmatic access
             el.dataset.raw = onlyDigits(formatted);
@@ -82,6 +87,10 @@
                 const delta = formatted.length - before.length;
                 el.setSelectionRange(start + Math.max(delta, 0), start + Math.max(delta, 0));
             } catch (_) { /* selection not supported on some inputs */ }
+            // Issue 812/#497: re-dispatcha 'input' para o x-model do Alpine capturar o
+            // valor JA mascarado (antes o x-model guardava o valor pre-mascara e divergia).
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el._masking = false;
         };
         el.addEventListener('input', handler);
         el.dataset.maskApplied = '1';

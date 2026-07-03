@@ -1181,8 +1181,13 @@
                     });
                 },
 
+                _movingPhoto: false,
                 async movePhoto(fromIdx, toIdx) {
                     if (fromIdx === null || fromIdx === toIdx) return;
+                    // Issue 812: single-flight + rollback. Antes cliques rapidos intercalavam
+                    // POSTs e, na falha, a UI ficava numa ordem que o servidor nao tinha.
+                    if (this._movingPhoto) return;
+                    const snapshot = [...this.photos];
                     const updated = [...this.photos];
                     const [moved] = updated.splice(fromIdx, 1);
                     updated.splice(toIdx, 0, moved);
@@ -1192,6 +1197,7 @@
                     const token = document.querySelector('meta[name="csrf-token"]')?.content
                                || document.querySelector('[name=__RequestVerificationToken]')?.value
                                || '';
+                    this._movingPhoto = true;
                     try {
                         const r = await esFetch('/produtos/' + prodId + '/fotos/reordenar', {
                             method: 'POST',
@@ -1199,8 +1205,16 @@
                             body: JSON.stringify(novaOrdem)
                         });
                         const d = await r.json();
-                        if (!d.ok) window.showToast(d.erro || 'Não foi possível salvar a nova ordem.', 'warning');
-                    } catch { window.showToast('Erro ao salvar ordem.', 'warning'); }
+                        if (!r.ok || !d.ok) {
+                            this.photos = snapshot; // rollback: servidor nao aceitou a nova ordem
+                            window.showToast(d.erro || 'Não foi possível salvar a nova ordem.', 'warning');
+                        }
+                    } catch {
+                        this.photos = snapshot;
+                        window.showToast('Erro ao salvar ordem.', 'warning');
+                    } finally {
+                        this._movingPhoto = false;
+                    }
                 },
 
                 _deletingPhoto: false,

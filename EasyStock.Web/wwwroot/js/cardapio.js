@@ -121,6 +121,8 @@
       },
 
       async mover(dir) {
+        // Issue 812: single-flight — double-click disparava 2 POSTs de reordenacao concorrentes.
+        if (this._movendo) return;
         const card = this.$root;
         const isCard = function (el) { return el && el.classList && el.classList.contains('cdp-card'); };
         const sib = dir === 'up' ? card.previousElementSibling : card.nextElementSibling;
@@ -129,6 +131,7 @@
         const beyondEl = dir === 'up' ? sib.previousElementSibling : sib.nextElementSibling;
         const beyond = isCard(beyondEl) ? (parseFloat(beyondEl.dataset.ordem) || 0) : (dir === 'up' ? target - 2 : target + 2);
         const novaOrdem = (target + beyond) / 2;
+        this._movendo = true;
         try {
           const r = await window.api.post('/cardapio/' + this.id + '/reordenar', { novaOrdem: novaOrdem });
           if (!r || r.ok === false) { toast('Não foi possível reordenar.', 'error'); return; }
@@ -139,6 +142,8 @@
           if (btn) btn.focus();
         } catch (e) {
           toast('Não foi possível reordenar.', 'error');
+        } finally {
+          this._movendo = false;
         }
       },
     };
