@@ -50,6 +50,10 @@ public class NfeRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : 
         }
 
         await using var queryCtx = fixture.CreateDbContext();
+        // Contexto de tenant da Empresa A (pego via #822): o filtro global de tenant agora
+        // cobre NfeDocumento e um ctx sem tenant (CurrentTenantId=Guid.Empty) devolve null
+        // para TODO lookup — em prod o Find roda com o tenant do JWT, entao o teste espelha.
+        queryCtx.SetMobileTenantContext(empresaA.empresaId);
         var repo = new NfeRepository(queryCtx);
 
         var doA = await repo.FindByIdempotencyKeyAsync(empresaA.empresaId, chaveCompartilhada);
