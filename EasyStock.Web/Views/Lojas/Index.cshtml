@@ -123,7 +123,7 @@
      @@click.self="open = false">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Nova Loja</h2>
-        <form action="/lojas/criar" method="post" data-validate x-data="{ loading: false }" @@submit="loading = true">
+        <form action="/lojas/criar" method="post" data-validate x-data="{ loading: false }" x-on:submit="loading = true">
             @Html.AntiForgeryToken()
             <div class="mb-4">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Nome *</label>

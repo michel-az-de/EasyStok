@@ -67,7 +67,7 @@
             if (!string.IsNullOrEmpty(nxt))
             {
                 @* BUG-02: progressivo — sem JS o form posta normal (PRG/reload). Com JS,
-                   @@submit.prevent faz AJAX em status.json e atualiza badge/timeline/botao/toast
+                   o handler Alpine de submit faz AJAX em status.json e atualiza badge/timeline/botao/toast
                    sem reload (espelha o cockpit do Index). *@
                 <form id="ped-acao-form" asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
                       x-data="pedidoStatusAcao('@p.Id')" x-on:submit.prevent="avancar($el)" data-noprogress>

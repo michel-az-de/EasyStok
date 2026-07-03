@@ -44,6 +44,26 @@ public class AlpineHygieneTests
     }
 
     [Fact]
+    public void Views_NaoDevemUsarDiretivaAlpineDeSubmitEmForm()
+    {
+        // Issue 714: o FormTagHelper descarta o atributo `@submit*` (escrito @@submit no Razor)
+        // e TODOS os atributos seguintes da tag <form>. O padrao correto e x-on:submit
+        // (que o TagHelper preserva) ou listener programatico no init (form-modal.js).
+        // 12 views regrediram nessa classe (varredura 2026-07-02); este guard e estrito:
+        // qualquer @@submit em .cshtml do Web falha — inclusive em comentario, para o
+        // proximo dev nao copiar o padrao errado de um exemplo.
+        var views = ArchTestPaths.AppDirectory("EasyStock.Web", "Views");
+        var ofensores = views.EnumerateFiles("*.cshtml", SearchOption.AllDirectories)
+            .Where(f => File.ReadAllText(f.FullName).Contains("@@submit"))
+            .Select(f => ArchTestPaths.ToRelative(views, f.FullName))
+            .ToList();
+
+        ofensores.Should().BeEmpty(
+            "diretivas Alpine de submit em <form> sao descartadas pelo FormTagHelper junto com os " +
+            "atributos seguintes (issue 714) — use x-on:submit/x-on:submit.prevent ou listener no init().");
+    }
+
+    [Fact]
     public void FormModal_DeveDispararInputEChangeAposPreenchimentoProgramatico()
     {
         var js = ArchTestPaths.ReadAppFile("EasyStock.Web","wwwroot", "js", "form-modal.js");

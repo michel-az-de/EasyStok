@@ -29,7 +29,6 @@
 
 <form id="produto-form" action="@formAction" method="post" enctype="multipart/form-data" novalidate
       x-data="produtoForm()"
-      @@submit.prevent="isEdit ? abrirModalConfirmacao() : submitForm()"
       class="max-w-3xl pb-24 sm:pb-8">
     @Html.AntiForgeryToken()
     @if (isEdit)
@@ -1573,13 +1572,11 @@
                 _clickHandler: null,
 
                 init() {
-                    // BUG-14 (hardening): liga o submit programaticamente, igual ao form-modal.js
-                    // (f95160dc). Se o @@submit.prevent nao ligar no form por algum motivo, sem isto
-                    // o form method=post faria POST NATIVO e pularia o fluxo AJAX desenhado (upload de
-                    // foto em 2 fases + toast). x-data esta no proprio form, entao $el e o proprio form.
-                    // Handlers idempotentes/guardados (saving / showConfirmModal): double-fire e seguro.
-                    // NOTA: a causa exata de o @@submit.prevent nao ligar precisa de verificacao em
-                    // runtime (HTML servido); este listener torna o submit robusto independente disso.
+                    // BUG-14/issue 714: este listener e o mecanismo CANONICO de submit deste form.
+                    // O FormTagHelper do Razor descarta diretivas Alpine de submit na tag <form>
+                    // (f95160dc), entao o handler e ligado programaticamente, igual ao form-modal.js.
+                    // Sem isto o form method=post faria POST NATIVO e pularia o fluxo AJAX desenhado
+                    // (upload de foto em 2 fases + toast). x-data esta no proprio form ($el = form).
                     this.$el.addEventListener('submit', (e) => {
                         e.preventDefault();
                         if (this.isEdit) this.abrirModalConfirmacao();

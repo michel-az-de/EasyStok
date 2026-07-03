@@ -351,7 +351,7 @@
 </div>
 
 @* Modal de cadastro rapido (ADR-0027, #505) — reusa POST /produtos/quick.json + padrao fm-*.
-   Sem <form> (FormTagHelper descartaria @@submit.prevent — BUG-01/02); botoes type=button. *@
+   Sem <form> (FormTagHelper descartaria a diretiva Alpine de submit — BUG-01/02); botoes type=button. *@
 <div x-data="cadastroRapidoModal()"
      x-show="open" x-cloak
      @@open-modal-rapido.window="abrir()"

@@ -131,7 +131,6 @@
        de entrada fica no painel via x-show — antes o x-transition do painel era inerte
        (sem x-show proprio) e o fade do overlay deixava o texto do fundo vazar. *@
     <form x-ref="panel" class="fm-panel" x-show="open"
-          @@submit.prevent="submit()"
           x-transition:enter="transition duration-150 ease-out"
           x-transition:enter-start="opacity-0 scale-95"
           x-transition:enter-end="opacity-100 scale-100">
