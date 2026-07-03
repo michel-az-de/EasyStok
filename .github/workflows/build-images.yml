@@ -1,0 +1,70 @@
+# build-images — builda as 3 imagens da VM (api/web/admin) no CI e pusha pro GHCR.
+# Issue 605: o gargalo do deploy era o dotnet publish rodando NA VM (1,9 GB RAM,
+# swap thrashing → janela de ~2h). Com as imagens prontas no registry, a VM só
+# faz `docker compose pull` (vm-deploy.sh em modo pull, fatia 3).
+#
+# - Tags: :latest e :<sha do commit>. O vm-deploy.sh (modo pull) puxa :<sha> do
+#   HEAD — se este workflow ainda não terminou (ou falhou), o pull falha e o
+#   deploy aborta sem trocar nada: o CI vira gate natural do deploy.
+# - GIT_SHA via build-arg, declarado só no estágio runtime dos Dockerfiles —
+#   não invalida o cache de camadas (issue 572).
+# - Cache buildx type=gha com escopo por imagem (restore/publish do NuGet ficam
+#   quentes entre commits).
+name: build-images
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+# Push novo em master cancela o build do commit anterior: o HEAD avançou, e o
+# vm-deploy pull-mode só procura a tag do HEAD atual.
+concurrency:
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: Dockerfile
+          - name: web
+            dockerfile: Dockerfile.Web
+          - name: admin
+            dockerfile: Dockerfile.cloudrun.admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push easystok-${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/easystok-${{ matrix.name }}:latest
+            ghcr.io/${{ github.repository_owner }}/easystok-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=easystok-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=easystok-${{ matrix.name }}
