@@ -36,7 +36,10 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
                 "sem transação ativa, o FOR UPDATE é descartado pelo Postgres e a serialização entre " +
                 "agentes Babá fica quebrada (race em aprovar/recusar concorrente).");
 
-        const string sql = "SELECT * FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
+        // xmin explicito: Pedido usa xmin como concurrency token (80ce216f) e coluna de
+        // SISTEMA nao vem no SELECT * — sem ela o EF falha com "column e.xmin does not
+        // exist" e TODO aprovar/recusar de pedido storefront morre (pego via #822).
+        const string sql = "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
         return await db.Pedidos
             .FromSqlRaw(sql, pedidoId)
             .IgnoreQueryFilters()

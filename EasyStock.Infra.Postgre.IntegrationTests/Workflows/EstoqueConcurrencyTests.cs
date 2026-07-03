@@ -94,7 +94,8 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             return await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -114,7 +115,8 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             return await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -148,5 +150,14 @@ public class EstoqueConcurrencyTests(PostgreSqlDatabaseFixture fixture) : IClass
                 "quantidade final deve ser 0 (10 - 5 - 5), nunca negativa. " +
                 "Isso valida que transações pessimistas (FOR UPDATE) funcionam.");
         }
+    }
+
+    // issue 306 (pego via #822): o use case exige IPublicadorEventos; no-op basta aqui.
+    private static readonly EasyStock.Application.Ports.Output.Events.IPublicadorEventos PublicadorNoOp
+        = new PublicadorEventosNoOp();
+
+    private sealed class PublicadorEventosNoOp : EasyStock.Application.Ports.Output.Events.IPublicadorEventos
+    {
+        public Task PublicarAsync<T>(T evento) where T : EasyStock.Domain.Events.DomainEvent => Task.CompletedTask;
     }
 }

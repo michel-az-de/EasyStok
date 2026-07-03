@@ -96,11 +96,15 @@ public class NfeRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : 
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
+        // Pedidos DISTINTOS de proposito: o ux_nfe_pedido_ativo (issue 791, 2026-07-02)
+        // passou a proibir 2 NFe ativas no MESMO pedido — o alvo DESTE teste e o indice
+        // parcial de IdempotencyKey, entao cada doc legado vive no seu pedido.
         var seed = await SeedEmpresaEPedidoAsync("Empresa Backfill");
+        var seed2 = await SeedEmpresaEPedidoAsync("Empresa Backfill 2");
 
         await using var ctx = fixture.CreateDbContext();
         ctx.NfeDocumentos.Add(CriarNfe(seed.empresaId, seed.pedidoId, serie: 1, numero: 1, key: null));
-        ctx.NfeDocumentos.Add(CriarNfe(seed.empresaId, seed.pedidoId, serie: 1, numero: 2, key: null));
+        ctx.NfeDocumentos.Add(CriarNfe(seed2.empresaId, seed2.pedidoId, serie: 1, numero: 2, key: null));
 
         var act = async () => await ctx.SaveChangesAsync();
 
