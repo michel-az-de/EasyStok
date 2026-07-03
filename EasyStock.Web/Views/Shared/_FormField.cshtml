@@ -18,7 +18,6 @@
     // Acesso defensivo a um modelo anonimo dinamico: chamadores podem omitir
     // qualquer propriedade. Sem try/catch, Model.<ausente> lanca RuntimeBinderException
     // e derruba a view inteira (o storybook /dev/components quebrava em Model.Error).
-    // Mesmo padrao defensivo do _Modal.cshtml.
     string? label = null;      try { label = Model.Label as string; } catch { }
     string? forId = null;      try { forId = Model.For as string; } catch { }
     if (string.IsNullOrEmpty(forId)) { try { forId = Model.Id as string; } catch { } }

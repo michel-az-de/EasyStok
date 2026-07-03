@@ -140,69 +140,6 @@ public class DashboardController(ApiClient api, SessionService session, IOptions
         return View(vm);
     }
 
-    [HttpGet("/dashboard/alertas")]
-    public async Task<IActionResult> Alertas(Guid? lojaId = null, int page = 1, int pageSize = 30)
-    {
-        var tasks = new[]
-        {
-            api.GetAsync<object>($"analytics/validade?lojaId={lojaId}&page={page}&pageSize={pageSize}"),
-            api.GetAsync<object>($"analytics/parados?lojaId={lojaId}&page={page}&pageSize={pageSize}"),
-        };
-        await Task.WhenAll(tasks);
-        return Json(new
-        {
-            validade = tasks[0].Result.Success ? tasks[0].Result.Data : null,
-            parados  = tasks[1].Result.Success ? tasks[1].Result.Data : null,
-        });
-    }
-
-    [HttpGet("/dashboard/receita-custo")]
-    public async Task<IActionResult> ReceitaCusto(int periodo = 30, Guid? lojaId = null, int tz = 0)
-    {
-        var result = await api.GetAsync<object>(
-            $"analytics/receita-custo?periodo={periodo}&lojaId={lojaId}&tz={tz}");
-
-        if (!result.Success)
-            return StatusCode(502, new { message = result.ErrorMessage ?? "Erro ao carregar dados de receita." });
-
-        return Json(result.Data);
-    }
-
-    [HttpGet("/dashboard/data")]
-    public async Task<IActionResult> Data(int periodo = 30, Guid? lojaId = null, int tz = 0)
-    {
-        var result = await api.GetAsync<object>(
-            $"analytics/dashboard-full?periodo={periodo}&lojaId={lojaId}&tz={tz}");
-
-        if (!result.Success)
-            return StatusCode(502, new { message = result.ErrorMessage ?? "Erro ao carregar dashboard." });
-
-        return Json(result.Data);
-    }
-
-    [HttpGet("/dashboard/extras")]
-    public async Task<IActionResult> Extras(int periodo = 30, Guid? lojaId = null, int tz = 0)
-    {
-        var result = await api.GetAsync<object>(
-            $"analytics/dashboard-extras?periodo={periodo}&lojaId={lojaId}&tz={tz}");
-
-        if (!result.Success)
-            return StatusCode(502, new { message = result.ErrorMessage ?? "Erro ao carregar dados extras." });
-
-        return Json(result.Data);
-    }
-
-    [HttpGet("/dashboard/pedido/{id}")]
-    public async Task<IActionResult> PedidoDetalhe(Guid id)
-    {
-        var result = await api.GetAsync<object>($"pedidos/{id}");
-
-        if (!result.Success)
-            return StatusCode(502, new { message = result.ErrorMessage ?? "Pedido não encontrado." });
-
-        return Json(result.Data);
-    }
-
     // Dispensa o checklist de ativacao (issue #415). Cookie de 1 ano; auto-cura:
     // o card some sozinho ao concluir os 4 passos, entao perder o cookie em outro
     // device e inocuo.

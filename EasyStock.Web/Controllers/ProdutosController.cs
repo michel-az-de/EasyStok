@@ -388,29 +388,6 @@ public class ProdutosController(ProdutosService svc, EntradasService entradasSvc
         return RedirectToAction(nameof(Detail), new { id });
     }
 
-    [HttpPost("/produtos/{id}/foto")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UploadFoto(string id, IFormFile foto)
-    {
-        if (foto == null || foto.Length == 0)
-        {
-            Toast("error", "Selecione uma imagem.");
-            return RedirectToAction(nameof(Detail), new { id });
-        }
-
-        if (foto.Length > 10 * 1024 * 1024)
-        {
-            Toast("error", "Imagem nao pode ser maior que 10MB.");
-            return RedirectToAction(nameof(Detail), new { id });
-        }
-
-        var result = await svc.UploadFotoAsync(id, foto);
-        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
-
-        Toast("success", "Foto enviada com sucesso!");
-        return RedirectToAction(nameof(Detail), new { id });
-    }
-
     [HttpPost("/produtos/{id}/variacoes")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AdicionarVariacao(string id, string nome, string? sku = null)

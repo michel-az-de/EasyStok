@@ -51,7 +51,6 @@ public class RegistrarPagamentoJsonRequest
     public string? Referencia { get; set; }
     public string? Observacao { get; set; }
 }
-public class CancelarPedidoJsonRequest { public string? Motivo { get; set; } }
 
 public class PedidosController(
     PedidosService svc,
@@ -203,11 +202,6 @@ public class PedidosController(
     public async Task<IActionResult> AddPagamentoJson(string id, [FromBody] RegistrarPagamentoJsonRequest? req) =>
         PedidoJsonContract.From(await svc.RegistrarPagamentoAsync(
             id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao));
-
-    [HttpPost("/pedidos/{id}/cancelar.json")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CancelarJson(string id, [FromBody] CancelarPedidoJsonRequest? req) =>
-        PedidoJsonContract.From(await svc.CancelarAsync(id, req?.Motivo));
 
     [HttpPost("/pedidos/{id}/status")]
     [ValidateAntiForgeryToken]
