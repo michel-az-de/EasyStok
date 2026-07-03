@@ -70,8 +70,8 @@
         </es-select>
         <es-input name="vencimentoDe" type="date" label="Vencimento de" value="@(Model.VencimentoDe?.ToString("yyyy-MM-dd"))" />
         <es-input name="vencimentoAte" type="date" label="Vencimento até" value="@(Model.VencimentoAte?.ToString("yyyy-MM-dd"))" />
-        <es-input name="valorMin" type="number" step="0.01" label="Valor mín" value="@(Model.ValorMin?.ToString(System.Globalization.CultureInfo.InvariantCulture))" prefix="R$" />
-        <es-input name="valorMax" type="number" step="0.01" label="Valor máx" value="@(Model.ValorMax?.ToString(System.Globalization.CultureInfo.InvariantCulture))" prefix="R$" />
+        <es-input name="valorMin" type="text" inputmode="decimal" label="Valor mín" value="@(Model.ValorMin?.ToString(System.Globalization.CultureInfo.InvariantCulture))" prefix="R$" />
+        <es-input name="valorMax" type="text" inputmode="decimal" label="Valor máx" value="@(Model.ValorMax?.ToString(System.Globalization.CultureInfo.InvariantCulture))" prefix="R$" />
         <div style="display:flex; gap:8px;">
             <es-button type="submit" variant="primary" icon="filter">Filtrar</es-button>
             <es-button variant="ghost" href="/Faturas">Limpar</es-button>

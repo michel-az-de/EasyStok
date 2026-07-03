@@ -55,8 +55,8 @@
 
         <h3 style="margin:24px 0 8px; font-size:14px; font-weight:600; color:var(--text-primary);">Negócio</h3>
         <div style="display:flex; flex-direction:column; gap:16px;">
-            <es-input asp-for="Input.PedidoMinimoEntrega" type="number" step="0.01" label="Pedido mínimo (R$)" />
-            <es-input asp-for="Input.FreteGratisAcima" type="number" step="0.01" label="Frete grátis acima de (R$)" help-text="Deixe vazio para nunca dar frete grátis." />
+            <es-input asp-for="Input.PedidoMinimoEntrega" type="text" inputmode="decimal" placeholder="0,00" label="Pedido mínimo (R$)" />
+            <es-input asp-for="Input.FreteGratisAcima" type="text" inputmode="decimal" placeholder="0,00" label="Frete grátis acima de (R$)" help-text="Deixe vazio para nunca dar frete grátis." />
             <es-input asp-for="Input.DominioCustom" label="Domínio custom" placeholder="casadababa.com" />
         </div>
 

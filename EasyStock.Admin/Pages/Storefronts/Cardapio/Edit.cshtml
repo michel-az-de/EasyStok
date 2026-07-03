@@ -44,7 +44,7 @@
             <es-input asp-for="Input.CategoriaTexto" label="Categoria" placeholder="Ex.: Lasanhas" maxlength="100"
                       help-text="Agrupa o item no cardápio público." />
 
-            <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0"
+            <es-input asp-for="Input.PrecoStorefront" type="text" inputmode="decimal" placeholder="0,00"
                       label="@(Model.Avulso ? "Preço (R$)" : "Preço override (R$)")"
                       help-text="@(Model.Avulso ? "Preço do item." : "Vazio = usa Produto.PrecoReferencia.")" />
 

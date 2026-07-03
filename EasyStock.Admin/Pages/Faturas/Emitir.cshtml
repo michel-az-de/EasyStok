@@ -77,8 +77,8 @@
                     <template x-for="(item, idx) in itens" :key="idx">
                         <tr>
                             <td><input type="text" name="itemDescricao" x-model="item.descricao" class="es-form-input" required minlength="2" maxlength="300" /></td>
-                            <td><input type="number" name="itemQuantidade" x-model.number="item.quantidade" step="0.001" min="0.001" class="es-form-input" style="text-align:right;" x-on:focus="$event.target.select()" required /></td>
-                            <td><input type="number" name="itemPrecoUnitario" x-model.number="item.precoUnitario" step="0.01" min="0" class="es-form-input" style="text-align:right;" :style="{ 'border-color': Number(item.precoUnitario) < 0 ? 'var(--crit-600)' : '' }" placeholder="0,00" x-on:focus="$event.target.select()" required /></td>
+                            <td><input type="text" inputmode="decimal" name="itemQuantidade" x-model.number="item.quantidade" class="es-form-input" style="text-align:right;" x-on:focus="$event.target.select()" required /></td>
+                            <td><input type="text" inputmode="decimal" name="itemPrecoUnitario" x-model.number="item.precoUnitario" class="es-form-input" style="text-align:right;" :style="{ 'border-color': Number(item.precoUnitario) < 0 ? 'var(--crit-600)' : '' }" placeholder="0,00" x-on:focus="$event.target.select()" required /></td>
                             <td>
                                 <select name="itemTipo" x-model="item.tipo" class="es-form-select">
                                     <option value="Servico">Serviço</option>

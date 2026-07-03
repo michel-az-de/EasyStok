@@ -85,7 +85,7 @@
             </div>
 
             <!-- ── Comuns ───────────────────────────────────────────────── -->
-            <es-input asp-for="Input.PrecoStorefront" type="number" step="0.01" min="0"
+            <es-input asp-for="Input.PrecoStorefront" type="text" inputmode="decimal" placeholder="0,00"
                       label="Preço (R$)"
                       help-text="No modo 'produto do estoque', deixe vazio para herdar o preço do produto." />
 
@@ -128,7 +128,7 @@
                     <es-input asp-for="Input.SugestaoMolho" label="Sugestão de molho" maxlength="200" />
                     <es-input asp-for="Input.TempoPreparo" label="Tempo de preparo" placeholder="ex: 25 min" maxlength="50" />
                     <es-input asp-for="Input.PesoExibicao" label="Peso de exibição" placeholder="ex: 500g" maxlength="50" />
-                    <es-input asp-for="Input.OrdemExibicao" type="number" step="0.5" min="0"
+                    <es-input asp-for="Input.OrdemExibicao" type="text" inputmode="decimal"
                               label="Ordem de exibição" help-text="Use 0.5 entre 1 e 2 para reordenar sem renumerar." />
                 </div>
             </div>

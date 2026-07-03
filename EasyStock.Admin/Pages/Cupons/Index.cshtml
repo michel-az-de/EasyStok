@@ -112,7 +112,7 @@ else
                             <option value="ValorFixo" selected="@(tipo == "ValorFixo")">Valor fixo (R$)</option>
                             <option value="MesesGratis" selected="@(tipo == "MesesGratis")">Meses grátis</option>
                         </es-select>
-                        <es-input name="valor" type="number" label="Valor" value="@valor.ToString(System.Globalization.CultureInfo.InvariantCulture)" step="0.01" required="true" />
+                        <es-input name="valor" type="text" inputmode="decimal" label="Valor" value="@valor.ToString(System.Globalization.CultureInfo.InvariantCulture)" placeholder="0,00" required="true" />
                         <es-input name="limiteUsos" type="number" label="Limite de usos" value="@(limiteUsos?.ToString() ?? "")" min="1" label-optional="true" />
                         <es-input name="validoAte" type="date" label="Válido até" value="@(validoAte != null ? validoAteDt.ToString("yyyy-MM-dd") : "")" label-optional="true" />
                         <es-select name="planoId" label="Restringir a plano" label-optional="true">
@@ -193,7 +193,7 @@ else
                 <option value="ValorFixo">Valor fixo (R$)</option>
                 <option value="MesesGratis">Meses grátis</option>
             </es-select>
-            <es-input name="valor" type="number" label="Valor" step="0.01" min="0" required="true" />
+            <es-input name="valor" type="text" inputmode="decimal" label="Valor" placeholder="0,00" required="true" />
         </div>
 
         <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
