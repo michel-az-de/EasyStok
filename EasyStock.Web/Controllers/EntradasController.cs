@@ -1,4 +1,3 @@
-using System.Globalization;
 using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Entradas;
 using EasyStock.Web.Models.ViewModels.Shared;
@@ -242,8 +241,10 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
             m.Produto?.Nome ?? "",
             m.ProdutoVariacao?.Nome ?? "",
             m.Qty.ToString(),
-            m.Custo?.ToString("F2", CultureInfo.InvariantCulture) ?? "",
-            m.ValorTotal?.Valor.ToString("F2", CultureInfo.InvariantCulture) ?? "",
+            // pt-BR ("12,34"), como no export de Saidas: o CsvExport promete Excel pt-BR
+            // (separador ';'); o invariante "12.34" virava texto/data no Excel — issue 807.
+            m.Custo?.ToString("F2") ?? "",
+            m.ValorTotal?.Valor.ToString("F2") ?? "",
             m.Natureza ?? "",
             m.DocumentoReferencia ?? "",
             m.Descricao ?? ""
