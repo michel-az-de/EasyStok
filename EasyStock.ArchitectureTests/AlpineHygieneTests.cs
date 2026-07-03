@@ -64,6 +64,25 @@ public class AlpineHygieneTests
     }
 
     [Fact]
+    public void Views_NaoDevemChamarInitViaXInit()
+    {
+        // Issue 801: o Alpine 3 auto-invoca o metodo init() definido em x-data; um
+        // x-init="init()" na mesma tag roda o init DUAS vezes (listener duplicado matou o
+        // cheatsheet, instanciou scanner/camera 2x, fetch duplicado no Detail). E se o
+        // componente nao definir init(), a expressao quebra em runtime. Ou seja: o padrao
+        // e sempre errado — renomeie para setup($el) se precisar de init explicito.
+        var views = ArchTestPaths.AppDirectory("EasyStock.Web", "Views");
+        var ofensores = views.EnumerateFiles("*.cshtml", SearchOption.AllDirectories)
+            .Where(f => File.ReadAllText(f.FullName).Contains("x-init=\"init()\""))
+            .Select(f => ArchTestPaths.ToRelative(views, f.FullName))
+            .ToList();
+
+        ofensores.Should().BeEmpty(
+            "o Alpine auto-invoca init() de x-data; x-init=\"init()\" roda o init 2x (issue 801) — " +
+            "remova o x-init ou renomeie o metodo para setup($el).");
+    }
+
+    [Fact]
     public void FormModal_DeveDispararInputEChangeAposPreenchimentoProgramatico()
     {
         var js = ArchTestPaths.ReadAppFile("EasyStock.Web","wwwroot", "js", "form-modal.js");
