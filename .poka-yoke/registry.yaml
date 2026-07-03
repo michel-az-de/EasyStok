@@ -2,8 +2,8 @@
 # Definido em ADR-0029. Cada entrada e um guard rail ou um alvo de guard rail.
 # Mantido vivo: ampliar com evidencia medida (PS1). NAO editar sem atualizar o ADR.
 version: 1
-adr: docs/adr/0029-camada-poka-yoke-frugalidade-tokens.md
-updated: "2026-06-27"
+adr: docs/adr/0029-camada-poka-yoke-frugalidade-tokens.md  # + ADR-0040 (canonical_commands.gate)
+updated: "2026-07-03"
 
 # Arquivos gerados/copiados em build: editar a copia e sempre-erro (a fonte manda).
 # severity block = hook PreToolUse nega Edit/Write (Fatia 4).
@@ -44,15 +44,19 @@ mirrored_constants:
 
 # Comandos canonicos. Qualquer agente invoca sem redescobrir.
 canonical_commands:
+  gate:
+    cmd: 'powershell -File scripts/poka-yoke/gate.ps1'
+    why: "gate unico pre-commit (ADR-0040): build-check + arch-tests SEM rebuild (~50s quente). Builda o slnf p/ $TEMP, espelha via robocopy p/ .build/arch-gate (walk-up dos testes exige rodar de dentro do repo) e roda dotnet test na DLL. E o que o Husky pre-commit executa; substitui a dupla execucao build-check + dotnet test manual + dotnet test do Husky (~4-7min/commit, issue 813)."
+    status: active
   build-check:
     cmd: 'powershell -File scripts/poka-yoke/build-check.ps1'
     raw: 'dotnet build EasyStok.CI.slnf --nologo -p:UseAppHost=false -o $TEMP/easystok-build-check'
-    why: "slnf pula Mobile (sem maui); -o (dir temporario) + UseAppHost=false evitam o lock de bin do ambiente local (#448). Substitui o build da sln cheia do passo 0 do CLAUDE.md. Provado verde com Admin/Web ativos (1m01s, 0 erros)."
+    why: "slnf pula Mobile (sem maui); -o (dir temporario) + UseAppHost=false evitam o lock de bin do ambiente local (#448). Substitui o build da sln cheia do passo 0 do CLAUDE.md. Provado verde com Admin/Web ativos (1m01s, 0 erros). E o passo 1 do gate; avulso serve p/ check de sessao (par.0) sem rodar testes."
     status: active
   arch-gate:
     cmd: 'dotnet test EasyStock.ArchitectureTests/EasyStock.ArchitectureTests.csproj --filter "Category=Architecture"'
-    why: "gate R4 de arquitetura (o mesmo que o Husky pre-commit roda). 12 testes Category=Architecture, nao a suite inteira."
-    status: active
+    why: "gate R4 de arquitetura avulso (31 testes Category=Architecture, nao a suite inteira). Para o fluxo de commit foi englobado pelo gate (ADR-0040), que roda os mesmos testes sem rebuild; use este apenas isolado/debug."
+    status: superseded-by-gate
   commit-seguro:
     cmd: 'scripts/poka-yoke/commit-seguro.ps1'
     why: "stage por pathspec, diff cached, build-check, commit, valida HEAD (autor/arquivos/closes). Anti-race do auto-commit #448."
