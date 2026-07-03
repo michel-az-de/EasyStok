@@ -88,6 +88,10 @@
                     </div>
                 </template>
 
+                <template x-if="loading && !devices.length">
+                    <div style="padding:24px 16px; font-size:13px; color:var(--text-muted);">Carregando dispositivos…</div>
+                </template>
+
                 <template x-for="d in devices" :key="d.id">
                     <div style="display:grid; grid-template-columns:3fr 2fr 2fr 2fr 3fr; gap:8px; padding:12px 16px; align-items:center; border-bottom:1px solid var(--border-soft);">
                         <div>

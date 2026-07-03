@@ -82,9 +82,9 @@
                 <div class="flex gap-2 flex-wrap">
                     @if (Model.Status != "Resolvido" && Model.Status != "Fechado")
                     {
-                        <form method="post" asp-page-handler="Resolver">
+                        <form method="post" asp-page-handler="Resolver" x-data="{ submitting: false }" x-on:submit="submitting = true">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="btn-primary text-sm">✓ Resolver</button>
+                            <button type="submit" class="btn-primary text-sm" :disabled="submitting">✓ Resolver</button>
                         </form>
                     }
                     <form method="post" asp-page-handler="AlterarStatus" class="flex items-center gap-2"

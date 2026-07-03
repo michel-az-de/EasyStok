@@ -145,6 +145,19 @@
 else
 {
     <div class="deck-panel" style="padding:8px var(--s-5) 28px;">
-        <es-empty-state icon="trending-up" title="Carregando dados financeiros..." description="O dashboard será exibido em instantes." />
+        @* Render server-side: se chegou aqui, ou a API falhou (Erro) ou nao ha metricas.
+           Nunca mostrar "Carregando..." — nada mais vai carregar sem um novo GET. *@
+        @if (Model.Erro is not null)
+        {
+            <es-empty-state icon="alert-triangle"
+                            title="Não foi possível carregar as métricas"
+                            description="A API não respondeu. Recarregue a página; se persistir, verifique o Diagnóstico." />
+        }
+        else
+        {
+            <es-empty-state icon="trending-up"
+                            title="Sem dados no período"
+                            description="Nenhuma métrica financeira disponível para o período selecionado." />
+        }
     </div>
 }
