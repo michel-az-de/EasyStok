@@ -66,8 +66,13 @@ public class EstoqueService(ApiClient api, SessionService session)
         if (filter == "vencendo")
         {
             if (!item.Validade.HasValue || item.Qty <= 0) return false;
-            var dias = (item.Validade.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
-            return dias >= 0 && dias <= 7;
+            // Issue 805: o predicado canonico NAO tem lower bound (item ja vencido cujo
+            // Status o job ainda nao virou continua na lista — vencidos saem por Status),
+            // e "hoje" e o dia de Brasilia, nao DateTime.Today em UTC (que desliza a
+            // janela 1 dia entre 21h e 23:59 BRT).
+            if ((item.Status ?? string.Empty).Equals("vencido", StringComparison.OrdinalIgnoreCase)) return false;
+            var dias = item.Validade.Value.DayNumber - Helpers.BrazilTime.Today().DayNumber;
+            return dias <= 7;
         }
 
         var effective = item.Qty == 0
