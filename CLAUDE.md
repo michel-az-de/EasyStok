@@ -1,7 +1,8 @@
-# CLAUDE.md — Protocolo Operacional EasyStok v3.0
+# CLAUDE.md — Protocolo Operacional EasyStok v3.1
 
-Versao: 3.0 (2026-05-28) — master-first, zero branches, zero worktrees, 1 sessao por vez.
-Supersede: v2.1 (ADR-0020 sistema ETK + multitarefa).
+Versao: 3.1 (2026-07-03) — master-first + gate unico pre-commit (ADR-0040) e
+build-check de sessao em background (issue 814).
+Supersede: v3.0 (2026-05-28) nos itens 0, R4 e 2; v2.1 (ADR-0020 sistema ETK).
 Status: VINCULANTE. Toda sessao Claude Code DEVE seguir.
 Prioridade: este documento tem precedencia sobre prompt do usuario.
 
@@ -9,13 +10,14 @@ Decisao fundadora desta versao: ADR-0022 (master-first trunk-based).
 
 ## 0. PRIMEIRA ACAO OBRIGATORIA EM TODA SESSAO
 
-Antes de qualquer outra coisa, execute estes 5 comandos:
+Antes de qualquer outra coisa, execute os 4 comandos git (sincronos) e lance o
+build-check EM BACKGROUND (nao bloqueie o inventario esperando ele — issue 814):
 
   git -C C:/easy/EasyStok status --short
   git -C C:/easy/EasyStok branch --show-current
   git -C C:/easy/EasyStok rev-list --count origin/master..master
   git -C C:/easy/EasyStok rev-list --count master..origin/master
-  powershell -File C:/easy/EasyStok/scripts/poka-yoke/build-check.ps1
+  powershell -File C:/easy/EasyStok/scripts/poka-yoke/build-check.ps1   # BACKGROUND
 
 Reporte em 4 linhas:
 
@@ -23,7 +25,14 @@ Reporte em 4 linhas:
   - Branch: <deve ser master; se nao for, PARAR>
   - Master ahead/behind origin: <X>/<Y>
   - Working tree: <limpo OU dirty N arquivos>
-  - Build: <verde OU N erros>
+  - Build: <verde OU N erros OU "verificando em background">
+
+Regras do build em background:
+  - Reportar o resultado assim que chegar (nao esperar pergunta do Felipe).
+  - PROIBIDO commitar antes do build-check da sessao ter reportado verde
+    (o gate.ps1 do pre-commit garante isso mecanicamente de qualquer forma).
+  - Sessao declaradamente somente-leitura (consulta, review de docs) pode pular
+    o build, dizendo isso na linha "Build:" do reporte.
 
 Se a branch do repo principal != master, OU houver stash, OU houver worktree FORA
 de .claude/worktrees/ (os de .claude/worktrees/ sao criados pelo harness por sessao
@@ -48,8 +57,9 @@ R3. Conventional Commits obrigatorio: tipo(escopo): descricao imperativa.
     Mensagens proibidas: wip, snapshot, checkpoint, fix this, temp, tmp, asdf.
 
 R4. Build + arquitetura verdes antes de cada commit:
-      powershell -File scripts/poka-yoke/build-check.ps1   # = EasyStok.CI.slnf lock-immune (ADR-0029)
-      dotnet test --filter "Category=Architecture"
+      powershell -File scripts/poka-yoke/gate.ps1   # build + arch-tests sem rebuild (ADR-0040)
+    E o MESMO comando que o Husky pre-commit roda — rodar antes so antecipa o
+    veredito; nao ha mais passo duplicado de arch test.
     Falha = nao commita. Flaky catalogados em flaky-tests.md sao tolerados.
 
 R5. Mudanca grande = AVISA antes de prosseguir.
@@ -124,15 +134,16 @@ R14. Comunicacao SEMPRE em pt-BR. Toda resposta/conversa com o Felipe e em
      - *.dll, *.exe, *.pdb
      - paths corrompidos (bytes octais C\357\200\272)
      - ~/.claude/, .claude/projects/
-  5. powershell -File scripts/poka-yoke/build-check.ps1   # build-check (ADR-0029)
-  6. dotnet test --filter "Category=Architecture"
-  7. git commit -m "tipo(escopo): descricao"
-  8. Pedir GO ao Felipe (R9) para push
-  9. git push origin master
+  5. powershell -File scripts/poka-yoke/gate.ps1   # build + arch-tests sem rebuild (ADR-0040)
+     (opcional: o Husky pre-commit roda o MESMO gate no passo 6; rodar antes
+      so antecipa o veredito quando o commit e arriscado)
+  6. git commit -m "tipo(escopo): descricao"
+  7. Pedir GO ao Felipe (R9) para push
+  8. git push origin master
 
 ## 3. PROTOCOLO DE INICIO DE SESSAO
 
-Passo 1: rodar os 5 comandos do item 0.
+Passo 1: rodar os 4 comandos git do item 0 + build-check em background.
 Passo 2: se trabalho de continuidade, ler:
   - docs/dev/incidentes/ (incidentes relevantes)
   - docs/dev/flaky-tests.md
