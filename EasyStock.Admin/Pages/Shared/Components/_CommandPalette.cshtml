@@ -293,6 +293,7 @@
                         const r = await fetch('/api-proxy/buscar-global?q=' + encodeURIComponent(termo) + '&limit=8',
                             { credentials: 'same-origin', cache: 'no-store' });
                         if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        if (!r.ok) { this.erro = 'Falha ao buscar (HTTP ' + r.status + ').'; return; }
                         const d = await r.json();
                         const data = d.data || d;
                         this._remote = {

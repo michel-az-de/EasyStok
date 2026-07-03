@@ -216,7 +216,17 @@
 <!-- Modal Novo Ticket -->
 <es-modal id="novo-ticket" title="Novo ticket" description="Abrir um novo chamado em nome de uma empresa." size="md">
     <form method="post"
-          x-data="{ empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null }"
+          x-data="{ empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null, erroBusca: '',
+                    async buscar() {
+                        if (this.buscaEmpresa.length < 2) { this.resultadosEmpresa = []; this.erroBusca = ''; return; }
+                        try {
+                            const r = await fetch('/api-proxy/buscar-global?q=' + encodeURIComponent(this.buscaEmpresa) + '&limit=8');
+                            if (!r.ok) { this.resultadosEmpresa = []; this.erroBusca = 'Falha ao buscar empresas (HTTP ' + r.status + ').'; return; }
+                            const d = await r.json();
+                            this.resultadosEmpresa = (d.data && d.data.clientes) || d.clientes || [];
+                            this.erroBusca = '';
+                        } catch { this.resultadosEmpresa = []; this.erroBusca = 'Falha de rede ao buscar empresas.'; }
+                    } }"
           style="display:flex; flex-direction:column; gap:14px;">
         @Html.AntiForgeryToken()
 
@@ -226,7 +236,8 @@
             <template x-if="!empresaSelecionada">
                 <div style="position:relative;">
                     <input type="text" x-model="buscaEmpresa" placeholder="Digite o nome ou CNPJ..." class="es-form-input"
-                           @@input="clearTimeout(debounce); debounce = setTimeout(async () => { if (buscaEmpresa.length < 2) { resultadosEmpresa = []; return; } const r = await fetch('/api-proxy/buscar-global?q=' + encodeURIComponent(buscaEmpresa) + '&limit=8'); const d = await r.json(); resultadosEmpresa = (d.data && d.data.clientes) || d.clientes || []; }, 200)" />
+                           @@input="clearTimeout(debounce); debounce = setTimeout(() => buscar(), 200)" />
+                    <p x-show="erroBusca" x-cloak role="alert" style="margin-top:4px; color:var(--crit-600); font-size:12px;" x-text="erroBusca"></p>
                     <div x-show="resultadosEmpresa.length > 0"
                          style="position:absolute; z-index:50; margin-top:4px; width:100%; background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--r-md); box-shadow:var(--elev-3); max-height:240px; overflow-y:auto;">
                         <template x-for="emp in resultadosEmpresa" :key="emp.id">

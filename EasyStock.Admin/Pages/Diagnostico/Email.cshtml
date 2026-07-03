@@ -89,7 +89,7 @@ function diagEmail() {
                 this.resultado = {
                     sucesso: inner.sucesso === true,
                     provedor: inner.provedor || '?',
-                    erro: inner.erro || null
+                    erro: inner.erro || data.error || (!r.ok ? 'Falha HTTP ' + r.status : null)
                 };
             } catch (e) {
                 this.resultado = { sucesso: false, provedor: '?', erro: e.message || String(e) };

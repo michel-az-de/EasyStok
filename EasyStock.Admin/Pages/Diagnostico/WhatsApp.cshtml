@@ -129,7 +129,7 @@ function diagWhatsApp() {
                 this.resultado = {
                     sucesso: inner.sucesso === true,
                     provedor: inner.provedor || 'meta',
-                    erro: inner.erro || null,
+                    erro: inner.erro || data.error || (!r.ok ? 'Falha HTTP ' + r.status : null),
                     duracaoMs: inner.duracaoMs || 0
                 };
             } catch (e) {

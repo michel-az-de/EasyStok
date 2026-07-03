@@ -1368,6 +1368,7 @@ function operacaoErp(tenantId) {
                         const url = '/Tenants/Detail/' + this.tenantId + '?handler=Atividade&' + qs.toString();
                         const r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
                         if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        if (!r.ok) { this.erro = 'Falha ao carregar atividade (HTTP ' + r.status + ').'; return; }
                         const d = await r.json();
                         const items = (d.data || []);
                         this.itens = append ? this.itens.concat(items) : items;
@@ -1539,6 +1540,7 @@ function operacaoErp(tenantId) {
                     try {
                         const r = await fetch('/Tenants/Detail/' + this.tenantId + '?handler=Notas', { credentials: 'same-origin', cache: 'no-store' });
                         if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        if (!r.ok) { this.erro = 'Falha ao carregar notas (HTTP ' + r.status + ').'; return; }
                         const d = await r.json();
                         const data = d.data || d;
                         const itens = data.itens || [];
@@ -1738,6 +1740,7 @@ function operacaoErp(tenantId) {
                             credentials: 'same-origin', cache: 'no-store'
                         });
                         if (r.status === 401) { window.location.href = '/Auth/Login'; return; }
+                        if (!r.ok) { this.erroHist = 'Falha ao carregar historico (HTTP ' + r.status + ').'; return; }
                         const d = await r.json();
                         const items = (d.data || []);
                         this.historico = items;
