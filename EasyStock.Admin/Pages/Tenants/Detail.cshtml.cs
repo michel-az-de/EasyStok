@@ -198,7 +198,7 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
                 SetErro("Configuração de URL do EasyStock.Web inválida. Contate o administrador do sistema.");
                 return RedirectToPage(new { Id });
             }
-            return Content(IndexModel.BuildHandoffHtml(webUrl, token), "text/html; charset=utf-8");
+            return Content(IndexModel.BuildHandoffHtml(webUrl, token, config), "text/html; charset=utf-8");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)

@@ -14,7 +14,9 @@ public class AuthController(
     ApiClient api,
     SessionService session,
     IWebHostEnvironment env,
-    IJwtClaimsReader jwt) : Controller
+    IJwtClaimsReader jwt,
+    IConfiguration config,
+    ILogger<AuthController> log) : Controller
 {
     [AllowAnonymous]
     [HttpGet("/auth/login")]
@@ -204,10 +206,35 @@ public class AuthController(
     [AllowAnonymous]
     [HttpPost("/auth/impersonate")]
     [IgnoreAntiforgeryToken]
-    public async Task<IActionResult> Impersonate([FromForm] string token, [FromForm] string? refreshToken = null)
+    public async Task<IActionResult> Impersonate(
+        [FromForm] string token,
+        [FromForm] string? refreshToken = null,
+        [FromForm] long? ts = null,
+        [FromForm] string? assinatura = null)
     {
         if (string.IsNullOrWhiteSpace(token))
             return RedirectToAction(nameof(Login));
+
+        // Issue 802: este e o unico POST anonimo sem antiforgery do app e le claims do JWT
+        // sem validar assinatura — sem um segredo de handoff, um token vazado poderia ser
+        // replayado aqui para materializar sessao de browser. Com Auth:ImpersonationHandoffSecret
+        // configurado (no Admin E no Web), exigimos HMAC do Admin com validade curta.
+        // Sem o segredo configurado, mantem o comportamento atual (compat de rollout) e loga.
+        var handoffSecret = config["Auth:ImpersonationHandoffSecret"];
+        if (!string.IsNullOrWhiteSpace(handoffSecret))
+        {
+            if (ts is null || string.IsNullOrWhiteSpace(assinatura)
+                || Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts.Value) > 60
+                || !AssinaturaHandoffValida(handoffSecret, token, ts.Value, assinatura))
+            {
+                log.LogWarning("Impersonate rejeitado: handoff sem HMAC valido (ts={Ts}).", ts);
+                return Forbid();
+            }
+        }
+        else
+        {
+            log.LogWarning("Impersonate aceito SEM validacao de handoff — configure Auth:ImpersonationHandoffSecret no Admin e no Web (issue 802).");
+        }
 
         session.Clear();
         session.SetTokens(token, refreshToken ?? string.Empty);
@@ -241,6 +268,26 @@ public class AuthController(
 
         TempData["Toast"] = "info|Sessão de suporte iniciada. Saia ao terminar.";
         return RedirectToAction("Index", "Dashboard");
+    }
+
+    /// <summary>
+    /// HMAC-SHA256 hex de "{token}|{ts}" — espelho de
+    /// <c>EasyStock.Admin.Pages.Tenants.IndexModel.AssinarHandoff</c> (issue 802);
+    /// manter os dois em sincronia (Web e Admin nao compartilham projeto).
+    /// </summary>
+    public static string ComputarAssinaturaHandoff(string secret, string token, long ts)
+    {
+        using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
+        return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{token}|{ts}")));
+    }
+
+    private static bool AssinaturaHandoffValida(string secret, string token, long ts, string assinatura)
+    {
+        var esperado = ComputarAssinaturaHandoff(secret, token, ts);
+        var recebido = assinatura.Trim().ToUpperInvariant();
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(esperado),
+            System.Text.Encoding.UTF8.GetBytes(recebido));
     }
 
     [AllowAnonymous]

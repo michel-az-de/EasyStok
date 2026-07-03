@@ -343,7 +343,7 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
             }
             // POST handoff em vez de GET com token na URL — token não vaza em
             // logs/history/referrer. Renderiza HTML com auto-submit form.
-            return Content(BuildHandoffHtml(webUrl, token), "text/html; charset=utf-8");
+            return Content(BuildHandoffHtml(webUrl, token, config), "text/html; charset=utf-8");
         }
         catch (SessionExpiredException) { throw; }
         catch (Exception ex)
@@ -367,10 +367,25 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         return uri.GetLeftPart(UriPartial.Authority);
     }
 
-    internal static string BuildHandoffHtml(string webUrl, string token)
+    internal static string BuildHandoffHtml(string webUrl, string token, IConfiguration? config = null)
     {
         var safeToken = System.Net.WebUtility.HtmlEncode(token);
         var safeUrl = System.Net.WebUtility.HtmlEncode(webUrl);
+
+        // Issue 802: com Auth:ImpersonationHandoffSecret configurado (no Admin E no Web),
+        // o handoff vai assinado com HMAC + timestamp de validade curta; o Web rejeita
+        // POST sem assinatura valida. Sem o segredo, envia como antes (compat de rollout).
+        var camposAssinatura = string.Empty;
+        var secret = config?["Auth:ImpersonationHandoffSecret"];
+        if (!string.IsNullOrWhiteSpace(secret))
+        {
+            var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var assinatura = AssinarHandoff(secret, token, ts);
+            camposAssinatura =
+                $"<input type=\"hidden\" name=\"ts\" value=\"{ts}\" />\n" +
+                $"    <input type=\"hidden\" name=\"assinatura\" value=\"{assinatura}\" />";
+        }
+
         return $$"""
         <!doctype html><html><head><meta charset="utf-8"><title>Conectando…</title>
         <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
@@ -378,11 +393,23 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, IConfig
         <body style="font-family:system-ui;background:#0f172a;color:#cbd5e1;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
         <form id="f" method="POST" action="{{safeUrl}}/auth/impersonate" autocomplete="off">
             <input type="hidden" name="token" value="{{safeToken}}" />
+            {{camposAssinatura}}
             <p>Iniciando sessão de suporte…</p>
             <noscript><button type="submit">Continuar</button></noscript>
         </form>
         <script>document.getElementById('f').submit();</script>
         </body></html>
         """;
+    }
+
+    /// <summary>
+    /// HMAC-SHA256 hex de "{token}|{ts}" — espelho de
+    /// <c>EasyStock.Web.Controllers.AuthController.ComputarAssinaturaHandoff</c> (issue 802);
+    /// manter os dois em sincronia (Web e Admin nao compartilham projeto).
+    /// </summary>
+    public static string AssinarHandoff(string secret, string token, long ts)
+    {
+        using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
+        return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{token}|{ts}")));
     }
 }
