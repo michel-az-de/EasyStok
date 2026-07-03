@@ -53,7 +53,9 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
         var sucessos = results.Count(r => r.Sucesso);
         var falhas = results.Count(r => !r.Sucesso);
 
-        sucessos.Should().Be(1, "exatamente 1 aprovação deve vencer o lock");
+        // #822: quando AMBAS falham a contagem sozinha nao diz o porque — carrega as
+        // excecoes capturadas na mensagem pro proximo run do CI ser auto-diagnostico.
+        sucessos.Should().Be(1, "exatamente 1 aprovação deve vencer o lock. Erros capturados: {0}", ErrosDe(results));
         falhas.Should().Be(1, "a outra deve receber PedidoJaResolvidoException");
 
         results.Where(r => !r.Sucesso).Single().Excecao
@@ -85,7 +87,7 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
             CapturarResultadoAsync(taskAprovar),
             CapturarResultadoAsync(taskRecusar));
 
-        results.Count(r => r.Sucesso).Should().Be(1, "exatamente uma ação vence o lock");
+        results.Count(r => r.Sucesso).Should().Be(1, "exatamente uma ação vence o lock. Erros capturados: {0}", ErrosDe(results));
         results.Count(r => !r.Sucesso).Should().Be(1, "a outra recebe 409");
         results.Where(r => !r.Sucesso).Single().Excecao
             .Should().BeOfType<PedidoJaResolvidoException>();
@@ -107,7 +109,7 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
             CapturarResultadoAsync(t1),
             CapturarResultadoAsync(t2));
 
-        results.Count(r => r.Sucesso).Should().Be(1);
+        results.Count(r => r.Sucesso).Should().Be(1, "exatamente uma recusa vence o lock. Erros capturados: {0}", ErrosDe(results));
         results.Count(r => !r.Sucesso).Should().Be(1);
         results.Where(r => !r.Sucesso).Single().Excecao
             .Should().BeOfType<PedidoJaResolvidoException>();
@@ -189,6 +191,10 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
 
         await action(pedidoRepo, publicador, db);
     }
+
+    private static string ErrosDe((bool Sucesso, Exception? Excecao)[] results) =>
+        string.Join(" | ", results.Where(r => !r.Sucesso)
+            .Select(r => r.Excecao?.GetBaseException().ToString() ?? "(sem excecao)"));
 
     private static async Task<(bool Sucesso, Exception? Excecao)> CapturarResultadoAsync(Task task)
     {
