@@ -1,0 +1,24 @@
+# docker-compose.azure.images.yml — override de PULL (issue 605, fatia 2).
+# Troca o `build:` local de api/web/admin pelas imagens prontas do GHCR
+# (buildadas pelo workflow build-images.yml a cada push em master).
+#
+# Uso na VM (modo pull — via vm-deploy.sh com EASYSTOK_DEPLOY_MODE=pull):
+#   EASYSTOK_IMAGE_TAG=<sha> docker compose \
+#     -f docker-compose.azure.yml -f docker-compose.azure.images.yml pull api web admin
+#   EASYSTOK_IMAGE_TAG=<sha> docker compose \
+#     -f docker-compose.azure.yml -f docker-compose.azure.images.yml up -d
+#
+# EASYSTOK_IMAGE_TAG: sha completo do commit (tag gerada pelo CI); default latest.
+# O GIT_SHA ja vem carimbado DENTRO da imagem (build-arg no CI) — nao e mais
+# responsabilidade do compose no modo pull.
+#
+# Requer docker login ghcr.io na VM (PAT read:packages; ver vm-deploy.sh).
+# Os demais servicos (postgres/redis/caddy/storefront) seguem o arquivo base.
+
+services:
+  api:
+    image: ghcr.io/michel-az-de/easystok-api:${EASYSTOK_IMAGE_TAG:-latest}
+  web:
+    image: ghcr.io/michel-az-de/easystok-web:${EASYSTOK_IMAGE_TAG:-latest}
+  admin:
+    image: ghcr.io/michel-az-de/easystok-admin:${EASYSTOK_IMAGE_TAG:-latest}
