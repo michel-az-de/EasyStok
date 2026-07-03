@@ -162,6 +162,22 @@ app.UseResponseCompression();
 app.UseHttpsRedirection();
 
 // Security headers
+// CSP em Report-Only primeiro (issue #803): as views usam muito script inline + @Html.Raw
+// de JSON serializado dentro de JS (hoje encodado, sem XSS explorável) e CDNs (Alpine/Chart/
+// JsBarcode via jsdelivr, FilePond via unpkg, Google Fonts, ViaCEP). Report-Only NÃO bloqueia
+// nada — só coleta violações no console/report-uri para calibrar antes de virar enforce numa
+// próxima fatia (que provavelmente exige nonce nos inline ou self-host das CDNs, ver #777).
+const string csp =
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; " +
+    "font-src 'self' https://fonts.gstatic.com data:; " +
+    "img-src 'self' data: blob:; " +
+    "connect-src 'self' https://viacep.com.br; " +
+    "frame-ancestors 'self'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "object-src 'none'";
 app.Use(async (context, next) =>
 {
     context.Response.Headers.Remove("Server");
@@ -170,6 +186,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    context.Response.Headers["Content-Security-Policy-Report-Only"] = csp;
     await next();
 });
 
