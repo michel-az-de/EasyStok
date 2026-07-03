@@ -42,7 +42,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new MovimentacaoEstoqueRepository(context),
                 context,
                 NullLogger<RegistrarEntradaEstoqueUseCase>.Instance,
-                new GeradorDescricaoFake("Descricao gerada por IA"));
+                new GeradorDescricaoFake("Descricao gerada por IA"),
+                publicadorEventos: PublicadorNoOp);
 
             var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
                 empresaId,
@@ -218,7 +219,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -323,7 +325,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -419,7 +422,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -492,7 +496,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -839,7 +844,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -865,7 +871,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(context),
                 new MovimentacaoEstoqueRepository(context),
                 context,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId,
@@ -934,7 +941,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemEstoqueRepository(ctx),
                 new MovimentacaoEstoqueRepository(ctx),
                 ctx,
-                NullLogger<RegistrarEntradaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarEntradaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             var result = await entradaUseCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
                 EmpresaId: empresaId,
@@ -980,7 +988,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemVendaRepository(ctx),
                 new MovimentacaoEstoqueRepository(ctx),
                 ctx,
-                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance);
+                NullLogger<RegistrarSaidaEstoqueUseCase>.Instance,
+                publicadorEventos: PublicadorNoOp);
 
             await saidaUseCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 EmpresaId: empresaId,
@@ -1051,5 +1060,15 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
 
             receita.Should().Contain(r => r.Ano == dataSaida.Year && r.Mes == dataSaida.Month && r.TotalItensVendidos == 4);
         }
+    }
+
+    // issue 306 (pego via #822): os use cases de estoque exigem IPublicadorEventos; um
+    // no-op basta — os eventos publicados nao sao o alvo destes testes de persistencia.
+    private static readonly EasyStock.Application.Ports.Output.Events.IPublicadorEventos PublicadorNoOp
+        = new PublicadorEventosNoOp();
+
+    private sealed class PublicadorEventosNoOp : EasyStock.Application.Ports.Output.Events.IPublicadorEventos
+    {
+        public Task PublicarAsync<T>(T evento) where T : EasyStock.Domain.Events.DomainEvent => Task.CompletedTask;
     }
 }

@@ -162,6 +162,9 @@ public class FinalizarVendaBalcaoIntegrationTests(PostgreSqlDatabaseFixture fixt
         services.AddLogging();
         services.AddHttpContextAccessor();
         services.AddSingleton(Substitute.For<ICurrentUserAccessor>());
+        // SubscriptionStatusCache (registrado pela infra) exige IMemoryCache — em prod a Api
+        // registra; aqui o teste registra (pego via #822 quando o CI voltou a rodar).
+        services.AddMemoryCache();
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
         return services.BuildServiceProvider();
