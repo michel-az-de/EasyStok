@@ -79,7 +79,9 @@ public class AnunciosController(
 
         if (!success || stream is null)
         {
-            await Response.WriteAsync($"data: {error}\n\n");
+            // Issue 808: erro como JSON estruturado (antes texto cru quebrava o JSON.parse
+            // do consumidor e o spinner sumia sem feedback).
+            await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { error })}\n\n");
             await Response.Body.FlushAsync();
             return;
         }
@@ -120,7 +122,9 @@ public class AnunciosController(
 
         if (!success || stream is null)
         {
-            await Response.WriteAsync($"data: {error}\n\n");
+            // Issue 808: erro como JSON estruturado (antes texto cru quebrava o JSON.parse
+            // do consumidor e o spinner sumia sem feedback).
+            await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { error })}\n\n");
             await Response.Body.FlushAsync();
             return;
         }

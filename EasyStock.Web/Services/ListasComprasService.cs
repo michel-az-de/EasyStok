@@ -10,6 +10,10 @@ public class ListasComprasService(ApiClient api, SessionService session)
     private static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada.");
 
+    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500).
+    private static ApiResult<T> IdErr<T>() =>
+        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
+
     public Task<ApiResult<List<ListaCompras>>> ListarAsync(string? status = null) =>
         api.GetAsync<List<ListaCompras>>(
             $"listas-compras?empresaId={GetEmpresaId()}&page=1&pageSize=100" +
@@ -64,9 +68,10 @@ public class ListasComprasService(ApiClient api, SessionService session)
     {
         var emp = GetEmpresaId();
         if (emp == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
+        if (!Guid.TryParse(id, out var listaId)) return Task.FromResult(IdErr<object>());
         return api.PostAsync<object>($"listas-compras/{id}/itens", new
         {
-            empresaId = emp, listaComprasId = Guid.Parse(id),
+            empresaId = emp, listaComprasId = listaId,
             texto, quantidade, unidade, categoria, observacao, produtoId
         });
     }

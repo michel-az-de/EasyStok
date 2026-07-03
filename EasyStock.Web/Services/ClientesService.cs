@@ -15,6 +15,11 @@ public class ClientesService(ApiClient api, SessionService session)
     private static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
+    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500);
+    // agora devolve erro de validacao (o call-site trata como 4xx amigavel).
+    private static ApiResult<T> IdErr<T>() =>
+        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
+
     // ── CRUD raiz ──────────────────────────────────────────────────────
 
     public Task<ApiResult<List<Cliente>>> ListarAsync(string? status = null, string? search = null)
@@ -75,9 +80,10 @@ public class ClientesService(ApiClient api, SessionService session)
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
 
+        if (!Guid.TryParse(clienteId, out var cid)) return Task.FromResult(IdErr<object>());
         return api.PostAsync<object>($"clientes/{clienteId}/enderecos", new
         {
-            empresaId, clienteId = Guid.Parse(clienteId),
+            empresaId, clienteId = cid,
             tipo, logradouro, numero, complemento, bairro, cidade, estado, cep, pais,
             referencia, padrao
         });
@@ -92,9 +98,10 @@ public class ClientesService(ApiClient api, SessionService session)
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
 
+        if (!Guid.TryParse(clienteId, out var cid)) return Task.FromResult(IdErr<object>());
         return api.PostAsync<object>($"clientes/{clienteId}/telefones", new
         {
-            empresaId, clienteId = Guid.Parse(clienteId),
+            empresaId, clienteId = cid,
             numero, tipo, whatsapp, principal, observacao
         });
     }
@@ -108,9 +115,10 @@ public class ClientesService(ApiClient api, SessionService session)
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<object>());
 
+        if (!Guid.TryParse(clienteId, out var cid)) return Task.FromResult(IdErr<object>());
         return api.PostAsync<object>($"clientes/{clienteId}/documentos", new
         {
-            empresaId, clienteId = Guid.Parse(clienteId),
+            empresaId, clienteId = cid,
             tipo, valor, emissor, emitidoEm, validoAte, principal
         });
     }

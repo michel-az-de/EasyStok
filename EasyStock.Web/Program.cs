@@ -36,6 +36,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.ExpireTimeSpan = TimeSpan.FromMinutes(480);
         o.SlidingExpiration = true;
 
+        // Issue 808: explicitar SameSite/Secure em vez de herdar o default do framework
+        // (Lax/SameAsRequest) — alinha o cookie de auth aos de sessao e _rt, sem depender
+        // do proxy. Lax (nao Strict) porque o handoff de impersonation vem via POST cross-site.
+        o.Cookie.SameSite = SameSiteMode.Lax;
+        o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        o.Cookie.HttpOnly = true;
+
         // BUG-65 (#452): chamadas AJAX (X-Requested-With/Accept: application/json) recebem
         // 401/403 JSON em vez do 302 -> página de login HTML (que o fetch seguiria e
         // quebraria em r.json()). Navegação de documento continua redirecionando.

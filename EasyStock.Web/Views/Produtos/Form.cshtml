@@ -1802,6 +1802,7 @@
                                     try {
                                         const obj = JSON.parse(raw);
                                         if (obj.texto) this.descricao += obj.texto;
+                                        else if (obj.error) throw new Error(obj.error);
                                     } catch (e) { console.error('[EasyStock]', e); }
                                 }
                             }

@@ -202,7 +202,7 @@ public class EntradasController(EntradasService svc, EstoqueService estoqueSvc, 
         // ficava vazio na UI. Fuso BR + apenas data nua.
         if (string.IsNullOrEmpty(periodoInicio) && string.IsNullOrEmpty(periodoFim))
         {
-            var hojeBr = DateTime.UtcNow.AddHours(-3).Date;
+            var hojeBr = BrazilTime.Now().Date; // issue 808: usa o helper de fuso, nao offset fixo
             periodoInicio = hojeBr.AddDays(-30).ToString("yyyy-MM-dd");
             periodoFim = hojeBr.ToString("yyyy-MM-dd");
         }

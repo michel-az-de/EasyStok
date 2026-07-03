@@ -11,6 +11,11 @@ public class CaixaService(ApiClient api, SessionService session)
     private static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
+    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500);
+    // agora devolve erro de validacao (o call-site trata como 4xx amigavel).
+    private static ApiResult<T> IdErr<T>() =>
+        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
+
     public Task<ApiResult<CaixaDia>> ObterDiaAsync(DateOnly? data = null) =>
         api.GetAsync<CaixaDia>($"caixa/dia?empresaId={GetEmpresaId()}{(data.HasValue ? $"&data={data:yyyy-MM-dd}" : "")}");
 
@@ -45,9 +50,10 @@ public class CaixaService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<MovimentoCaixa>());
+        if (!Guid.TryParse(id, out var movId)) return Task.FromResult(IdErr<MovimentoCaixa>());
         return api.PostAsync<MovimentoCaixa>($"caixa/movimentos/{id}/estornar", new
         {
-            empresaId, id = Guid.Parse(id), motivo
+            empresaId, id = movId, motivo
         });
     }
 

@@ -11,7 +11,7 @@ namespace EasyStock.Web.Middleware;
 /// quando a sessão em memória foi zerada por um deploy ou restart do servidor.
 /// Isso garante que "permanecer logado" sobreviva a deploys.
 /// </summary>
-public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionRestoreMiddleware> log)
+public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionRestoreMiddleware> log, IWebHostEnvironment env)
 {
     private const string RememberCookie = "_rt";
 
@@ -92,7 +92,10 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
                 context.Response.Cookies.Append(RememberCookie, newRefresh, new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = true,
+                    // Issue 808: alinhado ao login (Secure = !IsDevelopment). Fixo em true,
+                    // em dev HTTP o browser descartava o cookie rotacionado e o remember-me
+                    // quebrava silenciosamente.
+                    Secure = !env.IsDevelopment(),
                     SameSite = SameSiteMode.Strict,
                     Expires = DateTimeOffset.UtcNow.AddDays(30)
                 });

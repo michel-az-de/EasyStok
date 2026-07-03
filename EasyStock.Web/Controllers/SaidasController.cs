@@ -71,7 +71,7 @@ public class SaidasController(SaidasService svc, SessionService session) : BaseC
         // puro e usam fuso BR (servidor pode rodar em UTC no Render).
         if (string.IsNullOrEmpty(de) && string.IsNullOrEmpty(ate))
         {
-            var hojeBr = DateTime.UtcNow.AddHours(-3).Date;
+            var hojeBr = BrazilTime.Now().Date; // issue 808: usa o helper de fuso, nao offset fixo
             de = hojeBr.AddDays(-30).ToString("yyyy-MM-dd");
             ate = hojeBr.ToString("yyyy-MM-dd");
         }

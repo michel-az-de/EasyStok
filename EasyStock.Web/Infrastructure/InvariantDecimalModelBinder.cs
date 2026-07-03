@@ -17,6 +17,17 @@ public sealed class InvariantDecimalModelBinder : IModelBinder
 
         if (string.IsNullOrWhiteSpace(value))
         {
+            // Issue 808: para decimal NAO-nullable, "vazio -> Success(null)" deixava a
+            // propriedade em 0 sem erro de ModelState (ex.: saldo inicial do caixa). So
+            // e sucesso silencioso quando o tipo aceita null; senao, cai no comportamento
+            // padrao de "campo obrigatorio".
+            var underlying = Nullable.GetUnderlyingType(bindingContext.ModelType);
+            if (underlying is null && bindingContext.ModelType.IsValueType)
+            {
+                bindingContext.ModelState.TryAddModelError(
+                    bindingContext.ModelName, "O campo é obrigatório.");
+                return Task.CompletedTask;
+            }
             bindingContext.Result = ModelBindingResult.Success(null);
             return Task.CompletedTask;
         }

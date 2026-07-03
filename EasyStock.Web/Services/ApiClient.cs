@@ -73,12 +73,20 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         {
             var response = await http.GetAsync(path, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
+            {
+                var cid = ExtractCorrelationId(response);
+                // Issue 808: no erro o HttpResponseMessage precisa ser disposed (nao entra
+                // no ResponseStream); sem isso a conexao vazava.
+                response.Dispose();
                 return ApiResult<Stream>.Fail("HTTP_ERROR",
                     $"Erro HTTP {(int)response.StatusCode}.",
-                    (int)response.StatusCode,
-                    ExtractCorrelationId(response));
+                    (int)response.StatusCode, cid);
+            }
             var stream = await response.Content.ReadAsStreamAsync();
-            return ApiResult<Stream>.Ok(stream) with { CorrelationId = ExtractCorrelationId(response) };
+            // ResponseStream faz dispose do response quando o stream fecha (igual ao
+            // PostStreamAsync) — evita socket exhaustion em download/streaming.
+            return ApiResult<Stream>.Ok(new ResponseStream(stream, response))
+                with { CorrelationId = ExtractCorrelationId(response) };
         }
         catch (TaskCanceledException)
         {

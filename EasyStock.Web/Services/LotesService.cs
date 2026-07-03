@@ -11,6 +11,11 @@ public class LotesService(ApiClient api, SessionService session)
     private static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
+    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500);
+    // agora devolve erro de validacao (o call-site trata como 4xx amigavel).
+    private static ApiResult<T> IdErr<T>() =>
+        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
+
     public Task<ApiResult<List<Lote>>> ListarAsync(string? status = null, string? search = null)
     {
         var qs = $"lotes?empresaId={GetEmpresaId()}&page=1&pageSize=100";
@@ -43,9 +48,10 @@ public class LotesService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Lote>());
+        if (!Guid.TryParse(id, out var loteId)) return Task.FromResult(IdErr<Lote>());
         return api.PostAsync<Lote>($"lotes/{id}/itens", new
         {
-            empresaId, loteId = Guid.Parse(id),
+            empresaId, loteId,
             nome, quantidade, produtoId, emoji, unidade, pesoG, validadeDias
         });
     }

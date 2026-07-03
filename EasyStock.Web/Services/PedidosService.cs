@@ -11,6 +11,11 @@ public class PedidosService(ApiClient api, SessionService session)
     private static ApiResult<T> EmpresaErr<T>() =>
         ApiResult<T>.Fail("EMPRESA_INVALIDA", "Loja não identificada. Selecione uma loja e tente novamente.");
 
+    // Issue 808: id malformado na rota fazia Guid.Parse lancar FormatException (500);
+    // agora devolve erro de validacao (o call-site trata como 4xx amigavel).
+    private static ApiResult<T> IdErr<T>() =>
+        ApiResult<T>.Fail("ID_INVALIDO", "Identificador inválido.", 400);
+
     public Task<ApiResult<PagedResult<Pedido>>> ListarPaginadoAsync(
         int page = 1, int pageSize = 30,
         string? status = null, Guid? clienteId = null,
@@ -89,9 +94,10 @@ public class PedidosService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
+        if (!Guid.TryParse(id, out var pedidoId)) return Task.FromResult(IdErr<Pedido>());
         return api.PatchAsync<Pedido>($"pedidos/{id}/agendamento", new
         {
-            empresaId, pedidoId = Guid.Parse(id), agendadoParaEm, origem = "web"
+            empresaId, pedidoId, agendadoParaEm, origem = "web"
         });
     }
 
@@ -99,9 +105,10 @@ public class PedidosService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
+        if (!Guid.TryParse(id, out var pedidoId)) return Task.FromResult(IdErr<Pedido>());
         return api.PatchAsync<Pedido>($"pedidos/{id}/status", new
         {
-            id = Guid.Parse(id), empresaId, status, origem = "web"
+            id = pedidoId, empresaId, status, origem = "web"
         });
     }
 
@@ -109,9 +116,10 @@ public class PedidosService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
+        if (!Guid.TryParse(id, out var pedidoId)) return Task.FromResult(IdErr<Pedido>());
         return api.PostAsync<Pedido>($"pedidos/{id}/cancelar", new
         {
-            id = Guid.Parse(id), empresaId, motivo, origem = "web"
+            id = pedidoId, empresaId, motivo, origem = "web"
         });
     }
 
@@ -121,9 +129,10 @@ public class PedidosService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
+        if (!Guid.TryParse(id, out var pedidoId)) return Task.FromResult(IdErr<Pedido>());
         return api.PostAsync<Pedido>($"pedidos/{id}/itens", new
         {
-            empresaId, pedidoId = Guid.Parse(id),
+            empresaId, pedidoId,
             nome, quantidade, precoUnitario, produtoId, emoji, unidade, observacao,
             origem = "web"
         });
@@ -137,9 +146,10 @@ public class PedidosService(ApiClient api, SessionService session)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
+        if (!Guid.TryParse(id, out var pedidoId)) return Task.FromResult(IdErr<Pedido>());
         return api.PostAsync<Pedido>($"pedidos/{id}/pagamentos", new
         {
-            empresaId, pedidoId = Guid.Parse(id),
+            empresaId, pedidoId,
             metodo, valor, referencia, observacao, origem = "web"
         });
     }
