@@ -8,6 +8,19 @@
 
 # Web (MVC) — pagina publica/app
 {$APP_HOST} {
+	# Access log persistente e rotacionado (issue #809). Objetivo pontual: descobrir
+	# se algum APK antigo em campo ainda faz poll de /downloads/apk/manifest antes de
+	# remover a action Downloads.Manifest (o consumidor migrou pra Api). Volume
+	# caddy-logs => sobrevive a recriacao do container (docker logs so guardava ~12h).
+	# Bounded: 10MiB x 5 arquivos. TEMPORARIO — remover apos a decisao da #809.
+	log {
+		output file /var/log/caddy/app-access.log {
+			roll_size 10MiB
+			roll_keep 5
+			roll_keep_for 720h
+		}
+		format json
+	}
 	reverse_proxy web:8081
 }
 

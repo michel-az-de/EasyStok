@@ -21,6 +21,7 @@ volumes:
   uploads-data:
   caddy-data:
   caddy-config:
+  caddy-logs:          # issue #809: access log persistente do Caddy (sobrevive a recriacao)
   dataprotection-web-keys:
   dataprotection-admin-keys:
 
@@ -211,4 +212,5 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+      - caddy-logs:/var/log/caddy      # issue #809: destino do access log persistente
     networks: [easystock-net]
