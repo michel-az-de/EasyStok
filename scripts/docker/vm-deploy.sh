@@ -13,6 +13,16 @@
 #   Auto (cron): */5 * * * * bash /home/azureuser/easystok/scripts/docker/vm-deploy.sh
 #                so rebuilda quando origin/master avanca; --force rebuilda sempre.
 #
+# Modos (issue 605):
+#   EASYSTOK_DEPLOY_MODE=build (default) — comportamento historico: docker compose
+#     up -d --build na propria VM (~dezenas de min por swap thrashing, issue 751).
+#   EASYSTOK_DEPLOY_MODE=pull — imagens prontas do GHCR (workflow build-images.yml):
+#     compose pull da tag :<sha> + up -d, sem build na VM. O pull roda ANTES do
+#     git pull: se a imagem do sha ainda nao existe (CI em andamento/vermelho), o
+#     deploy aborta SEM avancar o HEAD local — o proximo cron tenta de novo (o CI
+#     vira gate do deploy). Requer GHCR_TOKEN (PAT read:packages) no .env do repo
+#     ou docker login ghcr.io previo. Build-mode permanece como fallback.
+#
 # F0.1 (2026-06-25): snapshot pre-deploy OBRIGATORIO antes do `up --build`.
 #   A API auto-aplica migrations no boot (RunMigrationsOnStartup=true +
 #   StartupMigrationsAndSeed.RunAsync). Sem snapshot previo, uma migration
@@ -29,7 +39,9 @@ set -euo pipefail
 
 REPO="${EASYSTOK_REPO:-/home/azureuser/easystok}"
 COMPOSE="$REPO/docker-compose.azure.yml"
+COMPOSE_IMAGES="$REPO/docker-compose.azure.images.yml"
 BRANCH="${EASYSTOK_BRANCH:-master}"
+DEPLOY_MODE="${EASYSTOK_DEPLOY_MODE:-build}"
 # /home/azureuser e gravavel pelo cron (azureuser); /var/backups e root-only e o
 # mkdir do snapshot falhava com Permission denied, abortando TODO deploy (incidente
 # 2026-06-26: VM travada em 4c7f1b1b). Override com EASYSTOK_BACKUP_ROOT se quiser /var.
@@ -63,6 +75,22 @@ snapshot_predeploy() {
   find "$BACKUP_ROOT" -maxdepth 1 -type d -name 'predeploy-*' -mtime "+$RETENTION_DAYS" -exec rm -rf {} + 2>/dev/null || true
 }
 
+# Login no GHCR para o modo pull. Token vem do ambiente (GHCR_TOKEN) ou do .env
+# do repo (mesmo arquivo que o compose ja le). Sem token, tenta seguir com o
+# login docker ja existente na VM (docker guarda credencial em ~/.docker).
+ghcr_login() {
+  local user="${GHCR_USER:-}" token="${GHCR_TOKEN:-}"
+  if [ -z "$token" ] && [ -f "$REPO/.env" ]; then
+    user="${user:-$(grep -E '^GHCR_USER=' "$REPO/.env" | tail -1 | cut -d= -f2-)}"
+    token="$(grep -E '^GHCR_TOKEN=' "$REPO/.env" | tail -1 | cut -d= -f2-)"
+  fi
+  if [ -n "$token" ]; then
+    echo "$token" | docker login ghcr.io -u "${user:-michel-az-de}" --password-stdin >/dev/null
+  else
+    echo "[vm-deploy] AVISO: GHCR_TOKEN ausente (env/.env) — contando com docker login previo."
+  fi
+}
+
 main() {
   local force="${1:-}"
 
@@ -79,7 +107,21 @@ main() {
     exit 0
   fi
 
-  echo "[vm-deploy] atualizando ${local_sha:0:8} -> ${remote_sha:0:8} ..."
+  echo "[vm-deploy] atualizando ${local_sha:0:8} -> ${remote_sha:0:8} (modo $DEPLOY_MODE) ..."
+
+  # Modo pull: puxar as imagens do sha REMOTO antes de qualquer mutacao local.
+  # Mesma classe de bug do incidente 4c7f1b1b: qualquer falha daqui pra frente nao
+  # pode deixar o HEAD avancado, senao o proximo cron ve local==remote e desiste.
+  # Imagem ausente = CI do sha ainda em andamento (ou vermelho) => aborta e o
+  # proximo cron tenta de novo. O CI e o gate do deploy.
+  if [ "$DEPLOY_MODE" = "pull" ]; then
+    ghcr_login
+    echo "[vm-deploy] pull das imagens :${remote_sha:0:8} do GHCR ..."
+    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" pull --quiet api web admin; then
+      echo "[vm-deploy] imagens de ${remote_sha:0:8} ainda nao disponiveis no GHCR. Abortando SEM avancar HEAD; proximo cron tenta de novo."
+      exit 4
+    fi
+  fi
 
   # F0.1 (fix 2026-06-26): snapshot ANTES do git pull. A copia unica do banco e
   # identica antes e depois do pull (o pull so reescreve codigo, nao toca o banco),
@@ -93,14 +135,22 @@ main() {
   local sha
   sha="$(git rev-parse HEAD)"
 
-  echo "[vm-deploy] rebuildando stack (GIT_SHA=${sha:0:8}) ..."
-  GIT_SHA="$sha" docker compose -f "$COMPOSE" up -d --build
+  if [ "$DEPLOY_MODE" = "pull" ]; then
+    # Sobe com a tag que FOI puxada (remote_sha). Se um push aterrissou entre o
+    # fetch e o pull (HEAD alem de remote_sha), o proximo cron alinha sozinho.
+    echo "[vm-deploy] subindo stack com imagens :${remote_sha:0:8} (sem build) ..."
+    EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" up -d
+    sha="$remote_sha"
+  else
+    echo "[vm-deploy] rebuildando stack (GIT_SHA=${sha:0:8}) ..."
+    GIT_SHA="$sha" docker compose -f "$COMPOSE" up -d --build
+  fi
 
   sleep 8
   local web_sha
   web_sha="$(docker exec easystok-web printenv GIT_SHA 2>/dev/null || echo '?')"
-  echo "[vm-deploy] OK. HEAD=${sha:0:8}  container_web GIT_SHA=${web_sha:0:8}"
-  [ "$web_sha" = "$sha" ] || echo "[vm-deploy] AVISO: GIT_SHA do container difere do HEAD (rebuild pode ter usado cache)."
+  echo "[vm-deploy] OK. esperado=${sha:0:8}  container_web GIT_SHA=${web_sha:0:8}"
+  [ "$web_sha" = "$sha" ] || echo "[vm-deploy] AVISO: GIT_SHA do container difere do esperado (cache de rebuild ou tag antiga)."
 }
 
 main "$@"
