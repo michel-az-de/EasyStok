@@ -12,7 +12,19 @@ public class TokenRefreshHandler(
     IHttpContextAccessor httpContextAccessor,
     IJwtClaimsReader jwt) : DelegatingHandler
 {
-    private bool _isRefreshing;
+    /// <summary>
+    /// Single-flight de refresh keyed pelo refresh token (issue 796). O handler e resolvido
+    /// pelo IHttpClientFactory no escopo do pipeline (cacheado ~2min e compartilhado entre
+    /// requests/usuarios), entao qualquer estado de instancia vaza entre usuarios. O
+    /// dicionario estatico garante: 401s concorrentes do MESMO token compartilham 1 refresh
+    /// (a Api rotaciona o token single-use — um segundo refresh derrubaria a sessao) e
+    /// tokens diferentes nunca interferem. A entrada fica viva por um curto periodo apos
+    /// completar para que retries com sessao ainda-stale reutilizem o resultado.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<Task<RefreshResult?>>> RefreshFlights = new();
+    private static readonly TimeSpan FlightRetention = TimeSpan.FromSeconds(30);
+
+    private sealed record RefreshResult(string AccessToken, string? RefreshToken, string? EmpresaId);
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
@@ -41,38 +53,40 @@ public class TokenRefreshHandler(
 
             if (!string.IsNullOrEmpty(empresaId))
             {
+                // So a request original: o retry recebe o empresaId ATUAL da sessao apos o
+                // refresh (o novo JWT pode carregar outro empresaId — issue 796).
                 request.RequestUri = AddQueryString(request.RequestUri, "empresaId", empresaId);
-                retryRequest!.RequestUri = AddQueryString(retryRequest.RequestUri, "empresaId", empresaId);
             }
         }
 
         var response = await base.SendAsync(request, ct);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute && !_isRefreshing)
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !isAuthRoute)
         {
             var refreshToken = session.GetRefreshToken();
             if (!string.IsNullOrEmpty(refreshToken))
             {
-                _isRefreshing = true;
-                try
+                var result = await RefreshSingleFlightAsync(refreshToken);
+                if (result is not null && retryRequest is not null)
                 {
-                    var newToken = await TryRefreshAsync(refreshToken, ct);
-                    if (newToken != null && retryRequest is not null)
-                    {
-                        retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
-                        response.Dispose();
-                        response = await base.SendAsync(retryRequest, ct);
-                    }
-                    else
-                    {
-                        log.LogWarning("Token refresh failed — clearing session");
-                        MarkSessionExpired();
-                        session.Clear();
-                    }
+                    // Cada request concorrente aplica o resultado na PROPRIA copia da
+                    // sessao — reduz a janela de um commit stale sobrescrever os tokens.
+                    session.SetTokens(result.AccessToken, result.RefreshToken ?? refreshToken);
+                    if (!string.IsNullOrEmpty(result.EmpresaId))
+                        session.SetEmpresaId(result.EmpresaId);
+
+                    retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
+                    var empresaAtual = session.GetEmpresaId();
+                    if (!string.IsNullOrEmpty(empresaAtual))
+                        retryRequest.RequestUri = AddQueryString(retryRequest.RequestUri, "empresaId", empresaAtual);
+                    response.Dispose();
+                    response = await base.SendAsync(retryRequest, ct);
                 }
-                finally
+                else
                 {
-                    _isRefreshing = false;
+                    log.LogWarning("Token refresh failed — clearing session");
+                    MarkSessionExpired();
+                    session.Clear();
                 }
             }
             else
@@ -83,6 +97,29 @@ public class TokenRefreshHandler(
         }
 
         return response;
+    }
+
+    private async Task<RefreshResult?> RefreshSingleFlightAsync(string refreshToken)
+    {
+        var flight = new Lazy<Task<RefreshResult?>>(
+            // CancellationToken.None: o flight e compartilhado — o cancel de um caller
+            // nao pode envenenar o refresh dos demais.
+            () => TryRefreshAsync(refreshToken, CancellationToken.None),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        var existing = RefreshFlights.GetOrAdd(refreshToken, flight);
+        if (ReferenceEquals(existing, flight))
+        {
+            // Criador agenda a remocao apos retencao curta (retries stale reutilizam o resultado).
+            _ = CleanupFlightAsync(refreshToken, flight.Value);
+        }
+        return await existing.Value;
+    }
+
+    private static async Task CleanupFlightAsync(string refreshToken, Task flightTask)
+    {
+        try { await flightTask; } catch { /* falha do refresh e tratada nos callers */ }
+        await Task.Delay(FlightRetention);
+        RefreshFlights.TryRemove(refreshToken, out _);
     }
 
     /// <summary>
@@ -136,7 +173,7 @@ public class TokenRefreshHandler(
         }
     }
 
-    private async Task<string?> TryRefreshAsync(string refreshToken, CancellationToken ct)
+    private async Task<RefreshResult?> TryRefreshAsync(string refreshToken, CancellationToken ct)
     {
         try
         {
@@ -164,16 +201,13 @@ public class TokenRefreshHandler(
 
             if (!string.IsNullOrEmpty(newAccess))
             {
-                session.SetTokens(newAccess, newRefresh ?? refreshToken);
-
                 // Sincroniza empresa_atual_id com o novo JWT para que GetEmpresaId()
                 // nas services continue correto mesmo se o token anterior estava
                 // expirado e o novo token carrega um empresaId diferente/novo.
+                // (A escrita na sessao acontece no caller — cada request concorrente
+                // aplica na propria copia da sessao.)
                 var newEmpresaId = jwt.TryReadClaim(newAccess, "empresaId");
-                if (!string.IsNullOrEmpty(newEmpresaId))
-                    session.SetEmpresaId(newEmpresaId);
-
-                return newAccess;
+                return new RefreshResult(newAccess, newRefresh, newEmpresaId);
             }
 
             return null;
