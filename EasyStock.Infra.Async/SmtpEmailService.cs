@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output;
 using System.Net;
 using System.Net.Mail;
 using System.Net.Sockets;
-using System.Text.Json;
 
 namespace EasyStock.Infra.Async;
 
@@ -110,37 +109,8 @@ public sealed class SmtpEmailService : IEmailService, IDisposable
 
     public Task SendTemplateAsync(string to, string subject, string templateName, object model, bool isHtml = true)
     {
-        var modelJson = JsonSerializer.Serialize(model, new JsonSerializerOptions { WriteIndented = true });
-        var body = isHtml
-            ? $"""
-              <!doctype html>
-              <html lang="pt-BR">
-              <body style="margin:0;background:#f4f7fb;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fb;padding:32px 16px;">
-                  <tr>
-                    <td align="center">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
-                        <tr>
-                          <td style="padding:24px 28px;background:linear-gradient(135deg,#312e81,#4f46e5 58%,#0891b2);color:#ffffff;">
-                            <div style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;opacity:.75;">EasyStock</div>
-                            <h1 style="margin:8px 0 0;font-size:22px;line-height:1.25;">{WebUtility.HtmlEncode(subject)}</h1>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:28px;color:#475569;font-size:14px;line-height:1.7;">
-                            <p style="margin:0 0 16px;">Recebemos uma atualização relacionada a <strong>{WebUtility.HtmlEncode(templateName)}</strong>.</p>
-                            <pre style="white-space:pre-wrap;word-break:break-word;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;color:#334155;font-family:Consolas,Menlo,monospace;font-size:12px;">{WebUtility.HtmlEncode(modelJson)}</pre>
-                            <p style="margin:18px 0 0;color:#64748b;font-size:13px;">Equipe EasyStock</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </body>
-              </html>
-              """
-            : $"EasyStock - {subject}\n\nTemplate: {templateName}\n\nDados:\n{modelJson}\n\nEquipe EasyStock";
+        // Implementacao basica - em producao usar template engine como Razor ou Handlebars
+        var body = $"Template: {templateName}\n\nModel: {System.Text.Json.JsonSerializer.Serialize(model)}";
         return SendAsync(to, subject, body, isHtml);
     }
 

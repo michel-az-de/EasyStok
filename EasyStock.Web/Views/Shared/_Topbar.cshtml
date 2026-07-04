@@ -1,78 +1,96 @@
 @{
     var usuarioNome = ViewBag.UsuarioNome as string ?? "Usuário";
-    var iniciais = string.Join("", usuarioNome.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0].ToString().ToUpper()));
-    if (string.IsNullOrWhiteSpace(iniciais)) iniciais = "U";
+    var iniciais = string.Join("", (usuarioNome).Split(' ').Take(2).Select(p => p.Length > 0 ? p[0].ToString().ToUpper() : ""));
+    if (string.IsNullOrEmpty(iniciais)) iniciais = "U";
+    var lojaAtualNome = ViewBag.LojaAtualNome as string;
+    var lojaAtualEmoji = (ViewBag.LojaAtualEmoji as string) ?? "🏪";
+    var usuarioRole = ViewBag.Role as string;
 }
 
-<header class="app-topbar relative z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0">
+<header class="app-topbar relative z-40 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0"
+        style="background: var(--bg-surface); border-bottom: 1px solid var(--border-soft);">
+    <!-- Hamburger (mobile only) -->
     <button @@click="sidebarOpen = !sidebarOpen"
-            class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
-            aria-label="Abrir menu">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+            id="sidebar-toggle"
+            aria-label="Abrir menu"
+            aria-controls="app-sidebar"
+            :aria-expanded="sidebarOpen ? 'true' : 'false'"
+            class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
+            style="color: var(--text-secondary);">
+        <es-icon name="menu" class="w-5 h-5"></es-icon>
     </button>
 
+    <!-- Page title (mobile only) -->
     <div class="flex-1 lg:hidden min-w-0">
-        <span class="page-title text-sm font-semibold text-slate-800 block">@(ViewBag.Title as string ?? "EasyStock")</span>
+        <span class="page-title font-semibold block" style="font-size: 0.875rem; color: var(--text-primary);">@(ViewBag.Title as string ?? "EasyStok")</span>
     </div>
 
+    <!-- Busca global -->
     <div x-data="buscaUnificada()"
          @@keydown.window.ctrl.k.prevent="abrir()"
          @@keydown.window.slash.prevent="if(!document.activeElement || document.activeElement.tagName === 'BODY') abrir()"
          class="contents">
+
+        <!-- Desktop: full search bar -->
         <div class="hidden lg:block flex-1">
             <button @@click="abrir()"
-                    class="app-search-trigger flex items-center gap-3 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors w-full max-w-md">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-                </svg>
-                <span class="flex-1 text-left truncate">Buscar produto, SKU, fornecedor ou loja</span>
-                <kbd class="inline-flex items-center gap-1 px-2 py-1 text-[11px] bg-slate-100 border border-slate-200 rounded-md text-slate-400">Ctrl K</kbd>
+                    class="app-search-trigger flex items-center gap-3 px-4 py-2.5 border rounded-lg text-sm transition-colors w-full max-w-md focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    style="background: var(--bg-surface); border-color: var(--border-soft); color: var(--text-muted);">
+                <es-icon name="search" class="w-4 h-4 flex-shrink-0"></es-icon>
+                <span class="flex-1 text-left truncate">Buscar produto, SKU ou fornecedor</span>
+                <span class="inline-flex items-center gap-1"><es-kbd>Ctrl</es-kbd><es-kbd>K</es-kbd></span>
             </button>
         </div>
 
+        <!-- Mobile: icon-only search -->
         <button @@click="abrir()"
-                class="app-icon-btn lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
-                aria-label="Buscar">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-            </svg>
+                aria-label="Buscar"
+                class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                style="color: var(--text-secondary);">
+            <es-icon name="search" class="w-5 h-5"></es-icon>
         </button>
 
+        <!-- Command palette overlay -->
         <div x-show="aberto" x-cloak
              class="fixed inset-0 z-[220] flex items-start justify-center pt-[8vh] px-4"
              @@keydown.escape.window="fechar()">
+            <!-- Backdrop -->
             <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="fechar()"></div>
 
-            <div class="app-command-panel relative z-[221] w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            <!-- Painel -->
+            <div class="app-command-panel relative z-[221] w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden"
+                 style="background: var(--bg-surface); border: 1px solid var(--border-soft);"
                  @@keydown.arrow-down.prevent="mover(1)" @@keydown.arrow-up.prevent="mover(-1)"
                  @@keydown.enter.prevent="selecionar()">
-                <div class="search-command-header flex items-center gap-3 px-4 py-3 border-b border-slate-100">
-                    <svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-                    </svg>
+                <!-- Input -->
+                <div class="search-command-header flex items-center gap-3 px-4 py-3"
+                     style="border-bottom: 1px solid var(--border-soft);">
+                    <es-icon name="search" class="w-5 h-5 flex-shrink-0" style="color: var(--text-muted);"></es-icon>
                     <input type="text" placeholder="Buscar produto, SKU, fornecedor, loja, usuário..."
                            x-ref="input"
                            x-model="query"
                            @@input.debounce.300ms="buscar()"
-                           class="flex-1 text-sm text-slate-800 placeholder-slate-400 bg-transparent border-none outline-none" />
-                    <div x-show="carregando" class="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                    <kbd class="flex-shrink-0 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">Esc</kbd>
+                           class="flex-1 text-sm bg-transparent border-none outline-none"
+                           style="color: var(--text-primary); placeholder-color: var(--text-muted);" />
+                    <div x-show="carregando" class="w-4 h-4 border-2 border-navy-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                    <es-kbd>Esc</es-kbd>
                 </div>
 
+                <!-- Resultados -->
                 <div class="search-results-list max-h-[60vh] overflow-y-auto py-1">
                     <template x-if="results.length > 0">
                         <div>
-                            <template x-for="(item, idx) in results" :key="item.id + '-' + item.tipo">
+                            <template x-for="(item, idx) in results" :key="(item.id ?? ('i' + idx)) + '-' + item.tipo">
                                 <a :href="linkItem(item)"
                                    :class="idx === activeIdx ? 'search-result-item search-result-item--active' : 'search-result-item'"
                                    class="flex items-start gap-3 px-4 py-2.5 transition-colors cursor-pointer group"
                                    @@mouseenter="activeIdx = idx"
                                    @@click="fechar()">
+                                    <!-- Badge tipo -->
                                     <span :class="badgeClasse(item.tipo)"
                                           class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide flex-shrink-0 mt-0.5"
                                           x-text="badgeLabel(item.tipo)"></span>
+                                    <!-- Conteúdo -->
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2">
                                             <span class="text-sm font-medium text-slate-900 truncate" x-text="item.titulo"></span>
@@ -90,12 +108,19 @@
                                             <span x-show="item.fornecedorNome" class="text-xs text-slate-400 flex-shrink-0" x-text="item.fornecedorNome"></span>
                                         </div>
                                     </div>
+                                    <!-- Ações rápidas para estoque -->
                                     <template x-if="item.tipo === 'ItemEstoque'">
                                         <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                            <a :href="'/entradas/nova?produtoId=' + item.produtoId" @@click.stop
-                                               class="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition-colors">Entrada</a>
-                                            <a :href="'/saidas/nova?produtoId=' + item.produtoId" @@click.stop
-                                               class="text-xs px-2 py-1 bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">Saída</a>
+                                            <a :href="'/entradas/nova?produtoId=' + item.produtoId"
+                                               @@click.stop
+                                               class="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100 transition-colors">
+                                                Entrada
+                                            </a>
+                                            <a :href="'/saidas/nova?produtoId=' + item.produtoId"
+                                               @@click.stop
+                                               class="text-xs px-2 py-1 bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
+                                                Saída
+                                            </a>
                                         </div>
                                     </template>
                                 </a>
@@ -103,23 +128,29 @@
                         </div>
                     </template>
 
-                    <div x-show="semResultados && !carregando && query.length >= 2" class="px-4 py-8 text-center">
-                        <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-                        </svg>
-                        <p class="text-sm text-slate-400">Nenhum resultado para <strong x-text="query" class="text-slate-600"></strong></p>
-                        <p class="text-xs text-slate-300 mt-1">Tente por nome, SKU, código interno ou fornecedor</p>
+                    <!-- Estado vazio -->
+                    <div x-show="semResultados && !carregando && query.length >= 2"
+                         class="px-4 py-8 text-center">
+                        <div class="mb-2" style="color: var(--border-strong);">
+                            <es-icon name="search" class="w-10 h-10 mx-auto"></es-icon>
+                        </div>
+                        <p class="text-sm" style="color: var(--text-muted);">Nenhum resultado para <strong x-text="query" style="color: var(--text-secondary);"></strong></p>
+                        <p class="text-xs mt-1" style="color: var(--text-muted);">Tente por nome, SKU, código interno ou fornecedor</p>
                     </div>
 
-                    <div x-show="results.length === 0 && !semResultados && !carregando" class="px-4 py-4 text-xs text-slate-400 text-center">
+                    <!-- Estado inicial -->
+                    <div x-show="results.length === 0 && !semResultados && !carregando"
+                         class="px-4 py-4 text-xs text-center" style="color: var(--text-muted);">
                         Digite pelo menos 2 caracteres para buscar
                     </div>
                 </div>
 
-                <div class="search-command-footer border-t border-slate-100 px-4 py-2 flex items-center gap-4 text-xs text-slate-400">
-                    <span><kbd class="bg-slate-100 px-1 rounded border border-slate-200">↑↓</kbd> navegar</span>
-                    <span><kbd class="bg-slate-100 px-1 rounded border border-slate-200">Enter</kbd> abrir</span>
-                    <span><kbd class="bg-slate-100 px-1 rounded border border-slate-200">Esc</kbd> fechar</span>
+                <!-- Rodapé dicas -->
+                <div class="search-command-footer px-4 py-2 flex items-center gap-4 text-xs"
+                     style="border-top: 1px solid var(--border-soft); color: var(--text-muted);">
+                    <span><es-kbd>&uarr;&darr;</es-kbd> navegar</span>
+                    <span><es-kbd>Enter</es-kbd> abrir</span>
+                    <span><es-kbd>Esc</es-kbd> fechar</span>
                 </div>
             </div>
         </div>
@@ -134,6 +165,7 @@
                 semResultados: false,
                 carregando: false,
                 activeIdx: 0,
+
                 abrir() {
                     this.aberto = true;
                     this.$nextTick(() => this.$refs.input && this.$refs.input.focus());
@@ -156,26 +188,16 @@
                 },
                 async buscar() {
                     const q = this.query.trim();
-                    if (q.length < 2) {
-                        this.results = [];
-                        this.semResultados = false;
-                        return;
-                    }
-
+                    if (q.length < 2) { this.results = []; this.semResultados = false; return; }
                     this.carregando = true;
                     try {
-                        const r = await fetch('/busca?q=' + encodeURIComponent(q) + '&limit=15');
-                        if (!r.ok) {
-                            this.semResultados = true;
-                            return;
-                        }
-
+                        const r = await esFetch('/busca?q=' + encodeURIComponent(q) + '&limit=15');
+                        if (!r.ok) { this.semResultados = true; return; }
                         const data = await r.json();
                         this.results = Array.isArray(data) ? data : [];
                         this.semResultados = this.results.length === 0;
                         this.activeIdx = 0;
-                    } catch (e) {
-                        console.error('[EasyStock]', e);
+                    } catch (e) { console.error('[EasyStock]', e);
                         this.results = [];
                         this.semResultados = true;
                     } finally {
@@ -186,11 +208,11 @@
                     switch (item.tipo) {
                         case 'Produto': return '/produtos/' + item.produtoId;
                         case 'Variacao': return '/produtos/' + item.produtoId;
-                        case 'ItemEstoque': return '/estoque';
+                        case 'ItemEstoque': return item.id ? '/estoque?item=' + item.id : '/estoque';
                         case 'Fornecedor': return '/fornecedores/' + item.id;
-                        case 'Pedido': return '/fornecedores/pedidos';
-                        case 'Entrada': return '/entradas';
-                        case 'Saida': return '/saidas';
+                        case 'Pedido': return item.id ? '/pedidos/' + item.id : '/pedidos';
+                        case 'Entrada': return '/entradas/historico';
+                        case 'Saida': return '/saidas/historico';
                         case 'Loja': return '/configuracoes';
                         case 'Usuario': return '/usuarios';
                         default: return '/produtos/' + item.produtoId;
@@ -198,15 +220,9 @@
                 },
                 badgeLabel(tipo) {
                     return {
-                        Produto: 'Produto',
-                        Variacao: 'Variação',
-                        ItemEstoque: 'Estoque',
-                        Fornecedor: 'Fornecedor',
-                        Pedido: 'Pedido',
-                        Entrada: 'Entrada',
-                        Saida: 'Saída',
-                        Loja: 'Loja',
-                        Usuario: 'Usuário'
+                        Produto: 'Produto', Variacao: 'Variação', ItemEstoque: 'Estoque',
+                        Fornecedor: 'Fornecedor', Pedido: 'Pedido', Entrada: 'Entrada',
+                        Saida: 'Saída', Loja: 'Loja', Usuario: 'Usuário'
                     }[tipo] || tipo;
                 },
                 badgeClasse(tipo) {
@@ -236,69 +252,97 @@
         }
     </script>
 
-    <button type="button"
-            onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
-            class="theme-toggle-btn app-surface-btn flex items-center gap-2 px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
-            title="Ativar tema escuro"
-            aria-label="Ativar tema escuro">
-        <span class="theme-icon-light" aria-hidden="true">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.364 6.364-1.591-1.591M7.227 7.227 5.636 5.636m12.728 0-1.591 1.591M7.227 16.773l-1.591 1.591M12 16a4 4 0 100-8 4 4 0 000 8z" />
-            </svg>
-        </span>
-        <span class="theme-icon-dark hidden" aria-hidden="true">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1012 21a8.96 8.96 0 008.354-5.646z" />
-            </svg>
-        </span>
-        <span class="hidden md:inline theme-toggle-label">Ativar tema escuro</span>
-    </button>
+    <div class="relative">
+        <button type="button"
+                onclick="window.EasyStockTheme && window.EasyStockTheme.toggle()"
+                class="theme-toggle-btn app-surface-btn flex items-center gap-2 whitespace-nowrap px-3 py-2 bg-white/85 border border-slate-200 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-colors"
+                title="Ativar tema escuro"
+                aria-label="Ativar tema escuro">
+            <span class="theme-icon-light" aria-hidden="true">
+                <es-icon name="sun" class="w-4 h-4"></es-icon>
+            </span>
+            <span class="theme-icon-dark hidden" aria-hidden="true">
+                <es-icon name="moon" class="w-4 h-4"></es-icon>
+            </span>
+            <span class="hidden md:inline theme-toggle-label">Ativar tema escuro</span>
+        </button>
+    </div>
 
+    <!-- Acao rapida (desktop only). Antes tinha classe `app-primary-btn` que aplica
+         gradiente azul !important e tornava o texto `slate-700` ilegivel sobre fundo
+         escuro. Removida — botao continua secundario branco (consistente com tema). -->
     <div x-data="{ open: false }" class="relative hidden lg:block">
-        <button @@click="open = !open"
-                class="app-primary-btn flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
+        @* es-button (TagHelper) nao repassa @@click pro <button> de saida -> clique
+           morto. Usa <button> plain (igual ao dropdown de usuario, que funciona). *@
+        <button type="button" class="btn btn-navy btn-sm app-primary-btn" @@click="open = !open"
+                aria-haspopup="menu" :aria-expanded="open ? 'true' : 'false'">
+            <es-icon name="plus" class="btn-icon-leading"></es-icon>
             <span class="hidden sm:inline">Ação rápida</span>
         </button>
-        <div x-show="open" @@click.outside="open = false" x-cloak
+        <div x-show="open" x-cloak @@click.outside="open = false"
+             role="menu"
+             aria-label="Ações rápidas"
              class="app-dropdown absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+            <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Estoque</div>
             <a href="/entradas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span class="text-[11px] font-bold text-emerald-600 w-7">IN</span> Nova entrada
+                <es-icon name="arrow-down-to-line" class="es-icon--sm"></es-icon> Nova entrada
             </a>
             <a href="/saidas/nova" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span class="text-[11px] font-bold text-rose-600 w-7">OUT</span> Nova saída
+                <es-icon name="arrow-up-from-line" class="es-icon--sm"></es-icon> Registrar Saída
             </a>
             <a href="/entradas/reposicao" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span class="text-[11px] font-bold text-indigo-600 w-7">REP</span> Repor estoque
+                <es-icon name="refresh-cw" class="es-icon--sm"></es-icon> Repor estoque
             </a>
             <a href="/estoque" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span class="text-[11px] font-bold text-slate-500 w-7">EST</span> Ver estoque
+                <es-icon name="package" class="es-icon--sm"></es-icon> Ver estoque
+            </a>
+            <div class="border-t border-slate-100 my-1" role="separator"></div>
+            <div class="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Vendas</div>
+            <a href="/pedidos" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="shopping-cart" class="es-icon--sm"></es-icon> Pedidos
+            </a>
+            <a href="/kds" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="chef-hat" class="es-icon--sm"></es-icon> Abrir KDS (cozinha)
+            </a>
+            <a href="/clientes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="users" class="es-icon--sm"></es-icon> Clientes
+            </a>
+            <a href="/caixa" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                <es-icon name="wallet" class="es-icon--sm"></es-icon> Caixa
             </a>
             <div class="border-t border-slate-100 my-1"></div>
             <a href="/anuncios" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span class="text-[11px] font-bold text-violet-600 w-7">IA</span> Gerar anúncio com IA
+                <es-icon name="sparkles" class="es-icon--sm"></es-icon> Gerar anúncio com IA
             </a>
             <a href="/analytics/movimentacoes" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <span class="text-[11px] font-bold text-sky-600 w-7">MOV</span> Ver movimentações
+                <es-icon name="bar-chart-3" class="es-icon--sm"></es-icon> Ver movimentações
             </a>
         </div>
     </div>
 
+    <!-- Notificações Dropdown -->
     <div x-data="notifDropdown()" class="relative">
         <button @@click="toggle()"
+                type="button"
+                aria-haspopup="menu"
+                :aria-expanded="open ? 'true' : 'false'"
+                :aria-label="resumo && resumo.totalNaoLidas > 0 ? ('Notificações: ' + resumo.totalNaoLidas + ' não lida' + (resumo.totalNaoLidas > 1 ? 's' : '')) : 'Notificações'"
                 :class="open ? 'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-md shadow-indigo-100/80' : ''"
-                class="app-icon-btn relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                aria-label="Notificações">
-            <svg id="notif-bell-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span id="topbar-notif-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"></span>
+                class="app-icon-btn relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+            <es-icon name="bell" id="notif-bell-icon" class="w-5 h-5"></es-icon>
+            <span id="topbar-notif-badge"
+                  class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  aria-label="Notificacoes nao lidas"></span>
         </button>
 
         <div x-show="open" @@click.outside="open = false" x-cloak x-transition
-             class="app-dropdown absolute right-0 mt-2 w-96 max-h-[480px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col">
+             role="menu"
+             aria-label="Notificações recentes"
+             class="app-dropdown absolute right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] max-h-[480px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col">
+            <!-- Header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                 <div class="flex items-center gap-2">
                     <span class="font-semibold text-slate-900 text-sm">Notificações</span>
@@ -306,34 +350,40 @@
                         <span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full text-xs font-medium" x-text="resumo.totalNaoLidas"></span>
                     </template>
                 </div>
-                <template x-if="resumo && resumo.criticas > 0">
-                    <span class="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs font-bold" x-text="resumo.criticas + ' crítica' + (resumo.criticas > 1 ? 's' : '')"></span>
-                </template>
+                <div class="flex items-center gap-2">
+                    <template x-if="resumo && resumo.criticas > 0">
+                        <span class="px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs font-bold" x-text="resumo.criticas + ' crítica' + (resumo.criticas > 1 ? 's' : '')"></span>
+                    </template>
+                    <template x-if="resumo && resumo.totalNaoLidas > 0">
+                        <button @@click="marcarTodas()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap">Marcar todas como lidas</button>
+                    </template>
+                </div>
             </div>
 
-            <div class="overflow-y-auto flex-1">
+            <!-- Items -->
+            <div class="overflow-y-auto flex-1" role="presentation">
                 <template x-if="loading">
-                    <div class="px-4 py-8 text-center text-slate-400 text-sm">Carregando...</div>
+                    <div class="px-4 py-8 text-center text-slate-400 text-sm" role="status" aria-live="polite">Carregando notificações…</div>
                 </template>
                 <template x-if="!loading && erro">
                     <div class="px-4 py-8 text-center text-slate-400">
-                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                        </svg>
+                        <es-icon name="alert-triangle" class="w-8 h-8 mx-auto mb-2 opacity-40"></es-icon>
                         <p class="text-sm">Não foi possível carregar notificações</p>
                         <button @@click="erro=false; load()" class="mt-2 text-xs text-indigo-600 hover:underline">Tentar novamente</button>
                     </div>
                 </template>
                 <template x-if="!loading && !erro && items.length === 0">
                     <div class="px-4 py-8 text-center text-slate-400">
-                        <svg class="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
+                        <es-icon name="check" class="w-8 h-8 mx-auto mb-2 opacity-40"></es-icon>
                         <p class="text-sm">Nenhuma notificação pendente</p>
                     </div>
                 </template>
-                <template x-for="n in items" :key="n.id">
-                    <div class="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors" :class="severidadeBorder(n.severidade)">
+                @* :key blindado: usa n.id quando valido; fallback 'i'+idx (unico) se
+                   id vier nulo/repetido — evita chave duplicada que estoura .after e
+                   congela o x-for. *@
+                <template x-for="(n, idx) in items" :key="n.id ?? ('i' + idx)">
+                    <div class="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                         :class="severidadeBorder(n.severidade)">
                         <div class="flex items-start gap-3">
                             <div class="flex-shrink-0 mt-0.5" x-html="severidadeIcon(n.severidade)"></div>
                             <div class="flex-1 min-w-0">
@@ -341,8 +391,8 @@
                                 <div class="text-xs text-slate-500 mt-0.5 line-clamp-2" x-text="n.mensagem"></div>
                                 <div class="flex items-center gap-2 mt-1.5">
                                     <a :href="acaoUrl(n)" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium" x-text="acaoLabel(n)"></a>
-                                    <span class="text-slate-300">|</span>
-                                    <button @@click.stop="marcarLida(n.id)" class="text-xs text-slate-400 hover:text-slate-600">Marcar lida</button>
+                                    <span class="text-slate-300" aria-hidden="true">|</span>
+                                    <button type="button" @@click.stop="marcarLida(n.id)" class="text-xs text-slate-400 hover:text-slate-600">Marcar como lida</button>
                                     <span class="text-xs text-slate-300 ml-auto" x-text="tempoRelativo(n.criadaEm || n.createdAt)"></span>
                                 </div>
                             </div>
@@ -351,12 +401,12 @@
                 </template>
             </div>
 
-            <a href="/notificacoes" class="block px-4 py-2.5 text-center text-sm text-indigo-600 font-medium hover:bg-indigo-50 border-t border-slate-100 rounded-b-xl transition-colors">
+            <!-- Footer -->
+            <a href="/notificacoes" role="menuitem" class="block px-4 py-2.5 text-center text-sm text-indigo-600 font-medium hover:bg-indigo-50 border-t border-slate-100 rounded-b-xl transition-colors">
                 Ver todas as notificações
             </a>
         </div>
     </div>
-
     <script>
         function notifDropdown() {
             return {
@@ -365,6 +415,26 @@
                 erro: false,
                 items: [],
                 resumo: null,
+                async init() {
+                    // Eagerly populate the badge on Alpine init without waiting for the polling script
+                    try {
+                        const cached = window.__notifResumo;
+                        const data = (cached && (Date.now() - cached.ts) < 30000)
+                            ? cached.data
+                            : await esFetch('/notificacoes/resumo').then(r => r.ok ? r.json() : null);
+                        if (!data) return;
+                        if (!cached || (Date.now() - cached.ts) >= 30000) {
+                            window.__notifResumo = { data, ts: Date.now() };
+                        }
+                        this.resumo = data;
+                        const c = data.totalNaoLidas || 0;
+                        const badge = document.getElementById('topbar-notif-badge');
+                        if (badge) {
+                            if (c > 0) { badge.textContent = c > 99 ? '99+' : String(c); badge.classList.remove('hidden'); }
+                            else { badge.classList.add('hidden'); }
+                        }
+                    } catch (e) { /* silent */ }
+                },
                 async toggle() {
                     this.open = !this.open;
                     if (this.open && this.items.length === 0 && !this.erro) await this.load();
@@ -373,35 +443,58 @@
                     this.loading = true;
                     this.erro = false;
                     try {
-                        const [rItems, rResumo] = await Promise.all([
-                            fetch('/notificacoes/recentes').then(r => {
-                                if (!r.ok) throw new Error('HTTP ' + r.status);
-                                return r.json();
-                            }),
-                            fetch('/notificacoes/resumo').then(r => r.json())
-                        ]);
+                        // Buscar itens recentes (sempre necessário)
+                        const rItems = await esFetch('/notificacoes/recentes').then(r => {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            return r.json();
+                        });
                         this.items = Array.isArray(rItems) ? rItems : [];
-                        this.resumo = rResumo;
-                    } catch (e) {
-                        console.error('[EasyStock]', e);
-                        this.items = [];
-                        this.erro = true;
-                    }
+
+                        // Reutilizar resumo do polling global se recente (< 30s)
+                        const cached = window.__notifResumo;
+                        if (cached && (Date.now() - cached.ts) < 30000) {
+                            this.resumo = cached.data;
+                        } else {
+                            const rResumo = await esFetch('/notificacoes/resumo');
+                            if (rResumo.ok) this.resumo = await rResumo.json();
+                        }
+                    } catch (e) { console.error('[EasyStock]', e); this.items = []; this.erro = true; }
                     this.loading = false;
+                },
+                async marcarTodas() {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                    try {
+                        const res = await esFetch('/notificacoes/marcar-todas', {
+                            method: 'POST',
+                            headers: { 'RequestVerificationToken': token || '' }
+                        });
+                        // esFetch devolve 4xx/5xx cru (issue 806): sem este guard a UI
+                        // zerava badge/lista num erro e o poll de 45s trazia tudo de volta.
+                        if (!res.ok) { window.showToast && window.showToast('Erro ao marcar notificações.', 'error'); return; }
+                        this.items = [];
+                        if (this.resumo) this.resumo.totalNaoLidas = 0;
+                        const badge = document.getElementById('topbar-notif-badge');
+                        if (badge) badge.classList.add('hidden');
+                        window.showToast && window.showToast('Todas as notificações foram marcadas como lidas.', 'success');
+                    } catch (e) { console.error('[EasyStock]', e); window.showToast && window.showToast('Erro ao marcar notificações.', 'error'); }
                 },
                 async marcarLida(id) {
                     const token = document.querySelector('meta[name="csrf-token"]')?.content;
                     try {
-                        await fetch('/notificacoes/' + id + '/lida-ajax', {
+                        const res = await esFetch('/notificacoes/' + id + '/lida-ajax', {
                             method: 'POST',
                             headers: { 'RequestVerificationToken': token || '' }
                         });
+                        if (!res.ok) { window.showToast && window.showToast('Erro ao marcar notificação como lida.', 'error'); return; }
                         this.items = this.items.filter(n => n.id !== id);
                         if (this.resumo) this.resumo.totalNaoLidas = Math.max(0, (this.resumo.totalNaoLidas || 0) - 1);
-                        window.EasyStockNotifications?.refreshBadge?.(this.resumo?.totalNaoLidas || 0);
-                    } catch (e) {
-                        console.error('[EasyStock]', e);
-                    }
+                        const badge = document.getElementById('topbar-notif-badge');
+                        if (badge) {
+                            const c = this.resumo?.totalNaoLidas || 0;
+                            if (c > 0) { badge.textContent = c > 99 ? '99+' : c; }
+                            else { badge.classList.add('hidden'); }
+                        }
+                    } catch (e) { console.error('[EasyStock]', e); window.showToast && window.showToast('Erro ao marcar notificação como lida.', 'error'); }
                 },
                 severidadeBorder(s) {
                     const m = { Critica: 'border-l-4 border-red-500', Alta: 'border-l-4 border-orange-500', Media: 'border-l-4 border-yellow-400', Informativa: 'border-l-4 border-slate-300' };
@@ -449,26 +542,12 @@
                     if (!dt) return '';
                     const diff = (Date.now() - new Date(dt).getTime()) / 1000;
                     if (diff < 60) return 'agora';
-                    if (diff < 3600) return Math.floor(diff / 60) + 'min';
-                    if (diff < 86400) return Math.floor(diff / 3600) + 'h';
-                    return Math.floor(diff / 86400) + 'd';
+                    if (diff < 3600) return 'há ' + Math.floor(diff / 60) + 'min';
+                    if (diff < 86400) return 'há ' + Math.floor(diff / 3600) + 'h';
+                    return 'há ' + Math.floor(diff / 86400) + 'd';
                 }
             };
         }
-
-        window.EasyStockNotifications = {
-            refreshBadge(count) {
-                const badge = document.getElementById('topbar-notif-badge');
-                if (!badge) return;
-                const c = count || 0;
-                if (c > 0) {
-                    badge.textContent = c > 99 ? '99+' : c;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
-        };
 
         window.EasyStockTheme = {
             async toggle() {
@@ -486,12 +565,12 @@
 
                 if (!persist) return;
 
-                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                const token = document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content');
                 const form = new URLSearchParams();
                 form.append('theme', normalized);
 
                 try {
-                    await fetch('/auth/theme', {
+                    await esFetch('/auth/theme', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -499,9 +578,7 @@
                         },
                         body: form.toString()
                     });
-                } catch (e) {
-                    console.error('[EasyStock]', e);
-                }
+                } catch (e) { console.error('[EasyStock]', e); }
             },
             refreshToggle(theme) {
                 const isDark = theme === 'dark';
@@ -522,38 +599,101 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             window.EasyStockTheme.init();
-            fetch('/notificacoes/resumo')
-                .then(r => r.ok ? r.json() : null)
-                .then(data => window.EasyStockNotifications.refreshBadge(data?.totalNaoLidas || 0))
-                .catch(e => console.error('[EasyStock]', e));
+            // Badge de notificações é atualizado pelo polling global em _Layout.cshtml
         });
     </script>
 
-    <div x-data="{ open: false }" class="relative">
+    <!-- Avatar / usuário -->
+    <div x-data="{ open: false, logoutAsk: false }" class="relative">
         <button @@click="open = !open"
-                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors max-w-[220px]">
-            <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                type="button"
+                aria-haspopup="menu"
+                :aria-expanded="open ? 'true' : 'false'"
+                aria-label="Abrir menu da conta"
+                class="app-avatar-trigger flex items-center gap-2 p-1 rounded-lg transition-colors max-w-[220px]"
+                style="color: var(--text-primary);"
+                onmouseover="this.style.background='var(--ink-100)'"
+                onmouseout="this.style.background=''">
+            <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold" aria-hidden="true">
                 @iniciais
             </div>
             <div class="text-left hidden sm:block min-w-0 flex-1">
                 <div class="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[150px]" title="@usuarioNome">@usuarioNome</div>
             </div>
-            <svg class="hidden sm:block w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+            <es-icon name="chevron-down" class="hidden sm:block w-4 h-4 text-slate-400"></es-icon>
         </button>
-        <div x-show="open" @@click.outside="open = false" x-cloak
-             class="app-dropdown absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
-            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-100">@usuarioNome</div>
-            <form asp-controller="Auth" asp-action="Logout" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sair
-                </button>
-            </form>
+        <div x-show="open" x-cloak @@click.outside="open = false"
+             role="menu"
+             aria-label="Conta"
+             class="app-dropdown absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50">
+            <div class="px-4 py-2.5 border-b border-slate-100">
+                <div class="text-sm font-semibold text-slate-800 truncate" title="@usuarioNome">@usuarioNome</div>
+                @if (!string.IsNullOrEmpty(lojaAtualNome))
+                {
+                    <div class="text-xs text-slate-500 truncate mt-0.5" title="@lojaAtualNome">
+                        <span aria-hidden="true">@lojaAtualEmoji</span> @lojaAtualNome
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(usuarioRole))
+                {
+                    <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mt-1">@usuarioRole</div>
+                }
+            </div>
+            <a href="/configuracoes" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                <es-icon name="settings" class="w-4 h-4 text-slate-400"></es-icon>
+                Configurações
+            </a>
+            <a href="/usuarios" role="menuitem" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                <es-icon name="users" class="w-4 h-4 text-slate-400"></es-icon>
+                Gerenciar usuários
+            </a>
+            <div class="border-t border-slate-100 my-1" role="separator"></div>
+            <button type="button"
+                    @@click="open = false; logoutAsk = true; $nextTick(() => document.getElementById('logoutCancelBtn')?.focus())"
+                    class="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors"
+                    style="color: var(--crit-600);"
+                    onmouseover="this.style.background='var(--crit-50)'"
+                    onmouseout="this.style.background=''">
+                <es-icon name="log-out" class="w-4 h-4"></es-icon>
+                Sair
+            </button>
         </div>
+
+        <!-- Modal de confirmação de logout -->
+        <template x-teleport="body">
+            <div x-show="logoutAsk" x-cloak
+                 class="auth-prem-modal-backdrop"
+                 role="alertdialog"
+                 aria-labelledby="logoutTitle"
+                 aria-describedby="logoutText"
+                 @@keydown.escape.window="logoutAsk = false"
+                 @@click.self="logoutAsk = false">
+                <div class="auth-prem-modal" @@click.stop>
+                    <div class="auth-prem-modal-icon" aria-hidden="true">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </div>
+                    <h2 id="logoutTitle" class="auth-prem-modal-title">Sair da conta?</h2>
+                    <p id="logoutText" class="auth-prem-modal-text">
+                        Você precisará entrar novamente para continuar. Suas alterações estão salvas.
+                    </p>
+                    <div class="auth-prem-modal-actions">
+                        <button type="button"
+                                id="logoutCancelBtn"
+                                @@click="logoutAsk = false"
+                                class="auth-prem-modal-btn auth-prem-modal-btn--ghost">
+                            Cancelar
+                        </button>
+                        <form asp-controller="Auth" asp-action="Logout" method="post" style="flex: 1; display: flex;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="auth-prem-modal-btn auth-prem-modal-btn--danger" style="width: 100%;">
+                                Sair
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </header>

@@ -1,9 +1,4 @@
-using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Common;
-using EasyStock.Domain.Entities;
-using Microsoft.Extensions.Logging;
-using System.Net;
+using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.UseCases.EsqueciSenha;
 
@@ -12,6 +7,7 @@ public sealed class EsqueciSenhaUseCase(
     IResetTokenRepository resetTokenRepository,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
+    IConfiguration configuration,
     ILogger<EsqueciSenhaUseCase> logger,
     IEmailService? emailService = null) : IUseCase<EsqueciSenhaCommand, EsqueciSenhaResult>
 {
@@ -19,18 +15,31 @@ public sealed class EsqueciSenhaUseCase(
     {
         logger.LogInformation("Iniciando esqueci senha para email {Email}", command.Email);
 
+        // Formato inválido é tratado da mesma forma que email inexistente:
+        // retorna sucesso sem efeito colateral, para não vazar informação
+        // sobre formato aceito vs contas cadastradas (mesma classe de leak
+        // que user enumeration).
+        if (!EmailValidator.IsValid(command.Email))
+        {
+            logger.LogWarning("Tentativa de esqueci senha com email em formato invalido.");
+            return new EsqueciSenhaResult(true);
+        }
+
         var usuario = await usuarioRepository.GetByEmailAsync(command.Email);
         if (usuario == null || !usuario.Ativo)
         {
             logger.LogWarning("Tentativa de esqueci senha para email inexistente: {Email}", command.Email);
+            // Retornar sucesso para nao revelar se email existe
             return new EsqueciSenhaResult(true);
         }
 
+        // Token plaintext só circula em memória/email; persistimos só o hash.
         var token = Guid.NewGuid().ToString();
+        var tokenHash = TokenHashHelper.ComputeSha256Hash(token);
         var expiraEm = DateTime.UtcNow.AddHours(1);
         var resetToken = ResetToken.Criar(
             usuario.Id,
-            token,
+            tokenHash,
             expiraEm,
             null,
             null);
@@ -51,74 +60,40 @@ public sealed class EsqueciSenhaUseCase(
         {
             try
             {
-                var resetLink = !string.IsNullOrEmpty(command.BaseUrl)
-                    ? $"{command.BaseUrl.TrimEnd('/')}/auth/redefinir-senha?token={Uri.EscapeDataString(token)}"
+                // Nunca confiar no BaseUrl do corpo da requisicao: so compomos o link
+                // quando o host bate com uma origem confiavel (#765). Host nao-confiavel
+                // (ou ausente) => e-mail com token puro, nunca link para host do atacante.
+                var baseUrlConfiavel = LinkBaseUrlResolver.ResolveTrusted(command.BaseUrl, configuration);
+                if (!string.IsNullOrEmpty(command.BaseUrl) && baseUrlConfiavel is null)
+                    logger.LogWarning("BaseUrl do reset de senha ignorado por nao estar na allowlist de origens confiaveis.");
+
+                var resetLink = baseUrlConfiavel is not null
+                    ? $"{baseUrlConfiavel}/auth/redefinir-senha?token={Uri.EscapeDataString(token)}"
                     : token;
 
-                var hasLink = !string.IsNullOrEmpty(command.BaseUrl);
+                var hasLink = baseUrlConfiavel is not null;
                 var subject = "Recuperação de senha - EasyStock";
-                var body = MontarEmailRecuperacaoSenha(usuario.Nome, resetLink, token, hasLink);
+                var body = $"Olá {usuario.Nome},\n\n" +
+                           $"Recebemos uma solicitação para redefinir a senha da sua conta.\n\n" +
+                           (hasLink
+                               ? $"Clique no link abaixo para criar uma nova senha (válido por 1 hora):\n\n{resetLink}\n\n"
+                               : $"Use o token abaixo para criar uma nova senha (válido por 1 hora):\n\n{token}\n\n") +
+                           $"Se você não solicitou a redefinição de senha, ignore este e-mail.\n\n" +
+                           $"Equipe EasyStock";
 
-                await emailService.SendAsync(usuario.Email, subject, body, isHtml: true);
-                logger.LogInformation("E-mail de recuperação de senha enviado para {Email}", usuario.Email);
+                await emailService.SendAsync(usuario.Email, subject, body);
+                logger.LogInformation("E-mail de recuperacao de senha enviado para {Email}", usuario.Email);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Falha ao enviar e-mail de recuperação de senha para {Email}. Token gerado normalmente.", usuario.Email);
+                logger.LogError(ex, "Falha ao enviar e-mail de recuperacao de senha para {Email}. Token gerado normalmente.", usuario.Email);
             }
         }
         else
         {
-            logger.LogInformation("Token de reset gerado para usuário {UsuarioId}", usuario.Id);
+            logger.LogInformation("Token de reset gerado para usuario {UsuarioId}", usuario.Id);
         }
 
         return new EsqueciSenhaResult(true);
-    }
-
-    private static string MontarEmailRecuperacaoSenha(string nome, string resetLink, string token, bool hasLink)
-    {
-        var nomeSeguro = WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(nome) ? "Olá" : nome.Trim());
-        var acaoHtml = hasLink
-            ? $"""
-              <a href="{WebUtility.HtmlEncode(resetLink)}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 20px;border-radius:12px;">Criar nova senha</a>
-              <p style="margin:18px 0 0;color:#64748b;font-size:13px;line-height:1.6;">Se o botão não funcionar, copie e cole este link no navegador:<br><span style="word-break:break-all;color:#334155;">{WebUtility.HtmlEncode(resetLink)}</span></p>
-              """
-            : $"""
-              <p style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.6;">Use este token para criar uma nova senha:</p>
-              <div style="font-family:Consolas,Menlo,monospace;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:12px;padding:14px 16px;font-weight:700;letter-spacing:.02em;word-break:break-all;">{WebUtility.HtmlEncode(token)}</div>
-              """;
-
-        return $$"""
-          <!doctype html>
-          <html lang="pt-BR">
-          <body style="margin:0;background:#f4f7fb;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fb;padding:32px 16px;">
-              <tr>
-                <td align="center">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;box-shadow:0 18px 46px rgba(15,23,42,.08);">
-                    <tr>
-                      <td style="padding:28px 30px;background:linear-gradient(135deg,#312e81,#4f46e5 58%,#0891b2);color:#ffffff;">
-                        <div style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;opacity:.72;">EasyStock</div>
-                        <h1 style="margin:10px 0 0;font-size:26px;line-height:1.2;">Redefinição de senha</h1>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding:30px;">
-                        <p style="margin:0 0 14px;font-size:16px;line-height:1.6;">Olá, {{nomeSeguro}}.</p>
-                        <p style="margin:0 0 22px;color:#475569;font-size:14px;line-height:1.7;">Recebemos uma solicitação para redefinir a senha da sua conta. O acesso abaixo é válido por <strong>1 hora</strong>.</p>
-                        {{acaoHtml}}
-                        <div style="margin-top:26px;padding:16px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;font-size:13px;line-height:1.6;">
-                          Se você não solicitou a redefinição de senha, ignore este e-mail. Sua senha atual continuará a mesma.
-                        </div>
-                        <p style="margin:24px 0 0;color:#64748b;font-size:13px;line-height:1.6;">Equipe EasyStock</p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </body>
-          </html>
-          """;
     }
 }
