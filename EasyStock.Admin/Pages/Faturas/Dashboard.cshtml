@@ -5,6 +5,7 @@
     ViewData["Title"] = "Dashboard Financeiro";
     string FmtCurrency(decimal v) => v.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
     string FmtNumber(int v) => v.ToString("N0", new System.Globalization.CultureInfo("pt-BR"));
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
 }
 
 @* Fase 3: painel financeiro no padrao deck (issue #625). Server-rendered. *@
@@ -38,26 +39,38 @@
     var totalCohort = ativas + canceladas;
     var churnPct = totalCohort > 0 ? Math.Round((decimal)canceladas / totalCohort * 100m, 1) : 0m;
 
+    // Valores crus (invariante) para o count-up dos KPIs — esCountUp faz a formatacao pt-BR.
+    var mrrRaw = Model.Dec("mrr").ToString(inv);
+    var arrRaw = Model.Dec("arr").ToString(inv);
+    var receitaRaw = Model.Dec("receitaPeriodo").ToString(inv);
+    var vencidoRaw = Model.Dec("valorVencido").ToString(inv);
+    var ticketRaw = Model.Dec("ticketMedio").ToString(inv);
+    var convRaw = Model.Dec("taxaConversao").ToString(inv);
+    var atrasoRaw = Model.Dbl("atrasoMedioDias").ToString(inv);
+    var churnRaw = churnPct.ToString(inv);
+    var suspensasN = Model.Int("assinaturasSuspensas");
+    var faturasPeriodoN = Model.Int("faturasEmitidasPeriodo");
+
     <!-- Linha 1: receita (hero numerals) -->
     <section class="deck-rise" style="--deck-i:1; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:14px;">
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">MRR</div>
-            <div class="deck-kpi">@FmtCurrency(Model.Dec("mrr"))</div>
+            <div class="deck-kpi" x-data="esCountUp(@mrrRaw, 800, 'currency')" x-text="display">@FmtCurrency(Model.Dec("mrr"))</div>
             <div class="deck-meta">Estimativa mensal · assinaturas ativas</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">ARR</div>
-            <div class="deck-kpi">@FmtCurrency(Model.Dec("arr"))</div>
+            <div class="deck-kpi" x-data="esCountUp(@arrRaw, 800, 'currency')" x-text="display">@FmtCurrency(Model.Dec("arr"))</div>
             <div class="deck-meta">MRR × 12</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Receita no período</div>
-            <div class="deck-kpi" style="color:var(--ok-600);">@FmtCurrency(Model.Dec("receitaPeriodo"))</div>
+            <div class="deck-kpi" style="color:var(--ok-600);" x-data="esCountUp(@receitaRaw, 800, 'currency')" x-text="display">@FmtCurrency(Model.Dec("receitaPeriodo"))</div>
             <div class="deck-meta">@Model.Int("faturasPagasPeriodo") fatura(s) paga(s)</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Em atraso</div>
-            <div class="deck-kpi" style="color:var(--crit-600);">@FmtCurrency(Model.Dec("valorVencido"))</div>
+            <div class="deck-kpi" style="color:var(--crit-600);" x-data="esCountUp(@vencidoRaw, 800, 'currency')" x-text="display">@FmtCurrency(Model.Dec("valorVencido"))</div>
             <div class="deck-meta">@Model.Int("faturasVencidas") fatura(s) vencida(s)</div>
         </div>
     </section>
@@ -66,21 +79,21 @@
     <section class="deck-rise" style="--deck-i:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:14px;">
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Assinaturas ativas</div>
-            <div class="deck-kpi" style="font-size:26px;">@FmtNumber(Model.Int("assinaturasAtivas"))</div>
+            <div class="deck-kpi" style="font-size:26px;" x-data="esCountUp(@ativas, 800)" x-text="display">@FmtNumber(Model.Int("assinaturasAtivas"))</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Suspensas</div>
-            <div class="deck-kpi" style="font-size:26px; color:var(--warn-600);">@FmtNumber(Model.Int("assinaturasSuspensas"))</div>
+            <div class="deck-kpi" style="font-size:26px; color:var(--warn-600);" x-data="esCountUp(@suspensasN, 800)" x-text="display">@FmtNumber(Model.Int("assinaturasSuspensas"))</div>
             <div class="deck-meta">Inadimplência provável</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Canceladas</div>
-            <div class="deck-kpi" style="font-size:26px; color:var(--text-muted);">@FmtNumber(Model.Int("assinaturasCanceladas"))</div>
+            <div class="deck-kpi" style="font-size:26px; color:var(--text-muted);" x-data="esCountUp(@canceladas, 800)" x-text="display">@FmtNumber(Model.Int("assinaturasCanceladas"))</div>
             <div class="deck-meta">Acumulado histórico</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Churn aprox.</div>
-            <div class="deck-kpi" style="font-size:26px; color:@(churnPct > 10m ? "var(--crit-600)" : "var(--text-primary)");">@churnPct.ToString("0.0")%</div>
+            <div class="deck-kpi" style="font-size:26px; color:@(churnPct > 10m ? "var(--crit-600)" : "var(--text-primary)");"><span x-data="esCountUp(@churnRaw, 800)" x-text="display">@churnPct.ToString("0.0")</span>%</div>
             <div class="deck-meta">Cancel / (Ativa + Cancel)</div>
         </div>
     </section>
@@ -89,22 +102,22 @@
     <section class="deck-rise" style="--deck-i:3; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:24px;">
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Conversão</div>
-            <div class="deck-kpi" style="font-size:26px;">@Model.Dec("taxaConversao").ToString("0.0")%</div>
+            <div class="deck-kpi" style="font-size:26px;"><span x-data="esCountUp(@convRaw, 800)" x-text="display">@Model.Dec("taxaConversao").ToString("0.0")</span>%</div>
             <div class="deck-meta">Pagas / Emitidas</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Ticket médio</div>
-            <div class="deck-kpi" style="font-size:26px;">@FmtCurrency(Model.Dec("ticketMedio"))</div>
+            <div class="deck-kpi" style="font-size:26px;" x-data="esCountUp(@ticketRaw, 800, 'currency')" x-text="display">@FmtCurrency(Model.Dec("ticketMedio"))</div>
             <div class="deck-meta">Receita / Pagas</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Atraso médio</div>
-            <div class="deck-kpi" style="font-size:26px; color:@(Model.Dbl("atrasoMedioDias") > 30d ? "var(--crit-600)" : "var(--text-primary)");">@Model.Dbl("atrasoMedioDias").ToString("0.0") d</div>
+            <div class="deck-kpi" style="font-size:26px; color:@(Model.Dbl("atrasoMedioDias") > 30d ? "var(--crit-600)" : "var(--text-primary)");"><span x-data="esCountUp(@atrasoRaw, 800)" x-text="display">@Model.Dbl("atrasoMedioDias").ToString("0.0")</span> d</div>
             <div class="deck-meta">Vencidas em aberto</div>
         </div>
         <div class="deck-panel deck-tile">
             <div class="deck-eyebrow">Faturas no período</div>
-            <div class="deck-kpi" style="font-size:26px;">@FmtNumber(Model.Int("faturasEmitidasPeriodo"))</div>
+            <div class="deck-kpi" style="font-size:26px;" x-data="esCountUp(@faturasPeriodoN, 800)" x-text="display">@FmtNumber(Model.Int("faturasEmitidasPeriodo"))</div>
             <div class="deck-meta">Paga + Emitida + Vencida</div>
         </div>
     </section>

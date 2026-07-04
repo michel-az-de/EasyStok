@@ -27,27 +27,27 @@
 <section class="deck-rise" style="--deck-i:1; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:20px;">
     <div class="deck-panel deck-tile">
         <div class="deck-eyebrow">Abertos</div>
-        <div class="deck-kpi">@Model.Abertos</div>
+        <div class="deck-kpi" x-data="esCountUp(@Model.Abertos, 800)" x-text="display">@Model.Abertos</div>
     </div>
     <div class="deck-panel deck-tile">
         <div class="deck-eyebrow">Em atendimento</div>
-        <div class="deck-kpi" style="color:var(--orange-500);">@Model.EmAtendimento</div>
+        <div class="deck-kpi" style="color:var(--orange-500);" x-data="esCountUp(@Model.EmAtendimento, 800)" x-text="display">@Model.EmAtendimento</div>
     </div>
     <div class="deck-panel deck-tile">
         <div class="deck-eyebrow">Aguard. cliente</div>
-        <div class="deck-kpi" style="color:var(--warn-600);">@Model.AguardandoCliente</div>
+        <div class="deck-kpi" style="color:var(--warn-600);" x-data="esCountUp(@Model.AguardandoCliente, 800)" x-text="display">@Model.AguardandoCliente</div>
     </div>
     <div class="deck-panel deck-tile">
         <div class="deck-eyebrow">Resolvidos hoje</div>
-        <div class="deck-kpi" style="color:var(--ok-600);">@Model.ResolvidosHoje</div>
+        <div class="deck-kpi" style="color:var(--ok-600);" x-data="esCountUp(@Model.ResolvidosHoje, 800)" x-text="display">@Model.ResolvidosHoje</div>
     </div>
     <div class="deck-panel deck-tile">
         <div class="deck-eyebrow">SLA em risco</div>
-        <div class="deck-kpi" style="color:var(--warn-600);">@Model.SlaRisco</div>
+        <div class="deck-kpi" style="color:var(--warn-600);" x-data="esCountUp(@Model.SlaRisco, 800)" x-text="display">@Model.SlaRisco</div>
     </div>
     <div class="deck-panel deck-tile">
         <div class="deck-eyebrow">SLA violado</div>
-        <div class="deck-kpi" style="color:var(--crit-600);">@Model.SlaViolado</div>
+        <div class="deck-kpi" style="color:var(--crit-600);" x-data="esCountUp(@Model.SlaViolado, 800)" x-text="display">@Model.SlaViolado</div>
     </div>
 </section>
 
