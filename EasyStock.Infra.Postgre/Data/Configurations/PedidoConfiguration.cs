@@ -131,8 +131,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.ToTable("pedido_eventos");
             b.HasKey(x => x.Id);
             b.Property(x => x.Tipo).IsRequired().HasMaxLength(40);
-            b.Property(x => x.StatusAntigo).HasMaxLength(20);
-            b.Property(x => x.StatusNovo).HasMaxLength(20);
+            // 32 = mesmo limite da coluna Status do pedido: 'aguardando_aprovacao_baba' tem 25
+            // chars e estourava o varchar(20) em TODO aprovar/recusar (22001, pego via #822).
+            b.Property(x => x.StatusAntigo).HasMaxLength(32);
+            b.Property(x => x.StatusNovo).HasMaxLength(32);
             b.Property(x => x.Detalhes).HasColumnType("text");
             b.Property(x => x.UsuarioNome).HasMaxLength(120);
             b.Property(x => x.Origem).HasMaxLength(20);
