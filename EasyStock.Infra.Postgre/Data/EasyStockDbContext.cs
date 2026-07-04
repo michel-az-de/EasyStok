@@ -376,10 +376,12 @@ namespace EasyStock.Infra.Postgre.Data
             CancellationToken ct = default)
         {
             // issue 822: blocos nao-reexecutaveis (venda balcao compoe creates com Guids
-            // novos). A NonRetryingExecutionStrategy seta ExecutionStrategy.Current, o que
-            // satisfaz o guard "user-initiated transactions" da estrategia retrying do
-            // provider (EnableRetryOnFailure) sem reexecutar o bloco em falha transitoria.
-            var strategy = new Microsoft.EntityFrameworkCore.Storage.NonRetryingExecutionStrategy(this);
+            // novos). A SemRetryExecutionStrategy HERDA de ExecutionStrategy (a base seta a
+            // suspensao que os SaveChanges internos respeitam) com MaxRetryCount=0 —
+            // RetriesOnFailure=false desarma o guard "user-initiated transactions" do
+            // EnableRetryOnFailure sem reexecutar nada. (NonRetryingExecutionStrategy NAO
+            // serve: implementa so a interface e nao seta a suspensao.)
+            var strategy = new SemRetryExecutionStrategy(this);
             return strategy.ExecuteAsync(ct, async (token) =>
             {
                 await using var tx = await Database.BeginTransactionAsync(token);
@@ -387,6 +389,13 @@ namespace EasyStock.Infra.Postgre.Data
                 await tx.CommitAsync(token);
                 return result;
             });
+        }
+
+        private sealed class SemRetryExecutionStrategy(DbContext context)
+            : Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy(
+                context, maxRetryCount: 0, maxRetryDelay: TimeSpan.Zero)
+        {
+            protected override bool ShouldRetryOn(Exception exception) => false;
         }
 
         /// <summary>

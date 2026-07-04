@@ -64,6 +64,8 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
 
         // Pedido final está em AprovadoBaba (não em estado inconsistente).
         await using var db = fixture.CreateDbContext();
+        // #822: sem tenant o filtro global zera a leitura (mesma classe do Nfe Find).
+        db.SetMobileTenantContext(empresaId);
         var pedidoFinal = await db.Pedidos.FindAsync(pedidoId);
         pedidoFinal.Should().NotBeNull();
         pedidoFinal!.Status.Should().Be(StatusPedidoMapper.AprovadoBaba);
@@ -115,6 +117,8 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
             .Should().BeOfType<PedidoJaResolvidoException>();
 
         await using var db = fixture.CreateDbContext();
+        // #822: sem tenant o filtro global zera a leitura (mesma classe do Nfe Find).
+        db.SetMobileTenantContext(empresaId);
         var pedidoFinal = await db.Pedidos.FindAsync(pedidoId);
         pedidoFinal!.Status.Should().Be(StatusPedidoMapper.Cancelado);
         pedidoFinal.RecusadoEm.Should().NotBeNull();
