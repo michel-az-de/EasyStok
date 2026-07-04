@@ -37,14 +37,15 @@ public sealed record FinalizarVendaBalcaoResult(Guid PedidoId, bool Pago, decima
 /// <summary>
 /// Venda balcao: cria (opcionalmente) cliente novo + produtos novos (com entrada de estoque),
 /// cria o pedido, FINALIZA (saida de estoque ao chegar em Pronto/Entregue) e registra o pagamento,
-/// tudo numa TRANSACAO UNICA (BeginTransactionAsync + rollback-on-dispose). Se qualquer passo
-/// falhar, nada fica orfao.
+/// tudo numa TRANSACAO UNICA (ExecuteInTransactionSemRetryAsync). Se qualquer passo
+/// falhar, nada fica orfao (rollback automatico).
 ///
 /// NAO reimplementa logica: compoe os use cases ja testados. Cada um chama uow.CommitAsync()
-/// (= SaveChanges, so flush dentro da transacao aberta); o commit real e o tx.CommitAsync() no fim.
+/// (= SaveChanges, so flush dentro da transacao aberta); o commit real e o da transacao no fim.
 /// Nenhum dos use cases compostos abre transacao propria (so CommitAsync), entao nao ha aninhamento.
-/// Usamos BeginTransactionAsync (sem retry) de proposito: ExecuteInTransactionAsync reexecutaria
-/// os creates (novos Guids) em falha transitoria, duplicando produto/pedido.
+/// SEM retry de proposito: ExecuteInTransactionAsync reexecutaria os creates (novos Guids)
+/// em falha transitoria, duplicando produto/pedido. O SemRetry (issue 822) satisfaz o guard
+/// do EnableRetryOnFailure sem reexecutar.
 ///
 /// Caixa: registrar pagamento ja reconcilia por agregacao (a soma de PedidoPagamento do dia)
 /// e abre o caixa automaticamente no primeiro pagamento. Nao criamos MovimentoCaixa (by design).
@@ -72,8 +73,16 @@ public class FinalizarVendaBalcaoUseCase(
             ? "dinheiro"
             : cmd.FormaPagamento!.Trim().ToLowerInvariant();
 
-        await using var tx = await uow.BeginTransactionAsync(ct);
+        // issue 822: BeginTransactionAsync direto e rejeitado pelo EnableRetryOnFailure do
+        // provider ("does not support user-initiated transactions"). O SemRetry preserva a
+        // semantica original — creates com Guids novos NAO sao reexecutados em falha.
+        return await uow.ExecuteInTransactionSemRetryAsync(
+            token => ExecutarNaTransacaoAsync(cmd, origem, formaPagamento, token), ct);
+    }
 
+    private async Task<FinalizarVendaBalcaoResult> ExecutarNaTransacaoAsync(
+        FinalizarVendaBalcaoCommand cmd, string origem, string formaPagamento, CancellationToken ct)
+    {
         // 1. Cliente novo (opcional). Falha aqui aborta tudo (atomico).
         var clienteId = cmd.ClienteId;
         if ((clienteId is null || clienteId == Guid.Empty) && !string.IsNullOrWhiteSpace(cmd.NovoClienteNome))
@@ -202,8 +211,6 @@ public class FinalizarVendaBalcaoUseCase(
                 cmd.EmpresaId, pedido.Id, formaPagamento, pedido.Total, null,
                 "Pagamento na venda balcao.", cmd.CriadoPorUserId, cmd.CriadoPorNome, origem));
         }
-
-        await tx.CommitAsync(ct);
 
         logger.LogInformation(
             "Venda balcao finalizada: pedido {Id}, total {Total}, pago={Pago} ({Forma}), itens={Itens}.",

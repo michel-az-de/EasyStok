@@ -371,6 +371,24 @@ namespace EasyStock.Infra.Postgre.Data
             });
         }
 
+        public Task<T> ExecuteInTransactionSemRetryAsync<T>(
+            Func<CancellationToken, Task<T>> action,
+            CancellationToken ct = default)
+        {
+            // issue 822: blocos nao-reexecutaveis (venda balcao compoe creates com Guids
+            // novos). A NonRetryingExecutionStrategy seta ExecutionStrategy.Current, o que
+            // satisfaz o guard "user-initiated transactions" da estrategia retrying do
+            // provider (EnableRetryOnFailure) sem reexecutar o bloco em falha transitoria.
+            var strategy = new Microsoft.EntityFrameworkCore.Storage.NonRetryingExecutionStrategy(this);
+            return strategy.ExecuteAsync(ct, async (token) =>
+            {
+                await using var tx = await Database.BeginTransactionAsync(token);
+                var result = await action(token);
+                await tx.CommitAsync(token);
+                return result;
+            });
+        }
+
         /// <summary>
         /// Escopo transacional com semântica explícita: rollback-by-default no
         /// <c>Dispose</c> a menos que <see cref="CommitAsync"/> tenha sido chamado.

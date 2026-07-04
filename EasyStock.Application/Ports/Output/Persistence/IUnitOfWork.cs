@@ -40,4 +40,16 @@ public interface IUnitOfWork
     Task<T> ExecuteInTransactionAsync<T>(
         Func<CancellationToken, Task<T>> action,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Transacao explicita SEM retry (issue 822): para blocos NAO-idempotentes
+    /// (creates com Guids novos, composicao de use cases) que nao podem ser
+    /// reexecutados. Necessario porque o EnableRetryOnFailure do provedor
+    /// rejeita <see cref="BeginTransactionAsync"/> user-initiated fora de uma
+    /// execution strategy; esta API satisfaz o guard sem reexecutar nada.
+    /// Falha transitoria propaga ao caller (rollback automatico).
+    /// </summary>
+    Task<T> ExecuteInTransactionSemRetryAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken ct = default);
 }

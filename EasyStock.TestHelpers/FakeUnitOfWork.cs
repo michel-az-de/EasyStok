@@ -37,6 +37,11 @@ public sealed class FakeUnitOfWork : IUnitOfWork
         CancellationToken ct = default)
         => action(ct);
 
+    public Task<T> ExecuteInTransactionSemRetryAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken ct = default)
+        => action(ct);
+
     private sealed class FakeTransactionScope : IDbTransactionScope
     {
         public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;
