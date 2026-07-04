@@ -95,8 +95,9 @@ public class FinalizarVendaBalcaoUseCase(
 
         // 2. Produtos novos: cadastra produto + entrada de estoque (qtd = quantidade do item).
         //    A saida (passo 4) sai dessa mesma entrada -> saldo liquido 0 no balcao.
-        var itensPedido = new List<CriarPedidoItemInput>(cmd.Itens.Count);
-        foreach (var it in cmd.Itens)
+        var itens = cmd.Itens!; // validado no ExecuteAsync antes da transacao
+        var itensPedido = new List<CriarPedidoItemInput>(itens.Count);
+        foreach (var it in itens)
         {
             // #689/BUG-008: venda balcão é o único path de criação de pedido sem a guarda de
             // preço > 0 (que existe em AdicionarItemPedido/CriarPedido). Sem isto, um item
