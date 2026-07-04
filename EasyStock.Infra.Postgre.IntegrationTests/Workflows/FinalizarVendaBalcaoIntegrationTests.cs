@@ -148,8 +148,11 @@ public class FinalizarVendaBalcaoIntegrationTests(PostgreSqlDatabaseFixture fixt
             pag.Metodo.Should().Be("dinheiro");
 
             var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(assert);
+            // #822: a query usa JanelaDiaUtc (dia civil BRT). Pedir pelo dia UTC fazia o
+            // teste falhar SO entre 21h-24h BRT (pagamento cai no dia BRT anterior) —
+            // exatamente a janela classica do caixa (#379). DataOperacional e a regua certa.
             var totalDia = await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(
-                empresaId, DateOnly.FromDateTime(DateTime.UtcNow), lojaId);
+                empresaId, EasyStock.Application.Common.HorarioBrasil.DataOperacional(DateTime.UtcNow), lojaId);
             totalDia.Should().Be(75m);
         }
     }
