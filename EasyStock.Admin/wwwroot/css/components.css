@@ -868,7 +868,7 @@ button:focus-visible {
   border-radius: 999px;
   border: 2px solid currentColor;
   border-top-color: transparent;
-  animation: es-spin 0.7s linear infinite;
+  animation: es-spin var(--duration-spin) linear infinite;
 }
 .es-spinner-inline {
   display: inline-block;

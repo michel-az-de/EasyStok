@@ -108,10 +108,6 @@
   --shadow-md: 0 4px 12px rgba(10, 21, 48, 0.08), 0 2px 4px rgba(10, 21, 48, 0.04);
   --shadow-lg: 0 16px 40px rgba(10, 21, 48, 0.14), 0 4px 12px rgba(10, 21, 48, 0.06);
 
-  /* ----- Motion (duration + easing) ----- */
-  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-
   /* ----- Spacing scale ----- */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
   --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px;
@@ -123,15 +119,23 @@
   --focus-ring-danger: 0 0 0 3px rgba(192, 59, 42, .25);
   --focus-ring-success: 0 0 0 3px rgba(24, 135, 78, .25);
 
-  /* ----- Motion (durations + easings) ----- */
+  /* ----- Motion (durations + easings) — contrato emil (issue 834) -----
+     Movimento proposital, nao decorativo: entrar/sair usa --ease-out; sidebar/drawers
+     usam --ease-drawer; transicoes de propriedades ESPECIFICAS (nunca `all`); press
+     80-160ms; qualquer animacao de UI < 300ms. Acoes repetidas (Ctrl+K, atalhos) NAO
+     animam. Todo movimento novo morre sob prefers-reduced-motion.
+     --ease-spring tem overshoot (bounce), uso deliberado em entrada de modal/toast/cmdk;
+     revisar a intensidade no M3 (auditoria de movimento). */
   --duration-instant: 80ms;
   --duration-fast:    150ms;
   --duration-base:    200ms;
   --duration-slow:    320ms;
   --duration-slower:  500ms;
+  --duration-spin:    700ms;   /* spinner de loading (reduced-motion desacelera p/ 2s) */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in:     cubic-bezier(0.4, 0, 1, 1);
-  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);   /* alinhado ao Web (TokensCssDrift) */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);   /* iOS-like p/ sidebar e drawers */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ----- Elevation scale (cool-toned shadows, hierarchical) ----- */
@@ -354,7 +358,10 @@ html, body {
   border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
-  transition: transform .05s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+  transition: transform var(--duration-instant) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
   white-space: nowrap;
   position: relative;
 }
