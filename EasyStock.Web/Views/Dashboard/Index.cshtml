@@ -1,638 +1,310 @@
-@model DashboardViewModel
+﻿@model DashboardViewModel
 @using System.Globalization
-@using System.Text.Json
 @{
     var ptBR = new CultureInfo("pt-BR");
-    // Saudacao e data no fuso de Brasilia: o container roda em UTC, entao
-    // DateTime.Now adiantava ~3h e trocava a saudacao (e a data perto da
-    // meia-noite). Mesmo padrao de ListarJanelasDisponiveisUseCase.
-    var agoraBrasil = TimeZoneInfo.ConvertTimeFromUtc(
-        DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
-    var hora = agoraBrasil.Hour;
+    var hora = DateTime.Now.Hour;
     var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
     var primeiroNome = (ViewBag.UsuarioNome as string ?? "").Split(' ').First();
-    var dataHoje = agoraBrasil.ToString("dd 'de' MMMM 'de' yyyy", ptBR);
-
-    // Mensagem de status -- prioriza o que exige acao
-    string statusMsg;
-    string statusTone;
-    if (Model.EstoqueCritico > 0 && Model.ProximosVencimento > 0)
-    {
-        statusMsg = $"Você tem {TextHelpers.Plural(Model.EstoqueCritico, "item", "itens")} em estoque crítico e {TextHelpers.Plural(Model.ProximosVencimento, "próximo", "próximos")} ao vencimento.";
-        statusTone = "critical";
-    }
-    else if (Model.EstoqueCritico > 0)
-    {
-        statusMsg = $"Você tem {TextHelpers.Plural(Model.EstoqueCritico, "item", "itens")} em estoque crítico precisando de reposição.";
-        statusTone = "critical";
-    }
-    else if (Model.ProximosVencimento > 0)
-    {
-        statusMsg = $"{TextHelpers.Plural(Model.ProximosVencimento, "item", "itens")} {(Model.ProximosVencimento == 1 ? "vence" : "vencem")} em até 7 dias. Vale girar antes que estraguem.";
-        statusTone = "warning";
-    }
-    else if (Model.SugestoesReposicao > 0)
-    {
-        statusMsg = $"Nada urgente hoje. {TextHelpers.Plural(Model.SugestoesReposicao, "sugestão", "sugestões")} de reposição {(Model.SugestoesReposicao == 1 ? "pronta" : "prontas")} para revisão.";
-        statusTone = "info";
-    }
-    else if (Model.ReceitaMes > 0)
-    {
-        statusMsg = $"Estoque saudável. Vendas dos últimos 30 dias: {Model.ReceitaMes.ToString("C", ptBR)}.";
-        statusTone = "ok";
-    }
-    else
-    {
-        statusMsg = "Tudo certo por aqui. Comece registrando uma entrada ou venda.";
-        statusTone = "ok";
-    }
-
-    var toneClass = statusTone switch
-    {
-        "critical" => "ds-status--critical",
-        "warning" => "ds-status--warning",
-        "info" => "ds-status--info",
-        _ => "ds-status--ok"
-    };
 }
 
-@* Wrapper da entrada orquestrada (issue 712): revela as secoes do dashboard em
-   cascata no load. CSS em app.css (.ds-enter), reduced-motion-safe. *@
-<div class="ds-enter">
-@if (Model.TodasApisFalharam)
-{
-    @* Eixo B (issue 753): estado de erro padronizado via _ErrorState (mensagem amigavel + retry). *@
-    <div class="ws ds-api-error mb-6">
-        @await Html.PartialAsync("_ErrorState", null, new ViewDataDictionary(ViewData)
-        {
-            ["ErrorTitle"] = "Não conseguimos carregar seus dados agora",
-            ["ErrorDescription"] = "Pode ser instabilidade na conexão ou no servidor. Tente recarregar a página em alguns segundos.",
-            ["ErrorRetryText"] = "Recarregar"
-        })
-    </div>
-}
-else if (Model.ResumoApiFalhou)
-{
-    <div class="ws ds-api-warning mb-6" role="status">
-        <div class="flex items-center gap-3">
-            <svg class="w-4 h-4 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p class="text-sm text-slate-700">Alguns indicadores podem estar desatualizados — não conseguimos atualizar o resumo agora.</p>
-        </div>
-    </div>
-}
+<div class="pg-hd mb-6">
+    <h1>@saudacao, @primeiroNome!</h1>
+    <p>Aqui está um resumo do seu estoque hoje, @DateTime.Now.ToString("dd 'de' MMMM", ptBR).</p>
+</div>
 
-@* ─── Checklist de ativação "Comece por aqui" (issue 415) ──────────── *@
-@if (Model.MostrarChecklist)
-{
-    <section class="ws ds-onboarding mb-6" aria-labelledby="onb-title">
-        <div class="flex items-start justify-between gap-3 mb-3">
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="ws dashboard-kpi-card dashboard-kpi-card--catalog">
+        <div class="dashboard-kpi-top">
             <div>
-                <h2 id="onb-title" class="font-bold text-slate-800 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                    Comece por aqui
-                </h2>
-                <p class="text-xs text-slate-500 mt-0.5">@Model.OnboardingConcluidos de @Model.OnboardingTotal concluídos. Siga os passos para deixar sua loja pronta para vender.</p>
+                <div class="kpi-lbl">Total de SKUs</div>
+                <div class="kpi-val dashboard-kpi-value text-slate-900">@Model.TotalProdutos</div>
             </div>
-            <form method="post" asp-controller="Dashboard" asp-action="DispensarOnboarding" class="shrink-0">
-                <button type="submit" class="text-xs text-slate-400 hover:text-slate-600 hover:underline whitespace-nowrap"
-                        title="Dispensar este guia" aria-label="Dispensar o guia Comece por aqui">
-                    Dispensar ✕
-                </button>
-            </form>
-        </div>
-        <ul class="ds-onboarding-list space-y-2">
-            @foreach (var passo in Model.OnboardingPassos)
-            {
-                <li class="flex items-center gap-3">
-                    @if (passo.Concluido)
-                    {
-                        <svg class="w-5 h-5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Concluído">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span class="text-sm text-slate-400 line-through flex-1">@passo.Titulo</span>
-                    }
-                    else
-                    {
-                        <svg class="w-5 h-5 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="12" cy="12" r="9" stroke-width="2" />
-                        </svg>
-                        <span class="text-sm text-slate-700 flex-1">@passo.Titulo</span>
-                        <a href="@passo.Href" class="text-xs font-semibold text-indigo-600 hover:underline shrink-0">@passo.Acao →</a>
-                    }
-                </li>
-            }
-        </ul>
-    </section>
-}
-
-<header class="ds-header mb-6">
-    <h1 class="text-2xl font-bold text-slate-900">@saudacao@(string.IsNullOrEmpty(primeiroNome) ? "." : $", {primeiroNome}.")</h1>
-    <p class="ds-status @toneClass mt-1" role="status" aria-live="polite">@statusMsg</p>
-    <p class="text-xs text-slate-400 mt-1">@dataHoje</p>
-</header>
-
-@* ─── Pulso de hoje: resumo do dia já buscado em /analytics/dia (issue 592) ─── *@
-@{
-    var temPulsoHoje = Model.FaturamentoHoje > 0 || Model.PedidosEntreguesHoje > 0
-        || Model.PedidosPendentes > 0 || Model.CaixaAbertaHoje || Model.CaixaFechadaHoje
-        || Model.PixRecebidosHoje > 0;
-}
-@if (temPulsoHoje)
-{
-    <section class="ws mb-6" aria-labelledby="ds-pulso-title">
-        <div class="ds-section-hd">
-            <svg class="w-5 h-5" style="color:var(--orange-600)" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <h2 id="ds-pulso-title">Pulso de hoje</h2>
-            <span class="ds-section-meta">resumo de @dataHoje</span>
-        </div>
-        <div class="ds-pulse-grid">
-            <div class="ds-pulse ds-pulse--accent">
-                <div class="ds-pulse-lbl">Faturamento hoje</div>
-                <div class="ds-pulse-val">@Model.FaturamentoHoje.ToString("C", ptBR)</div>
-                <div class="ds-pulse-sub">@TextHelpers.Plural(Model.PedidosEntreguesHoje, "pedido entregue", "pedidos entregues")</div>
+            <div class="dashboard-kpi-icon dashboard-kpi-icon--catalog" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
             </div>
-
-            <div class="ds-pulse">
-                <div class="ds-pulse-lbl">Ticket médio</div>
-                <div class="ds-pulse-val">@Model.TicketMedioHoje.ToString("C", ptBR)</div>
-                <div class="ds-pulse-sub">por pedido hoje</div>
-            </div>
-
-            @if (Model.CaixaAbertaHoje)
-            {
-                <a href="/caixa" class="ds-pulse">
-                    <div class="ds-pulse-lbl">Caixa</div>
-                    <div class="ds-pulse-val">@Model.SaldoCaixaAtual.ToString("C", ptBR)</div>
-                    <div class="ds-pulse-sub up"><span class="ds-pulse-led"></span>caixa aberto</div>
-                </a>
-            }
-            else if (Model.CaixaFechadaHoje)
-            {
-                <a href="/caixa" class="ds-pulse">
-                    <div class="ds-pulse-lbl">Caixa</div>
-                    <div class="ds-pulse-val">@Model.SaldoCaixaAtual.ToString("C", ptBR)</div>
-                    <div class="ds-pulse-sub">fechado hoje</div>
-                </a>
-            }
-            else
-            {
-                <a href="/caixa" class="ds-pulse">
-                    <div class="ds-pulse-lbl">Caixa</div>
-                    <div class="ds-pulse-val" style="font-size:16px">Abrir caixa →</div>
-                    <div class="ds-pulse-sub warn">não aberto hoje</div>
-                </a>
-            }
-
-            @if (Model.PedidosPendentes > 0)
-            {
-                <a href="/pedidos" class="ds-pulse" aria-label="Ver pedidos pendentes no cockpit de pedidos">
-                    <div class="ds-pulse-lbl">Pendentes</div>
-                    <div class="ds-pulse-val">@Model.PedidosPendentes <small>· @Model.ValorPedidosPendentes.ToString("C", ptBR)</small></div>
-                    <div class="ds-pulse-sub warn">aguardando entrega</div>
-                </a>
-            }
-
-            @if (Model.PixRecebidosHoje > 0)
-            {
-                <div class="ds-pulse">
-                    <div class="ds-pulse-lbl">Pix recebidos</div>
-                    <div class="ds-pulse-val">@Model.ValorPixHoje.ToString("C", ptBR)</div>
-                    <div class="ds-pulse-sub">@TextHelpers.Plural(Model.PixRecebidosHoje, "transação", "transações")</div>
-                </div>
-            }
         </div>
-    </section>
-}
-
-@* ─── Atalhos contextuais movidos pro topo (issue 592, fatia 3) ─── *@
-<section class="ws mb-6" aria-labelledby="ds-atalhos-title">
-    <div class="ds-section-hd">
-        <svg class="w-5 h-5" style="color:var(--orange-600)" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <h2 id="ds-atalhos-title">Atalhos</h2>
     </div>
-    <div class="ds-shortcuts">
-        <a href="/saidas/nova" class="ds-shortcut ds-shortcut--primary">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span>Registrar venda</span>
-        </a>
-        <a href="/entradas/nova" class="ds-shortcut">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span>Registrar entrada</span>
-        </a>
-        <a href="/caixa" class="ds-shortcut">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span>@(Model.CaixaAbertaHoje ? "Ver caixa" : "Abrir caixa")</span>
-        </a>
-        <a href="/listas-compras/gerar" class="ds-shortcut">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-            </svg>
-            <span>Lista de compras</span>
-        </a>
-        @* issue #770: fiscal fora do escopo v1.0 (SCOPE.md) — atalho so aparece com o modulo habilitado *@
-        @if (Model.TemModuloFiscalHabilitado)
-        {
-            <a href="/notas-fiscais/emitir" class="ds-shortcut">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    <div class="ws dashboard-kpi-card dashboard-kpi-card--stock">
+        <div class="dashboard-kpi-top">
+            <div>
+                <div class="kpi-lbl">Itens em estoque</div>
+                <div class="kpi-val dashboard-kpi-value text-emerald-600">@Model.QuantidadeTotalEmEstoque</div>
+            </div>
+            <div class="dashboard-kpi-icon dashboard-kpi-icon--stock" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5 2a8 8 0 11-16 0 8 8 0 0116 0z" />
                 </svg>
-                <span>Emitir NF-e</span>
-            </a>
-        }
-        @if (Model.EstoqueCritico > 0)
-        {
-            <a href="/estoque?status=critico" class="ds-shortcut ds-shortcut--alert">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
-                </svg>
-                <span>Estoque crítico</span>
-            </a>
-        }
-        else
-        {
-            <a href="/estoque" class="ds-shortcut">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-                <span>Ver estoque</span>
-            </a>
-        }
-    </div>
-</section>
-
-@* ─── Layout 2 colunas: principal (alertas+gráfico+movs) | lateral (KPIs+IA) ─── *@
-<div class="ds-dash-grid">
-    <div class="ds-dash-main">
-
-@* ─── Alertas priorizados (só aparece quando há algo) ────────── *@
-@if (Model.TemQualquerAlerta)
-{
-    <section class="ws ds-alerts mb-6" aria-labelledby="ds-alerts-title">
-        <div class="flex items-center justify-between mb-3">
-            <h2 id="ds-alerts-title" class="font-bold text-slate-800 flex items-center gap-2">
-                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
-                </svg>
-                Atenção
-            </h2>
-            <span class="text-xs text-slate-400">prioridade alta primeiro</span>
+            </div>
         </div>
-        <ul class="ds-alerts-list">
-            @if (Model.EstoqueCritico > 0)
-            {
-                var lbl = Model.EstoqueCritico == 1 ? "produto crítico" : "produtos críticos";
-                <li>
-                    <a href="/estoque?status=critico" class="ds-alert ds-alert--critical"
-                       aria-label="@(Model.EstoqueCritico) @lbl. Ir para a lista para repor.">
-                        <span class="ds-alert-dot" aria-hidden="true"></span>
-                        <span class="ds-alert-count">@Model.EstoqueCritico</span>
-                        <span class="ds-alert-text">@lbl</span>
-                        <span class="ds-alert-cta" aria-hidden="true">Repor agora →</span>
-                    </a>
-                </li>
-            }
-            @if (Model.ProximosVencimento > 0)
-            {
-                var lbl = Model.ProximosVencimento == 1 ? "lote vence em 7 dias" : "lotes vencem em 7 dias";
-                <li>
-                    <a href="/estoque?status=vencendo" class="ds-alert ds-alert--warning"
-                       aria-label="@(Model.ProximosVencimento) @lbl. Ir para os lotes.">
-                        <span class="ds-alert-dot" aria-hidden="true"></span>
-                        <span class="ds-alert-count">@Model.ProximosVencimento</span>
-                        <span class="ds-alert-text">@(Model.ProximosVencimento == 1 ? "vence em 7 dias" : "vencem em 7 dias")</span>
-                        <span class="ds-alert-cta" aria-hidden="true">Ver lotes →</span>
-                    </a>
-                </li>
-            }
-            @if (Model.LotesVencidos > 0)
-            {
-                var lblV = Model.LotesVencidos == 1 ? "lote vencido com saldo" : "lotes vencidos com saldo";
-                <li>
-                    <a href="/estoque?status=vencido" class="ds-alert ds-alert--critical"
-                       aria-label="@(Model.LotesVencidos) @lblV. Risco sanitário (RDC 727). Ir para os lotes vencidos.">
-                        <span class="ds-alert-dot" aria-hidden="true"></span>
-                        <span class="ds-alert-count">@Model.LotesVencidos</span>
-                        <span class="ds-alert-text">@lblV</span>
-                        <span class="ds-alert-cta" aria-hidden="true">Descartar/revisar →</span>
-                    </a>
-                </li>
-            }
-            @if (Model.ProdutosParados > 0)
-            {
-                var paradosAria = $"{TextHelpers.Plural(Model.ProdutosParados, "produto parado", "produtos parados")} há mais de 30 dias. Considerar liquidar.";
-                <li>
-                    <a href="/estoque?status=parado" class="ds-alert ds-alert--info"
-                       aria-label="@paradosAria">
-                        <span class="ds-alert-dot" aria-hidden="true"></span>
-                        <span class="ds-alert-count">@Model.ProdutosParados</span>
-                        <span class="ds-alert-text">@TextHelpers.PluralWord(Model.ProdutosParados, "parado", "parados") há +30 dias</span>
-                        <span class="ds-alert-cta" aria-hidden="true">Considerar liquidar →</span>
-                    </a>
-                </li>
-            }
-            @if (Model.SugestoesReposicao > 0)
-            {
-                var lbl = Model.SugestoesReposicao == 1 ? "sugestão de reposição" : "sugestões de reposição";
-                <li>
-                    <a href="/entradas/reposicao" class="ds-alert ds-alert--success"
-                       aria-label="@(Model.SugestoesReposicao) @lbl. Ver a lista.">
-                        <span class="ds-alert-dot" aria-hidden="true"></span>
-                        <span class="ds-alert-count">@Model.SugestoesReposicao</span>
-                        <span class="ds-alert-text">@lbl</span>
-                        <span class="ds-alert-cta" aria-hidden="true">Ver lista →</span>
-                    </a>
-                </li>
-            }
-        </ul>
-    </section>
-}
+    </div>
+    <div class="ws dashboard-kpi-card dashboard-kpi-card--value">
+        <div class="dashboard-kpi-top">
+            <div>
+                <div class="kpi-lbl">Valor em estoque</div>
+                <div class="kpi-val dashboard-kpi-value text-indigo-600">@Model.ValorEstoque.ToString("C", ptBR)</div>
+            </div>
+            <div class="dashboard-kpi-icon dashboard-kpi-icon--value" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-2.21 0-4 .9-4 2s1.79 2 4 2 4 .9 4 2-1.79 2-4 2m0-8V6m0 10v2m8-6a8 8 0 11-16 0 8 8 0 0116 0z" />
+                </svg>
+            </div>
+        </div>
+    </div>
+    <div class="ws dashboard-kpi-card dashboard-kpi-card--revenue">
+        <div class="dashboard-kpi-top">
+            <div>
+                <div class="kpi-lbl">Receita estimada</div>
+                <div class="kpi-val dashboard-kpi-value text-emerald-700">@Model.ReceitaMes.ToString("C", ptBR)</div>
+            </div>
+            <div class="dashboard-kpi-icon dashboard-kpi-icon--revenue" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 19V5m0 14h16M8 15l3-3 3 2 5-6" />
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
 
-@* ─── Gráfico de vendas por mês ─────────────────────────────── *@
-<div class="ws dashboard-chart-card mb-6">
-    <div class="flex items-start justify-between mb-4 flex-wrap gap-2">
+<div class="dashboard-kpi-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <a href="/estoque?status=critico" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-red-300 transition-colors cursor-pointer">
+        <div class="dashboard-attention-icon dashboard-attention-icon--critical">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v4m0 4h.01M10.29 3.86l-7.11 12.3A2 2 0 004.91 19h14.18a2 2 0 001.73-2.84l-7.11-12.3a2 2 0 00-3.42 0z" />
+            </svg>
+        </div>
         <div>
-            <h2 class="font-bold text-slate-800">Vendas por mês</h2>
-            @if (Model.TemComparativoReceita)
-            {
-                var pct = Model.VariacaoReceitaPercent;
-                var deltaClass = pct > 0 ? "text-emerald-600" : pct < 0 ? "text-red-600" : "text-slate-500";
-                var arrow = pct > 0 ? "↗" : pct < 0 ? "↘" : "→";
-                <p class="text-xs @deltaClass mt-0.5">@arrow @Math.Abs(pct)% vs. mês anterior</p>
-            }
-            else
-            {
-                <p class="text-xs text-slate-400 mt-0.5">Acompanhe a evolução das vendas mês a mês</p>
-            }
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-red-600">@Model.EstoqueCritico</div>
+            <div class="kpi-lbl">Estoque crítico</div>
         </div>
-        <div class="flex gap-1">
-            @foreach (var (m, label) in new[] { (3, "3m"), (6, "6m"), (12, "12m") })
-            {
-                var isActive = (ViewBag.MesesGrafico as int? ?? 6) == m;
-                <a href="/dashboard?meses=@m"
-                   class="px-2.5 py-1 text-xs font-medium rounded-lg @(isActive ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100")">
-                    @label
-                </a>
-            }
+    </a>
+    <a href="/estoque?status=atencao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-amber-300 transition-colors cursor-pointer">
+        <div class="dashboard-attention-icon dashboard-attention-icon--warning">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
         </div>
-    </div>
-    @if (Model.GraficoLabels.Any())
-    {
-        <div class="dashboard-chart-wrap">
-            <canvas id="grafico-receita" height="260"></canvas>
+        <div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-amber-600">@Model.ProximosVencimento</div>
+            <div class="kpi-lbl">Próx. ao vencimento</div>
         </div>
-    }
-    else
-    {
-        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "chart" },
-            { "EmptyTitle", "Ainda sem vendas registradas" },
-            { "EmptyDescription", "Quando você registrar a primeira saída, o gráfico mostra a evolução das vendas mês a mês." },
-            { "EmptyCta", "Registrar primeira saída" },
-            { "EmptyCtaHref", "/saidas/nova" }
-        })
-    }
+    </a>
+    <a href="/estoque?status=parado" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-blue-300 transition-colors cursor-pointer">
+        <div class="dashboard-attention-icon dashboard-attention-icon--info">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 13.5h10M9 17h6M8 6h8a2 2 0 012 2v8a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2z" />
+            </svg>
+        </div>
+        <div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-blue-600">@Model.ProdutosParados</div>
+            <div class="kpi-lbl">Parados +30 dias</div>
+        </div>
+    </a>
+    <a href="/entradas/reposicao" class="ws dashboard-kpi-card dashboard-attention-card flex items-center gap-3 hover:border-emerald-300 transition-colors cursor-pointer">
+        <div class="dashboard-attention-icon dashboard-attention-icon--success">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.5m0 13V21m7.07-14.07l-1.77 1.77M6.7 17.3l-1.77 1.77M21 12h-2.5M5.5 12H3m14.3 5.3l1.77 1.77M6.93 6.93L5.16 5.16M15.5 12a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+            </svg>
+        </div>
+        <div>
+            <div class="kpi-val dashboard-kpi-value dashboard-kpi-value--attention text-emerald-600">@Model.SugestoesReposicao</div>
+            <div class="kpi-lbl">Sugestões de reposição</div>
+        </div>
+    </a>
 </div>
 
-@* ─── Últimas movimentações (agrupadas por data) ─────────────── *@
-<div class="ws mb-6">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="font-bold text-slate-800">Últimas movimentações</h2>
-        <a href="/analytics/movimentacoes" class="text-xs text-indigo-600 hover:underline">Ver todas →</a>
-    </div>
-    @if (Model.MovimentacoesRecentes.Any())
-    {
-        var agrupado = Model.MovimentacoesRecentes
-            .GroupBy(m => m.Data)
-            .OrderByDescending(g => g.Key)
-            .ToList();
-
-        <div class="ds-mov-list">
-            @foreach (var grupo in agrupado)
-            {
-                // BUG-03: "hoje" no fuso BR (reusa agoraBrasil). Antes DateTime.Today = UTC do
-                // container -> na janela ~21h-24h BRT rotulava movimentacao de hoje como "Ontem".
-                var hoje = DateOnly.FromDateTime(agoraBrasil);
-                var ontem = hoje.AddDays(-1);
-                string rotuloDia = grupo.Key == hoje ? "Hoje" : grupo.Key == ontem ? "Ontem" : grupo.Key.ToString("dd 'de' MMMM", ptBR);
-
-                <div class="ds-mov-day">
-                    <div class="ds-mov-day-label">@rotuloDia · @grupo.Key.ToString("dd/MM/yyyy")</div>
-                    @foreach (var m in grupo)
-                    {
-                        var tipoNormalizado = m.Tipo is "Saida" or "Saída" ? "Saida" : m.Tipo;
-                        var label = tipoNormalizado switch
-                        {
-                            "Entrada" => TextHelpers.Plural(m.TotalMovimentacoes, "entrada", "entradas"),
-                            "Saida" => TextHelpers.Plural(m.TotalMovimentacoes, "saída", "saídas"),
-                            _ => $"{m.TotalMovimentacoes} {m.Tipo.ToLower()}"
-                        };
-                        var dotClass = tipoNormalizado switch
-                        {
-                            "Entrada" => "bg-emerald-500",
-                            "Saida" => "bg-red-500",
-                            _ => "bg-slate-400"
-                        };
-                        <a href="/analytics/movimentacoes?data=@grupo.Key.ToString("yyyy-MM-dd")&tipo=@tipoNormalizado"
-                           class="ds-mov-row">
-                            <span class="ds-mov-dot @dotClass"></span>
-                            <span class="ds-mov-main"><strong>@label</strong> · @m.Qty unid.</span>
-                            <span class="ds-mov-val">
-                                @if (m.Valor.HasValue)
-                                {
-                                    @m.Valor.Value.ToString("C", ptBR)
-                                }
-                                else
-                                {
-                                    <span class="text-slate-300">—</span>
-                                }
-                            </span>
-                        </a>
-                    }
-                </div>
-            }
-        </div>
-    }
-    else
-    {
-        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
-            { "EmptyIllustration", "chart" },
-            { "EmptyTitle", "Nenhuma movimentação ainda" },
-            { "EmptyDescription", "Registre sua primeira entrada para começar a acompanhar o fluxo do estoque." },
-            { "EmptyCta", "Registrar entrada" },
-            { "EmptyCtaHref", "/entradas/nova" }
-        })
-    }
-</div>
-
-    </div>
-    <div class="ds-dash-aside">
-
-@* ─── KPIs principais (3 cards), agora empilhados na lateral ─── *@
-<div class="ds-kpi-stack mb-6">
-    <div class="ws ds-kpi" title="Receita gerada com saídas nos últimos 30 dias">
-        <div class="ds-kpi-lbl">Vendas</div>
-        <div class="ds-kpi-val text-slate-900">@Model.ReceitaMes.ToString("C", ptBR)</div>
-        @if (Model.TemComparativoReceita)
+<div class="grid grid-cols-1 gap-6 mb-6">
+    <div class="ws">
+        <h2 class="font-bold text-slate-800 mb-4">Movimentações recentes</h2>
+        @if (Model.MovimentacoesRecentes.Any())
         {
-            var pct = Model.VariacaoReceitaPercent;
-            var deltaClass = pct > 0 ? "text-emerald-600" : pct < 0 ? "text-red-600" : "text-slate-500";
-            var arrow = pct > 0 ? "↗" : pct < 0 ? "↘" : "→";
-            <div class="ds-kpi-sub @deltaClass">@arrow @Math.Abs(pct)% vs. mês anterior</div>
+            <div class="overflow-x-auto">
+                <table class="tbl-full">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th class="text-right">Registros</th>
+                            <th class="text-right">Qtd</th>
+                            <th class="text-right">Valor</th>
+                            <th class="text-right">Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.MovimentacoesRecentes)
+                        {
+                            <tr>
+                                <td>
+                                    @{
+                                        var badgeClass = m.Tipo switch
+                                        {
+                                            "Entrada" => "badge-ok",
+                                            "Saida" or "Saída" => "badge-critical",
+                                            _ => "badge-slow"
+                                        };
+                                        var tipoLabel = m.Tipo is "Saida" ? "Saída" : m.Tipo;
+                                    }
+                                    <span class="badge @badgeClass px-2 py-0.5 rounded-full text-xs font-semibold">@tipoLabel</span>
+                                </td>
+                                <td class="text-right text-slate-500">@m.TotalMovimentacoes</td>
+                                <td class="text-right font-mono">@m.Qty</td>
+                                <td class="text-right text-slate-500">
+                                    @if (m.Valor.HasValue)
+                                    {
+                                        @m.Valor.Value.ToString("C", ptBR)
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                                <td class="text-right text-slate-500">@m.Data.ToString("dd/MM/yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
         else
         {
-            <div class="ds-kpi-sub text-slate-400">últimos 30 dias</div>
+            <div class="text-center py-8 text-slate-400">
+                <div class="empty-state-mark mb-2">MOV</div>
+                <p class="text-sm font-semibold text-slate-500">Nenhuma movimentação ainda</p>
+                <p class="text-xs mt-1">Registre sua primeira <a href="/entradas/nova" class="text-indigo-600 hover:underline">entrada de estoque</a> para começar.</p>
+            </div>
         }
-        @if (Model.ReceitaMes == 0)
+    </div>
+
+    <div class="ws dashboard-chart-card">
+        <h2 class="font-bold text-slate-800 mb-4">Receita — últimos @Model.GraficoLabels.Count @(Model.GraficoLabels.Count == 1 ? "mês" : "meses")</h2>
+        @if (Model.GraficoLabels.Any())
         {
-            <a href="/produtos?semPreco=true"
-               class="text-xs text-amber-600 hover:text-amber-700 hover:underline mt-1 block"
-               title="Saídas registradas com produtos sem preço resultam em receita zero">
-                ⚠ Verifique produtos sem preço
+            <div class="dashboard-chart-wrap">
+                <canvas id="grafico-receita" height="260"></canvas>
+            </div>
+        }
+        else
+        {
+            <div class="flex flex-col items-center justify-center min-h-[240px] text-slate-400">
+                <div class="empty-state-mark mb-3">R$</div>
+                <p class="text-sm font-semibold text-slate-500">Sem dados de receita</p>
+                <p class="text-xs mt-1">Registre saídas para visualizar o gráfico.</p>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="ws">
+    <h2 class="font-bold text-slate-800 mb-4">Ações rápidas</h2>
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        @{
+            var acoes = new[]
+            {
+                new { Icon = "IN", Label = "Nova entrada", Href = "/entradas/nova" },
+                new { Icon = "OUT", Label = "Nova saída", Href = "/saidas/nova" },
+                new { Icon = "REP", Label = "Repor estoque", Href = "/entradas/reposicao" },
+                new { Icon = "EST", Label = "Ver estoque", Href = "/estoque" },
+                new { Icon = "IA", Label = "Gerar anúncio", Href = "/anuncios" },
+                new { Icon = "MOV", Label = "Movimentações", Href = "/analytics/movimentacoes" },
+            };
+        }
+        @foreach (var acao in acoes)
+        {
+            <a href="@acao.Href"
+               class="quick-action-card flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
+                <span class="quick-action-icon text-2xl">@acao.Icon</span>
+                <span class="text-xs font-semibold text-slate-600">@acao.Label</span>
             </a>
         }
     </div>
-
-    @* BUG-06 (QA v1.10 issue 674): o valor exclui lotes vencidos (nao sao capital vendavel), entao
-       a lista de Estoque (que mostra vencidos) soma mais unidades. Rotulo honesto: "estoque vigente". *@
-    <div class="ws ds-kpi" title="Capital imobilizado (a custo) do estoque vigente — nao inclui lotes vencidos">
-        <div class="ds-kpi-lbl">Estoque em R$ (custo)</div>
-        <div class="ds-kpi-val text-slate-900">@Model.ValorEstoque.ToString("C", ptBR)</div>
-        <div class="ds-kpi-sub text-slate-400">@TextHelpers.Plural(Model.TotalProdutos, "produto", "produtos") · @Model.QuantidadeTotalEmEstoque unid. vigentes <span class="text-slate-300" title="Exclui lotes vencidos — por isso difere do total de lotes na tela de Estoque.">(exclui vencidos)</span></div>
-    </div>
-
-    <div class="ws ds-kpi" title="Média de unidades vendidas por dia">
-        <div class="ds-kpi-lbl">Média de vendas / dia</div>
-        <div class="ds-kpi-val text-slate-900">@Model.MediaVendasDiaria.ToString("N1", ptBR)</div>
-        <div class="ds-kpi-sub text-slate-400">unidades por dia</div>
-    </div>
 </div>
-
-@* ─── Card pequeno de IA (apenas se uso alto) ────────────────── *@
-@if (Model.IaConfigurada && !Model.IaIlimitada && Model.GeracoesIaPercent >= 70)
-{
-    var pct = Model.GeracoesIaPercent;
-    var barColor = pct >= 90 ? "bg-red-500" : "bg-amber-400";
-    var textColor = pct >= 90 ? "text-red-600" : "text-amber-600";
-    <div class="ws mb-6">
-        <div class="flex items-center justify-between mb-2">
-            <div>
-                <h3 class="font-semibold text-slate-700 text-sm">Você usou @pct% das gerações de IA deste mês</h3>
-                <p class="text-xs text-slate-400 mt-0.5">@Model.GeracoesIaUsadas de @Model.GeracoesIaLimite anúncios</p>
-            </div>
-            <a href="/assinatura" class="text-xs text-indigo-600 hover:underline whitespace-nowrap">Ver plano →</a>
-        </div>
-        <div class="w-full bg-slate-100 rounded-full h-1.5">
-            <div class="@barColor h-1.5 rounded-full transition-all" style="width:@(pct)%"></div>
-        </div>
-    </div>
-}
-
-    </div>
-</div>
-</div>@* /.ds-enter *@
 
 @section Scripts {
     @if (Model.GraficoLabels.Any())
     {
     <script>
-        (function () {
-            const ctx = document.getElementById('grafico-receita');
-            if (!ctx) return;
-            const css = getComputedStyle(document.documentElement);
-            const navy = css.getPropertyValue('--navy-500').trim() || 'rgb(30, 72, 168)';
-            const ink  = css.getPropertyValue('--text-muted').trim() || 'rgb(112, 120, 146)';
-            const labels = @Json.Serialize(Model.GraficoLabels);
-            const dados = @Json.Serialize(Model.GraficoDados);
+        const chartCanvas = document.getElementById('grafico-receita');
+        if (chartCanvas) {
+            const chartContext = chartCanvas.getContext('2d');
+            const isDark = document.documentElement.classList.contains('theme-dark');
+            const lineGradient = chartContext.createLinearGradient(0, 0, chartCanvas.clientWidth || 640, 0);
+            lineGradient.addColorStop(0, '#4F46E5');
+            lineGradient.addColorStop(.52, '#0891B2');
+            lineGradient.addColorStop(1, '#059669');
 
-            if (!dados.some(function (v) { return v > 0; })) {
-                var wrap = ctx.closest('.dashboard-chart-wrap');
-                if (wrap) wrap.innerHTML =
-                    '<div class="h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2 py-8">' +
-                    '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' +
-                    '<p>Nenhuma venda com valor registrada no período.</p>' +
-                    '<a href="/produtos?semPreco=true" class="text-indigo-600 text-xs hover:underline">Verificar produtos sem preço →</a>' +
-                    '</div>';
-                return;
-            }
+            const fillGradient = chartContext.createLinearGradient(0, 0, 0, 280);
+            fillGradient.addColorStop(0, isDark ? 'rgba(99, 102, 241, .24)' : 'rgba(79, 70, 229, .18)');
+            fillGradient.addColorStop(.55, isDark ? 'rgba(8, 145, 178, .10)' : 'rgba(8, 145, 178, .08)');
+            fillGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-            new Chart(ctx, {
-                type: labels.length > 1 ? 'line' : 'bar',
+            new Chart(chartCanvas, {
+                type: 'line',
                 data: {
-                    labels: labels,
+                    labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoLabels)),
                     datasets: [{
-                        label: 'Vendas',
-                        data: dados,
-                        borderColor: navy,
-                        backgroundColor: labels.length > 1
-                            ? (function() {
-                                var g = ctx.getContext('2d').createLinearGradient(0, 0, 0, 260);
-                                g.addColorStop(0, 'rgba(30, 72, 168, 0.25)');
-                                g.addColorStop(1, 'rgba(30, 72, 168, 0)');
-                                return g;
-                              })()
-                            : 'rgba(30, 72, 168, 0.7)',
-                        borderWidth: 2.5,
-                        fill: labels.length > 1,
-                        tension: 0.35,
-                        pointRadius: labels.length > 1 ? 0 : undefined,
+                        label: 'Receita',
+                        data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.GraficoDados)),
+                        borderColor: lineGradient,
+                        backgroundColor: fillGradient,
+                        borderWidth: 3,
+                        pointRadius: 3,
                         pointHoverRadius: 5,
-                        pointHoverBackgroundColor: 'rgb(30,72,168)',
-                        pointHoverBorderColor: 'white',
-                        pointHoverBorderWidth: 2,
-                        borderRadius: labels.length > 1 ? undefined : 6,
-                        maxBarThickness: 80
+                        pointBackgroundColor: isDark ? '#C7D2FE' : '#FFFFFF',
+                        pointBorderColor: '#4F46E5',
+                        pointBorderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
-                            backgroundColor: 'rgb(15,23,42)',
-                            titleColor: 'rgb(226,232,240)',
-                            bodyColor: 'white',
-                            padding: 10,
-                            cornerRadius: 8,
+                            backgroundColor: isDark ? 'rgba(15, 23, 42, .96)' : 'rgba(255, 255, 255, .96)',
+                            titleColor: isDark ? '#F8FAFC' : '#0F172A',
+                            bodyColor: isDark ? '#CBD5E1' : '#334155',
+                            borderColor: isDark ? 'rgba(71, 85, 105, .8)' : 'rgba(226, 232, 240, .9)',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 12,
                             displayColors: false,
                             callbacks: {
-                                label: ctx => ' R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                                label: ctx => 'Receita: ' + Number(ctx.parsed.y || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                             }
                         }
                     },
                     scales: {
                         x: {
-                            ticks: { color: ink },
-                            grid: { display: false }
+                            ticks: {
+                                color: isDark ? '#94A3B8' : '#64748B',
+                                font: { size: 11, weight: 600 }
+                            },
+                            grid: {
+                                display: false
+                            }
                         },
                         y: {
-                            beginAtZero: true,
                             ticks: {
-                                color: ink,
-                                callback: v => 'R$ ' + v.toLocaleString('pt-BR')
+                                color: isDark ? '#94A3B8' : '#64748B',
+                                padding: 10,
+                                font: { size: 11, weight: 600 },
+                                callback: v => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
                             },
-                            grid: { color: 'rgba(148, 163, 184, 0.18)' }
+                            grid: {
+                                color: isDark ? 'rgba(71, 85, 105, .42)' : 'rgba(148, 163, 184, .18)',
+                                drawBorder: false
+                            }
                         }
                     }
                 }
             });
-        })();
+        }
     </script>
     }
 }

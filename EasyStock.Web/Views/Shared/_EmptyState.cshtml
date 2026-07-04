@@ -1,79 +1,40 @@
 @{
-    // EmptyIcon aceita um nome Lucide (ex.: "package", "search"); aceita tambem um
-    // string raw com SVG/emoji para retrocompatibilidade quando ainda em migracao.
-    var iconRaw = ViewData["EmptyIcon"] as string;
-    var explicitIcon = iconRaw;
-    var iconName = ViewData["EmptyIconName"] as string ?? (iconRaw != null && iconRaw.All(c => char.IsLetterOrDigit(c) || c == '-') ? iconRaw : null);
-    var iconFallback = string.IsNullOrEmpty(iconName) ? (iconRaw ?? string.Empty) : null;
+    var icon = ViewData["EmptyIcon"] as string;
     var title = ViewData["EmptyTitle"] as string ?? "Nenhum item encontrado";
     var description = ViewData["EmptyDescription"] as string;
     var ctaText = ViewData["EmptyCta"] as string;
     var ctaHref = ViewData["EmptyCtaHref"] as string;
     var ctaModal = ViewData["EmptyCtaModal"] as string;
-    var illustration = ViewData["EmptyIllustration"] as string; // box | search | inbox | chart
-    // Quando nada for passado, mostra a ilustração genérica em vez do emoji 📋.
-    if (string.IsNullOrEmpty(illustration) && string.IsNullOrEmpty(explicitIcon))
-    {
-        illustration = "box";
-    }
-    var icon = explicitIcon ?? "📋";
 }
 
-<div class="text-center py-12 anim-fadeInUp" style="color: var(--text-muted);">
-    @if (!string.IsNullOrEmpty(illustration))
+<div class="empty-state text-center py-12 text-slate-400">
+    @if (!string.IsNullOrWhiteSpace(icon))
     {
-        <div class="es-empty-art">
-        <svg class="es-empty-illus w-32 h-32 opacity-70" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            @switch (illustration)
-            {
-                case "search":
-                    <circle cx="52" cy="52" r="26" />
-                    <path d="M72 72l20 20" />
-                    <path d="M52 40v12M52 56h.01" />
-                    break;
-                case "inbox":
-                    <path d="M20 50l10-26h60l10 26v40H20V50z" />
-                    <path d="M20 50h22l6 10h24l6-10h22" />
-                    break;
-                case "chart":
-                    <path d="M16 96V24M16 96h88" />
-                    <path d="M32 80l16-20 14 8 22-30" />
-                    <circle cx="32" cy="80" r="2" /><circle cx="48" cy="60" r="2" />
-                    <circle cx="62" cy="68" r="2" /><circle cx="84" cy="38" r="2" />
-                    break;
-                default: /* box */
-                    <path d="M20 36l40-18 40 18v48L60 102 20 84V36z" />
-                    <path d="M20 36l40 18 40-18M60 54v48" />
-                    break;
-            }
-        </svg>
-        </div>
-    }
-    else if (!string.IsNullOrEmpty(iconName))
-    {
-        <es-icon name="@iconName" class="mx-auto mb-3" style="width:48px; height:48px;"></es-icon>
-    }
-    else if (!string.IsNullOrEmpty(iconFallback))
-    {
-        <div class="text-5xl mb-3">@iconFallback</div>
+        <div class="text-5xl mb-3">@icon</div>
     }
     else
     {
-        <es-icon name="package" class="mx-auto mb-3" style="width:48px; height:48px;"></es-icon>
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 ring-1 ring-indigo-100">
+            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+        </div>
     }
-    <p class="font-semibold" style="color: var(--text-secondary);">@title</p>
+    <p class="font-semibold text-slate-700">@title</p>
     @if (!string.IsNullOrEmpty(description))
     {
-        <p class="text-sm mt-1 max-w-sm mx-auto" style="color: var(--text-muted);">@description</p>
+        <p class="text-sm mt-1 text-slate-500 max-w-sm mx-auto">@description</p>
     }
     @if (!string.IsNullOrEmpty(ctaHref))
     {
-        <es-button variant="secondary" size="sm" href="@ctaHref" class="mt-4">@ctaText</es-button>
+        <a href="@ctaHref" class="mt-4 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+            @ctaText
+        </a>
     }
     else if (!string.IsNullOrEmpty(ctaModal))
     {
         <button type="button" x-data @@click="$dispatch('open-modal', '@ctaModal')"
-                class="btn btn-secondary btn-sm mt-4">
+                class="mt-4 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
             @ctaText
         </button>
     }
