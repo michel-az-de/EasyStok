@@ -55,11 +55,13 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             // Idempotencia por referencia de documento (#790): impede movimentacao duplicada
             // no MESMO (empresa, produto, natureza, documento). O retry de recebimento de
             // pedido (item aplicado mas QuantidadeRecebida nao persistida) recriava a entrada.
-            // Parcial: so vale quando ha DocumentoReferencia (movimentacoes manuais tem ref
-            // nula, sem restricao). Natureza no indice pois refDoc e reusado por Venda/Estorno.
+            // Parcial: so vale para Natureza='Compra' com DocumentoReferencia — o MESMO escopo
+            // do check ExisteReferenciaAsync do ProcessarRecebimento. Restringir a Compra e
+            // necessario (#822): a SAIDA cria 1 movimentacao POR LOTE consumido no FIFO, entao
+            // vender 2 lotes do mesmo produto na mesma NF colidia no indice sem ser retry.
             builder.HasIndex(m => new { m.EmpresaId, m.ProdutoId, m.Natureza, m.DocumentoReferencia })
                 .IsUnique()
-                .HasFilter("\"DocumentoReferencia\" IS NOT NULL")
+                .HasFilter("\"DocumentoReferencia\" IS NOT NULL AND \"Natureza\" = 'Compra'")
                 .HasDatabaseName("ux_mov_estoque_referencia");
         }
     }
