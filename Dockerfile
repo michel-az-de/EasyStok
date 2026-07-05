@@ -66,8 +66,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Criar usuario nao-root
-RUN addgroup --system --gid 1001 appgroup \
- && adduser  --system --uid 1001 --ingroup appgroup appuser
+RUN groupadd --system --gid 1001 appgroup \
+ && useradd  --system --uid 1001 --gid appgroup appuser
 
 COPY --from=build /app/publish .
 COPY scripts/docker/api-entrypoint.sh /app/entrypoint.sh
