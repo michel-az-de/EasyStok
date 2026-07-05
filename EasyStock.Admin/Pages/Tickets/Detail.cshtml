@@ -43,10 +43,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ empresaId: '@Model.EmpresaId', ticketId: '@Model.Id', motivo })
             });
-            if (!r.ok) { alert('Falha ao revelar dados.'); return; }
+            if (!r.ok) {
+                if (window.toast) window.toast.error('Falha ao revelar dados do cliente.');
+                else alert('Falha ao revelar dados.');
+                return;
+            }
             const d = await r.json();
             clienteRevelado = d.data || d;
             modalRevelar = false;
+            // BUG-5 (issue 841): confirmacao inequivoca do reveal (o QA percebia a troca
+            // in-place como "continua mascarado"). Toast fecha o loop.
+            if (window.toast) window.toast.success({ title: 'Dados do cliente revelados', desc: 'Registrado no log de auditoria (LGPD).' });
         }
      }">
 
@@ -252,15 +259,19 @@
                 <button type="button" @@click="modalRevelar = true" class="text-es-accent hover:text-es-cream text-xs">🔓 Revelar (LGPD)</button>
             </div>
             <div class="text-es-ink-dim font-medium">@Model.EmpresaNome</div>
-            <template x-if="!clienteRevelado">
-                <div class="text-es-ink-mute text-xs mt-1">Documento: ••••••</div>
-            </template>
+            <!-- BUG-5 (issue 841): o documento troca IN-PLACE no mesmo lugar (nao mais um bloco
+                 "Dados revelados" separado, que o QA lia como "continua mascarado"). -->
+            <div class="text-xs mt-1 flex items-center gap-1">
+                <span class="text-es-ink-mute">Documento:</span>
+                <template x-if="!clienteRevelado">
+                    <span class="text-es-ink-mute font-mono">••••••</span>
+                </template>
+                <template x-if="clienteRevelado">
+                    <span class="text-green-400 font-mono" x-text="clienteRevelado.documentoExibicao || '—'"></span>
+                </template>
+            </div>
             <template x-if="clienteRevelado">
-                <div class="mt-1 text-xs space-y-1">
-                    <div class="text-yellow-400">✓ Dados revelados (audit gravado)</div>
-                    <div class="text-es-ink-dim">Doc: <span x-text="clienteRevelado.documentoExibicao || '—'"></span></div>
-                    <div class="text-es-ink-mute">Plano: <span x-text="clienteRevelado.planoNome || '—'"></span></div>
-                </div>
+                <div class="text-es-ink-mute text-xs mt-1">Plano: <span class="text-es-ink-dim" x-text="clienteRevelado.planoNome || '—'"></span></div>
             </template>
             <a href="/Tenants/Detail/@Model.EmpresaId" class="text-es-accent hover:text-es-cream text-xs mt-2 inline-block">Ver tenant →</a>
         </div>
