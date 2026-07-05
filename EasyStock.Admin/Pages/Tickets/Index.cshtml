@@ -159,11 +159,11 @@
             _ => "neutral"
         };
 
-        <tr style="cursor:pointer;@(naoLidos > 0 ? " box-shadow:inset 3px 0 0 var(--orange-500);" : "")" tabindex="0"
+        <tr class="@(naoLidos > 0 ? "is-unread" : "")" style="cursor:pointer;" tabindex="0"
             onclick="window.location.href='/Tickets/Detail/@tid'"
             onkeydown="if(event.key==='Enter') window.location.href='/Tickets/Detail/@tid'">
             <td onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><input type="checkbox" name="ids" value="@tid" data-bulk-row aria-label="Selecionar ticket" /></td>
-            <td data-label="SLA"><es-badge variant="@slaVariant">@slaText</es-badge></td>
+            <td data-label="SLA"><es-badge variant="@slaVariant" with-dot="true">@slaText</es-badge></td>
             <td data-label="Título" style="font-weight:500; color:var(--text-primary);">
                 @titulo
                 @if (naoLidos > 0)

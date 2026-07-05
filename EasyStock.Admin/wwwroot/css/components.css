@@ -1348,12 +1348,24 @@ button:focus-visible {
    bulk select, row actions, mobile reflow
    ============================================================ */
 .es-data-table-wrap {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
+  position: relative;
+  background: var(--deck-panel);
+  border: 1px solid var(--deck-hairline);
   border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+/* Top-highlight do Deck: fina borda de luz no topo do painel (issue 838). */
+.es-data-table-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--deck-top-highlight);
+  pointer-events: none;
+  z-index: 2;
 }
 .es-data-table-scroll {
   overflow-x: auto;
@@ -1407,6 +1419,9 @@ button:focus-visible {
 .es-data-table tbody tr:last-child { border-bottom: 0; }
 .es-data-table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
 [data-theme="dark"] .es-data-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+/* Linha nao-lida (ex.: ticket com mensagem nova) — tint sutil do acento, sem side-stripe (issue 838). */
+.es-data-table tbody tr.is-unread,
+.es-data-table tbody tr.is-unread:hover { background: var(--deck-accent-soft); }
 .es-data-table td {
   padding: 12px 14px;
   color: var(--text-primary);
@@ -1432,10 +1447,10 @@ button:focus-visible {
   /* fundo OPACO nos dois temas: --surface-sunken e semi-transparente no dark
      (rgba .04) e deixaria o conteudo das outras colunas vazar por baixo no
      scroll horizontal. --bg-surface e opaco em claro e escuro. */
-  background: var(--bg-surface);
+  background: var(--deck-panel);
   box-shadow: -8px 0 8px -8px rgba(10, 21, 48, 0.18);
 }
-.es-data-table tbody tr:hover td.es-data-table-td-actions { background: var(--bg-surface); }
+.es-data-table tbody tr:hover td.es-data-table-td-actions { background: var(--deck-panel); }
 .es-data-table th.es-data-table-th-bulk,
 .es-data-table td.es-data-table-td-bulk {
   width: 40px;

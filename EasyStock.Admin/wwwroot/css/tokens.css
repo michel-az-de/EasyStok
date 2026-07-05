@@ -473,6 +473,7 @@ html, body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   border: 1px solid;
+  font-variant-numeric: tabular-nums;
   transition: background-color .15s ease, color .15s ease;
 }
 .badge-ok    { background: var(--ok-50);    color: var(--ok-700);    border-color: var(--ok-200); }
