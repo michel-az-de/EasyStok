@@ -241,12 +241,22 @@ public class AdminTicketsController(
         if (!string.IsNullOrWhiteSpace(req.Nivel) && Enum.TryParse<NivelAtendimento>(req.Nivel, out var n))
             nivel = n;
 
+        // BUG-1 (#839): valida tamanho ANTES de persistir (varchar 200/4000) para devolver 400
+        // limpo em vez do 500 por estouro de coluna (Postgres 22001) quando o cliente contorna a
+        // validacao da UI. Mesmos limites e mensagens da Razor Page (Index.cshtml.cs).
+        var tituloT = (req.Titulo ?? string.Empty).Trim();
+        if (tituloT.Length is < 3 or > 200)
+            return DataBadRequest("Título deve ter entre 3 e 200 caracteres.");
+        var descricaoT = (req.Descricao ?? string.Empty).Trim();
+        if (descricaoT.Length is < 5 or > 4000)
+            return DataBadRequest("Descrição deve ter entre 5 e 4000 caracteres.");
+
         try
         {
             var ticket = await ticketService.AbrirAsync(new AbrirAdminTicketCommand(
-                req.EmpresaId, req.Titulo, req.Descricao, cat, pri, nivel,
+                req.EmpresaId, tituloT, descricaoT, cat, pri, nivel,
                 FaturaId: req.FaturaId, PedidoId: req.PedidoId));
-            await audit.TryLogAsync("TicketCriado", $"Titulo={req.Titulo}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}, PedidoId={req.PedidoId}", req.EmpresaId);
+            await audit.TryLogAsync("TicketCriado", $"Titulo={tituloT}, EmpresaId={req.EmpresaId}, FaturaId={req.FaturaId}, PedidoId={req.PedidoId}", req.EmpresaId);
             return DataCreated($"/api/admin/tickets/{ticket.Id}", new { ticket.Id });
         }
         catch (KeyNotFoundException ex) { return DataNotFound(ex.Message); }

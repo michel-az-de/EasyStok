@@ -79,13 +79,22 @@ namespace EasyStock.Domain.Entities
             Guid? criadoPorId = null,
             CanalOrigem canalOrigem = CanalOrigem.Admin)
         {
+            // BUG-1 (#839): invariante de dominio contra estouro de coluna (varchar 200/4000).
+            // Blinda callers que nao passam pelo controller (ex.: AutoTicket de falha de pagamento).
+            titulo = (titulo ?? string.Empty).Trim();
+            descricao = (descricao ?? string.Empty).Trim();
+            if (titulo.Length is < 3 or > 200)
+                throw new ArgumentException("Título deve ter entre 3 e 200 caracteres.", nameof(titulo));
+            if (descricao.Length is < 5 or > 4000)
+                throw new ArgumentException("Descrição deve ter entre 5 e 4000 caracteres.", nameof(descricao));
+
             var agora = DateTime.UtcNow;
             return new AdminTicket
             {
                 Id = Guid.NewGuid(),
                 EmpresaId = empresaId,
-                Titulo = titulo.Trim(),
-                Descricao = descricao.Trim(),
+                Titulo = titulo,
+                Descricao = descricao,
                 Status = TicketStatus.Aberto,
                 Categoria = categoria,
                 Prioridade = prioridade,
