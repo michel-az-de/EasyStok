@@ -1,0 +1,63 @@
+@{
+    // _Skeleton.cshtml (issue 837): placeholder de carregamento reutilizavel.
+    // Usa as classes .skeleton-* (components.css). Mesma convencao ViewData
+    // dos partials _EmptyState/_ErrorState.
+    //
+    // Variantes (ViewData["SkeletonVariant"]):
+    //   text  -> titulo + N linhas de texto (default)
+    //   media -> avatar/circulo + 2 linhas
+    //   cards -> grid responsivo de N cards
+    //   rows  -> N linhas de lista/tabela
+    // ViewData["SkeletonCount"] -> N (default 3, cap 24)
+    // ViewData["SkeletonClass"] -> classe extra no wrapper (opcional)
+    //
+    // Uso:
+    //   @await Html.PartialAsync("_Skeleton", null,
+    //       new ViewDataDictionary(ViewData) { ["SkeletonVariant"] = "cards", ["SkeletonCount"] = 6 })
+    var variant = (ViewData["SkeletonVariant"] as string ?? "text").ToLowerInvariant();
+    var count = ViewData["SkeletonCount"] as int? ?? 3;
+    if (count < 1) { count = 1; }
+    if (count > 24) { count = 24; }
+    var extraClass = ViewData["SkeletonClass"] as string ?? string.Empty;
+}
+@* role=status + aria-busy: leitores de tela anunciam "carregando" e param no fim. *@
+<div class="es-skeleton @extraClass" role="status" aria-busy="true" aria-live="polite">
+    <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Carregando</span>
+    @switch (variant)
+    {
+        case "cards":
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                @for (var i = 0; i < count; i++)
+                {
+                    <div class="skeleton skeleton-card"></div>
+                }
+            </div>
+            break;
+        case "rows":
+            @for (var i = 0; i < count; i++)
+            {
+                <div class="skeleton skeleton-row"></div>
+            }
+            break;
+        case "media":
+            <div class="flex items-center gap-3">
+                <div class="skeleton skeleton-circle"></div>
+                <div class="flex-1 space-y-2">
+                    <div class="skeleton skeleton-line"></div>
+                    <div class="skeleton skeleton-line" style="width: 60%"></div>
+                </div>
+            </div>
+            break;
+        default:
+            <div class="space-y-2">
+                <div class="skeleton skeleton-title" style="width: 70%"></div>
+                @for (var i = 0; i < count; i++)
+                {
+                    // ultima linha mais curta = borda direita irregular (mais realista)
+                    var w = i == count - 1 ? "65%" : "100%";
+                    <div class="skeleton skeleton-text" style="width: @w"></div>
+                }
+            </div>
+            break;
+    }
+</div>

@@ -178,6 +178,11 @@ button:focus-visible {
 .skeleton-circle{ width: 40px; height: 40px; border-radius: 50%; }
 .skeleton-card  { height: 120px; border-radius: 14px; }
 .skeleton-row   { height: 48px; border-radius: 8px; margin-bottom: 8px; }
+/* Reduced-motion: sem shimmer. O placeholder estatico + a forma + aria-busy
+   ja comunicam "carregando" sem movimento. issue 837. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+}
 
 /* ---------- Money / numeric (pente fino onda 1 item 6) ----------
    Use em valores monetarios soltos (fora de tabela). Em tabela, ja existe

@@ -297,20 +297,16 @@
     <!-- Skeleton -->
     <section>
         <h2 class="text-lg font-semibold mb-3">Skeleton</h2>
+        @* Partial reutilizavel _Skeleton (issue 837): substitui os placeholders
+           antes desenhados a mao aqui; vitrine das variantes text/media. *@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-2">
-                <div class="skeleton skeleton-title" style="width: 70%"></div>
-                <div class="skeleton skeleton-text"></div>
-                <div class="skeleton skeleton-text" style="width: 88%"></div>
-                <div class="skeleton skeleton-text" style="width: 65%"></div>
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="skeleton skeleton-circle"></div>
-                <div class="flex-1 space-y-2">
-                    <div class="skeleton skeleton-line"></div>
-                    <div class="skeleton skeleton-line" style="width: 60%"></div>
-                </div>
-            </div>
+            @await Html.PartialAsync("_Skeleton", null, new ViewDataDictionary(ViewData) { ["SkeletonVariant"] = "text", ["SkeletonCount"] = 3 })
+            @await Html.PartialAsync("_Skeleton", null, new ViewDataDictionary(ViewData) { ["SkeletonVariant"] = "media" })
+        </div>
+        @* variantes cards e rows (novas) *@
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            @await Html.PartialAsync("_Skeleton", null, new ViewDataDictionary(ViewData) { ["SkeletonVariant"] = "cards", ["SkeletonCount"] = 3 })
+            @await Html.PartialAsync("_Skeleton", null, new ViewDataDictionary(ViewData) { ["SkeletonVariant"] = "rows", ["SkeletonCount"] = 4 })
         </div>
     </section>
 
