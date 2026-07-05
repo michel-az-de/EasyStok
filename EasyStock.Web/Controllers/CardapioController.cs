@@ -17,7 +17,8 @@ public class CardapioController(
     CardapioService svc,
     ProdutosService produtosSvc,
     SessionService session,
-    IConfiguration config) : BaseController(session)
+    IConfiguration config,
+    ILogger<CardapioController> logger) : BaseController(session)
 {
     private const string ActiveKey = "Cardapio";
 
@@ -271,7 +272,16 @@ public class CardapioController(
 
         var r = await produtosSvc.BuscarAsync(termo.Trim(), 10);
         if (!r.Success || r.Data is null)
+        {
+            // #846: nao engolir em silencio. Busca vazia por ERRO (timeout/parse/permissao/500) fica
+            // indistinguivel de "sem resultado" no typeahead — o QA leu isso como "busca quebrada".
+            // O typeahead ainda recebe [] (degrada bem), mas a falha fica no log p/ diagnostico.
+            if (!r.Success)
+                logger.LogWarning(
+                    "Busca de produtos do cardapio falhou (termo='{Termo}', cid={Cid}): {Code} {Msg}",
+                    termo.Trim(), r.CorrelationId, r.ErrorCode, r.ErrorMessage);
             return Json(Array.Empty<object>());
+        }
 
         return Json(r.Data.Select(p => new { id = p.Id, nome = p.Nome }));
     }

@@ -31,8 +31,10 @@
 </div>
 
 @* BUG-002: sem action o submit nativo ia pra /cardapio/novo (GET-only) → 405. Aponta pro handler
-   POST real (@actionUrl = /cardapio/criar ou /{id}/atualizar). O Alpine intercepta via AJAX; isto é fallback. *@
-<form id="cardapio-form" method="post" action="@actionUrl" class="cdp-form"
+   POST real (@actionUrl = /cardapio/criar ou /{id}/atualizar). O Alpine intercepta via AJAX; isto é fallback.
+   issue 846: enctype=multipart + AntiForgeryToken (abaixo) tornam esse fallback FUNCIONAL — se o Alpine
+   falhar de novo (regressão do init, incidente de 18/jun), o POST nativo chega com CSRF e arquivo em vez de 400/405. *@
+<form id="cardapio-form" method="post" enctype="multipart/form-data" action="@actionUrl" class="cdp-form"
       x-data="cardapioForm({
         modo: '@Model.Modo',
         ehEdicao: @(Model.EhEdicao ? "true" : "false"),
@@ -50,6 +52,10 @@
          o Razor HTML-encodá-las (&quot;) — NÃO usar @@Html.Raw aqui (raw fecha o atributo no 1º "
          e trunca o x-data em 'produtoNome:', quebrando todo o form). Ver incidente 2026-06-18. *@
       x-init="setup($el)">
+
+    @* issue 846: token no corpo p/ o fallback nativo (submit sem JS). O AJAX (postForm) segue
+       mandando o MESMO token no header RequestVerificationToken — o antiforgery aceita qualquer um. *@
+    @Html.AntiForgeryToken()
 
     <input type="hidden" name="Modo" :value="modo" />
 
