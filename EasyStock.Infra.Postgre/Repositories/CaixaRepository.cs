@@ -131,8 +131,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(v => v.EmpresaId == empresaId && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
 
-            var vendas = await q.ToListAsync();
-            return vendas.Sum(v => v.ValorTotal == null ? 0m : v.ValorTotal.Valor);
+            // Projeta so a coluna ValorTotal (VO Dinheiro via HasConversion — o EF nao
+            // traduz Sum() sobre VO-com-converter, entao a soma fica em memoria, mas o
+            // SELECT deixa de trazer a entidade Venda inteira). Antes: SELECT * + materializa Venda.
+            var valores = await q.Select(v => v.ValorTotal).ToListAsync();
+            return valores.Sum(v => v == null ? 0m : v.Valor);
         }
 
         public Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
@@ -143,7 +146,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalPagamentosPedidosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
-            var pagamentos = await db.Set<PedidoPagamento>().AsNoTracking()
+            // pg.Valor e decimal simples -> SumAsync agrega no proprio Postgres (antes:
+            // materializava a lista de pagamentos do intervalo e somava em memoria).
+            return await db.Set<PedidoPagamento>().AsNoTracking()
                 .Where(pg => pg.PagoEm >= iniUtc && pg.PagoEm < fimUtc)
                 .Join(db.Pedidos.AsNoTracking(),
                       pg => pg.PedidoId,
@@ -152,10 +157,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(x => x.p.EmpresaId == empresaId
                          && x.p.Status != "cancelado"
                          && (lojaId == null || x.p.LojaId == lojaId))
-                .Select(x => x.pg.Valor)
-                .ToListAsync();
-
-            return pagamentos.Sum();
+                .SumAsync(x => (decimal?)x.pg.Valor) ?? 0m;
         }
 
         // ── Linhas para a lista "Movimentos do dia" (BUG-5) ───────────
