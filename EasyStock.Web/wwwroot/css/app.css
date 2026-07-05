@@ -179,6 +179,18 @@ body.app-body {
     overflow-x: hidden;
 }
 
+/* Container de leitura (issue 837): capa o conteudo em 1320px (largura canonica
+   do .stage/mockups) e centraliza em telas largas via padding-inline fluido.
+   Sem wrapper de propósito: preserva o sistema .app-main > * (anim-fadeInUp +
+   position:relative) e o stagger .ds-enter, que dependem do conteudo ser filho
+   DIRETO de .app-main. So >= 1024px (mobile/tablet intactos). O max() mantem o
+   gutter padrao (--s-6 = 24px, igual ao lg:p-6) enquanto a coluna nao passa de
+   ~1368px e cresce depois p/ centralizar; ajusta-se sozinho a sidebar
+   recolhida/expandida porque 100% e a largura do proprio .app-main. */
+@media (min-width: 1024px) {
+    .app-main { padding-inline: max(var(--s-6), (100% - 1320px) / 2); }
+}
+
 html:not(.theme-dark) .app-main::before {
     content: "";
     position: fixed;
