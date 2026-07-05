@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -15,12 +15,12 @@
       "principal" e o assembly vinha contra runtime mais antigo. Alinhar em 9.0.4
       resolve sem precisar de top-level Relational manual. Patch-level, sem breaking.
     -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.7" />
     <!--
       Mesmo apos bump do InMemory 9.0.0->9.0.4, algum analyzer do dotnet 10 SDK
       ainda traz Relational 9.0.1 net8.0 como transitiva. Top-level vence.
     -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.7" />
   </ItemGroup>
 
   <ItemGroup>

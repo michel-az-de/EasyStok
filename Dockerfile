@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ─── Stage 1: build + publish ────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copiar arquivos de projeto (camada cacheada — so invalida quando .csproj muda)
@@ -52,7 +52,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 # Migrations sao aplicadas pelo proprio app no startup (Program.cs com logging
 # gritante + MigrationsFailFast). Sem bundle EF separado pra encurtar build.
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # gosu: o entrypoint inicia como root para dar chown no volume de uploads (no Fly o

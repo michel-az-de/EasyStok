@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # ─── Stage 1: build ──────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Node 20 LTS para gerar tailwind.dist.css.
@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
     dotnet publish -c Release -o /app/publish /p:SkipTailwind=true
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # curl: usado pelo HEALTHCHECK (a imagem aspnet base nao traz wget/curl).
