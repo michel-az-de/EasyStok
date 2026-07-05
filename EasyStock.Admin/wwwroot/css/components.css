@@ -1479,6 +1479,25 @@ button:focus-visible {
   gap: var(--s-2);
 }
 
+/* Reveal da bulk-action bar (M2, issue 834) — fade + slide sutil ao selecionar.
+   Entra ease-out (--duration-fast); sai mais rapido (--duration-instant) — assimetria emil.
+   Alpine coordena o display do x-show; classes aplicadas via x-transition. */
+.es-bulk-reveal-enter {
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+.es-bulk-reveal-enter-start { opacity: 0; transform: translateY(-6px); }
+.es-bulk-reveal-enter-end   { opacity: 1; transform: translateY(0); }
+.es-bulk-reveal-leave {
+  transition: opacity var(--duration-instant) var(--ease-out), transform var(--duration-instant) var(--ease-out);
+}
+.es-bulk-reveal-leave-start { opacity: 1; transform: translateY(0); }
+.es-bulk-reveal-leave-end   { opacity: 0; transform: translateY(-6px); }
+@media (prefers-reduced-motion: reduce) {
+  /* Mantem o fade (ajuda a compreender a mudanca de estado), remove o movimento. */
+  .es-bulk-reveal-enter-start, .es-bulk-reveal-enter-end,
+  .es-bulk-reveal-leave-start, .es-bulk-reveal-leave-end { transform: none; }
+}
+
 /* Row actions (geralmente icon-only buttons) */
 .es-row-actions {
   display: inline-flex;

@@ -109,7 +109,9 @@ public sealed class DataTableTagHelper : TagHelper
         // Bulk action bar
         if (hasBulk)
         {
-            sb.Append("<div class=\"es-data-table-bulk-bar\" x-show=\"selected.size > 0\" x-cloak>");
+            sb.Append("<div class=\"es-data-table-bulk-bar\" x-show=\"selected.size > 0\" x-cloak")
+              .Append(" x-transition:enter=\"es-bulk-reveal-enter\" x-transition:enter-start=\"es-bulk-reveal-enter-start\" x-transition:enter-end=\"es-bulk-reveal-enter-end\"")
+              .Append(" x-transition:leave=\"es-bulk-reveal-leave\" x-transition:leave-start=\"es-bulk-reveal-leave-start\" x-transition:leave-end=\"es-bulk-reveal-leave-end\">");
             sb.Append("<svg class=\"es-icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><use href=\"/icons/sprite.svg#icon-check-circle\"/></svg>");
             sb.Append("<span class=\"es-data-table-bulk-bar-count\" x-text=\"selected.size + ' selecionado' + (selected.size > 1 ? 's' : '')\"></span>");
             sb.Append("<button type=\"button\" class=\"es-filter-clear\" @click=\"clearAll()\">LIMPAR</button>");
