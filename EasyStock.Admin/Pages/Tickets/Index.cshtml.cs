@@ -34,6 +34,15 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
         // sidebar/Dashboard/Operacao). "Todos" (incl. Resolvido/Fechado) e escolha explicita.
         if (string.IsNullOrWhiteSpace(Status)) Status = "EmAberto";
 
+        // BUG-11 (#844): valores fora do enum nao devem ecoar como chip de filtro ativo.
+        // A montagem da query ja filtrava por whitelist; aqui limpamos Model.* ANTES de
+        // renderizar para os chips (e os links de paginacao) nao propagarem valores invalidos.
+        if (!StatusValidos.Contains(Status)) Status = "EmAberto";
+        if (!string.IsNullOrWhiteSpace(Prioridade) && !PrioridadesValidas.Contains(Prioridade)) Prioridade = null;
+        if (!string.IsNullOrWhiteSpace(Nivel) && !NiveisValidos.Contains(Nivel)) Nivel = null;
+        if (!string.IsNullOrWhiteSpace(SlaStatus) && !SlaStatusValidos.Contains(SlaStatus)) SlaStatus = null;
+        if (!string.IsNullOrWhiteSpace(Categoria) && !CategoriasValidas.Contains(Categoria)) Categoria = null;
+
         try
         {
             var qs = $"api/admin/tickets?page={Page}&pageSize=25";
