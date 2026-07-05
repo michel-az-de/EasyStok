@@ -5405,6 +5405,26 @@ html.theme-dark .ds-shortcut:hover { border-color: rgba(255, 255, 255, .18); }
     to   { opacity: 1; transform: none; }
 }
 
+/* ── Entrada escalonada de linhas de lista (issue 837) ──────────────
+   Reusa o keyframe ds-enter-rise do dashboard, mas p/ LINHAS de lista/tabela:
+   passo mais curto e CAP nas 10 primeiras — da 11a em diante SEM rise, para
+   nao gerar "mass-motion" nem custo em listas de 100+ (essas linhas em geral
+   estao abaixo da dobra). Opt-in: por a classe no container das linhas
+   (ex.: <tbody class="ds-stagger-rows">). So transform/opacity (GPU-friendly).
+   Guardado por prefers-reduced-motion no bloco abaixo. */
+.ds-stagger-rows > * { animation: ds-enter-rise .42s var(--ease-out) backwards; }
+.ds-stagger-rows > *:nth-child(1) { animation-delay: .02s; }
+.ds-stagger-rows > *:nth-child(2) { animation-delay: .05s; }
+.ds-stagger-rows > *:nth-child(3) { animation-delay: .08s; }
+.ds-stagger-rows > *:nth-child(4) { animation-delay: .11s; }
+.ds-stagger-rows > *:nth-child(5) { animation-delay: .14s; }
+.ds-stagger-rows > *:nth-child(6) { animation-delay: .17s; }
+.ds-stagger-rows > *:nth-child(7) { animation-delay: .20s; }
+.ds-stagger-rows > *:nth-child(8) { animation-delay: .23s; }
+.ds-stagger-rows > *:nth-child(9) { animation-delay: .26s; }
+.ds-stagger-rows > *:nth-child(10) { animation-delay: .29s; }
+.ds-stagger-rows > *:nth-child(n+11) { animation: none; }
+
 @media (prefers-reduced-motion: reduce) {
     .ds-kpi,
     .ds-alert,
@@ -5418,6 +5438,7 @@ html.theme-dark .ds-shortcut:hover { border-color: rgba(255, 255, 255, .18); }
         transform: none;
     }
     .ds-enter > * { animation: none; }
+    .ds-stagger-rows > * { animation: none; }
     .ds-pulse-sub .ds-pulse-led { animation: none; }
 }
 
