@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Adapters de integração externa (pagamentos, fiscal, marketplace, logística) com pipelines de resiliência Polly e helpers de keyed DI. Implementa portas definidas em EasyStock.Application.Ports.Output.Integration.</Description>
@@ -13,13 +13,13 @@
          DependencyInjection.Abstractions vêm transitive via EasyStock.Application
          (10.0.5) — não fixar aqui pra evitar downgrade. -->
     <PackageReference Include="Polly.Core" Version="8.5.2" />
-    <PackageReference Include="Microsoft.Extensions.Resilience" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="10.0.7" />
     <!-- CVE sweep: DataProtection 9.0.0 traz Xml 9.0.0 transitiva (GHSA-37gx-xxp4-5rgx /
          GHSA-w3x6-4m5h-cxqf, HIGH). Override top-level cobre Api/Worker/IntegrationTests
          que tem este projeto na cadeia. -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.16" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.7" />
     <PackageReference Include="Scrutor" Version="5.0.2" />
   </ItemGroup>
 

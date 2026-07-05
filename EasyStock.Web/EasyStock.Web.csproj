@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>1.10.0</Version>
@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <!-- Authentication.Cookies é implícito no SDK Web do .NET 9 — não referenciar versão antiga -->
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.7" />
   </ItemGroup>
 
   <!-- Tailwind: gera wwwroot/css/tailwind.dist.css antes do build.

@@ -19,6 +19,11 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- CS1591 (membro publico sem doc XML): nao exigimos doc XML publica. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- NU1510 (net10): pacotes providos pelo shared framework sao podados; o SDK
+         avisa que a PackageReference explicita e redundante. Poda e automatica e
+         inofensiva. Suprimido no bump .NET 10 (refs #847); remover as refs
+         redundantes fica como follow-up de higiene. -->
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
     <!--
       Warnings de XML-doc sao COLATERAL do GenerateDocumentationFile (ligado so p/
       IDE0005, nao como gate de qualidade de doc). Suprimimos pra nao quebrar o build
@@ -33,6 +38,14 @@
       de primary ctor nao usado). CS8602 (null-deref) fica como erro: corrigir, nao mascarar.
     -->
     <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1998;CS9113</WarningsNotAsErrors>
+    <!--
+      Smells NOVOS revelados pelo net10 (bump .NET 10, refs #847). Visiveis p/ burn-down,
+      nao quebram o build; corrigir em follow-ups dedicados (nao no bump mecanico):
+        CA2024 (reader.EndOfStream em async, servicos de streaming de IA + AnunciosController)
+        ASPDEPR005 (ForwardedHeaders KnownNetworks/IPNetwork obsoletos -> KnownIPNetworks/
+          System.Net.IPNetwork; toca config sensivel de forwarded-headers, cuidado c/ #747).
+    -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CA2024;ASPDEPR005</WarningsNotAsErrors>
   </PropertyGroup>
 
 </Project>

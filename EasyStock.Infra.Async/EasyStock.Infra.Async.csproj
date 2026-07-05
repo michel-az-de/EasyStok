@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -9,8 +9,8 @@
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
     <!-- QuestPDF: MIT license para uso comercial em SaaS multi-tenant.
          Native .NET 9, sem dependencia de Chromium/iText. -->
     <PackageReference Include="QuestPDF" Version="2024.12.0" />
@@ -28,10 +28,10 @@
          o mesmo backend de storage. O SDK S3 (R2/MinIO self-hosted) antes só na API, o que
          deixava o motor de relatórios do Worker sem resolver IFileStorage (falha em runtime). -->
     <PackageReference Include="AWSSDK.S3" Version="3.7.415.3" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.7" />
     <!--
       MSB3277: dependencias transitivas (combinacao dotnet 10 SDK analyzers + Hosting
       9.0.0 cadeia) trazem Microsoft.EntityFrameworkCore.Relational 9.0.1 (net8.0).
@@ -40,7 +40,7 @@
       mais antigo — risco de MissingMethodException em APIs novas. PackageReference
       direta vence transitivas e alinha em 9.0.4. Espelha fix do Worker.csproj.
     -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.7" />
   </ItemGroup>
 
   <ItemGroup>
