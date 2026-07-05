@@ -81,8 +81,8 @@ snapshot_predeploy() {
 ghcr_login() {
   local user="${GHCR_USER:-}" token="${GHCR_TOKEN:-}"
   if [ -z "$token" ] && [ -f "$REPO/.env" ]; then
-    user="${user:-$(grep -E '^GHCR_USER=' "$REPO/.env" | tail -1 | cut -d= -f2-)}"
-    token="$(grep -E '^GHCR_TOKEN=' "$REPO/.env" | tail -1 | cut -d= -f2-)"
+    user="${user:-$(grep -E '^GHCR_USER=' "$REPO/.env" | tail -1 | cut -d= -f2- || true)}"
+    token="$(grep -E '^GHCR_TOKEN=' "$REPO/.env" | tail -1 | cut -d= -f2- || true)"
   fi
   if [ -n "$token" ]; then
     echo "$token" | docker login ghcr.io -u "${user:-michel-az-de}" --password-stdin >/dev/null
