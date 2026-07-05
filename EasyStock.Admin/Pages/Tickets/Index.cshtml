@@ -216,9 +216,10 @@
 <!-- Modal Novo Ticket -->
 <es-modal id="novo-ticket" title="Novo ticket" description="Abrir um novo chamado em nome de uma empresa." size="md">
     <form method="post"
-          x-data="{ empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null, erroBusca: '',
+          x-data="{ empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null, erroBusca: '', carregando: false,
                     async buscar() {
-                        if (this.buscaEmpresa.length < 2) { this.resultadosEmpresa = []; this.erroBusca = ''; return; }
+                        if (this.buscaEmpresa.length < 2) { this.resultadosEmpresa = []; this.erroBusca = ''; this.carregando = false; return; }
+                        this.carregando = true;
                         try {
                             const r = await fetch('/api-proxy/buscar-global?q=' + encodeURIComponent(this.buscaEmpresa) + '&limit=8');
                             if (!r.ok) { this.resultadosEmpresa = []; this.erroBusca = 'Falha ao buscar empresas (HTTP ' + r.status + ').'; return; }
@@ -226,6 +227,7 @@
                             this.resultadosEmpresa = (d.data && d.data.clientes) || d.clientes || [];
                             this.erroBusca = '';
                         } catch { this.resultadosEmpresa = []; this.erroBusca = 'Falha de rede ao buscar empresas.'; }
+                        finally { this.carregando = false; }
                     } }"
           style="display:flex; flex-direction:column; gap:14px;">
         @Html.AntiForgeryToken()
@@ -236,8 +238,10 @@
             <template x-if="!empresaSelecionada">
                 <div style="position:relative;">
                     <input type="text" x-model="buscaEmpresa" placeholder="Digite o nome ou CNPJ..." class="es-form-input"
-                           @@input="clearTimeout(debounce); debounce = setTimeout(() => buscar(), 200)" />
+                           @@input="clearTimeout(debounce); carregando = buscaEmpresa.length >= 2; debounce = setTimeout(() => buscar(), 200)" />
                     <p x-show="erroBusca" x-cloak role="alert" style="margin-top:4px; color:var(--crit-600); font-size:12px;" x-text="erroBusca"></p>
+                    <p x-show="carregando" x-cloak style="margin-top:4px; color:var(--text-muted); font-size:12px; display:inline-flex; align-items:center; gap:6px;"><span class="es-spinner es-spinner-inline" aria-hidden="true"></span>Buscando…</p>
+                    <p x-show="!carregando &amp;&amp; buscaEmpresa.length >= 2 &amp;&amp; resultadosEmpresa.length === 0 &amp;&amp; !erroBusca" x-cloak style="margin-top:4px; color:var(--text-muted); font-size:12px;">Nenhuma empresa encontrada.</p>
                     <div x-show="resultadosEmpresa.length > 0"
                          style="position:absolute; z-index:50; margin-top:4px; width:100%; background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--r-md); box-shadow:var(--elev-3); max-height:240px; overflow-y:auto;">
                         <template x-for="emp in resultadosEmpresa" :key="emp.id">
