@@ -136,28 +136,58 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
             .Where(pg => pg.EmpresaId == empresaId &&
                          pg.Status == StatusPagamentoParcela.Confirmado);
 
+        // Antes: 4 SumAsync POR bucket dentro do loop (ate 24 buckets = 96 SELECTs
+        // sequenciais no PG). Agora: 4 queries no total (uma por serie), projetando
+        // (data, valor) do range inteiro dos buckets; a bucketizacao roda em memoria
+        // com os MESMOS limites de GerarBuckets (preserva a semantica exata de
+        // diario/semanal/mensal e o cap de 24). Medido: 96 -> 4 comandos EF
+        // (FluxoBucketsPerfTests). Parcela/Pagamento.Valor sao decimal simples (nao
+        // value-object com converter), entao a projecao traduz direto pro SQL.
+        var inicioGeral = buckets[0].Inicio;
+        var fimGeral = buckets[^1].Fim;
+
+        var prevPagarRows = (await pagar
+            .Where(p => p.DataVencimento >= inicioGeral && p.DataVencimento <= fimGeral)
+            .Select(p => new { D = p.DataVencimento, V = p.Valor })
+            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
+        var prevReceberRows = (await receber
+            .Where(p => p.DataVencimento >= inicioGeral && p.DataVencimento <= fimGeral)
+            .Select(p => new { D = p.DataVencimento, V = p.Valor })
+            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
+        var realPagarRows = (await pagamentos
+            .Where(pg => pg.Lado == TipoLadoFinanceiro.Pagar &&
+                         pg.DataPagamento >= inicioGeral && pg.DataPagamento <= fimGeral)
+            .Select(pg => new { D = pg.DataPagamento, V = pg.Valor })
+            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
+        var realReceberRows = (await pagamentos
+            .Where(pg => pg.Lado == TipoLadoFinanceiro.Receber &&
+                         pg.DataPagamento >= inicioGeral && pg.DataPagamento <= fimGeral)
+            .Select(pg => new { D = pg.DataPagamento, V = pg.Valor })
+            .ToListAsync(ct)).Select(x => (x.D, x.V)).ToList();
+
         var resultado = new List<FluxoBucketDto>(buckets.Count);
         foreach (var (bIni, bFim, rotulo) in buckets)
         {
-            var prevPagar = await pagar
-                .Where(p => p.DataVencimento >= bIni && p.DataVencimento <= bFim)
-                .SumAsync(p => (decimal?)p.Valor, ct) ?? 0m;
-            var prevReceber = await receber
-                .Where(p => p.DataVencimento >= bIni && p.DataVencimento <= bFim)
-                .SumAsync(p => (decimal?)p.Valor, ct) ?? 0m;
-            var realPagar = await pagamentos
-                .Where(pg => pg.Lado == TipoLadoFinanceiro.Pagar &&
-                             pg.DataPagamento >= bIni && pg.DataPagamento <= bFim)
-                .SumAsync(pg => (decimal?)pg.Valor, ct) ?? 0m;
-            var realReceber = await pagamentos
-                .Where(pg => pg.Lado == TipoLadoFinanceiro.Receber &&
-                             pg.DataPagamento >= bIni && pg.DataPagamento <= bFim)
-                .SumAsync(pg => (decimal?)pg.Valor, ct) ?? 0m;
-
-            resultado.Add(new FluxoBucketDto(bIni, bFim, rotulo, prevPagar, prevReceber, realPagar, realReceber));
+            resultado.Add(new FluxoBucketDto(
+                bIni, bFim, rotulo,
+                SomaNoIntervalo(prevPagarRows, bIni, bFim),
+                SomaNoIntervalo(prevReceberRows, bIni, bFim),
+                SomaNoIntervalo(realPagarRows, bIni, bFim),
+                SomaNoIntervalo(realReceberRows, bIni, bFim)));
         }
 
         return resultado;
+    }
+
+    // Soma os valores cujas datas caem no intervalo [ini, fim] do bucket. Os intervalos
+    // de GerarBuckets sao contiguos e nao se sobrepoem, entao cada linha cai em no maximo
+    // um bucket — mesma atribuicao do filtro SQL por-bucket anterior.
+    private static decimal SomaNoIntervalo(List<(DateTime Data, decimal Valor)> rows, DateTime ini, DateTime fim)
+    {
+        decimal soma = 0m;
+        foreach (var (data, valor) in rows)
+            if (data >= ini && data <= fim) soma += valor;
+        return soma;
     }
 
     private static List<(DateTime Inicio, DateTime Fim, string Rotulo)> GerarBuckets(
