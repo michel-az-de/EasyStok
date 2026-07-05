@@ -111,6 +111,8 @@ internal static class HelpMarkup
         // ── Popover ──────────────────────────────────────────────
         sb.Append($"<span class=\"es-help-popover\" id=\"{panelId}\" role=\"tooltip\"");
         sb.Append(" x-show=\"open\" x-cloak");
+        sb.Append(" x-transition:enter=\"es-pop-enter\" x-transition:enter-start=\"es-pop-enter-start\" x-transition:enter-end=\"es-pop-enter-end\"");
+        sb.Append(" x-transition:leave=\"es-pop-leave\" x-transition:leave-start=\"es-pop-leave-start\" x-transition:leave-end=\"es-pop-leave-end\"");
         sb.Append(" @mouseenter=\"show()\" @mouseleave=\"scheduleHide()\">");
 
         if (!string.IsNullOrWhiteSpace(titulo))

@@ -208,8 +208,8 @@ button:focus-visible {
   position: fixed;
   inset: 0 auto 0 0;
   z-index: var(--z-drawer);
-  transition: width var(--duration-base) var(--ease-out),
-              transform var(--duration-base) var(--ease-out);
+  transition: width var(--duration-base) var(--ease-drawer),
+              transform var(--duration-base) var(--ease-drawer);
 }
 /* BUG-03 (issue 492): os tokens de texto da sidebar seguem --sidebar-ink
    (theme-aware): claro sobre o navy no tema escuro, escuro sobre a superficie clara
@@ -331,7 +331,7 @@ button:focus-visible {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 150px),
     var(--es-bg);
-  transition: margin-left var(--duration-base) var(--ease-out);
+  transition: margin-left var(--duration-base) var(--ease-drawer);
 }
 .app-main.is-rail {
   margin-left: 64px;

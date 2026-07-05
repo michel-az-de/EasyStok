@@ -72,9 +72,19 @@
     outline-offset: -1px;
     text-align: start;
     white-space: normal;
-    transition: opacity var(--duration-base) var(--ease-out),
-                transform var(--duration-base) var(--ease-spring);
+    /* Origin-aware (emil): o popover ancora abaixo-esquerda do gatilho "?", entao
+       emerge do topo-esquerdo, nao do centro. Entrada/saida via classes es-pop-*. */
+    transform-origin: top left;
 }
+
+/* Reveal origin-aware do popover (M3, issue 834) — scale + fade a partir do gatilho.
+   Entra ease-out (--duration-fast); sai mais rapido (--duration-instant). */
+.es-pop-enter { transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out); }
+.es-pop-enter-start { opacity: 0; transform: scale(0.96) translateY(-2px); }
+.es-pop-enter-end   { opacity: 1; transform: scale(1) translateY(0); }
+.es-pop-leave { transition: opacity var(--duration-instant) var(--ease-out), transform var(--duration-instant) var(--ease-out); }
+.es-pop-leave-start { opacity: 1; transform: scale(1) translateY(0); }
+.es-pop-leave-end   { opacity: 0; transform: scale(0.96) translateY(-2px); }
 
 .es-help-title {
     display: block;
@@ -126,6 +136,9 @@
     .es-help-popover {
         transition: none;
     }
+    /* Mantem o fade, remove o movimento (scale/slide). */
+    .es-pop-enter-start, .es-pop-enter-end,
+    .es-pop-leave-start, .es-pop-leave-end { transform: none; }
 }
 
 /* === es-page-header (cabeçalho pedagógico unificado de página) =========== */
