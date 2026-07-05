@@ -854,6 +854,44 @@ html.theme-dark .es-empty-art::before {
 .stp-ink     { background: var(--ink-100);   border-color: var(--ink-200);    color: var(--ink-700); }
 .stp-neutral { background: var(--ink-50);    border-color: var(--ink-200);    color: var(--ink-600); }
 
+/* ---------- Hierarquia de severidade (issue 837) ----------
+   Antes, .stp.critico / .validity-pill--crit / .stp-crit usavam a MESMA
+   receita visual de qualquer status (bg-50 / border-200 / peso 600), so
+   mudando o matiz: "critico/vencido" tinha o mesmo peso de "pronto". Esta
+   rampa escalona a legibilidade neutral/info < warn < crit, reusando os
+   ramps crit/warn existentes (nunca laranja; respeita a regra de cor do
+   epic 534). Vem DEPOIS das 3 familias (.stp / .validity-pill / .stp-*) p/
+   sobrescrever com a mesma especificidade. Sem token novo, sem drift Web/Admin. */
+
+/* WARN: reforco intermediario (borda mais firme). */
+.stp.vencendo,
+.validity-pill--warn,
+.stp-warn { border-color: var(--warn-400); }
+
+/* CRIT: nivel maximo (fundo mais denso, borda forte, peso 700, dot maior). */
+.stp.critico,
+.validity-pill--crit,
+.stp-crit {
+  background: var(--crit-100);
+  border-color: var(--crit-600);
+  color: var(--crit-700);
+  font-weight: 700;
+}
+.stp.critico .ind,
+.stp-crit .stp-dot { transform: scale(1.15); }
+
+/* Pulso OPT-IN p/ enfase pontual — deliberadamente NAO no atacado, p/ nao
+   virar ruido em tabelas com muitos criticos. Uso: class="stp critico pill-pulse".
+   Reusa os keyframes pulseRed/pulseAmber (app.css); guardado por reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .pill-pulse.critico,
+  .pill-pulse.validity-pill--crit,
+  .pill-pulse.stp-crit { animation: pulseRed 1.8s ease-in-out infinite; }
+  .pill-pulse.vencendo,
+  .pill-pulse.validity-pill--warn,
+  .pill-pulse.stp-warn { animation: pulseAmber 2.5s ease-in-out infinite; }
+}
+
 /* ---------- Badge defaults usados pelo EsBadgeTagHelper ---------- */
 .badge-default { background: var(--ink-100); color: var(--ink-700); }
 .badge-ok      { background: var(--ok-100);   color: var(--ok-700); }
