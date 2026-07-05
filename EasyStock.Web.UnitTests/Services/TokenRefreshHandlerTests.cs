@@ -65,6 +65,34 @@ public class TokenRefreshHandlerTests
         session.GetToken().Should().BeNull("a sessao deve ser limpa quando o refresh falha");
     }
 
+    // #846: o retry apos refresh reenvia o CLONE do request. Para POST/PUT com corpo, o
+    // CloneRequestAsync bufferiza e rebobina o content — este teste trava que o corpo sobrevive
+    // (o teste de race acima usa GET sem corpo, entao nao cobria o clone de content).
+    [Fact]
+    public async Task Retry_de_POST_apos_refresh_reenvia_o_corpo_intacto()
+    {
+        var refreshToken = $"rt-{Guid.NewGuid():N}";
+        var stub = new RetryBodyHandler();
+        var session = SessaoCom("old-token", refreshToken, out var accessor);
+
+        var handler = new TokenRefreshHandler(
+            session, NullLogger<TokenRefreshHandler>.Instance, accessor, new JwtClaimsReader())
+        {
+            InnerHandler = stub
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "http://api.test/minha-vitrine/cardapio")
+        {
+            Content = new StringContent("{\"nomePublico\":\"Lasanha\"}", Encoding.UTF8, "application/json")
+        };
+        var resp = await invoker.SendAsync(req, CancellationToken.None);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        stub.RetryBody.Should().Be("{\"nomePublico\":\"Lasanha\"}",
+            "o corpo do POST deve sobreviver ao clone e ao retry apos o refresh");
+    }
+
     private static HttpRequestMessage Req()
         => new(HttpMethod.Get, "http://api.test/produtos/listar");
 
@@ -108,6 +136,34 @@ public class TokenRefreshHandlerTests
             return new HttpResponseMessage(bearer == oldAccess || bearer is null
                 ? HttpStatusCode.Unauthorized
                 : HttpStatusCode.OK);
+        }
+    }
+
+    /// <summary>
+    /// Api fake para o retry de POST: 401 no token antigo, refresh OK, e no retry (token novo)
+    /// captura o corpo recebido — prova que o clone preservou o body atraves do refresh.
+    /// </summary>
+    private sealed class RetryBodyHandler : HttpMessageHandler
+    {
+        public string? RetryBody { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (request.RequestUri!.OriginalString.Contains("auth/refresh"))
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"token\":\"new-token\",\"refreshToken\":\"rt-novo\"}", Encoding.UTF8, "application/json")
+                };
+
+            var bearer = request.Headers.Authorization?.Parameter;
+            if (bearer is null || bearer == "old-token")
+                return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+
+            // Retry com o token novo: captura o corpo reenviado.
+            if (request.Content is not null)
+                RetryBody = await request.Content.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.OK);
         }
     }
 

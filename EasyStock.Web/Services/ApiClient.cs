@@ -188,6 +188,15 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             log.LogError(ex, "Network error on {Method} {Path}", method, path);
             return ApiResult<T>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
         }
+        catch (Exception ex)
+        {
+            // #846: rede de segurança. Sem este catch, uma exceção fora de TaskCanceled/HttpRequest
+            // no pipeline HTTP (ex.: um DelegatingHandler como o TokenRefreshHandler lançando durante
+            // clone/retry) escapa e vira 500 MUDO no Web (o usuário cai numa página de erro em vez de
+            // um toast). Aqui degrada para ApiResult.Fail → o controller devolve JsonFail 200 {ok:false}.
+            log.LogError(ex, "Unexpected error on {Method} {Path}", method, path);
+            return ApiResult<T>.Fail("ERRO_INESPERADO", "Não foi possível concluir a operação agora. Tente de novo.");
+        }
     }
 
     private async Task<ApiResult<T>> ParseResponse<T>(HttpResponseMessage response)
