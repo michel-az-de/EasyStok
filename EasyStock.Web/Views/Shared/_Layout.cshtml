@@ -37,9 +37,10 @@
        firewall corporativo E os hashes SRI antigos estavam errados; ambos matavam o
        Alpine -> interatividade inteira inerte. Vendored de alpinejs@3.14.9 (core). *@
     <script defer src="~/js/vendor/alpine/alpine.js" asp-append-version="true"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    @* Fontes self-hosted (issue 837): substitui o CDN do Google Fonts, que corria o
+       mesmo risco de firewall corporativo que ja derrubou o Alpine via jsDelivr.
+       Carregado ANTES de tokens.css. woff2 em ~/fonts (npm run fonts:copy). *@
+    <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/app-shell.css" asp-append-version="true" />

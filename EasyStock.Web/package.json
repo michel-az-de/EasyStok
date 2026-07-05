@@ -5,10 +5,14 @@
   "description": "EasyStock.Web — Tailwind build pipeline",
   "scripts": {
     "css:build": "tailwindcss -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.dist.css --minify",
-    "css:watch": "tailwindcss -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.dist.css --watch"
+    "css:watch": "tailwindcss -i wwwroot/css/tailwind.src.css -o wwwroot/css/tailwind.dist.css --watch",
+    "fonts:copy": "node build/copy-fonts.js"
   },
   "license": "UNLICENSED",
   "devDependencies": {
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "tailwindcss": "^3.4.19"
   }
 }
