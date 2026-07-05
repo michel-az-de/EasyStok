@@ -211,25 +211,31 @@ public static class ApiProxyEndpoints
             if (string.IsNullOrEmpty(session.GetToken()))
                 return Results.Unauthorized();
 
-            var empresaIdStr = ctx.Request.Query["empresaId"].FirstOrDefault();
-            if (!Guid.TryParse(empresaIdStr, out var empresaId))
-                return Results.BadRequest(new { error = "empresaId invÃ¡lido." });
-
+            // BUG-7 (#841): empresaId/ticketId/motivo trafegam no CORPO do POST, nunca na query
+            // string (IDs de operacao de PII nao podem vazar em logs de proxy/WAF/Referer).
+            // Alinhado a ADM-11/#746 (justificativa LGPD fora da URL).
+            Guid? empresaIdParsed = null;
             Guid? ticketId = null;
-            if (Guid.TryParse(ctx.Request.Query["ticketId"].FirstOrDefault(), out var tid))
-                ticketId = tid;
-
             string? motivo = null;
             try
             {
                 using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
-                if (doc.RootElement.TryGetProperty("motivo", out var m) && m.ValueKind == JsonValueKind.String)
+                var root = doc.RootElement;
+                if (root.TryGetProperty("empresaId", out var e) && e.ValueKind == JsonValueKind.String
+                    && Guid.TryParse(e.GetString(), out var eid))
+                    empresaIdParsed = eid;
+                if (root.TryGetProperty("ticketId", out var t) && t.ValueKind == JsonValueKind.String
+                    && Guid.TryParse(t.GetString(), out var tid))
+                    ticketId = tid;
+                if (root.TryGetProperty("motivo", out var m) && m.ValueKind == JsonValueKind.String)
                     motivo = m.GetString();
             }
             catch { /* corpo invalido â€” vai cair na validacao do backend */ }
 
+            if (empresaIdParsed is not { } empresaId)
+                return Results.BadRequest(new { error = "empresaId invalido." });
             if (string.IsNullOrWhiteSpace(motivo) || motivo.Length < 10)
-                return Results.BadRequest(new { error = "motivo deve ter no mÃ­nimo 10 caracteres." });
+                return Results.BadRequest(new { error = "motivo deve ter no minimo 10 caracteres." });
 
             try
             {

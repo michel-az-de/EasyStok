@@ -36,10 +36,12 @@
         modalEncaminhar: false, modalBug: false, modalRevelar: false,
         clienteRevelado: null,
         async revelar(motivo) {
-            const r = await fetch('/api-proxy/admin-empresas-revelar?empresaId=@Model.EmpresaId&ticketId=@Model.Id', {
+            // BUG-7 (#841): empresaId/ticketId vao no CORPO, nunca na query string (IDs de PII
+            // nao podem vazar em logs de proxy/WAF/Referer). Alinhado a ADM-11/#746.
+            const r = await fetch('/api-proxy/admin-empresas-revelar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ motivo })
+                body: JSON.stringify({ empresaId: '@Model.EmpresaId', ticketId: '@Model.Id', motivo })
             });
             if (!r.ok) { alert('Falha ao revelar dados.'); return; }
             const d = await r.json();
