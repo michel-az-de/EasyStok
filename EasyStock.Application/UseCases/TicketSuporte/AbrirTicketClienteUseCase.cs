@@ -54,7 +54,8 @@ namespace EasyStock.Application.UseCases.TicketSuporte
             if (string.IsNullOrWhiteSpace(cmd.Titulo) || cmd.Titulo.Length > 200)
                 throw new UseCaseValidationException("Título inválido");
 
-            if (string.IsNullOrWhiteSpace(cmd.Descricao) || cmd.Descricao.Length > 5000)
+            // BUG-1 (#839): teto alinhado a coluna varchar(4000) — antes 5000 estourava 22001 (500).
+            if (string.IsNullOrWhiteSpace(cmd.Descricao) || cmd.Descricao.Length > 4000)
                 throw new UseCaseValidationException("Descrição inválida");
 
             // F9 — Valida que a fatura pertence a empresa do user e captura
