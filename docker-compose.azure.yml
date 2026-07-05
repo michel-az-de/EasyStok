@@ -32,6 +32,7 @@ services:
     image: postgres:17-alpine
     container_name: easystok-postgres
     restart: unless-stopped
+    mem_limit: 448m
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -54,6 +55,7 @@ services:
     image: redis:7-alpine
     container_name: easystok-redis
     restart: unless-stopped
+    mem_limit: 80m
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     networks: [easystock-net]
     healthcheck:
@@ -72,11 +74,15 @@ services:
     image: easystok-api:latest
     container_name: easystok-api
     restart: unless-stopped
+    mem_limit: 448m
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # Onda 3 (#853): Workstation GC — a VM tem 1 CPU, entao o Server GC (default do
+      # Sdk.Web) nao traz paralelismo de coleta, so reserva mais RAM.
+      DOTNET_gcServer: "0"
       Database__Provider: PostgreSql
       # Sem passo de migrate separado (ao contrario do Render/Fly que rodam
       # --migrate-only antes): a propria API aplica migrations + seeds no startup.
@@ -126,9 +132,12 @@ services:
     image: easystok-web:latest
     container_name: easystok-web
     restart: unless-stopped
+    mem_limit: 192m
     depends_on: [api, redis]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # Onda 3 (#853): Workstation GC — VM de 1 CPU (ver api).
+      DOTNET_gcServer: "0"
       ApiSettings__BaseUrl: "http://api:8080/api"
       ApiSettings__TimeoutSeconds: "30"
       # issue 690 / BUG-006: sessao Web no Redis (persiste entre deploys do cron */5).
@@ -162,9 +171,12 @@ services:
     image: easystok-admin:latest
     container_name: easystok-admin
     restart: unless-stopped
+    mem_limit: 192m
     depends_on: [api]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # Onda 3 (#853): Workstation GC — VM de 1 CPU (ver api).
+      DOTNET_gcServer: "0"
       ApiBaseUrl: "http://api:8080"
       EasyStockWebUrl: "https://${APP_HOST}"
       # Persistencia das chaves de DataProtection num volume (mesma motivacao do web).
@@ -189,6 +201,7 @@ services:
     image: casadababa-storefront:latest
     container_name: easystok-storefront
     restart: unless-stopped
+    mem_limit: 48m
     networks: [easystock-net]
 
   # ── Caddy — reverse proxy + HTTPS automatico (Let's Encrypt) ─────────────────
@@ -197,6 +210,7 @@ services:
     image: caddy:2-alpine
     container_name: easystok-caddy
     restart: unless-stopped
+    mem_limit: 80m
     depends_on: [web, admin, api]
     ports:
       - "80:80"
