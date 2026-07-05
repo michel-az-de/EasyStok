@@ -17,7 +17,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot   = Split-Path -Parent $PSScriptRoot
 $apiProject = Join-Path $repoRoot 'EasyStock.Api/EasyStock.Api.csproj'
-$apiDll     = Join-Path $repoRoot 'EasyStock.Api/bin/Debug/net9.0/EasyStock.Api.dll'
+$apiDll     = Join-Path $repoRoot 'EasyStock.Api/bin/Debug/net10.0/EasyStock.Api.dll'
 $outputDir  = Join-Path $repoRoot 'docs/api'
 $outputFile = Join-Path $outputDir 'openapi.json'
 

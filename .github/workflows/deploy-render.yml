@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '9.x'
+  DOTNET_VERSION: '10.x'
 
 permissions:
   contents: write   # precisa commitar APK em wwwroot/downloads/
