@@ -215,8 +215,8 @@
 
 <!-- Modal Novo Ticket -->
 <es-modal id="novo-ticket" title="Novo ticket" description="Abrir um novo chamado em nome de uma empresa." size="md">
-    <form method="post"
-          x-data="{ empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null, erroBusca: '', carregando: false,
+    <form method="post" x-on:submit="enviando = true"
+          x-data="{ empresaSelecionada: null, buscaEmpresa: '', resultadosEmpresa: [], debounce: null, erroBusca: '', carregando: false, enviando: false,
                     async buscar() {
                         if (this.buscaEmpresa.length < 2) { this.resultadosEmpresa = []; this.erroBusca = ''; this.carregando = false; return; }
                         this.carregando = true;
@@ -292,9 +292,10 @@
         </div>
 
         <es-modal-footer>
-            <es-button variant="ghost" x-on:click="close()">Cancelar</es-button>
-            <button type="submit" class="btn btn-primary btn-md" :disabled="!empresaSelecionada">
-                <span>Criar ticket</span>
+            <es-button variant="ghost" x-on:click="close()" :disabled="enviando">Cancelar</es-button>
+            <button type="submit" class="btn btn-primary btn-md" :disabled="!empresaSelecionada || enviando">
+                <span x-show="!enviando">Criar ticket</span>
+                <span x-show="enviando" x-cloak>Criando…</span>
             </button>
         </es-modal-footer>
     </form>
