@@ -61,9 +61,14 @@
 
 <!-- Filtros -->
 <div class="ws mb-4">
-    <form method="get" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar produtos">
+    <form method="get" x-data="{}" class="flex flex-wrap gap-3 items-center" role="search" aria-label="Filtrar produtos">
+        @* #858: filtra ao digitar (debounce). requestSubmit recarrega a pagina (GET), entao o
+           x-init restaura foco + caret no fim quando ha termo, senao a digitacao continua quebra. *@
         <input type="search" name="search" value="@Model.Search" placeholder="Buscar por nome ou SKU..."
-               aria-label="Buscar por nome ou SKU" class="ui-field flex-1 min-w-48" />
+               aria-label="Buscar por nome ou SKU"
+               @@input.debounce.600ms="$el.form.requestSubmit()"
+               x-init="if ($el.value) { $el.focus(); const l = $el.value.length; try { $el.setSelectionRange(l, l); } catch (e) {} }"
+               class="ui-field flex-1 min-w-48" />
         <div class="ui-select-shell">
             <select name="categoria" aria-label="Filtrar por categoria" class="ui-select ui-select--plain text-sm">
                 <option value="">Todas as categorias</option>
