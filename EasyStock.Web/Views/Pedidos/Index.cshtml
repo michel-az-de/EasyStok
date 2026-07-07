@@ -1524,10 +1524,28 @@ function novoPedidoModal() {
         },
 
         // ── Submit: orquestração com etapas animadas + console group ──────
+        // issue 510 item A (espelha a issue 497 / form-modal.js submit): x-model so atualiza no evento
+        // input/change. Autofill/colar/gerenciador-de-senha/automacao setam el.value SEM disparar
+        // esses eventos, deixando clienteNovo/nomeAdHoc/itens com estado vazio -> _preflight barra
+        // como falso-negativo. Ressincroniza DOM -> Alpine antes de validar/enviar.
+        // So 'input' em input/textarea (padrao do Form.cshtml): cobre autofill/colar dos campos de
+        // texto (nome/telefone/nomeAdHoc/qtd/preco) sem re-disparar o handler change dos selects.
+        _syncCamposProgramaticos() {
+            const panel = this.$refs.panel;
+            if (!panel) return;
+            panel.querySelectorAll('input, textarea').forEach((el) => {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        },
+
         async submit() {
             console.log('%c[Pedidos] submit() chamado', 'font-weight:bold',
                 'fase=' + this.fase, 'loading=' + this.loading, 'balcao=' + this.vendaBalcao);
             if (this.loading) return;
+            // issue 510 item A: captura preenchimento programatico antes de validar (cobre submit
+            // via botao, Ctrl+Enter e submit nativo do form); fecha o combobox reaberto pelo sync.
+            this._syncCamposProgramaticos();
+            this.comboboxOpen = false;
             if (this.vendaBalcao) { await this.submitBalcao(); return; }
             const motivo = this._preflight();
             if (motivo) {
