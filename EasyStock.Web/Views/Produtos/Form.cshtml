@@ -1235,7 +1235,6 @@
                     this._syncCamposProgramaticos();
                     if (this.step === 1 && !this.step1Valid) {
                         this.step1AttemptedAdvance = true;
-                        console.warn('[Produto] nextStep bloqueado em step 1: nome="' + (this.nome || '') + '" categoriaId="' + (this.categoriaId || '') + '"');
                         if (!this.nome) window.showToast('Informe o nome do produto.', 'warning');
                         else window.showToast('Selecione uma categoria.', 'warning');
                         return;
@@ -1321,13 +1320,11 @@
                     // Captura referência ao componente Alpine fora de closures para garantir acesso
                     const self = this;
                     self.saving = true;
-                    console.log('[EasyStock] submitForm iniciado, action=', this.$el?.action);
                     // issue 690 / BUG-006: NAO descartar o rascunho aqui (antes do POST). Se a sessao
                     // expirou (401) ou der erro, o rascunho precisa sobreviver — so removemos apos sucesso.
 
                     // Belt-and-suspenders: reseta após 20s independente do que aconteça
                     const savingGuard = setTimeout(() => {
-                        console.warn('[EasyStock] savingGuard disparado — resetando saving');
                         self.saving = false;
                         window.showToast('O servidor não respondeu. Tente novamente.', 'error');
                     }, 20000);
@@ -1355,12 +1352,10 @@
 
                     const abortCtrl = new AbortController();
                     const abortTimeout = setTimeout(() => {
-                        console.warn('[EasyStock] AbortController disparado após 20s');
                         abortCtrl.abort();
                     }, 20000);
 
                     try {
-                        console.log('[EasyStock] fetch iniciando para', form.action);
                         // === FASE 1: Criar/Atualizar produto (sem fotos) ===
                         const r = await esFetch(form.action, {
                             method: 'POST',
@@ -1370,7 +1365,6 @@
                             signal: abortCtrl.signal
                         });
                         clearTimeout(abortTimeout);
-                        console.log('[EasyStock] fetch respondeu: status=', r.status, 'redirected=', r.redirected, 'url=', r.url);
 
                         // Se o controller fez redirect (sucesso), r.redirected === true
                         // Se retornou JSON de erro (400), r.redirected === false e Content-Type é application/json
@@ -1378,7 +1372,6 @@
                             let msg = 'Erro ao salvar. Verifique os campos e tente novamente.';
                             try {
                                 const ct = r.headers.get('Content-Type') ?? '';
-                                console.log('[EasyStock] erro sem redirect, Content-Type=', ct, 'status=', r.status);
                                 if (ct.includes('application/json')) {
                                     const data = await r.json();
                                     if (data?.erro) msg = data.erro;
@@ -1396,7 +1389,6 @@
                         const redirectUrl = r.url;
                         const match = redirectUrl.match(/\/produtos\/([0-9a-f\-]{36})/i);
                         const productId = this.productId || (match ? match[1] : null);
-                        console.log('[EasyStock] sucesso, redirectUrl=', redirectUrl, 'productId=', productId);
 
                         // Toast client-side (TempData é consumido pelo fetch redirect)
                         try {
@@ -1424,7 +1416,6 @@
                     } finally {
                         clearTimeout(savingGuard);
                         self.saving = false;
-                        console.log('[EasyStock] finally executado, saving=false');
                     }
                 },
                 async _uploadPhotosAfterSave(productId, files) {
