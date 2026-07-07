@@ -200,9 +200,9 @@
                         Descartar
                     </a>
                     <button type="submit"
-                            :disabled="loading || !produtoId || qty > estoqueAtual"
-                            :title="!produtoId ? 'Selecione um produto primeiro' : (qty > estoqueAtual ? 'Quantidade acima do estoque disponível' : '')"
-                            :class="(loading || !produtoId || qty > estoqueAtual)
+                            :disabled="loading || !produtoId || qty < 1 || qty > estoqueAtual"
+                            :title="!produtoId ? 'Selecione um produto primeiro' : (qty < 1 ? 'Informe uma quantidade de pelo menos 1' : (qty > estoqueAtual ? 'Quantidade acima do estoque disponível' : ''))"
+                            :class="(loading || !produtoId || qty < 1 || qty > estoqueAtual)
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                 : 'bg-indigo-600 text-white hover:bg-indigo-700'"
                             class="px-6 py-2 text-sm font-medium rounded-lg transition-colors">
