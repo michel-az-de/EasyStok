@@ -113,6 +113,9 @@
         <span class="ped-kpi__val ped-kpi__val--money" x-text="kpiReceberFmt">R$ 0,00</span>
     </div>
 </div>
+@* #859: os recortes se sobrepoem (pronto conta em Em aberto e em Prontos); deixar explicito
+   para o operador nao tentar somar os KPIs. *@
+<p class="text-xs text-slate-400 mt-1 mb-4">Os recortes podem se sobrepor: um pedido "pronto" conta em "Em aberto" e em "Prontos".</p>
 
 <div class="ws mb-6">
     <div class="flex gap-3 flex-wrap items-center">
