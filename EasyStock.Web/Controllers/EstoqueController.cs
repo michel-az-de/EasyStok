@@ -13,11 +13,30 @@ public class EstoqueController(
     SessionService session,
     ILogger<EstoqueController> log) : BaseController(session)
 {
+    // Allowlist de status reconhecidos, espelhando ItemEstoqueRepository.NormalizarStatusFiltro
+    // na Api (+ o filtro especial "vencendo" por data). Web e BFF HTTP puro (nao referencia
+    // Domain/Api), entao a lista e espelhada aqui: manter em sincronia com a fonte na Api.
+    private static readonly HashSet<string> StatusFiltrosValidos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ok", "atencao", "atenção", "critico", "crítico", "parado", "slow",
+        "vencendo", "vencido", "esgotado", "descartado", "bloqueado"
+    };
+
+    // #857: querystring ?status desconhecido nao pode ecoar como filtro ativo (a view renderiza
+    // um "filtro fantasma" sem pill ativa). Fora da allowlist -> null (= Todos).
+    private static string? NormalizarStatusFiltro(string? status)
+        => !string.IsNullOrWhiteSpace(status) && StatusFiltrosValidos.Contains(status.Trim())
+            ? status.Trim()
+            : null;
+
     [HttpGet("/estoque")]
     public async Task<IActionResult> Index(int page = 1, string? search = null, string? status = null, string? categoria = null)
     {
         ViewBag.Title = "Estoque";
         ViewBag.ActiveMenuItem = "Estoque";
+
+        // #857: normaliza status ANTES de filtrar e de popular o VM (StatusFiltro/pill/hidden input).
+        status = NormalizarStatusFiltro(status);
 
         // Listagem paginada + contadores agregados em paralelo. Contadores
         // separam "cadastrados" (= Paginacao.Total, inclui qty 0) de "com saldo"
