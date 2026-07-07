@@ -153,7 +153,9 @@
             <tbody>
                 @foreach (var p in Model.Produtos)
                 {
-                    <tr x-data="{ menuOpen: false, precoModal: false, precoVal: '', precoSaving: false }"
+                    @* #856: menu de acoes vai para <body> via x-teleport (escapa o clip do
+                       overflow-x-auto da tabela) e e posicionado por coordenadas do botao. *@
+                    <tr x-data="{ menuOpen: false, menuStyle: '', precoModal: false, precoVal: '', precoSaving: false, openMenu() { const r = this.$refs.menuBtn.getBoundingClientRect(); this.menuStyle = 'position:fixed;top:' + (r.bottom + 6) + 'px;right:' + (window.innerWidth - r.right) + 'px;z-index:40'; this.menuOpen = true; } }"
                         data-row-href="/produtos/@p.Id"
                         class="cursor-pointer hover:bg-slate-50 transition-colors">
                         <td>
@@ -224,7 +226,8 @@
                         <td>
                             <div class="relative flex items-center justify-end">
                                 <button type="button"
-                                        @@click.stop="menuOpen = !menuOpen"
+                                        x-ref="menuBtn"
+                                        @@click.stop="menuOpen ? menuOpen = false : openMenu()"
                                         class="grid-action-btn grid-action-btn--ghost product-row-menu-btn"
                                         title="Abrir ações do produto"
                                         aria-label="Abrir ações do produto">
@@ -232,7 +235,12 @@
                                         <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                                     </svg>
                                 </button>
-                                <div x-show="menuOpen" x-cloak @@click.outside="menuOpen = false" @@click.stop
+                                <template x-teleport="body">
+                                <div x-show="menuOpen" x-cloak
+                                     @@click.outside="menuOpen = false" @@click.stop
+                                     @@keydown.escape.window="menuOpen = false"
+                                     @@scroll.window="menuOpen = false" @@resize.window="menuOpen = false"
+                                     :style="menuStyle"
                                      class="product-row-menu">
                                     <a href="/produtos/@p.Id" class="product-row-menu__item">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,6 +270,7 @@
                                         Inativar
                                     </button>
                                 </div>
+                                </template>
                             </div>
                             <!-- Modal definir preço -->
                             <div x-show="precoModal" x-cloak @@click.stop
