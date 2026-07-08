@@ -259,12 +259,11 @@ public class PedidosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Aprovar(string id)
     {
+        // HasError ja emite o toast de erro SANITIZADO (+ correlationId). Nao sobrescrever
+        // com a mensagem crua — mesmo padrao de Cancelar/Agendar/AtualizarStatus.
         var result = await svc.AprovarAsync(id);
-        if (HasError(result))
-        {
-            Toast("error", result.ErrorMessage ?? "Não foi possível aprovar o pedido.");
-            return RedirectToAction(nameof(Detail), new { id });
-        }
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
         Toast("success", "Pedido aprovado.");
         return RedirectToAction(nameof(Detail), new { id });
     }
@@ -274,11 +273,8 @@ public class PedidosController(
     public async Task<IActionResult> Recusar(string id, string? motivo, string? mensagemCliente)
     {
         var result = await svc.RecusarAsync(id, string.IsNullOrWhiteSpace(motivo) ? "OPERACIONAL" : motivo, mensagemCliente);
-        if (HasError(result))
-        {
-            Toast("error", result.ErrorMessage ?? "Não foi possível recusar o pedido.");
-            return RedirectToAction(nameof(Detail), new { id });
-        }
+        if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
+
         Toast("success", "Pedido recusado.");
         return RedirectToAction(nameof(Index));
     }
