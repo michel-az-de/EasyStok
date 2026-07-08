@@ -13,6 +13,21 @@
 }
 
 <style>
+    .aviso-thumb {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--r-md);
+        border: 1px solid var(--border-soft);
+        background: var(--surface-sunken);
+        flex-shrink: 0;
+    }
+    img.aviso-thumb { object-fit: cover; }
+    span.aviso-thumb {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+    }
     .aviso-chip {
         display: inline-flex;
         align-items: center;
@@ -61,32 +76,34 @@
                 <div style="display:flex; align-items:center; gap:12px;">
                     @if (b.EhImagem && !string.IsNullOrWhiteSpace(b.ImagemUrl))
                     {
-                        <img src="@b.ImagemUrl" alt="" loading="lazy"
-                             style="width:44px; height:44px; border-radius:var(--r-md); object-fit:cover; border:1px solid var(--border-soft); background:var(--surface-sunken); flex-shrink:0;" />
+                        <img src="@b.ImagemUrl" alt="" loading="lazy" class="aviso-thumb"
+                             onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='inline-flex';" />
+                        <span class="aviso-thumb" style="display:none;" aria-hidden="true" title="Imagem indisponível"><es-icon name="alert-triangle" size="18" /></span>
                     }
                     else
                     {
-                        <span style="width:44px; height:44px; border-radius:var(--r-md); border:1px solid var(--border-soft); background:var(--surface-sunken); display:inline-flex; align-items:center; justify-content:center; color:var(--text-muted); flex-shrink:0;">
-                            <es-icon name="@(b.EhImagem ? "eye-off" : "info")" size="18" />
-                        </span>
+                        <span class="aviso-thumb"><es-icon name="@(b.EhImagem ? "alert-triangle" : "info")" size="18" /></span>
                     }
                     <div style="min-width:0;">
                         <div style="font-weight:600; color:var(--text-primary);">@b.Titulo</div>
-                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
-                            <span style="font-size:11px; color:var(--text-muted);">@(b.EhImagem ? "Imagem" : "Mensagem")</span>
-                            @if (b.ExigeConfirmacao)
-                            {
-                                <span class="aviso-chip"><es-icon name="check-circle" size="11" /> Confirmação</span>
-                            }
-                            @if (b.Unica)
-                            {
-                                <span class="aviso-chip"><es-icon name="eye" size="11" /> 1× por usuário</span>
-                            }
-                            @if (b.Notifica)
-                            {
-                                <span class="aviso-chip"><es-icon name="bell" size="11" /> Notifica</span>
-                            }
-                        </div>
+                        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">@(b.EhImagem ? "Imagem" : "Mensagem")</div>
+                        @if (b.ExigeConfirmacao || b.Unica || b.Notifica)
+                        {
+                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                                @if (b.ExigeConfirmacao)
+                                {
+                                    <span class="aviso-chip"><es-icon name="check-circle" size="11" /> Confirmação</span>
+                                }
+                                @if (b.Unica)
+                                {
+                                    <span class="aviso-chip"><es-icon name="eye" size="11" /> 1× por usuário</span>
+                                }
+                                @if (b.Notifica)
+                                {
+                                    <span class="aviso-chip"><es-icon name="bell" size="11" /> Notifica</span>
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
             </td>
@@ -94,7 +111,7 @@
                 <es-badge variant="@s.Variant" with-dot="@s.Dot">@s.Label</es-badge>
             </td>
             <td data-label="Janela (BRT)" style="color:var(--text-muted); font-size:12px;">@b.Janela</td>
-            <td data-label="Prioridade" class="es-data-table-td-numeric" style="font-weight:500;">@b.Prioridade</td>
+            <td data-label="Prioridade" class="es-data-table-td-numeric">@b.Prioridade</td>
             <td class="es-data-table-td-actions">
                 <div class="es-row-actions">
                     <es-button variant="ghost" size="xs" icon="edit-2" href="/Banners/Edit/@b.Id">Editar</es-button>

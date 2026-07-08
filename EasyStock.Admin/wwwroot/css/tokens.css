@@ -483,6 +483,16 @@ html, body {
 .badge-accent{ background: var(--orange-50);color: var(--orange-700);border-color: var(--orange-200); }
 .badge-neutral { background: var(--ink-100); color: var(--ink-700);  border-color: var(--ink-200); }
 
+/* Dark-first (issue 872): os fills -50 dos badges semanticos sao de tema claro e no dark
+   viram pilulas quase-brancas, colapsando a codificacao de cor (No ar/Agendado/Expirado
+   ficam indistinguiveis). Remapeia para tinta translucida + texto claro -300/-200, no mesmo
+   padrao translucido do .badge-neutral e do .op-status-* (operacao.css). So .badge-neutral
+   ja estava correto no dark (usa --ink-*, que e remapeado). */
+:root[data-theme="dark"] .badge-ok   { background: color-mix(in srgb, var(--ok-500) 18%, transparent);   color: var(--ok-300);   border-color: color-mix(in srgb, var(--ok-500) 34%, transparent); }
+:root[data-theme="dark"] .badge-warn { background: color-mix(in srgb, var(--warn-500) 20%, transparent); color: var(--warn-300); border-color: color-mix(in srgb, var(--warn-500) 36%, transparent); }
+:root[data-theme="dark"] .badge-crit { background: color-mix(in srgb, var(--crit-500) 18%, transparent); color: var(--crit-300); border-color: color-mix(in srgb, var(--crit-500) 34%, transparent); }
+:root[data-theme="dark"] .badge-info { background: color-mix(in srgb, var(--navy-500) 26%, transparent); color: var(--navy-200); border-color: color-mix(in srgb, var(--navy-500) 42%, transparent); }
+
 /* dot indicator */
 .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; display: inline-block; }
 

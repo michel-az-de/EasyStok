@@ -66,8 +66,8 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         }
         catch (Exception ex)
         {
-            log.LogError(ex, "Falha ao carregar banner {Id}", id);
-            SetErro("Falha ao carregar o banner.");
+            log.LogError(ex, "Falha ao carregar aviso {Id}", id);
+            SetErro("Falha ao carregar o aviso.");
         }
     }
 
@@ -76,9 +76,9 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         var ehTexto = string.Equals(Forma, "texto", StringComparison.OrdinalIgnoreCase);
 
         if (string.IsNullOrWhiteSpace(TituloInterno))
-            return ComErro("Informe um título interno.");
+            return ComErroCampo(nameof(TituloInterno), "Informe um título interno.");
         if (ehTexto && string.IsNullOrWhiteSpace(Corpo))
-            return ComErro("Banner só-texto exige a mensagem.");
+            return ComErroCampo(nameof(Corpo), "O aviso em mensagem exige o texto do aviso.");
 
         try
         {
@@ -102,7 +102,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
             }
 
             if (!ehTexto && string.IsNullOrWhiteSpace(ImagemStorageKey))
-                return ComErro("Envie uma imagem (ou escolha a forma só-texto).");
+                return ComErroCampo(nameof(Imagem), "Envie uma imagem (ou escolha a forma Mensagem).");
 
             var payload = new
             {
@@ -131,12 +131,12 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
             if (Id is { } id && id != Guid.Empty)
             {
                 await api.PutAsync($"api/admin/banners/{id}", payload);
-                SetSucesso("Banner atualizado.");
+                SetSucesso("Aviso atualizado.");
             }
             else
             {
                 await api.PostJsonAsync<JsonElement>("api/admin/banners", payload);
-                SetSucesso("Banner criado.");
+                SetSucesso("Aviso criado.");
             }
             return RedirectToPage("/Banners/Index");
         }
@@ -146,14 +146,20 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
         }
         catch (Exception ex)
         {
-            log.LogError(ex, "Falha ao salvar banner");
-            return ComErro("Falha ao salvar o banner.");
+            log.LogError(ex, "Falha ao salvar aviso");
+            return ComErro("Falha ao salvar o aviso.");
         }
     }
 
     private IActionResult ComErro(string msg)
     {
         SetErro(msg);
+        return Page();
+    }
+
+    private IActionResult ComErroCampo(string campo, string msg)
+    {
+        ModelState.AddModelError(campo, msg);
         return Page();
     }
 
