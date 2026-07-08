@@ -1,0 +1,130 @@
+@page "{id?}"
+@model EasyStock.Admin.Pages.Banners.EditModel
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Editar banner" : "Novo banner";
+    string JsBool(bool b) => b ? "true" : "false";
+    string? Dt(DateTime? d) => d?.ToString("yyyy-MM-ddTHH:mm");
+}
+
+<es-page-header eyebrow="Comunicação"
+                titulo="@ViewData["Title"]"
+                descricao="Banner de plataforma exibido a todos os lojistas no app Web.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Banners">Banners</es-breadcrumb-item>
+            <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Novo")</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+    <es-button variant="ghost" href="/Banners" icon="arrow-left">Voltar</es-button>
+</es-page-header>
+
+<div style="max-width:960px;"
+     x-data="bannerForm({ forma: '@Model.Forma', urlAtiva: @JsBool(Model.LinkAtivo), tooltipAtivo: @JsBool(Model.TooltipAtivo), tamanhoModo: '@Model.TamanhoModo', imagemUrl: '@(Model.ImagemUrl ?? "")' })">
+    <div style="display:grid; grid-template-columns:1fr; gap:16px;">
+        <es-card>
+            <form method="post" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:14px;">
+                <es-input asp-for="TituloInterno" label="Título interno" required="true" maxlength="120"
+                          helper="Só aparece no console — não é exibido ao lojista." />
+
+                <div role="radiogroup" aria-label="Forma do banner" style="display:flex; gap:16px;">
+                    <label class="es-switch"><input type="radio" name="Forma" value="imagem" x-model="forma"><span>Imagem</span></label>
+                    <label class="es-switch"><input type="radio" name="Forma" value="texto" x-model="forma"><span>Só texto (vira modal)</span></label>
+                </div>
+
+                @* ── Forma imagem ── *@
+                <div x-show="forma === 'imagem'" x-cloak style="display:flex; flex-direction:column; gap:14px;">
+                    <div>
+                        <label for="Imagem" style="font-size:13px; color:var(--text-secondary);">Imagem (PNG, JPG ou WEBP)</label>
+                        <input type="file" id="Imagem" name="Imagem" accept="image/png,image/jpeg,image/webp"
+                               x-on:change="previewLocal($event)" style="display:block; margin-top:6px;">
+                    </div>
+
+                    <div role="radiogroup" aria-label="Tamanho" style="display:flex; gap:16px;">
+                        <label class="es-switch"><input type="radio" name="TamanhoModo" value="herdado" x-model="tamanhoModo"><span>Herdar da imagem</span></label>
+                        <label class="es-switch"><input type="radio" name="TamanhoModo" value="manual" x-model="tamanhoModo"><span>Definir L × A</span></label>
+                    </div>
+                    <div x-show="tamanhoModo === 'manual'" x-cloak style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <es-input asp-for="LarguraPx" type="number" label="Largura (px)" />
+                        <es-input asp-for="AlturaPx" type="number" label="Altura (px)" />
+                    </div>
+
+                    <label class="es-switch"><input type="checkbox" name="LinkAtivo" value="true" x-model="urlAtiva"><span>Link clicável</span></label>
+                    <div x-show="urlAtiva" x-cloak style="display:flex; flex-direction:column; gap:10px;">
+                        <es-input asp-for="LinkUrl" type="url" label="URL de destino" placeholder="https://..." />
+                        <es-switch name="NovaAba" label="Abrir em nova aba" checked="@Model.NovaAba" />
+                    </div>
+
+                    <label class="es-switch"><input type="checkbox" name="TooltipAtivo" value="true" x-model="tooltipAtivo"><span>Tooltip</span></label>
+                    <div x-show="tooltipAtivo" x-cloak>
+                        <es-input asp-for="TooltipTexto" label="Texto do tooltip" maxlength="300" />
+                    </div>
+                </div>
+
+                @* ── Forma texto ── *@
+                <div x-show="forma === 'texto'" x-cloak>
+                    <es-textarea asp-for="Corpo" label="Mensagem do modal" rows="5"
+                                 helper="Exibida como aviso em modal. Quebras de linha são preservadas." />
+                </div>
+
+                <hr style="border:none; border-top:1px solid var(--border-soft); margin:4px 0;">
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <es-switch name="VisualizacaoUnica" label="Mostrar só 1× por usuário" checked="@Model.VisualizacaoUnica" />
+                    <es-switch name="ExigeConfirmacao" label="Exigir “Ok, recebi”" checked="@Model.ExigeConfirmacao" />
+                    <es-switch name="NotificarAoPublicar" label="Também criar notificação" checked="@Model.NotificarAoPublicar" />
+                    <es-switch name="Ativo" label="Ativo (visível)" checked="@Model.Ativo" />
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+                    <es-input asp-for="InicioEm" type="datetime-local" label="Início" label-optional="true" value="@Dt(Model.InicioEm)" />
+                    <es-input asp-for="FimEm" type="datetime-local" label="Fim" label-optional="true" value="@Dt(Model.FimEm)" />
+                    <es-input asp-for="Prioridade" type="number" label="Prioridade" />
+                </div>
+
+                <div style="display:flex; gap:8px; padding-top:6px;">
+                    <es-button type="submit" variant="primary" icon="check">Salvar</es-button>
+                    <es-button variant="ghost" href="/Banners">Cancelar</es-button>
+                </div>
+            </form>
+        </es-card>
+
+        @* ── Preview ao vivo (client-only) ── *@
+        <es-card>
+            <h3 style="margin:0 0 10px; font-size:14px; color:var(--text-secondary);">Prévia</h3>
+            <div style="border:1px solid var(--border-soft); border-radius:8px; padding:16px; background:var(--surface-2, var(--bg-subtle));">
+                <template x-if="forma === 'imagem' && (previewUrl || imagemUrl)">
+                    <img x-bind:src="previewUrl || imagemUrl"
+                         x-bind:style="tamanhoModo === 'manual' && $refs.lp?.value && $refs.ap?.value ? ('width:' + $refs.lp.value + 'px;height:' + $refs.ap.value + 'px;max-width:100%;object-fit:contain') : 'max-width:100%;height:auto'"
+                         alt="Prévia do banner">
+                </template>
+                <template x-if="forma === 'imagem' && !(previewUrl || imagemUrl)">
+                    <p style="color:var(--text-muted); font-size:13px; margin:0;">Envie uma imagem para ver a prévia.</p>
+                </template>
+                <template x-if="forma === 'texto'">
+                    <div style="white-space:pre-line; color:var(--text-primary);" x-text="$refs.corpo?.value || 'Mensagem do modal…'"></div>
+                </template>
+            </div>
+        </es-card>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function bannerForm(init) {
+            return {
+                forma: init.forma || 'imagem',
+                urlAtiva: !!init.urlAtiva,
+                tooltipAtivo: !!init.tooltipAtivo,
+                tamanhoModo: init.tamanhoModo || 'herdado',
+                imagemUrl: init.imagemUrl || '',
+                previewUrl: '',
+                previewLocal(ev) {
+                    const f = ev.target.files && ev.target.files[0];
+                    if (this.previewUrl) { try { URL.revokeObjectURL(this.previewUrl); } catch (_) {} }
+                    this.previewUrl = f ? URL.createObjectURL(f) : '';
+                }
+            };
+        }
+    </script>
+}

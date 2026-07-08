@@ -1,0 +1,85 @@
+@page
+@model EasyStock.Admin.Pages.Banners.IndexModel
+@{
+    ViewData["Title"] = "Banners — Comunicação de plataforma";
+}
+
+<es-page-header eyebrow="Comunicação"
+                titulo="Banners"
+                descricao="Avisos de plataforma exibidos a todos os lojistas no app Web.">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item>Banners</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+    <es-button variant="primary" href="/Banners/Edit" icon="plus">Novo banner</es-button>
+</es-page-header>
+
+<es-filter-bar>
+    <es-button variant="@(Model.Ativo == null ? "primary" : "ghost")" size="xs" href="/Banners">Todos</es-button>
+    <es-button variant="@(Model.Ativo == true ? "primary" : "ghost")" size="xs" href="/Banners?ativo=1">Ativos</es-button>
+    <es-button variant="@(Model.Ativo == false ? "primary" : "ghost")" size="xs" href="/Banners?ativo=0">Inativos</es-button>
+</es-filter-bar>
+
+<es-data-table is-empty="@(!Model.Itens.Any())">
+    <es-data-table-column label="Título interno" />
+    <es-data-table-column label="Forma" />
+    <es-data-table-column label="Situação" />
+    <es-data-table-column label="Janela" />
+    <es-data-table-column label="Prioridade" align="right" />
+    <es-data-table-column label="" actions="true" width="260px" />
+
+    @foreach (var b in Model.Itens)
+    {
+        var id = b.GetProperty("id").GetGuid();
+        var titulo = b.GetProperty("tituloInterno").GetString();
+        var tipo = b.GetProperty("tipo").GetString();
+        var ativo = b.TryGetProperty("ativo", out var a) && a.GetBoolean();
+        var prioridade = b.TryGetProperty("prioridade", out var p) ? p.GetInt32() : 0;
+        var inicio = b.TryGetProperty("inicioEm", out var i) && i.ValueKind == JsonValueKind.String ? i.GetDateTime() : (DateTime?)null;
+        var fim = b.TryGetProperty("fimEm", out var f) && f.ValueKind == JsonValueKind.String ? f.GetDateTime() : (DateTime?)null;
+        var formaLabel = string.Equals(tipo, "Mensagem", StringComparison.OrdinalIgnoreCase) ? "Só texto" : "Imagem";
+
+        <tr>
+            <td data-label="Título interno" style="font-weight:500; color:var(--text-primary);">@titulo</td>
+            <td data-label="Forma" style="color:var(--text-secondary); font-size:13px;">@formaLabel</td>
+            <td data-label="Situação">
+                <es-badge variant="@(ativo ? "ok" : "neutral")" with-dot="true">@(ativo ? "ATIVO" : "INATIVO")</es-badge>
+            </td>
+            <td data-label="Janela" style="color:var(--text-muted); font-size:12px;">
+                @(inicio?.ToString("dd/MM/yy") ?? "—") → @(fim?.ToString("dd/MM/yy") ?? "sem fim")
+            </td>
+            <td data-label="Prioridade" class="es-data-table-td-numeric" style="font-weight:500;">@prioridade</td>
+            <td class="es-data-table-td-actions">
+                <div class="es-row-actions">
+                    <es-button variant="ghost" size="xs" icon="edit-2" href="/Banners/Edit/@id">Editar</es-button>
+                    @if (!ativo)
+                    {
+                        <form method="post" asp-page-handler="Ativar" asp-route-id="@id" style="display:inline;">
+                            <es-button type="submit" variant="ghost" size="xs" icon="check">Ativar</es-button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="Desativar" asp-route-id="@id" style="display:inline;">
+                            <es-button type="submit" variant="ghost" size="xs">Desativar</es-button>
+                        </form>
+                    }
+                    <form method="post" asp-page-handler="Excluir" asp-route-id="@id" style="display:inline;"
+                          onsubmit="return confirm('Excluir este banner? Se houver confirmações registradas, use Desativar.');">
+                        <es-button type="submit" variant="ghost" size="xs" icon="trash-2">Excluir</es-button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+    }
+
+    <es-data-table-empty>
+        <es-empty-state icon="megaphone"
+                        title="Nenhum banner"
+                        description="Crie um banner para comunicar avisos a todos os lojistas.">
+            <es-button variant="primary" icon="plus" href="/Banners/Edit">Criar primeiro banner</es-button>
+        </es-empty-state>
+    </es-data-table-empty>
+</es-data-table>

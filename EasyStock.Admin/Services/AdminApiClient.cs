@@ -243,6 +243,14 @@ public class AdminApiClient(HttpClient httpClient)
         await EnsureSuccessOrThrowAsync(response);
     }
 
+    /// <summary>POST sem corpo de retorno relevante (204 NoContent). Ex.: ativar/desativar.</summary>
+    public async Task PostAsync(string path, object body)
+    {
+        using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Post, path, body));
+        ThrowIfUnauthorized(response);
+        await EnsureSuccessOrThrowAsync(response);
+    }
+
     public async Task PatchRawAsync(string path, object body)
     {
         using var response = await httpClient.SendAsync(BuildRequest(HttpMethod.Patch, path, body));
