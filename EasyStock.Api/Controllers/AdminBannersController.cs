@@ -21,6 +21,8 @@ public class AdminBannersController(
     DeletarBannerUseCase deletarUseCase,
     ListarBannersAdminUseCase listarUseCase,
     ObterBannerUseCase obterUseCase,
+    ConsultarRecebimentoBannerUseCase recebimentoUseCase,
+    RevelarEmailRecebimentoUseCase revelarEmailUseCase,
     GerenciarUploadsUseCase uploadsUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
@@ -40,6 +42,33 @@ public class AdminBannersController(
     {
         try { return DataOk(await obterUseCase.ExecuteAsync(new ObterBannerQuery(id), ct)); }
         catch (BannerNaoEncontradoException) { return DataNotFound("Banner não encontrado."); }
+    }
+
+    /// <summary>Console de recebimento (#875): resumo + série diária + log paginado (e-mail mascarado).</summary>
+    [HttpGet("{id:guid}/recebimento")]
+    public async Task<IActionResult> Recebimento(
+        Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? tipo = null,
+        [FromQuery] string? busca = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var r = await recebimentoUseCase.ExecuteAsync(
+                new ConsultarRecebimentoBannerQuery(id, page, pageSize, tipo, busca), ct);
+            return DataOk(r);
+        }
+        catch (BannerNaoEncontradoException) { return DataNotFound("Banner não encontrado."); }
+    }
+
+    /// <summary>Revela o e-mail completo de um usuário no console (LGPD: acesso auditado no use case).</summary>
+    [HttpGet("{id:guid}/recebimento/{usuarioId:guid}/email")]
+    public async Task<IActionResult> RevelarEmail(Guid id, Guid usuarioId, CancellationToken ct)
+    {
+        var email = await revelarEmailUseCase.ExecuteAsync(usuarioId, currentUser.UsuarioId, ct);
+        return email is null ? DataNotFound("Usuário não encontrado.") : DataOk(new { email });
     }
 
     [HttpPost]

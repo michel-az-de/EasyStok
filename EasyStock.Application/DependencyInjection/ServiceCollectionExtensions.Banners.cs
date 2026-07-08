@@ -19,6 +19,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<DeletarBannerUseCase>();
         services.AddScoped<ListarBannersAdminUseCase>();
         services.AddScoped<ObterBannerUseCase>();
+        services.AddScoped<ConsultarRecebimentoBannerUseCase>();
+        services.AddScoped<RevelarEmailRecebimentoUseCase>();
 
         // Web (usuário logado)
         services.AddScoped<ListarBannersAtivosUseCase>();
