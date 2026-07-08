@@ -161,6 +161,12 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventDispatcher,
                 Integration.IntegrationEventDispatcher>();
 
+            // Handlers de integracao (keyed pelo TipoEvento). pedido.mudou_status (Onda 4 /
+            // issue 866): handler de observabilidade — evita que o evento fique em retry por
+            // "sem handler"; a Onda 5 (#867) pluga Hiram/marketplace ao lado deste.
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Pedidos.Handlers.PedidoMudouStatusLogHandler>("pedido.mudou_status");
+
             // Modulo Fiscal NFC-e (F1) — repositorios + servicos sobre Nfe*
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.INfeRepository,
                 Repositories.Fiscal.NfeRepository>();

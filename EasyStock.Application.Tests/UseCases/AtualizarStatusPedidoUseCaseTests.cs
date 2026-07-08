@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -11,7 +12,7 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class AtualizarStatusPedidoUseCaseTests
 {
-    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow) Build(bool permiteNegativo = true)
+    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true)
     {
         var pedidoRepo = Substitute.For<IPedidoRepository>();
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
@@ -20,14 +21,15 @@ public class AtualizarStatusPedidoUseCaseTests
         var configRepo = Substitute.For<IConfiguracaoLojaRepository>();
         var contaReceberRepo = Substitute.For<IContaReceberRepository>();
         var categoriaRepo = Substitute.For<ICategoriaFinanceiraRepository>();
+        var publicador = Substitute.For<IPublicadorEventoIntegracao>();
         var criarContaReceber = new CriarContaReceberUseCase(contaReceberRepo, categoriaRepo,
             Substitute.For<ICentroCustoRepository>(), uow, NullLogger<CriarContaReceberUseCase>.Instance);
         var gerarCr = new GerarContaReceberDePedidoUseCase(contaReceberRepo, categoriaRepo, configRepo,
             criarContaReceber, NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
         var opts = Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = permiteNegativo });
         var integ = new PedidoEstoqueIntegrationService(itemRepo, movRepo, opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
-        var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
-        return (uc, pedidoRepo, itemRepo, movRepo, uow);
+        var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, publicador, uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
+        return (uc, pedidoRepo, itemRepo, movRepo, uow, publicador);
     }
 
     private static Pedido NovoPedido(Guid empresaId, Guid lojaId, Guid produtoId, decimal qty, string status = "aguardando")
@@ -49,7 +51,7 @@ public class AtualizarStatusPedidoUseCaseTests
     [Fact]
     public async Task Status_aguardando_para_preparando_nao_mexe_estoque()
     {
-        var (uc, repo, itemRepo, movRepo, _) = Build();
+        var (uc, repo, itemRepo, movRepo, _, _) = Build();
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
@@ -66,7 +68,7 @@ public class AtualizarStatusPedidoUseCaseTests
     [Fact]
     public async Task Status_para_pronto_desconta_estoque_e_atualiza_status()
     {
-        var (uc, repo, itemRepo, movRepo, _) = Build();
+        var (uc, repo, itemRepo, movRepo, _, _) = Build();
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
@@ -95,7 +97,7 @@ public class AtualizarStatusPedidoUseCaseTests
     [Fact]
     public async Task Transicao_invalida_lanca_e_status_nao_muda()
     {
-        var (uc, repo, _, _, _) = Build();
+        var (uc, repo, _, _, _, publicador) = Build();
         var empresaId = Guid.NewGuid();
         var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1, "entregue");
         repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
@@ -104,12 +106,42 @@ public class AtualizarStatusPedidoUseCaseTests
 
         await Assert.ThrowsAsync<UseCaseValidationException>(() => uc.ExecuteAsync(cmd));
         pedido.Status.Should().Be("entregue");
+        // Transicao invalida NAO publica evento no outbox.
+        await publicador.DidNotReceive().PublicarAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(),
+            Arg.Any<EasyStock.Application.Events.Pedidos.PedidoMudouStatusEvent>(),
+            Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Transicao_valida_publica_PedidoMudouStatus_no_outbox()
+    {
+        var (uc, repo, _, _, _, publicador) = Build();
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 2, "aguardando");
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var cmd = new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "preparando",
+            UsuarioNome: "Operador", Origem: "web");
+        await uc.ExecuteAsync(cmd);
+
+        await publicador.Received(1).PublicarAsync(
+            empresaId,
+            "pedido.mudou_status",
+            "pedido",
+            pedido.Id,
+            Arg.Is<EasyStock.Application.Events.Pedidos.PedidoMudouStatusEvent>(e =>
+                e.StatusAntigo == "aguardando" && e.StatusNovo == "preparando" && e.Origem == "web"),
+            Arg.Any<int>(),
+            pedido.Id.ToString(),
+            Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Cancelar_pedido_entregue_devolve_estoque()
     {
-        var (uc, repo, itemRepo, movRepo, _) = Build();
+        var (uc, repo, itemRepo, movRepo, _, _) = Build();
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();

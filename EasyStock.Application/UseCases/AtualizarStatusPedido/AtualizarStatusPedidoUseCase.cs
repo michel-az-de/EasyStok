@@ -1,3 +1,5 @@
+using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
@@ -37,6 +39,7 @@ public class AtualizarStatusPedidoUseCase(
     PedidoEstoqueIntegrationService estoqueIntegration,
     IConfiguracaoLojaRepository configLojaRepo,
     GerarContaReceberDePedidoUseCase gerarContaReceberUseCase,
+    IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger)
 {
@@ -106,6 +109,26 @@ public class AtualizarStatusPedidoUseCase(
             Origem = cmd.Origem,
             OcorridoEm = DateTime.UtcNow
         });
+
+        // Ponto de integracao unico da esteira (ADR-0042, Onda 4): publica a transicao no
+        // outbox, na MESMA transacao do commit de status. Hiram/marketplaces consomem este
+        // evento em vez de observar a coluna Status (issue 866).
+        await publicadorEventos.PublicarAsync(
+            empresaId: pedido.EmpresaId,
+            tipoEvento: "pedido.mudou_status",
+            aggregateType: "pedido",
+            aggregateId: pedido.Id,
+            payload: new PedidoMudouStatusEvent(
+                PedidoId: pedido.Id,
+                EmpresaId: pedido.EmpresaId,
+                LojaId: pedido.LojaId,
+                StatusAntigo: statusAntigoStr,
+                StatusNovo: statusNovoStr,
+                Origem: cmd.Origem,
+                UsuarioId: cmd.UsuarioId,
+                UsuarioNome: cmd.UsuarioNome,
+                OcorridoEm: DateTime.UtcNow),
+            correlationId: pedido.Id.ToString());
 
         await pedidoRepo.UpdateAsync(pedido);
         await uow.CommitAsync();
