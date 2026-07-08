@@ -38,5 +38,11 @@ public class StatusHelperStatusVocabularyTests
             $"o status '{wire}' ({status}) precisa de entrada em StatusHelper.Map (issue #719)");
         info.Label.Should().NotStartWith("UNMAPPED:",
             $"o status '{wire}' ({status}) caiu no fallback de dev — falta no StatusHelper.Map (issue #719)");
+
+        // Onda 1 (issue 863): o rótulo do Web deve DERIVAR do vocabulário canônico do
+        // domínio — bater, não só existir. Drift de rótulo (não só ausência) vira vermelho.
+        // O Web é BFF puro e não referencia o Domain; este teste (que referencia) é a ponte.
+        info.Label.Should().Be(StatusPedidoVocabulario.RotuloLojista(status),
+            $"o rótulo de '{wire}' no StatusHelper deve bater com StatusPedidoVocabulario (issue 863)");
     }
 }

@@ -18,7 +18,7 @@ public static class StatusHelper
         // Esquema de-enfatiza estados terminais (epic #534): cor chama atencao no que
         // precisa de acao (aguardando/preparando); pronto=positivo; entregue/cancelado calmos.
         ["aguardando"] = new("Aguardando", "badge-warn",    "warn"),
-        ["preparando"] = new("Preparando", "badge-info",    "info"),
+        ["preparando"] = new("Em preparo", "badge-info",    "info"),  // canônico (issue 863): StatusPedidoVocabulario.RotuloLojista
         ["pronto"]     = new("Pronto",     "badge-ok",      "ok"),
         ["entregue"]   = new("Entregue",   "badge-neutral", "neutral"),
         ["cancelado"]  = new("Cancelado",  "badge-neutral badge-struck", "neutral"),
