@@ -23,7 +23,10 @@ public class IndexModel(AdminApiClient api, AdminSessionService session, ILogger
 
     public IReadOnlyList<BannerLinha> Itens { get; private set; } = Array.Empty<BannerLinha>();
     public int Total { get; private set; }
-    public int Page { get; private set; } = 1;
+    // 'new': esconde deliberadamente PageModel.Page() (metodo base); aqui Page e o
+    // numero da pagina atual. Sem 'new' o compilador emite CS0108, que vira erro sob
+    // -warnaserror e quebrava o Build da CI.
+    public new int Page { get; private set; } = 1;
     public bool? Ativo { get; private set; }
 
     public async Task OnGetAsync([FromQuery] int page = 1, [FromQuery] string? ativo = null)
