@@ -220,6 +220,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FaqVisualizacao> FaqVisualizacoes { get; set; } = null!;
         public DbSet<FaqFeedback> FaqFeedbacks { get; set; } = null!;
 
+        // Banners — broadcast global de plataforma (sem multi-tenant, sem RLS). Ver #869.
+        public DbSet<EasyStock.Domain.Entities.Banners.Banner> Banners { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Banners.BannerConfirmacao> BannerConfirmacoes { get; set; } = null!;
+
         public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
         public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;

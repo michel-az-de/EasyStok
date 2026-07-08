@@ -130,6 +130,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
             services.AddScoped<IFaqRepository, FaqRepository>();
             services.AddScoped<IFaqAdminRepository, FaqAdminRepository>();
+            services.AddScoped<IBannerRepository, BannerRepository>();
+            services.AddScoped<IBannerConfirmacaoRepository, BannerConfirmacaoRepository>();
             services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
