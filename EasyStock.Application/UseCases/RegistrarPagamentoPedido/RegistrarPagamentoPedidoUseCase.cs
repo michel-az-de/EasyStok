@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 
@@ -44,6 +45,17 @@ public class RegistrarPagamentoPedidoUseCase(
 
         var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
         if (pedido == null) return null;
+
+        // Pagamento manual so em pedido operacional: pre-operacional (montagem / pagamento
+        // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o
+        // pagamento-fantasma em pedido do cardapio nao aprovado, em TODA superficie que chame
+        // este use case (cockpit, Detail, mobile, API). Espelha PRE_OPERACIONAL do cockpit (issue 862).
+        if (StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
+            && !PedidoStateMachine.AceitaPagamento(statusPedido))
+        {
+            throw new UseCaseValidationException(
+                "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
+        }
 
         var pag = new PedidoPagamento
         {

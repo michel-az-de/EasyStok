@@ -441,4 +441,49 @@ public class PedidoUseCasesTests
         pedido.TotalPago.Should().Be(55m); // 30 + 25
         pedido.Total.Should().Be(Dinheiro.FromDecimal(100m));    // total não muda
     }
+
+    // Guarda de causa-raiz (issue 862): nao se registra pagamento manual num pedido
+    // pre-operacional (montagem/pagamento-online/aprovacao do cardapio guest). Fecha o
+    // "pagamento-fantasma" em TODAS as superficies (cockpit, Detail, mobile, API), nao so
+    // escondendo o botao no front. Espelha PRE_OPERACIONAL do cockpit.
+    [Theory]
+    [InlineData("rascunho")]
+    [InlineData("aguardando_pagamento")]
+    [InlineData("aguardando_aprovacao_baba")]
+    public async Task RegistrarPagamento_DeveRejeitar_QuandoStatusPreOperacional(string statusPre)
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        pedido.Total = Dinheiro.FromDecimal(100m);
+        pedido.Status = statusPre;
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var act = () => PagamentoUC().ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 50m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        pedido.Pagamentos.Should().BeEmpty();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Theory]
+    [InlineData("aguardando")]
+    [InlineData("preparando")]
+    [InlineData("pronto")]
+    [InlineData("entregue")]
+    [InlineData("aprovado_baba")]
+    public async Task RegistrarPagamento_DevePermitir_QuandoStatusOperacional(string statusOp)
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        pedido.Total = Dinheiro.FromDecimal(100m);
+        pedido.Status = statusOp;
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await PagamentoUC().ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 50m));
+
+        pedido.TotalPago.Should().Be(50m);
+        await _uow.Received(1).CommitAsync();
+    }
 }

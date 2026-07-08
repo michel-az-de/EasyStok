@@ -85,6 +85,28 @@ public static class PedidoStateMachine
     public static IReadOnlySet<StatusPedido> ComEstoqueDescontado { get; } =
         new HashSet<StatusPedido> { StatusPedido.Pronto, StatusPedido.Entregue };
 
+    /// <summary>
+    /// Status "pré-operacionais": o pedido ainda não entrou na fila de trabalho — está
+    /// sendo montado (<see cref="StatusPedido.Rascunho"/>), aguardando o pagamento online
+    /// do checkout (<see cref="StatusPedido.AguardandoPagamento"/>) ou a confirmação da loja
+    /// (<see cref="StatusPedido.AguardandoAprovacaoBaba"/>, do cardápio guest, que nem cobra
+    /// online). Não se registra pagamento manual aqui: primeiro o pedido é aprovado/entra no
+    /// fluxo, depois se recebe. Espelhado no cockpit (PRE_OPERACIONAL em pedidos-cockpit.js),
+    /// issue 862.
+    /// </summary>
+    public static IReadOnlySet<StatusPedido> PreOperacionais { get; } =
+        new HashSet<StatusPedido>
+        {
+            StatusPedido.Rascunho, StatusPedido.AguardandoPagamento, StatusPedido.AguardandoAprovacaoBaba,
+        };
+
+    /// <summary>
+    /// Pode registrar pagamento manual? Só quando o pedido já é operacional — nunca em
+    /// estado <see cref="PreOperacionais">pré-operacional</see> (montagem / pagamento-online
+    /// pendente / aprovação do cardápio). Guarda de causa-raiz contra pagamento-fantasma.
+    /// </summary>
+    public static bool AceitaPagamento(StatusPedido status) => !PreOperacionais.Contains(status);
+
     public static bool PodeTransicionar(StatusPedido de, StatusPedido para)
         => Transicoes.TryGetValue(de, out var destinos) && destinos.Contains(para);
 
