@@ -21,6 +21,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IReadOnlyList<Banner>> ListarAtivosNaoConfirmadosAsync(
             Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default);
 
+        /// <summary>
+        /// Banners marcados para notificar, ativos e ainda não notificados. O worker os
+        /// enfileira (fan-out por empresa) e marca via <see cref="MarcarNotificadoSeIneditoAsync"/>.
+        /// </summary>
+        Task<IReadOnlyList<Banner>> ListarPendentesDeNotificacaoAsync(CancellationToken ct = default);
+
         Task InserirAsync(Banner banner, CancellationToken ct = default);
         Task AtualizarAsync(Banner banner, CancellationToken ct = default);
         Task RemoverAsync(Banner banner, CancellationToken ct = default);

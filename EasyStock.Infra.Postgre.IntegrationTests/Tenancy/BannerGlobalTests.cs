@@ -161,6 +161,29 @@ public class BannerGlobalTests(PostgreSqlDatabaseFixture fixture)
         (await new BannerConfirmacaoRepository(ctx).ContarAsync(banner.Id)).Should().Be(1);
     }
 
+    // ── #8 — fila de notificação: lista pendentes e o guard remove ──────────
+    [SkippableFact]
+    public async Task Pendentes_de_notificacao_lista_e_guard_remove()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+
+        var comNotif = await SeedBannerAsync(b => { b.Ativo = true; b.NotificarAoPublicar = true; });
+        var semNotif = await SeedBannerAsync(b => { b.Ativo = true; b.NotificarAoPublicar = false; });
+        var inativo = await SeedBannerAsync(b => { b.Ativo = false; b.NotificarAoPublicar = true; });
+
+        await using var ctx = fixture.CreateDbContext();
+        var repo = new BannerRepository(ctx);
+
+        var pendentes = (await repo.ListarPendentesDeNotificacaoAsync()).Select(b => b.Id).ToList();
+        pendentes.Should().Contain(comNotif.Id);
+        pendentes.Should().NotContain(semNotif.Id, "sem NotificarAoPublicar não entra na fila");
+        pendentes.Should().NotContain(inativo.Id, "banner inativo não notifica");
+
+        // Guard atômico marca e tira da fila (não re-notifica no próximo tick).
+        (await repo.MarcarNotificadoSeIneditoAsync(comNotif.Id, DateTime.UtcNow)).Should().BeTrue();
+        (await repo.ListarPendentesDeNotificacaoAsync()).Select(b => b.Id).Should().NotContain(comNotif.Id);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
     private async Task<Banner> SeedBannerAsync(Action<BannerSeed>? ajustar = null)
     {
