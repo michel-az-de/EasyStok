@@ -1,0 +1,169 @@
+@page "{id:guid}"
+@model EasyStock.Admin.Pages.Banners.RecebimentoModel
+@{
+    ViewData["Title"] = "Recebimento — " + Model.Titulo;
+    var maxSerie = Model.Serie.Count > 0 ? Model.Serie.Max(x => x.Total) : 1;
+
+    string ComQuery(string? tipo, string? busca, int page)
+    {
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(tipo)) qs.Add($"tipo={Uri.EscapeDataString(tipo)}");
+        if (!string.IsNullOrWhiteSpace(busca)) qs.Add($"busca={Uri.EscapeDataString(busca)}");
+        if (page > 1) qs.Add($"page={page}");
+        return $"/Banners/Recebimento/{Model.Id}" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
+    }
+    (string Variant, string Label) TipoTag(string t) => t switch
+    {
+        "Confirmado" => ("ok", "CONFIRMADO"),
+        "Visto" => ("info", "VISTO"),
+        _ => ("neutral", "IMPRESSÃO")
+    };
+}
+
+<style>
+    .recv-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .recv-kpi { background: var(--bg-surface); border: 1px solid var(--border-soft); border-radius: var(--r-md); padding: 16px; box-shadow: var(--elev-1); }
+    .recv-kpi-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+    .recv-kpi-num { font-family: var(--font-display); font-size: 30px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 4px; }
+    .recv-kpi-pct { font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-left: 4px; }
+    .recv-kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .recv-bar { height: 4px; background: var(--surface-sunken); border-radius: var(--r-pill); overflow: hidden; margin-top: 10px; }
+    .recv-bar span { display: block; height: 100%; border-radius: var(--r-pill); }
+    .recv-bar.is-viram span { background: var(--intent-info); }
+    .recv-bar.is-conf span { background: var(--intent-success); }
+    .recv-bar.is-pend span { background: var(--text-muted); }
+
+    .recv-spark { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+    .recv-spark-bar { flex: 1; min-width: 3px; background: var(--intent-info); border-radius: 2px 2px 0 0; opacity: .7; }
+
+    .recv-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .recv-busca { display: flex; align-items: center; gap: 6px; }
+    .recv-busca .es-form-input { min-width: 220px; }
+
+    .recv-console { background: var(--surface-sunken); border: 1px solid var(--border-soft); border-radius: var(--r-md); font-family: var(--font-mono); font-size: 12.5px; overflow: hidden; }
+    .recv-line { display: grid; grid-template-columns: 148px auto minmax(0, 1fr) 32px; gap: 12px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border-soft); }
+    .recv-line:last-child { border-bottom: none; }
+    .recv-line:nth-child(odd) { background: color-mix(in srgb, var(--text-muted) 4%, transparent); }
+    .recv-ts { color: var(--text-muted); white-space: nowrap; }
+    .recv-who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; min-width: 0; }
+    .recv-nome { font-family: var(--font-sans); color: var(--text-primary); font-weight: 500; }
+    .recv-email { color: var(--text-secondary); }
+    .recv-reveal { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); cursor: pointer; transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out); }
+    .recv-reveal:hover { color: var(--intent-action); border-color: var(--intent-action); }
+    .recv-reveal:focus-visible { box-shadow: var(--focus-ring-orange); outline: none; }
+
+    .recv-pag { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+
+    @@media (prefers-reduced-motion: reduce) { .recv-reveal { transition: none; } }
+</style>
+
+<es-page-header eyebrow="Recebimento"
+                titulo="@Model.Titulo"
+                descricao="Quem viu e confirmou este aviso · dados de uso restrito (LGPD).">
+    <es-page-header-breadcrumb>
+        <es-breadcrumb>
+            <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Banners">Quadro de avisos</es-breadcrumb-item>
+            <es-breadcrumb-item>Recebimento</es-breadcrumb-item>
+        </es-breadcrumb>
+    </es-page-header-breadcrumb>
+    <es-button variant="ghost" href="/Banners" icon="arrow-left">Voltar</es-button>
+</es-page-header>
+
+@* ── KPIs ── *@
+<div class="recv-kpis">
+    <div class="recv-kpi">
+        <div class="recv-kpi-label">Elegíveis</div>
+        <div class="recv-kpi-num">@Model.Elegiveis</div>
+        <div class="recv-kpi-sub">lojistas ativos</div>
+    </div>
+    <div class="recv-kpi">
+        <div class="recv-kpi-label">Viram</div>
+        <div class="recv-kpi-num">@Model.Viram<span class="recv-kpi-pct">@Model.Pct(Model.Viram)%</span></div>
+        <div class="recv-bar is-viram"><span style="width:@Model.Pct(Model.Viram)%"></span></div>
+    </div>
+    <div class="recv-kpi">
+        <div class="recv-kpi-label">Confirmaram</div>
+        <div class="recv-kpi-num">@Model.Confirmaram<span class="recv-kpi-pct">@Model.Pct(Model.Confirmaram)%</span></div>
+        <div class="recv-bar is-conf"><span style="width:@Model.Pct(Model.Confirmaram)%"></span></div>
+    </div>
+    <div class="recv-kpi">
+        <div class="recv-kpi-label">Pendentes</div>
+        <div class="recv-kpi-num">@Model.Pendentes<span class="recv-kpi-pct">@Model.Pct(Model.Pendentes)%</span></div>
+        <div class="recv-bar is-pend"><span style="width:@Model.Pct(Model.Pendentes)%"></span></div>
+    </div>
+</div>
+
+@* ── Timeline ── *@
+@if (Model.Serie.Any())
+{
+    <es-card title="Linha do tempo" description="Interações por dia (BRT).">
+        <div class="recv-spark">
+            @foreach (var pt in Model.Serie)
+            {
+                <div class="recv-spark-bar" style="height:@(Math.Max(6, (int)(100.0 * pt.Total / maxSerie)))%" title="@pt.Dia — @pt.Total"></div>
+            }
+        </div>
+    </es-card>
+}
+
+@* ── Filtros + busca ── *@
+<div class="recv-toolbar" style="margin-top:16px;">
+    <es-filter-bar>
+        <es-button variant="@(Model.Tipo == null ? "primary" : "ghost")" size="xs" href="@ComQuery(null, Model.Busca, 1)">Todos</es-button>
+        <es-button variant="@(Model.Tipo == "Confirmado" ? "primary" : "ghost")" size="xs" href="@ComQuery("Confirmado", Model.Busca, 1)">Confirmações</es-button>
+        <es-button variant="@(Model.Tipo == "Visto" ? "primary" : "ghost")" size="xs" href="@ComQuery("Visto", Model.Busca, 1)">Vistos</es-button>
+        <es-button variant="@(Model.Tipo == "Impressao" ? "primary" : "ghost")" size="xs" href="@ComQuery("Impressao", Model.Busca, 1)">Impressões</es-button>
+    </es-filter-bar>
+    <form method="get" class="recv-busca">
+        <input type="hidden" name="tipo" value="@Model.Tipo" />
+        <input type="search" name="busca" value="@Model.Busca" placeholder="Buscar por nome ou e-mail…" class="es-form-input" />
+        <es-button type="submit" variant="ghost" size="sm" icon="search">Buscar</es-button>
+    </form>
+</div>
+
+@* ── Console de log ── *@
+@if (Model.Eventos.Any())
+{
+    <div class="recv-console">
+        @foreach (var ev in Model.Eventos)
+        {
+            var tag = TipoTag(ev.Tipo);
+            <div class="recv-line" x-data="{ email: '@ev.EmailMascarado', shown: false, loading: false }">
+                <span class="recv-ts">@Model.QuandoBrt(ev.QuandoUtc)</span>
+                <es-badge variant="@tag.Variant">@tag.Label</es-badge>
+                <span class="recv-who">
+                    <span class="recv-nome">@ev.Nome</span>
+                    <span class="recv-email" x-text="email"></span>
+                </span>
+                <button type="button" class="recv-reveal" x-show="!shown" x-cloak
+                        x-bind:disabled="loading"
+                        x-bind:title="loading ? 'Revelando…' : 'Revelar e-mail (registrado por LGPD)'"
+                        x-on:click="loading = true; fetch('?handler=RevelarEmail&usuarioId=@ev.UsuarioId').then(r => r.json()).then(j => { if (j.email) { email = j.email; shown = true; } loading = false; }).catch(() => loading = false)">
+                    <es-icon name="eye" size="14" />
+                </button>
+            </div>
+        }
+    </div>
+
+    @if (Model.TotalPaginas > 1)
+    {
+        <div class="recv-pag">
+            @if (Model.Pagina > 1)
+            {
+                <es-button variant="ghost" size="xs" icon="arrow-left" href="@ComQuery(Model.Tipo, Model.Busca, Model.Pagina - 1)">Anterior</es-button>
+            }
+            <span>Página @Model.Pagina de @Model.TotalPaginas · @Model.TotalEventos registros</span>
+            @if (Model.Pagina < Model.TotalPaginas)
+            {
+                <es-button variant="ghost" size="xs" icon="arrow-right" href="@ComQuery(Model.Tipo, Model.Busca, Model.Pagina + 1)">Próxima</es-button>
+            }
+        </div>
+    }
+}
+else
+{
+    <es-empty-state icon="eye"
+                    title="Ainda sem registros"
+                    description="Ninguém interagiu com este aviso ainda — ou o filtro não retornou resultados." />
+}
