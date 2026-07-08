@@ -253,6 +253,36 @@ public class PedidosController(
         return RedirectToAction(nameof(Index));
     }
 
+    // Aprovar/recusar pedido do cardapio pela tela de Detalhe (form-POST + reload, como
+    // Cancelar/Agendar). O cockpit usa as variantes .json (AJAX). Issue 862.
+    [HttpPost("/pedidos/{id}/aprovar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Aprovar(string id)
+    {
+        var result = await svc.AprovarAsync(id);
+        if (HasError(result))
+        {
+            Toast("error", result.ErrorMessage ?? "Não foi possível aprovar o pedido.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+        Toast("success", "Pedido aprovado.");
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    [HttpPost("/pedidos/{id}/recusar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Recusar(string id, string? motivo, string? mensagemCliente)
+    {
+        var result = await svc.RecusarAsync(id, string.IsNullOrWhiteSpace(motivo) ? "OPERACIONAL" : motivo, mensagemCliente);
+        if (HasError(result))
+        {
+            Toast("error", result.ErrorMessage ?? "Não foi possível recusar o pedido.");
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+        Toast("success", "Pedido recusado.");
+        return RedirectToAction(nameof(Index));
+    }
+
     /// <summary>
     /// Onda 1.1 — abre ticket SaaS pra EasyStok reportando problema sobre
     /// um pedido especifico. Vincula via PedidoId (cross-tenant validado no
