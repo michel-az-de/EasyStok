@@ -199,7 +199,9 @@
         @* ── Publicação ── *@
         <es-card title="Publicação" description="Quando o aviso entra e sai do ar (horário de Brasília).">
             <div class="banner-fields">
-                <es-switch name="Ativo" label="Ativo (visível no app)" checked="@Model.Ativo" />
+                @* Aviso novo nasce Ativo (criar => publicar); na edição respeita o valor salvo.
+                   O default da property continua false para o POST honrar o toggle desmarcado. *@
+                <es-switch name="Ativo" label="Ativo (visível no app)" checked="@(Model.Id.HasValue ? Model.Ativo : true)" />
                 <div class="banner-grid-3">
                     <es-input asp-for="InicioEm" type="datetime-local" label="Início" label-optional="true" value="@Dt(Model.InicioEm)" />
                     <es-input asp-for="FimEm" type="datetime-local" label="Fim" label-optional="true" value="@Dt(Model.FimEm)" />
