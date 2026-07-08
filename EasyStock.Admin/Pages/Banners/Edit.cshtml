@@ -26,8 +26,8 @@
     .banner-editor-actions { display: flex; gap: 8px; padding-top: 4px; }
     .banner-fields { display: flex; flex-direction: column; gap: 16px; }
     .banner-reveal { display: flex; flex-direction: column; gap: 14px; padding-left: 12px; border-left: 2px solid var(--border-soft); }
-    .banner-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .banner-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .banner-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .banner-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
     .banner-switches { display: flex; flex-direction: column; gap: 12px; }
 
     /* Segmented control (forma, tamanho) */
@@ -40,7 +40,8 @@
 
     /* File dropzone */
     .file-drop { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border: 1px dashed var(--border-strong); border-radius: var(--r-md); background: var(--surface-sunken); color: var(--text-secondary); font-size: 13px; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out); }
-    .file-drop:hover { border-color: var(--intent-action); background: var(--bg-surface); }
+    .file-drop:hover, .file-drop.is-dragover { border-color: var(--intent-action); background: var(--bg-surface); }
+    .file-drop:focus-within { border-color: var(--intent-action); background: var(--bg-surface); box-shadow: var(--focus-ring-orange); }
     .file-drop-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
     /* Preview stage */
@@ -58,6 +59,7 @@
     }
     @@media (prefers-reduced-motion: reduce) {
         .seg-opt span, .file-drop { transition: none; }
+        .es-switch input[type="checkbox"]::after { transition: none; }
     }
 </style>
 
@@ -75,7 +77,7 @@
 </es-page-header>
 
 <div class="banner-editor" x-data="bannerForm(@init)">
-    <form method="post" enctype="multipart/form-data" class="banner-editor-form">
+    <form method="post" enctype="multipart/form-data" class="banner-editor-form" x-on:submit="saving = true">
 
         @* ── Conteúdo ── *@
         <es-card title="Conteúdo" description="O que o lojista vê na tela.">
@@ -84,8 +86,8 @@
                           helper="Só aparece aqui no console — o lojista não vê este texto." />
 
                 <div>
-                    <label class="es-form-label">Forma do aviso</label>
-                    <div class="seg" role="radiogroup" aria-label="Forma do aviso" style="margin-top:6px;">
+                    <div id="lbl-forma" class="es-form-label">Forma do aviso</div>
+                    <div class="seg" role="radiogroup" aria-labelledby="lbl-forma" style="margin-top:6px;">
                         <label class="seg-opt">
                             <input type="radio" name="Forma" value="imagem" x-model="forma" />
                             <span><es-icon name="eye" size="14" /> Imagem</span>
@@ -101,20 +103,27 @@
                 <div x-show="forma === 'imagem'" x-cloak class="banner-reveal">
                     <div>
                         <label class="es-form-label" for="Imagem">Imagem</label>
-                        <label class="file-drop" style="margin-top:6px;">
+                        <label class="file-drop" style="margin-top:6px;"
+                               x-bind:class="{ 'is-dragover': dragOver }"
+                               x-on:dragover.prevent="dragOver = true" x-on:dragleave.prevent="dragOver = false"
+                               x-on:drop.prevent="dropFile($event)">
                             <es-icon name="upload" size="18" />
-                            <span x-text="fileName || 'Selecionar imagem — PNG, JPG ou WEBP'"></span>
-                            <input type="file" id="Imagem" name="Imagem" class="file-drop-input"
+                            <span x-text="fileName || 'Arraste uma imagem ou clique para selecionar — PNG, JPG ou WEBP'"></span>
+                            <input type="file" id="Imagem" name="Imagem" class="file-drop-input" x-ref="fileInput"
                                    accept="image/png,image/jpeg,image/webp" x-on:change="previewLocal($event)" />
                         </label>
                         <span class="es-form-helper" x-show="!!imagemUrl && !previewUrl" x-cloak>
                             Já existe uma imagem salva. Envie outra só se quiser trocar.
                         </span>
+                        @if (ViewData.ModelState["Imagem"]?.Errors.Count > 0)
+                        {
+                            <span class="es-form-error" role="alert">@ViewData.ModelState["Imagem"]!.Errors[0].ErrorMessage</span>
+                        }
                     </div>
 
                     <div>
-                        <label class="es-form-label">Tamanho</label>
-                        <div class="seg" role="radiogroup" aria-label="Tamanho" style="margin-top:6px;">
+                        <div id="lbl-tamanho" class="es-form-label">Tamanho</div>
+                        <div class="seg" role="radiogroup" aria-labelledby="lbl-tamanho" style="margin-top:6px;">
                             <label class="seg-opt">
                                 <input type="radio" name="TamanhoModo" value="herdado" x-model="tamanhoModo" />
                                 <span>Herdar da imagem</span>
@@ -125,7 +134,7 @@
                             </label>
                         </div>
                     </div>
-                    <div x-show="tamanhoModo === 'manual'" x-cloak class="banner-grid-2">
+                    <div x-show="tamanhoModo === 'manual'" x-transition.opacity.duration.150ms x-cloak class="banner-grid-2">
                         <div class="es-form-field">
                             <label class="es-form-label" for="LarguraPx">Largura (px)</label>
                             <input id="LarguraPx" name="LarguraPx" type="number" min="1" class="es-form-input"
@@ -142,7 +151,7 @@
                         <input type="checkbox" role="switch" name="LinkAtivo" value="true" x-model="urlAtiva" />
                         <span>Link clicável</span>
                     </label>
-                    <div x-show="urlAtiva" x-cloak class="banner-reveal">
+                    <div x-show="urlAtiva" x-transition.opacity.duration.150ms x-cloak class="banner-reveal">
                         <es-input asp-for="LinkUrl" type="url" label="URL de destino" placeholder="https://..." />
                         <es-switch name="NovaAba" label="Abrir em nova aba" checked="@Model.NovaAba" />
                     </div>
@@ -151,7 +160,7 @@
                         <input type="checkbox" role="switch" name="TooltipAtivo" value="true" x-model="tooltipAtivo" />
                         <span>Tooltip ao passar o mouse</span>
                     </label>
-                    <div x-show="tooltipAtivo" x-cloak class="banner-reveal">
+                    <div x-show="tooltipAtivo" x-transition.opacity.duration.150ms x-cloak class="banner-reveal">
                         <es-input asp-for="TooltipTexto" label="Texto do tooltip" maxlength="300" />
                     </div>
                 </div>
@@ -163,6 +172,10 @@
                         <textarea id="Corpo" name="Corpo" class="es-form-textarea" rows="5" x-model="corpo"
                                   placeholder="Escreva o aviso que aparecerá no modal…"></textarea>
                         <span class="es-form-helper">Aparece como aviso em modal. Quebras de linha são preservadas.</span>
+                        @if (ViewData.ModelState["Corpo"]?.Errors.Count > 0)
+                        {
+                            <span class="es-form-error" role="alert">@ViewData.ModelState["Corpo"]!.Errors[0].ErrorMessage</span>
+                        }
                     </div>
                 </div>
             </div>
@@ -196,7 +209,10 @@
         </es-card>
 
         <div class="banner-editor-actions">
-            <es-button type="submit" variant="primary" icon="check">Salvar aviso</es-button>
+            <es-button type="submit" variant="primary" icon="check" x-bind:disabled="saving">
+                <span x-show="!saving">Salvar aviso</span>
+                <span x-show="saving" x-cloak>Salvando…</span>
+            </es-button>
             <es-button variant="ghost" href="/Banners">Cancelar</es-button>
         </div>
     </form>
@@ -209,9 +225,13 @@
                     <div style="width:100%; text-align:center;">
                         <template x-if="imgSrc">
                             <div>
-                                <img x-bind:src="imgSrc" x-bind:style="sizeStyle" alt="Prévia do aviso"
-                                     style="border-radius:var(--r-sm);" />
-                                <p class="preview-note" x-show="urlAtiva" x-cloak>
+                                <img x-bind:src="imgSrc" x-bind:style="sizeStyle" alt="Prévia do aviso" x-show="!imgBroken"
+                                     x-on:error="imgBroken = true" style="border-radius:var(--r-sm);" />
+                                <div x-show="imgBroken" x-cloak class="preview-empty">
+                                    <es-icon name="alert-triangle" size="20" />
+                                    <span>Imagem salva indisponível — envie outra para substituir.</span>
+                                </div>
+                                <p class="preview-note" x-show="urlAtiva && !imgBroken" x-cloak>
                                     <es-icon name="external-link" size="12" /> Imagem clicável
                                 </p>
                             </div>
@@ -253,11 +273,23 @@
                 imagemUrl: init.imagemUrl || '',
                 previewUrl: '',
                 fileName: '',
+                saving: false,
+                dragOver: false,
+                imgBroken: false,
                 previewLocal(ev) {
                     const f = ev.target.files && ev.target.files[0];
                     if (this.previewUrl) { try { URL.revokeObjectURL(this.previewUrl); } catch (_) {} }
                     this.previewUrl = f ? URL.createObjectURL(f) : '';
                     this.fileName = f ? f.name : '';
+                    this.imgBroken = false;
+                },
+                dropFile(ev) {
+                    this.dragOver = false;
+                    const dt = ev.dataTransfer;
+                    if (!dt || !dt.files || !dt.files.length) return;
+                    const input = this.$refs.fileInput;
+                    input.files = dt.files;
+                    this.previewLocal({ target: input });
                 },
                 get imgSrc() { return this.previewUrl || this.imagemUrl; },
                 get sizeStyle() {
