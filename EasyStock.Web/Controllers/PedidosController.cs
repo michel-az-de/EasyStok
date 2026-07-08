@@ -51,6 +51,8 @@ public class RegistrarPagamentoJsonRequest
     public string? Referencia { get; set; }
     public string? Observacao { get; set; }
 }
+public class AprovarJsonRequest { public string? Observacoes { get; set; } }
+public class RecusarJsonRequest { public string? Motivo { get; set; } public string? MensagemCliente { get; set; } }
 
 public class PedidosController(
     PedidosService svc,
@@ -202,6 +204,18 @@ public class PedidosController(
     public async Task<IActionResult> AddPagamentoJson(string id, [FromBody] RegistrarPagamentoJsonRequest? req) =>
         PedidoJsonContract.From(await svc.RegistrarPagamentoAsync(
             id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao));
+
+    // Aprovação/recusa do pedido do cardápio no cockpit (#862). Reusam os endpoints
+    // prontos da API; retornam { success, pedido: { status } } pra UI avançar a linha.
+    [HttpPost("/pedidos/{id}/aprovar.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AprovarJson(string id, [FromBody] AprovarJsonRequest? req) =>
+        PedidoJsonContract.FromAcao(await svc.AprovarAsync(id, req?.Observacoes));
+
+    [HttpPost("/pedidos/{id}/recusar.json")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RecusarJson(string id, [FromBody] RecusarJsonRequest? req) =>
+        PedidoJsonContract.FromAcao(await svc.RecusarAsync(id, req?.Motivo ?? "", req?.MensagemCliente));
 
     [HttpPost("/pedidos/{id}/status")]
     [ValidateAntiForgeryToken]

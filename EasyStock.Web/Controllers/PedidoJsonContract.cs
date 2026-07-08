@@ -18,19 +18,30 @@ public static class PedidoJsonContract
 {
     public static IActionResult From(ApiResult<Pedido> r)
     {
-        if (!r.Success || r.Data is null)
-            return new ObjectResult(new
-            {
-                success = false,
-                error = new
-                {
-                    code = r.ErrorCode ?? "API_ERROR",
-                    message = r.ErrorMessage ?? "Não foi possível processar o pedido."
-                },
-                correlationId = r.CorrelationId
-            })
-            { StatusCode = r.HttpStatus > 0 ? r.HttpStatus : 400 };
-
+        if (!r.Success || r.Data is null) return Erro(r);
         return new OkObjectResult(new { success = true, pedido = PedidoRowDto.From(r.Data) });
     }
+
+    /// <summary>
+    /// Contrato das ações de aprovar/recusar do cockpit (#862): sucesso → 200
+    /// <c>{ success: true, pedido: { status } }</c> (o cliente faz <c>Object.assign</c> na
+    /// linha, só o status muda); falha → propaga o HttpStatus da API (404/409/422).
+    /// </summary>
+    public static IActionResult FromAcao(ApiResult<AprovacaoResult> r)
+    {
+        if (!r.Success || r.Data is null) return Erro(r);
+        return new OkObjectResult(new { success = true, pedido = new { status = r.Data.Status } });
+    }
+
+    private static ObjectResult Erro<T>(ApiResult<T> r) => new(new
+    {
+        success = false,
+        error = new
+        {
+            code = r.ErrorCode ?? "API_ERROR",
+            message = r.ErrorMessage ?? "Não foi possível processar o pedido."
+        },
+        correlationId = r.CorrelationId
+    })
+    { StatusCode = r.HttpStatus > 0 ? r.HttpStatus : 400 };
 }

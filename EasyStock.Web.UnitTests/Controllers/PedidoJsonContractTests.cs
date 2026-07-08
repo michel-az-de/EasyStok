@@ -65,4 +65,37 @@ public class PedidoJsonContractTests
 
         result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(400);
     }
+
+    // ── Aprovar/Recusar (Onda 0, #862): retorno enxuto — só o status novo, que o
+    // cockpit aplica na linha (Object.assign). Aprovar não mexe em pagamento/itens. ──
+
+    [Fact]
+    public void FromAcao_sucesso_retorna_200_com_status_novo()
+    {
+        var result = PedidoJsonContract.FromAcao(
+            ApiResult<AprovacaoResult>.Ok(new AprovacaoResult("p1", "aprovado_baba")));
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.StatusCode.Should().Be(200);
+        ok.Value.Should().BeEquivalentTo(new { success = true, pedido = new { status = "aprovado_baba" } });
+    }
+
+    [Theory]
+    [InlineData("NOT_FOUND", 404)]               // pedido de outro tenant
+    [InlineData("CONFLICT", 409)]                // já resolvido (2 babás simultâneas)
+    [InlineData("VALIDATION_ERROR", 422)]        // motivo inválido na recusa
+    public void FromAcao_falha_propaga_status_e_corpo_de_erro(string code, int status)
+    {
+        var result = PedidoJsonContract.FromAcao(
+            ApiResult<AprovacaoResult>.Fail(code, "mensagem do servidor", status, "cid-9"));
+
+        var obj = result.Should().BeOfType<ObjectResult>().Subject;
+        obj.StatusCode.Should().Be(status);
+        obj.Value.Should().BeEquivalentTo(new
+        {
+            success = false,
+            error = new { code, message = "mensagem do servidor" },
+            correlationId = "cid-9"
+        });
+    }
 }

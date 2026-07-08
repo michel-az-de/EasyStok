@@ -149,6 +149,24 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
     public Task<ApiResult<bool>> RemoverPagamentoAsync(string id, string pagamentoId) =>
         api.DeleteAsync($"pedidos/{id}/pagamentos/{pagamentoId}?empresaId={GetEmpresaId()}");
 
+    // ── Aprovação storefront (#862) ───────────────────────────────────
+    // Reusa os endpoints prontos da API (AprovacaoPedidoController): EmpresaId/UsuarioId
+    // saem do token (currentUser), não do body — por isso só validamos a sessão aqui.
+
+    public Task<ApiResult<AprovacaoResult>> AprovarAsync(string id, string? observacoes = null)
+    {
+        if (GetEmpresaId() == Guid.Empty) return Task.FromResult(EmpresaErr<AprovacaoResult>());
+        if (!Guid.TryParse(id, out _)) return Task.FromResult(IdErr<AprovacaoResult>());
+        return api.PostAsync<AprovacaoResult>($"storefront/pedidos/{id}/aprovar", new { observacoes });
+    }
+
+    public Task<ApiResult<AprovacaoResult>> RecusarAsync(string id, string motivo, string? mensagemCliente = null)
+    {
+        if (GetEmpresaId() == Guid.Empty) return Task.FromResult(EmpresaErr<AprovacaoResult>());
+        if (!Guid.TryParse(id, out _)) return Task.FromResult(IdErr<AprovacaoResult>());
+        return api.PostAsync<AprovacaoResult>($"storefront/pedidos/{id}/recusar", new { motivo, mensagemCliente });
+    }
+
     // ── Mobile ────────────────────────────────────────────────────────
 
     public Task<ApiResult<List<MobilePedidoSummary>>> ListarMobileAsync(bool pendingOnly = false, string? status = null)
