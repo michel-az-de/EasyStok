@@ -727,9 +727,10 @@ function trunc(s, n) { return s && s.length > n ? s.substring(0, n) + '…' : s;
     @section Scripts {
     <script>
     // BUG-02: detalhe reativo. Espelha StatusHelper (label/badge) + a ordem da timeline.
+    // Rotulos = StatusPedidoVocabulario.RotuloLojista (issue 863); manter sincronizado.
     const PED_STATUS = {
         aguardando: { label: 'Aguardando', badge: 'badge-warn' },
-        preparando: { label: 'Preparando', badge: 'badge-info' },
+        preparando: { label: 'Em preparo', badge: 'badge-info' },
         pronto:     { label: 'Pronto',     badge: 'badge-ok' },
         entregue:   { label: 'Entregue',   badge: 'badge-neutral' },
         cancelado:  { label: 'Cancelado',  badge: 'badge-neutral badge-struck' }
