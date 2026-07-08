@@ -103,6 +103,22 @@ html.theme-dark .ped-table tbody tr.ped-row--moved:hover td { background-color: 
 }
 .ped-pay-btn:hover { background: var(--ok-100); }
 
+/* ── Aprovar / recusar pedido do cardapio (issue 862) ── */
+/* Aprovar = acao principal (navy, confirma o pedido); Recusar = destrutiva discreta (crit). */
+.ped-approve {
+    font-size: 12.5px; font-weight: 600; color: var(--intent-action-fg);
+    background: linear-gradient(135deg, var(--navy-600) 0%, var(--navy-700) 130%);
+    border: 1px solid var(--navy-700); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+.ped-approve:hover { filter: brightness(1.06); }
+.ped-approve:disabled { opacity: .6; cursor: wait; }
+.ped-refuse {
+    margin-left: 8px; font-size: 12.5px; font-weight: 600;
+    color: var(--crit-700); background: none;
+    border: 1px solid var(--crit-200); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+.ped-refuse:hover { background: var(--crit-50); }
+
 /* ── Mensagem de filtro vazio ── */
 .ped-empty-filter { padding: 28px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .ped-link { color: var(--navy-600); font-weight: 600; background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

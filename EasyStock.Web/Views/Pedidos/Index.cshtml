@@ -32,17 +32,19 @@
     // intercepta via Alpine pra AJAX sem reload.
     string nextStatus(string? s) => s switch
     {
-        "aguardando" => "preparando",
-        "preparando" => "pronto",
-        "pronto"     => "entregue",
-        _            => ""
+        "aguardando"    => "preparando",
+        "preparando"    => "pronto",
+        "pronto"        => "entregue",
+        "aprovado_baba" => "preparando",   // pós-aprovação do cardápio entra na fila (issue 862)
+        _               => ""
     };
     string nextLabel(string? s) => s switch
     {
-        "aguardando" => "Iniciar preparo",
-        "preparando" => "Marcar pronto",
-        "pronto"     => "Confirmar entrega",
-        _            => ""
+        "aguardando"    => "Iniciar preparo",
+        "preparando"    => "Marcar pronto",
+        "pronto"        => "Confirmar entrega",
+        "aprovado_baba" => "Iniciar preparo",
+        _               => ""
     };
 
     // Cockpit (fatia 2b): renderiza o conjunto INTEIRO; o filtro de status/agenda e
@@ -213,6 +215,14 @@
                             <div class="ped-data-rel">criado @tempoRelativo(p.CriadoEm)</div>
                         </td>
                         <td class="ped-actions">
+                            @* Cardapio aguardando aprovacao (issue 862): a acao e aprovar/recusar
+                               (so client-side, como o Receber). Aprovar -> aprovado_baba (entra na
+                               fila); recusar abre o popover de motivo. *@
+                            <button type="button" class="ped-approve" x-show="needsAprovacao(p)" x-cloak
+                                    :disabled="!!_inflight['@p.Id']" @@click="approve('@p.Id')">Aprovar</button>
+                            <button type="button" class="ped-refuse" x-show="needsAprovacao(p)" x-cloak
+                                    @@click="openRefuse('@p.Id')">Recusar</button>
+
                             @* SSR so renderiza o form pra nao-terminal (degrada sem JS: form-POST
                                + reload). Com JS, x-show o esconde dinamicamente quando o pedido
                                vira terminal apos o avanco. Sem x-cloak: visivel sem JS. *@
@@ -225,6 +235,20 @@
                                     <input type="hidden" name="status" value="@nextStatus(p.Status)" />
                                     <button type="submit" class="ped-advance" :disabled="!!_inflight['@p.Id']"
                                             x-text="nextLabel(p.status)">@nextLabel(p.Status)</button>
+                                </form>
+                            }
+                            else if (p.Status == "aguardando_aprovacao_baba")
+                            {
+                                @* Avanco pos-aprovacao (aprovado_baba -> preparando) sem reload.
+                                   x-cloak: invisivel sem JS (evita submeter "preparando" antes de
+                                   aprovar); via x-show so aparece quando o status ja e aprovado_baba. *@
+                                <form asp-action="AtualizarStatus" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
+                                      class="ped-advance-form" x-show="nextStatus(p.status)" x-cloak
+                                      x-on:submit.prevent="advance('@p.Id')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="status" value="preparando" />
+                                    <button type="submit" class="ped-advance" :disabled="!!_inflight['@p.Id']"
+                                            x-text="nextLabel(p.status)">Iniciar preparo</button>
                                 </form>
                             }
                             <button type="button" class="ped-pay-btn" x-show="canPay(p)" x-cloak @@click="openPay('@p.Id')">Receber</button>
@@ -273,6 +297,36 @@
             <button type="button" class="ui-secondary-btn" @@click="closePay()">Cancelar</button>
             <button type="button" class="app-primary-btn app-primary-btn--hero" :disabled="pay.enviando"
                     @@click="submitPay()" x-text="pay.enviando ? 'Registrando…' : 'Registrar'">Registrar</button>
+        </div>
+    </div>
+</div>
+
+@* Popover de recusa do cardapio (issue 862) — motivo + mensagem opcional ao cliente.
+   Reusa o visual do popover de pagamento; recusar cancela o pedido (refund + notificacao
+   ao cliente sao enfileirados no backend). *@
+<div class="ped-pay-overlay" x-show="refuse.open" x-cloak @@click.self="closeRefuse()" x-transition.opacity>
+    <div class="ped-pay-card" role="dialog" aria-modal="true" aria-label="Recusar pedido">
+        <div class="ped-pay-card__hd">
+            <strong>Recusar pedido</strong>
+            <button type="button" class="ped-pay-close" @@click="closeRefuse()" aria-label="Fechar">✕</button>
+        </div>
+        <div class="ped-pay-card__bd">
+            <div class="ped-pay-pendente">Cliente: <strong x-text="refuseTarget().clienteNome || '—'">—</strong></div>
+            <label class="ped-pay-label" for="ped-refuse-motivo">Motivo</label>
+            <select id="ped-refuse-motivo" class="ui-field" x-model="refuse.motivo">
+                <template x-for="m in motivosRecusa" :key="m.v">
+                    <option :value="m.v" x-text="m.label"></option>
+                </template>
+            </select>
+            <label class="ped-pay-label" for="ped-refuse-msg">Mensagem ao cliente (opcional)</label>
+            <textarea id="ped-refuse-msg" class="ui-textarea" rows="2" maxlength="280"
+                      x-model="refuse.mensagem"
+                      placeholder="Ex.: Sem disponibilidade para a data. Podemos remarcar?"></textarea>
+        </div>
+        <div class="ped-pay-card__ft">
+            <button type="button" class="ui-secondary-btn" @@click="closeRefuse()">Cancelar</button>
+            <button type="button" class="app-primary-btn" :disabled="refuse.enviando"
+                    @@click="submitRefuse()" x-text="refuse.enviando ? 'Recusando…' : 'Recusar pedido'">Recusar pedido</button>
         </div>
     </div>
 </div>

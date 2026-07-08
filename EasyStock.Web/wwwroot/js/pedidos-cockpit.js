@@ -17,12 +17,26 @@
     aguardando: 'Aguardando', preparando: 'Em preparo', pronto: 'Pronto', entregue: 'Entregue', cancelado: 'Cancelado',
     rascunho: 'Rascunho', aguardando_pagamento: 'Aguardando pagamento', aguardando_aprovacao_baba: 'Aguardando aprovação', aprovado_baba: 'Aprovado'
   };
-  var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue' };
-  var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega' };
+  // Avanco operacional (forward-only). aprovado_baba entra na fila ERP em 'preparando'.
+  // A aprovacao em si (aguardando_aprovacao_baba -> aprovado_baba) NAO vem por aqui: e a
+  // acao dedicada `approve`, com lock/outbox/notificacao no backend (#862).
+  var NEXT = { aguardando: 'preparando', preparando: 'pronto', pronto: 'entregue', aprovado_baba: 'preparando' };
+  var NEXT_LABEL = { aguardando: 'Iniciar preparo', preparando: 'Marcar pronto', pronto: 'Confirmar entrega', aprovado_baba: 'Iniciar preparo' };
   // "Em aberto" = não-terminais operacionais. Inclui os pós-pagamento do storefront
   // (aprovacao_baba/aprovado_baba). rascunho/aguardando_pagamento são pré-operacionais
   // e ficam fora. Incluir aprovacao_baba corrige a subcontagem do BUG-009 (issue #719).
   var OPEN = ['aguardando', 'preparando', 'pronto', 'aguardando_aprovacao_baba', 'aprovado_baba'];
+  // Pre-operacionais: pedido ainda nao entrou na fila de trabalho. Enquanto aqui a acao
+  // NAO e receber pagamento (o cardapio guest nem cobra online) — e aprovar/recusar. Por
+  // isso o botao "Receber" e o KPI "A receber" ficam suprimidos ate o pedido virar
+  // operacional (aprovado_baba em diante). Corrige o pedido do cardapio "preso" (#862).
+  var PRE_OPERACIONAL = ['rascunho', 'aguardando_pagamento', 'aguardando_aprovacao_baba'];
+  // Motivos de recusa aceitos pela API (AprovacaoPedidoController / MotivoRecusa).
+  var MOTIVOS_RECUSA = [
+    { v: 'OPERACIONAL', label: 'Operacional (agenda/logística)' },
+    { v: 'ESTOQUE_INSUFICIENTE', label: 'Estoque insuficiente' },
+    { v: 'OUTRO', label: 'Outro' }
+  ];
 
   // Invariante (issue #719): todo status de OPEN precisa ter rótulo em STATUS_LABEL.
   // Sem runner de teste no gate JS — esta asserção só fala no console em dev.
@@ -53,6 +67,8 @@
       _inflight: {},              // chave -> true (guarda sincrona)
       focusId: null,
       pay: { open: false, id: null, metodo: 'pix', valor: '', enviando: false },
+      refuse: { open: false, id: null, motivo: 'OPERACIONAL', mensagem: '', enviando: false },
+      motivosRecusa: MOTIVOS_RECUSA,
       announce: '',               // regiao aria-live (leitor de tela)
 
       init: function () {
@@ -71,7 +87,7 @@
       get kpiAberto() { return this.rows.filter(function (p) { return OPEN.indexOf(p.status) >= 0; }).length; },
       get kpiPronto() { return this.rows.filter(function (p) { return p.status === 'pronto'; }).length; },
       get kpiAtrasado() { return this.rows.filter(function (p) { return p.isAtrasado; }).length; },
-      get kpiReceber() { return this.rows.filter(function (p) { return p.status !== 'cancelado'; }).reduce(function (s, p) { return s + (p.pendente || 0); }, 0); },
+      get kpiReceber() { return this.rows.filter(function (p) { return p.status !== 'cancelado' && PRE_OPERACIONAL.indexOf(p.status) < 0; }).reduce(function (s, p) { return s + (p.pendente || 0); }, 0); },
       get kpiReceberFmt() { return money(this.kpiReceber); },
 
       // ── filtro client-side ──
@@ -115,7 +131,10 @@
         if (p.status === 'entregue') return 'stp-neutral';
         return 'stp-warn';
       },
-      canPay: function (p) { return p.status !== 'cancelado' && (p.pendente || 0) > 0; },
+      // "Receber" so em pedido operacional: pre-operacional (aguardando aprovacao etc.)
+      // ainda nao e recebivel; a acao ali e aprovar/recusar (#862).
+      canPay: function (p) { return p.status !== 'cancelado' && (p.pendente || 0) > 0 && PRE_OPERACIONAL.indexOf(p.status) < 0; },
+      needsAprovacao: function (p) { return !!p && p.status === 'aguardando_aprovacao_baba'; },
       isFocus: function (id) { return this.focusId === id; },
 
       // ── avancar status (AJAX, otimista, rollback) ──
@@ -152,6 +171,77 @@
       _linger: function (id) {
         var self = this;
         setTimeout(function () { var it = self.items[id]; if (it) it._justMoved = false; }, 4000);
+      },
+
+      // ── aprovar/recusar pedido do cardapio (#862) ──
+      // O cardapio guest chega em 'aguardando_aprovacao_baba'; a Baba confirma (aprovar ->
+      // aprovado_baba, entra na fila) ou recusa (-> cancelado, com refund/notificacao no
+      // backend). Reusa os endpoints prontos da API via BFF (.json). Otimista + rollback,
+      // guarda sincrona anti-double-click, servidor vence na resposta.
+      approve: function (id) {
+        if (this._inflight[id]) return;                 // GUARDA SINCRONA
+        var it = this.items[id];
+        if (!it || !this.needsAprovacao(it)) return;
+        this._inflight[id] = true;
+        var snap = Object.assign({}, it);
+        it.status = 'aprovado_baba'; it._justMoved = true;   // otimista
+        var self = this;
+        esFetch('/pedidos/' + id + '/aprovar.json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+          body: JSON.stringify({})
+        }).then(function (res) {
+          return res.json().catch(function () { return null; }).then(function (data) {
+            if (!res.ok || !data || !data.success) {
+              Object.assign(it, snap);                  // rollback
+              toast('error', (data && data.error && data.error.message) || 'Não foi possível aprovar o pedido.', data && data.correlationId);
+              return;
+            }
+            Object.assign(it, data.pedido); it._justMoved = true;   // servidor vence
+            toast('success', 'Pedido aprovado.');
+            self.announce = 'Pedido aprovado.';
+            self._linger(id);
+          });
+        }).catch(function () {
+          Object.assign(it, snap);                      // rede/offline -> rollback
+          toast('error', 'Sem conexão — o pedido não foi aprovado.');
+        }).finally(function () { delete self._inflight[id]; });
+      },
+      openRefuse: function (id) {
+        var it = this.items[id];
+        if (!it || !this.needsAprovacao(it)) return;
+        this.refuse = { open: true, id: id, motivo: 'OPERACIONAL', mensagem: '', enviando: false };
+      },
+      closeRefuse: function () { this.refuse.open = false; this.refuse.id = null; },
+      refuseTarget: function () { return this.items[this.refuse.id] || {}; },
+      submitRefuse: function () {
+        var id = this.refuse.id;
+        var key = 'refuse:' + id;
+        if (!id || this._inflight[key]) return;          // single-flight
+        var it = this.items[id];
+        if (!it) return;
+        // Recusa cancela o pedido — destrutiva: NAO faz otimista, aplica so na resposta.
+        this._inflight[key] = true; this.refuse.enviando = true;
+        var self = this;
+        esFetch('/pedidos/' + id + '/recusar.json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+          body: JSON.stringify({ motivo: this.refuse.motivo, mensagemCliente: (this.refuse.mensagem || '').trim() || null })
+        }).then(function (res) {
+          return res.json().catch(function () { return null; }).then(function (data) {
+            if (!res.ok || !data || !data.success) {
+              toast('error', (data && data.error && data.error.message) || 'Não foi possível recusar o pedido.', data && data.correlationId);
+              return;
+            }
+            Object.assign(it, data.pedido); it._justMoved = true;   // servidor vence (status: cancelado)
+            toast('success', 'Pedido recusado.');
+            self.announce = 'Pedido recusado.';
+            self.closeRefuse();
+            self._linger(id);
+          });
+        }).catch(function () {
+          toast('error', 'Sem conexão — o pedido não foi recusado.');
+        }).finally(function () { delete self._inflight[key]; self.refuse.enviando = false; });
       },
 
       // ── pagamento inline (popover) ──
@@ -207,6 +297,7 @@
         document.addEventListener('keydown', function (e) {
           var tag = (document.activeElement && document.activeElement.tagName) || '';
           var typing = /^(INPUT|SELECT|TEXTAREA)$/.test(tag);
+          if (self.refuse.open) { if (e.key === 'Escape') { e.preventDefault(); self.closeRefuse(); } return; }
           if (self.pay.open) { if (e.key === 'Escape') { e.preventDefault(); self.closePay(); } return; }
           if (e.key === '/' && !typing) { e.preventDefault(); var s = document.querySelector('input[type=search]'); if (s) s.focus(); return; }
           if ((e.key === 'n' || e.key === 'N') && !typing) {
