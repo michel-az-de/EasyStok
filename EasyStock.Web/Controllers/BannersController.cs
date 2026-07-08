@@ -27,6 +27,10 @@ public class BannersController(ApiClient api, SessionService session) : BaseCont
     [IgnoreAntiforgeryToken]
     public Task<IActionResult> Visto(Guid id) => RegistrarAsync(id, "visto");
 
+    [HttpPost("/api/banners/{id:guid}/impressao")]
+    [IgnoreAntiforgeryToken]
+    public Task<IActionResult> Impressao(Guid id) => RegistrarAsync(id, "impressao");
+
     private async Task<IActionResult> RegistrarAsync(Guid id, string acao)
     {
         var r = await api.PostNoBodyAsync($"/api/banners/{id}/{acao}");
