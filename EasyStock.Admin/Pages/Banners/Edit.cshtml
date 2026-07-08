@@ -1,112 +1,241 @@
 @page "{id?}"
 @model EasyStock.Admin.Pages.Banners.EditModel
 @{
-    ViewData["Title"] = Model.Id.HasValue ? "Editar banner" : "Novo banner";
-    string JsBool(bool b) => b ? "true" : "false";
+    ViewData["Title"] = Model.Id.HasValue ? "Editar aviso" : "Novo aviso";
+    var titulo = (string)ViewData["Title"]!;
     string? Dt(DateTime? d) => d?.ToString("yyyy-MM-ddTHH:mm");
+
+    var init = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        forma = Model.Forma,
+        corpo = Model.Corpo ?? "",
+        urlAtiva = Model.LinkAtivo,
+        tooltipAtivo = Model.TooltipAtivo,
+        tamanhoModo = Model.TamanhoModo,
+        largura = Model.LarguraPx,
+        altura = Model.AlturaPx,
+        exigeConfirmacao = Model.ExigeConfirmacao,
+        imagemUrl = Model.ImagemUrl ?? ""
+    });
 }
 
+<style>
+    .banner-editor { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+    .banner-editor-form { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .banner-editor-preview { position: sticky; top: 16px; }
+    .banner-editor-actions { display: flex; gap: 8px; padding-top: 4px; }
+    .banner-fields { display: flex; flex-direction: column; gap: 16px; }
+    .banner-reveal { display: flex; flex-direction: column; gap: 14px; padding-left: 12px; border-left: 2px solid var(--border-soft); }
+    .banner-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .banner-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .banner-switches { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Segmented control (forma, tamanho) */
+    .seg { display: inline-flex; gap: 4px; background: var(--surface-sunken); border: 1px solid var(--border-soft); border-radius: var(--r-md); padding: 4px; }
+    .seg-opt { margin: 0; }
+    .seg-opt input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .seg-opt span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--r-sm); font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out); }
+    .seg-opt input:checked + span { background: var(--bg-surface); color: var(--text-primary); box-shadow: var(--elev-1); }
+    .seg-opt input:focus-visible + span { box-shadow: var(--focus-ring-orange); }
+
+    /* File dropzone */
+    .file-drop { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border: 1px dashed var(--border-strong); border-radius: var(--r-md); background: var(--surface-sunken); color: var(--text-secondary); font-size: 13px; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out); }
+    .file-drop:hover { border-color: var(--intent-action); background: var(--bg-surface); }
+    .file-drop-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+    /* Preview stage */
+    .preview-stage { border: 1px solid var(--border-soft); border-radius: var(--r-md); background: var(--surface-sunken); padding: 20px; min-height: 160px; display: flex; align-items: center; justify-content: center; }
+    .preview-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; text-align: center; }
+    .preview-note { display: inline-flex; align-items: center; gap: 4px; margin: 10px 0 0; font-size: 11px; color: var(--text-muted); }
+    .preview-modal { width: 100%; background: var(--bg-surface); border: 1px solid var(--border-soft); border-radius: var(--r-md); box-shadow: var(--elev-2); overflow: hidden; }
+    .preview-modal-body { padding: 16px; font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+    .preview-modal-actions { display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--border-soft); }
+    .preview-btn { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: var(--r-sm); background: var(--intent-action); color: var(--intent-action-fg); font-size: 12px; font-weight: 600; }
+
+    @@media (max-width: 900px) {
+        .banner-editor { grid-template-columns: 1fr; }
+        .banner-editor-preview { position: static; }
+    }
+    @@media (prefers-reduced-motion: reduce) {
+        .seg-opt span, .file-drop { transition: none; }
+    }
+</style>
+
 <es-page-header eyebrow="Comunicação"
-                titulo="@ViewData["Title"]"
-                descricao="Banner de plataforma exibido a todos os lojistas no app Web.">
+                titulo="@titulo"
+                descricao="Aviso exibido a todos os lojistas no app Web.">
     <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-            <es-breadcrumb-item href="/Banners">Banners</es-breadcrumb-item>
+            <es-breadcrumb-item href="/Banners">Quadro de avisos</es-breadcrumb-item>
             <es-breadcrumb-item>@(Model.Id.HasValue ? "Editar" : "Novo")</es-breadcrumb-item>
         </es-breadcrumb>
     </es-page-header-breadcrumb>
     <es-button variant="ghost" href="/Banners" icon="arrow-left">Voltar</es-button>
 </es-page-header>
 
-<div style="max-width:960px;"
-     x-data="bannerForm({ forma: '@Model.Forma', urlAtiva: @JsBool(Model.LinkAtivo), tooltipAtivo: @JsBool(Model.TooltipAtivo), tamanhoModo: '@Model.TamanhoModo', imagemUrl: '@(Model.ImagemUrl ?? "")' })">
-    <div style="display:grid; grid-template-columns:1fr; gap:16px;">
-        <es-card>
-            <form method="post" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:14px;">
-                <es-input asp-for="TituloInterno" label="Título interno" required="true" maxlength="120"
-                          helper="Só aparece no console — não é exibido ao lojista." />
+<div class="banner-editor" x-data="bannerForm(@init)">
+    <form method="post" enctype="multipart/form-data" class="banner-editor-form">
 
-                <div role="radiogroup" aria-label="Forma do banner" style="display:flex; gap:16px;">
-                    <label class="es-switch"><input type="radio" name="Forma" value="imagem" x-model="forma"><span>Imagem</span></label>
-                    <label class="es-switch"><input type="radio" name="Forma" value="texto" x-model="forma"><span>Só texto (vira modal)</span></label>
+        @* ── Conteúdo ── *@
+        <es-card title="Conteúdo" description="O que o lojista vê na tela.">
+            <div class="banner-fields">
+                <es-input asp-for="TituloInterno" label="Título interno" required="true" maxlength="120"
+                          helper="Só aparece aqui no console — o lojista não vê este texto." />
+
+                <div>
+                    <label class="es-form-label">Forma do aviso</label>
+                    <div class="seg" role="radiogroup" aria-label="Forma do aviso" style="margin-top:6px;">
+                        <label class="seg-opt">
+                            <input type="radio" name="Forma" value="imagem" x-model="forma" />
+                            <span><es-icon name="eye" size="14" /> Imagem</span>
+                        </label>
+                        <label class="seg-opt">
+                            <input type="radio" name="Forma" value="texto" x-model="forma" />
+                            <span><es-icon name="info" size="14" /> Mensagem</span>
+                        </label>
+                    </div>
                 </div>
 
-                @* ── Forma imagem ── *@
-                <div x-show="forma === 'imagem'" x-cloak style="display:flex; flex-direction:column; gap:14px;">
+                @* Forma imagem *@
+                <div x-show="forma === 'imagem'" x-cloak class="banner-reveal">
                     <div>
-                        <label for="Imagem" style="font-size:13px; color:var(--text-secondary);">Imagem (PNG, JPG ou WEBP)</label>
-                        <input type="file" id="Imagem" name="Imagem" accept="image/png,image/jpeg,image/webp"
-                               x-on:change="previewLocal($event)" style="display:block; margin-top:6px;">
+                        <label class="es-form-label" for="Imagem">Imagem</label>
+                        <label class="file-drop" style="margin-top:6px;">
+                            <es-icon name="upload" size="18" />
+                            <span x-text="fileName || 'Selecionar imagem — PNG, JPG ou WEBP'"></span>
+                            <input type="file" id="Imagem" name="Imagem" class="file-drop-input"
+                                   accept="image/png,image/jpeg,image/webp" x-on:change="previewLocal($event)" />
+                        </label>
+                        <span class="es-form-helper" x-show="!!imagemUrl && !previewUrl" x-cloak>
+                            Já existe uma imagem salva. Envie outra só se quiser trocar.
+                        </span>
                     </div>
 
-                    <div role="radiogroup" aria-label="Tamanho" style="display:flex; gap:16px;">
-                        <label class="es-switch"><input type="radio" name="TamanhoModo" value="herdado" x-model="tamanhoModo"><span>Herdar da imagem</span></label>
-                        <label class="es-switch"><input type="radio" name="TamanhoModo" value="manual" x-model="tamanhoModo"><span>Definir L × A</span></label>
+                    <div>
+                        <label class="es-form-label">Tamanho</label>
+                        <div class="seg" role="radiogroup" aria-label="Tamanho" style="margin-top:6px;">
+                            <label class="seg-opt">
+                                <input type="radio" name="TamanhoModo" value="herdado" x-model="tamanhoModo" />
+                                <span>Herdar da imagem</span>
+                            </label>
+                            <label class="seg-opt">
+                                <input type="radio" name="TamanhoModo" value="manual" x-model="tamanhoModo" />
+                                <span>Definir L × A</span>
+                            </label>
+                        </div>
                     </div>
-                    <div x-show="tamanhoModo === 'manual'" x-cloak style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <es-input asp-for="LarguraPx" type="number" label="Largura (px)" />
-                        <es-input asp-for="AlturaPx" type="number" label="Altura (px)" />
+                    <div x-show="tamanhoModo === 'manual'" x-cloak class="banner-grid-2">
+                        <div class="es-form-field">
+                            <label class="es-form-label" for="LarguraPx">Largura (px)</label>
+                            <input id="LarguraPx" name="LarguraPx" type="number" min="1" class="es-form-input"
+                                   x-model.number="largura" placeholder="ex.: 600" />
+                        </div>
+                        <div class="es-form-field">
+                            <label class="es-form-label" for="AlturaPx">Altura (px)</label>
+                            <input id="AlturaPx" name="AlturaPx" type="number" min="1" class="es-form-input"
+                                   x-model.number="altura" placeholder="ex.: 240" />
+                        </div>
                     </div>
 
-                    <label class="es-switch"><input type="checkbox" name="LinkAtivo" value="true" x-model="urlAtiva"><span>Link clicável</span></label>
-                    <div x-show="urlAtiva" x-cloak style="display:flex; flex-direction:column; gap:10px;">
+                    <label class="es-switch">
+                        <input type="checkbox" role="switch" name="LinkAtivo" value="true" x-model="urlAtiva" />
+                        <span>Link clicável</span>
+                    </label>
+                    <div x-show="urlAtiva" x-cloak class="banner-reveal">
                         <es-input asp-for="LinkUrl" type="url" label="URL de destino" placeholder="https://..." />
                         <es-switch name="NovaAba" label="Abrir em nova aba" checked="@Model.NovaAba" />
                     </div>
 
-                    <label class="es-switch"><input type="checkbox" name="TooltipAtivo" value="true" x-model="tooltipAtivo"><span>Tooltip</span></label>
-                    <div x-show="tooltipAtivo" x-cloak>
+                    <label class="es-switch">
+                        <input type="checkbox" role="switch" name="TooltipAtivo" value="true" x-model="tooltipAtivo" />
+                        <span>Tooltip ao passar o mouse</span>
+                    </label>
+                    <div x-show="tooltipAtivo" x-cloak class="banner-reveal">
                         <es-input asp-for="TooltipTexto" label="Texto do tooltip" maxlength="300" />
                     </div>
                 </div>
 
-                @* ── Forma texto ── *@
+                @* Forma mensagem *@
                 <div x-show="forma === 'texto'" x-cloak>
-                    <es-textarea asp-for="Corpo" label="Mensagem do modal" rows="5"
-                                 helper="Exibida como aviso em modal. Quebras de linha são preservadas." />
+                    <div class="es-form-field">
+                        <label class="es-form-label es-form-label-required" for="Corpo">Mensagem do aviso</label>
+                        <textarea id="Corpo" name="Corpo" class="es-form-textarea" rows="5" x-model="corpo"
+                                  placeholder="Escreva o aviso que aparecerá no modal…"></textarea>
+                        <span class="es-form-helper">Aparece como aviso em modal. Quebras de linha são preservadas.</span>
+                    </div>
                 </div>
-
-                <hr style="border:none; border-top:1px solid var(--border-soft); margin:4px 0;">
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <es-switch name="VisualizacaoUnica" label="Mostrar só 1× por usuário" checked="@Model.VisualizacaoUnica" />
-                    <es-switch name="ExigeConfirmacao" label="Exigir “Ok, recebi”" checked="@Model.ExigeConfirmacao" />
-                    <es-switch name="NotificarAoPublicar" label="Também criar notificação" checked="@Model.NotificarAoPublicar" />
-                    <es-switch name="Ativo" label="Ativo (visível)" checked="@Model.Ativo" />
-                </div>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
-                    <es-input asp-for="InicioEm" type="datetime-local" label="Início" label-optional="true" value="@Dt(Model.InicioEm)" />
-                    <es-input asp-for="FimEm" type="datetime-local" label="Fim" label-optional="true" value="@Dt(Model.FimEm)" />
-                    <es-input asp-for="Prioridade" type="number" label="Prioridade" />
-                </div>
-
-                <div style="display:flex; gap:8px; padding-top:6px;">
-                    <es-button type="submit" variant="primary" icon="check">Salvar</es-button>
-                    <es-button variant="ghost" href="/Banners">Cancelar</es-button>
-                </div>
-            </form>
+            </div>
         </es-card>
 
-        @* ── Preview ao vivo (client-only) ── *@
-        <es-card>
-            <h3 style="margin:0 0 10px; font-size:14px; color:var(--text-secondary);">Prévia</h3>
-            <div style="border:1px solid var(--border-soft); border-radius:8px; padding:16px; background:var(--surface-2, var(--bg-subtle));">
-                <template x-if="forma === 'imagem' && (previewUrl || imagemUrl)">
-                    <img x-bind:src="previewUrl || imagemUrl"
-                         x-bind:style="tamanhoModo === 'manual' && $refs.lp?.value && $refs.ap?.value ? ('width:' + $refs.lp.value + 'px;height:' + $refs.ap.value + 'px;max-width:100%;object-fit:contain') : 'max-width:100%;height:auto'"
-                         alt="Prévia do banner">
-                </template>
-                <template x-if="forma === 'imagem' && !(previewUrl || imagemUrl)">
-                    <p style="color:var(--text-muted); font-size:13px; margin:0;">Envie uma imagem para ver a prévia.</p>
+        @* ── Comportamento ── *@
+        <es-card title="Comportamento" description="Como o aviso se comporta para cada lojista.">
+            <div class="banner-switches">
+                <es-switch name="VisualizacaoUnica" label="Mostrar só 1× por usuário" checked="@Model.VisualizacaoUnica" />
+                <label class="es-switch">
+                    <input type="checkbox" role="switch" name="ExigeConfirmacao" value="true" x-model="exigeConfirmacao" />
+                    <span>Exigir confirmação (“Ok, recebi”)</span>
+                </label>
+                <es-switch name="NotificarAoPublicar" label="Também criar notificação ao publicar" checked="@Model.NotificarAoPublicar" />
+                <p class="es-form-helper" style="margin:0;">
+                    Confirmação obrigatória sempre aparece em modal e só some quando o lojista clica em “Ok, recebi”.
+                </p>
+            </div>
+        </es-card>
+
+        @* ── Publicação ── *@
+        <es-card title="Publicação" description="Quando o aviso entra e sai do ar (horário de Brasília).">
+            <div class="banner-fields">
+                <es-switch name="Ativo" label="Ativo (visível no app)" checked="@Model.Ativo" />
+                <div class="banner-grid-3">
+                    <es-input asp-for="InicioEm" type="datetime-local" label="Início" label-optional="true" value="@Dt(Model.InicioEm)" />
+                    <es-input asp-for="FimEm" type="datetime-local" label="Fim" label-optional="true" value="@Dt(Model.FimEm)" />
+                    <es-input asp-for="Prioridade" type="number" label="Prioridade" helper="Maior aparece antes." />
+                </div>
+            </div>
+        </es-card>
+
+        <div class="banner-editor-actions">
+            <es-button type="submit" variant="primary" icon="check">Salvar aviso</es-button>
+            <es-button variant="ghost" href="/Banners">Cancelar</es-button>
+        </div>
+    </form>
+
+    @* ── Prévia ao vivo (client-only) ── *@
+    <aside class="banner-editor-preview">
+        <es-card title="Prévia" description="Como o lojista vê.">
+            <div class="preview-stage">
+                <template x-if="forma === 'imagem'">
+                    <div style="width:100%; text-align:center;">
+                        <template x-if="imgSrc">
+                            <div>
+                                <img x-bind:src="imgSrc" x-bind:style="sizeStyle" alt="Prévia do aviso"
+                                     style="border-radius:var(--r-sm);" />
+                                <p class="preview-note" x-show="urlAtiva" x-cloak>
+                                    <es-icon name="external-link" size="12" /> Imagem clicável
+                                </p>
+                            </div>
+                        </template>
+                        <template x-if="!imgSrc">
+                            <div class="preview-empty">
+                                <es-icon name="upload" size="20" />
+                                <span>A imagem aparecerá aqui</span>
+                            </div>
+                        </template>
+                    </div>
                 </template>
                 <template x-if="forma === 'texto'">
-                    <div style="white-space:pre-line; color:var(--text-primary);" x-text="$refs.corpo?.value || 'Mensagem do modal…'"></div>
+                    <div class="preview-modal">
+                        <div class="preview-modal-body" style="white-space:pre-line;"
+                             x-text="corpo || 'A mensagem do aviso aparece aqui…'"></div>
+                        <div class="preview-modal-actions">
+                            <span class="preview-btn" x-text="exigeConfirmacao ? 'Ok, recebi' : 'Fechar'"></span>
+                        </div>
+                    </div>
                 </template>
             </div>
         </es-card>
-    </div>
+    </aside>
 </div>
 
 @section Scripts {
@@ -114,15 +243,28 @@
         function bannerForm(init) {
             return {
                 forma: init.forma || 'imagem',
+                corpo: init.corpo || '',
                 urlAtiva: !!init.urlAtiva,
                 tooltipAtivo: !!init.tooltipAtivo,
                 tamanhoModo: init.tamanhoModo || 'herdado',
+                largura: init.largura || null,
+                altura: init.altura || null,
+                exigeConfirmacao: !!init.exigeConfirmacao,
                 imagemUrl: init.imagemUrl || '',
                 previewUrl: '',
+                fileName: '',
                 previewLocal(ev) {
                     const f = ev.target.files && ev.target.files[0];
                     if (this.previewUrl) { try { URL.revokeObjectURL(this.previewUrl); } catch (_) {} }
                     this.previewUrl = f ? URL.createObjectURL(f) : '';
+                    this.fileName = f ? f.name : '';
+                },
+                get imgSrc() { return this.previewUrl || this.imagemUrl; },
+                get sizeStyle() {
+                    if (this.tamanhoModo === 'manual' && this.largura > 0 && this.altura > 0) {
+                        return 'width:' + this.largura + 'px;height:' + this.altura + 'px;max-width:100%;object-fit:contain';
+                    }
+                    return 'max-width:100%;height:auto';
                 }
             };
         }

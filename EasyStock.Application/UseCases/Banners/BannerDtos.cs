@@ -2,7 +2,11 @@ using EasyStock.Domain.Entities.Banners;
 
 namespace EasyStock.Application.UseCases.Banners;
 
-/// <summary>Projeção do banner para o console Admin (listagem e detalhe).</summary>
+/// <summary>
+/// Projeção do banner para o console Admin (listagem e detalhe). Carrega o conjunto
+/// completo de campos editáveis (corpo, link, tooltip, tamanho) para que a tela de
+/// edição consiga repopular o formulário sem perder configuração ao salvar.
+/// </summary>
 public sealed record BannerAdminDto(
     Guid Id,
     string TituloInterno,
@@ -17,12 +21,25 @@ public sealed record BannerAdminDto(
     int Prioridade,
     string? ImagemUrl,
     DateTime CriadoEm,
-    DateTime AtualizadoEm)
+    DateTime AtualizadoEm,
+    string? Corpo,
+    string TamanhoModo,
+    int? LarguraPx,
+    int? AlturaPx,
+    bool LinkAtivo,
+    string? LinkUrl,
+    bool NovaAba,
+    bool TooltipAtivo,
+    string? TooltipTexto)
 {
     public static BannerAdminDto De(Banner b) => new(
         b.Id, b.TituloInterno, b.Tipo.ToString(), b.Ativo,
         b.ExigeConfirmacao, b.VisualizacaoUnica, b.NotificarAoPublicar, b.NotificadoEm,
-        b.InicioEm, b.FimEm, b.Prioridade, b.ImagemUrl, b.CriadoEm, b.AtualizadoEm);
+        b.InicioEm, b.FimEm, b.Prioridade, b.ImagemUrl, b.CriadoEm, b.AtualizadoEm,
+        b.Corpo,
+        b.TamanhoModo == Domain.Enums.BannerTamanhoModo.Manual ? "manual" : "herdado",
+        b.LarguraPx, b.AlturaPx,
+        b.LinkAtivo, b.LinkUrl, b.NovaAba, b.TooltipAtivo, b.TooltipTexto);
 }
 
 /// <summary>
