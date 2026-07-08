@@ -30,6 +30,10 @@ public abstract class EasyStockControllerBase : ControllerBase
     protected IActionResult DataNotFound(string message = "Recurso não encontrado.", string? detail = null) =>
         base.NotFound(new ApiErrorResponse(new ApiError("NOT_FOUND", message, detail, null)));
 
+    /// <summary>409 with { error: { code: CONFLICT, ... } }</summary>
+    protected IActionResult DataConflict(string message, string? detail = null) =>
+        base.Conflict(new ApiErrorResponse(new ApiError("CONFLICT", message, detail, null)));
+
     /// <summary>
     /// Guarda HTTP-aware: se <paramref name="id"/> for <see cref="Guid.Empty"/>,
     /// devolve 400 <see cref="DataBadRequest(string, string?)"/> com mensagem

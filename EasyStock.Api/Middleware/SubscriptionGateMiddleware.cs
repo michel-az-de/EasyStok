@@ -39,6 +39,8 @@ public sealed class SubscriptionGateMiddleware(RequestDelegate next, ILogger<Sub
         "/api/assinatura",
         "/api/webhooks",
         "/api/admin",
+        "/api/banners", // broadcast de plataforma (#869): avisos valem inclusive p/ inadimplente
+
         "/api/ia/uso",
         "/api/diagnostico",
         "/health",

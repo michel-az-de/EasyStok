@@ -12,6 +12,13 @@ public sealed record UploadedFileResult(
     long Size,
     Guid? FileId = null);
 
+/// <summary>
+/// Resultado do upload da imagem de um banner (#869): expõe StorageKey E Url, porque o
+/// banner persiste os dois (a criação é em duas etapas — sobe a imagem, depois cadastra
+/// o banner referenciando a chave). Bucket global "banners" (sem segmento de tenant).
+/// </summary>
+public sealed record BannerImagemUploadResult(string StorageKey, string Url, string ContentType, long Size);
+
 public sealed class GerenciarUploadsUseCase(
     IFileStorage fileStorage,
     IImageProcessor imageProcessor,
@@ -197,6 +204,32 @@ public sealed class GerenciarUploadsUseCase(
         await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
+    }
+
+    /// <summary>
+    /// Imagem de um banner global de plataforma (#869). Sem tenant no caminho (banner é
+    /// global). Reusa <see cref="ValidarImagem"/> (allowlist png/jpg/webp + magic bytes) e
+    /// otimiza como as demais. Retorna StorageKey + Url (IsPublic=true → URL permanente).
+    /// Não persiste banner: o cadastro é etapa separada que referencia a chave.
+    /// </summary>
+    public async Task<BannerImagemUploadResult> UploadImagemBannerAsync(
+        string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)
+    {
+        ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
+
+        var (optimized, optContentType, optExt) = await Task.Run(
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            cancellationToken);
+
+        var stored = await fileStorage.UploadAsync(
+            new FileUploadRequest(
+                "banners",
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
+            cancellationToken);
+
+        return new BannerImagemUploadResult(stored.StorageKey, stored.Url, optContentType, stored.Size);
     }
 
     /// <summary>
