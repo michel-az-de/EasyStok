@@ -24,6 +24,7 @@ public sealed record RecebimentoSerieDia(string Dia, int Total);
 public sealed record RecebimentoEventoDto(
     Guid UsuarioId,
     string Nome,
+    string? Empresa,
     string EmailMascarado,
     string Tipo,
     DateTime RegistradoEmUtc);
@@ -43,6 +44,7 @@ public sealed record BannerRecebimentoReadModel(
 public sealed record RecebimentoEventoRaw(
     Guid UsuarioId,
     string Nome,
+    string? Empresa,
     string Email,
     string Tipo,
     DateTime RegistradoEmUtc);

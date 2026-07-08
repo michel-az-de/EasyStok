@@ -48,7 +48,21 @@ namespace EasyStock.Infra.Postgre.Repositories
                 from c in db.BannerConfirmacoes.AsNoTracking()
                 join u in db.Usuarios.AsNoTracking() on c.UsuarioId equals u.Id
                 where c.BannerId == bannerId
-                select new { c.UsuarioId, u.Nome, u.Email, c.Tipo, c.RegistradoEm };
+                select new
+                {
+                    c.UsuarioId,
+                    u.Nome,
+                    u.Email,
+                    c.Tipo,
+                    c.RegistradoEm,
+                    // Empresa primária do usuário (prefere a ativa). Leitura cross-tenant como o
+                    // AdminTenantsQueries — RLS inerte + admin sem tenant fixo; sem IgnoreQueryFilters.
+                    Empresa = db.UsuariosEmpresas
+                        .Where(ue => ue.UsuarioId == u.Id)
+                        .OrderByDescending(ue => ue.Ativo)
+                        .Select(ue => ue.Empresa!.Nome)
+                        .FirstOrDefault()
+                };
 
             if (!string.IsNullOrWhiteSpace(tipo) && Enum.TryParse<BannerInteracaoTipo>(tipo, ignoreCase: true, out var t))
                 eventos = eventos.Where(e => e.Tipo == t);
@@ -67,7 +81,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync(ct);
 
             var linhas = pagina
-                .Select(e => new RecebimentoEventoRaw(e.UsuarioId, e.Nome, e.Email, e.Tipo.ToString(), e.RegistradoEm))
+                .Select(e => new RecebimentoEventoRaw(e.UsuarioId, e.Nome, e.Empresa, e.Email, e.Tipo.ToString(), e.RegistradoEm))
                 .ToList();
 
             return new BannerRecebimentoReadModel(

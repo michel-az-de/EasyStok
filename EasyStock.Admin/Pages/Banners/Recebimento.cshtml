@@ -47,6 +47,8 @@
     .recv-ts { color: var(--text-muted); white-space: nowrap; }
     .recv-who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; min-width: 0; }
     .recv-nome { font-family: var(--font-sans); color: var(--text-primary); font-weight: 500; }
+    .recv-empresa { font-family: var(--font-sans); color: var(--text-muted); }
+    .recv-empresa::before { content: "·"; margin-right: 6px; color: var(--border-strong); }
     .recv-email { color: var(--text-secondary); }
     .recv-reveal { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); cursor: pointer; transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out); }
     .recv-reveal:hover { color: var(--intent-action); border-color: var(--intent-action); }
@@ -134,6 +136,10 @@
                 <es-badge variant="@tag.Variant">@tag.Label</es-badge>
                 <span class="recv-who">
                     <span class="recv-nome">@ev.Nome</span>
+                    @if (!string.IsNullOrWhiteSpace(ev.Empresa))
+                    {
+                        <span class="recv-empresa">@ev.Empresa</span>
+                    }
                     <span class="recv-email" x-text="email"></span>
                 </span>
                 <button type="button" class="recv-reveal" x-show="!shown" x-cloak

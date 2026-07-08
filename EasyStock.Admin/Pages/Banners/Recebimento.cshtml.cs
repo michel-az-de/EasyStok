@@ -1,7 +1,7 @@
 namespace EasyStock.Admin.Pages.Banners;
 
 /// <summary>Uma linha do log de recebimento (evento de um usuário com o aviso).</summary>
-public sealed record RecebimentoEventoVM(Guid UsuarioId, string Nome, string EmailMascarado, string Tipo, DateTime QuandoUtc);
+public sealed record RecebimentoEventoVM(Guid UsuarioId, string Nome, string? Empresa, string EmailMascarado, string Tipo, DateTime QuandoUtc);
 
 /// <summary>
 /// Console de recebimento de um aviso (#875): quem viu/confirmou, totais, % e quando.
@@ -85,6 +85,7 @@ public class RecebimentoModel(AdminApiClient api, AdminSessionService session, I
     private static RecebimentoEventoVM MapEvento(JsonElement e) => new(
         e.TryGetProperty("usuarioId", out var u) && u.ValueKind == JsonValueKind.String ? u.GetGuid() : Guid.Empty,
         Str(e, "nome") ?? "—",
+        Str(e, "empresa"),
         Str(e, "emailMascarado") ?? "—",
         Str(e, "tipo") ?? "—",
         e.TryGetProperty("registradoEmUtc", out var r) && r.ValueKind == JsonValueKind.String && r.TryGetDateTimeOffset(out var dto)

@@ -19,7 +19,7 @@ public sealed class ConsultarRecebimentoBannerUseCase(IBannerRecebimentoQuery qu
             ?? throw new BannerNaoEncontradoException();
 
         var eventos = rm.Eventos
-            .Select(e => new RecebimentoEventoDto(e.UsuarioId, e.Nome, MascararEmail(e.Email), e.Tipo, e.RegistradoEmUtc))
+            .Select(e => new RecebimentoEventoDto(e.UsuarioId, e.Nome, e.Empresa, MascararEmail(e.Email), e.Tipo, e.RegistradoEmUtc))
             .ToList();
 
         return new BannerRecebimentoDto(
