@@ -10,14 +10,17 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
     <PackageReference Include="Polly" Version="8.5.2" />
     <!--
+      7.2.5 (de 7.2.1): GHSA-7jvp-hj45-2f2m (advisory high, NU1903) passou a afetar
+      7.2.1 e quebrava o Build da CI em master sob -warnaserror. 7.2.5 (ultima patch
+      da linha 7.2.x) sai da faixa afetada; restore com audit limpo. Patch-level, sem
+      breaking change.
+      Historico:
       7.2.1 (de 7.2.0): GHSA-6q7j-xr26-3h2c (ExpressionDepthLimit nao interrompe o
       parse -> StackOverflow incancelavel) + GHSA-q6rr-fm2g-g5x8 (array * int sem
       limite de recurso -> DoS por OOM). Affected: <= 7.2.0, First Fixed: 7.2.1.
-      Patch-level, sem breaking change. NU1902 (advisory virando erro sob
-      -warnaserror) quebrava o Build da CI em master ate este bump.
-      Historico: 7.2.0 (de 7.1.0) corrigiu GHSA-24c8-4792-22hx (array.insert_at OOM).
+      7.2.0 (de 7.1.0) corrigiu GHSA-24c8-4792-22hx (array.insert_at OOM).
     -->
-    <PackageReference Include="Scriban" Version="7.2.1" />
+    <PackageReference Include="Scriban" Version="7.2.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.7" />
