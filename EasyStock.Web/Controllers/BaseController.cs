@@ -25,6 +25,8 @@ public abstract class BaseController(SessionService session) : Controller
     {
         "Lojas",
         "Assinatura",
+        // Banners de plataforma (#869): avisos globais valem antes de ter loja selecionada.
+        "Banners",
         // KDS filtra por empresaId (não lojaId) — funciona sem loja selecionada.
         // Sem esta entrada, login com múltiplas lojas redireciona para SelecionarLoja
         // antes que o usuário possa acessar a tela de cozinha.

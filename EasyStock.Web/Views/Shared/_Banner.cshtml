@@ -1,0 +1,160 @@
+@*
+    Faixas de banner de plataforma (issue 869). Casca SSR vazia; o store Alpine `esBanners`
+    busca /api/banners/ativos no client (no-store), separa faixas (imagem não-obrigatória) de
+    modais (texto ou obrigatório), e persiste as de visualização única na sessão. Modal em _BannerModal.
+*@
+<div x-data="{}" x-cloak class="banner-host"
+     role="region" aria-label="Avisos da plataforma"
+     style="display:flex; flex-direction:column;">
+    <template x-for="b in $store.esBanners.faixas" :key="b.id">
+        <div class="banner-strip"
+             style="display:flex; align-items:center; gap:12px; padding:8px 16px; font-size:14px;
+                    background:var(--navy-50, var(--bg-subtle)); border-bottom:1px solid var(--border-soft);
+                    color:var(--text-primary);">
+            <div style="flex:1 1 auto; min-width:0; display:flex; justify-content:center;">
+                <template x-if="b.linkAtivo && b.linkUrl">
+                    <a :href="b.linkUrl" :target="b.novaAba ? '_blank' : '_self'"
+                       :rel="b.novaAba ? 'noopener noreferrer' : null"
+                       :title="b.tooltipAtivo ? b.tooltipTexto : null"
+                       @@click="$store.esBanners.marcarVisto(b)">
+                        <img :src="b.imagemUrl" :alt="b.tooltipTexto || 'Aviso'" loading="lazy" decoding="async"
+                             @@error="$store.esBanners.onImgErro(b)"
+                             :style="$store.esBanners.dimStyle(b)">
+                    </a>
+                </template>
+                <template x-if="!(b.linkAtivo && b.linkUrl)">
+                    <img :src="b.imagemUrl" :alt="b.tooltipTexto || 'Aviso'" loading="lazy" decoding="async"
+                         :title="b.tooltipAtivo ? b.tooltipTexto : null"
+                         @@error="$store.esBanners.onImgErro(b)"
+                         :style="$store.esBanners.dimStyle(b)">
+                </template>
+            </div>
+            <button type="button" aria-label="Dispensar aviso"
+                    @@click="$store.esBanners.dispensar(b)"
+                    style="flex:0 0 auto; background:none; border:none; cursor:pointer; font-size:20px; line-height:1;
+                           color:var(--text-muted); padding:0 4px;">&times;</button>
+        </div>
+    </template>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', function () {
+        Alpine.store('esBanners', {
+            faixas: [],
+            modalQueue: [],
+            modal: null,
+
+            carregar() {
+                esFetch('/api/banners/ativos', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : { data: [] }; })
+                    .then((j) => this.hidratar((j && j.data) || []))
+                    .catch(() => this.hidratar([]));
+            },
+
+            hidratar(lista) {
+                const agora = Date.now();
+                const vistos = this._lerVistos();
+                const sticky = this._lerSticky().filter((b) => !this._venceu(b, agora));
+                const doServidor = lista.filter((b) => vistos.indexOf(b.id) === -1 && !this._venceu(b, agora));
+
+                // dedupe por id; dados do servidor têm precedência sobre o sticky da sessão.
+                const mapa = new Map();
+                sticky.forEach((b) => mapa.set(b.id, b));
+                doServidor.forEach((b) => mapa.set(b.id, b));
+                const todos = Array.from(mapa.values()).sort((a, b) => (b.prioridade || 0) - (a.prioridade || 0));
+
+                this.faixas = todos.filter((b) => !this._ehModal(b));
+                this.modalQueue = todos.filter((b) => this._ehModal(b));
+                this.modal = this.modalQueue[0] || null;
+
+                // Visualização única não-obrigatória: segura na sessão e registra Visto 1× no servidor.
+                todos.forEach((b) => {
+                    if (b.visualizacaoUnica && !b.exigeConfirmacao) {
+                        this._guardarSticky(b);
+                        this._autoVisto(b);
+                    }
+                });
+            },
+
+            // Presença: obrigatório OU só-texto → modal; senão faixa (imagem).
+            _ehModal(b) { return !!b.exigeConfirmacao || b.tipo === 'mensagem'; },
+            _venceu(b, agora) { return b.fimEm && new Date(b.fimEm).getTime() <= agora; },
+
+            dimStyle(b) {
+                if (b.tamanhoModo === 'manual' && b.larguraPx && b.alturaPx) {
+                    return 'width:' + b.larguraPx + 'px;height:' + b.alturaPx + 'px;max-width:100%;object-fit:contain;';
+                }
+                return 'max-width:100%;height:auto;';
+            },
+
+            onImgErro(b) { this._removerDaTela(b); },
+
+            marcarVisto(b) {
+                this._lembrarVisto(b.id);
+                esFetch('/api/banners/' + b.id + '/visto', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+            },
+
+            dispensar(b) {
+                this._removerDaTela(b); // otimista; não-obrigatório
+                esFetch('/api/banners/' + b.id + '/visto', { method: 'POST', credentials: 'same-origin' })
+                    .then((r) => { if (r && r.ok) this._lembrarVisto(b.id); })
+                    .catch(() => {});
+            },
+
+            confirmar(b) {
+                esFetch('/api/banners/' + b.id + '/confirmar', { method: 'POST', credentials: 'same-origin' })
+                    .then((r) => {
+                        if (r && r.ok) {
+                            this._removerDaTela(b);
+                            if (window.showToast) window.showToast('Recebido. Obrigado!', 'success');
+                        } else if (window.showToast) {
+                            window.showToast('Não deu para confirmar agora.', 'error');
+                        }
+                    })
+                    .catch(() => { if (window.showToast) window.showToast('Não deu para confirmar agora.', 'error'); });
+            },
+
+            fecharModalSePermitido() {
+                if (this.modal && !this.modal.exigeConfirmacao) this.dispensar(this.modal);
+            },
+
+            _autoVisto(b) {
+                const chave = 'es_banner_av_' + b.id;
+                try { if (sessionStorage.getItem(chave)) return; sessionStorage.setItem(chave, '1'); } catch (e) {}
+                esFetch('/api/banners/' + b.id + '/visto', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+            },
+
+            _removerDaTela(b) {
+                this.faixas = this.faixas.filter((x) => x.id !== b.id);
+                this.modalQueue = this.modalQueue.filter((x) => x.id !== b.id);
+                this._removerSticky(b.id);
+                this.modal = this.modalQueue[0] || null; // avança a fila de modais
+            },
+
+            // localStorage: dispensados (dedupe anti-flash), limitado.
+            _lerVistos() { try { return JSON.parse(localStorage.getItem('es_banners_vistos') || '[]'); } catch (e) { return []; } },
+            _lembrarVisto(id) {
+                try {
+                    const s = this._lerVistos().filter((x) => x !== id);
+                    s.push(id);
+                    while (s.length > 100) s.shift();
+                    localStorage.setItem('es_banners_vistos', JSON.stringify(s));
+                } catch (e) {}
+            },
+
+            // sessionStorage: banners de única já exibidos nesta sessão (persistem entre page loads).
+            _lerSticky() { try { return JSON.parse(sessionStorage.getItem('es_banners_sticky') || '[]'); } catch (e) { return []; } },
+            _guardarSticky(b) {
+                try {
+                    const s = this._lerSticky().filter((x) => x.id !== b.id);
+                    s.push(b);
+                    sessionStorage.setItem('es_banners_sticky', JSON.stringify(s));
+                } catch (e) {}
+            },
+            _removerSticky(id) {
+                try { sessionStorage.setItem('es_banners_sticky', JSON.stringify(this._lerSticky().filter((x) => x.id !== id))); } catch (e) {}
+            }
+        });
+        Alpine.store('esBanners').carregar();
+    });
+</script>

@@ -1,0 +1,47 @@
+@*
+    Modal de banner de plataforma (issue 869): só-texto (x-text, nunca x-html) ou imagem obrigatória.
+    Lê o modal atual de $store.esBanners.modal (definido em _Banner). Obrigatório não fecha por ESC/backdrop.
+    A11y espelha _ConfirmModal.
+*@
+<div x-data="{}" x-cloak
+     @@keydown.escape.window="$store.esBanners.fecharModalSePermitido()">
+    <template x-if="$store.esBanners.modal">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: var(--backdrop-color); backdrop-filter: blur(var(--backdrop-blur)); -webkit-backdrop-filter: blur(var(--backdrop-blur));"
+             @@click.self="$store.esBanners.fecharModalSePermitido()" x-transition.opacity>
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" @@click.stop
+                 role="dialog" aria-modal="true" aria-label="Aviso da plataforma">
+
+                <template x-if="$store.esBanners.modal.imagemUrl">
+                    <a x-bind:href="$store.esBanners.modal.linkAtivo && $store.esBanners.modal.linkUrl ? $store.esBanners.modal.linkUrl : null"
+                       x-bind:target="$store.esBanners.modal.novaAba ? '_blank' : null"
+                       x-bind:rel="$store.esBanners.modal.novaAba ? 'noopener noreferrer' : null"
+                       style="display:block;">
+                        <img x-bind:src="$store.esBanners.modal.imagemUrl"
+                             x-bind:alt="$store.esBanners.modal.tooltipTexto || 'Aviso'"
+                             style="max-width:100%; max-height:70vh; height:auto; margin:0 auto; display:block; border-radius:8px;">
+                    </a>
+                </template>
+
+                <template x-if="!$store.esBanners.modal.imagemUrl">
+                    <p style="white-space:pre-line; color:var(--text-primary); font-size:15px; line-height:1.5; margin:0;"
+                       x-text="$store.esBanners.modal.corpo"></p>
+                </template>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <template x-if="!$store.esBanners.modal.exigeConfirmacao">
+                        <button type="button" @@click="$store.esBanners.dispensar($store.esBanners.modal)"
+                                class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+                                style="color:var(--text-secondary); border-color:var(--border-soft);">
+                            Fechar
+                        </button>
+                    </template>
+                    <button type="button" @@click="$store.esBanners.confirmar($store.esBanners.modal)"
+                            class="px-4 py-2 text-sm font-bold text-white rounded-lg bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Ok, recebi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>

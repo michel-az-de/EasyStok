@@ -44,6 +44,27 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
             return http.PatchAsync(path, content);
         }, "PATCH", path);
 
+    /// <summary>POST sem corpo de resposta relevante (API responde 204). Espelha <see cref="DeleteAsync"/>.</summary>
+    public async Task<ApiResult<bool>> PostNoBodyAsync(string path)
+    {
+        try
+        {
+            var response = await http.PostAsync(path, new StringContent("", Encoding.UTF8, "application/json"));
+            if (response.IsSuccessStatusCode) return ApiResult<bool>.Ok(true);
+            return await ParseErrorResponse<bool>(response);
+        }
+        catch (TaskCanceledException)
+        {
+            log.LogWarning("POST {Path} timed out", path);
+            return ApiResult<bool>.Fail("TIMEOUT", "Servidor não respondeu. Verifique sua conexão.");
+        }
+        catch (HttpRequestException ex)
+        {
+            log.LogError(ex, "Network error on POST {Path}", path);
+            return ApiResult<bool>.Fail("NETWORK_ERROR", "Não foi possível conectar ao servidor.");
+        }
+    }
+
     public async Task<ApiResult<bool>> DeleteAsync(string path)
     {
         // Wrapper genérico WrapHttpCallAsync usa ParseResponse para o caminho de sucesso,
