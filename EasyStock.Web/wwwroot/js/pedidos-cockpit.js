@@ -87,6 +87,8 @@
       get kpiAberto() { return this.rows.filter(function (p) { return OPEN.indexOf(p.status) >= 0; }).length; },
       get kpiPronto() { return this.rows.filter(function (p) { return p.status === 'pronto'; }).length; },
       get kpiAtrasado() { return this.rows.filter(function (p) { return p.isAtrasado; }).length; },
+      // "Novos do cardapio" (issue 865): pedidos guest aguardando aprovacao da Baba.
+      get kpiCardapio() { return this.rows.filter(function (p) { return p.status === 'aguardando_aprovacao_baba'; }).length; },
       get kpiReceber() { return this.rows.filter(function (p) { return p.status !== 'cancelado' && PRE_OPERACIONAL.indexOf(p.status) < 0; }).reduce(function (s, p) { return s + (p.pendente || 0); }, 0); },
       get kpiReceberFmt() { return money(this.kpiReceber); },
 
@@ -97,9 +99,11 @@
         if (this.filter === 'agendados') return p.isScheduled;
         if (this.filter === 'atrasados') return p.isAtrasado;
         if (this.filter === '') return true;
-        // "Aguardando" cobre a família de espera do storefront (issue #719): sem isto,
-        // aguardando_aprovacao_baba sumia de todos os tabs exceto "Todos" (BUG-014).
-        if (this.filter === 'aguardando') return p.status === 'aguardando' || p.status === 'aguardando_aprovacao_baba';
+        // Bucket dedicado "Novos do cardapio" (issue 865): so aguardando_aprovacao_baba.
+        // Antes esse status caia no filtro "aguardando" (BUG-014), misturado com a fila
+        // ERP; agora tem tab propria — segue visivel (nao volta ao BUG-014) sem se misturar.
+        if (this.filter === 'cardapio') return p.status === 'aguardando_aprovacao_baba';
+        if (this.filter === 'aguardando') return p.status === 'aguardando';
         return p.status === this.filter;
       },
       isVisible: function (id) { return this.matches(this.items[id]); },

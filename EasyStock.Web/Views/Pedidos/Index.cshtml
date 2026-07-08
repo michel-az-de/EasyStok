@@ -110,6 +110,11 @@
         <span class="ped-kpi__eyebrow">Atrasados</span>
         <span class="ped-kpi__val" x-text="kpiAtrasado">0</span>
     </div>
+    @* Novos do cardapio (issue 865): pedidos guest aguardando aprovacao — recorte dedicado. *@
+    <div class="ped-kpi ped-kpi--accent" x-show="kpiCardapio > 0" x-cloak>
+        <span class="ped-kpi__eyebrow">Novos do cardápio</span>
+        <span class="ped-kpi__val" x-text="kpiCardapio">0</span>
+    </div>
     <div class="ped-kpi ped-kpi--warn">
         <span class="ped-kpi__eyebrow">A receber</span>
         <span class="ped-kpi__val ped-kpi__val--money" x-text="kpiReceberFmt">R$ 0,00</span>
@@ -128,6 +133,10 @@
         </form>
         <div class="filter-tab-group flex-wrap" role="tablist" aria-label="Filtrar por status">
             <button type="button" class="filter-tab" :class="{ active: isFilter('') }" @@click="setFilter('')">Todos</button>
+            @* Novos do cardapio (issue 865): tab dedicada, so aparece quando ha pedido do cardapio aguardando aprovacao. *@
+            <button type="button" class="filter-tab filter-tab--accent" :class="{ active: isFilter('cardapio') }" @@click="setFilter('cardapio')" x-show="kpiCardapio > 0" x-cloak>
+                🛎 Novos do cardápio (<span x-text="kpiCardapio"></span>)
+            </button>
             <button type="button" class="filter-tab" :class="{ active: isFilter('aguardando') }" @@click="setFilter('aguardando')">Aguardando</button>
             <button type="button" class="filter-tab" :class="{ active: isFilter('preparando') }" @@click="setFilter('preparando')">Em preparo</button>
             <button type="button" class="filter-tab" :class="{ active: isFilter('pronto') }" @@click="setFilter('pronto')">Pronto</button>

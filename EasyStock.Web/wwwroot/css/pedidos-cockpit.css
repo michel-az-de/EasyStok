@@ -171,6 +171,11 @@ html.theme-dark .ped-table tbody tr.ped-row--moved:hover td { background-color: 
     border-radius: 6px;
 }
 .ped-advance:disabled { opacity: .6; cursor: wait; }
+
+/* Novos do cardapio (issue 865): tab dedicada com destaque laranja — mesmo token do
+   KPI ped-kpi--accent, pra ligar visualmente o recorte. So tinge o estado inativo;
+   quando .active, o estilo base da filter-tab vence. */
+.filter-tab--accent { color: var(--orange-700); border-color: var(--orange-600); }
 .ped-cap-note {
     margin-top: 14px; padding: 10px 14px;
     font-size: 12.5px; color: var(--text-muted);

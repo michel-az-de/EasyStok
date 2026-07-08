@@ -72,7 +72,13 @@ public class PedidosController(
 
         // Status invalido na URL (?status=naoexiste) caia em lista vazia enganosa e sumia
         // a aba Agendados (BUG-016). Normaliza para "Todos" (null) fora do conjunto valido.
-        var statusesValidos = new[] { "aguardando", "preparando", "pronto", "entregue", "cancelado" };
+        // Inclui os 4 status storefront (issue 865): deep-link ?status=aprovado_baba etc.
+        // funciona; o bucket "Novos do cardapio" e client-side (pseudo-filtro, como agendados).
+        var statusesValidos = new[]
+        {
+            "aguardando", "preparando", "pronto", "entregue", "cancelado",
+            "rascunho", "aguardando_pagamento", "aguardando_aprovacao_baba", "aprovado_baba",
+        };
         var statusFiltro = !string.IsNullOrWhiteSpace(status) && statusesValidos.Contains(status) ? status : null;
 
         var vm = new PedidosListViewModel { Search = search, FiltroStatus = statusFiltro };
