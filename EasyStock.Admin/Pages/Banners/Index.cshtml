@@ -1,19 +1,43 @@
 @page
 @model EasyStock.Admin.Pages.Banners.IndexModel
 @{
-    ViewData["Title"] = "Banners — Comunicação de plataforma";
+    ViewData["Title"] = "Quadro de avisos";
+
+    (string Variant, string Label, bool Dot) Situacao(BannerEstado e) => e switch
+    {
+        BannerEstado.NoAr => ("ok", "No ar", true),
+        BannerEstado.Agendado => ("info", "Agendado", false),
+        BannerEstado.Expirado => ("warn", "Expirado", false),
+        _ => ("neutral", "Inativo", false)
+    };
 }
 
+<style>
+    .aviso-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        line-height: 1;
+        color: var(--text-secondary);
+        background: var(--surface-sunken);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--r-pill);
+        padding: 3px 8px;
+    }
+    .aviso-chip .es-icon { color: var(--text-muted); }
+</style>
+
 <es-page-header eyebrow="Comunicação"
-                titulo="Banners"
-                descricao="Avisos de plataforma exibidos a todos os lojistas no app Web.">
+                titulo="Quadro de avisos"
+                descricao="Avisos exibidos a todos os lojistas no app Web — imagem clicável ou mensagem em modal.">
     <es-page-header-breadcrumb>
         <es-breadcrumb>
             <es-breadcrumb-item href="/">Dashboard</es-breadcrumb-item>
-            <es-breadcrumb-item>Banners</es-breadcrumb-item>
+            <es-breadcrumb-item>Quadro de avisos</es-breadcrumb-item>
         </es-breadcrumb>
     </es-page-header-breadcrumb>
-    <es-button variant="primary" href="/Banners/Edit" icon="plus">Novo banner</es-button>
+    <es-button variant="primary" href="/Banners/Edit" icon="plus">Novo aviso</es-button>
 </es-page-header>
 
 <es-filter-bar>
@@ -23,51 +47,71 @@
 </es-filter-bar>
 
 <es-data-table is-empty="@(!Model.Itens.Any())">
-    <es-data-table-column label="Título interno" />
-    <es-data-table-column label="Forma" />
+    <es-data-table-column label="Aviso" />
     <es-data-table-column label="Situação" />
-    <es-data-table-column label="Janela" />
+    <es-data-table-column label="Janela (BRT)" />
     <es-data-table-column label="Prioridade" align="right" />
-    <es-data-table-column label="" actions="true" width="260px" />
+    <es-data-table-column label="" actions="true" width="240px" />
 
     @foreach (var b in Model.Itens)
     {
-        var id = b.GetProperty("id").GetGuid();
-        var titulo = b.GetProperty("tituloInterno").GetString();
-        var tipo = b.GetProperty("tipo").GetString();
-        var ativo = b.TryGetProperty("ativo", out var a) && a.GetBoolean();
-        var prioridade = b.TryGetProperty("prioridade", out var p) ? p.GetInt32() : 0;
-        var inicio = b.TryGetProperty("inicioEm", out var i) && i.ValueKind == JsonValueKind.String ? i.GetDateTime() : (DateTime?)null;
-        var fim = b.TryGetProperty("fimEm", out var f) && f.ValueKind == JsonValueKind.String ? f.GetDateTime() : (DateTime?)null;
-        var formaLabel = string.Equals(tipo, "Mensagem", StringComparison.OrdinalIgnoreCase) ? "Só texto" : "Imagem";
-
+        var s = Situacao(b.Estado);
         <tr>
-            <td data-label="Título interno" style="font-weight:500; color:var(--text-primary);">@titulo</td>
-            <td data-label="Forma" style="color:var(--text-secondary); font-size:13px;">@formaLabel</td>
+            <td data-label="Aviso">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    @if (b.EhImagem && !string.IsNullOrWhiteSpace(b.ImagemUrl))
+                    {
+                        <img src="@b.ImagemUrl" alt="" loading="lazy"
+                             style="width:44px; height:44px; border-radius:var(--r-md); object-fit:cover; border:1px solid var(--border-soft); background:var(--surface-sunken); flex-shrink:0;" />
+                    }
+                    else
+                    {
+                        <span style="width:44px; height:44px; border-radius:var(--r-md); border:1px solid var(--border-soft); background:var(--surface-sunken); display:inline-flex; align-items:center; justify-content:center; color:var(--text-muted); flex-shrink:0;">
+                            <es-icon name="@(b.EhImagem ? "eye-off" : "info")" size="18" />
+                        </span>
+                    }
+                    <div style="min-width:0;">
+                        <div style="font-weight:600; color:var(--text-primary);">@b.Titulo</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                            <span style="font-size:11px; color:var(--text-muted);">@(b.EhImagem ? "Imagem" : "Mensagem")</span>
+                            @if (b.ExigeConfirmacao)
+                            {
+                                <span class="aviso-chip"><es-icon name="check-circle" size="11" /> Confirmação</span>
+                            }
+                            @if (b.Unica)
+                            {
+                                <span class="aviso-chip"><es-icon name="eye" size="11" /> 1× por usuário</span>
+                            }
+                            @if (b.Notifica)
+                            {
+                                <span class="aviso-chip"><es-icon name="bell" size="11" /> Notifica</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </td>
             <td data-label="Situação">
-                <es-badge variant="@(ativo ? "ok" : "neutral")" with-dot="true">@(ativo ? "ATIVO" : "INATIVO")</es-badge>
+                <es-badge variant="@s.Variant" with-dot="@s.Dot">@s.Label</es-badge>
             </td>
-            <td data-label="Janela" style="color:var(--text-muted); font-size:12px;">
-                @(inicio?.ToString("dd/MM/yy") ?? "—") → @(fim?.ToString("dd/MM/yy") ?? "sem fim")
-            </td>
-            <td data-label="Prioridade" class="es-data-table-td-numeric" style="font-weight:500;">@prioridade</td>
+            <td data-label="Janela (BRT)" style="color:var(--text-muted); font-size:12px;">@b.Janela</td>
+            <td data-label="Prioridade" class="es-data-table-td-numeric" style="font-weight:500;">@b.Prioridade</td>
             <td class="es-data-table-td-actions">
                 <div class="es-row-actions">
-                    <es-button variant="ghost" size="xs" icon="edit-2" href="/Banners/Edit/@id">Editar</es-button>
-                    @if (!ativo)
+                    <es-button variant="ghost" size="xs" icon="edit-2" href="/Banners/Edit/@b.Id">Editar</es-button>
+                    @if (b.Estado == BannerEstado.Inativo)
                     {
-                        <form method="post" asp-page-handler="Ativar" asp-route-id="@id" style="display:inline;">
+                        <form method="post" asp-page-handler="Ativar" asp-route-id="@b.Id" style="display:inline;">
                             <es-button type="submit" variant="ghost" size="xs" icon="check">Ativar</es-button>
                         </form>
                     }
                     else
                     {
-                        <form method="post" asp-page-handler="Desativar" asp-route-id="@id" style="display:inline;">
-                            <es-button type="submit" variant="ghost" size="xs">Desativar</es-button>
+                        <form method="post" asp-page-handler="Desativar" asp-route-id="@b.Id" style="display:inline;">
+                            <es-button type="submit" variant="ghost" size="xs" icon="eye-off">Desativar</es-button>
                         </form>
                     }
-                    <form method="post" asp-page-handler="Excluir" asp-route-id="@id" style="display:inline;"
-                          onsubmit="return confirm('Excluir este banner? Se houver confirmações registradas, use Desativar.');">
+                    <form method="post" asp-page-handler="Excluir" asp-route-id="@b.Id" style="display:inline;"
+                          onsubmit="return confirm('Excluir este aviso? Se houver confirmações registradas, use Desativar.');">
                         <es-button type="submit" variant="ghost" size="xs" icon="trash-2">Excluir</es-button>
                     </form>
                 </div>
@@ -76,10 +120,10 @@
     }
 
     <es-data-table-empty>
-        <es-empty-state icon="megaphone"
-                        title="Nenhum banner"
-                        description="Crie um banner para comunicar avisos a todos os lojistas.">
-            <es-button variant="primary" icon="plus" href="/Banners/Edit">Criar primeiro banner</es-button>
+        <es-empty-state icon="layout-dashboard"
+                        title="Nenhum aviso ainda"
+                        description="Crie um aviso para comunicar algo a todos os lojistas — uma imagem clicável na tela ou uma mensagem em modal.">
+            <es-button variant="primary" icon="plus" href="/Banners/Edit">Criar primeiro aviso</es-button>
         </es-empty-state>
     </es-data-table-empty>
 </es-data-table>

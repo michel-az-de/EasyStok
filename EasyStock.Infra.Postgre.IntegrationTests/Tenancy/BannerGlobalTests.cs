@@ -167,21 +167,26 @@ public class BannerGlobalTests(PostgreSqlDatabaseFixture fixture)
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
 
+        var agora = DateTime.UtcNow;
         var comNotif = await SeedBannerAsync(b => { b.Ativo = true; b.NotificarAoPublicar = true; });
         var semNotif = await SeedBannerAsync(b => { b.Ativo = true; b.NotificarAoPublicar = false; });
         var inativo = await SeedBannerAsync(b => { b.Ativo = false; b.NotificarAoPublicar = true; });
+        var futuro = await SeedBannerAsync(b => { b.Ativo = true; b.NotificarAoPublicar = true; b.InicioEm = agora.AddDays(2); });
+        var vencido = await SeedBannerAsync(b => { b.Ativo = true; b.NotificarAoPublicar = true; b.FimEm = agora.AddHours(-1); });
 
         await using var ctx = fixture.CreateDbContext();
         var repo = new BannerRepository(ctx);
 
-        var pendentes = (await repo.ListarPendentesDeNotificacaoAsync()).Select(b => b.Id).ToList();
+        var pendentes = (await repo.ListarPendentesDeNotificacaoAsync(agora)).Select(b => b.Id).ToList();
         pendentes.Should().Contain(comNotif.Id);
         pendentes.Should().NotContain(semNotif.Id, "sem NotificarAoPublicar não entra na fila");
         pendentes.Should().NotContain(inativo.Id, "banner inativo não notifica");
+        pendentes.Should().NotContain(futuro.Id, "banner com janela futura não notifica antes de estar no ar");
+        pendentes.Should().NotContain(vencido.Id, "banner com janela vencida não notifica");
 
         // Guard atômico marca e tira da fila (não re-notifica no próximo tick).
-        (await repo.MarcarNotificadoSeIneditoAsync(comNotif.Id, DateTime.UtcNow)).Should().BeTrue();
-        (await repo.ListarPendentesDeNotificacaoAsync()).Select(b => b.Id).Should().NotContain(comNotif.Id);
+        (await repo.MarcarNotificadoSeIneditoAsync(comNotif.Id, agora)).Should().BeTrue();
+        (await repo.ListarPendentesDeNotificacaoAsync(agora)).Select(b => b.Id).Should().NotContain(comNotif.Id);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

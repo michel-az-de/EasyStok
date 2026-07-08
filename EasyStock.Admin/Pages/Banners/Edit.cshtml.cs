@@ -46,7 +46,16 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
 
             TituloInterno = b.GetProperty("tituloInterno").GetString() ?? "";
             Forma = string.Equals(b.GetProperty("tipo").GetString(), "Mensagem", StringComparison.OrdinalIgnoreCase) ? "texto" : "imagem";
+            Corpo = Str(b, "corpo");
             ImagemUrl = Str(b, "imagemUrl");
+            TamanhoModo = string.Equals(Str(b, "tamanhoModo"), "manual", StringComparison.OrdinalIgnoreCase) ? "manual" : "herdado";
+            LarguraPx = IntOpt(b, "larguraPx");
+            AlturaPx = IntOpt(b, "alturaPx");
+            LinkAtivo = Bool(b, "linkAtivo");
+            LinkUrl = Str(b, "linkUrl");
+            NovaAba = Bool(b, "novaAba");
+            TooltipAtivo = Bool(b, "tooltipAtivo");
+            TooltipTexto = Str(b, "tooltipTexto");
             ExigeConfirmacao = Bool(b, "exigeConfirmacao");
             VisualizacaoUnica = Bool(b, "visualizacaoUnica");
             NotificarAoPublicar = Bool(b, "notificarAoPublicar");
@@ -177,4 +186,7 @@ public class EditModel(AdminApiClient api, AdminSessionService session, ILogger<
 
     private static DateTime? DataOpt(JsonElement e, string prop)
         => e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String && v.TryGetDateTime(out var d) ? d : null;
+
+    private static int? IntOpt(JsonElement e, string prop)
+        => e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : null;
 }
