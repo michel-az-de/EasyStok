@@ -213,23 +213,12 @@ public sealed class ListarPedidosClienteUseCase(
     /// para o PascalCase que o frontend casa via map (ver fixture
     /// <c>casa-da-baba/src/api/fixtures/meus-pedidos-sucesso.json</c>).
     /// </summary>
-    internal static string StatusToContract(string statusInterno)
-    {
-        // Pedido em rascunho não chega aqui (filter do repo), mas defensivo:
-        return statusInterno switch
-        {
-            StatusPedidoMapper.AguardandoPagamento => "AguardandoPagamento",
-            StatusPedidoMapper.AguardandoAprovacaoBaba => "AguardandoAprovacaoBaba",
-            StatusPedidoMapper.AprovadoBaba => "AprovadoBaba",
-            StatusPedidoMapper.Aguardando => "EmPreparo",       // ERP "aguardando" mapeia pra "EmPreparo" no contrato cliente
-            StatusPedidoMapper.Preparando => "EmPreparo",
-            StatusPedidoMapper.Pronto => "SaiuParaEntrega",
-            StatusPedidoMapper.Entregue => "Entregue",
-            StatusPedidoMapper.Cancelado => "Cancelado",
-            StatusPedidoMapper.Rascunho => "Rascunho",          // não deveria aparecer
-            _ => statusInterno, // unknown — passa raw pra não esconder bug
-        };
-    }
+    internal static string StatusToContract(string statusInterno) =>
+        // Deriva do vocabulário canônico (StatusPedidoVocabulario, issue 863) — fonte única
+        // do contrato do cliente. String desconhecida passa crua pra não esconder bug.
+        StatusPedidoMapper.TryParse(statusInterno, out var status)
+            ? StatusPedidoVocabulario.ContratoCliente(status)
+            : statusInterno;
 
     /// <summary>
     /// Mapeia o status interno (StatusNovo de um <c>PedidoEvento</c>) para a chave do passo
