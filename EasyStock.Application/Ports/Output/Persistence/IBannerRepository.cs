@@ -22,10 +22,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
             Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default);
 
         /// <summary>
-        /// Banners marcados para notificar, ativos e ainda não notificados. O worker os
-        /// enfileira (fan-out por empresa) e marca via <see cref="MarcarNotificadoSeIneditoAsync"/>.
+        /// Banners marcados para notificar, ativos, ainda não notificados E dentro da janela de
+        /// exibição (não notifica sobre banner futuro/vencido — o usuário clicaria e não veria nada;
+        /// quando a janela abrir, o próximo tick do worker o pega). O worker faz fan-out por empresa
+        /// e marca via <see cref="MarcarNotificadoSeIneditoAsync"/>.
         /// </summary>
-        Task<IReadOnlyList<Banner>> ListarPendentesDeNotificacaoAsync(CancellationToken ct = default);
+        Task<IReadOnlyList<Banner>> ListarPendentesDeNotificacaoAsync(DateTime agoraUtc, CancellationToken ct = default);
 
         Task InserirAsync(Banner banner, CancellationToken ct = default);
         Task AtualizarAsync(Banner banner, CancellationToken ct = default);

@@ -63,7 +63,8 @@ public sealed class BannerNotificacaoService(
             var empresaRepo = sp.GetRequiredService<IEmpresaRepository>();
             var notificador = sp.GetRequiredService<INotificadorService>();
 
-            var pendentes = await bannerRepo.ListarPendentesDeNotificacaoAsync(token);
+            var agora = DateTime.UtcNow;
+            var pendentes = await bannerRepo.ListarPendentesDeNotificacaoAsync(agora, token);
             if (pendentes.Count == 0) return;
 
             // Materializa os ids de empresa uma vez (contagem = tenants, pequena). Evita abrir
@@ -72,7 +73,7 @@ public sealed class BannerNotificacaoService(
 
             foreach (var banner in pendentes)
             {
-                var venceu = await bannerRepo.MarcarNotificadoSeIneditoAsync(banner.Id, DateTime.UtcNow, token);
+                var venceu = await bannerRepo.MarcarNotificadoSeIneditoAsync(banner.Id, agora, token);
                 if (!venceu) continue; // outra réplica/tick já pegou
 
                 var payload = JsonSerializer.Serialize(new

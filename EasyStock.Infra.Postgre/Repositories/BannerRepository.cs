@@ -49,10 +49,15 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync(ct);
         }
 
-        public async Task<IReadOnlyList<Banner>> ListarPendentesDeNotificacaoAsync(CancellationToken ct = default)
+        public async Task<IReadOnlyList<Banner>> ListarPendentesDeNotificacaoAsync(
+            DateTime agoraUtc, CancellationToken ct = default)
             => await db.Banners
                 .AsNoTracking()
-                .Where(b => b.NotificarAoPublicar && b.Ativo && b.NotificadoEm == null)
+                .Where(b => b.NotificarAoPublicar
+                    && b.Ativo
+                    && b.NotificadoEm == null
+                    && (b.InicioEm == null || b.InicioEm <= agoraUtc)
+                    && (b.FimEm == null || b.FimEm > agoraUtc))
                 .OrderBy(b => b.CriadoEm)
                 .ToListAsync(ct);
 
