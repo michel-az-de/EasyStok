@@ -58,7 +58,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_aprovacao_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("EasyStock-IT-NonDefault-2026!")
                 .Build();
 
             await _pg.StartAsync();
