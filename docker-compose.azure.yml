@@ -194,6 +194,45 @@ services:
       retries: 5
       start_period: 40s
 
+  # ── Worker (.NET) — jobs de background: outbox de integracao, notificacoes,
+  # SLA de tickets, agendamento de pedidos, fan-out de banners, saude de endpoints,
+  # contingencia fiscal e motor de relatorios assincrono. #878: antes NAO era
+  # buildado nem deployado — nada de background rodava em prod (outbox parado,
+  # notificacoes/SLA/relatorios inertes). NAO expoe HTTP (Generic Host, sem porta)
+  # e NAO roda migrations: a API e a dona (RunMigrationsOnStartup nela) e o worker
+  # sobe DEPOIS dela (depends_on service_healthy) com o schema ja aplicado.
+  worker:
+    build:
+      context: .
+      dockerfile: EasyStock.Worker/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: easystok-worker:latest
+    container_name: easystok-worker
+    restart: unless-stopped
+    mem_limit: 192m
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Onda 3 (#853): Workstation GC — VM de 1 CPU (ver api).
+      DOTNET_gcServer: "0"
+      Database__Provider: PostgreSql
+      # A API aplica migrations/seeds no startup; o worker NAO migra (sobe depois dela).
+      RunMigrationsOnStartup: "false"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable"
+      Jwt__Issuer: ${Jwt__Issuer:-EasyStock}
+      Jwt__Audience: ${Jwt__Audience:-EasyStock}
+      Jwt__SecretKey: ${Jwt__SecretKey}
+      # Motor de relatorios grava artefatos via IFileStorage no MESMO volume que a API
+      # serve em /files (uploads-data). Sem o mesmo volume o link do relatorio quebra.
+      FileStorage__Provider: Local
+      FileStorage__PublicBaseUrl: "https://${API_HOST}/files"
+    volumes:
+      - uploads-data:/app/uploaded-files
+    networks: [easystock-net]
+
   # ── Storefront casadababa.com (site estatico Vite -> nginx) ──────────────────
   # Imagem buildada a parte na VM (contexto fora deste repo):
   #   docker build -t casadababa-storefront:latest /home/azureuser/casa-da-baba

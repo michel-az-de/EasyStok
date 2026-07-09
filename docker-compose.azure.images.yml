@@ -22,3 +22,6 @@ services:
     image: ghcr.io/michel-az-de/easystok-web:${EASYSTOK_IMAGE_TAG:-latest}
   admin:
     image: ghcr.io/michel-az-de/easystok-admin:${EASYSTOK_IMAGE_TAG:-latest}
+  # #878: worker buildado pelo CI (matriz em build-images.yml) e puxado no deploy pull.
+  worker:
+    image: ghcr.io/michel-az-de/easystok-worker:${EASYSTOK_IMAGE_TAG:-latest}
