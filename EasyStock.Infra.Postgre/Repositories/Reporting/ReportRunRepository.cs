@@ -119,26 +119,33 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         // B-02: DISTINCT ON é mais eficiente que ROW_NUMBER() com LIMIT externo.
         // Índice ix_report_runs_pending_picker_tenant cobre o WHERE status=0 AND contexto=1.
         // Para Admin (contexto=2), índice ix_report_runs_pending_picker_admin cobre.
+        //
+        // Cada braço do UNION ALL tem ORDER BY + LIMIT próprios, então PRECISA de
+        // parênteses: no Postgres, um SELECT com ORDER BY/LIMIT seguido de UNION sem
+        // parênteses é "syntax error at or near UNION" (42601). Sem os parênteses esta
+        // query nunca funcionou — o bug ficou latente porque o DbContext do Worker não
+        // construía (ICacheService ausente, #877) e as IntegrationTests de Postgre estão
+        // fora do CI; o picker de relatórios do Worker falhava em todo ciclo de dispatch.
         const string sql = """
             -- Tenant runs (round-robin por empresa_id)
-            SELECT DISTINCT ON (empresa_id) id
-              FROM public.report_runs
-             WHERE status = 0
-               AND contexto = 1
-               AND (next_attempt_at IS NULL OR next_attempt_at <= now())
-             ORDER BY empresa_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
-             LIMIT {0}
+            (SELECT DISTINCT ON (empresa_id) id
+               FROM public.report_runs
+              WHERE status = 0
+                AND contexto = 1
+                AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+              ORDER BY empresa_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
+              LIMIT {0})
 
             UNION ALL
 
             -- Admin SaaS runs (round-robin por usuário)
-            SELECT DISTINCT ON (usuario_solicitante_id) id
-              FROM public.report_runs
-             WHERE status = 0
-               AND contexto = 2
-               AND (next_attempt_at IS NULL OR next_attempt_at <= now())
-             ORDER BY usuario_solicitante_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
-             LIMIT {0}
+            (SELECT DISTINCT ON (usuario_solicitante_id) id
+               FROM public.report_runs
+              WHERE status = 0
+                AND contexto = 2
+                AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+              ORDER BY usuario_solicitante_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
+              LIMIT {0})
             """;
 
         // Usar FromSqlRaw com FormattableString — Npgsql não suporta {0} direto em LIMIT;
