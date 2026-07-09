@@ -1,5 +1,9 @@
 # syntax=docker/dockerfile:1.7
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
+# aspnet (nao runtime): o Worker puxa Infra.Async/Infra.Postgre, que tem
+# FrameworkReference Microsoft.AspNetCore.App (IHttpContextAccessor etc.). Com a
+# base runtime:10.0 o container crasha no launch ("No frameworks were found:
+# Microsoft.AspNetCore.App 10.0.0"). Mesma base da API.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 USER app
 
