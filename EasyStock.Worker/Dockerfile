@@ -13,6 +13,8 @@ COPY ["EasyStock.Domain/EasyStock.Domain.csproj",                     "EasyStock
 COPY ["EasyStock.Infra.Postgre/EasyStock.Infra.Postgre.csproj",       "EasyStock.Infra.Postgre/"]
 COPY ["EasyStock.Infra.Notifications/EasyStock.Infra.Notifications.csproj", "EasyStock.Infra.Notifications/"]
 COPY ["EasyStock.Infra.Async/EasyStock.Infra.Async.csproj",           "EasyStock.Infra.Async/"]
+COPY ["EasyStock.Infra.Integrations/EasyStock.Infra.Integrations.csproj", "EasyStock.Infra.Integrations/"]
+COPY ["EasyStock.Contracts/EasyStock.Contracts.csproj",               "EasyStock.Contracts/"]
 
 RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
     dotnet restore "EasyStock.Worker/EasyStock.Worker.csproj"
@@ -24,6 +26,8 @@ COPY EasyStock.Domain/              EasyStock.Domain/
 COPY EasyStock.Infra.Postgre/       EasyStock.Infra.Postgre/
 COPY EasyStock.Infra.Notifications/ EasyStock.Infra.Notifications/
 COPY EasyStock.Infra.Async/         EasyStock.Infra.Async/
+COPY EasyStock.Infra.Integrations/  EasyStock.Infra.Integrations/
+COPY EasyStock.Contracts/           EasyStock.Contracts/
 
 # Publish direto (publish ja faz build — etapa intermediaria removida)
 WORKDIR "/src/EasyStock.Worker"
