@@ -118,6 +118,9 @@
                                     </a>
                                 </div>
 
+                                @* issue 883: teleport para <body> — o `.ws` aplica `backdrop-filter`, que cria
+                                   containing block para `position: fixed`, prendendo o overlay dentro do card. *@
+                                <template x-teleport="body">
                                 <div x-show="confirmReceber" x-cloak
                                      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4"
                                      @@click.self="confirmReceber = false">
@@ -144,7 +147,9 @@
                                         </div>
                                     </div>
                                 </div>
+                                </template>
 
+                                <template x-teleport="body">
                                 <div x-show="confirmCancel" x-cloak
                                      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4"
                                      @@click.self="confirmCancel = false">
@@ -171,6 +176,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                </template>
                             </td>
                         </tr>
                     }
