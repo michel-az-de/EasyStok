@@ -190,6 +190,9 @@
                     class="w-full py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
                 Desativar Fornecedor
             </button>
+            @* issue 883: teleport para <body> — o `.ws` aplica `backdrop-filter`, que cria
+               containing block para `position: fixed`, prendendo o overlay dentro do card. *@
+            <template x-teleport="body">
             <div x-show="confirm" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
                  @@click.self="confirm = false">
@@ -212,6 +215,7 @@
                     </div>
                 </div>
             </div>
+            </template>
         </div>
     </div>
 

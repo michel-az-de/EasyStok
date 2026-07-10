@@ -219,7 +219,12 @@
                         <td>
                             @if (!isEstornada && !isEstorno)
                             {
-                                <form asp-action="Estornar" asp-route-id="@s.Id" method="post"
+                                @* issue 883: o modal e teleportado para o body. O card `.ws` aplica
+                                   `backdrop-filter`, que cria containing block para descendentes
+                                   `position: fixed` — sem o teleport o overlay fica preso ao card e o
+                                   `overflow` do `.ws` clipa o botao de confirmar (falha silenciosa).
+                                   O submit sobrevive ao teleport pelo atributo `form` no botao. *@
+                                <form id="estorno-@s.Id" asp-action="Estornar" asp-route-id="@s.Id" method="post"
                                       x-data="{ open: false, motivo: '' }"
                                       x-on:submit="if (!motivo || motivo.length < 3) { $event.preventDefault(); window.showToast && window.showToast('Informe o motivo do estorno (mínimo 3 caracteres).', 'warning'); }">
                                     @Html.AntiForgeryToken()
@@ -228,6 +233,7 @@
                                             class="text-xs text-red-500 hover:text-red-700 font-medium">
                                         Estornar
                                     </button>
+                                    <template x-teleport="body">
                                     <div x-show="open" x-cloak
                                          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
                                          @@click.self="open = false">
@@ -255,7 +261,7 @@
                                                 <button type="button" @@click="open = false; motivo = ''" class="btn-outline-dark">
                                                     Cancelar
                                                 </button>
-                                                <button type="submit"
+                                                <button type="submit" form="estorno-@s.Id"
                                                         :disabled="!motivo || motivo.length < 3"
                                                         :class="(!motivo || motivo.length < 3) ? 'opacity-50 cursor-not-allowed' : ''"
                                                         class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
@@ -264,6 +270,7 @@
                                             </div>
                                         </div>
                                     </div>
+                                    </template>
                                 </form>
                             }
                             else if (isEstornada)

@@ -92,4 +92,58 @@ public class AlpineHygieneTests
             "form-modal.js deve disparar Event('change') idem (#497).");
     }
 
+    [Fact]
+    public void Views_ModalFixedDentroDeCardWs_DeveUsarTeleport()
+    {
+        // Issue 883: `.ws` aplica `backdrop-filter: blur(18px)` (app.css). Pela spec CSS,
+        // backdrop-filter cria um containing block para descendentes `position: fixed`.
+        // Um overlay `fixed inset-0` dentro do card deixa de cobrir o viewport (medido:
+        // 1495x63 em vez de 1528x732) e e clipado pelo `overflow` do `.ws` — o botao de
+        // confirmar fica inalcancavel, sem request e sem erro no console. Foi assim que o
+        // botao "Estornar" do historico de saidas morreu silenciosamente.
+        // Padrao correto: <template x-teleport="body"> (ja usado em Produtos/Index, #856).
+        var views = ArchTestPaths.AppDirectory("EasyStock.Web", "Views");
+        var ofensores = new List<string>();
+
+        foreach (var f in views.EnumerateFiles("*.cshtml", SearchOption.AllDirectories))
+        {
+            var src = File.ReadAllText(f.FullName);
+            if (!src.Contains("class=\"ws\"") || !src.Contains("fixed inset-0")) continue;
+
+            foreach (Match card in CardWsAbertura.Matches(src))
+            {
+                var bloco = BlocoDoDivEm(src, card.Index);
+                var modais = Regex.Matches(bloco, "fixed inset-0").Count;
+                var teleports = Regex.Matches(bloco, "x-teleport").Count;
+                if (modais > teleports)
+                    ofensores.Add($"{ArchTestPaths.ToRelative(views, f.FullName)} " +
+                                  $"(card na linha {src.Take(card.Index).Count(c => c == '\n') + 1}: " +
+                                  $"{modais} modal(is) fixed, {teleports} teleport(s))");
+            }
+        }
+
+        ofensores.Should().BeEmpty(
+            "um overlay `fixed inset-0` dentro de `.ws` fica preso ao card (backdrop-filter cria " +
+            "containing block) e e clipado pelo overflow — envolva o modal em " +
+            "<template x-teleport=\"body\"> (issue 883).");
+    }
+
+    private static readonly Regex CardWsAbertura = new(
+        @"<div class=""ws""", RegexOptions.Compiled);
+
+    private static readonly Regex DivAberturaOuFechamento = new(
+        @"<div\b|</div>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Recorta o bloco do &lt;div&gt; que comeca em <paramref name="inicio"/>, balanceando aberturas/fechamentos.</summary>
+    private static string BlocoDoDivEm(string src, int inicio)
+    {
+        var profundidade = 0;
+        foreach (Match t in DivAberturaOuFechamento.Matches(src, inicio))
+        {
+            profundidade += t.Value.StartsWith("</", StringComparison.Ordinal) ? -1 : 1;
+            if (profundidade == 0)
+                return src[inicio..(t.Index + t.Length)];
+        }
+        return src[inicio..];
+    }
 }
