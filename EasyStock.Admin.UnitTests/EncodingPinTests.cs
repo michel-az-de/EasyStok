@@ -63,4 +63,24 @@ public class EncodingPinTests
 
         json.Should().Contain("</script>", "comprova que o encoder relaxado deixaria passar o breakout");
     }
+
+    [Fact]
+    public void JsonSerializer_default_escapa_apostrofe_premissa_do_carveout_dos_guards()
+    {
+        // Os guards AtributosAlpine_NaoDevemUsarHtmlRaw (AlpineHygieneTests e AdminAlpineHygieneTests)
+        // só acusam atributo Alpine delimitado por aspas DUPLAS. Atributo de aspas SIMPLES com
+        // Html.Raw é deixado passar de propósito — e isso só é seguro porque o encoder default
+        // escapa a apóstrofe como ', então o JSON cru não consegue fechar o atributo.
+        // Sites vivos que dependem disso: Views/Shared/_Combobox.cshtml, _CreatableCombobox.cshtml,
+        // Views/Produtos/Detail.cshtml (issue 900). Sem este pin, trocar o encoder pro relaxado
+        // reabriria truncagem de x-data e breakout de atributo com os guards VERDES.
+        JsonSerializer.Serialize("Bob's").Should().NotContain("'",
+            "a apóstrofe crua fecharia um atributo delimitado por aspas simples");
+        JsonSerializer.Serialize("Bob's").Should().Contain("\\u0027",
+            "o encoder default deve escapar a apóstrofe — é a premissa do carve-out dos guards");
+
+        var relaxado = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        JsonSerializer.Serialize("Bob's", relaxado).Should().Contain("'",
+            "comprova que o encoder relaxado emitiria a apóstrofe crua e invalidaria o carve-out");
+    }
 }
