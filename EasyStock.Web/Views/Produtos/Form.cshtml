@@ -148,7 +148,12 @@
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">SKU</label>
                     <div class="flex gap-2">
                         <div class="relative flex-1">
-                            <input name="SkuBase" x-model="sku" placeholder="Ex: CAM-BAS-K7Q2"
+                            @* issue 885: o SKU e SUGESTAO, nao preenchimento. Auto-popular um campo
+                               editavel fazia a digitacao do usuario se ANEXAR ao valor gerado
+                               (QA-VAL-TES-BNH4 + ROD-PRO-CENX = QA-VAL-TES-BNH4ROD-PRO-CENX),
+                               corrompendo SKUs na base. Mesmo principio do LOGIC-001 abaixo, que ja
+                               tornou a sugestao de tipo opt-in. Vazio = gerado no salvamento. *@
+                            <input name="SkuBase" x-model="sku" placeholder="Deixe vazio para gerar automaticamente"
                                    @@blur="checkSkuDisponivel()"
                                    :class="skuStatus === 'indisponivel' ? 'border-red-400 focus:ring-red-300' : skuStatus === 'disponivel' ? 'border-emerald-400 focus:ring-emerald-300' : ''"
                                    class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
@@ -162,6 +167,9 @@
                             Gerar
                         </button>
                     </div>
+                    <p x-show="!sku" class="text-xs text-slate-400 mt-1">
+                        Um SKU único será gerado ao salvar. Você também pode clicar em "Gerar" ou digitar o seu.
+                    </p>
                     @if (ViewData.ModelState["SkuBase"]?.Errors.Count > 0)
                     {
                         <p class="text-xs text-red-500 mt-1">@ViewData.ModelState["SkuBase"]!.Errors[0].ErrorMessage — clique "Preencher com IA" para gerar novo SKU.</p>
@@ -471,7 +479,7 @@
                     <div class="relative">
                         <input type="text" inputmode="decimal" autocomplete="off"
                                x-effect="syncMoneyInput($el, margem, 1)"
-                               @@input="margem = Math.round(parseDecimal($el.value) * 10) / 10; onMargemInput()"
+                               @@input="margem = clampMargem(parseDecimal($el.value)); onMargemInput()"
                                @* BUG-10: mostra também margem negativa (prejuízo), coerente com o aviso. *@
                                @@blur="$el.value = (margem !== null && margem !== 0 && Number.isFinite(margem)) ? margem.toFixed(1).replace('.', ',') : ''"
                                :class="{ 'field-calculated': (lastEdited === 'preco' || lastEdited === 'custo') && margem > 0 }"
@@ -945,6 +953,11 @@
                         <span class="text-xs font-mono text-slate-400">SKU: </span>
                         <span class="text-xs font-mono text-slate-500 font-medium" x-text="sku"></span>
                     </div>
+                    @* issue 885: campo vazio nao e omissao — e "gere para mim" no salvamento. *@
+                    <div x-show="!sku" x-cloak class="product-review-card__sku mt-1">
+                        <span class="text-xs font-mono text-slate-400">SKU: </span>
+                        <span class="text-xs text-slate-400 italic">será gerado automaticamente</span>
+                    </div>
 
                     <!-- Descricao curta -->
                     <p class="text-sm text-slate-500 mt-3 line-clamp-2 flex-grow" x-text="descricao || 'Sem descrição'" :class="{ 'italic text-slate-300': !descricao }"></p>
@@ -1297,6 +1310,17 @@
                         const okCat = await this._resolverCategoriaPendente();
                         if (!okCat) return;
                     }
+                    // issue 885: SKU vazio = "gere para mim". Gera aqui (nao ao digitar o nome),
+                    // para que o campo nunca contenha um valor que o usuario nao pediu.
+                    if (!isEdit && !this.sku) {
+                        await this.gerarSku(true);
+                        if (!this.sku) {
+                            this.step = 1;
+                            window.showToast('Não foi possível gerar um SKU. Informe um manualmente.', 'error');
+                            return;
+                        }
+                    }
+
                     // No modo edição, se o SKU não foi alterado, ignorar status "indisponivel"
                     if (isEdit && this.sku === this._originalSku && this.skuStatus === 'indisponivel') {
                         this.skuStatus = '';
@@ -1339,6 +1363,9 @@
                         return;
                     }
                     const fd = new FormData(form);
+                    // issue 885: o SKU pode ter acabado de ser gerado; o x-model propaga para o DOM
+                    // de forma assincrona, entao o FormData poderia capturar o valor antigo (vazio).
+                    fd.set('SkuBase', this.sku ?? '');
                     // Remover campos de arquivo — FilePond pode ter adicionado inputs hidden
                     fd.delete('fotos');
                     for (const key of [...fd.keys()]) {
@@ -1602,17 +1629,10 @@
                     };
                     document.addEventListener('click', this._clickHandler);
 
-                    // Auto-gerar SKU ao digitar nome (apenas novos produtos com SKU ainda vazio)
-                    if (!isEdit) {
-                        this.$watch('nome', (val) => {
-                            if (!this.sku && val && val.length >= 3) {
-                                clearTimeout(this._skuDebounce);
-                                this._skuDebounce = setTimeout(() => {
-                                    if (!this.sku) this.gerarSku(true);
-                                }, 600);
-                            }
-                        });
-                    }
+                    // issue 885: NAO auto-popular o SKU ao digitar o nome. O campo e editavel, entao
+                    // o valor gerado ficava no input e a digitacao do usuario se anexava a ele
+                    // (SKUs fundidos). O SKU agora e gerado no submit quando o campo esta vazio,
+                    // ou sob demanda pelo botao "Gerar". Mesmo racional do LOGIC-001 abaixo.
 
                     // LOGIC-001: NAO auto-aplicar tipo/controla-validade ao mudar categoria —
                     // sobrescrevia silenciosamente a escolha (ou o default) do usuario. A sugestao
@@ -1881,6 +1901,18 @@
                     const n = parseFloat(s);
                     return isFinite(n) ? n : 0;
                 },
+                // issue 885: o input de margem arredondava para 1 casa (Math.round(v*10)/10), entao
+                // "99,99" virava 100 -> custo/(1-1) = divisao por zero e preco zerado. O arredondamento
+                // e mantido (o campo exibe 1 casa), mas nao pode CRUZAR a fronteira dos 100%: quem
+                // digitou abaixo de 100 nao pediu uma margem invalida. Acima de 100 passa direto,
+                // para que o aviso "Margem invalida" e o bloqueio do nextStep continuem valendo.
+                clampMargem(v) {
+                    if (!Number.isFinite(v)) return 0;
+                    const arredondado = Math.round(v * 10) / 10;
+                    return (v < 100 && arredondado >= 100) ? 99.9 : arredondado;
+                },
+                _avisouMargem100: false,
+
                 // Sincroniza display do input com o estado reativo, sem sobrescrever enquanto o usuário digita.
                 // Sempre acessa `value` para que o Alpine re-rastreie a dependência mesmo quando o input está focado.
                 syncMoneyInput(el, value, decimals) {
@@ -1915,6 +1947,13 @@
                     // Limpa o preco para sinalizar estado invalido e bloquear avanco/submit.
                     if (this.margem >= 100) {
                         this.preco = 0;
+                        // issue 885: zerar o preco era silencioso no momento da digitacao (so havia
+                        // aviso visual e bloqueio no nextStep). Debounce p/ nao repetir a cada tecla.
+                        if (!this._avisouMargem100) {
+                            this._avisouMargem100 = true;
+                            window.showToast('Margem deve ser menor que 100% (é calculada sobre o preço de venda). Preço zerado.', 'warning');
+                            setTimeout(() => { this._avisouMargem100 = false; }, 4000);
+                        }
                         return;
                     }
                     // BUG-07: calcula o preco tambem com margem negativa (prejuizo: preco < custo),
