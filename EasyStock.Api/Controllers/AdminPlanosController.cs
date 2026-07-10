@@ -34,6 +34,10 @@ public class AdminPlanosController(IPlanoAdminRepository planos, IEmpresaReposit
         if (PlanoValidacao.ValidarNomeNaoColideComTenant(
                 req.Nome, (await empresas.GetAllAsync()).Select(e => e.Nome)) is { } erroColisao)
             return DataBadRequest(erroColisao);
+        // #891: dois planos "Starter" ficam indistinguiveis no seletor de "Trocar plano".
+        // Espelha o CODIGO_DUPLICADO do cupom; o backstop de banco e uq_planos_nome_lower.
+        if (await planos.ExisteNomeAsync(req.Nome, ct: ct))
+            return Conflict(new { error = new { code = "NOME_DUPLICADO", message = "Já existe um plano com este nome." } });
 
         var resumo = await planos.CriarAsync(
             new NovoPlano(req.Nome, req.Descricao, req.LimiteLojas, req.LimiteUsuarios,
@@ -70,6 +74,10 @@ public class AdminPlanosController(IPlanoAdminRepository planos, IEmpresaReposit
             && PlanoValidacao.ValidarNomeNaoColideComTenant(
                 req.Nome, (await empresas.GetAllAsync()).Select(e => e.Nome)) is { } erroColisao)
             return DataBadRequest(erroColisao);
+        // #891: renomear para um nome ja usado tambem colide. ignorarId = o proprio plano, senao
+        // salvar sem mudar o nome (o Admin sempre reenvia o conjunto completo) daria 409 contra si.
+        if (req.Nome is not null && await planos.ExisteNomeAsync(req.Nome, id, ct))
+            return Conflict(new { error = new { code = "NOME_DUPLICADO", message = "Já existe um plano com este nome." } });
 
         var resumo = await planos.AtualizarAsync(id,
             new PatchPlano(req.Nome, req.Descricao, req.LimiteLojas, req.LimiteUsuarios,
