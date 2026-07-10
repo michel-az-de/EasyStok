@@ -46,4 +46,55 @@ public class GerenciarCategoriaUseCaseTests
         await _repo.Received(1).ExisteNomeAsync(EmpId, "Novo", id);
         await _uow.Received(1).CommitAsync();
     }
+
+    // Issue 884: os limiares eram descartados na criacao — o command nem os carregava,
+    // entao a API os perdia na desserializacao e a entidade nascia com null.
+    [Fact]
+    public async Task CriarAsync_persiste_limiares_de_estoque()
+    {
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), Arg.Any<Guid?>()).Returns(false);
+
+        await Sut().CriarAsync(new CriarCategoriaCommand(EmpId, "Bebidas", null, null,
+            QuantidadeMinima: 10, QuantidadeCritica: 3));
+
+        await _repo.Received(1).AddAsync(Arg.Is<Categoria>(c =>
+            c.QuantidadeMinima == 10 && c.QuantidadeCritica == 3));
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task CriarAsync_sem_limiares_mantem_null_padrao_do_sistema()
+    {
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), Arg.Any<Guid?>()).Returns(false);
+
+        await Sut().CriarAsync(new CriarCategoriaCommand(EmpId, "Bebidas", null, null));
+
+        await _repo.Received(1).AddAsync(Arg.Is<Categoria>(c =>
+            c.QuantidadeMinima == null && c.QuantidadeCritica == null));
+    }
+
+    [Fact]
+    public async Task CriarAsync_rejeita_critica_maior_ou_igual_a_minima()
+    {
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), Arg.Any<Guid?>()).Returns(false);
+
+        // exatamente os valores do QA (min=3, crit=10): invertidos em relacao a regra.
+        var act = () => Sut().CriarAsync(new CriarCategoriaCommand(EmpId, "Bebidas", null, null,
+            QuantidadeMinima: 3, QuantidadeCritica: 10));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*critica precisa ser menor*");
+        await _repo.DidNotReceive().AddAsync(Arg.Any<Categoria>());
+    }
+
+    [Fact]
+    public async Task CriarAsync_rejeita_limiar_negativo()
+    {
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), Arg.Any<Guid?>()).Returns(false);
+
+        var act = () => Sut().CriarAsync(new CriarCategoriaCommand(EmpId, "Bebidas", null, null,
+            QuantidadeMinima: -1));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*nao pode ser negativa*");
+        await _repo.DidNotReceive().AddAsync(Arg.Any<Categoria>());
+    }
 }

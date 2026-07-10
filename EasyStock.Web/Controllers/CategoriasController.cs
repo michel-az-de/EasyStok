@@ -98,7 +98,12 @@ public class CategoriasController(CategoriasService svc, SessionService session)
         if (!editResult.Success)
             return BadRequest(new { success = false, error = new { code = editResult.ErrorCode, message = editResult.ErrorMessage } });
 
-        await svc.AtualizarLimiarAsync(id, req.QuantidadeMinima, req.QuantidadeCritica);
+        // issue 884: o resultado do PATCH de limiares era descartado — um limiar invalido
+        // (critica >= minima, ou negativo) respondia `success: true` sem ter salvo nada.
+        var limiarResult = await svc.AtualizarLimiarAsync(id, req.QuantidadeMinima, req.QuantidadeCritica);
+        if (!limiarResult.Success)
+            return BadRequest(new { success = false, error = new { code = limiarResult.ErrorCode, message = limiarResult.ErrorMessage } });
+
         return Ok(new { success = true });
     }
 }
