@@ -103,7 +103,11 @@ else
                 <!-- Inline edit -->
                 <div x-show="editingId === '@cid'" x-cloak style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border-soft);">
                     <form method="post" asp-page-handler="Editar" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; align-items:end;"
-                          x-on:submit="{ const f = $event.target; if ((!f.validoAte || !f.validoAte.value) && (!f.limiteUsos || !f.limiteUsos.value)) { if (!confirm('Este cupom não tem validade nem limite de usos: o desconto nunca expira. Salvar mesmo assim?')) $event.preventDefault(); } }">
+                          @* Sem as chaves externas: o Alpine so embrulha o handler numa IIFE quando ele comeca com
+                             if(...)/let/const. Comecando com `{`, o handler vira o lado direito de
+                             `__self.result = {...}` e e parseado como objeto literal -> SyntaxError, e a
+                             confirmacao nunca dispara (issue 890). Mesmo formato de Tickets/Detail.cshtml:230. *@
+                          x-on:submit="const f = $event.target; if ((!f.validoAte || !f.validoAte.value) && (!f.limiteUsos || !f.limiteUsos.value)) { if (!confirm('Este cupom não tem validade nem limite de usos: o desconto nunca expira. Salvar mesmo assim?')) $event.preventDefault(); }">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@cid" />
                         <es-input name="codigo" label="Código" value="@codigo" required="true" pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="50" />
