@@ -24,7 +24,9 @@ param(
   [Parameter(Mandatory = $true)][string[]]$Paths,
   [switch]$Build,
   [switch]$NoVerify,
-  [string]$ExpectedAuthorEmail = 'felipe.azevedo@gmail.com',
+  # Email VINCULADO a conta michel-az-de (R12): o unico que atribui os commits no GitHub
+  # (`gh api user/emails` -> michel.az.de@gmail.com verified/primary unico). Corrigido na #896.
+  [string]$ExpectedAuthorEmail = 'michel.az.de@gmail.com',
   [string]$Repo
 )
 $ErrorActionPreference = 'Stop'

@@ -11,7 +11,11 @@ deve atrapalhar o fluxo). Emite hookSpecificOutput.additionalContext (e systemMe
 Configurado em .claude/settings.json. Ver .poka-yoke/registry.yaml (traps.autocommit-hijack).
 #>
 $ErrorActionPreference = 'SilentlyContinue'
-$expected = 'felipe.azevedo@gmail.com'
+# Email VINCULADO a conta michel-az-de (R12) -- e o unico que ATRIBUI os commits no GitHub.
+# `gh api user/emails` confirma: michel.az.de@gmail.com verified=true primary=true (unico).
+# felipe.azevedo@gmail.com NAO e vinculado -> commits com ele nao sao atribuidos. Estava invertido
+# (avisava quando o commit estava certo) ate a issue #896.
+$expected = 'michel.az.de@gmail.com'
 
 try {
   $raw = [Console]::In.ReadToEnd()
