@@ -9,6 +9,13 @@ public interface IPlanoAdminRepository
 {
     Task<IReadOnlyList<PlanoAdminItem>> ListarComTenantsAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Ja existe plano com este nome? Compara ignorando caixa e espacos nas bordas, casando com a
+    /// constraint <c>uq_planos_nome_lower</c> do banco. Passe <paramref name="ignorarId"/> ao editar,
+    /// para o plano nao colidir consigo mesmo. Espelha <c>ICupomAdminRepository.ExisteCodigoAsync</c>.
+    /// </summary>
+    Task<bool> ExisteNomeAsync(string nome, Guid? ignorarId = null, CancellationToken ct = default);
+
     Task<PlanoResumo> CriarAsync(NovoPlano dados, CancellationToken ct = default);
 
     /// <summary>Patch parcial. Retorna null se o plano não existir.</summary>
