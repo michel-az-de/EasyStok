@@ -72,6 +72,10 @@ jobs:
           # oficial nao tem TLS e o Npgsql 9.x tentaria handshake. O fixture deriva dela
           # o login NOSUPERUSER rls_test_client para exercer a RLS de verdade.
           EASYSTOCK_IT_PG: "Host=localhost;Port=5432;Database=easystock_ci;Username=postgres;Password=postgres;SSL Mode=Disable"
+          # Timeout do ScribanRenderer: 2s no CI (500ms em prod/local). O runner sob JIT frio/GC
+          # estoura 500ms na primeira renderizacao de template -- flaky de timing (issue #910,
+          # flaky-tests.md). NAO relaxa a guarda de producao, so o piso do runner lento.
+          EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
         run: >-
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore

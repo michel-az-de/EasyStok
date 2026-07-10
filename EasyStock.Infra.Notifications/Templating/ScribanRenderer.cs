@@ -11,7 +11,15 @@ namespace EasyStock.Infra.Notifications.Templating;
 
 public sealed class ScribanRenderer(ILogger<ScribanRenderer> logger) : IRendererTemplate
 {
-    private static readonly TimeSpan RenderTimeout = TimeSpan.FromMilliseconds(500);
+    // Guarda de sanidade: um template nao pode custar segundos. Default 500ms -- prod e dev local
+    // ficam INALTERADOS. Configuravel por EASYSTOK_SCRIBAN_TIMEOUT_MS so para o CI relaxar para 2s:
+    // o runner, sob JIT frio/GC, estoura 500ms na primeira renderizacao (flaky reproduzido 2/2 sem
+    // carga -- issue #910, docs/dev/flaky-tests.md). Lido uma vez (static); o ci.yml seta a env var
+    // no processo de teste antes de rodar. Fallback para 500ms se ausente, vazia ou <= 0.
+    private static readonly TimeSpan RenderTimeout =
+        int.TryParse(Environment.GetEnvironmentVariable("EASYSTOK_SCRIBAN_TIMEOUT_MS"), out var ms) && ms > 0
+            ? TimeSpan.FromMilliseconds(ms)
+            : TimeSpan.FromMilliseconds(500);
     private const int TemplateMaxBytes = 256 * 1024;
     private const int CacheCapacity = 256;
 
