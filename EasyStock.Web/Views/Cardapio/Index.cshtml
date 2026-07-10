@@ -45,8 +45,12 @@
 @if (!Model.TemVitrine)
 {
     var lojaNome = (ViewBag.LojaAtualNome as string) ?? string.Empty;
+    @* x-data é atributo com aspas DUPLAS e JsonSerializer emite aspas duplas: deixamos o Razor
+       HTML-encodá-las (&quot;) — NÃO usar @@Html.Raw aqui (raw fecha o atributo no 1º " e trunca o
+       x-data em 'titulo:', quebrando o card em toda loja nova). Mesma classe do #895 e do
+       incidente 2026-06-18; guard em AlpineHygieneTests. *@
     <div class="ws" style="max-width: 520px; margin: 24px auto;"
-         x-data="cardapioVitrine({ titulo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(lojaNome)) })">
+         x-data="cardapioVitrine({ titulo: @(JsonSerializer.Serialize(lojaNome)) })">
         <h2 class="text-xl font-semibold mb-1" style="font-family: var(--font-display, var(--font-sans)); color: var(--text-primary, var(--ink-900));">
             Crie sua vitrine online
         </h2>
