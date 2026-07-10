@@ -86,6 +86,40 @@ public class AdminAlpineHygieneTests
             .Should().BeFalse("idem (integrity declarado antes do src do alpine).");
     }
 
+    // Handler de EVENTO Alpine (x-on:*, @evt, x-init) cujo valor comeca com `{`.
+    // Deliberadamente NAO casa x-data nem bindings (:class, x-bind:style), onde `{...}` e um
+    // objeto literal legitimo — a diferenca e que ali o `{` e o valor esperado, e aqui e um bloco.
+    private static readonly Regex HandlerAlpineComecandoComChave = new(
+        @"(?:\bx-on:[\w.:-]+|\bx-init|@@\w+(?:\.\w+)*)\s*=\s*""\s*\{",
+        RegexOptions.Compiled);
+
+    [Fact]
+    public void HandlersAlpine_NaoDevemComecarComBloco()
+    {
+        // Issue 890: o avaliador do Alpine so embrulha o handler numa IIFE async quando ele casa
+        // /^[\n\s]*if.*\(.*\)/ ou /^(let|const)\s/. Fora disso ele interpola cru:
+        //     with (scope) { __self.result = <handler> }
+        // Um handler que comeca com `{` vira o lado direito de uma atribuicao e e parseado como
+        // OBJETO LITERAL, nao como bloco: `{ const f = ... }` estoura "Unexpected identifier 'f'".
+        // Foi assim que o confirm() de "cupom que nunca expira" morreu em /Cupons — sem truncamento,
+        // sem escaping errado, com a expressao chegando intacta ao browser.
+        // Correcao: largar as chaves externas para o handler comecar com `const`/`let`/`if(...)`.
+        var pages = ArchTestPaths.AppDirectory("EasyStock.Admin", "Pages");
+        var ofensores = new List<string>();
+
+        foreach (var f in pages.EnumerateFiles("*.cshtml", SearchOption.AllDirectories))
+        {
+            var src = CommentRegex.Replace(File.ReadAllText(f.FullName), " ");
+            foreach (Match m in HandlerAlpineComecandoComChave.Matches(src))
+                ofensores.Add($"{ArchTestPaths.ToRelative(pages, f.FullName)} " +
+                              $"(linha {src.Take(m.Index).Count(c => c == '\n') + 1}): {m.Value.Trim()}");
+        }
+
+        ofensores.Should().BeEmpty(
+            "handler Alpine que comeca com `{` e parseado como objeto literal, nao como bloco — " +
+            "remova as chaves externas para ele comecar com const/let/if(...); issue 890.");
+    }
+
     private static string LayoutSemComentarios() =>
         CommentRegex.Replace(ArchTestPaths.ReadAppFile("EasyStock.Admin", "Pages", "_Layout.cshtml"), " ");
 }
