@@ -120,6 +120,37 @@ public class AdminAlpineHygieneTests
             "remova as chaves externas para ele comecar com const/let/if(...); issue 890.");
     }
 
+    // Atributo Alpine (x-data, x-init, x-on:..., x-if, ...) cujo valor invoca Html.Raw.
+    // [^""]* nao atravessa aspas: o match so vale enquanto estiver dentro do atributo.
+    private static readonly Regex AtributoAlpineComHtmlRaw = new(
+        @"\bx-[\w:.@-]+\s*=\s*""[^""]*Html\.Raw",
+        RegexOptions.Compiled);
+
+    [Fact]
+    public void AtributosAlpine_NaoDevemUsarHtmlRaw()
+    {
+        // Issue 889: `Html.Raw` desliga o encoder do Razor. Se o valor cru contiver aspas duplas
+        // — e JsonSerializer.Serialize("field") devolve `"field"`, COM aspas — o parser HTML fecha
+        // o atributo na primeira aspa interna. O _EmpresaPicker morreu assim: o x-data chegava ao
+        // Alpine como `empresaPicker({ mode: `, derrubando /Faturas/Emitir e /Dispositivos com
+        // "Unexpected token '}'" e uma cascata de "sel is not defined".
+        // Sem Html.Raw o Razor emite &quot; e o browser decodifica de volta ao ler o atributo.
+        var pages = ArchTestPaths.AppDirectory("EasyStock.Admin", "Pages");
+        var ofensores = new List<string>();
+
+        foreach (var f in pages.EnumerateFiles("*.cshtml", SearchOption.AllDirectories))
+        {
+            var src = CommentRegex.Replace(File.ReadAllText(f.FullName), " ");
+            foreach (Match m in AtributoAlpineComHtmlRaw.Matches(src))
+                ofensores.Add($"{ArchTestPaths.ToRelative(pages, f.FullName)} " +
+                              $"(linha {src.Take(m.Index).Count(c => c == '\n') + 1}): {m.Value.Trim()}");
+        }
+
+        ofensores.Should().BeEmpty(
+            "Html.Raw dentro de atributo Alpine emite aspas duplas cruas e trunca o atributo no " +
+            "parser HTML — deixe o Razor encodar (@J(x), nao @Html.Raw(J(x))); issue 889.");
+    }
+
     private static string LayoutSemComentarios() =>
         CommentRegex.Replace(ArchTestPaths.ReadAppFile("EasyStock.Admin", "Pages", "_Layout.cshtml"), " ");
 }
