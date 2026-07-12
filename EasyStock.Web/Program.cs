@@ -110,14 +110,27 @@ var app = builder.Build();
 // ForwardedHeaders: Fly/Render/etc fazem TLS termination no edge e mandam
 // HTTP pra container com X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection
 // vê HTTP, tenta redirect, e estoura 400 (não sabe qual porta HTTPS).
-app.UseForwardedHeaders(new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
+//
+// CRITICO (pentest #913): com KnownNetworks/KnownProxies VAZIOS o middleware só confia
+// no loopback, então atrás do Caddy (bridge Docker 172.x, não-loopback) ele DESCARTA o
+// X-Forwarded-Proto=https -> o app vê scheme=http -> o RedirectUri de login sai http://
+// e o UseHsts() (gated em Request.IsHttps) nunca emite. Espelha o padrão já provado da
+// API (EasyStock.Api/Program.cs): confiar nas faixas privadas (a Web só é alcançada pela
+// rede interna do Docker) restaura o scheme https E o IP real do cliente. ForwardLimit=1:
+// consome só a entrada mais à direita (a que o proxy confiável anexou) — XFF forjado pelo
+// cliente fica à esquerda e é ignorado.
+var forwardedHeaders = new Microsoft.AspNetCore.Builder.ForwardedHeadersOptions
 {
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
-    KnownNetworks = { },
-    KnownProxies = { }
-});
+    ForwardLimit = 1
+};
+forwardedHeaders.KnownNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+foreach (var rede in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8" })
+    forwardedHeaders.KnownNetworks.Add(Microsoft.AspNetCore.HttpOverrides.IPNetwork.Parse(rede));
+app.UseForwardedHeaders(forwardedHeaders);
 
 // Startup: verificar conectividade com a API (não-bloqueante).
 // Tudo envolto em try/catch externo porque falhas em GetRequiredService
