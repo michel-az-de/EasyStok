@@ -85,6 +85,30 @@ public class BannerGlobalTests(PostgreSqlDatabaseFixture fixture)
         (await AtivosNaoConfirmadosAsync(usuario)).Should().NotContain(b => b.Id == banner.Id);
     }
 
+    // ── #4b — Impressão (alcance) NÃO esconde: nem faixa, nem obrigatório ────
+    [SkippableFact]
+    public async Task Impressao_nao_esconde_o_aviso_da_fila_de_ativos()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var usuario = Guid.NewGuid();
+        var faixa = await SeedBannerAsync(b => { b.Ativo = true; b.ExigeConfirmacao = false; });
+        var obrigatorio = await SeedBannerAsync(b => { b.Ativo = true; b.ExigeConfirmacao = true; });
+
+        await RegistrarAsync(faixa.Id, usuario, BannerInteracaoTipo.Impressao);
+        await RegistrarAsync(obrigatorio.Id, usuario, BannerInteracaoTipo.Impressao);
+
+        var ids = (await AtivosNaoConfirmadosAsync(usuario)).Select(b => b.Id).ToList();
+        ids.Should().Contain(faixa.Id, "Impressão é só alcance — não dispensa a faixa");
+        ids.Should().Contain(obrigatorio.Id, "Impressão não substitui a confirmação do obrigatório");
+
+        // Visto/Confirmado continuam escondendo normalmente (regra intacta).
+        await RegistrarAsync(faixa.Id, usuario, BannerInteracaoTipo.Visto);
+        await RegistrarAsync(obrigatorio.Id, usuario, BannerInteracaoTipo.Confirmado);
+        var idsDepois = (await AtivosNaoConfirmadosAsync(usuario)).Select(b => b.Id).ToList();
+        idsDepois.Should().NotContain(faixa.Id);
+        idsDepois.Should().NotContain(obrigatorio.Id);
+    }
+
     // ── #5 — fora da janela não entra na consulta ───────────────────────────
     [SkippableFact]
     public async Task Banner_inativo_ou_fora_da_janela_nao_aparece()

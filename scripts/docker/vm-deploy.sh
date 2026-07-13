@@ -117,7 +117,7 @@ main() {
   if [ "$DEPLOY_MODE" = "pull" ]; then
     ghcr_login
     echo "[vm-deploy] pull das imagens :${remote_sha:0:8} do GHCR ..."
-    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" pull --quiet api web admin; then
+    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" pull --quiet api web admin worker; then
       echo "[vm-deploy] imagens de ${remote_sha:0:8} ainda nao disponiveis no GHCR. Abortando SEM avancar HEAD; proximo cron tenta de novo."
       exit 4
     fi

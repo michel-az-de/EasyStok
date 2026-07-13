@@ -18,12 +18,22 @@ public sealed class PlanoAdminRepository(EasyStockDbContext db) : IPlanoAdminRep
                 db.AssinaturasEmpresa.Count(a => a.PlanoId == p.Id && a.Status == StatusAssinatura.Ativa)))
             .ToListAsync(ct);
 
+    public Task<bool> ExisteNomeAsync(string nome, Guid? ignorarId = null, CancellationToken ct = default)
+    {
+        // lower(trim(x)) espelha a coluna gerada nome_lower do banco (uq_planos_nome_lower).
+        // Os nomes ja sao gravados trimados (CriarAsync/AtualizarAsync), entao lower() basta do lado
+        // da coluna; o trim aqui e do lado do argumento, que vem cru do request.
+        var alvo = (nome ?? "").Trim().ToLowerInvariant();
+        return db.Planos.AnyAsync(
+            p => p.Nome.ToLower() == alvo && (ignorarId == null || p.Id != ignorarId), ct);
+    }
+
     public async Task<PlanoResumo> CriarAsync(NovoPlano dados, CancellationToken ct = default)
     {
         var plano = new Plano
         {
             Id = Guid.NewGuid(),
-            Nome = dados.Nome,
+            Nome = dados.Nome.Trim(),
             Descricao = dados.Descricao,
             LimiteLojas = dados.LimiteLojas,
             LimiteUsuarios = dados.LimiteUsuarios,
@@ -43,7 +53,7 @@ public sealed class PlanoAdminRepository(EasyStockDbContext db) : IPlanoAdminRep
         var plano = await db.Planos.FindAsync([id], ct);
         if (plano is null) return null;
 
-        if (patch.Nome is not null) plano.Nome = patch.Nome;
+        if (patch.Nome is not null) plano.Nome = patch.Nome.Trim();
         if (patch.Descricao is not null) plano.Descricao = patch.Descricao;
         if (patch.LimiteLojas.HasValue) plano.LimiteLojas = patch.LimiteLojas.Value;
         if (patch.LimiteUsuarios.HasValue) plano.LimiteUsuarios = patch.LimiteUsuarios.Value;

@@ -31,6 +31,11 @@ public class BannersController(
     public Task<IActionResult> Visto(Guid id, CancellationToken ct)
         => RegistrarAsync(id, BannerInteracaoTipo.Visto, ct);
 
+    /// <summary>Registra a exibição (alcance). Idempotente; não altera quais banners aparecem.</summary>
+    [HttpPost("{id:guid}/impressao")]
+    public Task<IActionResult> Impressao(Guid id, CancellationToken ct)
+        => RegistrarAsync(id, BannerInteracaoTipo.Impressao, ct);
+
     private async Task<IActionResult> RegistrarAsync(Guid id, BannerInteracaoTipo tipo, CancellationToken ct)
     {
         try

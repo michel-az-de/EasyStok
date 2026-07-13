@@ -25,7 +25,11 @@
     var required = ViewData["Required"] as bool? ?? false;
     string J(string s) => System.Text.Json.JsonSerializer.Serialize(s ?? "");
 }
-<div x-data="empresaPicker({ mode: @Html.Raw(J(mode)), navBase: @Html.Raw(J(navBase)), id: @Html.Raw(J(initialId)), nome: @Html.Raw(J(initialNome)), doc: @Html.Raw(J(initialDoc)) })">
+@* Nao envolver o J() em Html.Raw: ele devolve JSON com aspas duplas, e o atributo tambem e
+   delimitado por aspas duplas. Emitida crua, a primeira aspa interna fecha o atributo e o x-data
+   chega ao Alpine truncado em `empresaPicker({ mode: `. Deixando o Razor encodar, a aspa vira
+   &quot; no fonte e o browser a decodifica de volta no valor do atributo (issue 889). *@
+<div x-data="empresaPicker({ mode: @J(mode), navBase: @J(navBase), id: @J(initialId), nome: @J(initialNome), doc: @J(initialDoc) })">
     <label class="es-form-label@(required ? " es-form-label-required" : "")">@label</label>
 
     @if (mode == "field")

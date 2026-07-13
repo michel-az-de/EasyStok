@@ -126,6 +126,17 @@ builder.Services.AddReportingWorker();
 // registrava o cache, via AddEasyStockCache). Singleton consumido por Scoped: OK.
 builder.Services.AddMemoryCache();
 
+// #877: registra ICacheService — sem isso o EstoqueSaldoCacheInvalidationInterceptor
+// (adicionado ao DbContext incondicionalmente em AddEasyStockPostgreInfrastructure via
+// ProdutoCacheInvalidator, commit f5d1ec23/#525) nao resolve e o EasyStockDbContext NAO
+// constroi, derrubando TODO background service de banco do Worker (outbox, notificacoes,
+// SLA, banners, agendamento, jobs de cobranca) por tick. RedisCacheService envelopa
+// IDistributedCache; espelha a API sem Redis conn string (in-memory distribuido). TODO:
+// extrair AddEasyStockCache p/ local compartilhado (API+Worker) e ligar Redis
+// (ConnectionStrings__Redis) p/ invalidacao cross-processo com a API.
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSingleton<EasyStock.Application.Ports.Output.ICacheService, EasyStock.Infra.Async.RedisCacheService>();
+
 // Modulo Fiscal NFC-e (F4) — Polly pipelines + adapters Focus NFe + Mock + jobs background
 builder.Services.AddEasyStockIntegrationResilience();
 builder.Services.AddFocusNFeAdapter(builder.Configuration);

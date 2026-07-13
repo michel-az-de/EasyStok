@@ -41,6 +41,11 @@ jobs:
             dockerfile: Dockerfile.Web
           - name: admin
             dockerfile: Dockerfile.cloudrun.admin
+          # #878: o Worker (outbox/notificacoes/SLA/jobs de cobranca) nao era buildado
+          # nem deployado na VM canonica. Sem esta imagem, o docker-compose.azure.yml nao
+          # tem servico worker e nada de background roda em prod.
+          - name: worker
+            dockerfile: EasyStock.Worker/Dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v4

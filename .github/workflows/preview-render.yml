@@ -5,9 +5,15 @@ name: Render Preview (PR)
 #
 # Este workflow:
 #   - reescreve CACHE_VERSION com cdb-<sha-do-PR> antes de qualquer build
-#   - roda os testes
+#   - compila (fail-fast antes de esperar 3min pelo preview env)
 #   - aguarda o preview env subir e smoke-testa /health dos services
 #   - comenta o link do preview no PR
+#
+# NÃO roda testes: o ci.yml já executa a suíte inteira, no mesmo EasyStok.CI.slnf
+# e no mesmo gatilho (pull_request -> master), porém COM o service postgres e a env
+# EASYSTOCK_IT_PG. Repetir `dotnet test` aqui, sem esse service, faria os
+# [SkippableFact] pularem — inclusive o canário anti-falso-verde — entregando um
+# verde mais fraco que o do ci.yml e dobrando o tempo de runner por PR.
 #
 # NÃO commita APK aqui — APK release só sai em master pra evitar poluir
 # wwwroot/downloads com builds de PR descartáveis.
@@ -24,8 +30,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  build-test:
-    name: Build + Test
+  build:
+    name: Build (preview)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +43,17 @@ jobs:
         shell: pwsh
         run: ./scripts/rewrite-cache-version.ps1 -Sha "${{ github.event.pull_request.head.sha }}"
 
-      - run: dotnet restore
-      - run: dotnet build -c Release --no-restore
-      - run: dotnet test -c Release --no-build
+      # EasyStok.CI.slnf (o mesmo do ci.yml) exclui EasyStok.Mobile (net9.0-android).
+      # `dotnet restore` da solution inteira exige o workload maui-android, ausente no
+      # runner -> NETSDK1147 no restore. Mesma causa que tirou o deploy-render.yml do
+      # gatilho por push (ADR-0029). O preview não precisa do Mobile: não gera APK.
+      - run: dotnet restore EasyStok.CI.slnf
+      - run: dotnet build EasyStok.CI.slnf -c Release --no-restore
 
   smoke-preview:
     name: Smoke-test Render Preview
     runs-on: ubuntu-latest
-    needs: build-test
+    needs: build
     steps:
       - name: Wait for preview env (Render leva ~5min)
         run: sleep 180

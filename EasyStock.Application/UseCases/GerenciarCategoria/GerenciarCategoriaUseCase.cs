@@ -4,7 +4,9 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
         Guid EmpresaId,
         string Nome,
         string? Descricao,
-        Guid? CategoriaPaiId);
+        Guid? CategoriaPaiId,
+        int? QuantidadeMinima = null,
+        int? QuantidadeCritica = null);
 
     public sealed record AtualizarCategoriaCommand(
         Guid Id,
@@ -47,6 +49,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
                     throw new UseCaseValidationException("Categoria pai nao encontrada ou nao pertence a esta empresa.");
             }
 
+            EnsureLimiaresValidos(command.QuantidadeMinima, command.QuantidadeCritica);
+
             var agora = DateTime.UtcNow;
             var categoria = new Categoria
             {
@@ -55,6 +59,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
                 Nome = nomeTrim,
                 Descricao = command.Descricao?.Trim(),
                 CategoriaPaiId = command.CategoriaPaiId,
+                QuantidadeMinima = command.QuantidadeMinima,
+                QuantidadeCritica = command.QuantidadeCritica,
                 CriadoEm = agora,
                 AlteradoEm = agora
             };
@@ -105,12 +111,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (categoria == null)
                 throw new UseCaseValidationException("Categoria nao encontrada.");
 
-            if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)
-                throw new UseCaseValidationException("Quantidade minima nao pode ser negativa.");
-            if (quantidadeCritica.HasValue && quantidadeCritica.Value < 0)
-                throw new UseCaseValidationException("Quantidade critica nao pode ser negativa.");
-            if (quantidadeMinima.HasValue && quantidadeCritica.HasValue && quantidadeCritica.Value >= quantidadeMinima.Value)
-                throw new UseCaseValidationException("Quantidade critica precisa ser menor que a minima.");
+            EnsureLimiaresValidos(quantidadeMinima, quantidadeCritica);
 
             categoria.QuantidadeMinima = quantidadeMinima;
             categoria.QuantidadeCritica = quantidadeCritica;
@@ -147,6 +148,22 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (categoria == null)
                 return null;
             return ToResult(categoria);
+        }
+
+        /// <summary>
+        /// Ponto unico de validacao dos limiares de estoque da categoria (issue 884).
+        /// Antes so o caminho de edicao (<see cref="AtualizarLimiaresAsync"/>) validava; a criacao
+        /// nem recebia os valores, entao os descartava em silencio. A regra e `critica &lt; minima`:
+        /// a critica e o patamar de urgencia, abaixo do ponto de reposicao.
+        /// </summary>
+        private static void EnsureLimiaresValidos(int? quantidadeMinima, int? quantidadeCritica)
+        {
+            if (quantidadeMinima is < 0)
+                throw new UseCaseValidationException("Quantidade minima nao pode ser negativa.");
+            if (quantidadeCritica is < 0)
+                throw new UseCaseValidationException("Quantidade critica nao pode ser negativa.");
+            if (quantidadeMinima.HasValue && quantidadeCritica.HasValue && quantidadeCritica.Value >= quantidadeMinima.Value)
+                throw new UseCaseValidationException("Quantidade critica precisa ser menor que a minima.");
         }
 
         private static CategoriaResult ToResult(Categoria c) => new(

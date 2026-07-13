@@ -67,6 +67,11 @@
                 this.modalQueue = todos.filter((b) => this._ehModal(b));
                 this.modal = this.modalQueue[0] || null;
 
+                // Impressão (alcance): registra 1× por usuário o que está sendo exibido — faixas (todas)
+                // e o modal da frente. Os próximos da fila entram ao virarem front (_removerDaTela).
+                this.faixas.forEach((b) => this._impressao(b));
+                if (this.modal) this._impressao(this.modal);
+
                 // Visualização única não-obrigatória: segura na sessão e registra Visto 1× no servidor.
                 todos.forEach((b) => {
                     if (b.visualizacaoUnica && !b.exigeConfirmacao) {
@@ -124,11 +129,19 @@
                 esFetch('/api/banners/' + b.id + '/visto', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
             },
 
+            // Impressão idempotente (alcance): 1× por sessão por banner; o servidor também dedupe (índice único).
+            _impressao(b) {
+                const chave = 'es_banner_imp_' + b.id;
+                try { if (sessionStorage.getItem(chave)) return; sessionStorage.setItem(chave, '1'); } catch (e) {}
+                esFetch('/api/banners/' + b.id + '/impressao', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+            },
+
             _removerDaTela(b) {
                 this.faixas = this.faixas.filter((x) => x.id !== b.id);
                 this.modalQueue = this.modalQueue.filter((x) => x.id !== b.id);
                 this._removerSticky(b.id);
                 this.modal = this.modalQueue[0] || null; // avança a fila de modais
+                if (this.modal) this._impressao(this.modal); // novo modal da frente foi exibido
             },
 
             // localStorage: dispensados (dedupe anti-flash), limitado.

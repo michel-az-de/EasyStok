@@ -119,37 +119,56 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         // B-02: DISTINCT ON é mais eficiente que ROW_NUMBER() com LIMIT externo.
         // Índice ix_report_runs_pending_picker_tenant cobre o WHERE status=0 AND contexto=1.
         // Para Admin (contexto=2), índice ix_report_runs_pending_picker_admin cobre.
+        //
+        // Duas armadilhas resolvidas aqui (a query nunca funcionou — latente porque o
+        // DbContext do Worker não construía até #877 e as IntegrationTests de Postgre
+        // estão fora do CI):
+        //
+        //  (1) Cada braço do UNION ALL tem ORDER BY + LIMIT próprios → PRECISA de
+        //      parênteses, senão é "syntax error at or near UNION" (42601).
+        //  (2) Composição LINQ sobre FromSqlRaw de um UNION é "non-composable": no EF
+        //      estrito (SDK 10.0.301 do CI, não no 10.0.201 local) `.FromSqlRaw(union)
+        //      .Select(r => r.Id).Take(n)` lança "'FromSql' was called with
+        //      non-composable SQL and with a query composing over it". Por isso usamos
+        //      db.Database.SqlQueryRaw<Guid> (query escalar terminal, SEM composição) —
+        //      o LIMIT externo vai DENTRO do SQL e a coluna é aliased "Value" (convenção
+        //      do EF para SqlQuery escalar).
+        //
+        // report_runs usa coluna snake_case (empresa_id) → fora da policy RLS (que só
+        // pega colunas "EmpresaId" PascalCase), então o picker enxerga runs de todos os
+        // tenants sem precisar de bypass. É o comportamento cross-tenant desejado.
         const string sql = """
-            -- Tenant runs (round-robin por empresa_id)
-            SELECT DISTINCT ON (empresa_id) id
-              FROM public.report_runs
-             WHERE status = 0
-               AND contexto = 1
-               AND (next_attempt_at IS NULL OR next_attempt_at <= now())
-             ORDER BY empresa_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
-             LIMIT {0}
+            SELECT id AS "Value"
+              FROM (
+                -- Tenant runs (round-robin por empresa_id)
+                (SELECT DISTINCT ON (empresa_id) id
+                   FROM public.report_runs
+                  WHERE status = 0
+                    AND contexto = 1
+                    AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+                  ORDER BY empresa_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
+                  LIMIT {0})
 
-            UNION ALL
+                UNION ALL
 
-            -- Admin SaaS runs (round-robin por usuário)
-            SELECT DISTINCT ON (usuario_solicitante_id) id
-              FROM public.report_runs
-             WHERE status = 0
-               AND contexto = 2
-               AND (next_attempt_at IS NULL OR next_attempt_at <= now())
-             ORDER BY usuario_solicitante_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
+                -- Admin SaaS runs (round-robin por usuário)
+                (SELECT DISTINCT ON (usuario_solicitante_id) id
+                   FROM public.report_runs
+                  WHERE status = 0
+                    AND contexto = 2
+                    AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+                  ORDER BY usuario_solicitante_id, COALESCE(next_attempt_at, enqueued_at), enqueued_at
+                  LIMIT {0})
+              ) sub
              LIMIT {0}
             """;
 
-        // Usar FromSqlRaw com FormattableString — Npgsql não suporta {0} direto em LIMIT;
-        // precisamos de string interpolada segura. batchSize é int — sem risco de injection.
+        // string.Format (não parâmetro): Npgsql não aceita {0} parametrizado em LIMIT.
+        // batchSize é int — sem risco de injection.
         var formattedSql = string.Format(sql, batchSize);
 
-        var ids = await db.ReportRuns
-            .FromSqlRaw(formattedSql)
-            .AsNoTracking()
-            .Select(r => r.Id)
-            .Take(batchSize)
+        var ids = await db.Database
+            .SqlQueryRaw<Guid>(formattedSql)
             .ToListAsync(ct);
 
         return ids;

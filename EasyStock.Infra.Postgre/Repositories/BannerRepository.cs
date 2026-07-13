@@ -42,8 +42,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                     && !db.BannerConfirmacoes.Any(c =>
                         c.BannerId == b.Id
                         && c.UsuarioId == usuarioId
+                        // Impressao é só alcance (analítico) — nunca esconde. Obrigatório some
+                        // só com Confirmado; não-obrigatório some com qualquer interação ≠ Impressao.
                         && ((b.ExigeConfirmacao && c.Tipo == BannerInteracaoTipo.Confirmado)
-                            || !b.ExigeConfirmacao)))
+                            || (!b.ExigeConfirmacao && c.Tipo != BannerInteracaoTipo.Impressao))))
                 .OrderByDescending(b => b.Prioridade)
                 .ThenByDescending(b => b.CriadoEm)
                 .ToListAsync(ct);
