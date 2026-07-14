@@ -17,7 +17,10 @@ namespace EasyStock.Api.Controllers;
 /// </para>
 /// </summary>
 [SwaggerTag("Configuracao Fiscal (admin tenant)")]
-[Authorize]
+// Pentest #915: era [Authorize] de classe SEM policy -> qualquer usuario autenticado do tenant
+// (inclusive Operador/Visualizador) gerenciava certificado A1 / emissao NF-e / credenciais. Alinha
+// ao ConfiguracoesController (config geral tambem exige Gerente). Gerente = SuperAdmin/Admin/Gerente.
+[Authorize(Policy = "Gerente")]
 [ValidateEmpresaId]
 [ApiController]
 [Route("api/configuracao-fiscal")]
