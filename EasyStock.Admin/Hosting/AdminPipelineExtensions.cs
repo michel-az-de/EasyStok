@@ -24,14 +24,25 @@ public static class AdminPipelineExtensions
     {
         // ForwardedHeaders: Fly/Render/etc fazem TLS no edge e mandam HTTP com
         // X-Forwarded-Proto=https. Sem isso o UseHttpsRedirection estoura 400.
-        app.UseForwardedHeaders(new ForwardedHeadersOptions
+        //
+        // CRITICO (pentest #913): com KnownNetworks/KnownProxies VAZIOS o middleware só
+        // confia no loopback, então atrás do Caddy (bridge Docker 172.x) ele DESCARTA o
+        // X-Forwarded-Proto=https -> scheme=http -> redirect de login http:// e HSTS não
+        // emite. Espelha o padrão da API: confiar nas faixas privadas (o Admin só é
+        // alcançado pela rede interna do Docker) + ForwardLimit=1 (consome só a entrada
+        // mais à direita, injetada pelo proxy confiável; XFF forjado à esquerda é ignorado).
+        var forwardedHeaders = new ForwardedHeadersOptions
         {
             ForwardedHeaders = ForwardedHeaders.XForwardedFor
                              | ForwardedHeaders.XForwardedProto
                              | ForwardedHeaders.XForwardedHost,
-            KnownNetworks = { },
-            KnownProxies = { }
-        });
+            ForwardLimit = 1
+        };
+        forwardedHeaders.KnownNetworks.Clear();
+        forwardedHeaders.KnownProxies.Clear();
+        foreach (var rede in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8" })
+            forwardedHeaders.KnownNetworks.Add(Microsoft.AspNetCore.HttpOverrides.IPNetwork.Parse(rede));
+        app.UseForwardedHeaders(forwardedHeaders);
 
         // Headers de seguranca (issue 818). CSP em Report-Only nesta primeira fatia:
         // o Admin usa Alpine com x-data/x-on inline (exige 'unsafe-eval'/'unsafe-inline'),
