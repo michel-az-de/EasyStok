@@ -42,6 +42,23 @@ public sealed class HelpdeskClienteService(
         if (string.IsNullOrWhiteSpace(cmd.Motivo) || cmd.Motivo.Trim().Length < 10)
             throw new InvalidOperationException("Motivo obrigatorio (minimo 10 caracteres).");
 
+        // BOLA (ADM-BOLA-1): quando ha ticket de contexto, ele DEVE pertencer a empresa cujo dado
+        // sera revelado. Validado ANTES de carregar/retornar a PII: sem esta amarracao, um SuperAdmin
+        // no ticket do Tenant A revelaria a PII do Tenant B e ainda gravaria o TicketHistorico no
+        // ticket errado (trilha de auditoria corrompida). Ticket permanece opcional (decisao Felipe):
+        // valida-se somente quando fornecido; reveal sem ticket segue permitido.
+        if (cmd.TicketIdContexto.HasValue)
+        {
+            var ticketEmpresaId = await db.AdminTickets.AsNoTracking()
+                .Where(t => t.Id == cmd.TicketIdContexto.Value)
+                .Select(t => (Guid?)t.EmpresaId)
+                .FirstOrDefaultAsync(ct);
+            if (ticketEmpresaId is null)
+                throw new KeyNotFoundException("Ticket de contexto nao encontrado.");
+            if (ticketEmpresaId.Value != cmd.EmpresaId)
+                throw new UnauthorizedAccessException("Ticket de contexto nao pertence a empresa informada.");
+        }
+
         var dados = await CarregarAsync(cmd.EmpresaId, ct);
 
         await audit.LogAsync(
