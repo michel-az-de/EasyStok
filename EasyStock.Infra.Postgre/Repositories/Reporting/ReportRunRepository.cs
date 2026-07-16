@@ -262,24 +262,31 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
 
     // ── GC de artefatos ───────────────────────────────────────────────────────
 
-    public async Task<int> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct)
     {
-        // Carrega as runs elegíveis para GC
+        // Seleciona as runs elegíveis UMA vez, com ordem determinística (#929). Antes o
+        // watchdog fazia uma SEGUNDA query Take(batchSize) sem OrderBy para obter as storage
+        // keys, e o Postgres não garante o mesmo conjunto entre dois Take(N) quando há mais
+        // elegíveis que batchSize — arquivos deletados divergiam das linhas zeradas no DB.
         var expiredRuns = await db.ReportRuns
             .Where(r =>
                 r.Status == ReportStatus.Succeeded &&
                 r.ArtifactStorageKey != null &&
                 r.ExpiresAt < DateTimeOffset.UtcNow)
+            .OrderBy(r => r.ExpiresAt)
             .Take(batchSize)
             .ToListAsync(ct);
 
-        if (expiredRuns.Count == 0) return 0;
+        if (expiredRuns.Count == 0) return Array.Empty<string>();
+
+        // Captura as chaves ANTES de MarkArtifactPurged (que zera ArtifactStorageKey).
+        var storageKeys = expiredRuns.Select(r => r.ArtifactStorageKey!).ToList();
 
         foreach (var run in expiredRuns)
             run.MarkArtifactPurged();
 
         await db.SaveChangesAsync(ct);
-        return expiredRuns.Count;
+        return storageKeys;
     }
 
     public async Task<int> PurgeAllForTenantAsync(Guid empresaId, CancellationToken ct)

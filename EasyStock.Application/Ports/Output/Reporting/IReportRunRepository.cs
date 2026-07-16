@@ -61,10 +61,11 @@ public interface IReportRunRepository
     Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct);
 
     /// <summary>
-    /// GC de artefatos: remove artifact_storage_key de runs expiradas.
-    /// Retorna quantidade de runs atualizadas.
+    /// GC de artefatos: remove artifact_storage_key de runs expiradas (uma única seleção,
+    /// ordem determinística). Retorna as storage keys das runs purgadas, para o caller
+    /// deletar exatamente esses arquivos do storage (#929 — evita divergência DB vs storage).
     /// </summary>
-    Task<int> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct);
+    Task<IReadOnlyList<string>> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct);
 
     /// <summary>Retorna quantas runs estão em Running para o owner informado.</summary>
     Task<int> CountRunningForOwnerAsync(Guid? empresaId, Guid? adminUsuarioId, CancellationToken ct);
