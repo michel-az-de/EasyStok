@@ -78,6 +78,7 @@ public class IniciarCheckoutUseCaseTests
         };
         var cardapioItem = CardapioItem.CriarAPartirDeProduto(storefront.Id, produto);
         cardapioItem.TornarVisivel();
+        cardapioItem.Produto = produto; // nav p/ PrecoEfetivo() herdar PrecoReferencia (R$10)
 
         var cardapioRepo = Substitute.For<ICardapioItemRepository>();
         cardapioRepo.GetByIdAsync(storefront.Id, CardapioItemId1, Arg.Any<CancellationToken>())
@@ -195,6 +196,21 @@ public class IniciarCheckoutUseCaseTests
         result.ExpiresIn.Should().Be(1800);
 
         await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, result.PedidoId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HappyPath_PersistePedidoComTotalDeItensMaisFrete()
+    {
+        var f = BuildFakes();
+        var uc = BuildUseCase(f);
+
+        // 2 x Brigadeiro (R$10) + frete SP Centro (R$5) = R$25.
+        // Regressão: fluxo logado não chamava RecalcularTotal e persistia Total=0.
+        await uc.ExecuteAsync(InputValido());
+
+        await f.PedidoRepo.Received().UpdateAsync(
+            Arg.Is<EasyStock.Domain.Entities.Pedido>(p => p.Total.Valor == 25m),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

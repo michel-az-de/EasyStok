@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using DomainPedido = EasyStock.Domain.Entities.Pedido;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
@@ -177,6 +178,13 @@ public sealed class IniciarCheckoutUseCase(
         };
         await pedidoRepository.AddItemAsync(itemFrete, ct);
 
+        // Total agregado (itens + frete) — persistir no Pedido. Os itens são inseridos
+        // via AddItemAsync (DbSet) e NÃO em pedido.Itens, então RecalcularTotal() computaria
+        // 0 (coleção vazia); por isso atribuímos o Total diretamente. É o mesmo somatório
+        // cobrado no MercadoPago (Fase 3), reutilizado aqui.
+        decimal total = input.Items.Sum(i => cardapioItens[i.CardapioItemId].PrecoEfetivo() * i.Qtd)
+                        + zonaMatch.Valor;
+        pedido.Total = Dinheiro.FromDecimal(total);
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
 
@@ -246,9 +254,6 @@ public sealed class IniciarCheckoutUseCase(
 
         if (zonaMatch.Valor > 0m)
             preferenceItems.Add(new PreferenceItemCommand($"Entrega — {zonaMatch.Label}", 1, zonaMatch.Valor));
-
-        decimal total = input.Items.Sum(i => cardapioItens[i.CardapioItemId].PrecoEfetivo() * i.Qtd)
-                        + zonaMatch.Valor;
 
         var command = new CriarPreferenceCommand(
             PedidoId: pedido.Id,
