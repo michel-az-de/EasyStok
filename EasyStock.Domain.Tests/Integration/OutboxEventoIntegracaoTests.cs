@@ -131,6 +131,47 @@ public class OutboxEventoIntegracaoTests
     }
 
     [Fact]
+    public void MarcarEmEnvio_seta_lease_futuro_em_ProximaTentativaEm()
+    {
+        // #928: o lease permite ao watchdog detectar eventos presos em EmEnvio.
+        var evt = CriarValido();
+        evt.MarcarEmEnvio();
+
+        evt.ProximaTentativaEm.Should().BeAfter(DateTime.UtcNow);
+        evt.ProximaTentativaEm.Should().BeCloseTo(
+            DateTime.UtcNow.Add(OutboxEventoIntegracao.LeaseEmEnvio),
+            TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void ReclamarEmEnvioExpirado_incrementa_e_volta_para_Pendente_se_nao_esgotou()
+    {
+        // #928: evento preso em EmEnvio (worker caiu) é reclamado de volta para Pendente.
+        var evt = CriarValido();
+        evt.MarcarEmEnvio();
+
+        evt.ReclamarEmEnvioExpirado();
+
+        evt.Status.Should().Be(StatusOutboxIntegracao.Pendente);
+        evt.Tentativas.Should().Be(1);
+        evt.ProximaTentativaEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+        evt.ErroUltimaTentativa.Should().Contain("EmEnvio expirado");
+    }
+
+    [Fact]
+    public void ReclamarEmEnvioExpirado_esgotando_tentativas_vai_para_Falhado()
+    {
+        var evt = OutboxEventoIntegracao.Criar(
+            Guid.NewGuid(), "evt", "Agg", Guid.NewGuid(), "{}", maxTentativas: 1);
+        evt.MarcarEmEnvio();
+
+        evt.ReclamarEmEnvioExpirado();
+
+        evt.Status.Should().Be(StatusOutboxIntegracao.Falhado);
+        evt.TentativasEsgotadas().Should().BeTrue();
+    }
+
+    [Fact]
     public void MarcarEnviado_seta_ProcessadoEm_e_limpa_erro()
     {
         var evt = CriarValido();

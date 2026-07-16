@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Persistence;
 
 namespace EasyStock.Worker.BackgroundServices;
 
@@ -59,6 +60,10 @@ public sealed class IntegrationOutboxBackgroundService(
         {
             try
             {
+                // Watchdog (#928): reclama eventos presos em EmEnvio (worker caiu ou commit
+                // pós-handler falhou) antes de despachar — sem isto ficavam parados pra sempre.
+                await ReclamarPresosAsync(batchSize, stoppingToken);
+
                 int processados = await RodarRodadaAsync(batchSize, stoppingToken);
 
                 // Se processou batch cheio, há mais — rodar imediatamente sem esperar.
@@ -86,5 +91,16 @@ public sealed class IntegrationOutboxBackgroundService(
         using var scope = serviceProvider.CreateScope();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IIntegrationEventDispatcher>();
         return await dispatcher.ExecutarRodadaAsync(batchSize, ct);
+    }
+
+    private async Task ReclamarPresosAsync(int batchSize, CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IOutboxEventoIntegracaoRepository>();
+        int reclamados = await repo.ReclamarEmEnvioExpiradosAsync(batchSize, ct);
+        if (reclamados > 0)
+            logger.LogWarning(
+                "IntegrationOutbox: {Count} evento(s) preso(s) em EmEnvio reclamado(s) — worker caiu ou commit pós-handler falhou (#928).",
+                reclamados);
     }
 }

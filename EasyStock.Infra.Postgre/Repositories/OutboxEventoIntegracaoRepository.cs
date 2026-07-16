@@ -58,6 +58,26 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
             .ToListAsync(ct);
     }
 
+    public async Task<int> ReclamarEmEnvioExpiradosAsync(int max, CancellationToken ct = default)
+    {
+        var agora = DateTime.UtcNow;
+        var presos = await db.Set<OutboxEventoIntegracao>()
+            .IgnoreQueryFilters()
+            .Where(e => e.Status == StatusOutboxIntegracao.EmEnvio
+                     && e.ProximaTentativaEm < agora)
+            .OrderBy(e => e.ProximaTentativaEm)
+            .Take(max)
+            .ToListAsync(ct);
+
+        if (presos.Count == 0) return 0;
+
+        foreach (var evt in presos)
+            evt.ReclamarEmEnvioExpirado();
+
+        await db.SaveChangesAsync(ct);
+        return presos.Count;
+    }
+
     public async Task<TimeSpan> LagDoMaisAntigoPendenteAsync(CancellationToken ct = default)
     {
         var maisAntigo = await db.Set<OutboxEventoIntegracao>()
