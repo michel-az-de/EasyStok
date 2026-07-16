@@ -139,90 +139,108 @@ public sealed class AtualizarProdutoUseCase(
         produto.AlteradoPor = command.UsuarioId != Guid.Empty ? command.UsuarioId : null;
         produto.AlteradoEm = DateTime.UtcNow;
 
+        // Validacoes que podem lancar movidas para ANTES de qualquer delete (#927 — fail-fast).
+        // Os DeleteByProdutoAsync sao ExecuteDelete (DELETE imediato auto-commitado): se uma
+        // validacao estourasse no MEIO do delete-and-recreate, as sub-entidades ficavam apagadas
+        // e os re-inserts (so rastreados) perdidos. Validar tudo antes evita apagar em vao.
+        if (command.Embalagens is not null && command.Embalagens.Count(e => e.Padrao) > 1)
+            throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
+        if (command.Variacoes is not null)
+        {
+            foreach (var variacao in command.Variacoes)
+                if (!string.IsNullOrWhiteSpace(variacao.Sku))
+                    _ = CodigoSku.From(variacao.Sku); // valida formato do SKU antes de deletar
+        }
+
         try
         {
-            await produtoRepository.UpdateAsync(produto);
-
-            // Replace caracteristicas — batch delete + re-insert
-            if (command.Caracteristicas is not null)
+            // Delete-and-recreate ATOMICO (#927): Update + deletes (ExecuteDelete) + re-inserts
+            // numa unica transacao. Sem ela, os DELETEs auto-commitavam e qualquer falha antes do
+            // CommitAsync (inclusive no proprio commit) deixava o produto sem sub-entidades. Espelha
+            // GerenciarComposicaoUseCase.SubstituirAsync. Nao-idempotente (gera Guids), mas o retry
+            // do ExecuteInTransactionAsync so reexecuta apos rollback completo — seguro.
+            await unitOfWork.ExecuteInTransactionAsync(async _ =>
             {
-                await caracteristicaRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
+                await produtoRepository.UpdateAsync(produto);
 
-                var agora = DateTime.UtcNow;
-                foreach (var input in command.Caracteristicas)
+                // Replace caracteristicas — batch delete + re-insert
+                if (command.Caracteristicas is not null)
                 {
-                    await caracteristicaRepository.InsertAsync(new ProdutoCaracteristica
+                    await caracteristicaRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
+
+                    var agora = DateTime.UtcNow;
+                    foreach (var input in command.Caracteristicas)
                     {
-                        Id = Guid.NewGuid(),
-                        EmpresaId = command.EmpresaId,
-                        ProdutoId = command.ProdutoId,
-                        Nome = input.Nome.Trim(),
-                        Descricao = input.Descricao?.Trim(),
-                        QuantidadeReferencia = input.QuantidadeReferencia,
-                        VariacaoPadrao = input.VariacaoPadrao?.Trim(),
-                        VariacaoId = input.VariacaoId,
-                        OrdemExibicao = input.OrdemExibicao,
-                        CriadoEm = agora,
-                        AlteradoEm = agora
-                    });
+                        await caracteristicaRepository.InsertAsync(new ProdutoCaracteristica
+                        {
+                            Id = Guid.NewGuid(),
+                            EmpresaId = command.EmpresaId,
+                            ProdutoId = command.ProdutoId,
+                            Nome = input.Nome.Trim(),
+                            Descricao = input.Descricao?.Trim(),
+                            QuantidadeReferencia = input.QuantidadeReferencia,
+                            VariacaoPadrao = input.VariacaoPadrao?.Trim(),
+                            VariacaoId = input.VariacaoId,
+                            OrdemExibicao = input.OrdemExibicao,
+                            CriadoEm = agora,
+                            AlteradoEm = agora
+                        });
+                    }
                 }
-            }
 
-            // Replace embalagens — batch delete + re-insert
-            if (command.Embalagens is not null)
-            {
-                if (command.Embalagens.Count(e => e.Padrao) > 1)
-                    throw new UseCaseValidationException("Somente uma embalagem pode ser marcada como padrao.");
-
-                await embalagemRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
-
-                var agora = DateTime.UtcNow;
-                foreach (var input in command.Embalagens)
+                // Replace embalagens — batch delete + re-insert (validacao de padrao unico feita acima)
+                if (command.Embalagens is not null)
                 {
-                    await embalagemRepository.InsertAsync(new ProdutoEmbalagem
+                    await embalagemRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
+
+                    var agora = DateTime.UtcNow;
+                    foreach (var input in command.Embalagens)
                     {
-                        Id = Guid.NewGuid(),
-                        EmpresaId = command.EmpresaId,
-                        ProdutoId = command.ProdutoId,
-                        Nome = input.Nome.Trim(),
-                        Descricao = input.Descricao?.Trim(),
-                        Dimensoes = input.Dimensoes.ToValueObjectOrNull(),
-                        Padrao = input.Padrao,
-                        CriadoEm = agora,
-                        AlteradoEm = agora
-                    });
+                        await embalagemRepository.InsertAsync(new ProdutoEmbalagem
+                        {
+                            Id = Guid.NewGuid(),
+                            EmpresaId = command.EmpresaId,
+                            ProdutoId = command.ProdutoId,
+                            Nome = input.Nome.Trim(),
+                            Descricao = input.Descricao?.Trim(),
+                            Dimensoes = input.Dimensoes.ToValueObjectOrNull(),
+                            Padrao = input.Padrao,
+                            CriadoEm = agora,
+                            AlteradoEm = agora
+                        });
+                    }
                 }
-            }
 
-            // Replace variacoes — batch delete + re-insert
-            if (command.Variacoes is not null)
-            {
-                await produtoVariacaoRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
-
-                var agora = DateTime.UtcNow;
-                foreach (var variacao in command.Variacoes)
+                // Replace variacoes — batch delete + re-insert (formato do SKU validado acima)
+                if (command.Variacoes is not null)
                 {
-                    await produtoVariacaoRepository.InsertAsync(new ProdutoVariacao
-                    {
-                        Id = Guid.NewGuid(),
-                        EmpresaId = command.EmpresaId,
-                        ProdutoId = command.ProdutoId,
-                        Nome = variacao.Nome.Trim(),
-                        Cor = variacao.Cor?.Trim(),
-                        Tamanho = variacao.Tamanho?.Trim(),
-                        DescricaoComercial = variacao.DescricaoComercial?.Trim(),
-                        Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
-                        CodigoBarras = variacao.CodigoBarras?.Trim(),
-                        AtributosJson = variacao.AtributosJson,
-                        DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
-                        Ativa = variacao.Ativa,
-                        CriadoEm = agora,
-                        AlteradoEm = agora
-                    });
-                }
-            }
+                    await produtoVariacaoRepository.DeleteByProdutoAsync(command.EmpresaId, command.ProdutoId);
 
-            await unitOfWork.CommitAsync();
+                    var agora = DateTime.UtcNow;
+                    foreach (var variacao in command.Variacoes)
+                    {
+                        await produtoVariacaoRepository.InsertAsync(new ProdutoVariacao
+                        {
+                            Id = Guid.NewGuid(),
+                            EmpresaId = command.EmpresaId,
+                            ProdutoId = command.ProdutoId,
+                            Nome = variacao.Nome.Trim(),
+                            Cor = variacao.Cor?.Trim(),
+                            Tamanho = variacao.Tamanho?.Trim(),
+                            DescricaoComercial = variacao.DescricaoComercial?.Trim(),
+                            Sku = string.IsNullOrWhiteSpace(variacao.Sku) ? null : CodigoSku.From(variacao.Sku),
+                            CodigoBarras = variacao.CodigoBarras?.Trim(),
+                            AtributosJson = variacao.AtributosJson,
+                            DimensoesPadrao = variacao.DimensoesPadrao.ToValueObjectOrNull(),
+                            Ativa = variacao.Ativa,
+                            CriadoEm = agora,
+                            AlteradoEm = agora
+                        });
+                    }
+                }
+
+                await unitOfWork.CommitAsync();
+            });
 
             if (alteracaoRepository is not null && command.UsuarioId != Guid.Empty)
             {
