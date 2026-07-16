@@ -111,6 +111,7 @@ public class VendaController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Operador")]
     [HttpPost]
     public async Task<IActionResult> CriarVenda([FromBody] CriarVendaRequest request)
     {
