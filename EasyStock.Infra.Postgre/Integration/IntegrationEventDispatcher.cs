@@ -160,7 +160,7 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
             catch (Exception persistEx)
             {
                 _logger.LogError(persistEx,
-                    "Outbox {EventId} persistência do estado pós-handler falhou — risco de re-processo.",
+                    "Outbox {EventId} persistência do estado pós-handler falhou — evento fica em EmEnvio; o watchdog o reclama após o lease e re-despacha (#928, handlers idempotentes).",
                     evt.Id);
             }
 
