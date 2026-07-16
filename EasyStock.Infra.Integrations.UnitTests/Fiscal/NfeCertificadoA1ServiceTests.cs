@@ -47,6 +47,19 @@ public class NfeCertificadoA1ServiceTests
     }
 
     [Fact]
+    public void ValidarUpload_retorna_DateTime_Kind_Utc()
+    {
+        // Regressão #930: X509.NotAfter vem Kind=Local; a coluna valido_ate é timestamptz e
+        // o Npgsql rejeita Kind=Local, 500ando o upload de certificado. ValidarUpload deve
+        // devolver Kind=Utc para persistir sem erro.
+        var pfx = GerarPfx(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(1), "s3nha");
+
+        var validade = Sut().ValidarUpload(pfx, "s3nha");
+
+        validade.Kind.Should().Be(DateTimeKind.Utc);
+    }
+
+    [Fact]
     public void ValidarUpload_cert_expirado_rejeita()
     {
         var pfx = GerarPfx(DateTimeOffset.UtcNow.AddDays(-10), DateTimeOffset.UtcNow.AddDays(-1), "s3nha");

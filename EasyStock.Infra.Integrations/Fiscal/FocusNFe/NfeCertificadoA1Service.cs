@@ -75,11 +75,13 @@ public sealed class NfeCertificadoA1Service(
         try
         {
             using var cert = X509CertificateLoader.LoadPkcs12(pfxBytes, senha);
-            // X509Certificate2.NotAfter retorna DateTime com Kind=Local — comparar com
-            // DateTime.UtcNow daria erro de fuso (3h em SP). Usar DateTime.Now (mesmo Kind).
-            if (cert.NotAfter <= DateTime.Now)
+            // X509Certificate2.NotAfter retorna DateTime com Kind=Local. A coluna valido_ate
+            // e timestamptz e o Npgsql rejeita DateTime com Kind=Local (o upload 500ava).
+            // Normalizar para UTC e comparar a expiracao com UtcNow no mesmo Kind.
+            var validoAteUtc = cert.NotAfter.ToUniversalTime();
+            if (validoAteUtc <= DateTime.UtcNow)
                 throw new InvalidOperationException("Certificado expirado.");
-            return cert.NotAfter;
+            return validoAteUtc;
         }
         catch (CryptographicException ex)
         {
