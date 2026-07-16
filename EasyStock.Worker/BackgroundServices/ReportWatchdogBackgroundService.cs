@@ -106,20 +106,10 @@ public sealed class ReportWatchdogBackgroundService(
         bool gotLock = await TryAcquireWatchdogLockAsync(db, ct);
         if (!gotLock) return;
 
-        // Carrega as storage keys antes de NULLificar no DB.
-        var storageKeys = await db.ReportRuns
-            .Where(r =>
-                r.Status == Domain.Reporting.ReportStatus.Succeeded &&
-                r.ArtifactStorageKey != null &&
-                r.ExpiresAt < DateTimeOffset.UtcNow)
-            .Take(batchSize)
-            .Select(r => r.ArtifactStorageKey!)
-            .ToListAsync(ct);
-
+        // Purga no DB e recebe as storage keys EXATAS das runs purgadas — mesma seleção,
+        // sem divergência entre o que é deletado do storage e o que é zerado no DB (#929).
+        var storageKeys = await repo.PurgeExpiredArtifactsAsync(batchSize, ct);
         if (storageKeys.Count == 0) return;
-
-        // Marca como purgados no DB.
-        int purged = await repo.PurgeExpiredArtifactsAsync(batchSize, ct);
 
         // Deleção física no storage (best-effort).
         int deleted = 0;
@@ -137,13 +127,10 @@ public sealed class ReportWatchdogBackgroundService(
             }
         }
 
-        if (purged > 0)
-        {
-            logger.LogInformation(
-                "ReportWatchdog: {DbPurged} artefato(s) expirado(s) purgado(s) no DB; {StorageDeleted} deletado(s) do storage.",
-                purged, deleted);
-            metrics.RecordArtifactsPurged("tenant", "Expired", purged);
-        }
+        logger.LogInformation(
+            "ReportWatchdog: {DbPurged} artefato(s) expirado(s) purgado(s) no DB; {StorageDeleted} deletado(s) do storage.",
+            storageKeys.Count, deleted);
+        metrics.RecordArtifactsPurged("tenant", "Expired", storageKeys.Count);
     }
 
     // ── Advisory lock global do watchdog (§G-15) ──────────────────────────────
