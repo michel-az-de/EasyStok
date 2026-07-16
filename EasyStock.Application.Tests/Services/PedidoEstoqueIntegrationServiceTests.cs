@@ -166,4 +166,44 @@ public class PedidoEstoqueIntegrationServiceTests
         itemB.QuantidadeAtual!.Value.Should().Be(100);
         await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
     }
+
+    [Fact] // #939: estorno por item quando houve saída (Venda) anterior por este pedido+item.
+    public async Task DevolverItemAsync_estorna_quando_houve_venda_anterior()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 3);
+        var item = pedido.Itens.Single();
+
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, $"{pedido.Id}:{item.Id}",
+            NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        var alvo = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+            ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0)
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { alvo });
+
+        await svc.DevolverItemAsync(pedido, item);
+
+        alvo.QuantidadeAtual!.Value.Should().Be(3);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
+    }
+
+    [Fact] // #939: sem Venda anterior, não há o que estornar (idempotência).
+    public async Task DevolverItemAsync_pula_quando_sem_venda_anterior()
+    {
+        var (svc, _, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 3);
+
+        await svc.DevolverItemAsync(pedido, pedido.Itens.Single());
+
+        await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
 }

@@ -152,63 +152,74 @@ public sealed class PedidoEstoqueIntegrationService(
     public async Task DevolverAsync(PedidoEntity pedido, CancellationToken ct = default)
     {
         if (!pedido.LojaId.HasValue) return;
-        var lojaId = pedido.LojaId.Value;
 
         foreach (var item in pedido.Itens)
+            await DevolverItemAsync(pedido, item, ct);
+    }
+
+    /// <summary>
+    /// Estorna o estoque de UM item do pedido. Usado ao remover um item de um pedido que
+    /// já teve o estoque descontado (Pronto/Entregue) — #939 — e como bloco do
+    /// <see cref="DevolverAsync"/>. Idempotente: só estorna se houve saída (Venda) anterior
+    /// por este pedido+item e ainda não há Estorno.
+    /// </summary>
+    public async Task DevolverItemAsync(PedidoEntity pedido, PedidoItem item, CancellationToken ct = default)
+    {
+        if (!pedido.LojaId.HasValue) return;
+        var lojaId = pedido.LojaId.Value;
+
+        if (!item.ProdutoId.HasValue || item.Quantidade <= 0) return;
+
+        // Mesma chave de idempotência do desconto (refDocItem).
+        var refDocItem = $"{pedido.Id}:{item.Id}";
+
+        // Só devolve se houve saída anterior por este pedido+item.
+        if (!await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Venda, ct))
+            return;
+
+        // Idempotência do estorno: se já há um Estorno referenciando este pedido+item, pula.
+        if (await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Estorno, ct))
+            return;
+
+        var itens = await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value);
+        var alvoCandidate = itens
+            ?.Where(i => i.LojaId == lojaId)
+            .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
+            .FirstOrDefault();
+        if (alvoCandidate is null) return;
+
+        var alvo = await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, alvoCandidate.Id) ?? alvoCandidate;
+
+        var qtd = item.Quantidade;
+        if (qtd <= 0m) return;
+        var atual = alvo.QuantidadeAtual?.Value ?? 0m;
+        alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual + qtd);
+
+        var agora = DateTime.UtcNow;
+        const int janelaDias = 30;
+        var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
+            pedido.EmpresaId, item.ProdutoId.Value,
+            agora.AddDays(-janelaDias), agora);
+        var velocidadeAtualizada = Math.Max(0m, (taxaAnterior * janelaDias - qtd) / janelaDias);
+        alvo.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);
+
+        await itemEstoqueRepo.UpdateAsync(alvo);
+
+        await movRepo.InsertAsync(new MovimentacaoEstoque
         {
-            if (!item.ProdutoId.HasValue || item.Quantidade <= 0) continue;
-
-            // Mesma chave de idempotência do desconto (refDocItem).
-            var refDocItem = $"{pedido.Id}:{item.Id}";
-
-            // Só devolve se houve saída anterior por este pedido+item.
-            if (!await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Venda, ct))
-                continue;
-
-            // Idempotência do estorno: se já há um Estorno referenciando este pedido+item, pula.
-            if (await movRepo.ExisteReferenciaAsync(pedido.EmpresaId, item.ProdutoId.Value, refDocItem, NaturezaMovimentacaoEstoque.Estorno, ct))
-                continue;
-
-            var itens = await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value);
-            var alvoCandidate = itens
-                ?.Where(i => i.LojaId == lojaId)
-                .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
-                .FirstOrDefault();
-            if (alvoCandidate is null) continue;
-
-            var alvo = await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, alvoCandidate.Id) ?? alvoCandidate;
-
-            var qtd = item.Quantidade;
-            if (qtd <= 0m) continue;
-            var atual = alvo.QuantidadeAtual?.Value ?? 0m;
-            alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual + qtd);
-
-            var agora = DateTime.UtcNow;
-            const int janelaDias = 30;
-            var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
-                pedido.EmpresaId, item.ProdutoId.Value,
-                agora.AddDays(-janelaDias), agora);
-            var velocidadeAtualizada = Math.Max(0m, (taxaAnterior * janelaDias - qtd) / janelaDias);
-            alvo.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);
-
-            await itemEstoqueRepo.UpdateAsync(alvo);
-
-            await movRepo.InsertAsync(new MovimentacaoEstoque
-            {
-                Id = Guid.NewGuid(),
-                EmpresaId = pedido.EmpresaId,
-                ProdutoId = item.ProdutoId.Value,
-                ItemEstoqueId = alvo.Id,
-                Tipo = TipoMovimentacaoEstoque.Entrada,
-                Natureza = NaturezaMovimentacaoEstoque.Estorno,
-                Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(qtd),
-                ValorUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario),
-                ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtd),
-                DocumentoReferencia = refDocItem,
-                DataMovimentacao = agora,
-                Descricao = $"Cancelamento pedido {pedido.Id} item {item.Id}",
-                CriadoEm = agora
-            });
-        }
+            Id = Guid.NewGuid(),
+            EmpresaId = pedido.EmpresaId,
+            ProdutoId = item.ProdutoId.Value,
+            ItemEstoqueId = alvo.Id,
+            Tipo = TipoMovimentacaoEstoque.Entrada,
+            Natureza = NaturezaMovimentacaoEstoque.Estorno,
+            Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(qtd),
+            ValorUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario),
+            ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtd),
+            DocumentoReferencia = refDocItem,
+            DataMovimentacao = agora,
+            Descricao = $"Cancelamento pedido {pedido.Id} item {item.Id}",
+            CriadoEm = agora
+        });
     }
 }

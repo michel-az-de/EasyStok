@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Application.UseCases.RemoverPagamentoPedido;
 using Microsoft.Extensions.Logging;
@@ -16,7 +17,13 @@ public class RemoverItemPagamentoPedidoUseCaseTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     private RemoverItemPedidoUseCase ItemUC() =>
-        new(_repo, _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
+        new(_repo,
+            new PedidoEstoqueIntegrationService(
+                Substitute.For<IItemEstoqueRepository>(),
+                Substitute.For<IMovimentacaoEstoqueRepository>(),
+                Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
+                Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
+            _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
     private RemoverPagamentoPedidoUseCase PagUC() =>
         new(_repo, _uow, Substitute.For<ILogger<RemoverPagamentoPedidoUseCase>>());
 

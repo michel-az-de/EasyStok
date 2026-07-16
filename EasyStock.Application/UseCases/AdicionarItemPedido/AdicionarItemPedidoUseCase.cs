@@ -1,5 +1,7 @@
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.AdicionarItemPedido;
 
@@ -20,6 +22,7 @@ public sealed record AdicionarItemPedidoCommand(
 public class AdicionarItemPedidoUseCase(
     IPedidoRepository repo,
     IProdutoRepository produtoRepo,
+    PedidoEstoqueIntegrationService estoqueIntegration,
     IUnitOfWork uow,
     ILogger<AdicionarItemPedidoUseCase> logger)
 {
@@ -93,6 +96,14 @@ public class AdicionarItemPedidoUseCase(
             OcorridoEm = DateTime.UtcNow,
             Detalhes = $"+{item.Quantidade} {item.Nome} ({item.Subtotal.ToString("C", Cultura.PtBr)})"
         });
+
+        // #939: se o pedido já teve o estoque descontado (Pronto/Entregue), baixar o estoque
+        // do item recém-adicionado agora — senão ele seria faturado/entregue sem sair do
+        // estoque (a transição Pronto→Entregue não redesconta). DescontarAsync é idempotente
+        // por item, então os itens já descontados são pulados; só o novo é baixado. Tudo no
+        // mesmo CommitAsync (atômico) — se faltar estoque, lança e nada é persistido.
+        if (PedidoStateMachine.DescontaEstoque(pedido.StatusEnum))
+            await estoqueIntegration.DescontarAsync(pedido);
 
         await repo.UpdateAsync(pedido);
         await uow.CommitAsync();

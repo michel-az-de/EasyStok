@@ -1,5 +1,7 @@
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.RemoverItemPedido;
 
@@ -13,6 +15,7 @@ public sealed record RemoverItemPedidoCommand(
 
 public class RemoverItemPedidoUseCase(
     IPedidoRepository repo,
+    PedidoEstoqueIntegrationService estoqueIntegration,
     IUnitOfWork uow,
     ILogger<RemoverItemPedidoUseCase> logger)
 {
@@ -29,6 +32,13 @@ public class RemoverItemPedidoUseCase(
 
         var item = pedido.Itens.FirstOrDefault(i => i.Id == cmd.ItemId);
         if (item == null) return CriarPedidoUseCase.Map(pedido);
+
+        // #939: se o pedido já teve o estoque descontado (Pronto/Entregue), estornar o estoque
+        // deste item ANTES de removê-lo — senão as unidades já baixadas ficariam perdidas (a
+        // remoção tira o item da coleção e um cancelamento posterior, que itera pedido.Itens,
+        // nunca o veria). DevolverItemAsync é idempotente. Mesmo CommitAsync (atômico).
+        if (PedidoStateMachine.DescontaEstoque(pedido.StatusEnum))
+            await estoqueIntegration.DevolverItemAsync(pedido, item);
 
         // Remocao rastreada: o pedido veio tracked de GetByIdWithDetailsAsync e a FK
         // PedidoItem->Pedido e required+Cascade, entao remover da colecao marca o item
