@@ -156,6 +156,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
                          && x.p.Status != "cancelado"
+                         // So pedidos SEM Venda consolidada (balcao/web tem so PedidoPagamento).
+                         // Pedido mobile entregue gera Venda (VendaId setado) e ja e contado por
+                         // GetTotalVendas — sem este filtro o mesmo dinheiro somava 2x no caixa (#926).
+                         && x.p.VendaId == null
                          && (lojaId == null || x.p.LojaId == lojaId))
                 .SumAsync(x => (decimal?)x.pg.Valor) ?? 0m;
         }
@@ -182,6 +186,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                       (pg, p) => new { pg, p })
                 .Where(x => x.p.EmpresaId == empresaId
                          && x.p.Status != "cancelado"
+                         // Mesmo filtro do total (#926): exclui pagamentos de pedidos com Venda
+                         // consolidada, para a soma das linhas exibidas casar com o SaldoEsperado.
+                         && x.p.VendaId == null
                          && (lojaId == null || x.p.LojaId == lojaId))
                 .OrderBy(x => x.pg.PagoEm)
                 .Select(x => x.pg)
