@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -19,22 +20,28 @@ public class PedidoUseCasesTests
     private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
     private readonly IClienteRepository _clienteRepo = Substitute.For<IClienteRepository>();
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
+    private readonly IItemEstoqueRepository _itemEstoqueRepo = Substitute.For<IItemEstoqueRepository>();
+    private readonly IMovimentacaoEstoqueRepository _movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    // Service real com repos de estoque mockados (sealed -> não mockável direto);
+    // permite asserir movimentações de estoque emitidas pelos use cases (#939).
+    private PedidoEstoqueIntegrationService EstoqueSvc() => new(
+        _itemEstoqueRepo, _movRepo,
+        Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
+        Substitute.For<ILogger<PedidoEstoqueIntegrationService>>());
 
     private CriarPedidoUseCase CriarPedidoUC() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
         Substitute.For<ILogger<CriarPedidoUseCase>>());
-    private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo,
-        new PedidoEstoqueIntegrationService(
-            Substitute.For<IItemEstoqueRepository>(),
-            Substitute.For<IMovimentacaoEstoqueRepository>(),
-            Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
-            Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
+    private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo, EstoqueSvc(),
         Substitute.For<IContaReceberRepository>(),
         _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
         Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>());
-    private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, _uow,
+    private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, EstoqueSvc(), _uow,
         Substitute.For<ILogger<AdicionarItemPedidoUseCase>>());
+    private RemoverItemPedidoUseCase RemoverItemUC() => new(_pedidoRepo, EstoqueSvc(), _uow,
+        Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
 
     private static Produto ProdutoComStatus(Guid empresaId, Guid id, StatusProduto status) => new()
     {
@@ -84,6 +91,101 @@ public class PedidoUseCasesTests
         var result = await AdicionarItemUC().ExecuteAsync(cmd);
 
         result.Should().BeNull();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // #939: mutação de itens em pedido já com estoque descontado ('pronto')
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact] // Adicionar item a pedido 'pronto' (estoque já descontado) deve baixar o item novo.
+    public async Task AdicionarItem_EmPedidoPronto_BaixaEstoqueDoItemNovo()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Ativo));
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, lojaId, "web");
+        pedido.Status = "pronto";
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        _itemEstoqueRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(10) }
+        });
+
+        var cmd = new AdicionarItemPedidoCommand(empresaId, pedido.Id, "Novo", 3, 10m, ProdutoId: produtoId);
+        await AdicionarItemUC().ExecuteAsync(cmd);
+
+        await _movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Venda && m.ProdutoId == produtoId));
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact] // Adicionar item a pedido 'aguardando' (estoque ainda não descontado) NÃO baixa estoque.
+    public async Task AdicionarItem_EmPedidoAguardando_NaoBaixaEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _produtoRepo.GetByIdAsync(empresaId, produtoId)
+            .Returns(ProdutoComStatus(empresaId, produtoId, StatusProduto.Ativo));
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, Guid.NewGuid(), "web"); // 'aguardando'
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var cmd = new AdicionarItemPedidoCommand(empresaId, pedido.Id, "Novo", 3, 10m, ProdutoId: produtoId);
+        await AdicionarItemUC().ExecuteAsync(cmd);
+
+        await _movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
+
+    [Fact] // Remover item de pedido 'pronto' (estoque já descontado) deve estornar o item removido.
+    public async Task RemoverItem_EmPedidoPronto_EstornaEstoqueDoItem()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, lojaId, "web");
+        pedido.Status = "pronto";
+        var item = new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId,
+            Nome = "X", Quantidade = 2, PrecoUnitario = 10m };
+        pedido.Itens.Add(item);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        // Houve saída (Venda) anterior por este pedido+item (desconto na entrada em 'pronto').
+        _movRepo.ExisteReferenciaAsync(empresaId, produtoId, $"{pedido.Id}:{item.Id}",
+            NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        _itemEstoqueRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) }
+        });
+
+        await RemoverItemUC().ExecuteAsync(new RemoverItemPedidoCommand(empresaId, pedido.Id, item.Id));
+
+        await _movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno && m.ProdutoId == produtoId));
+        pedido.Itens.Should().NotContain(item);
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact] // Remover item de pedido 'aguardando' (estoque não descontado) NÃO estorna.
+    public async Task RemoverItem_EmPedidoAguardando_NaoEstornaEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId, cliente: null, Guid.NewGuid(), "web"); // 'aguardando'
+        var item = new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId,
+            Nome = "X", Quantidade = 2, PrecoUnitario = 10m };
+        pedido.Itens.Add(item);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await RemoverItemUC().ExecuteAsync(new RemoverItemPedidoCommand(empresaId, pedido.Id, item.Id));
+
+        await _movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+        pedido.Itens.Should().NotContain(item);
     }
 
     [Fact] // Guarda nova: criacao de pedido com item de produto inativo e bloqueada.

@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities;
@@ -68,6 +69,7 @@ public sealed class AdicionarItemPedidoUseCaseTests : IDisposable
         var uc = new AdicionarItemPedidoUseCase(
             new PedidoRepository(_db),
             Substitute.For<IProdutoRepository>(),
+            EstoqueSvc(),
             _db, // EasyStockDbContext É o IUnitOfWork (CommitAsync = SaveChangesAsync)
             NullLogger<AdicionarItemPedidoUseCase>.Instance);
 
@@ -95,6 +97,7 @@ public sealed class AdicionarItemPedidoUseCaseTests : IDisposable
         var uc = new AdicionarItemPedidoUseCase(
             new PedidoRepository(_db),
             Substitute.For<IProdutoRepository>(),
+            EstoqueSvc(),
             _db,
             NullLogger<AdicionarItemPedidoUseCase>.Instance);
 
@@ -103,6 +106,14 @@ public sealed class AdicionarItemPedidoUseCaseTests : IDisposable
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
+
+    // Pedidos 'aguardando' (Pedido.Criar) não têm estoque descontado, então a integração
+    // de estoque (#939) não é acionada; basta um service com repos mockados p/ satisfazer o ctor.
+    private static PedidoEstoqueIntegrationService EstoqueSvc() => new(
+        Substitute.For<IItemEstoqueRepository>(),
+        Substitute.For<IMovimentacaoEstoqueRepository>(),
+        Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
+        NullLogger<PedidoEstoqueIntegrationService>.Instance);
 
     public void Dispose() => _db.Dispose();
 }

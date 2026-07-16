@@ -90,10 +90,10 @@ public class PedidosControllerTests
         var obter = new ObterPedidoDetalhesUseCase(_pedidoRepo);
 
         var addItem = new AdicionarItemPedidoUseCase(
-            _pedidoRepo, _produtoRepo, _uow, NullLogger<AdicionarItemPedidoUseCase>.Instance);
+            _pedidoRepo, _produtoRepo, estoqueIntegration, _uow, NullLogger<AdicionarItemPedidoUseCase>.Instance);
 
         var removeItem = new RemoverItemPedidoUseCase(
-            _pedidoRepo, _uow, NullLogger<RemoverItemPedidoUseCase>.Instance);
+            _pedidoRepo, estoqueIntegration, _uow, NullLogger<RemoverItemPedidoUseCase>.Instance);
 
         var addPag = new RegistrarPagamentoPedidoUseCase(
             _pedidoRepo, _uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance);
