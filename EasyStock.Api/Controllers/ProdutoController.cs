@@ -102,6 +102,7 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = "Operador")]
     [HttpPost]
     public async Task<IActionResult> Create(CadastrarProdutoCommand command)
     {
@@ -117,6 +118,7 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Operador")]
     [HttpPatch("{id}")]
     public async Task<IActionResult> Update(Guid id, AtualizarProdutoCommand command)
     {
@@ -137,6 +139,7 @@ public class ProdutoController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Operador")]
     [HttpPatch("{id:guid}/limiar")]
     public async Task<IActionResult> UpdateLimiar(Guid id, [FromQuery] Guid empresaId, [FromBody] AtualizarLimiarProdutoBody body)
     {
