@@ -51,7 +51,7 @@ public class RegistrarPagamentoFaturaUseCase(
 
         try
         {
-            fatura.RegistrarPagamento(pagamento);
+            fatura.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
         }
         catch (RegraDeDominioVioladaException ex)
         {

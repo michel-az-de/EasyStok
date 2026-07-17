@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Concurrency;
@@ -114,7 +115,9 @@ public sealed class FaturaVencimentoJob(
         using var _rls = db.UseRowLevelSecurityBypass();
         var notificador = scope.ServiceProvider.GetRequiredService<INotificadorService>();
 
-        var hoje = DateTime.UtcNow.Date;
+        // #520: dia civil de Brasilia como instante UTC (00:00Z), nao UtcNow.Date. No fim do dia BRT
+        // (21h-24h = 00h-03h UTC) o UtcNow.Date ja virou "amanha" e marcava a fatura vencida 3h cedo.
+        var hoje = HorarioBrasil.HojeInstanteUtc();
         var d3Inicio = hoje.AddDays(2);  // vence em 2-3 dias
         var d3Fim = hoje.AddDays(4);
         var d1Inicio = hoje;             // vence em 0-1 dias
@@ -216,7 +219,9 @@ public sealed class FaturaVencimentoJob(
         INotificadorService notificador,
         CancellationToken ct)
     {
-        var hoje = DateTime.UtcNow.Date;
+        // #520: dia civil de Brasilia como instante UTC (00:00Z), nao UtcNow.Date. No fim do dia BRT
+        // (21h-24h = 00h-03h UTC) o UtcNow.Date ja virou "amanha" e marcava a fatura vencida 3h cedo.
+        var hoje = HorarioBrasil.HojeInstanteUtc();
 
         var candidatas = await db.Faturas
             .IgnoreQueryFilters()
@@ -232,7 +237,7 @@ public sealed class FaturaVencimentoJob(
         {
             try
             {
-                fatura.MarcarVencidaSeAplicavel();
+                fatura.MarcarVencidaSeAplicavel(hoje);
                 if (fatura.Status != StatusFatura.Vencida) continue;
 
                 db.FaturaEventos.Add(FaturaEvento.Criar(

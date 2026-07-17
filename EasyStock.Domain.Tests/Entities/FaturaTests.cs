@@ -103,7 +103,7 @@ public class FaturaTests
         f.Emitir();
 
         var pag = FaturaPagamento.CriarConfirmado(f.Id, "manual", 30m, "Manual", Guid.NewGuid());
-        f.RegistrarPagamento(pag);
+        f.RegistrarPagamento(pag, DateTime.UtcNow);
 
         f.Status.Should().Be(StatusFatura.ParcialmentePaga);
         f.TotalPago.Should().Be(30m);
@@ -117,7 +117,7 @@ public class FaturaTests
         f.AdicionarItem("Servico", 1, 100m);
         f.Emitir();
 
-        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()));
+        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()), DateTime.UtcNow);
 
         f.Status.Should().Be(StatusFatura.Paga);
         f.DataPagamentoTotal.Should().NotBeNull();
@@ -132,7 +132,7 @@ public class FaturaTests
         f.AdicionarItem("Servico", 1, 100m);
         f.Emitir();
 
-        f.RegistrarPagamento(FaturaPagamento.CriarPendente(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()));
+        f.RegistrarPagamento(FaturaPagamento.CriarPendente(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()), DateTime.UtcNow);
 
         f.Status.Should().Be(StatusFatura.Emitida);
         f.TotalPago.Should().Be(0);
@@ -144,7 +144,7 @@ public class FaturaTests
         var f = NovaFaturaRascunho();
         f.AdicionarItem("X", 1, 100m);
 
-        var act = () => f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "manual", 100m, "Manual", Guid.NewGuid()));
+        var act = () => f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "manual", 100m, "Manual", Guid.NewGuid()), DateTime.UtcNow);
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
 
@@ -156,7 +156,7 @@ public class FaturaTests
         f.Emitir();
         f.Cancelar("teste");
 
-        var act = () => f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "manual", 100m, "Manual", Guid.NewGuid()));
+        var act = () => f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "manual", 100m, "Manual", Guid.NewGuid()), DateTime.UtcNow);
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
 
@@ -166,7 +166,7 @@ public class FaturaTests
         var f = NovaFaturaRascunho();
         f.AdicionarItem("X", 1, 100m);
         f.Emitir();
-        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()));
+        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()), DateTime.UtcNow);
 
         var act = () => f.Cancelar();
         act.Should().Throw<RegraDeDominioVioladaException>();
@@ -193,7 +193,7 @@ public class FaturaTests
         var f = NovaFaturaRascunho();
         f.AdicionarItem("X", 1, 100m);
         f.Emitir();
-        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()));
+        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()), DateTime.UtcNow);
 
         var act = () => f.AdicionarItem("Y", 1, 10m);
         act.Should().Throw<RegraDeDominioVioladaException>();
@@ -214,7 +214,7 @@ public class FaturaTests
         f.AdicionarItem("Mensalidade", 1, 100m);
         f.Emitir();
 
-        f.MarcarVencidaSeAplicavel();
+        f.MarcarVencidaSeAplicavel(DateTime.UtcNow);
         f.Status.Should().Be(StatusFatura.Vencida);
     }
 
@@ -232,10 +232,37 @@ public class FaturaTests
             dataVencimento: DateTime.UtcNow.AddDays(-3));
         f.AdicionarItem("Mensalidade", 1, 100m);
         f.Emitir();
-        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()));
+        f.RegistrarPagamento(FaturaPagamento.CriarConfirmado(f.Id, "pix", 100m, "EfiPix", Guid.NewGuid()), DateTime.UtcNow);
 
-        f.MarcarVencidaSeAplicavel();
+        f.MarcarVencidaSeAplicavel(DateTime.UtcNow);
         f.Status.Should().Be(StatusFatura.Paga);
+    }
+
+    [Fact]
+    public void MarcarVencidaSeAplicavel_nao_vence_3h_cedo_no_fim_do_dia_BRT()
+    {
+        // #520: fatura vence no dia civil 2026-07-15 (Brasilia). As 21h BRT desse dia o relogio UTC
+        // ja marca 2026-07-16T00:00Z; com o antigo UtcNow.Date a fatura era marcada vencida 3h cedo.
+        var (faturado, emissor) = StubsDados();
+        var f = Fatura.Criar(
+            empresaId: Guid.NewGuid(),
+            numero: "2026-000520",
+            dadosFaturado: faturado,
+            dadosEmissor: emissor,
+            origem: OrigemFatura.Assinatura,
+            dataEmissao: new DateTime(2026, 7, 8, 12, 0, 0, DateTimeKind.Utc),
+            dataVencimento: new DateTime(2026, 7, 15, 12, 0, 0, DateTimeKind.Utc));
+        f.AdicionarItem("Mensalidade", 1, 100m);
+        f.Emitir();
+
+        // Ainda dia civil 15 em Brasilia (HojeInstanteUtc = 2026-07-15T00:00Z), mesmo que o relogio
+        // UTC ja seja 16T00:00Z (21h BRT do dia 15). NAO deve vencer.
+        f.MarcarVencidaSeAplicavel(new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc));
+        f.Status.Should().Be(StatusFatura.Emitida);
+
+        // Brasilia virou o dia 16 (00h BRT = 03h UTC). Agora sim vence.
+        f.MarcarVencidaSeAplicavel(new DateTime(2026, 7, 16, 0, 0, 0, DateTimeKind.Utc));
+        f.Status.Should().Be(StatusFatura.Vencida);
     }
 
     [Fact]
