@@ -14,6 +14,10 @@ internal static class IdempotencyKeyHelper
         "vendas",
         "movimentacoes",
         "estoque/estorno",
+        // #920: saida/entrada de estoque mutam saldo (e criam venda/movimentacao); sem o header
+        // Idempotency-Key o double-submit debita/credita 2x. Espelha estoque/estorno ja protegido.
+        "estoque/saida",
+        "estoque/entrada",
     };
 
     public static string? AutoGenerateIfApplicable(string path)
