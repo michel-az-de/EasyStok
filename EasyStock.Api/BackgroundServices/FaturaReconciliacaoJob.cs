@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Data;
@@ -193,7 +194,8 @@ public sealed class FaturaReconciliacaoJob(
                                 : $"{pag.Observacao}\nConfirmado via reconciliacao (webhook perdido).";
 
                             // Recalcula Status da fatura com o pagamento agora confirmado.
-                            fatura.AtualizarStatusPorPagamentos();
+                            // #520: dia civil de Brasilia (instante UTC) para nao vencer 3h cedo.
+                            fatura.AtualizarStatusPorPagamentos(HorarioBrasil.HojeInstanteUtc());
 
                             db.FaturaEventos.Add(FaturaEvento.Criar(
                                 fatura.Id,

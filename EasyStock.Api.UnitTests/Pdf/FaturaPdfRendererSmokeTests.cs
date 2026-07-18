@@ -45,7 +45,7 @@ public class FaturaPdfRendererSmokeTests
 
         var pag = FaturaPagamento.CriarConfirmado(
             f.Id, "pix", 100m, "EfiPix", f.EmpresaId, gatewayTransactionId: "TX12345");
-        f.RegistrarPagamento(pag);
+        f.RegistrarPagamento(pag, DateTime.UtcNow);
         return f;
     }
 
