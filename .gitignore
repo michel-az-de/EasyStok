@@ -20,6 +20,9 @@ appsettings.*.local.json
 **/C\357\200\272Users*
 **/*claude-projects*tool-results*pr-sizes.json
 
+# Uploads de runtime da Api (banners etc.) — dados locais, nunca versionar
+EasyStock.Api/uploaded-files/
+
 # Node / Tailwind build artifacts (gerados em build, não versionados)
 node_modules/
 **/wwwroot/css/tailwind.dist.css
