@@ -24,10 +24,11 @@ public class PedidoJsonContractTests
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         ok.StatusCode.Should().Be(200);
+        // issue 962: trava Excedente=0m no contrato JSON (pedido sem overpay).
         ok.Value.Should().BeEquivalentTo(new
         {
             success = true,
-            pedido = new { Id = "p1", Status = "pronto", Pendente = 60m, Quitado = false }
+            pedido = new { Id = "p1", Status = "pronto", Pendente = 60m, Quitado = false, Excedente = 0m }
         });
     }
 

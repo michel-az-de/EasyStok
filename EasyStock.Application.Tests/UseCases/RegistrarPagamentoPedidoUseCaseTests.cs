@@ -138,6 +138,78 @@ public class RegistrarPagamentoPedidoUseCaseTests
         pedido.Pagamentos.Should().ContainSingle();
     }
 
+    // issue 962 (BUG-002 do QA): o guard client-side do cockpit e' sobre dado carregado --
+    // uma aba stale repete o superpagamento acidental. O servidor agora rejeita overpay
+    // salvo quando o CALLER sinaliza PermitirExcedente=true (Detail.cshtml, onde o aviso
+    // de gorjeta/arredondamento ja existe). Preserva #607 sem reverter a permissividade.
+
+    [Fact]
+    public async Task Pagamento_acima_do_pendente_e_rejeitado_sem_a_flag()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+
+        var act = () => UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 150m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        pedido.Pagamentos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Pagamento_acima_do_pendente_e_aceito_com_a_flag()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+
+        var result = await UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 150m, PermitirExcedente: true));
+
+        result.Should().NotBeNull();
+        pedido.TotalPago.Should().Be(150m);
+    }
+
+    [Fact]
+    public async Task Pagamento_exatamente_igual_ao_pendente_nao_e_bloqueado_mesmo_sem_a_flag()
+    {
+        // Fronteira: valor == pendente nao e excedente, entao nao deveria exigir a flag.
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+
+        var result = await UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 100m));
+
+        result.Should().NotBeNull();
+        pedido.TotalPago.Should().Be(100m);
+    }
+
+    [Fact]
+    public async Task Segundo_pagamento_em_pedido_ja_quitado_e_rejeitado_sem_a_flag()
+    {
+        // Reproduz o cenario exato do QA: pedido "Thatiane" (R$299,40) ja quitado recebe
+        // uma segunda tentativa de pagamento pelo cockpit (sem a flag) -- deve ser
+        // rejeitada, fechando o vetor de aba stale que o Include (#959) sozinho nao cobre.
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        pedido.Itens.Clear();
+        pedido.Itens.Add(new PedidoItem
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Item",
+            Quantidade = 1, PrecoUnitario = 299.40m, Subtotal = 299.40m, CriadoEm = DateTime.UtcNow
+        });
+        pedido.RecalcularTotal();
+        pedido.Pagamentos.Add(new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 299.40m, PagoEm = DateTime.UtcNow
+        });
+
+        var act = () => UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 299.40m));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        pedido.Pagamentos.Should().ContainSingle("o segundo pagamento nao pode ter sido persistido");
+    }
+
     [Fact]
     public async Task Nao_reexecuta_o_retry_padrao_com_guid_novo_por_tentativa()
     {

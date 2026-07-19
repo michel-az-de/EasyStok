@@ -42,4 +42,31 @@ public class PedidoRowDtoTests
         dto.Quitado.Should().BeTrue();
         dto.Pendente.Should().Be(0m);
     }
+
+    // issue 962 (BUG-002 do QA): números reais do relatório — pedido "Thatiane" total
+    // R$299,40 recebeu R$598,80 (pago em dobro pelo cockpit). Excedente expõe o valor
+    // pago acima do total sem mexer no clamp de Pendente (que corretamente vai a zero).
+    [Fact]
+    public void Excedente_quando_pago_acima_do_total()
+    {
+        var dto = PedidoRowDto.From(new Pedido
+        {
+            Id = "p", Status = "entregue", Total = 299.40m, TotalPago = 598.80m
+        });
+
+        dto.Excedente.Should().Be(299.40m);
+        dto.Pendente.Should().Be(0m);
+        dto.Quitado.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Excedente_zero_quando_nao_ha_overpay()
+    {
+        var dto = PedidoRowDto.From(new Pedido
+        {
+            Id = "p", Status = "pronto", Total = 100m, TotalPago = 40m
+        });
+
+        dto.Excedente.Should().Be(0m);
+    }
 }

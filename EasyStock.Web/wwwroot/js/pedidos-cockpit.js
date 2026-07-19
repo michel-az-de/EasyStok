@@ -122,6 +122,9 @@
       payText: function (p) {
         if (p.status === 'cancelado') return p.totalPago > 0 ? ('Pago · ' + money(p.totalPago)) : 'Sem cobrança';
         if (p.total === 0) return 'Sem cobrança'; // issue 689 / BUG-008b: total R$0 não é "Pendente"
+        // issue 962 (BUG-002 do QA): excedente deliberado (#607) fica visivel na listagem,
+        // nao so no Detail -- "Quitado" sozinho escondia que foi pago em dobro.
+        if (p.quitado && p.excedente > 0) return 'Quitado · +' + money(p.excedente);
         if (p.quitado) return 'Quitado';
         if (p.totalPago > 0) return 'Parcial · ' + money(p.totalPago);
         if (p.status === 'entregue') return 'Verificar';
