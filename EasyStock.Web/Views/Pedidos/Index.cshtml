@@ -217,7 +217,8 @@
                         <td class="col-num">@p.ItensCount</td>
                         <td class="col-num"><span class="ped-total" x-text="money(p.total)">@p.Total.AsMoney()</span></td>
                         <td>
-                            <span class="stp stp--sm" :class="payClass(p)"><span class="stp-dot"></span><span x-text="payText(p)">@(p.Quitado ? "Quitado" : "Pendente")</span></span>
+                            @* issue 962: fallback SSR (pre-hidratacao) espelha payText(p) do JS -- inclusive o excedente, senao o no-JS diverge do hidratado. *@
+                            <span class="stp stp--sm" :class="payClass(p)"><span class="stp-dot"></span><span x-text="payText(p)">@(p.Quitado && p.TemExcedente ? $"Quitado · +{p.Excedente.AsMoney()}" : p.Quitado ? "Quitado" : "Pendente")</span></span>
                         </td>
                         <td class="ped-data">
                             <div>@p.CriadoEm.ParaBrasilia().AsDateTime()</div>

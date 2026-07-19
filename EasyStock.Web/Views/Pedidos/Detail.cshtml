@@ -249,6 +249,13 @@ else
                 else if (p.Quitado)
                 {
                     <span class="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✓ Quitado</span>
+                    @* issue 962 (BUG-002 do QA): excedente deliberado (#607, gorjeta/arredondamento)
+                       fica visivel em vez de sumir atras de "Falta R$ 0,00" (Pendente clampa em zero). *@
+                    if (p.TemExcedente)
+                    {
+                        <span class="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full ml-1"
+                              title="Pago acima do total (gorjeta/arredondamento).">+@p.Excedente.AsMoney()</span>
+                    }
                 }
                 else if (p.TotalPago > 0)
                 {
@@ -270,10 +277,22 @@ else
                         <span class="text-slate-500">Pago</span>
                         <span class="font-semibold text-slate-900 ml-1 tabular-nums">@p.TotalPago.AsMoney()</span>
                     </div>
-                    <div>
-                        <span class="text-slate-500">Falta</span>
-                        <span class="font-semibold ml-1 tabular-nums @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.AsMoney()</span>
-                    </div>
+                    @if (p.TemExcedente)
+                    {
+                        @* issue 962: "Falta R$ 0,00" era a mentira literal do BUG-002 -- o pedido
+                           estava pago em dobro. Mostra o excedente em vez de esconder atras do clamp. *@
+                        <div>
+                            <span class="text-slate-500">Excedente</span>
+                            <span class="font-semibold ml-1 tabular-nums text-blue-700">+@p.Excedente.AsMoney()</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <span class="text-slate-500">Falta</span>
+                            <span class="font-semibold ml-1 tabular-nums @(p.Pendente > 0 ? "text-amber-800" : "text-green-700")">@p.Pendente.AsMoney()</span>
+                        </div>
+                    }
                 </div>
             }
             else if (p.TotalPago > 0)

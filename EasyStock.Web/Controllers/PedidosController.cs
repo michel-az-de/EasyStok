@@ -343,7 +343,11 @@ public class PedidosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddPagamento(string id, string metodo, decimal valor, string? referencia, string? observacao)
     {
-        var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao);
+        // issue 962: o Detail e' a UNICA superficie que mostra o aviso de excedente
+        // (gorjeta/arredondamento, ver Detail.cshtml) antes do submit -- por isso e' a
+        // unica que pode sinalizar permitirExcedente=true. O cockpit (AddPagamentoJson)
+        // continua com o bloqueio duro.
+        var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao, permitirExcedente: true);
         if (HasError(result))
         {
             Toast("error", result.ErrorMessage ?? "Não foi possível registrar o pagamento. Confira os dados e tente de novo.");

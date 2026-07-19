@@ -136,8 +136,13 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
     public Task<ApiResult<bool>> RemoverItemAsync(string id, string itemId) =>
         api.DeleteAsync($"pedidos/{id}/itens/{itemId}?empresaId={GetEmpresaId()}");
 
+    // issue 962: permitirExcedente=true SOMENTE quando o caller ja mostrou o aviso de
+    // gorjeta/arredondamento (Detail.cshtml). O cockpit chama com o default false --
+    // mantem o bloqueio duro la, onde o valor costuma vir pre-preenchido de uma listagem
+    // que pode estar desatualizada e o risco de fat-finger no balcao e maior.
     public Task<ApiResult<Pedido>> RegistrarPagamentoAsync(string id,
-        string metodo, decimal valor, string? referencia, string? observacao)
+        string metodo, decimal valor, string? referencia, string? observacao,
+        bool permitirExcedente = false)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
@@ -145,7 +150,7 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
         return api.PostAsync<Pedido>($"pedidos/{id}/pagamentos", new
         {
             empresaId, pedidoId,
-            metodo, valor, referencia, observacao, origem = "web"
+            metodo, valor, referencia, observacao, origem = "web", permitirExcedente
         });
     }
 

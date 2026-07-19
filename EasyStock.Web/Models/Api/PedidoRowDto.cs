@@ -23,6 +23,11 @@ public sealed record PedidoRowDto(
     bool IsScheduled,
     bool IsAtrasado)
 {
+    // issue 962: membro do CORPO (não da lista posicional) — mudar a aridade do
+    // construtor quebraria PedidoJsonContractTests e o seed que constrói PedidoRowDto
+    // diretamente. System.Text.Json serializa propriedades do corpo normalmente.
+    public decimal Excedente => Math.Max(0m, TotalPago - Total);
+
     public static PedidoRowDto From(Pedido p) => new(
         p.Id, p.Status, p.ClienteNome, p.ClienteApt, p.ClienteTelefone,
         p.Total, p.TotalPago, p.Pendente, p.Quitado, p.ItensCount,

@@ -13,7 +13,13 @@ public sealed record RegistrarPagamentoPedidoCommand(
     string? Observacao = null,
     Guid? RegistradoPorUserId = null,
     [property: MaxLength(120)] string? RegistradoPorNome = null,
-    [property: MaxLength(20)] string? Origem = "web");
+    [property: MaxLength(20)] string? Origem = "web",
+    // issue 962 (BUG-002 do QA): overpay continua permitido por decisao de produto (#607 --
+    // gorjeta/arredondamento), mas so quando o CALLER sinaliza explicitamente que mostrou o
+    // aviso. Hoje so o Detail.cshtml (onde o aviso de excedente ja existe) envia true; o
+    // cockpit NAO envia -- mantem o bloqueio duro la, onde o risco de fat-finger e maior e o
+    // valor costuma vir pre-preenchido de uma listagem que pode estar desatualizada.
+    bool PermitirExcedente = false);
 
 public class RegistrarPagamentoPedidoUseCase(
     IPedidoRepository repo,
@@ -55,6 +61,18 @@ public class RegistrarPagamentoPedidoUseCase(
         {
             throw new UseCaseValidationException(
                 "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
+        }
+
+        // issue 962 (BUG-002 do QA): o guard client-side do cockpit e' sobre dado carregado —
+        // uma aba stale (lista rec-carregada, pagamento feito em outra tela) repete o
+        // superpagamento acidental, e o servidor aceitava por design (#607) sem distinguir
+        // deliberado de acidental. Overpay so passa com PermitirExcedente=true, enviado
+        // SOMENTE pelo Detail.cshtml (onde o aviso de gorjeta/arredondamento ja existe).
+        var pendente = Math.Max(0m, pedido.Total.Valor - pedido.TotalPago);
+        if (cmd.Valor > pendente && !cmd.PermitirExcedente)
+        {
+            throw new UseCaseValidationException(
+                $"Valor do pagamento ({cmd.Valor.ToString("C", Cultura.PtBr)}) excede o pendente ({pendente.ToString("C", Cultura.PtBr)}).");
         }
 
         // issue 951: todo o restante roda numa transacao explicita (SemRetry — pag/evento tem

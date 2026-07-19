@@ -32,6 +32,12 @@ public record Pedido
     // #689/BUG-008b: pedido com total R$0 não tem cobrança. Sem isto caía em "Pendente"
     // (porque Quitado exige Total>0) exibindo "Pendente / Falta R$0,00" — contraditório.
     public bool SemCobranca => Total == 0m;
+    // issue 962 (BUG-002 do QA): overpay deliberado (#607) ficava invisível — Pendente
+    // clampa em zero, então "Falta R$ 0,00" escondia um pedido pago em dobro. Excedente
+    // expõe o valor pago acima do total sem mexer no clamp de Pendente (que está correto
+    // — "falta" nunca é negativo).
+    public decimal Excedente => Math.Max(0m, TotalPago - Total);
+    public bool TemExcedente => Excedente > 0m;
 }
 
 public record PedidoDetalhe
