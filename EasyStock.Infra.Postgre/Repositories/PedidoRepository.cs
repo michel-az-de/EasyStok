@@ -25,8 +25,16 @@ namespace EasyStock.Infra.Postgre.Repositories
             DateTime? desde = null, DateTime? ate = null,
             string? search = null, string? sort = "criadoem", string? order = "desc")
         {
+            // issue 958 (BUG-003+002 do QA): sem este Include, Pedido.TotalPago (computed
+            // property que soma a colecao Pagamentos em memoria) sempre le 0 aqui — a listagem
+            // mostra "Pendente" enquanto o detalhe (GetByIdWithDetailsAsync, com o Include
+            // correto) mostra "Quitado". Em cascata, o cockpit calcula "pendente" = total cheio
+            // e o guard client-side libera um segundo pagamento integral em pedido ja quitado.
+            // UseQuerySplittingBehavior(SplitQuery) ja e global — vira +1 roundtrip, sem
+            // produto cartesiano; lista capada em 200 (ListarPedidosUseCase.Math.Clamp).
             var query = db.Pedidos.AsNoTracking()
                 .Include(p => p.Itens)
+                .Include(p => p.Pagamentos)
                 .Where(p => p.EmpresaId == empresaId);
 
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(p => p.Status == status);

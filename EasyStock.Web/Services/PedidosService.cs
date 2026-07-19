@@ -26,7 +26,10 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
         string? status = null, Guid? clienteId = null,
         DateTime? desde = null, DateTime? ate = null, string? search = null, string? sort = null)
     {
-        var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=500";
+        // issue 958: pedia 500, mas ListarPedidosUseCase clampa em 200 (Math.Clamp) — o
+        // excedente era truncado silenciosamente, sem erro nem sinal pro cockpit/KDS.
+        // Alinhado ao cap real ate a listagem virar paginacao server-side de verdade.
+        var qs = $"pedidos?empresaId={GetEmpresaId()}&page=1&pageSize=200";
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
         if (clienteId.HasValue && clienteId.Value != Guid.Empty) qs += $"&clienteId={clienteId}";
         if (desde.HasValue) qs += $"&desde={Uri.EscapeDataString(desde.Value.ToString("o"))}";
