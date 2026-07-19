@@ -27,7 +27,10 @@ public class AlterarAgendamentoPedidoUseCase(
         if (agendado.HasValue && agendado.Value <= DateTime.UtcNow)
             throw new UseCaseValidationException("Data agendada precisa ser no futuro.");
 
-        var pedido = await pedidoRepo.GetByIdAsync(cmd.EmpresaId, cmd.PedidoId);
+        // issue 958: era GetByIdAsync (sem Include de Itens/Pagamentos) — o unico dos 14
+        // call-sites de CriarPedidoUseCase.Map() sem details, entao o PATCH de agendamento
+        // respondia totalPago=0 e itensCount=0 pro caller.
+        var pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
         if (pedido == null) return null;
 
         if (pedido.Status == "entregue" || pedido.Status == "cancelado")

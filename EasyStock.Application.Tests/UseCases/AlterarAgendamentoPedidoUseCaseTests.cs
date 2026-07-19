@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Application.Tests.UseCases;
 
+// issue 958: AlterarAgendamentoPedidoUseCase trocou GetByIdAsync por GetByIdWithDetailsAsync
+// (era o único dos 14 call-sites de Map() sem Itens/Pagamentos) -- os mocks abaixo precisam
+// configurar o metodo que o use case REALMENTE chama, senao NSubstitute devolve default(Pedido?)
+// = null e todo teste falha com "pedido nao encontrado" mesmo com o pedido setado.
 public class AlterarAgendamentoPedidoUseCaseTests
 {
     private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
@@ -17,7 +21,7 @@ public class AlterarAgendamentoPedidoUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         var novaData = DateTime.UtcNow.AddHours(3);
         var result = await Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(
@@ -37,7 +41,7 @@ public class AlterarAgendamentoPedidoUseCaseTests
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
         pedido.AgendadoParaEm = DateTime.UtcNow.AddHours(5);
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         var result = await Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(
             empresaId, pedido.Id, AgendadoParaEm: null));
@@ -72,7 +76,7 @@ public class AlterarAgendamentoPedidoUseCaseTests
         pedido.MudarStatus(Domain.Sales.StatusPedido.Preparando);
         pedido.MudarStatus(Domain.Sales.StatusPedido.Pronto);
         pedido.MudarStatus(Domain.Sales.StatusPedido.Entregue);
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         var act = () => Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(
             empresaId, pedido.Id, DateTime.UtcNow.AddHours(2)));
@@ -87,7 +91,7 @@ public class AlterarAgendamentoPedidoUseCaseTests
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
         pedido.Cancelar();
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         var act = () => Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(
             empresaId, pedido.Id, DateTime.UtcNow.AddHours(2)));
@@ -101,7 +105,7 @@ public class AlterarAgendamentoPedidoUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var pedidoId = Guid.NewGuid();
-        _pedidoRepo.GetByIdAsync(empresaId, pedidoId).Returns((Pedido?)null);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedidoId).Returns((Pedido?)null);
 
         var result = await Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(
             empresaId, pedidoId, DateTime.UtcNow.AddHours(1)));
@@ -118,7 +122,7 @@ public class AlterarAgendamentoPedidoUseCaseTests
         // (espelha o fix do CriarPedido — antes este path reintroduzia o bug).
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
-        _pedidoRepo.GetByIdAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         var futuroSemFuso = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(1), DateTimeKind.Unspecified);
         await Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(empresaId, pedido.Id, futuroSemFuso));
