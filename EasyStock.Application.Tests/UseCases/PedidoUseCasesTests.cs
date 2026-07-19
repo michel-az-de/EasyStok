@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Application.UseCases.RemoverItemPedido;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,17 @@ public class PedidoUseCasesTests
     private readonly IItemEstoqueRepository _itemEstoqueRepo = Substitute.For<IItemEstoqueRepository>();
     private readonly IMovimentacaoEstoqueRepository _movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    public PedidoUseCasesTests()
+    {
+        // issue 951: RegistrarPagamentoPedidoUseCase passou a rodar dentro de
+        // uow.ExecuteInTransactionSemRetryAsync (flush isolado da abertura automática de
+        // caixa). NSubstitute não invoca o lambda de um método genérico não configurado —
+        // sem isto o corpo da transação nunca roda e os asserts de TotalPago/evento ficam
+        // falso-negativos (mesmo pitfall documentado em EasyStock.TestHelpers.FakeUnitOfWork).
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<PedidoResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<PedidoResult>>>()(ci.Arg<CancellationToken>()));
+    }
 
     // Service real com repos de estoque mockados (sealed -> não mockável direto);
     // permite asserir movimentações de estoque emitidas pelos use cases (#939).

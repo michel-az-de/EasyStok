@@ -153,12 +153,16 @@ public class GlobalExceptionHandler(
                 false),
 
             // Postgres unique constraint violation (23505) — duplicação detectada
-            // só na hora do INSERT (corrida de 2 requests). Mapear pra 409.
-            DbUpdateException dbex when IsUniqueViolation(dbex) => (
+            // só na hora do INSERT (corrida de 2 requests). Mapear pra 409. issue 951 (BUG-006
+            // do QA): antes o texto "SKU, email, documento" era fixo pra QUALQUER unique
+            // violation — inclusive a de abertura automática de caixa, que não tem nenhuma
+            // relação com cadastro e confundia o operador. Agora desembrulha ConstraintName
+            // (Npgsql já inclui no PostgresException) e usa mensagem específica quando conhecida.
+            DbUpdateException dbex when TryGetUniqueViolationConstraint(dbex, out var constraintName) => (
                 StatusCodes.Status409Conflict,
                 "DUPLICATE_RESOURCE",
                 "Registro duplicado",
-                "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
+                MapDuplicateMessage(constraintName),
                 false),
 
             // Exceções de domínio (todas herdam de RegraDeDominioVioladaException - case genérico)
@@ -229,16 +233,33 @@ public class GlobalExceptionHandler(
             ? ex.Message
             : Regex.Replace(ex.Message, @"\s*\(Parameter '[^']*'\)\s*$", string.Empty);
 
-    private static bool IsUniqueViolation(DbUpdateException ex)
+    private static bool TryGetUniqueViolationConstraint(DbUpdateException ex, out string? constraintName)
     {
         var inner = ex.InnerException;
         while (inner is not null)
         {
-            if (inner is Npgsql.PostgresException pg && pg.SqlState == "23505") return true;
+            if (inner is Npgsql.PostgresException pg && pg.SqlState == "23505")
+            {
+                constraintName = pg.ConstraintName;
+                return true;
+            }
             inner = inner.InnerException;
         }
+        constraintName = null;
         return false;
     }
+
+    // issue 951 (BUG-006 do QA): mensagens específicas por constraint conhecida. O fallback
+    // genérico ("SKU, email, documento") só faz sentido pra unicidade de cadastro — não pra
+    // qualquer 23505 que aparecer no futuro. Adicionar aqui quando um novo caso confundir o
+    // operador (grep pelo nome do índice nos logs — TrySaveSystemErrorLogAsync já registra a
+    // mensagem original do Postgres, que inclui o ConstraintName).
+    private static string MapDuplicateMessage(string? constraintName) => constraintName switch
+    {
+        "ix_movimentos_caixa_abertura_unica" =>
+            "O caixa deste dia/loja já foi aberto por outra operação. Recarregue a tela antes de tentar de novo.",
+        _ => "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
+    };
 
     private static async Task TrySaveSystemErrorLogAsync(
         IServiceProvider services,

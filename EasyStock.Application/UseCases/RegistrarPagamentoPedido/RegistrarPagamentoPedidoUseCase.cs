@@ -26,7 +26,7 @@ public class RegistrarPagamentoPedidoUseCase(
         "pix", "dinheiro", "credito", "debito", "transferencia", "outro"
     };
 
-    public async Task<PedidoResult?> ExecuteAsync(RegistrarPagamentoPedidoCommand cmd)
+    public async Task<PedidoResult?> ExecuteAsync(RegistrarPagamentoPedidoCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
@@ -57,57 +57,75 @@ public class RegistrarPagamentoPedidoUseCase(
                 "Não é possível registrar pagamento: o pedido ainda não foi confirmado/aprovado.");
         }
 
-        var pag = new PedidoPagamento
+        // issue 951: todo o restante roda numa transacao explicita (SemRetry — pag/evento tem
+        // Guid.NewGuid() fresco; retry reexecutaria o lambda e duplicaria, mesma classe do #952).
+        // A transacao explicita e o que permite o flush ISOLADO da abertura automatica logo
+        // abaixo: se ela colidir com a unique parcial, so aquele SaveChanges e revertido (EF Core
+        // cria savepoint automatico a cada SaveChanges dentro de uma tx ja em andamento) — o
+        // pagamento, commitado no flush ANTERIOR, permanece de pe ate o commit final da tx.
+        return await uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
-            Id = Guid.NewGuid(),
-            PedidoId = pedido.Id,
-            Metodo = metodo,
-            Valor = cmd.Valor,
-            Referencia = cmd.Referencia,
-            Observacao = cmd.Observacao,
-            PagoEm = DateTime.UtcNow,
-            RegistradoPorUserId = cmd.RegistradoPorUserId,
-            RegistradoPorNome = cmd.RegistradoPorNome
-        };
+            var pag = new PedidoPagamento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Metodo = metodo,
+                Valor = cmd.Valor,
+                Referencia = cmd.Referencia,
+                Observacao = cmd.Observacao,
+                PagoEm = DateTime.UtcNow,
+                RegistradoPorUserId = cmd.RegistradoPorUserId,
+                RegistradoPorNome = cmd.RegistradoPorNome
+            };
 
-        await repo.AddPagamentoAsync(pag);
-        pedido.Pagamentos.Add(pag);
+            await repo.AddPagamentoAsync(pag);
+            pedido.Pagamentos.Add(pag);
 
-        await repo.AddEventoAsync(new PedidoEvento
-        {
-            Id = Guid.NewGuid(),
-            PedidoId = pedido.Id,
-            Tipo = "pagamento",
-            UsuarioId = cmd.RegistradoPorUserId,
-            UsuarioNome = cmd.RegistradoPorNome,
-            Origem = cmd.Origem,
-            OcorridoEm = DateTime.UtcNow,
-            Detalhes = $"+{pag.Valor.ToString("C", Cultura.PtBr)} via {metodo}"
-        });
+            await repo.AddEventoAsync(new PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Tipo = "pagamento",
+                UsuarioId = cmd.RegistradoPorUserId,
+                UsuarioNome = cmd.RegistradoPorNome,
+                Origem = cmd.Origem,
+                OcorridoEm = DateTime.UtcNow,
+                Detalhes = $"+{pag.Valor.ToString("C", Cultura.PtBr)} via {metodo}"
+            });
 
-        await TentarAbrirCaixaAsync(cmd, pedido, pag.PagoEm);
+            // Flush do pagamento+evento ANTES da tentativa de abertura (ver comentario acima
+            // sobre savepoint automatico) — e o que garante que a abertura nunca pode derrubar
+            // o pagamento, mesmo que colida com a unique.
+            await uow.CommitAsync();
 
-        await uow.CommitAsync();
+            await TentarAbrirCaixaAsync(cmd, pedido, pag.PagoEm, token);
 
-        logger.LogInformation("Pedido {Id}: pagamento {Valor} {Metodo} (TotalPago={TotalPago}/{Total}).",
-            pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
-        return CriarPedidoUseCase.Map(pedido);
+            logger.LogInformation("Pedido {Id}: pagamento {Valor} {Metodo} (TotalPago={TotalPago}/{Total}).",
+                pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
+            return CriarPedidoUseCase.Map(pedido);
+        }, ct);
     }
 
-    private async Task TentarAbrirCaixaAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm)
+    private async Task TentarAbrirCaixaAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm, CancellationToken ct)
     {
         // Caixa segue Pedido: ao receber o primeiro pagamento do dia, abrimos o caixa
         // automaticamente para evitar divergência "pedidos pagos mas caixa zerado".
         //
-        // Best-effort: qualquer falha aqui não pode derrubar o pagamento. Race condition
-        // entre TXs paralelas é mitigada pelo UNIQUE INDEX parcial em movimentos_caixa
-        // (migration 20260516010000_UniqueAberturaCaixaPorDia) — quem perde a corrida
-        // recebe unique_violation, capturado abaixo.
+        // Best-effort de verdade: o pagamento já foi commitado no flush anterior (ver
+        // ExecuteAsync) antes deste método rodar, então NENHUMA falha aqui — esperada
+        // (corrida perdida) ou não — pode derrubá-lo. TryAddMovimentoAsync trata a corrida
+        // como caso normal (retorna false); o catch abaixo é so para falhas inesperadas
+        // (timeout, conexão, etc.) que não devem propagar como 500 pro operador.
         if (caixaRepo is null) return;
 
         try
         {
-            var data = DateOnly.FromDateTime(pagoEm);
+            // issue 951: dia OPERACIONAL de Brasília (não dia civil UTC) — a unique parcial
+            // (ix_movimentos_caixa_abertura_unica) agrupa por caixa_abertura_utc_day (UTC-3).
+            // DateOnly.FromDateTime(pagoEm) divergia do índice exatamente na janela 21h-24h
+            // BRT: o pagamento via dia N+1 (UTC), a abertura existente do dia N (BRT) não
+            // era vista, uma segunda abertura era tentada, e ela colidia com a primeira.
+            var data = HorarioBrasil.DataOperacional(pagoEm);
 
             // Não reabre caixa fechado (replica regra de AbrirCaixaUseCase). Pagamentos
             // retroativos em dia fechado ficam apenas como PedidoPagamento; aparecem
@@ -127,14 +145,21 @@ public class RegistrarPagamentoPedidoUseCase(
             abertura.RegistradoPorUserId = cmd.RegistradoPorUserId;
             abertura.RegistradoPorNome = string.IsNullOrWhiteSpace(cmd.RegistradoPorNome) ? "Sistema" : cmd.RegistradoPorNome;
             abertura.Origem = "auto-pagamento";
-            await caixaRepo.AddMovimentoAsync(abertura);
-            logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
+
+            var criada = await caixaRepo.TryAddMovimentoAsync(abertura, ct);
+            if (criada)
+                logger.LogInformation("Caixa aberto automaticamente em {Data} por pagamento de pedido {PedidoId}.", data, pedido.Id);
+            else
+                logger.LogInformation(
+                    "Abertura de caixa em {Data} já existe (corrida perdida contra outra transação); pagamento de pedido {PedidoId} já persistido.",
+                    data, pedido.Id);
         }
         catch (Exception ex)
         {
-            // Não propagar: pagamento já foi adicionado ao UoW. Se a abertura falhar
-            // (race, constraint, timeout), o pagamento deve persistir mesmo assim.
-            logger.LogWarning(ex, "Falha ao abrir caixa automaticamente para pedido {PedidoId}. Pagamento prossegue.", pedido.Id);
+            // Falha inesperada (nao a corrida esperada — essa TryAddMovimentoAsync ja
+            // absorve retornando false). Nao propagar: o pagamento ja foi commitado antes
+            // desta chamada.
+            logger.LogWarning(ex, "Falha inesperada ao abrir caixa automaticamente para pedido {PedidoId}. Pagamento já persistido.", pedido.Id);
         }
     }
 }

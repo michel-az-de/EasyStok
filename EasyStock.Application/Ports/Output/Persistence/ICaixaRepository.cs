@@ -43,6 +43,21 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddMovimentoAsync(MovimentoCaixa movimento);
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 
+        /// <summary>
+        /// Tenta inserir o movimento; se colidir com <c>ix_movimentos_caixa_abertura_unica</c>
+        /// (corrida perdida — outra transação já abriu o caixa do dia/loja), retorna
+        /// <see langword="false"/> sem lançar, e a entidade é destrackeada. Qualquer OUTRA
+        /// falha de persistência propaga normalmente (issue 951: mesmo padrão de
+        /// <c>VagaOcupadaRepository.OcuparDentroDeTxAsync</c> para <c>uq_vaga_ativa_por_pedido</c>
+        /// — uma constraint única simples não precisa de advisory lock, o próprio índice
+        /// serializa; só checagens de threshold/contagem precisam).
+        /// <para>Precisa rodar dentro de uma transação explícita já em andamento: o EF Core
+        /// cria um savepoint automático antes deste <c>SaveChanges</c> quando há uma transação
+        /// ambiente — se este flush falhar, só ele é revertido; mudanças já persistidas antes
+        /// na mesma transação (ex.: o pagamento) permanecem íntegras até o commit final.</para>
+        /// </summary>
+        Task<bool> TryAddMovimentoAsync(MovimentoCaixa movimento, CancellationToken ct = default);
+
         // ── Fechamentos ───────────────────────────────────────────
         Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
 
