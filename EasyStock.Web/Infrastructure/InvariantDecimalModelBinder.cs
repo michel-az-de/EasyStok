@@ -34,7 +34,12 @@ public sealed class InvariantDecimalModelBinder : IModelBinder
 
         // BUG-003: pt-BR usa vírgula decimal. Com NumberStyles.Any + InvariantCulture a vírgula
         // virava separador de MILHAR ("1000,50" -> 100050 = inflação de 1000x). Normalizamos antes
-        // de parsear, espelhando o parseDecimal do JS do form (o último separador é o decimal).
+        // de parsear, seguindo a mesma convenção do parseDecimalBR do JS do form (o último
+        // separador é o decimal) -- MAS os dois divergem de propósito no caso multi-ponto sem
+        // vírgula (ex.: "14.297.77"): o parseFloat do JS aceita silenciosamente e trunca no
+        // primeiro ponto extra (14.297), enquanto aqui NumberStyles.AllowDecimalPoint (sem
+        // AllowThousands) REJEITA com erro de ModelState. É intencional (issue 960/BUG-004):
+        // "consertar" uma entrada ambígua em silêncio seria pior que falhar alto e explícito.
         var normalizado = NormalizarDecimalPtBr(value);
         if (decimal.TryParse(normalizado, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out var result))

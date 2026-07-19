@@ -34,6 +34,7 @@ public class InvariantDecimalModelBinderTests
     [InlineData("10,5", "10.5")]
     [InlineData("1.234,56", "1234.56")]  // ponto de milhar + vírgula decimal
     [InlineData("1,234.56", "1234.56")]  // formato US (vírgula de milhar + ponto decimal)
+    [InlineData("1.234.567,89", "1234567.89")] // múltiplos pontos de milhar + vírgula decimal
     public async Task Parseia_virgula_decimal_ptBR(string raw, string esperado)
     {
         var ctx = await BindAsync(raw);
@@ -53,6 +54,13 @@ public class InvariantDecimalModelBinderTests
     [Theory]
     [InlineData("abc")]
     [InlineData("R$ 10")]
+    // issue 960 (BUG-004 do QA): "14.297.77" é o valor exato reportado pelo QA (campo
+    // pré-preenchido "14.29" + digitar "7,77" sem apagar, ANTES do fix do locale.js).
+    // Multi-ponto sem vírgula não tem separador de milhar declarado — rejeitar é a
+    // escolha certa (aceitar seria "consertar" entrada ambígua em silêncio); antes
+    // desta issue nenhum teste cobria o caso multi-ponto.
+    [InlineData("14.297.77")]
+    [InlineData("1.2.3")]
     public async Task Rejeita_invalido(string raw)
     {
         var ctx = await BindAsync(raw);

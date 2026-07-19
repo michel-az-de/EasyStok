@@ -132,7 +132,7 @@
                         @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
                         <input asp-for="Valor" type="text" inputmode="decimal"
                                x-model.number="valorUnit"
-                               x-on:input="calcularTotal()"
+                               x-on:input="valorTocado = true; calcularTotal()"
                                placeholder="R$ 0,00"
                                class="ui-field w-full text-sm" />
                     </div>
@@ -346,6 +346,11 @@ function saidaForm() {
         estoqueAtual: 0,
         qty: 1,
         valorUnit: null,
+        // issue 960 (BUG-004): protege o valor digitado pelo usuario contra a
+        // resposta assincrona de _setProdutoDetalhe sobrescrever incondicionalmente
+        // valorUnit. Resetada em selecionarProduto() -- trocar de produto DEVE
+        // trazer o preco-base novo; a flag so protege a corrida do init().
+        valorTocado: false,
         loading: false,
         _debounce: null,
 
@@ -394,7 +399,10 @@ function saidaForm() {
             if (this.variacoes.length > 0 && this.variacoes[0].quantidadeEmEstoque !== undefined) {
                 this.estoqueAtual = this.variacoes[0].quantidadeEmEstoque;
             }
-            this.valorUnit = d.precoReferencia || d.custoReferencia || null;
+            // issue 960: so aplica o preco-base se o usuario ainda nao mexeu no
+            // campo -- senao a resposta assincrona do produto (init()/selecionarProduto())
+            // sobrescreve o valor ja digitado.
+            if (!this.valorTocado) this.valorUnit = d.precoReferencia || d.custoReferencia || null;
             this.produtoFotoUrl = d.fotoUrl || '';
             this.produtoMarca = d.marca || '';
             this.produtoCodigoBarras = d.codigoBarras || '';
@@ -499,6 +507,9 @@ function saidaForm() {
             this.estoqueAtual = 0;
             this.varId = '';
             this.margemEstimada = null;
+            // issue 960: trocar de produto deve trazer o preco-base do produto NOVO,
+            // mesmo que o usuario tivesse digitado um valor pro produto anterior.
+            this.valorTocado = false;
             try {
                 const dr = await esFetch('/estoque/produto-detalhe/' + p.id);
                 if (dr.ok) {
