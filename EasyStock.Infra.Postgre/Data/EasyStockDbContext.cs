@@ -379,6 +379,16 @@ namespace EasyStock.Infra.Postgre.Data
             Func<CancellationToken, Task<T>> action,
             CancellationToken ct = default)
         {
+            // Composicao de use cases (doc do IUnitOfWork): se ja existe uma transacao
+            // explicita em andamento, o CALLER externo e o dono dela (ex.: um pagamento
+            // registrado dentro de FinalizarVendaBalcaoUseCase, que ja abriu sua propria
+            // ExecuteInTransactionSemRetryAsync) — reusa em vez de tentar abrir uma segunda,
+            // que o Npgsql rejeita com "already in a transaction" (issue 951, achado ao rodar
+            // a integracao contra Postgres real). Mesmo padrao de
+            // VagaOcupadaRepository.OcuparAsync. O commit/rollback fica com quem abriu.
+            if (Database.CurrentTransaction is not null)
+                return action(ct);
+
             // issue 822: blocos nao-reexecutaveis (venda balcao compoe creates com Guids
             // novos). A SemRetryExecutionStrategy HERDA de ExecutionStrategy (a base seta a
             // suspensao que os SaveChanges internos respeitam) com MaxRetryCount=0 —

@@ -100,6 +100,40 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
         public Task UpdateMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Update(m); return Task.CompletedTask; }
 
+        // issue 951: flush isolado da abertura automatica, dentro da tx explicita aberta pelo
+        // caller (RegistrarPagamentoPedidoUseCase). Se colidir com a unique parcial por dia/loja
+        // (corrida perdida), o EF Core reverte SO este SaveChanges via savepoint automatico —
+        // o pagamento, ja commitado num flush anterior na MESMA tx, permanece de pe. Mesmo
+        // padrao de VagaOcupadaRepository para uq_vaga_ativa_por_pedido: constraint unica simples
+        // nao precisa de advisory lock, o proprio indice serializa.
+        public async Task<bool> TryAddMovimentoAsync(MovimentoCaixa m, CancellationToken ct = default)
+        {
+            db.MovimentosCaixa.Add(m);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return true;
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex, "ix_movimentos_caixa_abertura_unica"))
+            {
+                db.Entry(m).State = EntityState.Detached;
+                return false;
+            }
+        }
+
+        private static bool IsUniqueViolation(DbUpdateException ex, string constraintName)
+        {
+            var inner = ex.InnerException;
+            while (inner is not null)
+            {
+                if (inner is Npgsql.PostgresException pg && pg.SqlState == "23505"
+                    && string.Equals(pg.ConstraintName, constraintName, StringComparison.Ordinal))
+                    return true;
+                inner = inner.InnerException;
+            }
+            return false;
+        }
+
         public Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null) =>
             db.FechamentosCaixa.FirstOrDefaultAsync(f =>
                 f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);
