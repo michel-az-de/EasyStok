@@ -36,7 +36,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default);
         /// <param name="fefo">true = FEFO (saída pelo lote com validade mais próxima); false = FIFO (saída pela entrada mais antiga).</param>
-        Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true);
+        /// <param name="incluirVencidos">
+        /// false (padrão) = exclui lotes com <c>ValidadeEm</c> vencido (#983) — evita que uma
+        /// venda comum derrube a transação inteira por causa de um lote vencido no meio do FEFO.
+        /// true = inclui vencidos; usar apenas quando o caller vai dar baixa neles (natureza que
+        /// satisfaz <see cref="Domain.Enums.NaturezaMovimentacaoEstoqueExtensions.PermiteBaixaDeLoteVencido"/>).
+        /// </param>
+        Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false);
         Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId);
         Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId);
         Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id);
