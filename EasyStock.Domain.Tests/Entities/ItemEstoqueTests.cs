@@ -154,6 +154,54 @@ public class ItemEstoqueTests
         item.Status.Should().Be(StatusItemEstoque.Vencido);
     }
 
+    [Fact]
+    public void Nao_deve_permitir_saida_de_lote_vencido_por_padrao()
+    {
+        // #983 (regressao): lote vencido continua bloqueado quando permitirVencido
+        // nao e informado (default false) — nao e uma regressao de seguranca introduzir
+        // o novo parametro, o guard segue valendo pra Venda e demais naturezas comuns.
+        var item = CriarItem(status: StatusItemEstoque.Ok, validade: Validade.From(new DateTime(2026, 4, 1)));
+
+        Action act = () => item.RegistrarSaida(Quantidade.From(1), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        act.Should().Throw<ItemEstoqueVencidoException>();
+    }
+
+    [Fact]
+    public void Deve_permitir_saida_de_lote_vencido_quando_permitirVencido_true()
+    {
+        // #983 (D2): naturezas de baixa/descarte (ex.: Perda) furam o guard de vencido.
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 5, validade: Validade.From(new DateTime(2026, 4, 1)));
+
+        item.RegistrarSaida(Quantidade.From(5), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow, permitirVencido: true);
+
+        item.QuantidadeAtual.Value.Should().Be(0);
+    }
+
+    [Fact]
+    public void Saida_de_lote_bloqueado_continua_barrada_mesmo_com_permitirVencido_true()
+    {
+        // permitirVencido fura APENAS o guard de vencido — Bloqueado segue absoluto.
+        var item = CriarItem(status: StatusItemEstoque.Bloqueado, validade: Validade.From(new DateTime(2026, 4, 1)));
+
+        Action act = () => item.RegistrarSaida(Quantidade.From(1), new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc), DateTime.UtcNow, permitirVencido: true);
+
+        act.Should().Throw<ItemEstoqueBloqueadoException>();
+    }
+
+    [Fact]
+    public void Saida_nao_vence_3h_cedo_no_fim_do_dia_BRT()
+    {
+        // #983: lote com ValidadeEm=14/06 ainda e vendavel as 22h BRT do proprio dia 14
+        // (= 2026-06-15T01:00:00Z). Com UtcNow.Date cru isso venceria 3h cedo (espelha
+        // FaturaTests.MarcarVencidaSeAplicavel_nao_vence_3h_cedo_no_fim_do_dia_BRT).
+        var item = CriarItem(status: StatusItemEstoque.Ok, quantidadeAtual: 5, validade: Validade.From(new DateTime(2026, 6, 14)));
+
+        item.RegistrarSaida(Quantidade.From(1), new DateTime(2026, 6, 15, 1, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
+
+        item.QuantidadeAtual.Value.Should().Be(4);
+    }
+
     private static ItemEstoque CriarItem(StatusItemEstoque status, int quantidadeAtual = 10, Validade? validade = null) =>
         new()
         {

@@ -476,4 +476,78 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         totalVazio.Should().Be(0);
         vazio.Should().BeEmpty();
     }
+
+    [SkippableFact]
+    public async Task GetLotesDisponiveisParaSaidaAsync_por_padrao_exclui_lote_vencido()
+    {
+        // #983 (D1): antes do fix, a query FEFO ordenava o lote vencido ANTES do valido
+        // (ValidadeEm mais antigo primeiro) sem filtrar — o caller batia nele primeiro e
+        // a saida inteira caia com ItemEstoqueVencidoException, mesmo havendo saldo valido
+        // suficiente. Por padrao (incluirVencidos=false) o vencido nao deve nem aparecer.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
+
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Vencido", Documento = "111", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Perecivel", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.Add(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Queijo Fresco",
+            Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow
+        });
+
+        var idValido = Guid.NewGuid();
+        context.ItensEstoque.AddRange(
+            // Vencido ha 5 dias — ValidadeEm mais antigo, viria primeiro no FEFO se nao filtrado
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(10),
+                QuantidadeAtual = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(-5)),
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = DateTime.UtcNow.AddDays(-10),
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            },
+            // Valido, vence em 30 dias
+            new ItemEstoque
+            {
+                Id = idValido,
+                EmpresaId = empresaId,
+                ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(8),
+                QuantidadeAtual = Quantidade.From(8),
+                CustoUnitario = Dinheiro.FromDecimal(10m),
+                ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(30)),
+                Status = StatusItemEstoque.Ok,
+                EntradaEm = DateTime.UtcNow.AddDays(-1),
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            });
+
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+
+        var padrao = await repository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null);
+        padrao.Should().ContainSingle().Which.Id.Should().Be(idValido);
+
+        var comVencido = await repository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, incluirVencidos: true);
+        comVencido.Should().HaveCount(2, "incluirVencidos=true e usado pelas naturezas de baixa/descarte (#983)");
+    }
 }

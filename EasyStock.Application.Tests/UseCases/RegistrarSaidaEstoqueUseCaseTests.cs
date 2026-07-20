@@ -658,6 +658,207 @@ public class RegistrarSaidaEstoqueUseCaseTests
         await unitOfWork.DidNotReceive().CommitAsync();
     }
 
+    // #983 (D1): pelo FEFO/ProdutoId (sem ItemEstoqueId direto), o repositorio corrigido
+    // ja exclui lotes vencidos do resultado quando incluirVencidos=false — o mock aqui
+    // modela esse contrato pos-fix. Antes do fix, um lote vencido na frente da lista
+    // FEFO derrubava a venda inteira com ItemEstoqueVencidoException mesmo havendo saldo
+    // valido suficiente; agora a venda consome so o lote valido.
+    [Fact]
+    public async Task Venda_por_produto_consome_so_o_lote_valido_quando_ha_lote_vencido_no_mesmo_produto()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var vendaRepository = Substitute.For<IVendaRepository>();
+        var itemVendaRepository = Substitute.For<IItemVendaRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        var empresaId = Guid.NewGuid();
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Status = StatusProduto.Ativo
+        };
+
+        var loteValido = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(10),
+            QuantidadeInicial = Quantidade.From(10),
+            CustoUnitario = Dinheiro.FromDecimal(250m),
+            Status = StatusItemEstoque.Ok,
+            EntradaEm = new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc),
+            ValidadeEm = Validade.From(new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc))
+        };
+
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        // Repositorio pos-fix: incluirVencidos=false (Venda nao permite baixa de vencido)
+        // ja retorna so o lote valido — o lote vencido nem chega no use case.
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null, Arg.Any<bool>(), incluirVencidos: false)
+            .Returns([loteValido]);
+        movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, produto.Id, Arg.Any<DateTime>(), Arg.Any<DateTime>())
+            .Returns(0m);
+
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        var useCase = new RegistrarSaidaEstoqueUseCase(
+            produtoRepository,
+            itemRepository,
+            vendaRepository,
+            itemVendaRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>());
+
+        var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+            empresaId,
+            [new RegistrarSaidaEstoqueItemCommand(produto.Id, null, 4, 399.90m, "Venda com lote vencido no meio")],
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 3, 12, 5, 0, DateTimeKind.Utc),
+            null,
+            null,
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            null));
+
+        result.Itens.Should().ContainSingle().Which.ItemEstoqueId.Should().Be(loteValido.Id);
+        await itemRepository.Received(1).GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null, Arg.Any<bool>(), incluirVencidos: false);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
+    // #983 (D2): natureza Perda fura o guard de vencido — bloqueio absoluto derrubava
+    // qualquer tentativa de dar baixa/descarte num lote 100% vencido.
+    [Fact]
+    public async Task Perda_sobre_lote_100_por_cento_vencido_tem_sucesso()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var vendaRepository = Substitute.For<IVendaRepository>();
+        var itemVendaRepository = Substitute.For<IItemVendaRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        var empresaId = Guid.NewGuid();
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Status = StatusProduto.Ativo
+        };
+
+        var loteVencido = new ItemEstoque
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            ProdutoId = produto.Id,
+            QuantidadeAtual = Quantidade.From(3),
+            QuantidadeInicial = Quantidade.From(3),
+            CustoUnitario = Dinheiro.FromDecimal(250m),
+            Status = StatusItemEstoque.Ok,
+            EntradaEm = new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+            ValidadeEm = Validade.From(new DateTime(2026, 4, 2, 0, 0, 0, DateTimeKind.Utc))
+        };
+
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        // Perda pede incluirVencidos=true — repositorio devolve o lote vencido.
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null, Arg.Any<bool>(), incluirVencidos: true)
+            .Returns([loteVencido]);
+        movimentacaoRepository.GetTaxaSaidaDiariaAsync(empresaId, produto.Id, Arg.Any<DateTime>(), Arg.Any<DateTime>())
+            .Returns(0m);
+
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        var useCase = new RegistrarSaidaEstoqueUseCase(
+            produtoRepository,
+            itemRepository,
+            vendaRepository,
+            itemVendaRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>());
+
+        var result = await useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+            empresaId,
+            [new RegistrarSaidaEstoqueItemCommand(produto.Id, null, 3, 0m, "Descarte de lote vencido")],
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 3, 12, 5, 0, DateTimeKind.Utc),
+            null,
+            null,
+            NaturezaMovimentacaoEstoque.Perda,
+            CanalVenda.LojaPropria,
+            null));
+
+        result.Itens.Should().ContainSingle().Which.QuantidadeRestante.Should().Be(0);
+        await itemRepository.Received(1).GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null, Arg.Any<bool>(), incluirVencidos: true);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
+    // #983 (D3): quando so resta lote vencido e a natureza NAO permite baixa de vencido,
+    // "disponivel" deve excluir esse lote (repositorio pos-fix ja devolve lista vazia) —
+    // erro correto e EstoqueInsuficienteException, nao mais ItemEstoqueVencidoException
+    // depois de somar erroneamente a quantidade de um lote que nunca seria vendido.
+    [Fact]
+    public async Task Venda_sem_lote_valido_quando_so_resta_vencido_falha_por_estoque_insuficiente()
+    {
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var itemRepository = Substitute.For<IItemEstoqueRepository>();
+        var vendaRepository = Substitute.For<IVendaRepository>();
+        var itemVendaRepository = Substitute.For<IItemVendaRepository>();
+        var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        var empresaId = Guid.NewGuid();
+
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(),
+            EmpresaId = empresaId,
+            Nome = "Galaxy Buds FE",
+            Status = StatusProduto.Ativo
+        };
+
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        // Repositorio pos-fix: so havia lote vencido, incluirVencidos=false filtra tudo.
+        itemRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, produto.Id, null, Arg.Any<bool>(), incluirVencidos: false)
+            .Returns(Array.Empty<ItemEstoque>());
+
+        var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
+        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        var useCase = new RegistrarSaidaEstoqueUseCase(
+            produtoRepository,
+            itemRepository,
+            vendaRepository,
+            itemVendaRepository,
+            movimentacaoRepository,
+            unitOfWork,
+            logger,
+            publicadorEventos: Substitute.For<IPublicadorEventos>());
+
+        var act = () => useCase.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
+            empresaId,
+            [new RegistrarSaidaEstoqueItemCommand(produto.Id, null, 1, 399.90m, "Venda sem saldo valido")],
+            new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 4, 3, 12, 5, 0, DateTimeKind.Utc),
+            null,
+            null,
+            NaturezaMovimentacaoEstoque.Venda,
+            CanalVenda.MercadoLivre,
+            null));
+
+        await act.Should().ThrowAsync<EstoqueInsuficienteException>();
+        await vendaRepository.DidNotReceive().InsertAsync(Arg.Any<Venda>());
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+
     [Fact]
     public async Task Nao_deve_persistir_venda_parcial_quando_segundo_item_falha()
     {
