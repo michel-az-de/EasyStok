@@ -38,4 +38,25 @@ internal static class UnitOfWorkMockExtensions
             });
         return uow;
     }
+
+    /// <summary>
+    /// Espelha <see cref="SetupExecuteInTransaction{T}"/> para o caminho SEM retry
+    /// (issue 952): use cases que criam Guids novos no corpo nao podem ser re-executados
+    /// pelo IExecutionStrategy — o retry duplicava a venda. Quem migrou para
+    /// ExecuteInTransactionSemRetryAsync precisa deste setup, senao o Substitute
+    /// devolve default(T) sem invocar a action e o teste falha com NullReference.
+    /// </summary>
+    public static IUnitOfWork SetupExecuteInTransactionSemRetry<T>(this IUnitOfWork uow)
+    {
+        uow.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<T>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var action = call.Arg<Func<CancellationToken, Task<T>>>();
+                var ct = call.Arg<CancellationToken>();
+                return action(ct);
+            });
+        return uow;
+    }
 }
