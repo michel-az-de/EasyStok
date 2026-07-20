@@ -487,7 +487,12 @@ html.theme-dark .badge-slow {
     padding: 7px 12px;
     font-size: 13px;
     font-weight: 450;
-    color: #64748B;
+    /* issue 970: era #64748B, que reprova WCAG AA nos DOIS temas para texto normal
+       (13px/450 exige 4.5:1): 3.07:1 sobre o topo do gradiente claro (#1E293B),
+       3.75:1 sobre a base (#0F172A), 3.78:1 sobre o navy-900 do tema escuro.
+       #94A3B8 da 5.71:1 e ~7.0:1 — e ja e o valor usado nos favoritos logo abaixo,
+       entao a sidebar passa a ter uma escala de cinza coerente em vez de duas. */
+    color: #94A3B8;
     border-radius: 8px;
     text-decoration: none;
     transition: background .16s ease, color .16s ease;
@@ -554,7 +559,9 @@ html.theme-dark .badge-slow {
     margin-bottom: 4px;
     border-bottom: 1px solid rgba(255, 255, 255, .05);
 }
-.es-fav .es-ni { font-weight: 600; color: #94A3B8; }
+/* Cor herdada de .es-ni desde a issue 970 (os dois valores convergiram no #94A3B8
+   AA-safe). A hierarquia do favorito passa a ser o peso, nao uma segunda cor. */
+.es-fav .es-ni { font-weight: 600; }
 .es-fav .es-ni-row:hover .es-ni { color: #E2E8F0; }
 
 /* Grupos (accordion via <details>/<summary>) */
