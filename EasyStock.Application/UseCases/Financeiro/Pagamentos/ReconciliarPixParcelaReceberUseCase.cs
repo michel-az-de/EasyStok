@@ -91,7 +91,7 @@ public class ReconciliarPixParcelaReceberUseCase(
                 conta.EmpresaId, TipoLadoFinanceiro.Receber,
                 aplicado, "pix", DataUtc.ParaUtc(pagoEm),
                 "EfiPix", cmd.Txid, "Reconciliado via Pix Efi");
-            parcela.RegistrarPagamento(pagamento);
+            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
             var mov = MovimentoCaixa.Criar(
                 conta.EmpresaId, "entrada", aplicado,
