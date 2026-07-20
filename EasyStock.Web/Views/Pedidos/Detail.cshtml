@@ -54,7 +54,10 @@
     var progressoPagamento = p.Total > 0 ? Math.Min(100, (int)Math.Round((double)(p.TotalPago / p.Total) * 100)) : 0;
 }
 
-<div class="flex items-center gap-3 mb-4">
+@* issue 977: flex-wrap nos dois niveis. Ate 7 controles podiam coexistir numa linha
+   unica ao lado de um h1 de 24px — em 320-375px isso esmagava ou estourava. A
+   listagem (Pedidos/Index) e o Caixa ja tinham wrap; este header era o outlier. *@
+<div class="flex flex-wrap items-center gap-3 mb-4">
     <a asp-action="Index" asp-controller="Pedidos" class="text-slate-400 hover:text-slate-600" aria-label="Voltar para pedidos">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -62,7 +65,7 @@
     </a>
     <h1 class="text-2xl font-bold text-slate-900">@(p.ClienteNome ?? "Pedido")</h1>
     <span id="ped-status-badge" class="badge @statusInfo.BadgeClass">@statusInfo.Label</span>
-    <div class="ml-auto flex gap-2">
+    <div class="ml-auto flex flex-wrap gap-2">
         <a href="/pedidos/@p.Id/recibo" target="_blank" rel="noopener noreferrer" class="btn-outline-dark">
             🖨 Recibo
         </a>
