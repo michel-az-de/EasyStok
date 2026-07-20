@@ -152,11 +152,17 @@
                         <span x-show="natureza === 'venda'">Valor unitário (R$) <span class="text-red-500">*</span></span>
                         <span x-show="natureza === 'prejuizo'" x-cloak>Custo perdido por unidade (R$, opcional)</span>
                     </label>
-                    @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
-                    <input type="text" inputmode="decimal" x-model.number="valor"
-                           placeholder="0,00"
+                    @* issue 986: mesmo par display/canonico de Saidas/Nova. Aqui o envio e JSON,
+                       nao FormData, entao o hidden nao existe pelo binder — existe para que os
+                       DOIS campos de saida se comportem igual. Antes divergiam: placeholder sem
+                       R$, classes inline em vez de .ui-field, e nenhuma mascara. *@
+                    <input type="text" inputmode="decimal" id="saida-modal-valor-display"
+                           data-mask="money" data-money-target="saida-modal-valor"
+                           x-effect="window.EasyMasks && window.EasyMasks.setMoney($el, valor)"
+                           placeholder="R$ 0,00"
                            :class="natureza === 'venda' && semPreco ? 'border-amber-400 focus:ring-amber-300' : 'border-slate-300 dark:border-slate-600 focus:ring-indigo-300'"
                            class="w-full px-3 py-2 dark:bg-slate-800 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 border" />
+                    <input type="hidden" id="saida-modal-valor" x-model.number="valor" />
                     <p x-show="natureza === 'venda' && semPreco" x-cloak
                        class="text-xs text-amber-600 mt-1">
                         Produto sem preço cadastrado. Informe o valor de venda para calcular a receita.
