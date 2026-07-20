@@ -911,9 +911,14 @@
         /* !important para sobrescrever o atributo HTML `hidden` no _Layout.cshtml. */
         display: flex !important;
     }
-    /* Esconde o app principal abaixo de 320px (split-screen casos extremos). */
-    body > div.flex.h-screen {
-        opacity: 0;
-        pointer-events: none;
+    /* Esconde o app principal abaixo de 320px (split-screen casos extremos).
+       issue 977: era `body > div.flex.h-screen` + `opacity:0; pointer-events:none`.
+       Dois problemas: (1) o seletor dependia de classes utilitarias, entao trocar
+       `h-screen` por `min-h-dvh` quebraria o gate em silencio — agora ancora em
+       [data-app-root]; (2) `pointer-events:none` bloqueia mouse mas NAO teclado nem
+       leitor de tela, dando para tabular pra dentro do app invisivel atras de um
+       overlay aria-live. `display:none` tira da arvore de acessibilidade. */
+    body > [data-app-root] {
+        display: none;
     }
 }

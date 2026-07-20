@@ -4304,6 +4304,11 @@ html.theme-dark .ped-add-item:hover {
     background: var(--bg-elevated, #ffffff);
     border: 1px solid rgba(226, 232, 240, .85);
     border-radius: 14px;
+    /* issue 977: os steps sao flex-shrink:0 com label nowrap, entao os 4 estados
+       ("Recebido/Em preparo/Pronto/Entregue") estouravam o container abaixo de ~340px.
+       Rolar preserva a leitura do stepper; espremer ou quebrar destruiria. */
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 
 html.theme-dark .ped-timeline {
