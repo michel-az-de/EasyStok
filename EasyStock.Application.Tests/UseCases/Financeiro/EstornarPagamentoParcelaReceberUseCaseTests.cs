@@ -32,7 +32,7 @@ public class EstornarPagamentoParcelaReceberUseCaseTests
         parcela.ContaReceber = conta;
 
         var pag = PagamentoParcela.CriarConfirmado(Empresa, TipoLadoFinanceiro.Receber, 100m, "pix", DateTime.UtcNow);
-        parcela.RegistrarPagamento(pag);
+        parcela.RegistrarPagamento(pag, DateTime.UtcNow);
         conta.AtualizarStatusPorParcelas(); // -> Paga
 
         MovimentoCaixa? mov = null;

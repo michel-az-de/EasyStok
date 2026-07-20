@@ -51,7 +51,7 @@ public class EstornarPagamentoParcelaPagarUseCase(
                 }
             }
 
-            parcela.AtualizarStatusPorPagamentos();
+            parcela.AtualizarStatusPorPagamentos(HorarioBrasil.HojeInstanteUtc());
             conta.AtualizarStatusPorParcelas();
 
             await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaPagar(
@@ -122,7 +122,7 @@ public class EstornarPagamentoParcelaReceberUseCase(
                 }
             }
 
-            parcela.AtualizarStatusPorPagamentos();
+            parcela.AtualizarStatusPorPagamentos(HorarioBrasil.HojeInstanteUtc());
             conta.AtualizarStatusPorParcelas();
 
             await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
