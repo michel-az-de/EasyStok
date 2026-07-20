@@ -287,7 +287,12 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     // ValidadeEm=null em ambos, o tie-break por EntradaEm
                     // dentro do FromSqlRaw + FOR UPDATE nao sobrevive ao
                     // wrap externo da composicao com o filtro global do EF.
-                    ValidadeEm = Validade.From(entradaBase.AddMonths(2)),
+                    //
+                    // #983: relativas a DateTime.UtcNow (nao a entradaBase, fixo em
+                    // 2026-04-01) -- GetLotesDisponiveisParaSaidaAsync agora exclui
+                    // lote vencido por padrao, e uma data fixa no passado da execucao
+                    // do teste faria loteAntigo ser filtrado como vencido.
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddYears(1)),
                     Status = StatusItemEstoque.Ok,
                     EntradaEm = entradaBase,
                     UltimaMovimentacaoEm = entradaBase,
@@ -304,7 +309,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                     QuantidadeAtual = Quantidade.From(5),
                     QuantidadeMinima = 5,
                     CustoUnitario = Dinheiro.FromDecimal(255m),
-                    ValidadeEm = Validade.From(entradaBase.AddMonths(6)), // loteNovo: validade mais distante -> FEFO sai depois
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddYears(2)), // loteNovo: validade mais distante -> FEFO sai depois
                     Status = StatusItemEstoque.Ok,
                     EntradaEm = entradaBase.AddDays(2),
                     UltimaMovimentacaoEm = entradaBase.AddDays(2),
