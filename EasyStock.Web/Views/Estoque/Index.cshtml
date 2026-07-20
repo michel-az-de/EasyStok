@@ -211,17 +211,17 @@
         @if (Model.Itens.Any())
         {
             <div class="overflow-x-auto">
-            <table class="tbl-full">
+            <table class="tbl-full tbl-full--lg">
                 <thead>
                     <tr>
-                        <th class="sticky left-0 z-10 bg-white">Produto / Variação</th>
+                        <th class="tbl-sticky-start">Produto / Variação</th>
                         <th>SKU</th>
                         <th class="text-center">Qtd</th>
                         <th class="text-center hidden md:table-cell">Giro</th>
                         <th class="hidden md:table-cell">Último mov.</th>
                         <th>Validade</th>
                         <th class="text-center">Status</th>
-                        <th></th>
+                        <th class="tbl-sticky-end"><span class="sr-only">Ações</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -232,7 +232,7 @@
                             : (int?)null;
                         var velInt = (int)Math.Min(Math.Round(item.Vel * 5), 5);
                         <tr id="row-@item.Id">
-                            <td class="sticky left-0 z-10 bg-white">
+                            <td class="tbl-sticky-start">
                                 <div class="font-semibold text-slate-900">@(item.Produto?.Nome ?? item.Sku)</div>
                                 <div class="text-xs text-slate-400">
                                     @(item.Variacao?.Nome ?? "Padrão")
@@ -242,7 +242,7 @@
                                     }
                                 </div>
                             </td>
-                            <td class="font-mono text-xs text-slate-500">@item.Sku</td>
+                            <td class="tbl-cell-code font-mono text-xs text-slate-500" title="@item.Sku">@item.Sku</td>
                             <td class="text-center">
                                 <span class="font-bold text-lg @(item.Qty == 0 ? "text-red-600" : item.Qty < 5 ? "text-amber-600" : "text-slate-900")">
                                     @item.Qty
@@ -319,7 +319,7 @@
                                 }
                                 <span class="@sClass px-2 py-0.5 rounded-full text-xs font-semibold">@statusLabel</span>
                             </td>
-                            <td class="min-w-48 whitespace-nowrap">
+                            <td class="tbl-sticky-end min-w-48 whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="/entradas/reposicao?itemId=@item.Id"
                                        class="grid-action-btn grid-action-btn--ghost"
