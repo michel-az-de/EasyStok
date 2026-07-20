@@ -66,7 +66,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             // Saldo esperado do caixa: fonte ÚNICA (CaixaSaldoCalculator), a MESMA consumida
             // pela tela /caixa. Antes este bloco somava abertura+entrada-saída (+pagamentos) e
             // OMITIA as Vendas do período, divergindo do /caixa pelo total de vendas (BUG-1).
-            decimal saldoCaixa = (await caixaSaldo.CalcularAsync(empresaId, hojeBrt, lojaId)).SaldoEsperado;
+            // issue 988: guarda o breakdown inteiro em vez de so o escalar. Os componentes ja
+            // vinham calculados nesta MESMA chamada e eram descartados; o dashboard exibia um
+            // saldo que o lojista nao conseguia explicar.
+            var caixaBreakdown = await caixaSaldo.CalcularAsync(empresaId, hojeBrt, lojaId);
+            decimal saldoCaixa = caixaBreakdown.SaldoEsperado;
 
             // ── Pedidos ────────────────────────────────────────────────────
             // Entregues hoje (= vendas consolidadas do dia)
@@ -136,7 +140,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 pixValor,
                 onboardingCompleto,
                 categoriasCount,
-                entradasCount);
+                entradasCount,
+                caixaBreakdown.TotalVendas,
+                caixaBreakdown.TotalPagamentosPedidos);
 
             await SetCachedAsync(cacheKey, resumo, ResumoDiaTtl);
             return resumo;
