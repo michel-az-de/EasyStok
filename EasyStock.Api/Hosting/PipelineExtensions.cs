@@ -243,7 +243,13 @@ public static class PipelineExtensions
             // creditava o saldo 2x. A limpeza ampla das rotas mortas fica no epico #917 (Fase A).
             .Add("/api/estoque/saida")
             .Add("/api/estoque/entrada")
-            .Add("/api/mobile/calculadora/criar-compra"));
+            .Add("/api/mobile/calculadora/criar-compra")
+            // issue 917 Fase B: fecha o vetor de duplicata de pagamento (timeout no POST ->
+            // toast generico -> operador clica de novo). Prefixo largo (nao so .../pagamentos)
+            // porque o id do pedido fica NO MEIO do path e o matcher e' so-prefixo; cobre de
+            // quebra outras mutacoes de pedido contra double-submit, o que e' estritamente
+            // seguro (opt-in por header -- sem Idempotency-Key a rota segue como sempre).
+            .Add("/api/pedidos"));
         app.MapControllers();
 
         app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
