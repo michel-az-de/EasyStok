@@ -178,7 +178,8 @@ public class EstoqueController(
             Valor = req.Valor,
             DtVenda = data,
             Descricao = motivoNorm,
-            PermitirDescoberto = true
+            PermitirDescoberto = true,
+            IdempotencyKey = req.IdempotencyKey
         };
 
         var result = await saidasSvc.CriarAsync(saidaVm);

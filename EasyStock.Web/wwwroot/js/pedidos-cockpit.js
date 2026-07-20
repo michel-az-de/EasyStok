@@ -255,7 +255,10 @@
       openPay: function (id) {
         var it = this.items[id];
         if (!it) return;
-        this.pay = { open: true, id: id, metodo: 'pix', valor: (it.pendente || 0).toFixed(2), enviando: false };
+        // issue 917 Fase B: chave nasce aqui (abertura do popover = a intencao), nao no
+        // submit -- retry apos timeout/erro de rede reusa a MESMA chave em vez de gerar
+        // uma nova a cada tentativa (sem isso a idempotencia no servidor era ilusoria).
+        this.pay = { open: true, id: id, metodo: 'pix', valor: (it.pendente || 0).toFixed(2), enviando: false, idempotencyKey: crypto.randomUUID() };
         var self = this;
         this.$nextTick(function () { if (self.$refs.payValor) self.$refs.payValor.focus(); });
       },
@@ -280,7 +283,7 @@
         esFetch('/pedidos/' + id + '/pagamentos.json', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
-          body: JSON.stringify({ metodo: this.pay.metodo, valor: valor })
+          body: JSON.stringify({ metodo: this.pay.metodo, valor: valor, idempotencyKey: this.pay.idempotencyKey })
         }).then(function (res) {
           return res.json().catch(function () { return null; }).then(function (data) {
             if (!res.ok || !data || !data.success) {
@@ -293,8 +296,14 @@
             self.closePay();
           });
         }).catch(function () {
+          // issue 917: antes afirmava categoricamente "pagamento não registrado" — mas o
+          // POST pode ter completado no servidor e só a resposta se perdeu na rede (exatamente
+          // o cenario que motivou a chave estavel acima). Sem confirmacao, nao sabemos; a UI
+          // nao pode mentir pra nenhum dos dois lados. Reverte o otimista e forca reload pra
+          // pegar o estado real do servidor em vez de inventar um.
           Object.assign(it, snap);
-          toast('error', 'Sem conexão — pagamento não registrado.');
+          toast('error', 'Não foi possível confirmar se o pagamento foi registrado. Atualizando...');
+          setTimeout(function () { location.reload(); }, 1200);
         }).finally(function () { delete self._inflight[key]; self.pay.enviando = false; });
       },
 
