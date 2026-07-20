@@ -128,13 +128,22 @@
                 <!-- Valor e Data -->
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
-                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
-                        <input asp-for="Valor" type="text" inputmode="decimal"
-                               x-model.number="valorUnit"
-                               x-on:input="valorTocado = true; calcularTotal()"
+                        <label for="Valor-display" class="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
+                        @* issue 986: par display/canonico. O visivel e mascarado em centavos
+                           (caixa registradora) e NAO tem name — nunca e submetido. O hidden
+                           abaixo carrega o decimal invariante que o InvariantDecimalModelBinder
+                           espera; e ele que tem o name, que o FormData le e que o x-model observa.
+                           Mascarar direto o campo que submete mandaria "R$ 1.234,56" ao servidor,
+                           que o binder rejeita (parseia sem AllowCurrencySymbol).
+                           O x-effect reflete mudanca vinda de fora (preco-base assincrono, troca
+                           de produto) sem sobrescrever o que esta sendo digitado. *@
+                        <input type="text" inputmode="decimal" id="Valor-display"
+                               data-mask="money" data-money-target="Valor"
+                               x-on:input="valorTocado = true"
+                               x-effect="window.EasyMasks && window.EasyMasks.setMoney($el, valorUnit)"
                                placeholder="R$ 0,00"
                                class="ui-field w-full text-sm" />
+                        <input type="hidden" asp-for="Valor" x-model.number="valorUnit" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Data da saída *</label>

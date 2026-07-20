@@ -30,8 +30,17 @@
     return s.replace(',', '.');
   }
 
+  // issue 986: campo com mascara de moeda se governa sozinho — a entrada e em
+  // CENTAVOS e o separador e desenhado pela mascara, entao o usuario nunca digita
+  // ',' nem '.'. Deixar o listener global agir ali so introduziria um ponto que o
+  // onlyDigits() da mascara descartaria em seguida, alem de mover o cursor.
+  function temMascaraDeMoeda(t) {
+    return !!(t && t.dataset && t.dataset.mask === 'money');
+  }
+
   function ehCampoDecimal(t) {
     return t && t.tagName === 'INPUT' && t.type !== 'number' &&
+      !temMascaraDeMoeda(t) &&
       (t.inputMode === 'decimal' || t.inputMode === 'numeric');
   }
 
@@ -39,6 +48,7 @@
     if (e.key !== ',' && e.key !== 'Decimal') return;
     if (e.target.tagName !== 'INPUT') return;
     const t = e.target;
+    if (temMascaraDeMoeda(t)) return;   // issue 986 — ver comentario em ehCampoDecimal
     if (t.type !== 'number' && t.inputMode !== 'decimal' && t.inputMode !== 'numeric') return;
     e.preventDefault();
     if (t.type !== 'number') {
