@@ -70,9 +70,15 @@ public static class MenuDefinition
             // lista lotes de producao (em_producao/finalizado) — clicar o alerta caia em tela
             // vazia ("Nenhum lote"). Mesmo href ja usado no Dashboard (alerta de vencidos).
             // ActiveKeys mantem "Lotes" pra nao orfanizar o alias emitido pelo LotesController.
-            new MenuItem("lotes-validade", "Lotes e validade", "layers", "/estoque?status=vencido",
+            // issue 970: labels curtos porque o orcamento horizontal do label num item de
+            // grupo e ~123px (sidebar 240px menos padding do nav, indentacao, estrela,
+            // padding do item, icone e gap) — e cai para ~99px quando ha badge, que e o
+            // caso destes dois. "Lotes e validade" e "Posicao de estoque" truncavam
+            // sempre ("Lotes e vali...", "Posicao de e..."). O grupo ja se chama
+            // "Producao e estoque", entao o contexto nao se perde.
+            new MenuItem("lotes-validade", "Validade", "layers", "/estoque?status=vencido",
                 new[] { "Lotes", "LotesMobile" }, BadgeKey: BadgeLotesVencidos),
-            new MenuItem("posicao-estoque", "Posição de estoque", "clipboard-list", "/estoque",
+            new MenuItem("posicao-estoque", "Posição", "clipboard-list", "/estoque",
                 new[] { "Estoque" }, BadgeKey: BadgeProdutosCriticos),
             new MenuItem("entradas", "Entradas", "arrow-down-to-line", "/entradas/historico",
                 new[] { "Entradas" }),
