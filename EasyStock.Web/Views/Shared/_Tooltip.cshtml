@@ -7,12 +7,21 @@
 
     Para casos diretos basta adicionar data-tooltip em qualquer elemento existente:
     <button data-tooltip="Atalho: Ctrl+S">Salvar</button>
+
+    Variantes (issue 967), componiveis, para uso direto:
+      data-tooltip-wide          quebra linha + max-width 32ch. O default e nowrap, que so
+                                 serve a rotulo curto.
+      data-tooltip-pos="bottom"  abre para baixo. OBRIGATORIO dentro de wrapper com
+                                 overflow-x:auto — o overflow-y computado vira `auto` e o
+                                 tooltip clipa no topo do scroll container.
+
+    Este partial ja aplica `wide`: ele existe para ajuda contextual, que e sempre frase.
 *@
 @model dynamic
 @{
     var text = (string?)Model.Text ?? "";
     var content = (string?)(Model.Content) ?? "?";
 }
-<span class="ui-tooltip" tabindex="0" data-tooltip="@text" aria-label="@text" role="tooltip">
+<span class="ui-tooltip" tabindex="0" data-tooltip="@text" data-tooltip-wide aria-label="@text" role="tooltip">
     @Html.Raw(content)
 </span>
