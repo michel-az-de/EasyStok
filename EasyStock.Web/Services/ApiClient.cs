@@ -21,10 +21,13 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
         {
             var content = new StringContent(JsonSerializer.Serialize(body, JsonOpts), Encoding.UTF8, "application/json");
             using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content };
-            // Idempotencia: P0-3. Auto-gera UUID se path bate com whitelist conhecida
-            // ou se chamador explicitar uma chave. Server (whitelist em Program.cs)
-            // ignora chaves em paths nao-criticos.
-            var key = idempotencyKey ?? IdempotencyKeyHelper.AutoGenerateIfApplicable(path);
+            // Idempotencia: P0-3 + issue 917 Fase B. Prioriza a chave explicita do chamador
+            // (gerada no BROWSER, estavel entre retries da mesma intencao); cai no fallback
+            // por-request so quando o chamador nao mandou nada (string vazia/whitespace conta
+            // como "nao mandou" -- nao deixa a request sair sem header algum).
+            var key = !string.IsNullOrWhiteSpace(idempotencyKey)
+                ? idempotencyKey
+                : IdempotencyKeyHelper.AutoGenerateIfApplicable(path);
             if (!string.IsNullOrWhiteSpace(key))
                 request.Headers.TryAddWithoutValidation("Idempotency-Key", key);
             return await http.SendAsync(request);

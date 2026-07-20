@@ -498,8 +498,12 @@ else
                 {
                     <form asp-action="AddPagamento" asp-controller="Pedidos" asp-route-id="@p.Id" method="post"
                           class="ped-add-row" aria-label="Registrar pagamento"
-                          x-data="{ valor: @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) }">
+                          x-data="{ valor: @p.Pendente.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), idempotencyKey: crypto.randomUUID() }">
                         @Html.AntiForgeryToken()
+                        @* issue 917 Fase B: gerada uma vez na renderizacao do form (a intencao).
+                           Retry apos timeout do proprio browser (reenvio de form) reusa o mesmo
+                           valor; so um novo carregamento da pagina de Detail gera outro. *@
+                        <input type="hidden" name="idempotencyKey" x-model="idempotencyKey" />
                         <div class="flex items-baseline justify-between mb-2">
                             <div class="ped-add-row__title">Registrar pagamento</div>
                             <div class="flex gap-2">

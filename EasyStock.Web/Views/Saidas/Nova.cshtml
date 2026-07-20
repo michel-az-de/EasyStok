@@ -18,6 +18,10 @@
 <div class="max-w-5xl min-h-[calc(100vh-14rem)]" x-data="saidaForm()">
     <form asp-action="Criar" asp-controller="Saidas" method="post" x-on:submit.prevent="submitSaida()">
         @Html.AntiForgeryToken()
+        @* issue 917 Fase B: gerada uma vez no estado inicial de saidaForm() (abertura da
+           pagina = a intencao). FormData(form) em _executarSaida() a inclui automaticamente;
+           retry apos timeout reusa o MESMO valor -- so um novo carregamento de pagina gera outro. *@
+        <input type="hidden" name="IdempotencyKey" x-model="idempotencyKey" />
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- ══════ Left column: Form ══════ -->
@@ -353,6 +357,9 @@ function saidaForm() {
         valorTocado: false,
         loading: false,
         _debounce: null,
+        // issue 917 Fase B: uma chave por carregamento de pagina (a intencao), nao por
+        // tentativa de submit -- ver hidden input IdempotencyKey acima.
+        idempotencyKey: crypto.randomUUID(),
 
         // BUG-18: total e getter reativo (qty * valorUnit). Antes, calcularTotal() no handler de
         // input rodava com o qty anterior (ordem de evento x-model vs handler) e o total travava em 1x o valor.

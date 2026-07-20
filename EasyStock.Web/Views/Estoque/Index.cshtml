@@ -418,6 +418,7 @@
 
                 precoSugerido: null,
                 semPreco: false,
+                idempotencyKey: null,
 
                 openModal(id, nome, qty, precoSugerido) {
                     this.estoqueId = id;
@@ -431,6 +432,10 @@
                     this.erroMsg = '';
                     this.natureza = 'venda';
                     this.data = new Date().toLocaleDateString('en-CA');
+                    // issue 917 Fase B: chave nasce aqui, na abertura do modal (a intencao),
+                    // nao no submit -- retry apos timeout/erro reusa a MESMA chave em vez de
+                    // gerar uma nova a cada tentativa.
+                    this.idempotencyKey = crypto.randomUUID();
                     this.open = true;
                 },
 
@@ -490,7 +495,8 @@
                                 qty: this.qty,
                                 valor: (this.natureza === 'venda' || this.natureza === 'prejuizo') ? this.valor : null,
                                 motivo: (this.natureza === 'perda' || this.natureza === 'prejuizo') ? this.motivo.trim() : null,
-                                data: this.data
+                                data: this.data,
+                                idempotencyKey: this.idempotencyKey
                             })
                         });
                         if (r.ok) {
