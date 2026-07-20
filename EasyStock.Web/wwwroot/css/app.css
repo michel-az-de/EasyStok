@@ -753,6 +753,58 @@ html.es-rail .es-more { display: none; }
 }
 .tbl-full th.col-num { text-align: right; }
 
+/* ── Densidade de tabela: modificadores opt-in (issue 968) ──
+   Sem min-width, `.tbl-full` (width:100%) faz o browser COMPRIMIR as celulas para
+   caber, em vez de estourar e acionar o `overflow-x` do wrapper. O resultado e o
+   oposto do pretendido: conteudo quebrado em varias linhas e ultima coluna cortada
+   na borda. Consolida o padrao que ja foi inventado duas vezes de forma bespoke
+   (`.users-table-wrap` aqui embaixo, `.ped-table` em pedidos-cockpit.css).
+   Opt-in de proposito: tabela estreita (4 colunas) nao deve ganhar scroll. */
+.tbl-full--lg { min-width: 1080px; }
+
+/* Celula de codigo (SKU, EAN, chave): uma linha so, com ellipsis. Par obrigatorio no
+   markup: `title` com o valor completo, senao o truncamento esconde informacao. */
+.tbl-cell-code {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Colunas fixas nas bordas — acao primaria de linha nao deve depender de scroll.
+   O fundo OPACO nao e cosmetico: sem ele o conteudo das outras colunas passa por
+   baixo ao rolar. E `--ink-50` sozinho nao serve porque no tema escuro ele e
+   translucido (rgba(255,255,255,.05)) — dai o empilhamento sobre `--bg-surface`. */
+.tbl-full th.tbl-sticky-start,
+.tbl-full th.tbl-sticky-end {
+    position: sticky;
+    background: linear-gradient(var(--ink-50), var(--ink-50)), var(--bg-surface);
+    z-index: 11;
+}
+.tbl-full td.tbl-sticky-start,
+.tbl-full td.tbl-sticky-end {
+    position: sticky;
+    background: var(--bg-surface);
+    z-index: 10;
+}
+.tbl-full th.tbl-sticky-start,
+.tbl-full td.tbl-sticky-start {
+    left: 0;
+    box-shadow: 8px 0 8px -8px rgba(10, 21, 48, .18);
+}
+.tbl-full th.tbl-sticky-end,
+.tbl-full td.tbl-sticky-end {
+    right: 0;
+    box-shadow: -8px 0 8px -8px rgba(10, 21, 48, .18);
+}
+/* O hover generico (`tbody tr:hover td`) tem especificidade maior que as regras acima
+   e reintroduziria o `--ink-50` translucido no dark. Reafirma opaco no hover. */
+.tbl-full tbody tr:hover td.tbl-sticky-start,
+.tbl-full tbody tr:hover td.tbl-sticky-end {
+    background: linear-gradient(var(--ink-50), var(--ink-50)), var(--bg-surface);
+}
+
 .users-table-wrap .tbl-full {
     min-width: 980px;
 }
