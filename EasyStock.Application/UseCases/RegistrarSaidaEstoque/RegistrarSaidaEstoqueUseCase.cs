@@ -126,13 +126,22 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             // guard de lote vencido; as demais (Venda, Doacao, ...) seguem bloqueando.
             var permitirVencido = command.Natureza.PermiteBaixaDeLoteVencido();
 
-            // ExecuteInTransactionAsync usa IExecutionStrategy do Npgsql (retry
-            // compativel com EnableRetryOnFailure). FOR UPDATE adquirido em
-            // GetByIdComLockAsync/GetLotesDisponiveisParaSaidaAsync mantem o lock
-            // pessimistico ate o commit final do bloco — sem isso, EF abre
-            // transacao implicita so no SaveChanges e o lock libera ao fim do
-            // statement, abrindo race com requests concorrentes.
-            return await unitOfWork.ExecuteInTransactionAsync(async ct =>
+            // issue 952: ERA ExecuteInTransactionAsync (com retry via IExecutionStrategy do
+            // Npgsql). O racional antigo — "retry preserva o lock pessimistico (FOR UPDATE)
+            // ate o commit" — e verdadeiro mas incompleto: numa falha transitoria DEPOIS do
+            // SaveChanges interno (linha ~313) e ANTES do commit externo do wrapper, o retry
+            // reexecuta o delegate INTEIRO no MESMO DbContext, sem ChangeTracker.Clear. Duas
+            // consequencias: (a) Venda/ItemVenda/MovimentacaoEstoque desta tentativa, criadas
+            // com Guid.NewGuid, continuam Added no tracker e sao inseridas de novo junto com
+            // as da tentativa seguinte (venda duplicada); (b) GetByIdComLockAsync e
+            // GetLotesDisponiveisParaSaidaAsync sao queries TRACKED — o identity map devolve
+            // a MESMA instancia de ItemEstoque ja decrementada em memoria pela tentativa
+            // anterior, e a nova tentativa decrementa de novo (uma saida de N un baixa 2N).
+            // ExecuteInTransactionSemRetryAsync (issue 822, ja usado em FinalizarVendaBalcao
+            // pelo mesmo motivo) desarma o retry SEM abrir mao do lock: o FOR UPDATE continua
+            // valendo ate o commit, so que agora uma falha transitoria propaga ao caller
+            // (rollback automatico) em vez de reexecutar o bloco nao-idempotente.
+            return await unitOfWork.ExecuteInTransactionSemRetryAsync(async ct =>
             {
 
             var agora = DateTime.UtcNow;

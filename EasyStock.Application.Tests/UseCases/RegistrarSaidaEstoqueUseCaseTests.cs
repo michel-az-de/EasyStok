@@ -19,7 +19,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -62,7 +62,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             .Returns(0m);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -105,7 +105,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -134,7 +134,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             .Returns(0m);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -177,7 +177,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -216,7 +216,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item2.Id).Returns(item2);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -271,7 +271,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var empresaId = Guid.NewGuid();
         var produto = new Produto
@@ -298,7 +298,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -336,7 +336,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var empresaId = Guid.NewGuid();
         var produto = new Produto
@@ -363,7 +363,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -401,7 +401,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var empresaId = Guid.NewGuid();
         var produto = new Produto
@@ -440,7 +440,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -474,7 +474,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
 
         var produto = new Produto
         {
@@ -499,7 +499,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -538,7 +538,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -565,7 +565,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -602,7 +602,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -630,7 +630,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -672,7 +672,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -705,7 +705,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             .Returns(0m);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -743,7 +743,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -775,7 +775,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             .Returns(0m);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -815,7 +815,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -832,7 +832,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
             .Returns(Array.Empty<ItemEstoque>());
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -868,7 +868,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var empresaId = Guid.NewGuid();
 
         var produto = new Produto
@@ -908,7 +908,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), itemSemSaldo.Id).Returns(itemSemSaldo);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,
@@ -949,7 +949,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         var itemVendaRepository = Substitute.For<IItemVendaRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var publicadorEventos = Substitute.For<IPublicadorEventos>();
         var empresaId = Guid.NewGuid();
 
@@ -978,7 +978,7 @@ public class RegistrarSaidaEstoqueUseCaseTests
         itemRepository.GetByIdComLockAsync(Arg.Any<Guid>(), item.Id).Returns(item);
 
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
-        unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepository,
             itemRepository,

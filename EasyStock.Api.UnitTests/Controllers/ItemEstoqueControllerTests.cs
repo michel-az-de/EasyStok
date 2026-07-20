@@ -292,7 +292,7 @@ public class ItemEstoqueControllerTests
             CategoriaId = Guid.NewGuid()
         });
         _unitOfWork.CommitAsync().Returns(1);
-        _unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        _unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
 
         var result = await _controller.RegistrarSaida(command);
 
@@ -364,7 +364,7 @@ public class ItemEstoqueControllerTests
         });
         _movimentacaoEstoqueRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(0.2m);
         _unitOfWork.CommitAsync().Returns(1);
-        _unitOfWork.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        _unitOfWork.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
 
         var result = await _controller.RegistrarSaida(command);
 

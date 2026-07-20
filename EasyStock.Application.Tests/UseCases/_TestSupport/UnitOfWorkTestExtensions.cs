@@ -38,4 +38,24 @@ internal static class UnitOfWorkTestExtensions
                 return action(ct);
             });
     }
+
+    // issue 952: RegistrarSaidaEstoqueUseCase trocou ExecuteInTransactionAsync (com retry) por
+    // ExecuteInTransactionSemRetryAsync -- retry reexecutava o delegate no mesmo DbContext sem
+    // ChangeTracker.Clear, duplicando Venda/ItemVenda/MovimentacaoEstoque e rebaixando o mesmo
+    // ItemEstoque tracked 2x numa falha transitoria pos-SaveChanges. Sem este forward, o mock
+    // devolve default(Task<T>) pro metodo que o use case agora chama de verdade, e todo teste
+    // falha com resultado null (mesmo pitfall documentado no metodo acima, so que pro SemRetry).
+    public static void SetupExecuteInTransactionSemRetryForward<T>(this IUnitOfWork unitOfWork)
+    {
+        unitOfWork
+            .ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<T>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var action = (Func<CancellationToken, Task<T>>)call[0];
+                var ct = (CancellationToken)call[1];
+                return action(ct);
+            });
+    }
 }
