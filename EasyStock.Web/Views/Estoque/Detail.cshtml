@@ -34,9 +34,11 @@
                     <div class="kpi-val text-slate-700">@item.Stopped</div>
                     <div class="kpi-lbl">Dias parado</div>
                 </div>
+                @* issue 982: mesma metrica que a coluna "Giro" da listagem, que la e barra e aqui
+                   era um numero cru sem unidade nem janela ("1,4" nao diz 1,4 do que, quando). *@
                 <div class="text-center p-4 bg-slate-50 rounded-xl">
-                    <div class="kpi-val text-slate-700">@item.Vel.ToString("F1")</div>
-                    <div class="kpi-lbl">Rotatividade</div>
+                    <div class="kpi-val text-slate-700">@item.Vel.ToString("F1") <span class="text-sm font-normal text-slate-500">un/dia</span></div>
+                    <div class="kpi-lbl" title="Saídas por dia nos últimos 30 dias">Giro (30 dias)</div>
                 </div>
                 <div class="text-center p-4 bg-slate-50 rounded-xl">
                     @{

@@ -354,17 +354,20 @@ html.theme-dark .badge-slow {
 }
 
 /* ─── Velocity bars ──────────────────────────────────────────── */
+/* Barra de giro (issue 982). A magnitude e codificada pela CONTAGEM de segmentos, nao
+   pela cor — como indicador de sinal/bateria. A escala anterior era verde/ambar/vermelha
+   e invertida em relacao a intuicao (pouco giro pintava vermelho), competindo com o
+   vermelho real de estoque critico e validade vencendo na mesma linha. Tokens de ink
+   porque tem remap no bloco dark; os hex antigos nao tinham. */
 .vel-bar { display: flex; gap: 3px; }
 .vel-seg {
     width: 8px;
     height: 8px;
     border-radius: 2px;
-    background: #E2E8F0;
+    background: var(--ink-200);
     transition: background var(--transition);
 }
-.vel-seg.g { background: #16A34A; }
-.vel-seg.a { background: #D97706; }
-.vel-seg.r { background: #DC2626; }
+.vel-seg.is-on { background: var(--ink-600); }
 
 /* ─── Sidebar nav ────────────────────────────────────────────── */
 .nav-sep {
