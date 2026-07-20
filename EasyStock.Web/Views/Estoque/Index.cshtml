@@ -286,14 +286,12 @@
                                 }
                                 else
                                 {
-                                    @if (item.Qty == 0)
-                                    {
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Sem validade</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-slate-400">—</span>
-                                    }
+                                    @* issue 970: ausencia de validade e estado NEUTRO. O badge ambar so
+                                       aparecia quando Qty == 0 — o caso MENOS preocupante dos dois, e ja
+                                       comunicado pela coluna Status ao lado ("Esgotado"). Item COM estoque
+                                       e sem validade renderizava "—". O alerta estava no ramo errado e
+                                       competia com os sinais que importam (vencendo, critico). *@
+                                    <span class="text-slate-400" title="Produto sem data de validade cadastrada">—</span>
                                 }
                             </td>
                             <td class="text-center">
