@@ -62,6 +62,8 @@ public class DashboardController(ApiClient api, SessionService session, IOptions
             vm.CaixaAbertaHoje = dia.CaixaAbertaHoje;
             vm.CaixaFechadaHoje = dia.CaixaFechadaHoje;
             vm.SaldoCaixaAtual = dia.SaldoCaixaAtual;
+            vm.CaixaVendas = dia.CaixaVendas;
+            vm.CaixaPagamentosPedidos = dia.CaixaPagamentosPedidos;
             vm.PixRecebidosHoje = dia.PixRecebidosHoje;
             vm.ValorPixHoje = dia.ValorPixHoje;
             vm.OnboardingCompleto = dia.OnboardingCompleto;
