@@ -191,10 +191,14 @@ else if (Model.ResumoApiFalhou)
 
             @if (Model.PedidosPendentes > 0)
             {
-                <a href="/pedidos" class="ds-pulse" aria-label="Ver pedidos pendentes no cockpit de pedidos">
-                    <div class="ds-pulse-lbl">Pendentes</div>
+                @* ADR-0044 (BUG-005 do QA): "Pendentes" -> "A entregar". E' Pedido.Total BRUTO de
+                   pedidos nao-entregues, sem descontar pagamentos ja recebidos — diferente do "a
+                   receber" de Pedidos/Financeiro. O rotulo tem que dizer o que mede. *@
+                <a href="/pedidos" class="ds-pulse" aria-label="Ver pedidos a entregar no cockpit de pedidos"
+                   title="Valor bruto dos pedidos ainda não entregues (não desconta pagamentos já recebidos).">
+                    <div class="ds-pulse-lbl">A entregar</div>
                     <div class="ds-pulse-val">@Model.PedidosPendentes <small>· @Model.ValorPedidosPendentes.ToString("C", ptBR)</small></div>
-                    <div class="ds-pulse-sub warn">aguardando entrega</div>
+                    <div class="ds-pulse-sub warn">aguardando entrega · valor bruto</div>
                 </a>
             }
 

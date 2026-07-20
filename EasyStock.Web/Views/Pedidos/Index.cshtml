@@ -115,8 +115,11 @@
         <span class="ped-kpi__eyebrow">Novos do cardápio</span>
         <span class="ped-kpi__val" x-text="kpiCardapio">0</span>
     </div>
-    <div class="ped-kpi ped-kpi--warn">
-        <span class="ped-kpi__eyebrow">A receber</span>
+    @* ADR-0044 (BUG-005 do QA): soma o pendente das linhas CARREGADAS nesta tela (cap de 200,
+       inclui pedidos entregues) — diferente do "Pendentes/A entregar" do Dashboard (bruto, so
+       nao-entregues) e do "A Receber 30d" do Financeiro (parcelas, nao pedidos). *@
+    <div class="ped-kpi ped-kpi--warn" title="Soma do pendente dos pedidos carregados nesta lista (até 200), inclui pedidos já entregues.">
+        <span class="ped-kpi__eyebrow">A receber (nesta lista)</span>
         <span class="ped-kpi__val ped-kpi__val--money" x-text="kpiReceberFmt">R$ 0,00</span>
     </div>
 </div>
