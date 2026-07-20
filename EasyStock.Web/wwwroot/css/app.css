@@ -354,17 +354,20 @@ html.theme-dark .badge-slow {
 }
 
 /* ─── Velocity bars ──────────────────────────────────────────── */
+/* Barra de giro (issue 982). A magnitude e codificada pela CONTAGEM de segmentos, nao
+   pela cor — como indicador de sinal/bateria. A escala anterior era verde/ambar/vermelha
+   e invertida em relacao a intuicao (pouco giro pintava vermelho), competindo com o
+   vermelho real de estoque critico e validade vencendo na mesma linha. Tokens de ink
+   porque tem remap no bloco dark; os hex antigos nao tinham. */
 .vel-bar { display: flex; gap: 3px; }
 .vel-seg {
     width: 8px;
     height: 8px;
     border-radius: 2px;
-    background: #E2E8F0;
+    background: var(--ink-200);
     transition: background var(--transition);
 }
-.vel-seg.g { background: #16A34A; }
-.vel-seg.a { background: #D97706; }
-.vel-seg.r { background: #DC2626; }
+.vel-seg.is-on { background: var(--ink-600); }
 
 /* ─── Sidebar nav ────────────────────────────────────────────── */
 .nav-sep {
@@ -487,7 +490,12 @@ html.theme-dark .badge-slow {
     padding: 7px 12px;
     font-size: 13px;
     font-weight: 450;
-    color: #64748B;
+    /* issue 970: era #64748B, que reprova WCAG AA nos DOIS temas para texto normal
+       (13px/450 exige 4.5:1): 3.07:1 sobre o topo do gradiente claro (#1E293B),
+       3.75:1 sobre a base (#0F172A), 3.78:1 sobre o navy-900 do tema escuro.
+       #94A3B8 da 5.71:1 e ~7.0:1 — e ja e o valor usado nos favoritos logo abaixo,
+       entao a sidebar passa a ter uma escala de cinza coerente em vez de duas. */
+    color: #94A3B8;
     border-radius: 8px;
     text-decoration: none;
     transition: background .16s ease, color .16s ease;
@@ -554,7 +562,9 @@ html.theme-dark .badge-slow {
     margin-bottom: 4px;
     border-bottom: 1px solid rgba(255, 255, 255, .05);
 }
-.es-fav .es-ni { font-weight: 600; color: #94A3B8; }
+/* Cor herdada de .es-ni desde a issue 970 (os dois valores convergiram no #94A3B8
+   AA-safe). A hierarquia do favorito passa a ser o peso, nao uma segunda cor. */
+.es-fav .es-ni { font-weight: 600; }
 .es-fav .es-ni-row:hover .es-ni { color: #E2E8F0; }
 
 /* Grupos (accordion via <details>/<summary>) */
@@ -752,6 +762,58 @@ html.es-rail .es-more { display: none; }
     font-feature-settings: "tnum" 1;
 }
 .tbl-full th.col-num { text-align: right; }
+
+/* ── Densidade de tabela: modificadores opt-in (issue 968) ──
+   Sem min-width, `.tbl-full` (width:100%) faz o browser COMPRIMIR as celulas para
+   caber, em vez de estourar e acionar o `overflow-x` do wrapper. O resultado e o
+   oposto do pretendido: conteudo quebrado em varias linhas e ultima coluna cortada
+   na borda. Consolida o padrao que ja foi inventado duas vezes de forma bespoke
+   (`.users-table-wrap` aqui embaixo, `.ped-table` em pedidos-cockpit.css).
+   Opt-in de proposito: tabela estreita (4 colunas) nao deve ganhar scroll. */
+.tbl-full--lg { min-width: 1080px; }
+
+/* Celula de codigo (SKU, EAN, chave): uma linha so, com ellipsis. Par obrigatorio no
+   markup: `title` com o valor completo, senao o truncamento esconde informacao. */
+.tbl-cell-code {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Colunas fixas nas bordas — acao primaria de linha nao deve depender de scroll.
+   O fundo OPACO nao e cosmetico: sem ele o conteudo das outras colunas passa por
+   baixo ao rolar. E `--ink-50` sozinho nao serve porque no tema escuro ele e
+   translucido (rgba(255,255,255,.05)) — dai o empilhamento sobre `--bg-surface`. */
+.tbl-full th.tbl-sticky-start,
+.tbl-full th.tbl-sticky-end {
+    position: sticky;
+    background: linear-gradient(var(--ink-50), var(--ink-50)), var(--bg-surface);
+    z-index: 11;
+}
+.tbl-full td.tbl-sticky-start,
+.tbl-full td.tbl-sticky-end {
+    position: sticky;
+    background: var(--bg-surface);
+    z-index: 10;
+}
+.tbl-full th.tbl-sticky-start,
+.tbl-full td.tbl-sticky-start {
+    left: 0;
+    box-shadow: 8px 0 8px -8px rgba(10, 21, 48, .18);
+}
+.tbl-full th.tbl-sticky-end,
+.tbl-full td.tbl-sticky-end {
+    right: 0;
+    box-shadow: -8px 0 8px -8px rgba(10, 21, 48, .18);
+}
+/* O hover generico (`tbody tr:hover td`) tem especificidade maior que as regras acima
+   e reintroduziria o `--ink-50` translucido no dark. Reafirma opaco no hover. */
+.tbl-full tbody tr:hover td.tbl-sticky-start,
+.tbl-full tbody tr:hover td.tbl-sticky-end {
+    background: linear-gradient(var(--ink-50), var(--ink-50)), var(--bg-surface);
+}
 
 .users-table-wrap .tbl-full {
     min-width: 980px;
@@ -4245,6 +4307,11 @@ html.theme-dark .ped-add-item:hover {
     background: var(--bg-elevated, #ffffff);
     border: 1px solid rgba(226, 232, 240, .85);
     border-radius: 14px;
+    /* issue 977: os steps sao flex-shrink:0 com label nowrap, entao os 4 estados
+       ("Recebido/Em preparo/Pronto/Entregue") estouravam o container abaixo de ~340px.
+       Rolar preserva a leitura do stepper; espremer ou quebrar destruiria. */
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 
 html.theme-dark .ped-timeline {

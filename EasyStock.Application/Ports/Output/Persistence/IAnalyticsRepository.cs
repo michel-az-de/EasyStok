@@ -178,7 +178,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal ValorPixHoje,
         bool OnboardingCompleto,
         int CategoriasCount,
-        int EntradasCount);
+        int EntradasCount,
+        // issue 988: o CaixaSaldoBreakdown ja decompoe o saldo em 5 componentes, mas so o
+        // escalar chegava ao dashboard — dai o card "Caixa" exibir um numero que o lojista
+        // nao conseguia explicar (o QA viu R$ 126,00 que era o pago de UM pedido). Estes
+        // dois sao os que respondem "de onde veio", e sao o mesmo recorte que a tela /caixa
+        // ja mostra. Opcionais para nao quebrar call-sites existentes.
+        decimal CaixaVendas = 0m,
+        decimal CaixaPagamentosPedidos = 0m);
 
     // ── Receita x Custo DTOs ────────────────────────────────────────────
 

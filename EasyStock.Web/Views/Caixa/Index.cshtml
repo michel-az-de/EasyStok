@@ -22,7 +22,10 @@
         </h1>
         <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
-    <div class="flex gap-3">
+    @* issue 977: o container externo ja tinha flex-wrap, este filho nao — dois botoes
+       de label longo ("Lançamentos do app", "Histórico") ficavam presos numa linha
+       rigida e estouravam em telas estreitas. *@
+    <div class="flex flex-wrap gap-3">
         <a href="/caixa-mobile" class="btn-outline-dark inline-flex items-center gap-2">
             <es-icon name="phone" class="es-icon--sm"></es-icon> Lançamentos do app
         </a>

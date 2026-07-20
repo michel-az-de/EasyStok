@@ -27,6 +27,9 @@ public class DashboardViewModel
     public bool CaixaAbertaHoje { get; set; }
     public bool CaixaFechadaHoje { get; set; }
     public decimal SaldoCaixaAtual { get; set; }
+    // issue 988: composicao do saldo, para o card poder mostrar de onde o numero veio.
+    public decimal CaixaVendas { get; set; }
+    public decimal CaixaPagamentosPedidos { get; set; }
     public int PixRecebidosHoje { get; set; }
     public decimal ValorPixHoje { get; set; }
     public bool OnboardingCompleto { get; set; } = true;

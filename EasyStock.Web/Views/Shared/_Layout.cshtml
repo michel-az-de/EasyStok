@@ -94,7 +94,12 @@
         <p class="text-sm opacity-80">Gire o aparelho ou abra em tela maior (mínimo 320px).</p>
     </div>
 
+    @* data-app-root (issue 977): ancora ESTAVEL para o gate de <320px em mobile.css.
+       O seletor era `body > div.flex.h-screen`, acoplado a classes utilitarias — trocar
+       `h-screen` por `min-h-dvh` numa melhoria de mobile quebraria o gate em silencio,
+       sem teste pegando. Nao remover este atributo. *@
     <div x-data="{ sidebarOpen: false }"
+         data-app-root
          @@keydown.escape.window="if (sidebarOpen) { sidebarOpen = false; document.getElementById('sidebar-toggle')?.focus(); }"
          class="flex h-screen overflow-hidden">
         <div x-show="sidebarOpen" x-cloak

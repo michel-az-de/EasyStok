@@ -65,7 +65,7 @@ public class RegistrarPagamentoParcelaPagarUseCase(
                 cmd.GatewayProvedor, cmd.GatewayTransactionId,
                 cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
-            parcela.RegistrarPagamento(pagamento);
+            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
             // MovimentoCaixa na MESMA transacao — sai pelo caixa do dia atual
             var mov = MovimentoCaixa.Criar(

@@ -164,20 +164,31 @@ else if (Model.ResumoApiFalhou)
                 <div class="ds-pulse-sub">por pedido hoje</div>
             </div>
 
+            @* issue 988: o subtitulo era so "caixa aberto" e o lojista nao conseguia explicar o
+               numero (o QA viu R$ 126,00 que era o pago de UM pedido). Mostrar a composicao
+               responde "de onde veio" sem pedir fe — e o mesmo recorte que a tela /caixa ja
+               exibe. O CaixaSaldoBreakdown ja calculava isto; so nao chegava ate aqui. *@
+            @{
+                var caixaComposicao = $"Vendas {Model.CaixaVendas.ToString("C", ptBR)} · Pedidos {Model.CaixaPagamentosPedidos.ToString("C", ptBR)}";
+                var caixaTitulo = "Saldo esperado = abertura + vendas + pagamentos de pedido + entradas − saídas. "
+                                + "Pagamento de pedido entra independente do método (inclusive Pix e cartão).";
+            }
             @if (Model.CaixaAbertaHoje)
             {
-                <a href="/caixa" class="ds-pulse">
+                <a href="/caixa" class="ds-pulse" title="@caixaTitulo">
                     <div class="ds-pulse-lbl">Caixa</div>
                     <div class="ds-pulse-val">@Model.SaldoCaixaAtual.ToString("C", ptBR)</div>
                     <div class="ds-pulse-sub up"><span class="ds-pulse-led"></span>caixa aberto</div>
+                    <div class="ds-pulse-sub tabular-nums">@caixaComposicao</div>
                 </a>
             }
             else if (Model.CaixaFechadaHoje)
             {
-                <a href="/caixa" class="ds-pulse">
+                <a href="/caixa" class="ds-pulse" title="@caixaTitulo">
                     <div class="ds-pulse-lbl">Caixa</div>
                     <div class="ds-pulse-val">@Model.SaldoCaixaAtual.ToString("C", ptBR)</div>
                     <div class="ds-pulse-sub">fechado hoje</div>
+                    <div class="ds-pulse-sub tabular-nums">@caixaComposicao</div>
                 </a>
             }
             else
@@ -191,10 +202,14 @@ else if (Model.ResumoApiFalhou)
 
             @if (Model.PedidosPendentes > 0)
             {
-                <a href="/pedidos" class="ds-pulse" aria-label="Ver pedidos pendentes no cockpit de pedidos">
-                    <div class="ds-pulse-lbl">Pendentes</div>
+                @* ADR-0044 (BUG-005 do QA): "Pendentes" -> "A entregar". E' Pedido.Total BRUTO de
+                   pedidos nao-entregues, sem descontar pagamentos ja recebidos — diferente do "a
+                   receber" de Pedidos/Financeiro. O rotulo tem que dizer o que mede. *@
+                <a href="/pedidos" class="ds-pulse" aria-label="Ver pedidos a entregar no cockpit de pedidos"
+                   title="Valor bruto dos pedidos ainda não entregues (não desconta pagamentos já recebidos).">
+                    <div class="ds-pulse-lbl">A entregar</div>
                     <div class="ds-pulse-val">@Model.PedidosPendentes <small>· @Model.ValorPedidosPendentes.ToString("C", ptBR)</small></div>
-                    <div class="ds-pulse-sub warn">aguardando entrega</div>
+                    <div class="ds-pulse-sub warn">aguardando entrega · valor bruto</div>
                 </a>
             }
 

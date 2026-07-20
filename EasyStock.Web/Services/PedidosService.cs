@@ -142,7 +142,7 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
     // que pode estar desatualizada e o risco de fat-finger no balcao e maior.
     public Task<ApiResult<Pedido>> RegistrarPagamentoAsync(string id,
         string metodo, decimal valor, string? referencia, string? observacao,
-        bool permitirExcedente = false)
+        bool permitirExcedente = false, string? idempotencyKey = null)
     {
         var empresaId = GetEmpresaId();
         if (empresaId == Guid.Empty) return Task.FromResult(EmpresaErr<Pedido>());
@@ -151,7 +151,7 @@ public class PedidosService(ApiClient api, SessionService session) : TenantServi
         {
             empresaId, pedidoId,
             metodo, valor, referencia, observacao, origem = "web", permitirExcedente
-        });
+        }, idempotencyKey: idempotencyKey);
     }
 
     public Task<ApiResult<bool>> RemoverPagamentoAsync(string id, string pagamentoId) =>

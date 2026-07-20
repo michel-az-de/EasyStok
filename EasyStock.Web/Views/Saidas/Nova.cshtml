@@ -18,6 +18,10 @@
 <div class="max-w-5xl min-h-[calc(100vh-14rem)]" x-data="saidaForm()">
     <form asp-action="Criar" asp-controller="Saidas" method="post" x-on:submit.prevent="submitSaida()">
         @Html.AntiForgeryToken()
+        @* issue 917 Fase B: gerada uma vez no estado inicial de saidaForm() (abertura da
+           pagina = a intencao). FormData(form) em _executarSaida() a inclui automaticamente;
+           retry apos timeout reusa o MESMO valor -- so um novo carregamento de pagina gera outro. *@
+        <input type="hidden" name="IdempotencyKey" x-model="idempotencyKey" />
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- ══════ Left column: Form ══════ -->
@@ -128,13 +132,22 @@
                 <!-- Valor e Data -->
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
-                        @* BUG-001: text+inputmode=decimal (parse locale-safe) *@
-                        <input asp-for="Valor" type="text" inputmode="decimal"
-                               x-model.number="valorUnit"
-                               x-on:input="valorTocado = true; calcularTotal()"
+                        <label for="Valor-display" class="block text-sm font-medium text-slate-700 mb-1">Valor Unitário (R$)</label>
+                        @* issue 986: par display/canonico. O visivel e mascarado em centavos
+                           (caixa registradora) e NAO tem name — nunca e submetido. O hidden
+                           abaixo carrega o decimal invariante que o InvariantDecimalModelBinder
+                           espera; e ele que tem o name, que o FormData le e que o x-model observa.
+                           Mascarar direto o campo que submete mandaria "R$ 1.234,56" ao servidor,
+                           que o binder rejeita (parseia sem AllowCurrencySymbol).
+                           O x-effect reflete mudanca vinda de fora (preco-base assincrono, troca
+                           de produto) sem sobrescrever o que esta sendo digitado. *@
+                        <input type="text" inputmode="decimal" id="Valor-display"
+                               data-mask="money" data-money-target="Valor"
+                               x-on:input="valorTocado = true"
+                               x-effect="window.EasyMasks && window.EasyMasks.setMoney($el, valorUnit)"
                                placeholder="R$ 0,00"
                                class="ui-field w-full text-sm" />
+                        <input type="hidden" asp-for="Valor" x-model.number="valorUnit" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Data da saída *</label>
@@ -195,20 +208,21 @@
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-3 pt-4 border-t">
-                    <a asp-action="Historico" asp-controller="Saidas" class="btn-outline-dark">
-                        Descartar
-                    </a>
-                    <button type="submit"
-                            :disabled="loading || !produtoId || qty < 1 || qty > estoqueAtual"
-                            :title="!produtoId ? 'Selecione um produto primeiro' : (qty < 1 ? 'Informe uma quantidade de pelo menos 1' : (qty > estoqueAtual ? 'Quantidade acima do estoque disponível' : ''))"
-                            :class="(loading || !produtoId || qty < 1 || qty > estoqueAtual)
-                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                : 'bg-indigo-600 text-white hover:bg-indigo-700'"
-                            class="px-6 py-2 text-sm font-medium rounded-lg transition-colors">
-                        <span x-show="!loading">Registrar Saída</span>
-                        <span x-show="loading" x-cloak>Registrando...</span>
-                    </button>
+                <div class="pt-4 border-t">
+                    <div class="flex justify-end gap-3">
+                        <a asp-action="Historico" asp-controller="Saidas" class="btn-outline-dark">
+                            Descartar
+                        </a>
+                        <button type="submit"
+                                :disabled="loading || !!motivoBloqueio"
+                                :aria-describedby="motivoBloqueio ? 'saida-bloqueio' : null"
+                                class="app-primary-btn px-6 py-2 text-white text-sm font-medium rounded-lg">
+                            <span x-show="!loading">Registrar Saída</span>
+                            <span x-show="loading" x-cloak>Registrando...</span>
+                        </button>
+                    </div>
+                    <p id="saida-bloqueio" x-show="motivoBloqueio" x-cloak x-text="motivoBloqueio"
+                       class="text-xs text-slate-500 mt-2 text-right"></p>
                 </div>
             </div>
 
@@ -353,6 +367,21 @@ function saidaForm() {
         valorTocado: false,
         loading: false,
         _debounce: null,
+        // issue 917 Fase B: uma chave por carregamento de pagina (a intencao), nao por
+        // tentativa de submit -- ver hidden input IdempotencyKey acima.
+        idempotencyKey: crypto.randomUUID(),
+
+        // issue 969: o motivo do bloqueio precisa ser TEXTO VISIVEL, nao tooltip. O
+        // :disabled aplica pointer-events:none (app.css), entao nem o title nativo nem
+        // o [data-tooltip] chegam a disparar -- a explicacao existia e nunca aparecia.
+        // Redacao em linguagem de ACAO ("reduza para X"), nao de diagnostico: o aviso
+        // sob o campo de quantidade ja descreve o problema; repetir seria ruido.
+        get motivoBloqueio() {
+            if (!this.produtoId) return 'Selecione um produto para continuar';
+            if (!this.qty || this.qty < 1) return 'Informe uma quantidade de pelo menos 1';
+            if (this.qty > this.estoqueAtual) return 'Reduza a quantidade para no máximo ' + this.estoqueAtual;
+            return '';
+        },
 
         // BUG-18: total e getter reativo (qty * valorUnit). Antes, calcularTotal() no handler de
         // input rodava com o qty anterior (ordem de evento x-model vs handler) e o total travava em 1x o valor.

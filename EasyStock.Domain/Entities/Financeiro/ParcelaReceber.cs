@@ -72,7 +72,7 @@ public class ParcelaReceber
         };
     }
 
-    public void RegistrarPagamento(PagamentoParcela pagamento)
+    public void RegistrarPagamento(PagamentoParcela pagamento, DateTime hojeUtc)
     {
         if (pagamento is null) throw new ArgumentNullException(nameof(pagamento));
         if (Status == StatusParcela.Cancelada)
@@ -94,11 +94,11 @@ public class ParcelaReceber
 
         pagamento.ParcelaReceberId = Id;
         Pagamentos.Add(pagamento);
-        AtualizarStatusPorPagamentos();
+        AtualizarStatusPorPagamentos(hojeUtc);
         AlteradoEm = DateTime.UtcNow;
     }
 
-    public void AtualizarStatusPorPagamentos()
+    public void AtualizarStatusPorPagamentos(DateTime hojeUtc)
     {
         if (Status == StatusParcela.Cancelada) return;
 
@@ -118,7 +118,7 @@ public class ParcelaReceber
             Status = StatusParcela.ParcialmentePaga;
             DataPagamentoTotal = null;
         }
-        else if (DataVencimento.Date < DateTime.UtcNow.Date)
+        else if (DataVencimento.Date < hojeUtc.Date)
         {
             Status = StatusParcela.Vencida;
             DataPagamentoTotal = null;

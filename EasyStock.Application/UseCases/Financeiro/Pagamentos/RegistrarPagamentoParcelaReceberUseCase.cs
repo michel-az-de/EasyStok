@@ -54,7 +54,7 @@ public class RegistrarPagamentoParcelaReceberUseCase(
                 cmd.GatewayProvedor, cmd.GatewayTransactionId,
                 cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
-            parcela.RegistrarPagamento(pagamento);
+            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
             var mov = MovimentoCaixa.Criar(
                 cmd.EmpresaId, "entrada", cmd.Valor,

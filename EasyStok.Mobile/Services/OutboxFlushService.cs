@@ -20,12 +20,14 @@ public sealed class OutboxFlushService : IOutboxFlushService
 
 	private readonly IHttpClientFactory _httpFactory;
 	private readonly IOutboxRepository _outbox;
+	private readonly AppIdentity _identity;
 	private readonly ILogger<OutboxFlushService> _logger;
 
-	public OutboxFlushService(IHttpClientFactory httpFactory, IOutboxRepository outbox, ILogger<OutboxFlushService> logger)
+	public OutboxFlushService(IHttpClientFactory httpFactory, IOutboxRepository outbox, AppIdentity identity, ILogger<OutboxFlushService> logger)
 	{
 		_httpFactory = httpFactory;
 		_outbox = outbox;
+		_identity = identity;
 		_logger = logger;
 	}
 
@@ -83,19 +85,35 @@ public sealed class OutboxFlushService : IOutboxFlushService
 		}
 	}
 
-	private static async Task<HttpResponseMessage> SendAsync(HttpClient http, OutboxItem item, CancellationToken ct) =>
-		item.Type switch
+	private async Task<HttpResponseMessage> SendAsync(HttpClient http, OutboxItem item, CancellationToken ct)
+	{
+		var path = item.Type switch
 		{
-			OutboxTypes.EstoqueEntrada => await http.PostAsJsonAsync(
-				"/api/estoque/entrada",
-				JsonSerializer.Deserialize<RegistrarEntradaCommand>(item.PayloadJson, _jsonOptions),
-				ct),
-			OutboxTypes.EstoqueSaida => await http.PostAsJsonAsync(
-				"/api/estoque/saida",
-				JsonSerializer.Deserialize<RegistrarSaidaCommand>(item.PayloadJson, _jsonOptions),
-				ct),
+			OutboxTypes.EstoqueEntrada => "/api/estoque/entrada",
+			OutboxTypes.EstoqueSaida => "/api/estoque/saida",
 			_ => throw new InvalidOperationException($"Outbox type desconhecido: {item.Type}"),
 		};
+		// JsonContent.Create<T>() por branch (nao um object? comum) -- serializar via
+		// tipo declarado "object" perderia as propriedades do record concreto (STJ usa o
+		// tipo estatico, nao o runtime, no overload generico).
+		var content = item.Type switch
+		{
+			OutboxTypes.EstoqueEntrada => JsonContent.Create(JsonSerializer.Deserialize<RegistrarEntradaCommand>(item.PayloadJson, _jsonOptions), options: _jsonOptions),
+			OutboxTypes.EstoqueSaida => JsonContent.Create(JsonSerializer.Deserialize<RegistrarSaidaCommand>(item.PayloadJson, _jsonOptions), options: _jsonOptions),
+			_ => throw new InvalidOperationException($"Outbox type desconhecido: {item.Type}"),
+		};
+
+		using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = content };
+		// issue 917 Fase B: item.Id e' um int AutoIncrement LOCAL (por aparelho) -- sem o
+		// prefixo do device, dois aparelhos da mesma empresa colidiriam na unicidade
+		// (Key, EmpresaId, MetodoRecurso) do servidor e o segundo receberia replay da
+		// venda do primeiro em vez de processar a sua propria. Retry do MESMO item (falha
+		// de rede -> proxima rodada) reusa a MESMA chave -- e o resultado desejado.
+		request.Headers.TryAddWithoutValidation("Idempotency-Key", $"outbox:{_identity.DeviceId}:{item.Id}");
+		request.Headers.TryAddWithoutValidation("X-Device-Id", _identity.DeviceId);
+
+		return await http.SendAsync(request, ct);
+	}
 
 	private static string Truncate(string s, int max) =>
 		string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max]);

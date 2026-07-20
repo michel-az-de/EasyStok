@@ -50,6 +50,9 @@ public class RegistrarPagamentoJsonRequest
     public decimal Valor { get; set; }
     public string? Referencia { get; set; }
     public string? Observacao { get; set; }
+
+    /// <summary>issue 917 Fase B: gerado no browser ao abrir o form de pagamento do cockpit.</summary>
+    public string? IdempotencyKey { get; set; }
 }
 public class AprovarJsonRequest { public string? Observacoes { get; set; } }
 public class RecusarJsonRequest { public string? Motivo { get; set; } public string? MensagemCliente { get; set; } }
@@ -209,7 +212,8 @@ public class PedidosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddPagamentoJson(string id, [FromBody] RegistrarPagamentoJsonRequest? req) =>
         PedidoJsonContract.From(await svc.RegistrarPagamentoAsync(
-            id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao));
+            id, req?.Metodo ?? "", req?.Valor ?? 0m, req?.Referencia, req?.Observacao,
+            idempotencyKey: req?.IdempotencyKey));
 
     // Aprovação/recusa do pedido do cardápio no cockpit (#862). Reusam os endpoints
     // prontos da API; retornam { success, pedido: { status } } pra UI avançar a linha.
@@ -341,13 +345,15 @@ public class PedidosController(
 
     [HttpPost("/pedidos/{id}/pagamentos")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddPagamento(string id, string metodo, decimal valor, string? referencia, string? observacao)
+    public async Task<IActionResult> AddPagamento(string id, string metodo, decimal valor, string? referencia, string? observacao, string? idempotencyKey)
     {
         // issue 962: o Detail e' a UNICA superficie que mostra o aviso de excedente
         // (gorjeta/arredondamento, ver Detail.cshtml) antes do submit -- por isso e' a
         // unica que pode sinalizar permitirExcedente=true. O cockpit (AddPagamentoJson)
         // continua com o bloqueio duro.
-        var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao, permitirExcedente: true);
+        // issue 917 Fase B: idempotencyKey vem de hidden field gerado no browser na
+        // abertura do form de pagamento (ver Detail.cshtml) -- estavel entre retries.
+        var result = await svc.RegistrarPagamentoAsync(id, metodo, valor, referencia, observacao, permitirExcedente: true, idempotencyKey: idempotencyKey);
         if (HasError(result))
         {
             Toast("error", result.ErrorMessage ?? "Não foi possível registrar o pagamento. Confira os dados e tente de novo.");
