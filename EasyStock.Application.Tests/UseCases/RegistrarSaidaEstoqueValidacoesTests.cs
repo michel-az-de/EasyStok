@@ -25,7 +25,7 @@ public class RegistrarSaidaEstoqueValidacoesTests
         ICurrentUserAccessor? currentUser = null,
         IConfiguracaoLojaRepository? configuracaoLojaRepository = null)
     {
-        unitOfWork.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         return new(
             produtoRepository,
             itemRepository,

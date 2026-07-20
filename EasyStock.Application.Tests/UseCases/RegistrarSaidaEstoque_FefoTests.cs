@@ -20,7 +20,7 @@ public class RegistrarSaidaEstoque_FefoTests
         var itemVendaRepo = Substitute.For<IItemVendaRepository>();
         var movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
         var uow = Substitute.For<IUnitOfWork>();
-        uow.SetupExecuteInTransactionForward<RegistrarSaidaEstoqueResult>();
+        uow.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
         var configRepo = Substitute.For<IConfiguracaoLojaRepository>();
         var logger = Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>();
 
@@ -36,7 +36,7 @@ public class RegistrarSaidaEstoque_FefoTests
         itemRepo.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, fifoAtivo).Returns([lote]);
         itemRepo.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, !fifoAtivo).Returns([]);
 
-        uow.SetupExecuteInTransaction<RegistrarSaidaEstoqueResult>();
+        uow.SetupExecuteInTransactionSemRetry<RegistrarSaidaEstoqueResult>();
 
         var useCase = new RegistrarSaidaEstoqueUseCase(
             produtoRepo, itemRepo, vendaRepo, itemVendaRepo, movRepo, uow, logger,
