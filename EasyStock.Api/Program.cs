@@ -38,15 +38,30 @@ var builder = WebApplication.CreateBuilder(args);
 var diagLevelSwitch = new Serilog.Core.LoggingLevelSwitch(Serilog.Events.LogEventLevel.Information);
 
 // Configure Serilog — máximo de informações em cada log entry
-Log.Logger = new LoggerConfiguration()
+var loggerConfiguration = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .MinimumLevel.ControlledBy(diagLevelSwitch)
     .Enrich.FromLogContext()
     .Enrich.WithEnvironmentName()
     .Enrich.WithThreadId()
     .Enrich.WithProcessId()
-    .Enrich.WithMachineName()
-    .CreateLogger();
+    .Enrich.WithMachineName();
+
+// Logs via OTLP quando ha collector configurado (issue 1002; na VM consolidada,
+// OpenTelemetry__OtlpEndpoint -> otel-collector). O sink inclui trace_id/span_id do
+// Activity corrente => logs correlacionados com os traces no OpenObserve. Opt-in:
+// sem a config (dev local/CI), nenhum sink extra.
+if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
+{
+    loggerConfiguration = loggerConfiguration.WriteTo.OpenTelemetry(o =>
+    {
+        o.Endpoint = otlpLogsEndpoint;
+        o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
+        o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Api" };
+    });
+}
+
+Log.Logger = loggerConfiguration.CreateLogger();
 
 builder.Host.UseSerilog();
 

@@ -14,6 +14,10 @@
     <!-- CVE sweep: Cookies 2.3.9 -> AspNetCore.Authentication 2.3.0 -> DataProtection 2.3.0
          -> Xml 8.0.2 transitiva (GHSA-37gx-xxp4-5rgx / GHSA-w3x6-4m5h-cxqf, HIGH).
          Override top-level para versao patched 9.0.16. -->
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
   </ItemGroup>
 

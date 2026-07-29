@@ -12,6 +12,9 @@ System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = ptBR;
 // === Services (DI) ===
 builder.AddEasyStockAdminServices();
 
+// Telemetria OTLP opt-in (issue 1002) — no-op sem OpenTelemetry:OtlpEndpoint.
+builder.AddEasyStockTelemetry("EasyStock.Admin");
+
 var app = builder.Build();
 
 // === Pipeline + redirects + Razor Pages (verbatim em Hosting/AdminPipelineExtensions.cs) ===
