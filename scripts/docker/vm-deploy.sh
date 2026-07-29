@@ -40,6 +40,10 @@ set -euo pipefail
 REPO="${EASYSTOK_REPO:-/home/azureuser/easystok}"
 COMPOSE="$REPO/docker-compose.azure.yml"
 COMPOSE_IMAGES="$REPO/docker-compose.azure.images.yml"
+# Host consolidado (issue 997): a VM compartilhada ja tem um Caddy central (edge) nas
+# portas 80/443; EASYSTOK_COMPOSE_EXTRA aponta um override (ex.: docker-compose.azure.
+# noedge.yml) que tira o caddy proprio da stack. Vazio = comportamento historico.
+COMPOSE_EXTRA="${EASYSTOK_COMPOSE_EXTRA:-}"
 BRANCH="${EASYSTOK_BRANCH:-master}"
 DEPLOY_MODE="${EASYSTOK_DEPLOY_MODE:-build}"
 # /home/azureuser e gravavel pelo cron (azureuser); /var/backups e root-only e o
@@ -117,7 +121,7 @@ main() {
   if [ "$DEPLOY_MODE" = "pull" ]; then
     ghcr_login
     echo "[vm-deploy] pull das imagens :${remote_sha:0:8} do GHCR ..."
-    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" pull --quiet api web admin worker; then
+    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" ${COMPOSE_EXTRA:+-f "$COMPOSE_EXTRA"} pull --quiet api web admin worker; then
       echo "[vm-deploy] imagens de ${remote_sha:0:8} ainda nao disponiveis no GHCR. Abortando SEM avancar HEAD; proximo cron tenta de novo."
       exit 4
     fi
@@ -139,11 +143,11 @@ main() {
     # Sobe com a tag que FOI puxada (remote_sha). Se um push aterrissou entre o
     # fetch e o pull (HEAD alem de remote_sha), o proximo cron alinha sozinho.
     echo "[vm-deploy] subindo stack com imagens :${remote_sha:0:8} (sem build) ..."
-    EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" up -d
+    EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" ${COMPOSE_EXTRA:+-f "$COMPOSE_EXTRA"} up -d
     sha="$remote_sha"
   else
     echo "[vm-deploy] rebuildando stack (GIT_SHA=${sha:0:8}) ..."
-    GIT_SHA="$sha" docker compose -f "$COMPOSE" up -d --build
+    GIT_SHA="$sha" docker compose -f "$COMPOSE" ${COMPOSE_EXTRA:+-f "$COMPOSE_EXTRA"} up -d --build
   fi
 
   sleep 8
