@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.StaticFiles;
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
+// Telemetria OTLP opt-in (issue 1002) — no-op sem OpenTelemetry:OtlpEndpoint.
+builder.AddEasyStockTelemetry("EasyStock.Web");
+
 // 1. Cultura pt-BR global
 var ptBR = new CultureInfo("pt-BR");
 CultureInfo.DefaultThreadCurrentCulture = ptBR;

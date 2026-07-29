@@ -12,6 +12,11 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.7" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
     <!--
       MSB3277: dependencias transitivas (alguma combinacao de Microsoft.Extensions.Hosting
       9.0.0 + analyzers do dotnet 10 SDK) trazem Microsoft.EntityFrameworkCore.Relational
@@ -24,6 +29,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.7" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
   </ItemGroup>
 

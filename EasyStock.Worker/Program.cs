@@ -31,12 +31,28 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 var builder = Host.CreateApplicationBuilder(args);
 
 // Serilog
-Log.Logger = new LoggerConfiguration()
+var loggerConfiguration = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .CreateLogger();
+    .Enrich.FromLogContext();
+
+// Logs via OTLP quando ha collector configurado (issue 1002) — correlacionados por
+// trace_id/span_id com os traces do TelemetrySetup. Opt-in: sem a config, sem sink.
+if (builder.Configuration["OpenTelemetry:OtlpEndpoint"] is { Length: > 0 } otlpLogsEndpoint)
+{
+    loggerConfiguration = loggerConfiguration.WriteTo.OpenTelemetry(o =>
+    {
+        o.Endpoint = otlpLogsEndpoint;
+        o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
+        o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = "EasyStock.Worker" };
+    });
+}
+
+Log.Logger = loggerConfiguration.CreateLogger();
 
 builder.Services.AddSerilog();
+
+// Telemetria OTLP opt-in (issue 1002) — no-op sem OpenTelemetry:OtlpEndpoint.
+builder.AddEasyStockTelemetry("EasyStock.Worker");
 
 // Options — WorkerOptions mantido por retro-compat (lê seção "Worker"); seção canônica é
 // "Notifications:Hosting" lida via AddNotificationsCore.

@@ -6,6 +6,7 @@ using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -383,7 +384,11 @@ public static class ApiServiceCollectionExtensions
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
-        var otlpEndpoint = new Uri(configuration[ConfigurationKeys.OtlpEndpoint] ?? "http://localhost:4317");
+        // string.IsNullOrWhiteSpace (nao `??`): o compose da VM injeta a env como string
+        // vazia quando OTEL_COLLECTOR_ENDPOINT nao esta no .env, e new Uri("") lanca
+        // UriFormatException derrubando a API no startup (issue 1002).
+        var otlpConfigured = configuration[ConfigurationKeys.OtlpEndpoint];
+        var otlpEndpoint = new Uri(string.IsNullOrWhiteSpace(otlpConfigured) ? "http://localhost:4317" : otlpConfigured);
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService("EasyStock.Api"))
@@ -392,6 +397,7 @@ public static class ApiServiceCollectionExtensions
                 tracing
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
+                    .AddNpgsql()
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 
                 if (environment.IsDevelopment())
@@ -403,7 +409,10 @@ public static class ApiServiceCollectionExtensions
                     // Em prod, amostra 10% das traces pra reduzir custo de egress
                     // OTLP e backend (Honeycomb/Tempo cobram por span). Health checks
                     // e polling endpoints ja sao filtrados pelo Serilog request logging.
-                    tracing.SetSampler(new TraceIdRatioBasedSampler(0.1));
+                    // ParentBased: quando a Web/Admin ja decidiu amostrar o trace, a API
+                    // segue a decisao — sem isso o ratio re-decide e quebra o trace
+                    // distribuido Web -> Api -> Postgres no meio (issue 1002).
+                    tracing.SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(0.1)));
                 }
             })
             .WithMetrics(metrics =>
