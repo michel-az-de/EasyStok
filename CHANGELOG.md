@@ -5,6 +5,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Telemetria OpenTelemetry (traces + metricas + logs) nos 4 hosts (Api/Web/Admin/Worker),
+  exportada via OTLP pro otel-collector da VM consolidada -> OpenObserve. Opt-in por
+  `OpenTelemetry:OtlpEndpoint` (vazio = desligado; dev/CI intactos). Api ganha Npgsql
+  tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
+
 ### Changed
 - Homolog consolidada na VM unica `hiram-demo-vm` (eastus2, `*.20.98.234.200.sslip.io`), host
   compartilhado com jornada + levante atras de um Caddy central; stack sobe sem caddy proprio
