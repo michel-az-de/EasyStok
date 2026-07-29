@@ -1,0 +1,13 @@
+# docker-compose.azure.noedge.yml — override para host consolidado (issue 997).
+#
+# Na hiram-demo-vm (20.98.234.200) o edge e um Caddy central compartilhado
+# (/opt/hiram/deploy/stack) que ja publica 80/443 e roteia jornada + levante +
+# easystok. O caddy DESTA stack ficaria em crash-loop disputando as portas;
+# este override o poe atras de um profile para o `up -d` nao subi-lo.
+#
+# Uso (cron da VM): EASYSTOK_COMPOSE_EXTRA=/home/azureuser/easystok/docker-compose.azure.noedge.yml
+# O Caddy central alcanca web/admin/api/storefront conectando-se a rede externa
+# easystok_easystock-net (so o caddy entra na rede da stack, nao o contrario).
+services:
+  caddy:
+    profiles: ["edge-local"]

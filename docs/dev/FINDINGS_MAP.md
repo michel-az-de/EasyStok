@@ -11,7 +11,7 @@ estava corrigida ou em andamento em master. Padrão "black-box false negative po
 Legenda de veredito: **JÁ-CORRIGIDO** (fix em master, falta deploy) · **REFUTADO** (não é bug /
 by-design) · **PARCIAL** (em andamento, issue existe) · **ABERTO** (confirmado, sem cobertura).
 
-## App cliente (app.20.230.185.203.sslip.io)
+## App cliente (app.20.98.234.200.sslip.io)
 
 | ID | Sintoma | Veredito | Evidência arquivo:linha | Issue/PR alvo |
 |----|---------|----------|-------------------------|---------------|
@@ -28,7 +28,7 @@ by-design) · **PARCIAL** (em andamento, issue existe) · **ABERTO** (confirmado
 | AC-11 | Saídas com granularidade explodida (1 venda → N linhas) | ABERTO | `EasyStock.Web/Views/Saidas/Historico.cshtml:122` lista `MovimentacaoEstoque` item-a-item; tem `VendaId`, não agrupa | abrir issue |
 | Higiene | Produtos XSS-escapado e item R$142.857.142,84 poluindo agregados | ABERTO | `EasyStock.Domain/Entities/Empresa.cs:14` `IsSeedData` é `[NotMapped]` (não persiste) → não filtra agregados | abrir issue (p3) |
 
-## Admin (admin.20.230.185.203.sslip.io)
+## Admin (admin.20.98.234.200.sslip.io)
 
 | ID | Sintoma | Veredito | Evidência arquivo:linha | Issue/PR alvo |
 |----|---------|----------|-------------------------|---------------|
