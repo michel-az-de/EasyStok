@@ -63,6 +63,15 @@
     @* Navegação (ADR-0032): estrutura, favoritos (Meu dia), grupos e badges renderizados
        no servidor pelo <es-sidebar> (EsSidebarTagHelper). A interatividade (pin/accordion
        exclusivo/rail/reorder) entra na fatia 7. *@
+    @if (Context.Request.Query.ContainsKey("modulo"))
+    {
+        <div class="px-3 py-2 border-b border-white/5">
+            <a href="/launcher" class="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/5 rounded transition-colors">
+                <es-icon name="arrow-left" class="w-3.5 h-3.5"></es-icon>
+                <span>Voltar ao portal</span>
+            </a>
+        </div>
+    }
     <div class="sidebar-nav-wrap flex-1 min-h-0 relative">
         <es-sidebar></es-sidebar>
         <div class="sidebar-scroll-hint" aria-hidden="true"></div>

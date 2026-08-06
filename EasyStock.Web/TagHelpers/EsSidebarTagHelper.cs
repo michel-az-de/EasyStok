@@ -37,6 +37,8 @@ public sealed class EsSidebarTagHelper(
     {
         _publicApi = (config["PublicApiUrl"] ?? string.Empty).TrimEnd('/');
         var path = ViewContext?.HttpContext?.Request?.Path.Value;
+        var query = ViewContext?.HttpContext?.Request?.Query;
+        var moduloAtivo = query?.ContainsKey("modulo") == true ? query["modulo"].ToString() : null;
         var activeMenuItem = ViewContext?.ViewData["ActiveMenuItem"] as string;
         var usuarioId = session.GetUsuarioId();
         var lojaId = session.GetLojaId();
@@ -52,23 +54,24 @@ public sealed class EsSidebarTagHelper(
 
         // Sem linha de favoritos => seed por perfil (flag KDS).
         var favoritos = fav.Favoritos ?? MenuDefinition.DefaultFavoritos(fav.KdsHabilitado);
-        var vm = MenuViewModelBuilder.Build(path, activeMenuItem, favoritos, badges, fav.KdsHabilitado);
+        var vm = MenuViewModelBuilder.Build(path, activeMenuItem, favoritos, badges, fav.KdsHabilitado, moduloAtivo);
 
         output.TagName = "nav";
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Attributes.SetAttribute("class", "es-nav");
         output.Attributes.SetAttribute("aria-label", "Menu principal");
         output.Attributes.SetAttribute("data-es-sidebar", "");
-        output.Content.SetHtmlContent(BuildHtml(vm));
+        output.Attributes.SetAttribute("data-modulo", moduloAtivo ?? "");
+        output.Content.SetHtmlContent(BuildHtml(vm, moduloAtivo));
     }
 
-    private string BuildHtml(MenuViewModel vm)
+    private string BuildHtml(MenuViewModel vm, string? moduloAtivo)
     {
         var favKeys = vm.MeuDia.Select(v => v.Key).ToHashSet(StringComparer.Ordinal);
         var sb = new StringBuilder(2048);
 
         // Dashboard (topo fixo, fora de grupo).
-        AppendItem(sb, vm.Dashboard, favKeys, idSuffix: string.Empty, showStar: false);
+        AppendItem(sb, vm.Dashboard, favKeys, idSuffix: string.Empty, showStar: false, moduloAtivo: moduloAtivo);
 
         // "Meu dia" (favoritos) — some quando vazio.
         if (vm.MeuDia.Count > 0)
@@ -76,7 +79,7 @@ public sealed class EsSidebarTagHelper(
             sb.Append("<div class=\"es-fav\" data-meu-dia>");
             sb.Append("<div class=\"es-nav-label\">Meu dia</div>");
             foreach (var item in vm.MeuDia)
-                AppendItem(sb, item, favKeys, idSuffix: "-fav", showStar: true);
+                AppendItem(sb, item, favKeys, idSuffix: "-fav", showStar: true, moduloAtivo: moduloAtivo);
             sb.Append("</div>");
         }
 
@@ -94,20 +97,20 @@ public sealed class EsSidebarTagHelper(
               .Append(g.BadgeSum > 0 ? "" : " hidden").Append('>').Append(g.BadgeSum).Append("</span>");
             sb.Append("</summary>");
             foreach (var item in g.Items)
-                AppendItem(sb, item, favKeys, idSuffix: string.Empty, showStar: true);
+                AppendItem(sb, item, favKeys, idSuffix: string.Empty, showStar: true, moduloAtivo: moduloAtivo);
             sb.Append("</details>");
         }
 
         // Rodape fixo.
         sb.Append("<div class=\"es-footer\">");
         foreach (var item in vm.Footer)
-            AppendItem(sb, item, favKeys, idSuffix: string.Empty, showStar: false);
+            AppendItem(sb, item, favKeys, idSuffix: string.Empty, showStar: false, moduloAtivo: moduloAtivo);
         sb.Append("</div>");
 
         return sb.ToString();
     }
 
-    private void AppendItem(StringBuilder sb, MenuItemView v, HashSet<string> favKeys, string idSuffix, bool showStar)
+    private void AppendItem(StringBuilder sb, MenuItemView v, HashSet<string> favKeys, string idSuffix, bool showStar, string? moduloAtivo)
     {
         var i = v.Item;
         sb.Append("<div id=\"es-row-").Append(Enc(i.Key)).Append(Enc(idSuffix)).Append('"')
@@ -115,6 +118,12 @@ public sealed class EsSidebarTagHelper(
           .Append(" data-menu-key=\"").Append(Enc(i.Key)).Append("\">");
 
         var href = i.IsExternal && _publicApi.Length > 0 ? _publicApi + i.Href : i.Href;
+        // Preserva o parametro modulo nos links internos quando estamos num contexto de modulo.
+        if (!string.IsNullOrEmpty(moduloAtivo) && !i.IsExternal && !href.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            var sep = href.Contains('?') ? "&" : "?";
+            href = href + sep + "modulo=" + Uri.EscapeDataString(moduloAtivo);
+        }
         // title = tooltip nativo (usado sobretudo no modo rail, onde o label some).
         sb.Append("<a class=\"es-ni\" href=\"").Append(Enc(href)).Append("\" title=\"").Append(Enc(i.Label)).Append('"');
         if (v.IsActive) sb.Append(" aria-current=\"page\"");

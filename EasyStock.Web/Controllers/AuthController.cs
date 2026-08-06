@@ -23,7 +23,7 @@ public class AuthController(
     public IActionResult Login(string? returnUrl = null, string? bye = null)
     {
         if (session.IsLoggedIn())
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("Index", "Launcher");
 
         // Verifica se a sessão expirou (sinalizado pelo TokenRefreshHandler via cookie _se)
         if (Request.Cookies.ContainsKey("_se"))
@@ -154,7 +154,7 @@ public class AuthController(
         }
 
         // 0 lojas (ou falha ao listar): manda pro wizard/aviso. Sem isso o usuario
-        // cairia direto no Dashboard sem LojaId, conseguindo navegar e tentar criar
+        // cairia direto no Launcher sem LojaId, conseguindo navegar e tentar criar
         // recursos numa loja inexistente.
         return RedirectToAction(nameof(SelecionarLoja));
     }
@@ -195,7 +195,7 @@ public class AuthController(
     public IActionResult SelecionarLoja(string lojaId, string lojaNome, string? lojaEmoji, string? empresaId)
     {
         session.SetLoja(lojaId, lojaNome, lojaEmoji, empresaId);
-        return RedirectToAction("Index", "Dashboard");
+        return RedirectToAction("Index", "Launcher");
     }
 
     /// <summary>
@@ -267,7 +267,7 @@ public class AuthController(
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
 
         TempData["Toast"] = "info|Sessão de suporte iniciada. Saia ao terminar.";
-        return RedirectToAction("Index", "Dashboard");
+        return RedirectToAction("Index", "Launcher");
     }
 
     /// <summary>
@@ -295,7 +295,7 @@ public class AuthController(
     public IActionResult Registrar()
     {
         if (session.IsLoggedIn())
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("Index", "Launcher");
         return View(new RegisterViewModel());
     }
 
@@ -410,7 +410,7 @@ public class AuthController(
         }
 
         TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias esta ativo.";
-        return RedirectToAction("Index", "Dashboard");
+        return RedirectToAction("Index", "Launcher");
     }
 
     [AllowAnonymous]
@@ -418,7 +418,7 @@ public class AuthController(
     public IActionResult EsqueciSenha()
     {
         if (session.IsLoggedIn())
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("Index", "Launcher");
         return View();
     }
 
@@ -502,7 +502,7 @@ public class AuthController(
     private IActionResult SafeRedirect(string? returnUrl) =>
         !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? Redirect(returnUrl)
-            : RedirectToAction("Index", "Dashboard");
+            : RedirectToAction("Index", "Launcher");
 
     // AuthController não herda BaseController; replica a regra anti-loop (#619): se o gate
     // barrou por assinatura bloqueada (ASSINATURA_BLOQUEADA:{sub-code}), manda para a landing

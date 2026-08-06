@@ -16,7 +16,8 @@ public static class MenuViewModelBuilder
         string? activeMenuItem,
         IReadOnlyList<string>? favoritosKeys,
         MenuBadges? badges,
-        bool kdsHabilitado)
+        bool kdsHabilitado,
+        string? moduloAtivo = null)
     {
         badges ??= MenuBadges.Zero;
 
@@ -26,6 +27,14 @@ public static class MenuViewModelBuilder
         var groups = MenuDefinition.Groups
             .Select(g => (group: g, items: g.Items.Where(Visible).ToList()))
             .ToList();
+
+        // (1b) filtra pelo modulo ativo (shell modular) — mantém apenas o grupo do modulo.
+        if (!string.IsNullOrEmpty(moduloAtivo))
+        {
+            var grupoEsperado = ModuloDefinition.GrupoDoModulo(moduloAtivo);
+            if (!string.IsNullOrEmpty(grupoEsperado))
+                groups = groups.Where(x => x.group.Key == grupoEsperado).ToList();
+        }
 
         // Itens navegaveis visiveis (Dashboard + grupos filtrados + rodape): base do
         // matching e da resolucao de favoritos.
