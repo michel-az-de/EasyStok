@@ -23,8 +23,6 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
         ViewBag.Title = "Portal";
         ViewBag.ActiveMenuItem = "Launcher";
 
-        var empresaId = session.GetEmpresaId() ?? string.Empty;
-        var lojaId = session.GetLojaId() ?? string.Empty;
         var usuarioNome = session.GetUsuarioNome() ?? "Usuário";
 
         // ── Saudação e data (fuso BR, mesmo padrão do Dashboard) ──
@@ -76,7 +74,7 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
         vm.ContasVencerHoje = 0; // placeholder — será preenchido quando o endpoint existir
 
         // ── Monta cards de módulo ──
-        var modulosDef = ModuloDefinition.PorEmpresa(empresaId);
+        var modulosDef = ModuloDefinition.Modulos;
         // Mesma composicao do MenuResumoService (ADR-0032, fatia 2): pedidos vem do resumo
         // do dia, criticos e vencidos do dashboard. Em F4 a chamada direta ao ApiClient sai
         // e o servico com cache passa a ser a unica fonte.
@@ -113,6 +111,6 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
 
         return new ModuloCardViewModel(
             m.Key, m.Nome, m.IconeLucide, m.Descricao, m.HrefDefault,
-            badge, badgeType, status, m.CorClasse);
+            badge, badgeType, status);
     }
 }

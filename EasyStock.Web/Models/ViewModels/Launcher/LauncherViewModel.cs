@@ -15,8 +15,7 @@ public sealed record ModuloCardViewModel(
     string Href,
     int BadgeCount,
     string BadgeType,   // crit | warn | ok | info
-    string StatusText,
-    string CorClasse    // mod-op | mod-prod | mod-comp | mod-fin | mod-cre | mod-adm
+    string StatusText
 );
 
 /// <summary>

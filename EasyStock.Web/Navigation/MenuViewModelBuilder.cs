@@ -5,7 +5,14 @@ namespace EasyStock.Web.Navigation;
 /// da rota atual, do ActiveMenuItem legado, dos favoritos e dos badges. Toda a
 /// logica testavel do menu vive aqui (ADR-0032). Pipeline na ordem (P1-6):
 /// (1) filtra a arvore pela flag KDS; (2) resolve ativo e favoritos contra a arvore
-/// JA filtrada (favorito orfao some sozinho).
+/// JA filtrada (favorito orfao some sozinho); (2b) filtra os grupos pelo modulo ativo,
+/// so para apresentacao (ADR-0046).
+///
+/// <para>
+/// A ordem importa: o filtro de KDS DESCARTA (item que nao existe para o tenant), o de
+/// modulo apenas ESCONDE. Por isso ativo e favoritos sao resolvidos antes do (2b) —
+/// "Meu dia" e lista de salto cross-modulo e continua clicavel de dentro de qualquer modulo.
+/// </para>
 /// </summary>
 public static class MenuViewModelBuilder
 {
@@ -24,26 +31,36 @@ public static class MenuViewModelBuilder
         // (1) filtra a arvore pela flag KDS — itens de producao somem quando off.
         bool Visible(MenuItem i) => kdsHabilitado || !i.IsProducaoKds;
 
-        var groups = MenuDefinition.Groups
+        var todosGrupos = MenuDefinition.Groups
             .Select(g => (group: g, items: g.Items.Where(Visible).ToList()))
             .ToList();
 
-        // (1b) filtra pelo modulo ativo (shell modular) — mantém apenas o grupo do modulo.
-        if (!string.IsNullOrEmpty(moduloAtivo))
-        {
-            var grupoEsperado = ModuloDefinition.GrupoDoModulo(moduloAtivo);
-            if (!string.IsNullOrEmpty(grupoEsperado))
-                groups = groups.Where(x => x.group.Key == grupoEsperado).ToList();
-        }
-
-        // Itens navegaveis visiveis (Dashboard + grupos filtrados + rodape): base do
-        // matching e da resolucao de favoritos.
+        // Itens navegaveis visiveis (Dashboard + TODOS os grupos + rodape): base do
+        // matching e da resolucao de favoritos, ANTES do filtro de modulo.
         var navigable = new List<MenuItem> { MenuDefinition.Dashboard };
-        navigable.AddRange(groups.SelectMany(x => x.items));
+        navigable.AddRange(todosGrupos.SelectMany(x => x.items));
         navigable.AddRange(MenuDefinition.Footer);
 
         // (2) item ativo: rota por segmentos; fallback ActiveMenuItem legado.
         var activeKey = ResolveActive(navigable, currentPath, activeMenuItem);
+
+        // (2b) modulo ativo (ADR-0046): renderiza apenas o grupo daquele modulo.
+        // 'admin' e o rodape, que nao e grupo — nenhum grupo aparece. Modulo nulo ou
+        // desconhecido mantem o menu inteiro (fail-open).
+        var groups = todosGrupos;
+        if (!string.IsNullOrEmpty(moduloAtivo))
+        {
+            if (moduloAtivo == ModuloDefinition.ModuloAdmin)
+            {
+                groups = [];
+            }
+            else
+            {
+                var grupoEsperado = ModuloDefinition.GrupoDoModulo(moduloAtivo);
+                if (!string.IsNullOrEmpty(grupoEsperado))
+                    groups = todosGrupos.Where(x => x.group.Key == grupoEsperado).ToList();
+            }
+        }
 
         // Grupo que contem o ativo (accordion exclusivo abre esse no load).
         var activeGroupKey = groups

@@ -5,19 +5,12 @@
     var lojaAtualNome = ViewBag.LojaAtualNome as string;
     var lojaAtualEmoji = (ViewBag.LojaAtualEmoji as string) ?? "🏪";
     var usuarioRole = ViewBag.Role as string;
-    var moduloAtual = Context.Request.Query.ContainsKey("modulo") ? Context.Request.Query["modulo"].ToString() : null;
-    var moduloNome = moduloAtual switch
-    {
-        "operacao" => "Operação",
-        "producao" => "Produção e Estoque",
-        "compras" => "Compras",
-        "financeiro" => "Financeiro",
-        "crescimento" => "Crescimento",
-        "admin" => "Administração",
-        "comercial" => "Comercial",
-        "crm" => "CRM",
-        _ => null
-    };
+    @* Shell modular (ADR-0046): módulo derivado da ROTA e nome vindo do ModuloDefinition —
+       antes o breadcrumb lia a querystring e um ?modulo= inválido exibia "você está no
+       módulo X" com o menu inteiro do lado. *@
+    var moduloAtual = EasyStock.Web.Navigation.ModuloDefinition.ResolverPorRota(
+        Context.Request.Path.Value, ViewData["ActiveMenuItem"] as string);
+    var moduloNome = EasyStock.Web.Navigation.ModuloDefinition.PorChave(moduloAtual)?.Nome;
 }
 
 <header class="app-topbar relative z-40 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0"

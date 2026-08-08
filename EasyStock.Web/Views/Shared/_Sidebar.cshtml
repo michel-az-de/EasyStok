@@ -62,8 +62,15 @@
 
     @* Navegação (ADR-0032): estrutura, favoritos (Meu dia), grupos e badges renderizados
        no servidor pelo <es-sidebar> (EsSidebarTagHelper). A interatividade (pin/accordion
-       exclusivo/rail/reorder) entra na fatia 7. *@
-    @if (Context.Request.Query.ContainsKey("modulo"))
+       exclusivo/rail/reorder) vive em menu-sidebar.js. *@
+    @* Shell modular (ADR-0046): o módulo vem da ROTA, não de querystring — por isso o
+       atalho aparece exatamente quando o menu está filtrado, e some no Dashboard/portal.
+       text-slate-400 sobre a superfície invertida dá ~7:1 (ADR-0045). *@
+    @{
+        var moduloDaRota = EasyStock.Web.Navigation.ModuloDefinition.ResolverPorRota(
+            Context.Request.Path.Value, ViewData["ActiveMenuItem"] as string);
+    }
+    @if (moduloDaRota is not null)
     {
         <div class="px-3 py-2 border-b border-white/5">
             <a href="/launcher" class="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/5 rounded transition-colors">
