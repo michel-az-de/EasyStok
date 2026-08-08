@@ -27,7 +27,7 @@ namespace EasyStock.Web.UnitTests.TagHelpers;
 public class EsSidebarTagHelperTests
 {
     private static string Render(string path, IReadOnlyList<string>? favoritos, bool kds, MenuResumoRaw resumo,
-        string? queryString = null, string? activeMenuItem = null)
+        string? queryString = null, string? activeMenuItem = null, IReadOnlyList<string>? features = null)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -39,6 +39,10 @@ public class EsSidebarTagHelperTests
         var source = Substitute.For<IMenuResumoSource>();
         source.FetchAsync().Returns(resumo);
         var resumoSvc = new MenuResumoService(source, cache);
+
+        var featuresFonte = Substitute.For<ITenantFeaturesFonte>();
+        featuresFonte.FetchAsync().Returns((features ?? [], true));
+        var featuresSvc = new TenantFeaturesService(featuresFonte, cache);
 
         var httpCtx = new DefaultHttpContext { Session = new FakeSession() };
         httpCtx.Request.Path = path;
@@ -58,7 +62,7 @@ public class EsSidebarTagHelperTests
             Substitute.For<ITempDataDictionary>(), TextWriter.Null, new HtmlHelperOptions());
 
         var config = Substitute.For<IConfiguration>();
-        var th = new EsSidebarTagHelper(favSvc, resumoSvc, session, icons, config) { ViewContext = viewCtx };
+        var th = new EsSidebarTagHelper(favSvc, resumoSvc, featuresSvc, session, icons, config) { ViewContext = viewCtx };
 
         var ctx = new TagHelperContext(new TagHelperAttributeList(), new Dictionary<object, object>(), "t");
         var output = new TagHelperOutput("es-sidebar", new TagHelperAttributeList(),

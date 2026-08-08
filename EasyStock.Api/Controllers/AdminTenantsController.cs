@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
 using EasyStock.Application.UseCases.Admin.ExportarTenantsCsv;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -26,6 +27,8 @@ public class AdminTenantsController(
     AdminAuditService audit,
     CriarTenantPorAdminUseCase criarTenantUseCase,
     ExportarTenantsCsvUseCase exportarTenantsCsvUseCase,
+    ListarFeaturesDoTenantUseCase listarFeaturesUseCase,
+    DefinirFeatureDoTenantUseCase definirFeatureUseCase,
     ILogger<AdminTenantsController> logger) : EasyStockControllerBase
 {
     /// <summary>Exporta clientes filtrados (ou os <c>ids</c> selecionados) como CSV.</summary>
@@ -346,6 +349,50 @@ public class AdminTenantsController(
         return DataOk(new { status = novoStatus.ToString() });
     }
 
+    /// <summary>
+    /// Features do tenant para a aba "Features" do back-office: o catálogo inteiro com o
+    /// estado de cada uma, não só o que já foi gravado — a tela só oferece toggle para o que
+    /// vem nesta lista, então um tenant sem linha nenhuma precisa ver o catálogo para poder
+    /// ligar o primeiro módulo.
+    /// </summary>
+    [HttpGet("{id:guid}/features")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListarFeatures(Guid id, CancellationToken ct)
+    {
+        var features = await listarFeaturesUseCase.ExecuteAsync(new ListarFeaturesDoTenantQuery(id), ct);
+        return DataOk(features);
+    }
+
+    /// <summary>
+    /// Liga ou desliga uma feature do tenant. Auditado: mexer no que um cliente enxerga não
+    /// pode ser anônimo.
+    /// </summary>
+    [HttpPatch("{id:guid}/features/{feature}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PatchFeature(
+        Guid id, string feature, [FromBody] PatchTenantFeatureRequest req, CancellationToken ct)
+    {
+        var existe = await db.Empresas.AnyAsync(e => e.Id == id, ct);
+        if (!existe) return DataNotFound("Tenant não encontrado.");
+
+        // O JWT emite o claim curto "email"; ClaimTypes.Email só resolve quando o handler
+        // mapeia para a URI longa, o que aqui não acontece — sem os dois, a auditoria
+        // gravaria um GUID no lugar de quem mexeu.
+        var adminEmail = User.FindFirstValue("email")
+            ?? User.FindFirstValue(ClaimTypes.Email)
+            ?? currentUser.UsuarioId.ToString();
+        var alterado = await definirFeatureUseCase.ExecuteAsync(
+            new DefinirFeatureDoTenantCommand(id, feature, req.Ativo, adminEmail), ct);
+
+        await audit.LogAsync(
+            "TenantFeatureAlterada",
+            $"Feature={alterado.Feature}, Ativo={alterado.Ativo}",
+            id);
+
+        return DataOk(alterado);
+    }
+
     [HttpPost("{id:guid}/impersonate")]
     public async Task<IActionResult> Impersonate(Guid id)
     {
@@ -608,6 +655,8 @@ public class AdminTenantsController(
 }
 
 public record PatchTenantStatusRequest(string Status, string? Motivo);
+
+public record PatchTenantFeatureRequest(bool Ativo);
 public record PatchTenantPlanoRequest(Guid PlanoId);
 public record GrantTrialRequest(int DiasTrial);
 public record AplicarCupomRequest(string Codigo);
