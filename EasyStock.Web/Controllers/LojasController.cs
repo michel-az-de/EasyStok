@@ -54,7 +54,7 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
 
         // Caso o usuário não tenha loja ativa (fluxo de onboarding após login sem
         // lojas vinculadas), auto-seleciona a loja recém-criada para que o
-        // BaseController não bloqueie o acesso ao Dashboard.
+        // BaseController não bloqueie o acesso ao portal.
         if (string.IsNullOrEmpty(Session.GetLojaId()))
         {
             var listaResult = await svc.ListarAsync();
@@ -63,7 +63,7 @@ public class LojasController(LojasService svc, SessionService sessionSvc) : Base
                 var nova = lojas.FirstOrDefault(l => string.Equals(l.Nome, nomeTrim, StringComparison.OrdinalIgnoreCase))
                     ?? lojas.Last();
                 Session.SetLoja(nova.Id.ToString(), nova.Nome, emoji, nova.EmpresaId ?? "");
-                return RedirectToAction("Index", "Dashboard");
+                return RedirectToAction("Index", "Launcher");
             }
         }
 

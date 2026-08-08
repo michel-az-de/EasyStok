@@ -137,9 +137,11 @@
 
     @* Bottom nav bar *@
     <nav class="bottom-nav">
-        <a href="/dashboard"
-           class="bottom-nav-item @(activeItem == "Dashboard" ? "bottom-nav-item--active" : "")">
-            <es-icon name="layout-dashboard" class="w-6 h-6"></es-icon>
+        @* Portal e a home autenticada (ADR-0046). No mobile este e o caminho de volta
+           aos modulos: o breadcrumb da topbar so aparece em telas grandes. *@
+        <a href="/launcher"
+           class="bottom-nav-item @(activeItem == "Launcher" ? "bottom-nav-item--active" : "")">
+            <es-icon name="layout-grid" class="w-6 h-6"></es-icon>
             <span>Início</span>
         </a>
 

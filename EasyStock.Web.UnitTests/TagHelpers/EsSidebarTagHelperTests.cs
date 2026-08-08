@@ -26,7 +26,8 @@ namespace EasyStock.Web.UnitTests.TagHelpers;
 /// </summary>
 public class EsSidebarTagHelperTests
 {
-    private static string Render(string path, IReadOnlyList<string>? favoritos, bool kds, MenuResumoRaw resumo)
+    private static string Render(string path, IReadOnlyList<string>? favoritos, bool kds, MenuResumoRaw resumo,
+        string? queryString = null, string? activeMenuItem = null)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -41,6 +42,7 @@ public class EsSidebarTagHelperTests
 
         var httpCtx = new DefaultHttpContext { Session = new FakeSession() };
         httpCtx.Request.Path = path;
+        if (queryString is not null) httpCtx.Request.QueryString = new QueryString(queryString);
         var accessor = Substitute.For<IHttpContextAccessor>();
         accessor.HttpContext.Returns(httpCtx);
         var session = new SessionService(accessor);
@@ -50,6 +52,7 @@ public class EsSidebarTagHelperTests
         var icons = new LucideIconResolver(env, Substitute.For<ILogger<LucideIconResolver>>());
 
         var viewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary());
+        if (activeMenuItem is not null) viewData["ActiveMenuItem"] = activeMenuItem;
         var actionCtx = new ActionContext(httpCtx, new RouteData(), new ActionDescriptor());
         var viewCtx = new ViewContext(actionCtx, Substitute.For<IView>(), viewData,
             Substitute.For<ITempDataDictionary>(), TextWriter.Null, new HtmlHelperOptions());
@@ -116,6 +119,84 @@ public class EsSidebarTagHelperTests
     {
         var html = Render("/dashboard", Array.Empty<string>(), kds: false, Resumo(0, 0, 0));
         html.Should().NotContain("data-menu-key=\"kds-operacao\"");
+    }
+
+    // ── shell modular: modulo derivado da rota (ADR-0046) ────────────
+
+    [Fact]
+    public void Rota_de_modulo_renderiza_so_o_grupo_daquele_modulo()
+    {
+        var html = Render("/pedidos", Array.Empty<string>(), kds: true, Resumo(0, 0, 0));
+
+        html.Should().Contain("data-group=\"operacao\"");
+        html.Should().NotContain("data-group=\"financeiro\"");
+    }
+
+    [Fact]
+    public void Rota_do_rodape_esconde_todos_os_grupos()
+    {
+        var html = Render("/usuarios", Array.Empty<string>(), kds: true, Resumo(0, 0, 0));
+
+        html.Should().NotContain("<details");
+        html.Should().Contain("data-menu-key=\"configuracoes\"");
+    }
+
+    [Fact]
+    public void Dashboard_mostra_o_menu_inteiro()
+    {
+        var html = Render("/dashboard", Array.Empty<string>(), kds: true, Resumo(0, 0, 0));
+
+        html.Should().Contain("data-group=\"operacao\"");
+        html.Should().Contain("data-group=\"financeiro\"");
+    }
+
+    [Fact]
+    public void Querystring_da_rota_desempata_itens_que_dividem_o_mesmo_path()
+    {
+        // "Validade" e "Posição" compartilham /estoque, diferindo so em ?status=vencido.
+        // O desempate por query existe no builder desde o ADR-0032, mas o TagHelper passava
+        // apenas o Path — entao Validade nunca ficava ativo, nem vindo do card do portal.
+        var html = Render("/estoque", Array.Empty<string>(), kds: true, Resumo(0, 0, 0),
+            queryString: "?status=vencido");
+
+        html.Should().Contain("data-menu-key=\"lotes-validade\"");
+        var trechoValidade = html[html.IndexOf("es-row-lotes-validade", StringComparison.Ordinal)..];
+        trechoValidade[..300].Should().Contain("aria-current=\"page\"");
+    }
+
+    [Fact]
+    public void Sem_querystring_o_item_sem_query_continua_ativo()
+    {
+        var html = Render("/estoque", Array.Empty<string>(), kds: true, Resumo(0, 0, 0));
+
+        var trechoPosicao = html[html.IndexOf("es-row-posicao-estoque", StringComparison.Ordinal)..];
+        trechoPosicao[..300].Should().Contain("aria-current=\"page\"");
+    }
+
+    [Fact]
+    public void Tela_que_so_casa_por_alias_legado_mantem_o_menu_inteiro()
+    {
+        // /operacao emite ActiveMenuItem="Operacao", alias do item de rodape "Dispositivos".
+        // Se o modulo saisse dai, a tela de operacao renderizaria ZERO grupos — sem Pedidos,
+        // Caixa, Estoque nem Financeiro.
+        var html = Render("/operacao", Array.Empty<string>(), kds: true, Resumo(0, 0, 0),
+            activeMenuItem: "Operacao");
+
+        html.Should().Contain("data-group=\"operacao\"");
+        html.Should().Contain("data-group=\"financeiro\"");
+    }
+
+    [Fact]
+    public void Querystring_de_modulo_nao_influencia_mais_o_menu()
+    {
+        // O ?modulo= foi removido (ADR-0046): quem manda e a rota. Enquanto era lido da
+        // query, um valor invalido escondia grupo nenhum mas a topbar dizia que o usuario
+        // estava dentro de um modulo.
+        var html = Render("/dashboard", Array.Empty<string>(), kds: true, Resumo(0, 0, 0),
+            queryString: "?modulo=financeiro");
+
+        html.Should().Contain("data-group=\"operacao\"");
+        html.Should().NotContain("modulo=");
     }
 
     private sealed class FakeSession : ISession

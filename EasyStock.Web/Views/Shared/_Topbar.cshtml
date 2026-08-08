@@ -5,20 +5,39 @@
     var lojaAtualNome = ViewBag.LojaAtualNome as string;
     var lojaAtualEmoji = (ViewBag.LojaAtualEmoji as string) ?? "🏪";
     var usuarioRole = ViewBag.Role as string;
+    @* Shell modular (ADR-0046): módulo derivado da ROTA e nome vindo do ModuloDefinition —
+       antes o breadcrumb lia a querystring e um ?modulo= inválido exibia "você está no
+       módulo X" com o menu inteiro do lado. *@
+    var moduloAtual = EasyStock.Web.Navigation.ModuloDefinition.ResolverPorRota(
+        Context.Request.Path.Value + Context.Request.QueryString.Value);
+    var moduloNome = EasyStock.Web.Navigation.ModuloDefinition.PorChave(moduloAtual)?.Nome;
 }
 
 <header class="app-topbar relative z-40 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0"
         style="background: var(--bg-surface); border-bottom: 1px solid var(--border-soft);">
-    <!-- Hamburger (mobile only) -->
-    <button @@click="sidebarOpen = !sidebarOpen"
-            id="sidebar-toggle"
-            aria-label="Abrir menu"
-            aria-controls="app-sidebar"
-            :aria-expanded="sidebarOpen ? 'true' : 'false'"
-            class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
-            style="color: var(--text-secondary);">
-        <es-icon name="menu" class="w-5 h-5"></es-icon>
-    </button>
+    @* Hamburger (mobile): some junto com a sidebar no portal — abriria um drawer vazio. *@
+    @if (ViewBag.OcultarSidebar != true)
+    {
+        <button @@click="sidebarOpen = !sidebarOpen"
+                id="sidebar-toggle"
+                aria-label="Abrir menu"
+                aria-controls="app-sidebar"
+                :aria-expanded="sidebarOpen ? 'true' : 'false'"
+                class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                style="color: var(--text-secondary);">
+            <es-icon name="menu" class="w-5 h-5"></es-icon>
+        </button>
+    }
+
+    <!-- Breadcrumb (desktop: quando dentro de um modulo) -->
+    @if (!string.IsNullOrEmpty(moduloNome))
+    {
+        <div class="hidden lg:flex items-center gap-2 text-sm flex-shrink-0">
+            <a href="/launcher" class="text-slate-500 hover:text-slate-700 transition-colors">Portal</a>
+            <es-icon name="chevron-right" class="w-3.5 h-3.5 text-slate-300"></es-icon>
+            <span class="font-medium text-slate-800">@moduloNome</span>
+        </div>
+    }
 
     <!-- Page title (mobile only) -->
     <div class="flex-1 lg:hidden min-w-0">

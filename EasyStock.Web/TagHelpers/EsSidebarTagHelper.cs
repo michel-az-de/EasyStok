@@ -14,8 +14,14 @@ namespace EasyStock.Web.TagHelpers;
 /// Degrada sem derrubar a pagina (falha nos services -> seed pela flag + badges 0).
 /// Acessibilidade: nav rotulado, grupos como &lt;details&gt;/&lt;summary&gt; (teclado e
 /// estado aberto nativos), item ativo com aria-current, estrela como BOTAO IRMAO do
-/// link (nunca aninhado em &lt;a&gt;). Interatividade (pin/accordion exclusivo/rail/
-/// reorder) entra na fatia 7; este TagHelper so produz a estrutura.
+/// link (nunca aninhado em &lt;a&gt;). A interatividade (pin, accordion exclusivo, rail,
+/// reorder) vive em <c>menu-sidebar.js</c>; este TagHelper so produz a estrutura.
+///
+/// <para>
+/// Shell modular (ADR-0046): o modulo ativo e DERIVADO da rota, nao lido de querystring
+/// nem de sessao. Dentro de um modulo o menu mostra so aquele grupo (mais Dashboard,
+/// "Meu dia" e rodape) e ganha o atalho "Voltar ao portal".
+/// </para>
 /// </summary>
 [HtmlTargetElement("es-sidebar")]
 public sealed class EsSidebarTagHelper(
@@ -36,8 +42,13 @@ public sealed class EsSidebarTagHelper(
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         _publicApi = (config["PublicApiUrl"] ?? string.Empty).TrimEnd('/');
-        var path = ViewContext?.HttpContext?.Request?.Path.Value;
+        // Path + querystring: o desempate por query do ResolveActive (ADR-0032) so existe
+        // porque "Validade" e "Posicao" compartilham /estoque, diferindo em ?status=vencido.
+        // Passando so o Path, esse desempate nunca acontecia e Validade nunca ficava ativo.
+        var req = ViewContext?.HttpContext?.Request;
+        var path = req is null ? null : req.Path.Value + req.QueryString.Value;
         var activeMenuItem = ViewContext?.ViewData["ActiveMenuItem"] as string;
+        var moduloAtivo = ModuloDefinition.ResolverPorRota(path);
         var usuarioId = session.GetUsuarioId();
         var lojaId = session.GetLojaId();
         var empresaId = session.GetEmpresaId();
@@ -52,13 +63,14 @@ public sealed class EsSidebarTagHelper(
 
         // Sem linha de favoritos => seed por perfil (flag KDS).
         var favoritos = fav.Favoritos ?? MenuDefinition.DefaultFavoritos(fav.KdsHabilitado);
-        var vm = MenuViewModelBuilder.Build(path, activeMenuItem, favoritos, badges, fav.KdsHabilitado);
+        var vm = MenuViewModelBuilder.Build(path, activeMenuItem, favoritos, badges, fav.KdsHabilitado, moduloAtivo);
 
         output.TagName = "nav";
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Attributes.SetAttribute("class", "es-nav");
         output.Attributes.SetAttribute("aria-label", "Menu principal");
         output.Attributes.SetAttribute("data-es-sidebar", "");
+        output.Attributes.SetAttribute("data-modulo", moduloAtivo ?? "");
         output.Content.SetHtmlContent(BuildHtml(vm));
     }
 
