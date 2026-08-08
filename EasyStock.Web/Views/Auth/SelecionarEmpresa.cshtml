@@ -1,0 +1,64 @@
+@model SelecionarEmpresaViewModel
+@{
+    Layout = null;
+    ViewBag.Title = "Selecionar Empresa";
+}
+@* Passo 2 do login em duas etapas (ADR-0047). Molde: SelecionarLoja — mesma moldura de
+   auth, mesmas classes (auth-title, auth-loja-card, auth-card-*), zero CSS novo.
+   Sem Alpine: a tela é um formulário por empresa, nada aqui precisa de JS. *@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Selecionar Empresa — EasyStok</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('easystock-theme');
+            const theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.dist.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+</head>
+<body class="h-full font-[Inter] antialiased flex items-center justify-center min-h-screen" style="background-color:var(--app-bg);background-image:var(--app-bg-image);">
+    <div class="w-full max-w-lg mx-auto px-4">
+        <div class="text-center mb-8">
+            <es-icon name="landmark" class="w-10 h-10 mx-auto" style="color: var(--orange-600);"></es-icon>
+            <h1 class="text-2xl font-extrabold auth-title mt-2">Selecione sua empresa</h1>
+            <p class="auth-subtitle text-sm mt-1">
+                Sua conta (@Model.Email) tem acesso a mais de uma empresa. Escolha com qual deseja entrar.
+            </p>
+        </div>
+
+        <div class="grid gap-3">
+            @foreach (var empresa in Model.Empresas)
+            {
+                <form asp-action="SelecionarEmpresa" asp-controller="Auth" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="empresaId" value="@empresa.Id" />
+                    <button type="submit" class="auth-loja-card w-full rounded-xl p-5 text-left flex items-center gap-4 transition-all shadow-sm group">
+                        <es-icon name="landmark" class="w-6 h-6 auth-icon-muted"></es-icon>
+                        <div>
+                            <div class="font-bold auth-card-title group-hover:text-indigo-500 transition-colors">@empresa.Nome</div>
+                            <div class="auth-card-subtitle text-sm">Entrar nesta empresa</div>
+                        </div>
+                        <svg class="ml-auto w-5 h-5 auth-icon-muted group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </form>
+            }
+        </div>
+
+        <p class="text-center mt-6">
+            <a href="/auth/login" class="text-xs auth-card-subtitle hover:underline">Voltar ao login</a>
+        </p>
+    </div>
+</body>
+</html>

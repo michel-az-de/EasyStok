@@ -25,6 +25,10 @@ public class AuthController(
         if (session.IsLoggedIn())
             return RedirectToAction("Index", "Launcher");
 
+        // Voltar para o login abandona qualquer selecao de empresa em curso — a senha
+        // guardada para o passo 2 nao sobrevive a desistencia (ADR-0047).
+        session.LimparLoginPendente();
+
         // Verifica se a sessão expirou (sinalizado pelo TokenRefreshHandler via cookie _se)
         if (Request.Cookies.ContainsKey("_se"))
         {
@@ -65,7 +69,6 @@ public class AuthController(
 
         var data = result.Data;
         var token = GetString(data, "token");
-        var refreshToken = GetString(data, "refreshToken");
 
         if (string.IsNullOrEmpty(token))
         {
@@ -73,46 +76,133 @@ public class AuthController(
             return View(vm);
         }
 
-        session.SetTokens(token, refreshToken ?? string.Empty);
-
+        // A Api emite token SEM empresaId quando o usuario tem 2+ empresas ativas — ela
+        // nao tem como escolher por ele. Checar ANTES de gravar sessao/cookie: o token
+        // ainda nao serve para nada, e antes o codigo autenticava para logo desfazer.
         var empresaId = jwt.TryReadClaim(token, "empresaId");
-        if (!string.IsNullOrEmpty(empresaId))
-            session.SetEmpresaId(empresaId);
+        if (string.IsNullOrEmpty(empresaId))
+            return await IniciarSelecaoDeEmpresaAsync(vm, returnUrl);
+
+        return await ConcluirLoginAsync(data, token, empresaId, vm.Email, vm.ManterLogado, returnUrl);
+    }
+
+    /// <summary>
+    /// Passo 1 do login em duas etapas (ADR-0047). Sem <c>empresaId</c> no token, pergunta
+    /// a Api quais empresas o usuario acessa. Duas ou mais: guarda a pendencia e manda pro
+    /// seletor. Qualquer outro caso e anomalia (SuperAdmin sem empresa, vinculo faltando) e
+    /// mantem a mensagem de suporte que ja existia.
+    /// </summary>
+    private async Task<IActionResult> IniciarSelecaoDeEmpresaAsync(LoginViewModel vm, string? returnUrl)
+    {
+        var empresasResult = await api.PostAsync<ListaEmpresasLoginApi>(
+            "auth/lista-empresas", new { email = vm.Email, senha = vm.Senha });
+
+        var empresas = empresasResult.Success ? empresasResult.Data?.Empresas ?? [] : [];
+        if (empresas.Count < 2)
+        {
+            ModelState.AddModelError(string.Empty, "Não foi possível identificar a empresa associada a este usuário. Entre em contato com o suporte.");
+            return View("Login", vm);
+        }
+
+        session.SetLoginPendente(new LoginPendente(
+            vm.Email, vm.Senha, vm.ManterLogado, returnUrl,
+            [.. empresas.Select(e => new EmpresaLoginItem(e.Id, e.Nome))],
+            DateTime.UtcNow.Add(SessionService.LoginPendenteTtl)));
+
+        return RedirectToAction(nameof(SelecionarEmpresa));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("/auth/selecionar-empresa")]
+    public IActionResult SelecionarEmpresa()
+    {
+        var pendente = session.GetLoginPendente(DateTime.UtcNow);
+        if (pendente is null) return RedirectToAction(nameof(Login));
+
+        return View(new SelecionarEmpresaViewModel
+        {
+            Email = pendente.Email,
+            Empresas = pendente.Empresas,
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("/auth/selecionar-empresa")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SelecionarEmpresa(string empresaId)
+    {
+        var pendente = session.GetLoginPendente(DateTime.UtcNow);
+        if (pendente is null)
+        {
+            TempData["Toast"] = "warning|A seleção de empresa expirou. Entre novamente.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        // A senha sai da sessao ANTES da chamada — o passo 2 e de uso unico, tenha ele
+        // sucesso ou nao. A Api revalida o vinculo com a empresa (sem IDOR); esta
+        // checagem aqui evita gastar a ida.
+        session.LimparLoginPendente();
+
+        if (!pendente.Empresas.Any(e => e.Id == empresaId))
+            return RedirectToAction(nameof(Login));
+
+        var result = await api.PostAsync<JsonElement>(
+            "auth/login", new { email = pendente.Email, senha = pendente.Senha, empresaId });
+
+        var token = result.Success ? GetString(result.Data, "token") : null;
+        if (string.IsNullOrEmpty(token))
+        {
+            TempData["Toast"] = "error|Não foi possível entrar nessa empresa. Tente novamente.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        var empresaDoToken = jwt.TryReadClaim(token, "empresaId");
+        if (string.IsNullOrEmpty(empresaDoToken))
+        {
+            TempData["Toast"] = "error|Não foi possível entrar nessa empresa. Tente novamente.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        return await ConcluirLoginAsync(
+            result.Data, token, empresaDoToken, pendente.Email, pendente.ManterLogado, pendente.ReturnUrl);
+    }
+
+    /// <summary>
+    /// Pipeline pos-token, comum ao login direto e ao login em duas etapas: grava sessao,
+    /// tema, cookie de autenticacao e resolve a loja de destino. Chamado apenas quando ja
+    /// existe <paramref name="empresaId"/>.
+    /// </summary>
+    private async Task<IActionResult> ConcluirLoginAsync(
+        JsonElement data, string token, string empresaId, string email, bool manterLogado, string? returnUrl)
+    {
+        var refreshToken = GetString(data, "refreshToken");
+        session.SetTokens(token, refreshToken ?? string.Empty);
+        session.SetEmpresaId(empresaId);
 
         var usuario = data.TryGetProperty("usuario", out var u) ? u : data;
         var nivel = GetString(usuario, "nivel") ?? GetString(usuario, "role") ?? "Operador";
         session.SetUsuario(
             GetString(usuario, "id") ?? string.Empty,
-            GetString(usuario, "nome") ?? vm.Email,
+            GetString(usuario, "nome") ?? email,
             nivel
         );
 
         var meResult = await api.GetAsync<JsonElement>("auth/me");
-        if (meResult.Success)
-        {
-            var meData = meResult.Data;
-            var temaPreferido = GetString(meData, "temaPreferido");
-            session.SetTemaPreferido(temaPreferido);
-        }
-        else
-        {
-            session.SetTemaPreferido("light");
-        }
+        session.SetTemaPreferido(meResult.Success ? GetString(meResult.Data, "temaPreferido") : "light");
 
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, GetString(usuario, "nome") ?? vm.Email),
-            new(ClaimTypes.Email, vm.Email),
-            new(ClaimTypes.Role, nivel)
+            new(ClaimTypes.Name, GetString(usuario, "nome") ?? email),
+            new(ClaimTypes.Email, email),
+            new(ClaimTypes.Role, nivel),
+            new("empresaId", empresaId),
         };
-        if (!string.IsNullOrEmpty(empresaId))
-            claims.Add(new Claim("empresaId", empresaId));
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var authProps = new AuthenticationProperties
         {
-            IsPersistent = vm.ManterLogado,
-            ExpiresUtc = vm.ManterLogado
+            IsPersistent = manterLogado,
+            ExpiresUtc = manterLogado
                 ? DateTimeOffset.UtcNow.AddDays(30)
                 : DateTimeOffset.UtcNow.AddMinutes(480)
         };
@@ -120,7 +210,7 @@ public class AuthController(
 
         // Se "permanecer logado", persiste o refresh token num cookie HttpOnly para
         // sobreviver a deploys (DistributedMemoryCache é zerada a cada restart)
-        if (vm.ManterLogado && !string.IsNullOrEmpty(refreshToken))
+        if (manterLogado && !string.IsNullOrEmpty(refreshToken))
         {
             Response.Cookies.Append("_rt", refreshToken, new CookieOptions
             {
@@ -129,14 +219,6 @@ public class AuthController(
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddDays(30)
             });
-        }
-
-        if (string.IsNullOrEmpty(empresaId))
-        {
-            session.Clear();
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            ModelState.AddModelError(string.Empty, "Não foi possível identificar a empresa associada a este usuário. Entre em contato com o suporte.");
-            return View(vm);
         }
 
         var lojasResult = await api.GetAsync<List<Loja>>("lojas");
