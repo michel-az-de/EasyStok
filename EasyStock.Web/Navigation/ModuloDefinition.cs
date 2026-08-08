@@ -73,11 +73,19 @@ public static class ModuloDefinition
     /// nenhum (Dashboard, portal, landing, rotas sem dono) — nesse caso o menu aparece
     /// inteiro (fail-open). Reusa o mesmo matching ativo-por-rota do menu, entao o
     /// modulo nunca discorda do item que o menu marca como ativo.
+    ///
+    /// <para>
+    /// So o casamento por ROTA decide o modulo; o fallback pelo <c>ActiveMenuItem</c> legado
+    /// e ignorado de proposito. Aqueles aliases foram feitos para DESTACAR um item parecido,
+    /// nao para declarar area: <c>/operacao</c> emite <c>ActiveMenuItem="Operacao"</c>, que
+    /// pertence ao item de rodape "Dispositivos" — resolver por ele esconderia todos os
+    /// grupos numa tela de operacao. Rota sem dono fica sem modulo, com o menu inteiro.
+    /// </para>
     /// </summary>
-    public static string? ResolverPorRota(string? currentPath, string? activeMenuItem)
+    public static string? ResolverPorRota(string? currentPath)
     {
         var itens = MenuDefinition.AllItems().ToList();
-        var activeKey = MenuViewModelBuilder.ResolveActive(itens, currentPath, activeMenuItem);
+        var activeKey = MenuViewModelBuilder.ResolveActive(itens, currentPath, activeMenuItem: null);
         if (activeKey is null) return null;
 
         if (MenuDefinition.Footer.Any(i => i.Key == activeKey))

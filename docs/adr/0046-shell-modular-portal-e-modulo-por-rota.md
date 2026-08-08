@@ -48,6 +48,12 @@ Consequencias:
 - **Rota sem dono => menu inteiro (fail-open).** `/dashboard`, `/launcher`, `/faq` e
   qualquer rota que nao casa com item de grupo nao tem modulo. Nunca deixamos o usuario
   sem navegacao por um mapeamento faltando.
+- **So o casamento por ROTA decide o modulo; o fallback pelo `ActiveMenuItem` legado nao
+  entra.** Aqueles aliases existem para DESTACAR um item parecido, nao para declarar area, e
+  usa-los aqui produzia o pior resultado possivel: `/operacao` emite
+  `ActiveMenuItem="Operacao"`, alias do item de **rodape** "Dispositivos" — o painel de
+  operacao acabava no modulo Administracao, sem Pedidos, Caixa, Estoque nem Financeiro no
+  menu. Rota que so casa por alias fica sem modulo, com o menu inteiro.
 - **Nao da para "ver o menu inteiro" de dentro de um modulo.** E o ponto do shell, nao um
   efeito colateral. O escape esta a um clique: o Dashboard (D3) ou "Voltar ao portal".
 

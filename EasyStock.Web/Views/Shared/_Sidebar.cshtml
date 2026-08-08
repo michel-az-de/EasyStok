@@ -68,8 +68,7 @@
        text-slate-400 sobre a superfície invertida dá ~7:1 (ADR-0045). *@
     @{
         var moduloDaRota = EasyStock.Web.Navigation.ModuloDefinition.ResolverPorRota(
-            Context.Request.Path.Value + Context.Request.QueryString.Value,
-            ViewData["ActiveMenuItem"] as string);
+            Context.Request.Path.Value + Context.Request.QueryString.Value);
     }
     @if (moduloDaRota is not null)
     {

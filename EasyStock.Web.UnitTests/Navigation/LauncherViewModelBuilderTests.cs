@@ -221,11 +221,45 @@ public class LauncherViewModelBuilderTests
     public void Fonte_indisponivel_tira_a_missao_em_vez_de_marca_la_como_feita()
     {
         // Missao ausente e honesto; missao "concluida" sem dado seria mentira.
-        var vm = Montar(dia: null, financeiro: null);
+        var vm = Montar(dia: null, financeiro: null, badges: MenuBadges.Zero);
 
         vm.Missoes.Select(m => m.Chave).Should().NotContain("caixa");
         vm.Missoes.Select(m => m.Chave).Should().NotContain("parcelas-vencidas");
         vm.Missoes.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void Resumo_fora_do_ar_nao_vira_missoes_concluidas()
+    {
+        // badges null = o analytics nao respondeu. Antes o controller mandava
+        // MenuBadges.Zero e a tela anunciava "3 de 3 concluidas" para quem podia ter 12
+        // lotes vencidos. Zero e uma medicao; ausencia nao e.
+        var vm = LauncherViewModelBuilder.Montar(
+            Manha, "Felipe", dash: null, dia: null, badges: null,
+            [], ModuloDefinition.Modulos);
+
+        vm.Missoes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Resumo_fora_do_ar_nao_diz_tudo_em_ordem_nos_cards()
+    {
+        var vm = LauncherViewModelBuilder.Montar(
+            Manha, "Felipe", dash: null, dia: null, badges: null,
+            [], ModuloDefinition.Modulos);
+
+        vm.Modulos.Should().OnlyContain(m => m.StatusText == string.Empty);
+        vm.Modulos.Should().OnlyContain(m => m.BadgeCount == 0);
+    }
+
+    [Fact]
+    public void Missao_so_conclui_com_dado_medido()
+    {
+        // Guarda do par acima: com badges medidos em zero, concluir E correto.
+        var vm = Montar(badges: MenuBadges.Zero, dia: new ResumoDiaApi { CaixaAbertaHoje = true });
+
+        vm.Missoes.Should().NotBeEmpty();
+        vm.Missoes.Should().OnlyContain(m => m.Concluida);
     }
 
     [Fact]

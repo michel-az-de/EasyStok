@@ -54,7 +54,7 @@ public class ModuloDefinitionTests
         // Trava anti-drift: mudar um HrefDefault para uma rota de outro grupo faria o
         // card do portal abrir um modulo e o menu mostrar outro.
         foreach (var modulo in ModuloDefinition.Modulos)
-            ModuloDefinition.ResolverPorRota(modulo.HrefDefault, null).Should().Be(modulo.Key,
+            ModuloDefinition.ResolverPorRota(modulo.HrefDefault).Should().Be(modulo.Key,
                 because: $"o card '{modulo.Key}' aponta para {modulo.HrefDefault}");
     }
 
@@ -71,7 +71,7 @@ public class ModuloDefinitionTests
     [InlineData("/configuracoes", "admin")]
     public void Rota_resolve_o_modulo(string path, string esperado)
     {
-        ModuloDefinition.ResolverPorRota(path, null).Should().Be(esperado);
+        ModuloDefinition.ResolverPorRota(path).Should().Be(esperado);
     }
 
     [Theory]
@@ -83,14 +83,21 @@ public class ModuloDefinitionTests
     public void Rota_sem_dono_nao_tem_modulo(string? path)
     {
         // Menu inteiro (fail-open). O Dashboard e ancora: nao pertence a modulo nenhum.
-        ModuloDefinition.ResolverPorRota(path, null).Should().BeNull();
+        ModuloDefinition.ResolverPorRota(path).Should().BeNull();
     }
 
-    [Fact]
-    public void Fallback_de_active_menu_item_tambem_resolve_o_modulo()
+    [Theory]
+    [InlineData("/operacao")]
+    [InlineData("/preferencias")]
+    [InlineData("/lojas")]
+    [InlineData("/assinatura")]
+    public void Rota_que_so_casa_por_alias_legado_nao_define_modulo(string path)
     {
-        // /preferencias nao casa por segmento com nenhum href; o alias legado resolve.
-        ModuloDefinition.ResolverPorRota("/preferencias", "Preferencias").Should().Be("admin");
+        // Os aliases de ActiveMenuItem servem para DESTACAR um item parecido, nao para
+        // declarar area. /operacao emite ActiveMenuItem="Operacao", que pertence ao item de
+        // rodape "Dispositivos": resolver por ele esconderia TODOS os grupos numa tela de
+        // operacao, deixando o usuario sem Pedidos, Caixa, Estoque nem Financeiro.
+        ModuloDefinition.ResolverPorRota(path).Should().BeNull();
     }
 
     [Fact]

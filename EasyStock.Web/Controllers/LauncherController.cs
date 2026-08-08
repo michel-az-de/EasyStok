@@ -46,8 +46,9 @@ public class LauncherController(
         try { fav = await favoritosSvc.ObterAsync(usuarioId, lojaId); }
         catch { fav = new MenuFavoritosBff(null, false); }
 
-        var badges = resumo.Dash is null
-            ? MenuBadges.Zero
+        // null (nao zero) quando o resumo nao respondeu: zero e uma medicao, ausencia nao é.
+        MenuBadges? badges = resumo.Dash is null
+            ? null
             : new MenuBadges(
                 PedidosAbertos: resumo.Dia?.PedidosPendentes ?? 0,
                 ProdutosCriticos: resumo.Dash.AlertasEstoqueBaixo,
@@ -58,7 +59,7 @@ public class LauncherController(
         var favoritos = fav.Favoritos ?? MenuDefinition.DefaultFavoritos(fav.KdsHabilitado);
         var menu = MenuViewModelBuilder.Build(
             currentPath: "/launcher", activeMenuItem: null,
-            favoritos, badges, fav.KdsHabilitado);
+            favoritos, badges ?? MenuBadges.Zero, fav.KdsHabilitado);
 
         // Fonte do badge do Financeiro e da missão de parcelas vencidas. Indisponível ->
         // null -> card sem número e missão ausente (nunca um zero que não medimos).

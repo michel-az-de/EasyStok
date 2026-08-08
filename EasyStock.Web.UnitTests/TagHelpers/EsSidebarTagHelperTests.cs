@@ -27,7 +27,7 @@ namespace EasyStock.Web.UnitTests.TagHelpers;
 public class EsSidebarTagHelperTests
 {
     private static string Render(string path, IReadOnlyList<string>? favoritos, bool kds, MenuResumoRaw resumo,
-        string? queryString = null)
+        string? queryString = null, string? activeMenuItem = null)
     {
         var cache = new MemoryCache(new MemoryCacheOptions());
 
@@ -52,6 +52,7 @@ public class EsSidebarTagHelperTests
         var icons = new LucideIconResolver(env, Substitute.For<ILogger<LucideIconResolver>>());
 
         var viewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary());
+        if (activeMenuItem is not null) viewData["ActiveMenuItem"] = activeMenuItem;
         var actionCtx = new ActionContext(httpCtx, new RouteData(), new ActionDescriptor());
         var viewCtx = new ViewContext(actionCtx, Substitute.For<IView>(), viewData,
             Substitute.For<ITempDataDictionary>(), TextWriter.Null, new HtmlHelperOptions());
@@ -170,6 +171,19 @@ public class EsSidebarTagHelperTests
 
         var trechoPosicao = html[html.IndexOf("es-row-posicao-estoque", StringComparison.Ordinal)..];
         trechoPosicao[..300].Should().Contain("aria-current=\"page\"");
+    }
+
+    [Fact]
+    public void Tela_que_so_casa_por_alias_legado_mantem_o_menu_inteiro()
+    {
+        // /operacao emite ActiveMenuItem="Operacao", alias do item de rodape "Dispositivos".
+        // Se o modulo saisse dai, a tela de operacao renderizaria ZERO grupos — sem Pedidos,
+        // Caixa, Estoque nem Financeiro.
+        var html = Render("/operacao", Array.Empty<string>(), kds: true, Resumo(0, 0, 0),
+            activeMenuItem: "Operacao");
+
+        html.Should().Contain("data-group=\"operacao\"");
+        html.Should().Contain("data-group=\"financeiro\"");
     }
 
     [Fact]

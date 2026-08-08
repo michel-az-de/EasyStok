@@ -9,8 +9,7 @@
        antes o breadcrumb lia a querystring e um ?modulo= inválido exibia "você está no
        módulo X" com o menu inteiro do lado. *@
     var moduloAtual = EasyStock.Web.Navigation.ModuloDefinition.ResolverPorRota(
-        Context.Request.Path.Value + Context.Request.QueryString.Value,
-        ViewData["ActiveMenuItem"] as string);
+        Context.Request.Path.Value + Context.Request.QueryString.Value);
     var moduloNome = EasyStock.Web.Navigation.ModuloDefinition.PorChave(moduloAtual)?.Nome;
 }
 

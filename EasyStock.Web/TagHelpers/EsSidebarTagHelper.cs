@@ -48,7 +48,7 @@ public sealed class EsSidebarTagHelper(
         var req = ViewContext?.HttpContext?.Request;
         var path = req is null ? null : req.Path.Value + req.QueryString.Value;
         var activeMenuItem = ViewContext?.ViewData["ActiveMenuItem"] as string;
-        var moduloAtivo = ModuloDefinition.ResolverPorRota(path, activeMenuItem);
+        var moduloAtivo = ModuloDefinition.ResolverPorRota(path);
         var usuarioId = session.GetUsuarioId();
         var lojaId = session.GetLojaId();
         var empresaId = session.GetEmpresaId();

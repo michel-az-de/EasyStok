@@ -48,21 +48,36 @@ descobria que faltava `empresaId` — desfazendo tudo com `session.Clear()` +
 num caminho critico. O pipeline pos-token virou `ConcluirLoginAsync`, chamado apenas
 quando ja existe `empresaId`, e compartilhado pelos dois caminhos.
 
-### D3. A pendencia entre os passos vive na SESSAO server-side, com TTL de 5 minutos e uso unico.
+### D3. A pendencia entre os passos vive na sessao server-side, CIFRADA e com prazo criptografico de 5 minutos.
 
 O passo 2 exige as credenciais outra vez, entao a senha precisa sobreviver entre os dois
-passos. Ela fica **so no servidor** (`DistributedMemoryCache`, a mesma superficie que ja
-guarda o access token e o refresh token — este ultimo com validade de 30 dias, portanto
-sensibilidade equivalente ou maior). Ao cliente vai apenas o id de sessao, em cookie
+passos. Ela fica **so no servidor**; ao cliente vai apenas o id de sessao, em cookie
 `HttpOnly` + `SameSite=Strict` + `Secure`.
 
-Tres garantias, cada uma coberta por teste:
+> **Correcao de premissa (revisao do PR #1006).** A primeira versao deste ADR dizia que a
+> pendencia ficava em `DistributedMemoryCache`, "a mesma superficie que ja guarda os tokens".
+> **Isso e falso na configuracao implantada:** `WebHttpServicesExtensions` usa
+> `AddStackExchangeRedisCache` sempre que `ConnectionStrings:Redis` existe — e o stack Azure
+> define exatamente isso, para a sessao sobreviver a redeploys. O container `redis` sobe sem
+> `requirepass`, na rede do compose. Somando o `Session:IdleTimeout` de **480 minutos**, a
+> senha em claro ficaria legivel por qualquer processo daquela rede pelo resto do dia — e o
+> TTL de 5 minutos, por ser avaliado apenas na leitura, nao apagava nada por abandono.
 
-1. **Uso unico.** A pendencia e removida ANTES da chamada do passo 2 — com sucesso ou com
+Por isso o payload e cifrado com **`ITimeLimitedDataProtector`** (Data Protection, chaves ja
+persistidas em volume por `DataProtection:KeysPath`), com o prazo embutido no proprio texto
+cifrado. Quatro garantias, cada uma coberta por teste:
+
+1. **Nada de senha em claro no armazenamento.** O que vai para o Redis e texto cifrado; o
+   teste assere que nem a senha nem o e-mail aparecem no valor gravado.
+2. **Prazo criptografico, nao cooperativo.** Passados 5 minutos o payload deixa de ser
+   decifravel, mesmo que a chave de sessao continue viva pelas 8 horas do `IdleTimeout` e
+   ninguem venha ler. Abandonar a tela nao deixa credencial utilizavel para tras.
+3. **Uso unico.** A pendencia e removida ANTES da chamada do passo 2 — com sucesso ou com
    falha. Nao ha caminho em que a senha sobreviva a uma tentativa.
-2. **Validade curta e propria.** 5 minutos gravados no payload, independentes do
-   `IdleTimeout` da sessao. E o tempo de escolher uma empresa, nao o de trabalhar.
-3. **Desistir limpa.** Voltar para `GET /auth/login` descarta a pendencia.
+4. **Desistir limpa.** Voltar para `GET /auth/login` descarta a pendencia.
+
+Efeito colateral desejavel: um redeploy que troque as chaves de Data Protection invalida as
+pendencias em voo — ninguem retoma um login pendente de outro processo.
 
 ### D4. Trocar de empresa DEPOIS de logado fica fora.
 
@@ -88,6 +103,12 @@ senha no HTML (pior que todas as opcoes anteriores).
 
 ## Consequencias
 
+- **O passo 1 gasta um `POST /auth/login` cujo token e descartado.** Esse endpoint revoga as
+  sessoes ativas, emite refresh token e grava auditoria — entao um login multi-empresa produz
+  duas linhas de `login`, um refresh token orfao e uma auditoria espuria de "novo
+  dispositivo" (a segunda chamada revoga a primeira). Corrigir de verdade exige mexer na Api
+  (um caminho de validacao sem efeito colateral), o que ficou fora desta rodada; registrado
+  como issue.
 - O caminho de empresa unica esta coberto por teste de regressao, incluindo a preservacao
   do `returnUrl` (deep link continua vencendo o portal).
 - A tela `Auth/SelecionarEmpresa` segue o molde do `SelecionarLoja` e nao usa Alpine: sao

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace EasyStock.Web.Services;
 
@@ -8,9 +9,12 @@ namespace EasyStock.Web.Services;
 /// exige as credenciais de novo no passo 2, junto do <c>empresaId</c>.
 ///
 /// <para>
-/// Mora na sessao SERVER-SIDE — a mesma superficie que ja guarda o access e o refresh
-/// token; ao cliente vai apenas o id de sessao, em cookie HttpOnly/Strict/Secure. Tem
-/// validade curta propria e e removida no primeiro uso, com sucesso ou sem.
+/// Mora na sessao server-side, mas <b>cifrada</b> com Data Protection e prazo de validade
+/// criptografico: em producao a sessao vive no Redis (<c>ConnectionStrings:Redis</c>) com
+/// <c>IdleTimeout</c> de 8h, entao gravar a senha em claro a exporia a qualquer processo da
+/// rede pelo resto do dia. Com <see cref="ITimeLimitedDataProtector"/> a chave sobrevive,
+/// mas o conteudo deixa de ser decifravel passados 5 minutos — o prazo nao depende de
+/// alguem vir ler para ser aplicado.
 /// </para>
 /// </summary>
 public sealed record LoginPendente(
@@ -26,7 +30,7 @@ public sealed record LoginPendente(
 
 public sealed record EmpresaLoginItem(string Id, string Nome);
 
-public class SessionService(IHttpContextAccessor acc)
+public class SessionService(IHttpContextAccessor acc, IDataProtectionProvider? protectionProvider = null)
 {
     /// <summary>Janela do login em duas etapas: tempo de escolher a empresa, nao de trabalhar.</summary>
     public static readonly TimeSpan LoginPendenteTtl = TimeSpan.FromMinutes(5);
@@ -34,6 +38,9 @@ public class SessionService(IHttpContextAccessor acc)
     private const string KeyLoginPendente = "login_pendente";
 
     private ISession Session => acc.HttpContext!.Session;
+
+    private ITimeLimitedDataProtector? Protector =>
+        protectionProvider?.CreateProtector("EasyStok.Web.LoginPendente").ToTimeLimitedDataProtector();
 
     public string? GetToken() => Session.GetString("access_token");
     public string? GetRefreshToken() => Session.GetString("refresh_token");
@@ -81,18 +88,34 @@ public class SessionService(IHttpContextAccessor acc)
 
     public void SetLoginPendente(LoginPendente pendente)
     {
-        Session.SetString(KeyLoginPendente, JsonSerializer.Serialize(pendente));
+        var json = JsonSerializer.Serialize(pendente);
+        var protector = Protector;
+
+        // Sem Data Protection (so em teste), grava em claro — nunca acontece em runtime,
+        // onde o provider e sempre registrado pelo host.
+        Session.SetString(KeyLoginPendente, protector is null
+            ? json
+            : protector.Protect(json, pendente.ExpiraEmUtc));
     }
 
-    /// <summary>Pendencia valida, ou null se nao existe, esta corrompida ou expirou.</summary>
+    /// <summary>
+    /// Pendencia valida, ou null se nao existe, nao decifra (prazo criptografico vencido,
+    /// chave de Data Protection trocada por redeploy, ou payload adulterado) ou expirou.
+    /// </summary>
     public LoginPendente? GetLoginPendente(DateTime agoraUtc)
     {
         var raw = Session.GetString(KeyLoginPendente);
         if (string.IsNullOrEmpty(raw)) return null;
 
-        LoginPendente? pendente;
-        try { pendente = JsonSerializer.Deserialize<LoginPendente>(raw); }
-        catch (JsonException) { pendente = null; }
+        LoginPendente? pendente = null;
+        try
+        {
+            var protector = Protector;
+            var json = protector is null ? raw : protector.Unprotect(raw);
+            pendente = JsonSerializer.Deserialize<LoginPendente>(json);
+        }
+        catch (JsonException) { }
+        catch (System.Security.Cryptography.CryptographicException) { }
 
         if (pendente is null || pendente.Expirou(agoraUtc))
         {

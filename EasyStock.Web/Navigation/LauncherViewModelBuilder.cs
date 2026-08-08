@@ -20,7 +20,7 @@ public static class LauncherViewModelBuilder
         string? usuarioNome,
         DashboardResumoApi? dash,
         ResumoDiaApi? dia,
-        MenuBadges badges,
+        MenuBadges? badges,
         IReadOnlyList<MenuItemView> meuDia,
         IReadOnlyList<ModuloInfo> modulos,
         DashboardFinanceiroApi? financeiro = null)
@@ -34,7 +34,7 @@ public static class LauncherViewModelBuilder
             Missoes = MontarMissoes(badges, dia, financeiro),
         };
 
-        if (dash is not null)
+        if (dash is not null && badges is not null)
         {
             // Mesma contagem do badge do Dashboard no menu (criticos + vencidos): o portal
             // e o menu nunca discordam sobre quantos alertas existem.
@@ -88,14 +88,18 @@ public static class LauncherViewModelBuilder
     /// respondeu nao entra na lista (em vez de aparecer falsamente concluida).
     /// </summary>
     private static List<MissaoViewModel> MontarMissoes(
-        MenuBadges badges, ResumoDiaApi? dia, DashboardFinanceiroApi? financeiro)
+        MenuBadges? badges, ResumoDiaApi? dia, DashboardFinanceiroApi? financeiro)
     {
-        var missoes = new List<MissaoViewModel>
+        var missoes = new List<MissaoViewModel>();
+
+        // badges null = o resumo nao respondeu. Sem isso, um timeout no analytics viraria
+        // "3 de 3 missoes concluidas" na tela de quem tem 12 lotes vencidos.
+        if (badges is not null)
         {
-            Missao("pedidos", "Zerar os pedidos em aberto", "/pedidos", badges.PedidosAbertos),
-            Missao("validade", "Resolver os lotes vencidos", "/estoque?status=vencido", badges.LotesVencidos),
-            Missao("estoque-critico", "Repor o estoque crítico", "/estoque", badges.ProdutosCriticos),
-        };
+            missoes.Add(Missao("pedidos", "Zerar os pedidos em aberto", "/pedidos", badges.PedidosAbertos));
+            missoes.Add(Missao("validade", "Resolver os lotes vencidos", "/estoque?status=vencido", badges.LotesVencidos));
+            missoes.Add(Missao("estoque-critico", "Repor o estoque crítico", "/estoque", badges.ProdutosCriticos));
+        }
 
         if (dia is not null)
         {
@@ -121,20 +125,22 @@ public static class LauncherViewModelBuilder
     private static MissaoViewModel Missao(string chave, string titulo, string href, int pendentes) =>
         new(chave, titulo, href, pendentes, pendentes == 0);
 
-    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges badges, DashboardFinanceiroApi? financeiro)
+    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges? badges, DashboardFinanceiroApi? financeiro)
     {
-        var alertasEstoque = badges.ProdutosCriticos + badges.LotesVencidos;
+        var alertasEstoque = badges is null ? 0 : badges.ProdutosCriticos + badges.LotesVencidos;
 
         var (badge, badgeType, status) = m.Key switch
         {
-            "operacao" => (badges.PedidosAbertos, badges.PedidosAbertos > 0 ? "crit" : "ok",
+            // Sem resumo, o card fica sem numero e sem status — "Tudo em ordem" seria uma
+            // afirmacao sobre dado que nao chegou.
+            "operacao" when badges is not null => (badges.PedidosAbertos, badges.PedidosAbertos > 0 ? "crit" : "ok",
                 badges.PedidosAbertos switch
                 {
                     0 => "Tudo em ordem",
                     1 => "1 pedido em aberto",
                     var n => $"{n} pedidos em aberto",
                 }),
-            "producao" => (alertasEstoque, alertasEstoque > 0 ? "warn" : "ok",
+            "producao" when badges is not null => (alertasEstoque, alertasEstoque > 0 ? "warn" : "ok",
                 alertasEstoque switch
                 {
                     0 => "Tudo em ordem",
