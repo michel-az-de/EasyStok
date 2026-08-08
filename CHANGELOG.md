@@ -6,6 +6,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- ADR-0048: decisao de **plataforma unica** para o ERP B2B da FMA Informatica — ela entra como
+  segundo tenant (`Empresa`) do EasyStok, com modulos novos gated por `TenantFeatureFlag`, em
+  vez de fork, greenfield ou segundo backend. Epico com as speks em #1013. (#1014)
 - Shell modular no Web: portal de modulos em `/launcher` como home autenticada (tela cheia,
   com pulso do dia, missoes e "Meu dia"), e menu lateral filtrado pelo modulo em que o
   usuario esta. O modulo e DERIVADO DA ROTA — sem querystring, cookie ou sessao —, entao o
