@@ -16,15 +16,39 @@ public sealed class ObterFeaturesAtivasUseCase(ITenantFeatureFlagRepository repo
 // ── Admin: visão de administração de um tenant ──────────────────────────────
 public sealed record ListarFeaturesDoTenantQuery(Guid EmpresaId);
 
+public sealed record FeatureDoTenantDto(
+    string Feature, string Descricao, bool Ativo, DateTime? AlteradoEm, string? AlteradoPor);
+
 /// <summary>
-/// Todas as flags do tenant (ligadas e desligadas), com a auditoria de quem mexeu — é o que
-/// a aba "Features" do back-office mostra.
+/// O que a aba "Features" do back-office mostra: o <b>catálogo inteiro</b> de features que o
+/// produto reconhece, cada uma com seu estado atual — e não apenas as linhas já gravadas.
+///
+/// <para>
+/// A diferença importa: a tela só oferece o botão de ligar/desligar para o que vem nesta
+/// lista. Devolvendo só o que está salvo, um tenant novo (que não tem linha nenhuma) veria a
+/// aba vazia e não teria como ativar módulo algum. Features salvas fora do catálogo — de
+/// versões anteriores — continuam aparecendo, para não sumirem sem ninguém notar.
+/// </para>
 /// </summary>
 public sealed class ListarFeaturesDoTenantUseCase(ITenantFeatureFlagRepository repo)
 {
-    public async Task<IReadOnlyList<TenantFeatureFlagItem>> ExecuteAsync(
+    public async Task<IReadOnlyList<FeatureDoTenantDto>> ExecuteAsync(
         ListarFeaturesDoTenantQuery q, CancellationToken ct = default)
-        => await repo.ListarPorEmpresaAsync(q.EmpresaId, ct);
+    {
+        var salvas = await repo.ListarPorEmpresaAsync(q.EmpresaId, ct);
+        var porNome = salvas.ToDictionary(f => f.Feature, StringComparer.OrdinalIgnoreCase);
+
+        var doCatalogo = FeatureCatalogo.Conhecidas.Select(c =>
+            porNome.TryGetValue(c.Nome, out var salva)
+                ? new FeatureDoTenantDto(c.Nome, c.Descricao, salva.Ativo, salva.AlteradoEm, salva.AlteradoPor)
+                : new FeatureDoTenantDto(c.Nome, c.Descricao, false, null, null));
+
+        var foraDoCatalogo = salvas
+            .Where(s => !FeatureCatalogo.Conhecidas.Any(c => string.Equals(c.Nome, s.Feature, StringComparison.OrdinalIgnoreCase)))
+            .Select(s => new FeatureDoTenantDto(s.Feature, "Feature fora do catálogo atual.", s.Ativo, s.AlteradoEm, s.AlteradoPor));
+
+        return [.. doCatalogo, .. foraDoCatalogo];
+    }
 }
 
 // ── Admin: ligar/desligar ───────────────────────────────────────────────────
@@ -68,8 +92,12 @@ public static class FeatureCatalogo
     public const string ModuloComercial = "modulo.comercial";
     public const string ModuloCrm = "modulo.crm";
 
-    /// <summary>Nomes conhecidos, na ordem em que aparecem no back-office.</summary>
-    public static IReadOnlyList<string> Conhecidas { get; } = [ModuloComercial, ModuloCrm];
+    /// <summary>Features conhecidas, na ordem em que aparecem no back-office.</summary>
+    public static IReadOnlyList<FeatureConhecida> Conhecidas { get; } =
+    [
+        new(ModuloComercial, "Propostas, contratos e catálogo de serviços (B2B)."),
+        new(ModuloCrm, "Clientes PJ, pipeline e oportunidades (B2B)."),
+    ];
 
     /// <summary>
     /// Aceita apenas letras, números, ponto, hífen e underscore — mesmo formato que o
@@ -79,3 +107,6 @@ public static class FeatureCatalogo
         !string.IsNullOrWhiteSpace(feature)
         && feature.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_');
 }
+
+/// <summary>Feature que o produto reconhece, com a descrição que o back-office exibe.</summary>
+public sealed record FeatureConhecida(string Nome, string Descricao);

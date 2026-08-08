@@ -104,11 +104,65 @@ public class FeatureFlagsUseCaseTests
     [Fact]
     public void Catalogo_expoe_os_modulos_b2b_e_recusa_nome_torto()
     {
-        FeatureCatalogo.Conhecidas.Should().Contain(FeatureCatalogo.ModuloComercial);
-        FeatureCatalogo.Conhecidas.Should().Contain(FeatureCatalogo.ModuloCrm);
-        FeatureCatalogo.Conhecidas.Should().OnlyHaveUniqueItems();
+        var nomes = FeatureCatalogo.Conhecidas.Select(c => c.Nome).ToList();
+        nomes.Should().Contain(FeatureCatalogo.ModuloComercial);
+        nomes.Should().Contain(FeatureCatalogo.ModuloCrm);
+        nomes.Should().OnlyHaveUniqueItems();
+        FeatureCatalogo.Conhecidas.Should().OnlyContain(c => !string.IsNullOrWhiteSpace(c.Descricao));
 
         FeatureCatalogo.NomeValido("modulo.comercial").Should().BeTrue();
         FeatureCatalogo.NomeValido("modulo comercial").Should().BeFalse();
+    }
+
+    // ── listagem do back-office (catálogo + estado) ──────────────────
+
+    [Fact]
+    public async Task Tenant_sem_flag_salva_ainda_ve_o_catalogo_inteiro_desligado()
+    {
+        // Sem isto a aba "Features" ficaria vazia num tenant novo — e a tela só oferece
+        // toggle para o que vem na lista, então não haveria como ligar o primeiro módulo.
+        var repo = Substitute.For<ITenantFeatureFlagRepository>();
+        repo.ListarPorEmpresaAsync(Empresa, Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<TenantFeatureFlagItem>());
+
+        var r = await new ListarFeaturesDoTenantUseCase(repo).ExecuteAsync(new ListarFeaturesDoTenantQuery(Empresa));
+
+        r.Select(f => f.Feature).Should().Equal(FeatureCatalogo.Conhecidas.Select(c => c.Nome));
+        r.Should().OnlyContain(f => !f.Ativo);
+        r.Should().OnlyContain(f => f.AlteradoPor == null);
+    }
+
+    [Fact]
+    public async Task Estado_salvo_vence_o_default_do_catalogo()
+    {
+        var repo = Substitute.For<ITenantFeatureFlagRepository>();
+        repo.ListarPorEmpresaAsync(Empresa, Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new TenantFeatureFlagItem(FeatureCatalogo.ModuloCrm, true, new DateTime(2026, 8, 8), "admin@easystok.com"),
+        });
+
+        var r = await new ListarFeaturesDoTenantUseCase(repo).ExecuteAsync(new ListarFeaturesDoTenantQuery(Empresa));
+
+        var crm = r.Single(f => f.Feature == FeatureCatalogo.ModuloCrm);
+        crm.Ativo.Should().BeTrue();
+        crm.AlteradoPor.Should().Be("admin@easystok.com");
+        r.Single(f => f.Feature == FeatureCatalogo.ModuloComercial).Ativo.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Feature_salva_fora_do_catalogo_nao_some_da_tela()
+    {
+        // Feature de uma versão anterior: some do catálogo mas continua valendo no banco.
+        // Escondê-la deixaria um módulo ligado sem ninguém conseguir desligar.
+        var repo = Substitute.For<ITenantFeatureFlagRepository>();
+        repo.ListarPorEmpresaAsync(Empresa, Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new TenantFeatureFlagItem("modulo.legado", true, DateTime.UtcNow, "admin@easystok.com"),
+        });
+
+        var r = await new ListarFeaturesDoTenantUseCase(repo).ExecuteAsync(new ListarFeaturesDoTenantQuery(Empresa));
+
+        r.Select(f => f.Feature).Should().Contain("modulo.legado");
+        r.Should().HaveCount(FeatureCatalogo.Conhecidas.Count + 1);
     }
 }
