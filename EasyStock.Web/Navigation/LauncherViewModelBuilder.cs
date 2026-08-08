@@ -1,6 +1,7 @@
 using System.Globalization;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Launcher;
+using EasyStock.Web.Services;
 
 namespace EasyStock.Web.Navigation;
 
@@ -21,14 +22,16 @@ public static class LauncherViewModelBuilder
         ResumoDiaApi? dia,
         MenuBadges badges,
         IReadOnlyList<MenuItemView> meuDia,
-        IReadOnlyList<ModuloInfo> modulos)
+        IReadOnlyList<ModuloInfo> modulos,
+        DashboardFinanceiroApi? financeiro = null)
     {
         var vm = new LauncherViewModel
         {
             Saudacao = Saudar(agoraBrasil, usuarioNome),
             DataHoje = agoraBrasil.ToString("dddd, d 'de' MMMM 'de' yyyy", PtBr),
             MeuDia = [.. meuDia],
-            Modulos = [.. modulos.Select(m => CriarCard(m, badges))],
+            Modulos = [.. modulos.Select(m => CriarCard(m, badges, financeiro))],
+            Missoes = MontarMissoes(badges, dia, financeiro),
         };
 
         if (dash is not null)
@@ -79,7 +82,46 @@ public static class LauncherViewModelBuilder
             : $"{saudacao}, {primeiro}. 👋";
     }
 
-    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges badges)
+    /// <summary>
+    /// Missoes de hoje: pendencias computadas do que o sistema ja sabe, sem tabela nem
+    /// estado — "concluida" e o proprio dado ter chegado a zero. Missao cuja fonte nao
+    /// respondeu nao entra na lista (em vez de aparecer falsamente concluida).
+    /// </summary>
+    private static List<MissaoViewModel> MontarMissoes(
+        MenuBadges badges, ResumoDiaApi? dia, DashboardFinanceiroApi? financeiro)
+    {
+        var missoes = new List<MissaoViewModel>
+        {
+            Missao("pedidos", "Zerar os pedidos em aberto", "/pedidos", badges.PedidosAbertos),
+            Missao("validade", "Resolver os lotes vencidos", "/estoque?status=vencido", badges.LotesVencidos),
+            Missao("estoque-critico", "Repor o estoque crítico", "/estoque", badges.ProdutosCriticos),
+        };
+
+        if (dia is not null)
+        {
+            // Caixa nao tem contagem: ou o dia foi aberto (ou ja fechado), ou esta pendente.
+            var caixaResolvido = dia.CaixaAbertaHoje || dia.CaixaFechadaHoje;
+            missoes.Add(new MissaoViewModel(
+                "caixa", "Abrir o caixa do dia", "/caixa",
+                caixaResolvido ? 0 : 1, caixaResolvido));
+        }
+
+        if (financeiro is not null)
+        {
+            // QtdParcelasVencidasHoje e combinado (pagar + receber) — o titulo diz isso e o
+            // link leva a visao geral, em vez de fingir uma desagregacao que nao temos.
+            missoes.Add(Missao(
+                "parcelas-vencidas", "Tratar as parcelas vencidas hoje", "/financeiro",
+                financeiro.QtdParcelasVencidasHoje));
+        }
+
+        return missoes;
+    }
+
+    private static MissaoViewModel Missao(string chave, string titulo, string href, int pendentes) =>
+        new(chave, titulo, href, pendentes, pendentes == 0);
+
+    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges badges, DashboardFinanceiroApi? financeiro)
     {
         var alertasEstoque = badges.ProdutosCriticos + badges.LotesVencidos;
 
@@ -99,8 +141,17 @@ public static class LauncherViewModelBuilder
                     1 => "1 alerta",
                     var n => $"{n} alertas",
                 }),
-            // Sem contagem propria: card sem numero e sem status. Nunca inventar dado —
-            // o badge do Financeiro entra quando houver fonte.
+            "financeiro" when financeiro is not null => (
+                financeiro.QtdParcelasVencidasHoje,
+                financeiro.QtdParcelasVencidasHoje > 0 ? "warn" : "ok",
+                financeiro.QtdParcelasVencidasHoje switch
+                {
+                    0 => "Em dia",
+                    1 => "1 parcela vencida hoje",
+                    var n => $"{n} parcelas vencidas hoje",
+                }),
+            // Sem fonte de contagem (ou financeiro fora do ar): card sem numero e sem
+            // status. Nunca inventar dado.
             _ => (0, "ok", string.Empty),
         };
 

@@ -1,6 +1,7 @@
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Models.ViewModels.Launcher;
 using EasyStock.Web.Navigation;
+using EasyStock.Web.Services;
 using FluentAssertions;
 
 namespace EasyStock.Web.UnitTests.Navigation;
@@ -19,10 +20,11 @@ public class LauncherViewModelBuilderTests
         string? nome = "Felipe Azevedo",
         DashboardResumoApi? dash = null,
         ResumoDiaApi? dia = null,
-        MenuBadges? badges = null) =>
+        MenuBadges? badges = null,
+        DashboardFinanceiroApi? financeiro = null) =>
         LauncherViewModelBuilder.Montar(
             agora ?? Manha, nome, dash, dia, badges ?? MenuBadges.Zero,
-            [], ModuloDefinition.Modulos);
+            [], ModuloDefinition.Modulos, financeiro);
 
     // ── saudacao ─────────────────────────────────────────────────────
 
@@ -142,10 +144,88 @@ public class LauncherViewModelBuilderTests
     [Fact]
     public void Card_sem_fonte_de_dado_nao_inventa_numero()
     {
+        // Financeiro fora do ar: nada de badge zero — zero seria uma afirmacao que nao medimos.
         var card = Montar(badges: new MenuBadges(9, 9, 9)).Modulos.Single(m => m.Key == "financeiro");
 
         card.BadgeCount.Should().Be(0);
         card.StatusText.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Card_de_financeiro_conta_parcelas_vencidas_hoje()
+    {
+        var card = Montar(financeiro: new DashboardFinanceiroApi { QtdParcelasVencidasHoje = 3 })
+            .Modulos.Single(m => m.Key == "financeiro");
+
+        card.BadgeCount.Should().Be(3);
+        card.BadgeType.Should().Be("warn");
+        card.StatusText.Should().Be("3 parcelas vencidas hoje");
+    }
+
+    [Fact]
+    public void Financeiro_sem_parcela_vencida_fica_em_dia()
+    {
+        Montar(financeiro: new DashboardFinanceiroApi()).Modulos
+            .Single(m => m.Key == "financeiro").StatusText.Should().Be("Em dia");
+    }
+
+    // ── missoes de hoje ──────────────────────────────────────────────
+
+    [Fact]
+    public void Missoes_saem_dos_dados_que_o_sistema_ja_tem()
+    {
+        var vm = Montar(
+            badges: new MenuBadges(PedidosAbertos: 3, ProdutosCriticos: 1, LotesVencidos: 2),
+            dia: new ResumoDiaApi(),
+            financeiro: new DashboardFinanceiroApi { QtdParcelasVencidasHoje = 4 });
+
+        vm.Missoes.Select(m => m.Chave).Should().Equal(
+            "pedidos", "validade", "estoque-critico", "caixa", "parcelas-vencidas");
+        vm.Missoes.Single(m => m.Chave == "pedidos").Pendentes.Should().Be(3);
+        vm.Missoes.Single(m => m.Chave == "validade").Pendentes.Should().Be(2);
+        vm.Missoes.Single(m => m.Chave == "estoque-critico").Pendentes.Should().Be(1);
+        vm.Missoes.Single(m => m.Chave == "parcelas-vencidas").Pendentes.Should().Be(4);
+        vm.Missoes.Should().OnlyContain(m => !m.Concluida);
+    }
+
+    [Fact]
+    public void Missao_conclui_quando_o_dado_zera()
+    {
+        var vm = Montar(dia: new ResumoDiaApi { CaixaAbertaHoje = true }, badges: MenuBadges.Zero,
+            financeiro: new DashboardFinanceiroApi());
+
+        vm.Missoes.Should().OnlyContain(m => m.Concluida);
+        vm.Missoes.Should().OnlyContain(m => m.Pendentes == 0);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Missao_do_caixa_conclui_com_caixa_aberto_ou_ja_fechado(bool aberta, bool fechada)
+    {
+        var vm = Montar(dia: new ResumoDiaApi { CaixaAbertaHoje = aberta, CaixaFechadaHoje = fechada });
+
+        vm.Missoes.Single(m => m.Chave == "caixa").Concluida.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Caixa_nao_tocado_hoje_e_missao_pendente()
+    {
+        var missao = Montar(dia: new ResumoDiaApi()).Missoes.Single(m => m.Chave == "caixa");
+
+        missao.Concluida.Should().BeFalse();
+        missao.Pendentes.Should().Be(1);
+    }
+
+    [Fact]
+    public void Fonte_indisponivel_tira_a_missao_em_vez_de_marca_la_como_feita()
+    {
+        // Missao ausente e honesto; missao "concluida" sem dado seria mentira.
+        var vm = Montar(dia: null, financeiro: null);
+
+        vm.Missoes.Select(m => m.Chave).Should().NotContain("caixa");
+        vm.Missoes.Select(m => m.Chave).Should().NotContain("parcelas-vencidas");
+        vm.Missoes.Should().HaveCount(3);
     }
 
     [Fact]

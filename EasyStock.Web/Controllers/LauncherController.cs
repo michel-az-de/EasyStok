@@ -18,6 +18,7 @@ namespace EasyStock.Web.Controllers;
 public class LauncherController(
     MenuResumoService resumoSvc,
     PreferenciaMenuService favoritosSvc,
+    FinanceiroService financeiroSvc,
     SessionService session) : BaseController(session)
 {
     // NAO reivindicar "/": a raiz e da landing publica (SiteController), que redireciona
@@ -59,6 +60,16 @@ public class LauncherController(
             currentPath: "/launcher", activeMenuItem: null,
             favoritos, badges, fav.KdsHabilitado);
 
+        // Fonte do badge do Financeiro e da missão de parcelas vencidas. Indisponível ->
+        // null -> card sem número e missão ausente (nunca um zero que não medimos).
+        DashboardFinanceiroApi? financeiro = null;
+        try
+        {
+            var r = await financeiroSvc.ObterDashboardAsync();
+            if (r.Success) financeiro = r.Data;
+        }
+        catch { /* portal não cai por causa do financeiro */ }
+
         var vm = LauncherViewModelBuilder.Montar(
             BrazilTime.Now(),
             Session.GetUsuarioNome(),
@@ -66,7 +77,8 @@ public class LauncherController(
             resumo.Dia,
             badges,
             menu.MeuDia,
-            ModuloDefinition.Modulos);
+            ModuloDefinition.Modulos,
+            financeiro);
 
         return View(vm);
     }

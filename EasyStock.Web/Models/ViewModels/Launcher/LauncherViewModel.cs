@@ -19,6 +19,18 @@ public sealed record ModuloCardViewModel(
 );
 
 /// <summary>
+/// Missão do dia: uma pendência que o operador consegue zerar hoje, computada de dados que
+/// o sistema já tem (ADR-0046). Sem tabela, sem estado — <see cref="Concluida"/> é o próprio
+/// dado tendo chegado a zero. Missão sem fonte de dado simplesmente não é criada.
+/// </summary>
+public sealed record MissaoViewModel(
+    string Chave,
+    string Titulo,
+    string Href,
+    int Pendentes,
+    bool Concluida);
+
+/// <summary>
 /// ViewModel do launcher: cockpit de entrada do sistema.
 /// Reutiliza os mesmos dados do Dashboard (resumo do dia, alertas, KPIs)
 /// mas apresentados como portal de módulos em vez de dashboard tradicional.
@@ -32,6 +44,9 @@ public sealed class LauncherViewModel
 
     // ── Cards de módulo ──
     public List<ModuloCardViewModel> Modulos { get; set; } = [];
+
+    // ── Missões de hoje ──
+    public List<MissaoViewModel> Missoes { get; set; } = [];
 
     // ── Meu dia (favoritos) ──
     public List<MenuItemView> MeuDia { get; set; } = [];
