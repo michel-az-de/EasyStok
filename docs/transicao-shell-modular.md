@@ -2,6 +2,24 @@
 
 Documento de arquitetura. Baseado no codigo real do EasyStok (MenuDefinition.cs, EsSidebarTagHelper.cs, MenuViewModelBuilder.cs, _Layout.cshtml, _Topbar.cshtml, Dashboard/Index.cshtml, Auth/Login.cshtml).
 
+> **Status (2026-08-08, #1007): IMPLEMENTADO, com divergencias.** O que valeu na
+> implementacao esta no **ADR-0046**; este documento e o esboco que a antecedeu. As
+> divergencias deliberadas:
+>
+> - **Modulo vem da ROTA, nao de querystring.** O `?modulo=` da §3.3 foi removido: nao
+>   sobrevivia a redirect/formulario/paginacao, aceitava valor invalido em silencio e
+>   produzia URL malformada nos cards.
+> - **O Dashboard NAO foi movido para dentro de Crescimento** (§4 dizia que sim). Ele
+>   continua fixo no topo, visivel em todos os modulos: e a ancora e o escape de 1 clique
+>   para o menu inteiro.
+> - **O rodape virou o modulo `admin`**, com os grupos escondidos.
+> - **O `_Topbar.cshtml` NAO tinha breadcrumb** (§3.6 afirmava que sim); ele foi criado.
+> - **Rail permanente: descartado** — contradiz o PATCH-1 do ADR-0032. Ver a nota em
+>   `mapeamento-componentes-shell.md`.
+> - **Multi-tenant (§6): parcialmente antecipado.** O login multi-empresa foi feito
+>   (ADR-0047) porque destravava um bug real; o gating de modulos por tenant continua
+>   fora, aguardando o epico da FMA.
+
 ---
 
 ## 1. O que o sistema ja tem (e que NAO mexe)

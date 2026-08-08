@@ -6,12 +6,38 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Shell modular no Web: portal de modulos em `/launcher` como home autenticada (tela cheia,
+  com pulso do dia, missoes e "Meu dia"), e menu lateral filtrado pelo modulo em que o
+  usuario esta. O modulo e DERIVADO DA ROTA — sem querystring, cookie ou sessao —, entao o
+  filtro sobrevive a redirect, formulario e paginacao. Nenhuma rota interna muda; o Dashboard
+  continua como ancora, visivel dentro de qualquer modulo. Ver ADR-0046. (#1007)
+- Missoes do dia no portal: pendencias computadas de dados que o sistema ja tem (pedidos em
+  aberto, lotes vencidos, estoque critico, caixa do dia, parcelas vencidas). Sem tabela nova
+  e sem migracao; missao sem fonte de dado nao e exibida em vez de aparecer como concluida. (#1007)
+- Login em duas etapas com selecao de empresa: usuario com 2+ empresas ativas agora escolhe
+  com qual entrar. Ver ADR-0047. (#1007)
 - Telemetria OpenTelemetry (traces + metricas + logs) nos 4 hosts (Api/Web/Admin/Worker),
   exportada via OTLP pro otel-collector da VM consolidada -> OpenObserve. Opt-in por
   `OpenTelemetry:OtlpEndpoint` (vazio = desligado; dev/CI intactos). Api ganha Npgsql
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
+### Fixed
+- Usuario com 2+ empresas ativas nao conseguia entrar no Web: a Api emite token sem o claim
+  `empresaId` nesse caso e o Web tratava como erro terminal ("entre em contato com o suporte").
+  O caminho ja existia na Api (`auth/lista-empresas` + `login` aceitando `empresaId`) e nunca
+  fora consumido. (#1007)
+- `GET /` derrubava a landing publica com `AmbiguousMatchException`: o portal reivindicava o
+  mesmo template de rota que o `SiteController`. (#1007)
+- Card Financeiro do portal exibia texto de negocio fabricado ("2 contas a vencer hoje",
+  variando por tenant) sem consultar nada; passa a usar as parcelas vencidas hoje do
+  `financeiro/dashboard`, ou nenhum numero quando a fonte nao responde. (#1007)
+- Cards do portal geravam URL malformada (`/estoque?status=vencido?modulo=producao`), que
+  quebrava ao mesmo tempo o filtro de vencidos e o modulo. (#1007)
+
 ### Changed
+- Home autenticada passa a ser `/launcher` em todos os pontos (landing logada, onboarding,
+  cardapio, lojas, 404 e primeiro slot do bottom nav mobile). Deep link continua vencendo:
+  `returnUrl` valido tem precedencia sobre o portal. (#1007)
 - Homolog consolidada na VM unica `hiram-demo-vm` (eastus2, `*.20.98.234.200.sslip.io`), host
   compartilhado com jornada + levante atras de um Caddy central; stack sobe sem caddy proprio
   (`docker-compose.azure.noedge.yml` + `EASYSTOK_COMPOSE_EXTRA` no vm-deploy.sh). VM antiga

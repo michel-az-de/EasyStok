@@ -69,11 +69,20 @@
 
 ---
 
+> **Correção (2026-08-08, #1007).** A linha do rail abaixo estava errada e a implementação
+> não a seguiu. As classes `.app`/`.side`/`.side-item` de `app-shell.css:266-286` são
+> **mortas**: nenhuma view as usa (só a galeria `Views/Dev/Components.cshtml`). O rail vivo é
+> `html.es-rail` em `app.css:645-698`, a **64px**, e já existe desde a fatia 7 do ADR-0032 —
+> como **preferência togglável de dispositivo** (`localStorage['es:rail']`).
+> Torná-lo permanente contradiz o PATCH-1 daquele ADR e exigiria um flyout que o
+> `menu-sidebar.js` evitou de propósito; por isso foi **descartado** (ver ADR-0046).
+> O rail togglável convive com o shell modular sem ajuste nenhum.
+
 ## 2. O que o protótipo v6 traz de NOVO
 
 | Conceito v6 | Componente real que mapeia | Esforço de adaptação |
 |---|---|---|
-| **Rail lateral 72px** | `app-shell.css` já tem `.side` com rail em `@media (max-width: 1180px)` — é só ativar sempre | Baixo — reaproveitar CSS existente |
+| ~~**Rail lateral 72px**~~ (descartado) | ~~`app-shell.css` já tem `.side` com rail~~ — CSS morto; o rail vivo é `html.es-rail` (64px, togglável) | Não feito — ver nota acima |
 | **Cards de módulo no launcher** | `es-stat-card` + `card-hover` em components.css | Baixo — usar TagHelper existente |
 | **Tabela premium** | `.tbl` em app-shell.css + `.fin-table` em components.css | Baixo — estilos já existem |
 | **Drawer lateral** | `.drawer-panel` em components.css | Baixo — CSS pronto |
