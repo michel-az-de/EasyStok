@@ -43,22 +43,34 @@ public sealed class MenuResumoService(IMenuResumoSource source, IMemoryCache cac
 {
     public static readonly TimeSpan Ttl = TimeSpan.FromSeconds(60);
 
-    public async Task<(MenuBadges Badges, bool Ok)> ObterAsync(string? empresaId, string? lojaId)
+    /// <summary>
+    /// Resumo CRU (dashboard + dia) com o mesmo cache dos badges. O portal precisa de mais
+    /// que as 3 contagens (faturamento, caixa, pedidos), e chamava a Api por fora — o que
+    /// refazia, em toda renderizacao, os 2 requests que o menu da mesma pagina ja fizera.
+    /// </summary>
+    public async Task<MenuResumoRaw> ObterRawAsync(string? empresaId, string? lojaId)
     {
         var key = $"menu-resumo:{empresaId}:{lojaId}";
-        if (cache.TryGetValue(key, out MenuBadges? cached) && cached is not null)
-            return (cached, true);
+        if (cache.TryGetValue(key, out MenuResumoRaw? cached) && cached is not null)
+            return cached;
 
         var raw = await source.FetchAsync();
         if (!raw.Ok || raw.Dash is null)
-            return (MenuBadges.Zero, false); // não cacheia falha
+            return raw; // não cacheia falha
 
-        var badges = new MenuBadges(
+        cache.Set(key, raw, Ttl);
+        return raw;
+    }
+
+    public async Task<(MenuBadges Badges, bool Ok)> ObterAsync(string? empresaId, string? lojaId)
+    {
+        var raw = await ObterRawAsync(empresaId, lojaId);
+        if (!raw.Ok || raw.Dash is null)
+            return (MenuBadges.Zero, false);
+
+        return (new MenuBadges(
             PedidosAbertos: raw.Dia?.PedidosPendentes ?? 0,
             ProdutosCriticos: raw.Dash.AlertasEstoqueBaixo,
-            LotesVencidos: raw.Dash.AlertasVencidos);
-
-        cache.Set(key, badges, Ttl);
-        return (badges, true);
+            LotesVencidos: raw.Dash.AlertasVencidos), true);
     }
 }

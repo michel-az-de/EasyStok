@@ -21,44 +21,9 @@
     <p class="text-xs text-slate-400 mt-1">@Model.DataHoje</p>
 </header>
 
-@* ─── Atenção do dia (cards acionáveis) ─── *@
-@if (Model.PedidosAbertos > 0 || Model.LotesVencendo > 0 || Model.ContasVencerHoje > 0)
-{
-    <section class="ws mb-6" aria-labelledby="launcher-atencao-title">
-        <div class="ds-section-hd">
-            <svg class="w-5 h-5" style="color:var(--orange-600)" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <h2 id="launcher-atencao-title">Atenção do dia</h2>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            @if (Model.PedidosAbertos > 0)
-            {
-                <a href="/pedidos" class="es-stat-card is-link">
-                    <div class="es-stat-label">Pedidos em aberto</div>
-                    <div class="es-stat-value">@Model.PedidosAbertos</div>
-                    <div class="es-stat-meta">aguardando separação</div>
-                </a>
-            }
-            @if (Model.LotesVencendo > 0)
-            {
-                <a href="/estoque?status=vencendo" class="es-stat-card is-link">
-                    <div class="es-stat-label">Lotes vencendo</div>
-                    <div class="es-stat-value">@Model.LotesVencendo</div>
-                    <div class="es-stat-meta">próximos ao vencimento</div>
-                </a>
-            }
-            @if (Model.ContasVencerHoje > 0)
-            {
-                <a href="/contas-a-receber" class="es-stat-card is-link">
-                    <div class="es-stat-label">Contas a vencer hoje</div>
-                    <div class="es-stat-value">@Model.ContasVencerHoje</div>
-                    <div class="es-stat-meta">no financeiro</div>
-                </a>
-            }
-        </div>
-    </section>
-}
+@* "Atenção do dia" saiu daqui: os três cards liam campos que nunca eram populados
+   (contas ficava fixo em 0 e lotes-vencendo nunca era atribuído), então a seção era
+   invisível por construção. Os alertas reais aparecem no badge de cada módulo. *@
 
 @* ─── Pulso de hoje (atalhos rápidos) ─── *@
 @if (Model.FaturamentoHoje > 0 || Model.PedidosEntreguesHoje > 0 || Model.CaixaAbertoHoje || Model.CaixaFechadoHoje)

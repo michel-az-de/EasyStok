@@ -1,6 +1,4 @@
-using System.Globalization;
-using EasyStock.Web.Models.Api;
-using EasyStock.Web.Models.ViewModels.Launcher;
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Navigation;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -8,11 +6,19 @@ using Microsoft.AspNetCore.Mvc;
 namespace EasyStock.Web.Controllers;
 
 /// <summary>
-/// Launcher (portal de módulos): tela de entrada pós-login que apresenta
-/// os módulos do tenant como cards acionáveis, com resumo do dia e atenção
-/// imediata. Substitui o Dashboard como destino padrão pós-autenticação.
+/// Portal de módulos (ADR-0046): tela de entrada pós-login que apresenta os módulos como
+/// cards acionáveis, com o pulso do dia e o "Meu dia". Substitui o Dashboard como home
+/// autenticada — que continua existindo como âncora, visível dentro de qualquer módulo.
+///
+/// <para>
+/// Casca fina: busca os dados (pelos mesmos serviços cacheados que o menu lateral usa) e
+/// delega a montagem ao <see cref="LauncherViewModelBuilder"/>, que é puro e testável.
+/// </para>
 /// </summary>
-public class LauncherController(ApiClient api, SessionService session) : BaseController(session)
+public class LauncherController(
+    MenuResumoService resumoSvc,
+    PreferenciaMenuService favoritosSvc,
+    SessionService session) : BaseController(session)
 {
     // NAO reivindicar "/": a raiz e da landing publica (SiteController), que redireciona
     // pra ca quando ha sessao. Dois attribute routes com o mesmo template derrubariam
@@ -23,94 +29,44 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
         ViewBag.Title = "Portal";
         ViewBag.ActiveMenuItem = "Launcher";
 
-        var usuarioNome = session.GetUsuarioNome() ?? "Usuário";
+        var usuarioId = Session.GetUsuarioId();
+        var lojaId = Session.GetLojaId();
+        var empresaId = Session.GetEmpresaId();
 
-        // ── Saudação e data (fuso BR, mesmo padrão do Dashboard) ──
-        var agoraBrasil = TimeZoneInfo.ConvertTimeFromUtc(
-            DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
-        var hora = agoraBrasil.Hour;
-        var saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
-        var ptBR = new CultureInfo("pt-BR");
+        // Mesmos serviços do <es-sidebar>: cache de 60s (resumo) e 5min (favoritos)
+        // compartilhado, então abrir o portal não dispara requests a mais.
+        // Degrada como o menu: falha vira resumo vazio / seed conservador.
+        MenuResumoRaw resumo;
+        try { resumo = await resumoSvc.ObterRawAsync(empresaId, lojaId); }
+        catch { resumo = new MenuResumoRaw(null, null, Ok: false); }
 
-        var vm = new LauncherViewModel
-        {
-            Saudacao = $"{saudacao}, {usuarioNome.Split(' ').First()}. 👋",
-            DataHoje = agoraBrasil.ToString("dddd, d 'de' MMMM 'de' yyyy", ptBR),
-        };
+        MenuFavoritosBff fav;
+        try { fav = await favoritosSvc.ObterAsync(usuarioId, lojaId); }
+        catch { fav = new MenuFavoritosBff(null, false); }
 
-        // ── Busca resumo do dia (reusa endpoints do Dashboard) ──
-        var dashTask = api.GetAsync<DashboardResumoApi>("analytics/dashboard");
-        var diaTask = api.GetAsync<ResumoDiaApi>("analytics/dia");
+        var badges = resumo.Dash is null
+            ? MenuBadges.Zero
+            : new MenuBadges(
+                PedidosAbertos: resumo.Dia?.PedidosPendentes ?? 0,
+                ProdutosCriticos: resumo.Dash.AlertasEstoqueBaixo,
+                LotesVencidos: resumo.Dash.AlertasVencidos);
 
-        var dashResult = await dashTask;
-        var diaResult = await diaTask;
+        // "Meu dia" real: mesma resolução do menu (seed por perfil quando não há linha
+        // salva), com a flag KDS do tenant em vez do true hardcoded.
+        var favoritos = fav.Favoritos ?? MenuDefinition.DefaultFavoritos(fav.KdsHabilitado);
+        var menu = MenuViewModelBuilder.Build(
+            currentPath: "/launcher", activeMenuItem: null,
+            favoritos, badges, fav.KdsHabilitado);
 
-        if (dashResult.Success && dashResult.Data is { } d)
-        {
-            vm.StatusTone = d.AlertasEstoqueBaixo > 0 || d.AlertasVencimento > 0 ? "critical" :
-                            d.AlertasItensParados > 0 ? "warning" : "ok";
-            vm.StatusMsg = vm.StatusTone switch
-            {
-                "critical" => $"{d.AlertasEstoqueBaixo + d.AlertasVencimento} alertas precisam de atenção.",
-                "warning" => $"{d.AlertasItensParados} itens parados há mais de 30 dias.",
-                _ => "Estoque saudável. Tudo certo por aqui."
-            };
-        }
-
-        if (diaResult.Success && diaResult.Data is { } dia)
-        {
-            vm.FaturamentoHoje = dia.FaturamentoHoje;
-            vm.PedidosEntreguesHoje = dia.PedidosEntreguesHoje;
-            vm.CaixaAbertoHoje = dia.CaixaAbertaHoje;
-            vm.CaixaFechadoHoje = dia.CaixaFechadaHoje;
-            vm.SaldoCaixaAtual = dia.SaldoCaixaAtual;
-            vm.PedidosPendentes = dia.PedidosPendentes;
-            vm.ValorPedidosPendentes = dia.ValorPedidosPendentes;
-            vm.PedidosAbertos = dia.PedidosPendentes; // mesmo dado, rotulo diferente
-        }
-
-        // ── Contas a vencer (financeiro) ──
-        // Simplificado: busca do endpoint de contas a receber quando houver
-        vm.ContasVencerHoje = 0; // placeholder — será preenchido quando o endpoint existir
-
-        // ── Monta cards de módulo ──
-        var modulosDef = ModuloDefinition.Modulos;
-        // Mesma composicao do MenuResumoService (ADR-0032, fatia 2): pedidos vem do resumo
-        // do dia, criticos e vencidos do dashboard. Em F4 a chamada direta ao ApiClient sai
-        // e o servico com cache passa a ser a unica fonte.
-        var badges = dashResult.Success && dashResult.Data is { } db
-            ? new MenuBadges(
-                PedidosAbertos: diaResult.Success ? diaResult.Data?.PedidosPendentes ?? 0 : 0,
-                ProdutosCriticos: db.AlertasEstoqueBaixo,
-                LotesVencidos: db.AlertasVencidos)
-            : MenuBadges.Zero;
-
-        vm.Modulos = modulosDef.Select(m => CriarCard(m, badges)).ToList();
-
-        // ── Meu dia (favoritos) ──
-        // Reusa MenuViewModelBuilder com o menu atual (sem filtro de módulo)
-        var favoritos = new List<string>(); // TODO: buscar de PreferenciaMenuService
-        var menuVm = MenuViewModelBuilder.Build(null, null, favoritos, badges, true);
-        vm.MeuDia = [.. menuVm.MeuDia];
+        var vm = LauncherViewModelBuilder.Montar(
+            BrazilTime.Now(),
+            Session.GetUsuarioNome(),
+            resumo.Dash,
+            resumo.Dia,
+            badges,
+            menu.MeuDia,
+            ModuloDefinition.Modulos);
 
         return View(vm);
-    }
-
-    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges badges)
-    {
-        var (badge, badgeType, status) = m.Key switch
-        {
-            "operacao" => (badges.PedidosAbertos, badges.PedidosAbertos > 0 ? "crit" : "ok",
-                           badges.PedidosAbertos > 0 ? $"{badges.PedidosAbertos} pedidos em aberto" : "Tudo em ordem"),
-            "producao" => (badges.LotesVencidos + badges.ProdutosCriticos, badges.LotesVencidos + badges.ProdutosCriticos > 0 ? "warn" : "ok",
-                           badges.LotesVencidos + badges.ProdutosCriticos > 0 ? $"{badges.LotesVencidos + badges.ProdutosCriticos} alertas" : "Tudo em ordem"),
-            // Financeiro ainda nao tem contagem aqui: sem numero e melhor que numero inventado.
-            // O badge real (parcelas vencidas hoje) entra em F7, via financeiro/dashboard.
-            _ => (0, "ok", "")
-        };
-
-        return new ModuloCardViewModel(
-            m.Key, m.Nome, m.IconeLucide, m.Descricao, m.HrefDefault,
-            badge, badgeType, status);
     }
 }

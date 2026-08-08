@@ -30,11 +30,6 @@ public sealed class LauncherViewModel
     public string StatusMsg { get; set; } = string.Empty;
     public string StatusTone { get; set; } = "ok";
 
-    // ── Atenção do dia (cards acionáveis) ──
-    public int PedidosAbertos { get; set; }
-    public int LotesVencendo { get; set; }
-    public int ContasVencerHoje { get; set; }
-
     // ── Cards de módulo ──
     public List<ModuloCardViewModel> Modulos { get; set; } = [];
 
