@@ -6,6 +6,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `TenantFeatureFlag` passa a ser lido e escrito em runtime (ADR-0048): repository com filtro
+  explicito de `EmpresaId`, endpoint `GET /api/feature-flags` para o tenant logado, e servico
+  no BFF Web com cache de 5min por empresa. O portal e o menu lateral escondem modulo que o
+  tenant nao tem, com decisao **fail-closed** (Api fora do ar esconde, nao mostra). Item sem
+  feature exigida nunca e afetado. Pre-requisito de todo o epico B2B (#1013). (#1016)
+- Back-office ganha os endpoints `GET`/`PATCH api/admin/tenants/{id}/features`, que **acendem
+  a aba "Features" ja existente** no Admin — ela chamava rotas inexistentes e o `catch`
+  engolia a falha, exibindo "Nenhuma feature especial habilitada" como se fosse estado
+  normal. O GET devolve o catalogo inteiro com o estado de cada feature, senao um tenant sem
+  linha gravada nao teria como ligar o primeiro modulo. (#1016)
 - ADR-0048: decisao de **plataforma unica** para o ERP B2B da FMA Informatica — ela entra como
   segundo tenant (`Empresa`) do EasyStok, com modulos novos gated por `TenantFeatureFlag`, em
   vez de fork, greenfield ou segundo backend. Epico com as speks em #1013. (#1014)
