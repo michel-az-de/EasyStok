@@ -110,6 +110,11 @@ public static class WebHttpServicesExtensions
         services.AddScoped<IPreferenciaMenuFonte, PreferenciaMenuFonte>();
         services.AddScoped<PreferenciaMenuService>();
 
+        // 6c. Feature flags por tenant (ADR-0048): quais módulos esta empresa enxerga.
+        // Cache de 5min por EMPRESA — a flag não varia por loja nem por usuário.
+        services.AddScoped<ITenantFeaturesFonte, TenantFeaturesFonte>();
+        services.AddScoped<TenantFeaturesService>();
+
         // 6b. Marketing options + Leads API service (landing publica)
         services.Configure<MarketingOptions>(config.GetSection("Marketing"));
         // Feature flags (issue #770): modulo fiscal default-off ate homologacao FocusNFe.

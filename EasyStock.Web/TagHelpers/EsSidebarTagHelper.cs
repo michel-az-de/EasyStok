@@ -27,6 +27,7 @@ namespace EasyStock.Web.TagHelpers;
 public sealed class EsSidebarTagHelper(
     PreferenciaMenuService favoritosSvc,
     MenuResumoService resumoSvc,
+    TenantFeaturesService featuresSvc,
     SessionService session,
     LucideIconResolver icons,
     IConfiguration config) : TagHelper
@@ -61,9 +62,15 @@ public sealed class EsSidebarTagHelper(
         try { badges = (await resumoSvc.ObterAsync(empresaId, lojaId)).Badges; }
         catch { badges = MenuBadges.Zero; }
 
+        // Falha aqui esconde item gated (fail-closed, ADR-0048) em vez de derrubar o menu.
+        TenantFeaturesBff features;
+        try { features = await featuresSvc.ObterAsync(empresaId); }
+        catch { features = TenantFeaturesBff.Indisponivel; }
+
         // Sem linha de favoritos => seed por perfil (flag KDS).
         var favoritos = fav.Favoritos ?? MenuDefinition.DefaultFavoritos(fav.KdsHabilitado);
-        var vm = MenuViewModelBuilder.Build(path, activeMenuItem, favoritos, badges, fav.KdsHabilitado, moduloAtivo);
+        var vm = MenuViewModelBuilder.Build(
+            path, activeMenuItem, favoritos, badges, fav.KdsHabilitado, moduloAtivo, features.Ativas);
 
         output.TagName = "nav";
         output.TagMode = TagMode.StartTagAndEndTag;

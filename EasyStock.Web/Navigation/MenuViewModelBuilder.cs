@@ -24,12 +24,12 @@ public static class MenuViewModelBuilder
         IReadOnlyList<string>? favoritosKeys,
         MenuBadges? badges,
         bool kdsHabilitado,
-        string? moduloAtivo = null)
+        string? moduloAtivo = null,
+        IReadOnlySet<string>? featuresAtivas = null)
     {
         badges ??= MenuBadges.Zero;
 
-        // (1) filtra a arvore pela flag KDS — itens de producao somem quando off.
-        bool Visible(MenuItem i) => kdsHabilitado || !i.IsProducaoKds;
+        bool Visible(MenuItem i) => ItemVisivel(i, kdsHabilitado, featuresAtivas);
 
         var todosGrupos = MenuDefinition.Groups
             .Select(g => (group: g, items: g.Items.Where(Visible).ToList()))
@@ -106,6 +106,25 @@ public static class MenuViewModelBuilder
             groupViews,
             MenuDefinition.Footer.Select(ToView).ToList(),
             activeKey);
+    }
+
+    /// <summary>
+    /// Item existe para este tenant? Combina os dois filtros que DESCARTAM (ao contrário do
+    /// filtro de módulo, que só esconde): a flag KDS da loja e as features do tenant
+    /// (ADR-0048). Por serem descarte, favorito órfão some sozinho — a resolução de
+    /// "Meu dia" acontece depois.
+    ///
+    /// <para>
+    /// <paramref name="featuresAtivas"/> null significa que não conseguimos perguntar à Api;
+    /// nesse caso o item gated some (<b>fail-closed</b>). Item sem feature exigida nunca é
+    /// afetado, então uma indisponibilidade não esvazia o menu de quem não usa módulo gated.
+    /// </para>
+    /// </summary>
+    public static bool ItemVisivel(MenuItem item, bool kdsHabilitado, IReadOnlySet<string>? featuresAtivas)
+    {
+        if (item.IsProducaoKds && !kdsHabilitado) return false;
+        if (item.RequerFeature is null) return true;
+        return featuresAtivas?.Contains(item.RequerFeature) ?? false;
     }
 
     /// <summary>

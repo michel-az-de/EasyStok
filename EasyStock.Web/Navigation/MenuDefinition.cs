@@ -8,6 +8,11 @@ namespace EasyStock.Web.Navigation;
 /// controller DEVE constar em algum ActiveKeys (garantido por teste). <see cref="BadgeKey"/>
 /// liga o item a uma contagem de <see cref="MenuBadges"/>.
 /// </summary>
+/// <param name="RequerFeature">
+/// Feature de tenant que este item exige (ADR-0048). Null = visível para todo mundo. Quando
+/// preenchida, o item some para quem não tem a flag ativa — inclusive dos favoritos, porque
+/// o filtro acontece antes da resolução de "Meu dia".
+/// </param>
 public sealed record MenuItem(
     string Key,
     string Label,
@@ -17,7 +22,8 @@ public sealed record MenuItem(
     string? BadgeKey = null,
     string? Tag = null,
     bool IsProducaoKds = false,
-    bool IsExternal = false);
+    bool IsExternal = false,
+    string? RequerFeature = null);
 
 /// <summary>Grupo (accordion) do menu, com seus itens na ordem de exibicao.</summary>
 public sealed record MenuGroup(

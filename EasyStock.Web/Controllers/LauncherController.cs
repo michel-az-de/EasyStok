@@ -18,6 +18,7 @@ namespace EasyStock.Web.Controllers;
 public class LauncherController(
     MenuResumoService resumoSvc,
     PreferenciaMenuService favoritosSvc,
+    TenantFeaturesService featuresSvc,
     FinanceiroService financeiroSvc,
     SessionService session) : BaseController(session)
 {
@@ -46,6 +47,11 @@ public class LauncherController(
         try { fav = await favoritosSvc.ObterAsync(usuarioId, lojaId); }
         catch { fav = new MenuFavoritosBff(null, false); }
 
+        // Fail-closed (ADR-0048): sem resposta, módulo gated não aparece.
+        TenantFeaturesBff features;
+        try { features = await featuresSvc.ObterAsync(empresaId); }
+        catch { features = TenantFeaturesBff.Indisponivel; }
+
         // null (nao zero) quando o resumo nao respondeu: zero e uma medicao, ausencia nao é.
         MenuBadges? badges = resumo.Dash is null
             ? null
@@ -59,7 +65,8 @@ public class LauncherController(
         var favoritos = fav.Favoritos ?? MenuDefinition.DefaultFavoritos(fav.KdsHabilitado);
         var menu = MenuViewModelBuilder.Build(
             currentPath: "/launcher", activeMenuItem: null,
-            favoritos, badges ?? MenuBadges.Zero, fav.KdsHabilitado);
+            favoritos, badges ?? MenuBadges.Zero, fav.KdsHabilitado,
+            moduloAtivo: null, featuresAtivas: features.Ativas);
 
         // Fonte do badge do Financeiro e da missão de parcelas vencidas. Indisponível ->
         // null -> card sem número e missão ausente (nunca um zero que não medimos).
@@ -78,7 +85,10 @@ public class LauncherController(
             resumo.Dia,
             badges,
             menu.MeuDia,
-            ModuloDefinition.Modulos,
+            // Filtrado aqui, e não dentro de ModuloDefinition.Modulos: os testes-guarda
+            // amarram a lista estática ao MenuDefinition, e o builder já recebe a lista
+            // por parâmetro justamente para o call site poder decidir o que entra.
+            [.. ModuloDefinition.Modulos.Where(m => features.Permite(m.RequerFeature))],
             financeiro);
 
         return View(vm);

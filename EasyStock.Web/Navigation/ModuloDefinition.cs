@@ -97,9 +97,13 @@ public static class ModuloDefinition
 }
 
 /// <summary>Metadados de um modulo no portal.</summary>
+/// <param name="RequerFeature">
+/// Feature de tenant exigida para o card aparecer (ADR-0048). Null = todo tenant ve.
+/// </param>
 public sealed record ModuloInfo(
     string Key,
     string Nome,
     string IconeLucide,
     string Descricao,
-    string HrefDefault);
+    string HrefDefault,
+    string? RequerFeature = null);
