@@ -251,6 +251,12 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<CobrancaAssinatura> CobrancasAssinatura { get; set; } = null!;
         public DbSet<ConfiguracaoSistema> ConfiguracoesSistema { get; set; } = null!;
 
+        // Feature flags por tenant (ADR-0048). Isenta do global query filter E do RLS
+        // (ver SkipTenantFilter abaixo e a migration AddRowLevelSecurity): quem consulta
+        // filtra EmpresaId na mao. A entidade ja estava mapeada por convencao — este DbSet
+        // nao altera o schema, so da acesso nomeado.
+        public DbSet<TenantFeatureFlag> TenantFeatureFlags { get; set; } = null!;
+
         // Modulo Financeiro (F1+)
         public DbSet<Fatura> Faturas { get; set; } = null!;
         public DbSet<FaturaItem> FaturaItens { get; set; } = null!;

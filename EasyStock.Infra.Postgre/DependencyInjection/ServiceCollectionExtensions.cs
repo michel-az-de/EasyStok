@@ -140,6 +140,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IAdminBuscaGlobalQueries, AdminBuscaGlobalQueries>();
             services.AddScoped<IApkReleaseRepository, ApkReleaseRepository>();
             services.AddScoped<IConfiguracaoSistemaRepository, ConfiguracaoSistemaRepository>();
+            services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
             services.AddScoped<IPlanoAdminRepository, PlanoAdminRepository>();
             services.AddScoped<ICupomAdminRepository, CupomAdminRepository>();
             services.AddScoped<IAdminDashboardQueries, AdminDashboardQueries>();
