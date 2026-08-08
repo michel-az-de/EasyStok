@@ -15,16 +15,19 @@
 
 <header class="app-topbar relative z-40 px-4 py-3 flex items-center gap-2 sm:gap-3 flex-shrink-0"
         style="background: var(--bg-surface); border-bottom: 1px solid var(--border-soft);">
-    <!-- Hamburger (mobile only) -->
-    <button @@click="sidebarOpen = !sidebarOpen"
-            id="sidebar-toggle"
-            aria-label="Abrir menu"
-            aria-controls="app-sidebar"
-            :aria-expanded="sidebarOpen ? 'true' : 'false'"
-            class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
-            style="color: var(--text-secondary);">
-        <es-icon name="menu" class="w-5 h-5"></es-icon>
-    </button>
+    @* Hamburger (mobile): some junto com a sidebar no portal — abriria um drawer vazio. *@
+    @if (ViewBag.OcultarSidebar != true)
+    {
+        <button @@click="sidebarOpen = !sidebarOpen"
+                id="sidebar-toggle"
+                aria-label="Abrir menu"
+                aria-controls="app-sidebar"
+                :aria-expanded="sidebarOpen ? 'true' : 'false'"
+                class="app-icon-btn lg:hidden p-2 rounded-lg transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                style="color: var(--text-secondary);">
+            <es-icon name="menu" class="w-5 h-5"></es-icon>
+        </button>
+    }
 
     <!-- Breadcrumb (desktop: quando dentro de um modulo) -->
     @if (!string.IsNullOrEmpty(moduloNome))

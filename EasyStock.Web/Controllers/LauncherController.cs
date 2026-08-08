@@ -28,6 +28,7 @@ public class LauncherController(
     {
         ViewBag.Title = "Portal";
         ViewBag.ActiveMenuItem = "Launcher";
+        ViewBag.OcultarSidebar = true;   // portal é tela cheia (ADR-0046)
 
         var usuarioId = Session.GetUsuarioId();
         var lojaId = Session.GetLojaId();

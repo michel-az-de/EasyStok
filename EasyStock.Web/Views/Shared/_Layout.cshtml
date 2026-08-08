@@ -98,20 +98,28 @@
        O seletor era `body > div.flex.h-screen`, acoplado a classes utilitarias — trocar
        `h-screen` por `min-h-dvh` numa melhoria de mobile quebraria o gate em silencio,
        sem teste pegando. Nao remover este atributo. *@
+    @* Portal (ADR-0046): a home de módulos é tela cheia — sidebar e overlay saem, para
+       que o portal não exiba os 25 itens de menu que ele existe para não exibir. Flag no
+       layout existente em vez de layout próprio: um segundo <head> duplicaria pipeline de
+       CSS, anti-flash de tema/rail e fontes, duplicação que já driftou em SelecionarLoja. *@
+    @{ var ocultarSidebar = ViewBag.OcultarSidebar == true; }
     <div x-data="{ sidebarOpen: false }"
          data-app-root
          @@keydown.escape.window="if (sidebarOpen) { sidebarOpen = false; document.getElementById('sidebar-toggle')?.focus(); }"
          class="flex h-screen overflow-hidden">
-        <div x-show="sidebarOpen" x-cloak
-             x-transition:enter="transition-opacity ease-linear duration-200"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="transition-opacity ease-linear duration-200"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             @@click="sidebarOpen = false"
-             class="fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
-        @await Html.PartialAsync("_Sidebar")
+        @if (!ocultarSidebar)
+        {
+            <div x-show="sidebarOpen" x-cloak
+                 x-transition:enter="transition-opacity ease-linear duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition-opacity ease-linear duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 @@click="sidebarOpen = false"
+                 class="fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+            @await Html.PartialAsync("_Sidebar")
+        }
         <div class="flex flex-col flex-1 overflow-hidden min-w-0">
             @await Html.PartialAsync("_Topbar")
             <main id="app-main" class="app-main flex-1 overflow-y-auto p-4 lg:p-6 pb-28 lg:pb-6" tabindex="-1">
