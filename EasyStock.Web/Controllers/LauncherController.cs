@@ -74,8 +74,14 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
 
         // ── Monta cards de módulo ──
         var modulosDef = ModuloDefinition.PorEmpresa(empresaId);
+        // Mesma composicao do MenuResumoService (ADR-0032, fatia 2): pedidos vem do resumo
+        // do dia, criticos e vencidos do dashboard. Em F4 a chamada direta ao ApiClient sai
+        // e o servico com cache passa a ser a unica fonte.
         var badges = dashResult.Success && dashResult.Data is { } db
-            ? new MenuBadges(db.PedidosPendentes, db.AlertasEstoqueBaixo, db.AlertasVencimento, db.AlertasEstoqueBaixo + db.AlertasVencimento)
+            ? new MenuBadges(
+                PedidosAbertos: diaResult.Success ? diaResult.Data?.PedidosPendentes ?? 0 : 0,
+                ProdutosCriticos: db.AlertasEstoqueBaixo,
+                LotesVencidos: db.AlertasVencidos)
             : MenuBadges.Zero;
 
         vm.Modulos = modulosDef.Select(m => CriarCard(m, badges, empresaId)).ToList();
@@ -84,7 +90,7 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
         // Reusa MenuViewModelBuilder com o menu atual (sem filtro de módulo)
         var favoritos = new List<string>(); // TODO: buscar de PreferenciaMenuService
         var menuVm = MenuViewModelBuilder.Build(null, null, favoritos, badges, true);
-        vm.MeuDia = menuVm.MeuDia;
+        vm.MeuDia = [.. menuVm.MeuDia];
 
         return View(vm);
     }
