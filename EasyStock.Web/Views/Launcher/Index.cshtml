@@ -14,7 +14,10 @@
    nenhuma regra CSS nova, tudo via classes existentes.
    Sem sidebar (ViewBag.OcultarSidebar), o conteúdo ocuparia a tela inteira — daí a
    coluna centralizada, que mantém a medida de leitura dos cards. *@
-<div class="mx-auto w-full max-w-6xl">
+@* ds-enter: revela as seções em cascata no load (issue 712). Precisa ser filho DIRETO
+   de .app-main para a supressão do fadeInUp global valer — é o caso deste wrapper.
+   A guarda de prefers-reduced-motion já existe no app.css; nenhuma regra nova. *@
+<div class="ds-enter mx-auto w-full max-w-6xl">
 
 <header class="ds-header mb-6">
     <h1 class="text-2xl font-bold text-slate-900">@Model.Saudacao</h1>
@@ -101,7 +104,7 @@
                     <a href="@missao.Href" class="ds-shortcut">
                         <es-icon name="circle" class="es-icon--sm"></es-icon>
                         <span>@missao.Titulo</span>
-                        <span class="badge badge-warn">@missao.Pendentes</span>
+                        <span class="badge badge-warn" data-countup>@missao.Pendentes</span>
                     </a>
                 }
             }
@@ -118,7 +121,7 @@
         <h2 id="launcher-modulos-title">Módulos</h2>
         <span class="ds-section-meta">@Model.Modulos.Count disponíveis</span>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="ds-stagger-rows grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         @foreach (var m in Model.Modulos)
         {
             @* Href puro: o modulo vem da rota de destino (ADR-0046). Antes concatenava
@@ -130,7 +133,7 @@
                     <div class="es-stat-label">@m.Nome</div>
                     @if (m.BadgeCount > 0)
                     {
-                        <span class="badge badge-@(m.BadgeType)">@m.BadgeCount</span>
+                        <span class="badge badge-@(m.BadgeType)" data-countup>@m.BadgeCount</span>
                     }
                 </div>
                 <div class="flex items-center gap-3 mt-2">
@@ -175,3 +178,7 @@
 }
 
 </div>
+
+@section Scripts {
+    <script src="~/js/launcher.js" asp-append-version="true"></script>
+}
