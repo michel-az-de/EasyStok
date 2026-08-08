@@ -376,7 +376,12 @@ public class AdminTenantsController(
         var existe = await db.Empresas.AnyAsync(e => e.Id == id, ct);
         if (!existe) return DataNotFound("Tenant não encontrado.");
 
-        var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? currentUser.UsuarioId.ToString();
+        // O JWT emite o claim curto "email"; ClaimTypes.Email só resolve quando o handler
+        // mapeia para a URI longa, o que aqui não acontece — sem os dois, a auditoria
+        // gravaria um GUID no lugar de quem mexeu.
+        var adminEmail = User.FindFirstValue("email")
+            ?? User.FindFirstValue(ClaimTypes.Email)
+            ?? currentUser.UsuarioId.ToString();
         var alterado = await definirFeatureUseCase.ExecuteAsync(
             new DefinirFeatureDoTenantCommand(id, feature, req.Ativo, adminEmail), ct);
 
