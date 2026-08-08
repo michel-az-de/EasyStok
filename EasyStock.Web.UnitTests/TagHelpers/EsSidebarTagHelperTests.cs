@@ -150,6 +150,29 @@ public class EsSidebarTagHelperTests
     }
 
     [Fact]
+    public void Querystring_da_rota_desempata_itens_que_dividem_o_mesmo_path()
+    {
+        // "Validade" e "Posição" compartilham /estoque, diferindo so em ?status=vencido.
+        // O desempate por query existe no builder desde o ADR-0032, mas o TagHelper passava
+        // apenas o Path — entao Validade nunca ficava ativo, nem vindo do card do portal.
+        var html = Render("/estoque", Array.Empty<string>(), kds: true, Resumo(0, 0, 0),
+            queryString: "?status=vencido");
+
+        html.Should().Contain("data-menu-key=\"lotes-validade\"");
+        var trechoValidade = html[html.IndexOf("es-row-lotes-validade", StringComparison.Ordinal)..];
+        trechoValidade[..300].Should().Contain("aria-current=\"page\"");
+    }
+
+    [Fact]
+    public void Sem_querystring_o_item_sem_query_continua_ativo()
+    {
+        var html = Render("/estoque", Array.Empty<string>(), kds: true, Resumo(0, 0, 0));
+
+        var trechoPosicao = html[html.IndexOf("es-row-posicao-estoque", StringComparison.Ordinal)..];
+        trechoPosicao[..300].Should().Contain("aria-current=\"page\"");
+    }
+
+    [Fact]
     public void Querystring_de_modulo_nao_influencia_mais_o_menu()
     {
         // O ?modulo= foi removido (ADR-0046): quem manda e a rota. Enquanto era lido da

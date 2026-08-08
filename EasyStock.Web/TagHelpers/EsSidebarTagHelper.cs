@@ -42,7 +42,11 @@ public sealed class EsSidebarTagHelper(
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         _publicApi = (config["PublicApiUrl"] ?? string.Empty).TrimEnd('/');
-        var path = ViewContext?.HttpContext?.Request?.Path.Value;
+        // Path + querystring: o desempate por query do ResolveActive (ADR-0032) so existe
+        // porque "Validade" e "Posicao" compartilham /estoque, diferindo em ?status=vencido.
+        // Passando so o Path, esse desempate nunca acontecia e Validade nunca ficava ativo.
+        var req = ViewContext?.HttpContext?.Request;
+        var path = req is null ? null : req.Path.Value + req.QueryString.Value;
         var activeMenuItem = ViewContext?.ViewData["ActiveMenuItem"] as string;
         var moduloAtivo = ModuloDefinition.ResolverPorRota(path, activeMenuItem);
         var usuarioId = session.GetUsuarioId();
