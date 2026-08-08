@@ -8,7 +8,7 @@ namespace EasyStock.Web.Controllers;
 /// <summary>
 /// Landing publica do EasyStok. Todas as actions sao anonimas, com layout
 /// proprio (_LayoutSite) — separado do app autenticado. Usuarios ja logados
-/// sao redirecionados pro dashboard pra nao verem pitch de venda novamente.
+/// sao redirecionados pro portal (Launcher) pra nao verem pitch de venda novamente.
 ///
 /// <para>
 /// Antiforgery: o EasyStock.Web ja registra <see cref="AutoValidateAntiforgeryTokenAttribute"/>
@@ -30,9 +30,9 @@ public sealed class SiteController(
     [HttpGet("")]
     public IActionResult Index()
     {
-        // Usuario ja autenticado vai direto pro dashboard — landing e pitch de venda.
+        // Usuario ja autenticado vai direto pro portal — landing e pitch de venda.
         if (session.IsLoggedIn())
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("Index", "Launcher");
 
         return View(new LandingViewModel());
     }

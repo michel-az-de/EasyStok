@@ -14,12 +14,12 @@ public class OnboardingController(ApiClient api, SessionService session) : Contr
     {
         if (!session.IsLoggedIn()) return Redirect("/auth/login");
 
-        // Se ja completo, vai direto pro dashboard.
+        // Se ja completo, vai direto pro portal.
         var status = await api.GetAsync<JsonElement>("onboarding/status");
         if (status.Success && status.Data.TryGetProperty("data", out var d)
             && d.TryGetProperty("completo", out var c) && c.ValueKind == JsonValueKind.True)
         {
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("Index", "Launcher");
         }
 
         return View(new OnboardingViewModel());
@@ -48,6 +48,6 @@ public class OnboardingController(ApiClient api, SessionService session) : Contr
         }
 
         TempData["Toast"] = "success|Tudo pronto! Bem-vindo ao EasyStok.";
-        return RedirectToAction("Index", "Dashboard");
+        return RedirectToAction("Index", "Launcher");
     }
 }

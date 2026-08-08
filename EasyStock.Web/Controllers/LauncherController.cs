@@ -14,11 +14,14 @@ namespace EasyStock.Web.Controllers;
 /// </summary>
 public class LauncherController(ApiClient api, SessionService session) : BaseController(session)
 {
-    [HttpGet("/")]
+    // NAO reivindicar "/": a raiz e da landing publica (SiteController), que redireciona
+    // pra ca quando ha sessao. Dois attribute routes com o mesmo template derrubariam
+    // GET / com AmbiguousMatchException, inclusive para visitante anonimo.
     [HttpGet("/launcher")]
     public async Task<IActionResult> Index()
     {
         ViewBag.Title = "Portal";
+        ViewBag.ActiveMenuItem = "Launcher";
 
         var empresaId = session.GetEmpresaId() ?? string.Empty;
         var lojaId = session.GetLojaId() ?? string.Empty;
@@ -84,7 +87,7 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
                 LotesVencidos: db.AlertasVencidos)
             : MenuBadges.Zero;
 
-        vm.Modulos = modulosDef.Select(m => CriarCard(m, badges, empresaId)).ToList();
+        vm.Modulos = modulosDef.Select(m => CriarCard(m, badges)).ToList();
 
         // ── Meu dia (favoritos) ──
         // Reusa MenuViewModelBuilder com o menu atual (sem filtro de módulo)
@@ -95,7 +98,7 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
         return View(vm);
     }
 
-    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges badges, string empresaId)
+    private static ModuloCardViewModel CriarCard(ModuloInfo m, MenuBadges badges)
     {
         var (badge, badgeType, status) = m.Key switch
         {
@@ -103,8 +106,9 @@ public class LauncherController(ApiClient api, SessionService session) : BaseCon
                            badges.PedidosAbertos > 0 ? $"{badges.PedidosAbertos} pedidos em aberto" : "Tudo em ordem"),
             "producao" => (badges.LotesVencidos + badges.ProdutosCriticos, badges.LotesVencidos + badges.ProdutosCriticos > 0 ? "warn" : "ok",
                            badges.LotesVencidos + badges.ProdutosCriticos > 0 ? $"{badges.LotesVencidos + badges.ProdutosCriticos} alertas" : "Tudo em ordem"),
-            "financeiro" => (0, "ok", empresaId.Equals("fma", StringComparison.OrdinalIgnoreCase) ? "1 conta a vencer" : "2 contas a vencer hoje"),
-            _ => (0, "ok", "Tudo em ordem")
+            // Financeiro ainda nao tem contagem aqui: sem numero e melhor que numero inventado.
+            // O badge real (parcelas vencidas hoje) entra em F7, via financeiro/dashboard.
+            _ => (0, "ok", "")
         };
 
         return new ModuloCardViewModel(

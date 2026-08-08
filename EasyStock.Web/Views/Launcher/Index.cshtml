@@ -134,7 +134,10 @@
                     <es-icon name="@m.Icone" class="w-8 h-8" style="color:var(--navy-600)"></es-icon>
                     <div>
                         <div class="text-sm font-medium text-slate-700">@m.Descricao</div>
-                        <div class="text-xs text-slate-400 mt-0.5">@m.StatusText</div>
+                        @if (!string.IsNullOrEmpty(m.StatusText))
+                        {
+                            <div class="text-xs text-slate-400 mt-0.5">@m.StatusText</div>
+                        }
                     </div>
                 </div>
             </a>
