@@ -12,7 +12,13 @@ public sealed record CriarClienteCommand(
     [property: MaxLength(32)]  string? Telefone = null,
     [property: MaxLength(255)] string? Email = null,
     [property: MaxLength(30)]  string? Documento = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    // Pessoa jurídica (ADR-0048). No fim e com default porque este Command É o corpo HTTP
+    // (`[FromBody] CriarClienteCommand`): campo novo obrigatório viraria 400 imediato para
+    // PWA, Web e mobile, que não o enviam.
+    bool PessoaJuridica = false,
+    [property: MaxLength(150)] string? NomeFantasia = null,
+    [property: MaxLength(20)]  string? InscricaoEstadual = null);
 
 public class CriarClienteUseCase(
     IClienteRepository repo,
@@ -40,6 +46,7 @@ public class CriarClienteUseCase(
         cliente.AtualizarCadastro(
             cmd.Nome, cmd.Apt, cmd.Endereco,
             telNormalizado, cmd.Email, docNormalizado, cmd.Observacoes);
+        cliente.AtualizarPessoaJuridica(cmd.PessoaJuridica, cmd.NomeFantasia, cmd.InscricaoEstadual);
 
         await repo.AddAsync(cliente);
         await uow.CommitAsync();
@@ -51,5 +58,6 @@ public class CriarClienteUseCase(
     internal static ClienteResult Map(ClienteEntity c) => new(
         c.Id, c.EmpresaId, c.Nome, c.Apt, c.Endereco, c.Telefone, c.Email,
         c.Documento, c.Observacoes, c.OrderCount, c.LastOrderAt, c.Ativo,
-        c.CriadoEm, c.AlteradoEm);
+        c.CriadoEm, c.AlteradoEm,
+        c.TipoPessoa, c.NomeFantasia, c.InscricaoEstadual);
 }

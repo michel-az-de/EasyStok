@@ -31,8 +31,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
+                // NomeFantasia entra na busca porque, para PJ, e por ele que o operador
+                // conhece o cliente — o Nome guarda a razao social, que raramente e o que
+                // se digita.
                 query = query.Where(c =>
                     EF.Functions.ILike(c.Nome, $"%{termo}%") ||
+                    (c.NomeFantasia != null && EF.Functions.ILike(c.NomeFantasia, $"%{termo}%")) ||
                     (c.Documento != null && EF.Functions.ILike(c.Documento, $"%{termo}%")) ||
                     (c.Telefone != null && EF.Functions.ILike(c.Telefone, $"%{termo}%")) ||
                     (c.Email != null && EF.Functions.ILike(c.Email, $"%{termo}%")) ||
@@ -63,6 +67,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return await db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId && c.Ativo &&
                     (EF.Functions.ILike(c.Nome, pattern) ||
+                     (c.NomeFantasia != null && EF.Functions.ILike(c.NomeFantasia, pattern)) ||
                      (c.Telefone != null && EF.Functions.ILike(c.Telefone, pattern)) ||
                      (c.Documento != null && EF.Functions.ILike(c.Documento, pattern))))
                 .OrderBy(c => c.Nome)

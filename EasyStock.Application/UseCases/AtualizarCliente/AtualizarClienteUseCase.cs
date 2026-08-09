@@ -18,7 +18,11 @@ public sealed record AtualizarClienteCommand(
     string? Observacoes = null,
     Guid? AlteradoPorUserId = null,
     string? AlteradoPorNome = null,
-    string? Origem = "web");
+    string? Origem = "web",
+    // Pessoa jurídica (ADR-0048) — no fim e com default: este Command É o corpo HTTP.
+    bool PessoaJuridica = false,
+    [property: MaxLength(150)] string? NomeFantasia = null,
+    [property: MaxLength(20)]  string? InscricaoEstadual = null);
 
 public class AtualizarClienteUseCase(
     IClienteRepository repo,
@@ -53,6 +57,7 @@ public class AtualizarClienteUseCase(
         cliente.AtualizarCadastro(
             cmd.Nome, cmd.Apt, cmd.Endereco,
             telNormalizado, cmd.Email, docNormalizado, cmd.Observacoes);
+        cliente.AtualizarPessoaJuridica(cmd.PessoaJuridica, cmd.NomeFantasia, cmd.InscricaoEstadual);
 
         foreach (var (campo, antigo, novo) in diffs)
         {
@@ -89,6 +94,13 @@ public class AtualizarClienteUseCase(
         Compare("Email",       atual.Email,       cmd.Email,          diffs);
         Compare("Documento",   atual.Documento,   docNormalizado,     diffs);
         Compare("Observacoes", atual.Observacoes, cmd.Observacoes,    diffs);
+
+        // Sem estas linhas, virar um cliente de PF para PJ (ou mexer na IE) não deixaria
+        // rastro nenhum no histórico do cadastro.
+        var tipoNovo = cmd.PessoaJuridica ? TipoPessoaCliente.Juridica : TipoPessoaCliente.Fisica;
+        Compare("TipoPessoa",        atual.TipoPessoa,        tipoNovo,                                        diffs);
+        Compare("NomeFantasia",      atual.NomeFantasia,      cmd.PessoaJuridica ? cmd.NomeFantasia : null,      diffs);
+        Compare("InscricaoEstadual", atual.InscricaoEstadual, cmd.PessoaJuridica ? cmd.InscricaoEstadual : null, diffs);
         return diffs;
     }
 

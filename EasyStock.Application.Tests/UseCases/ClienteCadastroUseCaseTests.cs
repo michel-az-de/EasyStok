@@ -189,4 +189,106 @@ public class ClienteCadastroUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
+
+    // ── pessoa jurídica (ADR-0048, #1018) ────────────────────────────
+
+    [Fact]
+    public async Task Criar_sem_informar_tipo_nasce_pessoa_fisica()
+    {
+        // Regressão do contrato: PWA, mobile e qualquer cliente antigo não mandam o campo.
+        var r = await Criar().ExecuteAsync(new CriarClienteCommand(Empresa, "Ana"));
+
+        r.TipoPessoa.Should().Be("fisica");
+        r.NomeFantasia.Should().BeNull();
+        r.InscricaoEstadual.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Criar_pessoa_juridica_guarda_razao_social_no_nome()
+    {
+        var r = await Criar().ExecuteAsync(new CriarClienteCommand(
+            Empresa, "Distribuidora Sul Ltda", Documento: CnpjValido,
+            PessoaJuridica: true, NomeFantasia: "Sul Bebidas", InscricaoEstadual: "123.456.789.111"));
+
+        r.TipoPessoa.Should().Be("juridica");
+        r.Nome.Should().Be("Distribuidora Sul Ltda", because: "no vocabulário do repo, Nome É a razão social");
+        r.NomeFantasia.Should().Be("Sul Bebidas");
+        r.InscricaoEstadual.Should().Be("123.456.789.111");
+        r.Documento.Should().Be(CnpjValidoDigitos);
+    }
+
+    [Fact]
+    public async Task Inscricao_estadual_aceita_isento()
+    {
+        // Formato varia por UF e o literal "ISENTO" é válido — mesmo tratamento que a IE do
+        // emitente fiscal já recebe.
+        var r = await Criar().ExecuteAsync(new CriarClienteCommand(
+            Empresa, "Micro Empresa ME", PessoaJuridica: true, InscricaoEstadual: "ISENTO"));
+
+        r.InscricaoEstadual.Should().Be("ISENTO");
+    }
+
+    [Fact]
+    public async Task Campos_de_pj_sao_ignorados_quando_o_cadastro_e_pessoa_fisica()
+    {
+        // Payload inconsistente não deve deixar inscrição estadual pendurada numa PF.
+        var r = await Criar().ExecuteAsync(new CriarClienteCommand(
+            Empresa, "Ana", PessoaJuridica: false,
+            NomeFantasia: "não deveria colar", InscricaoEstadual: "123"));
+
+        r.TipoPessoa.Should().Be("fisica");
+        r.NomeFantasia.Should().BeNull();
+        r.InscricaoEstadual.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Converter_pj_para_pf_limpa_os_campos_de_pj()
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Distribuidora Sul Ltda");
+        cliente.AtualizarPessoaJuridica(true, "Sul Bebidas", "123456");
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+
+        var r = await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Joao da Silva", PessoaJuridica: false));
+
+        r!.TipoPessoa.Should().Be("fisica");
+        r.NomeFantasia.Should().BeNull(because: "corrigir para PF não pode deixar dado de PJ para trás");
+        r.InscricaoEstadual.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Virar_pj_deixa_rastro_no_audit_log()
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Distribuidora Sul");
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Distribuidora Sul", PessoaJuridica: true, InscricaoEstadual: "999"));
+
+        await _repo.Received(1).AddAlteracaoAsync(
+            Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "TipoPessoa" && a.ValorNovo == "juridica"));
+        await _repo.Received(1).AddAlteracaoAsync(
+            Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "InscricaoEstadual" && a.ValorNovo == "999"));
+    }
+
+    [Fact]
+    public async Task Editar_pessoa_fisica_nao_gera_rastro_de_pj()
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Ana");
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(Empresa, cliente.Id, "Ana Beatriz"));
+
+        await _repo.DidNotReceive().AddAlteracaoAsync(
+            Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "TipoPessoa"));
+    }
+
+    [Fact]
+    public void Vocabulario_de_tipo_pessoa_recusa_valor_fora_da_lista()
+    {
+        TipoPessoaCliente.EhValido("fisica").Should().BeTrue();
+        TipoPessoaCliente.EhValido("juridica").Should().BeTrue();
+        TipoPessoaCliente.EhValido("PJ").Should().BeFalse();
+        TipoPessoaCliente.EhValido(null).Should().BeFalse();
+    }
 }
