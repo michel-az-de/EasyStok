@@ -34,7 +34,43 @@
         public string? Complemento { get; set; }
         public string? Bairro { get; set; }
         public string? Cidade { get; set; }
+
+        /// <summary>
+        /// ⚠️ Campo SEM uso: nenhum caso de uso, controller, repositório ou DTO lê ou escreve
+        /// esta propriedade. O documento canônico do cliente — inclusive o CPF — é
+        /// <see cref="Documento"/>, que é o campo buscado, normalizado e exposto na Api.
+        /// Não confundir com pessoa física: quem distingue PF de PJ é <see cref="TipoPessoa"/>.
+        /// Remoção avaliada na issue #1019.
+        /// </summary>
         public string? Cpf { get; set; }
+
+        // ── Pessoa jurídica (ADR-0048, issue #1018) ─────────────────────
+        // Seguindo o vocabulário da entidade Empresa (que também é uma PJ): NÃO existe campo
+        // "RazaoSocial" — o Nome É a razão social quando o cliente é PJ, e NomeFantasia é
+        // opcional ao lado. Isso mantém Nome como o campo único que snapshots de pedido,
+        // busca e saudações já usam, sem dois campos disputando quem é o principal.
+
+        /// <summary>
+        /// <c>"fisica"</c> ou <c>"juridica"</c>. String e não enum, seguindo a convenção do
+        /// repo para status (evita migration ao acrescentar valor). Não-nullable com default
+        /// <c>"fisica"</c>: é o que mantém todo cadastro existente — e todo código que não
+        /// conhece o campo — produzindo pessoa física.
+        /// </summary>
+        public string TipoPessoa { get; set; } = TipoPessoaCliente.Fisica;
+
+        /// <summary>Nome fantasia da PJ. Null para pessoa física.</summary>
+        public string? NomeFantasia { get; set; }
+
+        /// <summary>
+        /// Inscrição estadual. Texto livre porque o formato varia por UF e o valor pode ser
+        /// o literal <c>"ISENTO"</c> — mesmo tratamento que <c>EmpresaConfiguracaoFiscal</c>
+        /// já dá à IE do emitente.
+        /// </summary>
+        public string? InscricaoEstadual { get; set; }
+
+        /// <summary>Conveniência de leitura; a fonte da verdade é <see cref="TipoPessoa"/>.</summary>
+        public bool EhPessoaJuridica =>
+            string.Equals(TipoPessoa, TipoPessoaCliente.Juridica, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// SHA-256 hex (64 chars) do telefone normalizado em E.164.
@@ -140,6 +176,37 @@
             AlteradoEm = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Dados de pessoa jurídica (ADR-0048). Método separado de propósito:
+        /// <see cref="AtualizarCadastro"/> tem 7 parâmetros posicionais e três call-sites —
+        /// acrescentar parâmetro lá compilaria e trocaria valores em silêncio.
+        ///
+        /// <para>
+        /// Passar <paramref name="ehPessoaJuridica"/> como false limpa os campos de PJ: um
+        /// cadastro corrigido de PJ para PF não deve manter inscrição estadual pendurada.
+        /// </para>
+        /// </summary>
+        public void AtualizarPessoaJuridica(
+            bool ehPessoaJuridica,
+            string? nomeFantasia,
+            string? inscricaoEstadual)
+        {
+            TipoPessoa = ehPessoaJuridica ? TipoPessoaCliente.Juridica : TipoPessoaCliente.Fisica;
+
+            if (!ehPessoaJuridica)
+            {
+                NomeFantasia = null;
+                InscricaoEstadual = null;
+            }
+            else
+            {
+                NomeFantasia = string.IsNullOrWhiteSpace(nomeFantasia) ? null : nomeFantasia.Trim();
+                InscricaoEstadual = string.IsNullOrWhiteSpace(inscricaoEstadual) ? null : inscricaoEstadual.Trim();
+            }
+
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void RegistrarPedido(DateTime quandoUtc)
         {
             OrderCount++;
@@ -149,6 +216,19 @@
 
         public void Desativar() { Ativo = false; AlteradoEm = DateTime.UtcNow; }
         public void Reativar() { Ativo = true; AlteradoEm = DateTime.UtcNow; }
+    }
+
+    /// <summary>
+    /// Valores de <see cref="Cliente.TipoPessoa"/>. Constantes em vez de enum para não exigir
+    /// migration a cada valor novo — mesma escolha que o repo faz para status de pedido.
+    /// </summary>
+    public static class TipoPessoaCliente
+    {
+        public const string Fisica = "fisica";
+        public const string Juridica = "juridica";
+
+        public static bool EhValido(string? valor) =>
+            valor is Fisica or Juridica;
     }
 
     /// <summary>

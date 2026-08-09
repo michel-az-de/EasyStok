@@ -30,6 +30,24 @@
             builder.Property(c => c.Cpf).HasMaxLength(11);
             builder.Property(c => c.ConsentiuMarketing).HasDefaultValue(false);
 
+            // ── Pessoa jurídica (ADR-0048, #1018) ──────────────────────
+            // O default no BANCO (não só no C#) é o que mantém as linhas existentes como
+            // pessoa física quando a coluna é criada, sem UPDATE de migração.
+            builder.Property(c => c.TipoPessoa)
+                .IsRequired()
+                .HasMaxLength(10)
+                .HasDefaultValue(TipoPessoaCliente.Fisica);
+
+            // Espelha Empresa.NomeFantasia (150) e a IE do emitente fiscal (20).
+            builder.Property(c => c.NomeFantasia).HasMaxLength(150);
+            builder.Property(c => c.InscricaoEstadual).HasMaxLength(20);
+
+            // Guarda contra valor fora do vocabulário: um "PJ"/"J"/"pessoa juridica" gravado
+            // por engano passaria despercebido e o cadastro nunca se comportaria como PJ.
+            builder.ToTable(t => t.HasCheckConstraint(
+                "ck_clientes_tipo_pessoa",
+                "\"TipoPessoa\" IN ('fisica','juridica')"));
+
             builder.HasOne(c => c.Empresa)
                 .WithMany()
                 .HasForeignKey(c => c.EmpresaId)
