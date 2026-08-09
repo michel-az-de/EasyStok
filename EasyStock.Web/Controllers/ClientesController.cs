@@ -13,6 +13,12 @@ public class CriarClienteWebRequest
     public string? Email { get; set; }
     public string? Documento { get; set; }
     public string? Observacoes { get; set; }
+
+    // Pessoa jurídica (ADR-0048). O modal envia o form inteiro serializado, então basta a
+    // chave existir aqui para chegar; ausente = pessoa física, que é o default.
+    public bool PessoaJuridica { get; set; }
+    public string? NomeFantasia { get; set; }
+    public string? InscricaoEstadual { get; set; }
 }
 
 public class ClientesController(ClientesService svc, SessionService session) : BaseController(session)
@@ -49,9 +55,11 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Criar(
         string nome, string? apt, string? endereco, string? telefone,
-        string? email, string? documento, string? observacoes)
+        string? email, string? documento, string? observacoes,
+        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null)
     {
-        var result = await svc.CriarAsync(nome, apt, endereco, telefone, email, documento, observacoes);
+        var result = await svc.CriarAsync(nome, apt, endereco, telefone, email, documento, observacoes,
+            pessoaJuridica, nomeFantasia, inscricaoEstadual);
         if (HasErrorVerbose(result, "Criar cliente")) return RedirectToAction(nameof(Index));
 
         Toast("success", "Cliente criado com sucesso!");
@@ -79,7 +87,8 @@ public class ClientesController(ClientesService svc, SessionService session) : B
             });
 
         var result = await svc.CriarAsync(req.Nome, req.Apt, req.Endereco, req.Telefone,
-            req.Email, req.Documento, req.Observacoes);
+            req.Email, req.Documento, req.Observacoes,
+            req.PessoaJuridica, req.NomeFantasia, req.InscricaoEstadual);
 
         if (!result.Success)
             return StatusCode(result.HttpStatus > 0 ? result.HttpStatus : 400, new
@@ -99,9 +108,11 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Editar(string id,
         string nome, string? apt, string? endereco, string? telefone,
-        string? email, string? documento, string? observacoes)
+        string? email, string? documento, string? observacoes,
+        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null)
     {
-        var result = await svc.EditarAsync(id, nome, apt, endereco, telefone, email, documento, observacoes);
+        var result = await svc.EditarAsync(id, nome, apt, endereco, telefone, email, documento, observacoes,
+            pessoaJuridica, nomeFantasia, inscricaoEstadual);
         if (HasErrorVerbose(result, "Editar cliente")) return RedirectToAction(nameof(Detail), new { id });
 
         Toast("success", "Cliente atualizado com sucesso!");
