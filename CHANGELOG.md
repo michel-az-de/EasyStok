@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Cadastro de cliente **pessoa juridica** (ADR-0048, item 1 do epico #1013): `TipoPessoa`,
+  `NomeFantasia` e `InscricaoEstadual` no `Cliente`, com o formulario do Web alternando entre
+  PF e PJ (rotulo, placeholder e campos condicionais). CNPJ ja era aceito antes — o que
+  faltava era o discriminador e os dois campos. Nao ha campo `RazaoSocial`: seguindo o
+  vocabulario da entidade `Empresa`, o **`Nome` E a razao social** quando o cliente e PJ.
+  A busca passa a encontrar PJ tambem pelo nome fantasia. Migration aditiva com default
+  `"fisica"` no banco — todo cadastro existente segue pessoa fisica sem UPDATE. (#1018)
 - `TenantFeatureFlag` passa a ser lido e escrito em runtime (ADR-0048): repository com filtro
   explicito de `EmpresaId`, endpoint `GET /api/feature-flags` para o tenant logado, e servico
   no BFF Web com cache de 5min por empresa. O portal e o menu lateral escondem modulo que o
