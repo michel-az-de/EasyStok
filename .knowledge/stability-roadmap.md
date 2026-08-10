@@ -37,7 +37,7 @@
 Hoje 474 unit/component, mas **integration gaps** em:
 
 - [x] Compras (`PedidoFornecedor`) recebimento → entrada de estoque — 2026-08-10
-- [ ] Pedido → Venda → Caixa (fluxo financeiro completo)
+- [x] Pedido → Venda → Caixa (fluxo financeiro completo) — 2026-08-10
 - [ ] Webhook Pix E2E: payload real assinado, valor parcial, replay, sobrepagamento
 - [ ] Subscription lifecycle: trial → expira → suspende → paga → reativa
 - [ ] **Multi-tenant leak test** automatizado: 2 empresas, garantir que A nunca lê B em **nenhum** endpoint
