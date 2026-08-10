@@ -38,7 +38,7 @@ Hoje 474 unit/component, mas **integration gaps** em:
 
 - [x] Compras (`PedidoFornecedor`) recebimento → entrada de estoque — 2026-08-10
 - [x] Pedido → Venda → Caixa (fluxo financeiro completo) — 2026-08-10
-- [ ] Webhook Pix E2E: payload real assinado, valor parcial, replay, sobrepagamento
+- [x] Webhook Pix E2E: payload real assinado, valor parcial, replay, sobrepagamento — 2026-08-10
 - [ ] Subscription lifecycle: trial → expira → suspende → paga → reativa
 - [ ] **Multi-tenant leak test** automatizado: 2 empresas, garantir que A nunca lê B em **nenhum** endpoint
 
@@ -99,6 +99,9 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
 - [x] **Dual frontend formalizado** — 2026-05-06 (`4e9ffda`). Política PWA → MAUI unidirecional em `dual-frontend-policy.md`.
 - [x] **Cascata API+Worker mitigada (parcial)** — 2026-05-07. `/health/dispatcher` separado de `/health/api`; heartbeat singleton dos 3 loops Hosted; warning de startup quando `Notifications:Hosting:Mode=Hosted` na API. Bulkhead real continua sendo Worker como deploy separado (default).
 - [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` fixed-window 10/min/IP cobre login + register + refresh + forgot-password + reset-password. Teste em `AuthRateLimitTests.cs`. Webhook Pix segue como item residual.
+- [x] **Webhook Pix E2E (controller completo)** — 2026-08-10. `WebhookPixControllerE2ETests` cobre assinatura HMAC válida/inválida, replay protection (timestamp fora da janela de 5min), sobrepagamento (aceito com log), subpagamento (rejeitado), e idempotência de duplo-fire (mesmo txid não renova 2x). Exercita o `WebhookPixController.Pix` com `DefaultHttpContext` e dependências reais contra Postgres.
+- [x] **Pedido → Venda → Caixa E2E** — 2026-08-10. `PedidoVendaCaixaIntegrationTests` cobre fluxo completo com produtos existentes: criação de pedido, transição de status (saida de estoque em "pronto"), múltiplos pagamentos parciais, abertura automática de caixa e idempotência de sobrepagamento.
+- [x] **Compras → estoque E2E + transação atômica** — 2026-08-10. `RecebimentoPedidoFornecedorIntegrationTests` cobre recebimento parcial, total e idempotência. `ProcessarRecebimentoPedidoFornecedorUseCase` usa `ExecuteInTransactionSemRetryAsync` (#1019) com aggregate loading via `GetByIdWithItensAsync`.
 
 ---
 
