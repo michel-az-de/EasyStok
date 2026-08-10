@@ -194,22 +194,19 @@ public class RecebimentoPedidoFornecedorIntegrationTests(PostgreSqlDatabaseFixtu
             pedido.Itens.Single(i => i.Id == itemId1).QuantidadeRecebida.Should().Be(10m);
             pedido.Itens.Single(i => i.Id == itemId2).QuantidadeRecebida.Should().Be(5m);
 
-            // 2 itens de estoque (A e B)
-            var itensEstoque = await assert.ItensEstoque.OrderBy(i => i.ProdutoId).ToListAsync();
+            // 2 itens de estoque (A e B) — nao depende de ordem de Guid
+            var itensEstoque = await assert.ItensEstoque.ToListAsync();
             itensEstoque.Should().HaveCount(2);
-            itensEstoque[0].ProdutoId.Should().Be(produtoId1);
-            itensEstoque[0].QuantidadeAtual.Value.Should().Be(10m);
-            itensEstoque[1].ProdutoId.Should().Be(produtoId2);
-            itensEstoque[1].QuantidadeAtual.Value.Should().Be(5m);
-            itensEstoque[1].CustoUnitario.Valor.Should().Be(80m);
+            itensEstoque.Should().ContainSingle(i => i.ProdutoId == produtoId1 && i.QuantidadeAtual!.Value == 10m);
+            itensEstoque.Should().ContainSingle(i => i.ProdutoId == produtoId2 && i.QuantidadeAtual!.Value == 5m && i.CustoUnitario.Valor == 80m);
 
-            // 2 movimentacoes de entrada (Compra)
-            var movs = await assert.MovimentacoesEstoque.OrderBy(m => m.ProdutoId).ToListAsync();
+            // 2 movimentacoes de entrada (Compra) — nao depende de ordem de Guid
+            var movs = await assert.MovimentacoesEstoque.ToListAsync();
             movs.Should().HaveCount(2);
             movs.Should().OnlyContain(m => m.Tipo == TipoMovimentacaoEstoque.Entrada);
             movs.Should().OnlyContain(m => m.Natureza == NaturezaMovimentacaoEstoque.Compra);
-            movs[0].Quantidade.Value.Should().Be(10m);
-            movs[1].Quantidade.Value.Should().Be(5m);
+            movs.Should().ContainSingle(m => m.ProdutoId == produtoId1 && m.Quantidade.Value == 10m);
+            movs.Should().ContainSingle(m => m.ProdutoId == produtoId2 && m.Quantidade.Value == 5m);
         }
     }
 

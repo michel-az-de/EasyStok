@@ -97,7 +97,6 @@ public class RegistrarPagamentoPedidoUseCase(
             };
 
             await repo.AddPagamentoAsync(pag);
-            pedido.Pagamentos.Add(pag);
 
             await repo.AddEventoAsync(new PedidoEvento
             {
