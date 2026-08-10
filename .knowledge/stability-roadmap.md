@@ -4,7 +4,7 @@
 >
 > Princípio: **código está em ~40% parity, operação em ~15%**. Estabilizar = fechar deploy, CI, backup, alerta, testes de integração.
 
-Última atualização: 2026-05-07
+Última atualização: 2026-08-10
 
 ---
 
@@ -15,7 +15,7 @@
 - [~] **CI rodando testes em cada PR** — 2026-05-07 (Onda 1 R6). `.github/workflows/ci.yml` criado com unit tests + SeedFlow integration tests. **Pendente**: estender pra rodar todos os 474 testes + branch protection no master exigindo `seed-flow-integration-tests`.
 - [x] **R6 — Seed fragil mitigado (Onda 1)** — 2026-05-07. Pipeline fail-loud, advisory lock no startup, double opt-in `/seed/*` em prod, fail-fast `SuperAdminSeed`, skip `SeedData` fora de Development, testes integracao DB-do-zero + idempotencia 3x. Ver `recent-evolution.md` snapshot 2026-05-07.
 - [ ] **Health checks reais** (`/health/live`, `/health/ready`) usados pelo Cloud Run pra restart automático. Middleware existe parcial — conferir e completar. (Parcial: 2026-05-07 — `/health/api` (PG+Redis+Config) e `/health/dispatcher` (heartbeat dos 3 loops Hosted) separados pra evitar cascata API↔Outbox quando `Notifications:Hosting:Mode=Hosted`. Falta plugar no Cloud Run/App Service e cobrir Worker via Kestrel mínimo.) Pipeline Azure ja usa `/health/ready` com retry (R6 Onda 1).
-- [ ] **Compras → estoque ponta-a-ponta testado**: `PedidoFornecedorItem` foi criada (commit recente) mas fluxo de recebimento → entrada de movimentação **sem teste de integração**.
+- [x] **Compras → estoque ponta-a-ponta testado** — 2026-08-10. `RecebimentoPedidoFornecedorIntegrationTests` com 2 cenários (recebimento parcial+total e idempotência). `ProcessarRecebimentoPedidoFornecedorUseCase` agora roda dentro de `ExecuteInTransactionSemRetryAsync` (#1019) com aggregate loading via `GetByIdWithItensAsync`.
 
 ### R6 Onda 2 e 3 (proximos)
 - [ ] **R6 Onda 2 (P1)**: migration formal `IsSeedData` (remove `[NotMapped]`), dupla checagem em `UpsertEmpresaAsync` (CNPJ colision proof), dry-run mode, backup pre-deploy automatizado, alertas em prod quando seed roda.
@@ -36,7 +36,7 @@
 
 Hoje 474 unit/component, mas **integration gaps** em:
 
-- [ ] Compras (`PedidoFornecedor`) recebimento → entrada de estoque
+- [x] Compras (`PedidoFornecedor`) recebimento → entrada de estoque — 2026-08-10
 - [ ] Pedido → Venda → Caixa (fluxo financeiro completo)
 - [ ] Webhook Pix E2E: payload real assinado, valor parcial, replay, sobrepagamento
 - [ ] Subscription lifecycle: trial → expira → suspende → paga → reativa

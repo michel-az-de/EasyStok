@@ -8,6 +8,14 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
     public Task<PedidoFornecedor?> GetByIdAsync(Guid id) =>
         dbContext.PedidosFornecedor.FirstOrDefaultAsync(x => x.Id == id);
 
+    public Task<PedidoFornecedor?> GetByIdWithItensAsync(Guid id, CancellationToken ct = default) =>
+        dbContext.PedidosFornecedor
+            .Include(x => x.Itens)
+            .Include(x => x.Fornecedor)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+    public Task AddAsync(PedidoFornecedor pedido) =>
+
     public Task AddAsync(PedidoFornecedor pedido) =>
         dbContext.PedidosFornecedor.AddAsync(pedido).AsTask();
 

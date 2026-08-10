@@ -20,42 +20,39 @@
 
 ## P1 — Confiabilidade
 
-4. **Compras (recebimento) sem teste de integração**
-   - Entity persiste agora, mas fluxo `ItemEstoque` não tem cobertura E2E.
-
-5. **Sem teste E2E pro fluxo Pedido→Venda→Caixa**
+4. **Sem teste E2E pro fluxo Pedido→Venda→Caixa**
    - Cobertura unit existe; bugs de integração escapam.
 
-6. **`Infra.MongoDb` é parcial e divergente do Postgre**
+5. **`Infra.MongoDb` é parcial e divergente do Postgre**
    - ADR 0001 (`docs/adr/0001-mongo-discarded.md`) descartou Mongo como provedor transacional.
    - Projetos `EasyStock.Infra.MongoDb` e `EasyStock.Infra.MongoDb.IntegrationTests` ainda fisicamente no repo.
    - Decisão pendente: deletar fisicamente os projetos ou manter como dead-ish code.
 
-7. **Webhook Pix idempotência em duplo-fire**
+6. **Webhook Pix idempotência em duplo-fire**
    - Efí pode mandar 2x dentro de 5 min — race em `ProcessarPagamentoAsync`.
    - Fix: lock distribuído (`SELECT ... FOR UPDATE` em `cobrancas` por txid) ou idempotency key na request.
 
 ## P2 — Qualidade
 
-8. **PWA mobile com `sync.js` monolítico**
+7. **PWA mobile com `sync.js` monolítico**
    - `EasyStock.Api/wwwroot/pwa/sync.js` ~1000 linhas, sem testes.
    - Não migrar agora, mas isolar mudanças.
 
-9. **Falta migration formalizada para `xmin` em entidades novas**
+8. **Falta migration formalizada para `xmin` em entidades novas**
    - `xmin` é system column, mas a config Fluent API precisa ser repetida — fácil esquecer ao adicionar entidade.
 
-10. **`appsettings.Production.json` com placeholders não-óbvios**
-    - `Efi:ClientId`, `Stripe:Webhook`, etc. Onboarding novo dev confuso.
+9. **`appsettings.Production.json` com placeholders não-óbvios**
+   - `Efi:ClientId`, `Stripe:Webhook`, etc. Onboarding novo dev confuso.
 
-11. ~~**`SubscriptionGateMiddleware` não tem cache**~~ — RESOLVIDO 2026-05-07 (ver "Resolvidos").
+10. ~~**`SubscriptionGateMiddleware` não tem cache**~~ — RESOLVIDO 2026-05-07 (ver "Resolvidos").
 
 ## P3 — Cosmético / Future
 
-12. Sem feature flags maduras (`Microsoft.FeatureManagement`).
-13. Sem health-check estruturado completo (`/health/live`, `/health/ready`) — middleware existe parcial.
-14. Status de pedido como `string` — adicionar enum-string converter pra evitar typos em transição.
-15. Logs sem `correlationId` propagado consistentemente em todas requests.
-16. **`EfiPixWebhookProcessor` renova vigência hard-coded em 30 dias**
+11. Sem feature flags maduras (`Microsoft.FeatureManagement`).
+12. Sem health-check estruturado completo (`/health/live`, `/health/ready`) — middleware existe parcial.
+13. Status de pedido como `string` — adicionar enum-string converter pra evitar typos em transição.
+14. Logs sem `correlationId` propagado consistentemente em todas requests.
+15. **`EfiPixWebhookProcessor` renova vigência hard-coded em 30 dias**
     - `assinatura.DataFim = baseDate.AddDays(30)` ignora `Plano.CicloMeses` (anual/semestral renovam errado).
     - Fix: usar `Plano.CicloMeses ?? 1` × 30, ou método de domínio `assinatura.RenovarVigencia(plano.CicloMeses)`.
     - Hoje só impacta planos não-mensais — billing atual é Pix mensal, então não é crítico ainda.
@@ -74,3 +71,4 @@
 - [x] **Mongo descartado como provedor transacional** — 2026-05-01 (`820843c`). ADR 0001 formal.
 - [x] **`SubscriptionGateMiddleware` sem cache** — 2026-05-07. `ISubscriptionStatusCache` (IMemoryCache, TTL 60s configurável via `Cache:SubscriptionStatusDuration`) com snapshot imutável `SubscriptionStatusSnapshot`. Invalidação automática via `AssinaturaCacheInvalidationInterceptor` (EF SaveChangesInterceptor) — captura `Added/Modified/Deleted` em `AssinaturaEmpresa` e dispara `Invalidate(empresaId)` apenas após SaveChanges bem-sucedido. Cobre webhook Pix, cancelar, alterar plano, jobs e admin sem precisar tocar cada call site.
 - [x] **B-015 — Rate limit em `/api/auth/login` e `/api/auth/register`** — 2026-05-07. Policy `auth` (fixed-window 10/min particionada por IP, `QueueLimit=0`) ativa em login/register/refresh/forgot-password/reset-password. Resposta 429 com `Retry-After` + envelope `RATE_LIMIT_EXCEEDED`. Coberto por `EasyStock.Api.IntegrationTests/AuthRateLimitTests.cs`. `/api/webhooks/pix` ainda fora — virou item residual no P0 #2.
+- [x] **Compras (recebimento) — teste de integração E2E + transação atômica** — 2026-08-10. `RecebimentoPedidoFornecedorIntegrationTests` cobre recebimento parcial, total e idempotência. `ProcessarRecebimentoPedidoFornecedorUseCase` usa `ExecuteInTransactionSemRetryAsync` (#1019) com aggregate loading via `GetByIdWithItensAsync`, removendo dependência de `IPedidoFornecedorItemRepository` no use case.
