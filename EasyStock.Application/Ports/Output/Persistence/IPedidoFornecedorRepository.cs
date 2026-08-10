@@ -5,7 +5,6 @@ public interface IPedidoFornecedorRepository
     Task<PedidoFornecedor?> GetByIdAsync(Guid id);
     Task<PedidoFornecedor?> GetByIdWithItensAsync(Guid id, CancellationToken ct = default);
     Task AddAsync(PedidoFornecedor pedido);
-    Task AddAsync(PedidoFornecedor pedido);
 
     /// <summary>Adiciona um item a um PedidoFornecedor existente (rastreado pelo DbContext).</summary>
     Task AddItemAsync(PedidoFornecedorItem item);

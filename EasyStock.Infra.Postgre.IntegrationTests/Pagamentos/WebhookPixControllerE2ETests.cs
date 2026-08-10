@@ -1,13 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Api.Controllers;
-using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
-using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
@@ -279,7 +278,7 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
             .Build();
 
         var env = Substitute.For<IWebHostEnvironment>();
-        env.IsProduction().Returns(false);
+        env.EnvironmentName.Returns("Development");
 
         var ctx = fixture.CreateDbContext();
 

@@ -15,10 +15,9 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public Task AddAsync(PedidoFornecedor pedido) =>
-
-    public Task AddAsync(PedidoFornecedor pedido) =>
         dbContext.PedidosFornecedor.AddAsync(pedido).AsTask();
 
+    /// <summary>Adiciona um item a um PedidoFornecedor existente (rastreado pelo DbContext).</summary>
     public Task AddItemAsync(PedidoFornecedorItem item)
     {
         dbContext.Set<PedidoFornecedorItem>().Add(item);

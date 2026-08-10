@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -28,6 +28,7 @@
     <ProjectReference Include="..\EasyStock.Infra.Async\EasyStock.Infra.Async.csproj" />
     <ProjectReference Include="..\EasyStock.Domain\EasyStock.Domain.csproj" />
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
+    <ProjectReference Include="..\EasyStock.Api\EasyStock.Api.csproj" />
   </ItemGroup>
 
 </Project>

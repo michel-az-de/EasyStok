@@ -1,8 +1,6 @@
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.UseCases.Pedido;
-using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
