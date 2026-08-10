@@ -11,20 +11,32 @@
                     : Model.Dia.Aberto  ? "aberto"
                                         : "fechado-pendente";
 }
+
+<div class="ds-enter">
+
+<!-- Header -->
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <div class="pg-hd">
         <h1 class="flex items-center gap-3">
             Caixa do dia
-            @{ var caixaStatus = StatusHelper.Resolve(statusCaixa); }
-            <span class="badge @caixaStatus.BadgeClass">
-                <span class="dot"></span> @caixaStatus.Label
+            @{
+                var caixaStatus = StatusHelper.Resolve(statusCaixa);
+                var statusBannerClass = statusCaixa switch
+                {
+                    "aberto" => "ds-status-banner--ok",
+                    "fechado" => "ds-status-banner--neutral",
+                    "fechado-pendente" => "ds-status-banner--warn",
+                    _ => "ds-status-banner--crit"
+                };
+                var dotAnim = statusCaixa == "aberto" ? "ds-status-dot--pulse" : "";
+            }
+            <span class="ds-status-banner @statusBannerClass">
+                <span class="ds-status-dot @dotAnim"></span>
+                @caixaStatus.Label
             </span>
         </h1>
         <p>@(Model.DataSelecionada.ToString("dddd, dd 'de' MMMM 'de' yyyy", new System.Globalization.CultureInfo("pt-BR")))</p>
     </div>
-    @* issue 977: o container externo ja tinha flex-wrap, este filho nao — dois botoes
-       de label longo ("Lançamentos do app", "Histórico") ficavam presos numa linha
-       rigida e estouravam em telas estreitas. *@
     <div class="flex flex-wrap gap-3">
         <a href="/caixa-mobile" class="btn-outline-dark inline-flex items-center gap-2">
             <es-icon name="phone" class="es-icon--sm"></es-icon> Lançamentos do app
@@ -43,54 +55,53 @@
     var isAuthIssue = string.Equals(Model.ErrorCode, "UNAUTHORIZED", StringComparison.OrdinalIgnoreCase)
                       || string.Equals(Model.ErrorCode, "TOKEN_EXPIRED", StringComparison.OrdinalIgnoreCase)
                       || string.Equals(Model.ErrorCode, "AUTH_TOKEN_EXPIRED", StringComparison.OrdinalIgnoreCase);
-    // Auto-retry só pra falha transitória (rede/timeout/5xx). Loja/auth precisam de ação humana.
     var canAutoRetry = !isLojaIssue && !isAuthIssue;
 
-    <div class="ws bg-red-50 border border-red-200 rounded-xl p-8 text-center"
+    <div class="ws text-center p-8"
          x-data="caixaAutoRetry(@(canAutoRetry ? "true" : "false"))" x-init="start()">
-        <svg class="w-12 h-12 mx-auto text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-12 h-12 mx-auto mb-3" style="color:var(--crit-400)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
-        <p class="text-red-700 font-semibold text-base">Não foi possível carregar o caixa do dia.</p>
+        <p style="color:var(--crit-700); font-weight:600; font-size:16px;">Não foi possível carregar o caixa do dia.</p>
         @if (!string.IsNullOrEmpty(Model.ErrorMessage))
         {
-            <p class="text-sm text-red-600 mt-1">@Model.ErrorMessage</p>
+            <p class="text-sm mt-1" style="color:var(--crit-600)">@Model.ErrorMessage</p>
         }
 
         @if (isLojaIssue)
         {
-            <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
+            <p class="text-sm mt-3 max-w-md mx-auto" style="color:var(--ink-500)">
                 Selecione uma loja no seletor do topo da página antes de acessar o caixa.
             </p>
         }
         else if (isAuthIssue)
         {
-            <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
+            <p class="text-sm mt-3 max-w-md mx-auto" style="color:var(--ink-500)">
                 Sua sessão expirou. Faça login novamente para continuar.
             </p>
         }
         else
         {
-            <p class="text-sm text-slate-600 mt-3 max-w-md mx-auto">
+            <p class="text-sm mt-3 max-w-md mx-auto" style="color:var(--ink-500)">
                 Tentaremos automaticamente novamente. Se o problema persistir, contate o suporte.
             </p>
             <p x-show="enabled && !exhausted" x-cloak
-               class="text-xs text-slate-500 mt-2">
+               class="text-xs mt-2" style="color:var(--ink-400)">
                 <span x-show="retrying">Tentando novamente…</span>
                 <span x-show="!retrying">
                     Tentativa <span x-text="attempts + 1"></span> de <span x-text="maxAttempts"></span>
                     em <span x-text="countdown" class="font-semibold"></span>s
                 </span>
             </p>
-            <p x-show="exhausted" x-cloak class="text-xs text-amber-600 mt-2 font-medium">
+            <p x-show="exhausted" x-cloak class="text-xs mt-2 font-medium" style="color:var(--warn-700)">
                 Tentativas automáticas esgotadas. Use o botão abaixo para tentar manualmente.
             </p>
         }
 
         <div class="flex justify-center gap-3 mt-5 flex-wrap">
             <button type="button" @@click="retryNow()"
-                    class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2">
+                    class="app-primary-btn inline-flex items-center gap-2">
                 <svg class="w-4 h-4" :class="retrying && 'animate-spin'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -124,58 +135,59 @@
 }
 else
 {
-    @* Entrada orquestrada (issue 715): reusa o .ds-enter do dashboard. *@
-    <div class="ds-enter">
     @if (d.AberturaPendenteCrossDay)
     {
-        <div class="bg-[var(--warn-50)] border border-[var(--warn-200)] rounded-xl p-4 mb-6 flex items-start gap-3">
-            <es-icon name="history" class="es-icon--sm text-[var(--warn-600)]"></es-icon>
-            <p class="text-sm text-[var(--warn-700)]">
+        <div class="ds-alert ds-alert--warn mb-6">
+            <es-icon name="history" class="es-icon--sm" style="color:var(--warn-600)"></es-icon>
+            <p class="text-sm" style="color:var(--warn-700)">
                 <strong>Caixa aberto em @(d.AbertoDesde?.ToString("dd/MM/yyyy"))</strong>, ainda sem fechamento.
                 Os totais abaixo somam a sessão inteira desde a abertura. Feche o caixa ao concluir o turno.
             </p>
         </div>
     }
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="ws caixa-kpi">
-            <h3 class="caixa-kpi-lbl">Saldo esperado</h3>
-            <div class="caixa-kpi-val tabular-nums">@d.SaldoEsperado.AsMoney()</div>
-            <div class="text-xs text-slate-500 mt-1">
+    <!-- KPIs -->
+    <div class="ds-kpi-grid">
+        <div class="ds-kpi-card ds-kpi-card--navy">
+            <div class="ds-kpi-label">Saldo esperado</div>
+            <div class="ds-kpi-value tabular-nums">@d.SaldoEsperado.AsMoney()</div>
+            <div class="ds-kpi-meta">
                 @(d.Fechado ? "Caixa fechado"
                   : d.AberturaPendenteCrossDay ? ("Aberto desde " + d.AbertoDesde?.ToString("dd/MM"))
                   : d.Aberto ? "Caixa aberto"
                   : "Caixa não aberto")
             </div>
         </div>
-        <div class="ws caixa-kpi">
-            <h3 class="caixa-kpi-lbl">Vendas + pagamentos</h3>
-            <div class="caixa-kpi-val is-positivo tabular-nums">@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</div>
-            <div class="text-xs text-slate-500 mt-1 tabular-nums">Vendas: @d.TotalVendas.AsMoney() · Pagamentos: @d.TotalPagamentosPedidos.AsMoney()</div>
+        <div class="ds-kpi-card ds-kpi-card--ok">
+            <div class="ds-kpi-label">Vendas + pagamentos</div>
+            <div class="ds-kpi-value tabular-nums" style="color:var(--ok-700)">@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</div>
+            <div class="ds-kpi-meta tabular-nums">Vendas: @d.TotalVendas.AsMoney() · Pagamentos: @d.TotalPagamentosPedidos.AsMoney()</div>
         </div>
-        <div class="ws caixa-kpi">
-            <h3 class="caixa-kpi-lbl">Entradas/saídas extras</h3>
-            <div class="caixa-kpi-val tabular-nums">@((d.TotalEntradasExtras - d.TotalSaidasExtras).AsMoney())</div>
-            <div class="text-xs text-slate-500 mt-1 tabular-nums">Entradas: +@d.TotalEntradasExtras.AsMoney() · Saídas: −@d.TotalSaidasExtras.AsMoney()</div>
+        <div class="ds-kpi-card ds-kpi-card--orange">
+            <div class="ds-kpi-label">Entradas/saídas extras</div>
+            <div class="ds-kpi-value tabular-nums">@((d.TotalEntradasExtras - d.TotalSaidasExtras).AsMoney())</div>
+            <div class="ds-kpi-meta tabular-nums">Entradas: +@d.TotalEntradasExtras.AsMoney() · Saídas: −@d.TotalSaidasExtras.AsMoney()</div>
         </div>
     </div>
 
-    <!-- Ações: abrir/fechar/lançar -->
+    <!-- Toolbar -->
     <div class="ws mb-6">
         <div class="flex flex-wrap gap-3 items-center">
             @if (!d.Aberto && !d.Fechado)
             {
                 <button type="button" x-data @@click="$dispatch('open-modal', 'abrir-caixa')"
-                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                    🔓 Abrir caixa do dia
+                        class="app-primary-btn inline-flex items-center gap-2">
+                    <es-icon name="unlock" class="es-icon--sm"></es-icon>
+                    Abrir caixa do dia
                 </button>
-                <span class="text-sm text-slate-500">Comece informando o saldo inicial em dinheiro.</span>
+                <span class="text-sm" style="color:var(--ink-400)">Comece informando o saldo inicial em dinheiro.</span>
             }
             @if (d.Aberto && !d.Fechado)
             {
                 <button type="button" x-data @@click="$dispatch('open-modal', 'lancar-mov')"
-                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                    + Lançar entrada/saída
+                        class="app-primary-btn inline-flex items-center gap-2">
+                    <es-icon name="plus" class="es-icon--sm"></es-icon>
+                    Lançar entrada/saída
                 </button>
                 <button type="button" x-data @@click="$dispatch('open-modal', 'fechar-caixa')"
                         class="btn-warn-dark inline-flex items-center gap-2">
@@ -184,21 +196,18 @@ else
             }
             @if (d.Fechado && d.Fechamento != null)
             {
-                <span class="text-sm text-slate-600">
+                <span class="text-sm" style="color:var(--ink-500)">
                     Fechado em @d.Fechamento.FechadoEm.ParaBrasilia().AsDateTime()
-                    @if (!string.IsNullOrEmpty(d.Fechamento.FechadoPorNome)) { <span class="text-slate-400">por @d.Fechamento.FechadoPorNome</span> }
+                    @if (!string.IsNullOrEmpty(d.Fechamento.FechadoPorNome)) { <span style="color:var(--ink-300)">por @d.Fechamento.FechadoPorNome</span> }
                     · Saldo final: <strong class="tabular-nums">@d.Fechamento.SaldoFinal.AsMoney()</strong>
                 </span>
             }
         </div>
     </div>
 
-    <!-- Lista de movimentos (inclui vendas/pagamentos que compõem o saldo — AC-4 #755) -->
+    <!-- Lista de movimentos -->
     <div class="ws">
         @{
-            // Unifica movimentos manuais + vendas/pagamentos numa lista ordenada por hora, para
-            // que a soma das linhas visíveis reconcilie com o saldo esperado (AC-4). Vendas e
-            // pagamentos não têm estorno aqui (vivem no fluxo de vendas/pedidos).
             var linhasCaixa = d.Movimentos
                 .Select(m => new {
                     Hora = m.DataMovimento, m.Tipo, m.Valor, IsSaida = m.Tipo == "saida",
@@ -213,44 +222,87 @@ else
                 .OrderBy(l => l.Hora)
                 .ToList();
         }
-        <h2 class="font-semibold text-slate-900 mb-4">Movimentos do dia (@linhasCaixa.Count)</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 style="font-size:16px; font-weight:600; color:var(--ink-900);">
+                Movimentos do dia <span style="font-size:13px; font-weight:400; color:var(--ink-400);">(@linhasCaixa.Count)</span>
+            </h2>
+        </div>
+
         @if (linhasCaixa.Count == 0)
         {
-            <p class="text-sm text-slate-500">Nenhum movimento registrado ainda.</p>
+            <div class="text-center py-12">
+                <svg class="w-14 h-14 mx-auto mb-4" style="color:var(--ink-300)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p style="font-size:16px; font-weight:600; color:var(--ink-500);">Nenhum movimento registrado</p>
+                <p class="text-sm" style="color:var(--ink-400)">Abra o caixa e comece a registrar movimentos do dia.</p>
+            </div>
         }
         else
         {
             <div class="overflow-x-auto">
-            <table class="tbl-full">
-                <thead><tr><th>Hora</th><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Categoria</th><th>Origem</th><th></th></tr></thead>
+            <table class="tbl-caixa">
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <th>Tipo</th>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                        <th>Categoria</th>
+                        <th>Origem</th>
+                        <th></th>
+                    </tr>
+                </thead>
                 <tbody>
                 @foreach (var l in linhasCaixa)
                 {
-                    string tipoBadge = l.Tipo switch
+                    var tipoBadgeClass = l.Tipo switch
                     {
-                        "abertura"   => "bg-blue-100 text-blue-700",
-                        "fechamento" => "bg-slate-100 text-slate-600",
-                        "entrada"    => "bg-green-100 text-green-700",
-                        "saida"      => "bg-red-100 text-red-700",
-                        "venda"      => "bg-green-100 text-green-700",
-                        "pagamento"  => "bg-blue-100 text-blue-700",
-                        _            => "bg-slate-100 text-slate-600"
+                        "abertura"   => "ds-tipo-badge--navy",
+                        "fechamento" => "ds-tipo-badge--neutral",
+                        "entrada"    => "ds-tipo-badge--ok",
+                        "saida"      => "ds-tipo-badge--crit",
+                        "venda"      => "ds-tipo-badge--info",
+                        "pagamento"  => "ds-tipo-badge--purple",
+                        _            => "ds-tipo-badge--neutral"
+                    };
+                    var tipoDotColor = l.Tipo switch
+                    {
+                        "abertura"   => "var(--navy-600)",
+                        "fechamento" => "var(--ink-400)",
+                        "entrada"    => "var(--ok-600)",
+                        "saida"      => "var(--crit-600)",
+                        "venda"      => "#0369A1",
+                        "pagamento"  => "#7C3AED",
+                        _            => "var(--ink-400)"
                     };
                     <tr>
-                        <td class="text-xs text-slate-500">@l.Hora.ParaBrasilia().ToString("HH:mm")</td>
-                        <td><span class="px-2 py-0.5 rounded-full text-xs font-medium @tipoBadge">@l.Tipo</span></td>
-                        <td class="font-medium @(l.IsSaida ? "text-red-700" : "text-slate-900")">
+                        <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">@l.Hora.ParaBrasilia().ToString("HH:mm")</td>
+                        <td>
+                            <span class="ds-tipo-badge @tipoBadgeClass">
+                                <span class="ds-tipo-dot" style="background:@tipoDotColor"></span>
+                                @l.Tipo
+                            </span>
+                        </td>
+                        <td class="tabular-nums @(l.IsSaida ? "text-crit" : "text-ok")" style="font-weight:600; font-family:var(--font-mono);">
                             @(l.IsSaida ? "−" : "+")@l.Valor.AsMoney()
                         </td>
-                        <td class="text-sm text-slate-600">@(l.Descricao ?? "—")</td>
-                        <td class="text-xs text-slate-500">@(l.Categoria ?? "—")</td>
-                        <td class="text-xs text-slate-500">@(l.Origem ?? "—") @if (!string.IsNullOrEmpty(l.Autor)) { <div class="text-slate-400">@l.Autor</div> }</td>
+                        <td style="font-size:14px; color:var(--ink-600);">@(l.Descricao ?? "—")</td>
+                        <td style="font-size:12px; color:var(--ink-400);">@(l.Categoria ?? "—")</td>
+                        <td style="font-size:12px; color:var(--ink-400);">
+                            @(l.Origem ?? "—")
+                            @if (!string.IsNullOrEmpty(l.Autor))
+                            {
+                                <div style="color:var(--ink-300)">@l.Autor</div>
+                            }
+                        </td>
                         <td>
                             @if (l.IsManual && l.Tipo != "abertura" && l.Tipo != "fechamento" && !d.Fechado)
                             {
-                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@l.Id" method="post" data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor será revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
+                                <form asp-action="Estornar" asp-controller="Caixa" asp-route-id="@l.Id" method="post"
+                                      data-confirm='{"titulo":"Estornar movimento?","mensagem":"O valor será revertido no fluxo do dia.","textoBotao":"Estornar","classBotao":"bg-red-600 hover:bg-red-700"}'>
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="text-xs text-slate-400 hover:text-red-600" aria-label="Estornar movimento">Estornar</button>
+                                    <button type="submit" class="ds-link-estorno" aria-label="Estornar movimento">Estornar</button>
                                 </form>
                             }
                         </td>
@@ -262,248 +314,311 @@ else
         }
     </div>
 
-    </div>@* /.ds-enter *@
+    @* Modais *@
+    @if (d != null && !d.Aberto && !d.Fechado)
+    {
+        <div x-data="abrirCaixaModal()"
+             x-show="open" x-cloak
+             @@keydown.escape.window="close()"
+             @@click.self="close()"
+             class="fm-overlay"
+             role="dialog" aria-modal="true" aria-labelledby="fm-abrir-title">
+            <form x-ref="panel" class="fm-panel" style="max-width: 540px" x-show="open"
+                  method="post" action="/caixa/abrir" data-validate novalidate
+                  x-transition:enter="transition duration-150 ease-out"
+                  x-transition:enter-start="opacity-0 scale-95"
+                  x-transition:enter-end="opacity-100 scale-100">
+                @Html.AntiForgeryToken()
+                <header class="fm-header">
+                    <div>
+                        <h2 id="fm-abrir-title" class="fm-header__title">Abrir caixa do dia</h2>
+                        <p class="fm-header__subtitle">Informe o saldo em dinheiro físico que está no caixa para começar.</p>
+                    </div>
+                    <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+                </header>
+                <div class="fm-body">
+                    <fieldset class="fm-section">
+                        <div class="fm-grid">
+                            <div class="fm-field fm-col-2">
+                                <label class="fm-field__label" for="abrir-saldo">
+                                    Saldo inicial em dinheiro<span class="fm-field__required" aria-hidden="true">*</span>
+                                </label>
+                                <input id="abrir-saldo" type="text" inputmode="decimal" name="saldoInicial" data-validate-min-num="0" required
+                                       placeholder="0,00"
+                                       data-error-message="Informe um saldo inicial igual ou maior que zero."
+                                       class="ui-field w-full text-sm" />
+                                <span class="fm-field__hint">Use 0 se não há caixa físico (só registros eletrônicos)</span>
+                            </div>
+                            <div class="fm-field fm-col-2">
+                                <label class="fm-field__label" for="abrir-obs">Observações</label>
+                                <input id="abrir-obs" type="text" name="observacoes" maxlength="200"
+                                       placeholder="Ex: troco do dia anterior, conferência..."
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+                <footer class="fm-footer">
+                    <button type="button" @@click="close()"
+                            class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+                        🔓 Abrir caixa
+                    </button>
+                </footer>
+            </form>
+        </div>
+    }
 
-    @* Modais movidos para o final do arquivo (após if/else completo). *@
+    @if (d != null && d.Aberto && !d.Fechado)
+    {
+        <div x-data="lancamentoCaixaModal()"
+             x-show="open" x-cloak
+             @@keydown.escape.window="close()"
+             @@click.self="close()"
+             class="fm-overlay"
+             role="dialog" aria-modal="true" aria-labelledby="fm-mov-title">
+            <form x-ref="panel" class="fm-panel" style="max-width: 640px" x-show="open"
+                  method="post" action="/caixa/movimentos" data-validate novalidate
+                  x-on:submit="validarSubmit($event)"
+                  x-transition:enter="transition duration-150 ease-out"
+                  x-transition:enter-start="opacity-0 scale-95"
+                  x-transition:enter-end="opacity-100 scale-100">
+                @Html.AntiForgeryToken()
+                <header class="fm-header">
+                    <div>
+                        <h2 id="fm-mov-title" class="fm-header__title">Registrar movimento</h2>
+                        <p class="fm-header__subtitle">Entradas extras (vendas, recebimentos) ou saídas (despesas, sangrias) que afetam o saldo do caixa.</p>
+                    </div>
+                    <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+                </header>
+                <div class="fm-body">
+                    <div class="ped-tabs" role="tablist">
+                        <button type="button" role="tab" class="ped-tab"
+                                :class="{ 'ped-tab--active': tipo === 'entrada' }"
+                                :aria-selected="tipo === 'entrada'"
+                                @@click="tipo = 'entrada'">
+                            ➕ Entrada
+                        </button>
+                        <button type="button" role="tab" class="ped-tab"
+                                :class="{ 'ped-tab--active': tipo === 'saida' }"
+                                :aria-selected="tipo === 'saida'"
+                                @@click="tipo = 'saida'">
+                            ➖ Saída
+                        </button>
+                    </div>
+                    <input type="hidden" name="tipo" :value="tipo" />
+
+                    <fieldset class="fm-section">
+                        <div class="fm-grid">
+                            <div class="fm-field">
+                                <label class="fm-field__label" for="mov-valor">
+                                    Valor<span class="fm-field__required" aria-hidden="true">*</span>
+                                </label>
+                                <input id="mov-valor" type="text" inputmode="decimal" name="valor" data-validate-money required
+                                       placeholder="0,00"
+                                       data-error-message="Informe um valor maior que zero."
+                                       class="ui-field w-full text-sm text-right" />
+                            </div>
+                            <div class="fm-field">
+                                <label class="fm-field__label" for="mov-metodo">Método<span x-show="tipo === 'saida'" x-cloak class="fm-field__required" aria-hidden="true">*</span></label>
+                                <select id="mov-metodo" name="metodo" :required="tipo === 'saida'" class="ui-select w-full text-sm">
+                                    <option value="">— Selecionar —</option>
+                                    <option value="dinheiro">Dinheiro</option>
+                                    <option value="pix">PIX</option>
+                                    <option value="credito">Crédito</option>
+                                    <option value="debito">Débito</option>
+                                    <option value="transferencia">Transferência</option>
+                                    <option value="outro">Outro</option>
+                                </select>
+                            </div>
+                            <div class="fm-field fm-col-2">
+                                <label class="fm-field__label" for="mov-desc">Descrição<span x-show="tipo === 'saida'" x-cloak class="fm-field__required" aria-hidden="true">*</span></label>
+                                <input id="mov-desc" type="text" name="descricao"
+                                       :required="tipo === 'saida'"
+                                       :placeholder="tipo === 'entrada' ? 'Ex: venda balcão, recebimento de cliente' : 'Ex: pagamento embalagem, sangria, troco'"
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                            <div class="fm-field">
+                                <label class="fm-field__label" for="mov-cat">Categoria</label>
+                                <input id="mov-cat" type="text" name="categoria"
+                                       :placeholder="tipo === 'entrada' ? 'venda, devolução' : 'embalagem, sangria, fornecedor'"
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                            <div class="fm-field">
+                                <label class="fm-field__label" for="mov-ref">Referência</label>
+                                <input id="mov-ref" type="text" name="referencia"
+                                       placeholder="txid, NSU, nº NF"
+                                       class="ui-field w-full text-sm" />
+                            </div>
+                        </div>
+                    </fieldset>
+                    <p x-show="erroSaldo" x-cloak x-text="erroSaldo" role="alert"
+                       class="text-sm text-red-600 font-medium mt-3 px-1"></p>
+                </div>
+                <footer class="fm-footer">
+                    <button type="button" @@click="close()"
+                            class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            :class="tipo === 'saida' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'"
+                            class="app-primary-btn px-4 py-2 text-white text-sm font-medium rounded-lg">
+                        <span x-show="tipo === 'entrada'">Registrar entrada</span>
+                        <span x-show="tipo === 'saida'">Registrar saída</span>
+                    </button>
+                </footer>
+            </form>
+        </div>
+
+        <div x-data="fecharCaixaModal()"
+             x-show="open" x-cloak
+             @@keydown.escape.window="close()"
+             @@click.self="close()"
+             class="fm-overlay"
+             role="alertdialog" aria-modal="true" aria-labelledby="fm-fechar-title">
+            <form x-ref="panel" class="fm-panel" style="max-width: 540px" x-show="open"
+                  method="post" action="/caixa/fechar"
+                  x-transition:enter="transition duration-150 ease-out"
+                  x-transition:enter-start="opacity-0 scale-95"
+                  x-transition:enter-end="opacity-100 scale-100">
+                @Html.AntiForgeryToken()
+                <header class="fm-header">
+                    <div>
+                        @if (d.AberturaPendenteCrossDay)
+                        {
+                            <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa de @(d.AbertoDesde?.ToString("dd/MM/yyyy"))?</h2>
+                            <p class="fm-header__subtitle">Esta sessão foi aberta em @(d.AbertoDesde?.ToString("dd/MM/yyyy")) e segue aberta. O fechamento será registrado nesse dia — o caixa de hoje continua livre para abrir. Esta ação não pode ser desfeita.</p>
+                        }
+                        else
+                        {
+                            <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa do dia?</h2>
+                            <p class="fm-header__subtitle">Após o fechamento, novos lançamentos vão pro caixa de amanhã. Esta ação não pode ser desfeita.</p>
+                        }
+                    </div>
+                    <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
+                </header>
+                <div class="fm-body">
+                    <div class="caixa-fechar-resumo">
+                        <div class="caixa-fechar-resumo__item">
+                            <span class="text-xs text-slate-500 uppercase tracking-wider">Saldo final esperado</span>
+                            <span class="caixa-fechar-resumo__valor tabular-nums">@d.SaldoEsperado.AsMoney()</span>
+                        </div>
+                        <div class="caixa-fechar-resumo__split">
+                            <div>
+                                <span class="text-xs text-slate-500">Vendas + pagamentos</span>
+                                <strong class="text-green-700 block tabular-nums">+@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500">Entradas extras</span>
+                                <strong class="text-green-700 block tabular-nums">+@d.TotalEntradasExtras.AsMoney()</strong>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500">Saídas extras</span>
+                                <strong class="text-red-700 block tabular-nums">−@d.TotalSaidasExtras.AsMoney()</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <fieldset class="fm-section" style="margin-top: 16px">
+                        <div class="fm-field fm-col-2">
+                            <label class="fm-field__label" for="fechar-obs">Observações do fechamento</label>
+                            <textarea id="fechar-obs" name="observacoes" rows="2"
+                                      placeholder="Ex: diferença de troco, conferência..."
+                                      class="ui-textarea w-full text-sm"></textarea>
+                            <span class="fm-field__hint">Fica registrado no histórico do dia</span>
+                        </div>
+                    </fieldset>
+                </div>
+                <footer class="fm-footer">
+                    <button type="button" @@click="close()"
+                            class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+                        Voltar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
+                        🔒 Sim, fechar caixa
+                    </button>
+                </footer>
+            </form>
+        </div>
+    }
 }
 
-@* ===== Modais de Caixa (fora do if/else para sempre serem renderizados quando aplicável) ===== *@
+</div>
 
-@if (d != null && !d.Aberto && !d.Fechado)
-{
-    <!-- Modal: abrir caixa -->
-    <div x-data="abrirCaixaModal()"
-         x-show="open" x-cloak
-         @@keydown.escape.window="close()"
-         @@click.self="close()"
-         class="fm-overlay"
-         role="dialog" aria-modal="true" aria-labelledby="fm-abrir-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 540px" x-show="open"
-              method="post" action="/caixa/abrir" data-validate novalidate
-              x-transition:enter="transition duration-150 ease-out"
-              x-transition:enter-start="opacity-0 scale-95"
-              x-transition:enter-end="opacity-100 scale-100">
-            @Html.AntiForgeryToken()
-            <header class="fm-header">
-                <div>
-                    <h2 id="fm-abrir-title" class="fm-header__title">Abrir caixa do dia</h2>
-                    <p class="fm-header__subtitle">Informe o saldo em dinheiro físico que está no caixa para começar.</p>
-                </div>
-                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
-            </header>
-            <div class="fm-body">
-                <fieldset class="fm-section">
-                    <div class="fm-grid">
-                        <div class="fm-field fm-col-2">
-                            <label class="fm-field__label" for="abrir-saldo">
-                                Saldo inicial em dinheiro<span class="fm-field__required" aria-hidden="true">*</span>
-                            </label>
-                            @* BUG-001: text+inputmode=decimal (nao type=number, que parseia por locale e colapsa "1.50" em pt-BR). min nativo -> data-validate-min-num (form-validate.js, parse BR). *@
-                            <input id="abrir-saldo" type="text" inputmode="decimal" name="saldoInicial" data-validate-min-num="0" required
-                                   placeholder="0,00"
-                                   data-error-message="Informe um saldo inicial igual ou maior que zero."
-                                   class="ui-field w-full text-sm" />
-                            <span class="fm-field__hint">Use 0 se não há caixa físico (só registros eletrônicos)</span>
-                        </div>
-                        <div class="fm-field fm-col-2">
-                            <label class="fm-field__label" for="abrir-obs">Observações</label>
-                            <input id="abrir-obs" type="text" name="observacoes" maxlength="200"
-                                   placeholder="Ex: troco do dia anterior, conferência..."
-                                   class="ui-field w-full text-sm" />
-                        </div>
-                    </div>
-                </fieldset>
-            </div>
-            <footer class="fm-footer">
-                <button type="button" @@click="close()"
-                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                    Cancelar
-                </button>
-                <button type="submit"
-                        class="app-primary-btn px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
-                    🔓 Abrir caixa
-                </button>
-            </footer>
-        </form>
-    </div>
-}
+@section Styles {
+<style>
+/* ===== Caixa v6 — KPI cards ===== */
+.ds-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+@@media (max-width: 768px) { .ds-kpi-grid { grid-template-columns: 1fr; } }
 
-@if (d != null && d.Aberto && !d.Fechado)
-{
-    <!-- Modal: lançar entrada/saída -->
-    <div x-data="lancamentoCaixaModal()"
-         x-show="open" x-cloak
-         @@keydown.escape.window="close()"
-         @@click.self="close()"
-         class="fm-overlay"
-         role="dialog" aria-modal="true" aria-labelledby="fm-mov-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 640px" x-show="open"
-              method="post" action="/caixa/movimentos" data-validate novalidate
-              x-on:submit="validarSubmit($event)"
-              x-transition:enter="transition duration-150 ease-out"
-              x-transition:enter-start="opacity-0 scale-95"
-              x-transition:enter-end="opacity-100 scale-100">
-            @Html.AntiForgeryToken()
-            <header class="fm-header">
-                <div>
-                    <h2 id="fm-mov-title" class="fm-header__title">Registrar movimento</h2>
-                    <p class="fm-header__subtitle">Entradas extras (vendas, recebimentos) ou saídas (despesas, sangrias) que afetam o saldo do caixa.</p>
-                </div>
-                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
-            </header>
-            <div class="fm-body">
-                <!-- Tabs entrada / saída -->
-                <div class="ped-tabs" role="tablist">
-                    <button type="button" role="tab" class="ped-tab"
-                            :class="{ 'ped-tab--active': tipo === 'entrada' }"
-                            :aria-selected="tipo === 'entrada'"
-                            @@click="tipo = 'entrada'">
-                        ➕ Entrada
-                    </button>
-                    <button type="button" role="tab" class="ped-tab"
-                            :class="{ 'ped-tab--active': tipo === 'saida' }"
-                            :aria-selected="tipo === 'saida'"
-                            @@click="tipo = 'saida'">
-                        ➖ Saída
-                    </button>
-                </div>
-                <input type="hidden" name="tipo" :value="tipo" />
+.ds-kpi-card { background: var(--white); border: 1px solid var(--ink-100); border-radius: var(--r-md); padding: 20px; position: relative; overflow: hidden; }
+.ds-kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.ds-kpi-card--navy::before { background: var(--navy-600); }
+.ds-kpi-card--ok::before { background: var(--ok-600); }
+.ds-kpi-card--orange::before { background: var(--orange-600); }
 
-                <fieldset class="fm-section">
-                    <div class="fm-grid">
-                        <div class="fm-field">
-                            <label class="fm-field__label" for="mov-valor">
-                                Valor<span class="fm-field__required" aria-hidden="true">*</span>
-                            </label>
-                            @* BUG-001: text+inputmode=decimal; min=0.01 nativo -> data-validate-money (>0, parse BR) no form-validate.js. *@
-                            <input id="mov-valor" type="text" inputmode="decimal" name="valor" data-validate-money required
-                                   placeholder="0,00"
-                                   data-error-message="Informe um valor maior que zero."
-                                   class="ui-field w-full text-sm text-right" />
-                        </div>
-                        <div class="fm-field">
-                            <label class="fm-field__label" for="mov-metodo">Método<span x-show="tipo === 'saida'" x-cloak class="fm-field__required" aria-hidden="true">*</span></label>
-                            <select id="mov-metodo" name="metodo" :required="tipo === 'saida'" class="ui-select w-full text-sm">
-                                <option value="">— Selecionar —</option>
-                                <option value="dinheiro">Dinheiro</option>
-                                <option value="pix">PIX</option>
-                                <option value="credito">Crédito</option>
-                                <option value="debito">Débito</option>
-                                <option value="transferencia">Transferência</option>
-                                <option value="outro">Outro</option>
-                            </select>
-                        </div>
-                        <div class="fm-field fm-col-2">
-                            <label class="fm-field__label" for="mov-desc">Descrição<span x-show="tipo === 'saida'" x-cloak class="fm-field__required" aria-hidden="true">*</span></label>
-                            <input id="mov-desc" type="text" name="descricao"
-                                   :required="tipo === 'saida'"
-                                   :placeholder="tipo === 'entrada' ? 'Ex: venda balcão, recebimento de cliente' : 'Ex: pagamento embalagem, sangria, troco'"
-                                   class="ui-field w-full text-sm" />
-                        </div>
-                        <div class="fm-field">
-                            <label class="fm-field__label" for="mov-cat">Categoria</label>
-                            <input id="mov-cat" type="text" name="categoria"
-                                   :placeholder="tipo === 'entrada' ? 'venda, devolução' : 'embalagem, sangria, fornecedor'"
-                                   class="ui-field w-full text-sm" />
-                        </div>
-                        <div class="fm-field">
-                            <label class="fm-field__label" for="mov-ref">Referência</label>
-                            <input id="mov-ref" type="text" name="referencia"
-                                   placeholder="txid, NSU, nº NF"
-                                   class="ui-field w-full text-sm" />
-                        </div>
-                    </div>
-                </fieldset>
-                <p x-show="erroSaldo" x-cloak x-text="erroSaldo" role="alert"
-                   class="text-sm text-red-600 font-medium mt-3 px-1"></p>
-            </div>
-            <footer class="fm-footer">
-                <button type="button" @@click="close()"
-                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                    Cancelar
-                </button>
-                <button type="submit"
-                        :class="tipo === 'saida' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'"
-                        class="app-primary-btn px-4 py-2 text-white text-sm font-medium rounded-lg">
-                    <span x-show="tipo === 'entrada'">Registrar entrada</span>
-                    <span x-show="tipo === 'saida'">Registrar saída</span>
-                </button>
-            </footer>
-        </form>
-    </div>
+.ds-kpi-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-500); margin-bottom: 8px; }
+.ds-kpi-value { font-size: 28px; font-weight: 700; color: var(--ink-900); line-height: 1; font-family: var(--font-mono); }
+.ds-kpi-meta { font-size: 12px; color: var(--ink-400); margin-top: 8px; }
 
-    <!-- Modal: fechar caixa -->
-    <div x-data="fecharCaixaModal()"
-         x-show="open" x-cloak
-         @@keydown.escape.window="close()"
-         @@click.self="close()"
-         class="fm-overlay"
-         role="alertdialog" aria-modal="true" aria-labelledby="fm-fechar-title">
-        <form x-ref="panel" class="fm-panel" style="max-width: 540px" x-show="open"
-              method="post" action="/caixa/fechar"
-              x-transition:enter="transition duration-150 ease-out"
-              x-transition:enter-start="opacity-0 scale-95"
-              x-transition:enter-end="opacity-100 scale-100">
-            @Html.AntiForgeryToken()
-            <header class="fm-header">
-                <div>
-                    @if (d.AberturaPendenteCrossDay)
-                    {
-                        <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa de @(d.AbertoDesde?.ToString("dd/MM/yyyy"))?</h2>
-                        <p class="fm-header__subtitle">Esta sessão foi aberta em @(d.AbertoDesde?.ToString("dd/MM/yyyy")) e segue aberta. O fechamento será registrado nesse dia — o caixa de hoje continua livre para abrir. Esta ação não pode ser desfeita.</p>
-                    }
-                    else
-                    {
-                        <h2 id="fm-fechar-title" class="fm-header__title">Fechar caixa do dia?</h2>
-                        <p class="fm-header__subtitle">Após o fechamento, novos lançamentos vão pro caixa de amanhã. Esta ação não pode ser desfeita.</p>
-                    }
-                </div>
-                <button type="button" class="fm-close" aria-label="Fechar" @@click="close()">✕</button>
-            </header>
-            <div class="fm-body">
-                <div class="caixa-fechar-resumo">
-                    <div class="caixa-fechar-resumo__item">
-                        <span class="text-xs text-slate-500 uppercase tracking-wider">Saldo final esperado</span>
-                        <span class="caixa-fechar-resumo__valor tabular-nums">@d.SaldoEsperado.AsMoney()</span>
-                    </div>
-                    <div class="caixa-fechar-resumo__split">
-                        <div>
-                            <span class="text-xs text-slate-500">Vendas + pagamentos</span>
-                            <strong class="text-green-700 block tabular-nums">+@((d.TotalVendas + d.TotalPagamentosPedidos).AsMoney())</strong>
-                        </div>
-                        <div>
-                            <span class="text-xs text-slate-500">Entradas extras</span>
-                            <strong class="text-green-700 block tabular-nums">+@d.TotalEntradasExtras.AsMoney()</strong>
-                        </div>
-                        <div>
-                            <span class="text-xs text-slate-500">Saídas extras</span>
-                            <strong class="text-red-700 block tabular-nums">−@d.TotalSaidasExtras.AsMoney()</strong>
-                        </div>
-                    </div>
-                </div>
+/* ===== Status banner ===== */
+.ds-status-banner { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--r-pill); font-size: 13px; font-weight: 600; }
+.ds-status-banner--ok { background: var(--ok-50); color: var(--ok-700); border: 1px solid var(--ok-200); }
+.ds-status-banner--neutral { background: var(--ink-50); color: var(--ink-600); border: 1px solid var(--ink-200); }
+.ds-status-banner--warn { background: var(--warn-50); color: var(--warn-700); border: 1px solid var(--warn-200); }
+.ds-status-banner--crit { background: var(--crit-50); color: var(--crit-700); border: 1px solid var(--crit-200); }
 
-                <fieldset class="fm-section" style="margin-top: 16px">
-                    <div class="fm-field fm-col-2">
-                        <label class="fm-field__label" for="fechar-obs">Observações do fechamento</label>
-                        <textarea id="fechar-obs" name="observacoes" rows="2"
-                                  placeholder="Ex: diferença de troco, conferência..."
-                                  class="ui-textarea w-full text-sm"></textarea>
-                        <span class="fm-field__hint">Fica registrado no histórico do dia</span>
-                    </div>
-                </fieldset>
-            </div>
-            <footer class="fm-footer">
-                <button type="button" @@click="close()"
-                        class="ui-secondary-btn px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
-                    Voltar
-                </button>
-                <button type="submit"
-                        class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700">
-                    🔒 Sim, fechar caixa
-                </button>
-            </footer>
-        </form>
-    </div>
+.ds-status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.ds-status-dot--pulse { animation: ds-pulse 2s infinite; }
+@@keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ===== Alert ===== */
+.ds-alert { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-radius: var(--r-md); }
+.ds-alert--warn { background: var(--warn-50); border: 1px solid var(--warn-200); }
+[data-theme="dark"] .ds-alert--warn { background: rgba(181, 122, 0, 0.1); border-color: rgba(181, 122, 0, 0.3); }
+[data-theme="dark"] .ds-alert--warn p { color: var(--warn-200); }
+
+/* ===== Tabela premium ===== */
+.tbl-caixa { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.tbl-caixa thead th { text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-400); border-bottom: 1px solid var(--ink-100); background: var(--ink-50); }
+.tbl-caixa thead th:first-child { border-radius: var(--r-sm) 0 0 0; }
+.tbl-caixa thead th:last-child { border-radius: 0 var(--r-sm) 0 0; }
+.tbl-caixa tbody tr { transition: background 0.15s; }
+.tbl-caixa tbody tr:hover { background: var(--ink-50); }
+.tbl-caixa tbody td { padding: 14px 16px; border-bottom: 1px solid var(--ink-100); vertical-align: middle; }
+.tbl-caixa tbody tr:last-child td { border-bottom: none; }
+.tbl-caixa tbody tr:last-child td:first-child { border-radius: 0 0 0 var(--r-sm); }
+.tbl-caixa tbody tr:last-child td:last-child { border-radius: 0 0 var(--r-sm) 0; }
+
+/* Badges de tipo */
+.ds-tipo-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 600; }
+.ds-tipo-badge--navy { background: var(--navy-50); color: var(--navy-700); }
+.ds-tipo-badge--ok { background: var(--ok-50); color: var(--ok-700); }
+.ds-tipo-badge--crit { background: var(--crit-50); color: var(--crit-700); }
+.ds-tipo-badge--info { background: #E0F2FE; color: #0369A1; }
+.ds-tipo-badge--purple { background: #F3E8FF; color: #7C3AED; }
+.ds-tipo-badge--neutral { background: var(--ink-100); color: var(--ink-600); }
+
+.ds-tipo-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+/* Valor */
+.text-ok { color: var(--ok-700); }
+.text-crit { color: var(--crit-700); }
+
+/* Link estorno */
+.ds-link-estorno { font-size: 12px; color: var(--ink-400); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color 0.15s; }
+.ds-link-estorno:hover { color: var(--crit-600); }
+
+/* Dark mode overrides */
+[data-theme="dark"] .ds-kpi-card { background: var(--ink-900); border-color: var(--ink-700); }
+[data-theme="dark"] .tbl-caixa thead th { background: var(--ink-800); color: var(--ink-300); border-color: var(--ink-700); }
+[data-theme="dark"] .tbl-caixa tbody td { border-color: var(--ink-800); }
+[data-theme="dark"] .tbl-caixa tbody tr:hover { background: var(--ink-800); }
+</style>
 }
 
 @section Scripts {
@@ -536,9 +651,6 @@ function fecharCaixaModal()      { return _caixaModalBase('fechar-caixa'); }
 function lancamentoCaixaModal()  {
     return Object.assign(_caixaModalBase('lancar-mov'), {
         tipo: 'entrada',
-        // BUG-07 (QA v1.10 issue 674): valida saida > saldo no cliente -> feedback IMEDIATO no
-        // modal. Antes, o backend rejeitava (toast no reload) mas o usuario perdia o toast ao
-        // o modal fechar. O backend continua autoritativo (saldo concorrente).
         saldoDisponivel: @(d is null ? "0" : d.SaldoEsperado.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         erroSaldo: '',
         validarSubmit(ev) {
@@ -556,8 +668,6 @@ function lancamentoCaixaModal()  {
     });
 }
 
-// Auto-retry exponencial pra falhas transitórias na carga do Caixa.
-// 3 tentativas com backoff (5s, 10s, 20s); usuário pode cancelar ou disparar agora.
 function caixaAutoRetry(enabled) {
     return {
         enabled: enabled,
@@ -594,8 +704,6 @@ function caixaAutoRetry(enabled) {
             this.retrying = true;
             this.attempts += 1;
             try {
-                // HEAD na própria URL — se o servidor responder OK, recarrega de vez.
-                // Se ainda falhar, agenda próxima tentativa.
                 const r = await esFetch(window.location.pathname + window.location.search, {
                     method: 'GET',
                     headers: { 'X-Probe': '1' },
@@ -606,7 +714,6 @@ function caixaAutoRetry(enabled) {
                     window.location.reload();
                     return;
                 }
-                // não-OK do servidor → conta como falha, segue tentando
                 this.retrying = false;
                 this.scheduleNext();
             } catch (e) {

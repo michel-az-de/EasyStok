@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EasyStok — Caixa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="EasyStock.Web/wwwroot/css/tokens.css">
+  <link rel="stylesheet" href="EasyStock.Web/wwwroot/css/components.css">
+  <link rel="stylesheet" href="EasyStock.Web/wwwroot/css/app-shell.css">
+  <link rel="stylesheet" href="EasyStock.Web/wwwroot/css/app.css">
+  <style>
+    /* Overrides mínimos para o protótipo standalone */
+    :root { --sidebar-w: 260px; --topbar-h: 56px; }
+    .proto-app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+    .proto-main { padding: 24px 32px; max-width: 1200px; }
+    @media (max-width: 1024px) { .proto-app { grid-template-columns: 1fr; } .proto-sidebar { display: none; } }
+
+    /* KPI Cards */
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 768px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+    .kpi-card { background: var(--white); border: 1px solid var(--ink-100); border-radius: var(--r-md); padding: 20px; position: relative; overflow: hidden; }
+    .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .kpi-card--saldo::before { background: var(--navy-600); }
+    .kpi-card--positivo::before { background: var(--ok-600); }
+    .kpi-card--extra::before { background: var(--orange-600); }
+
+    .kpi-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-500); margin-bottom: 8px; }
+    .kpi-value { font-size: 28px; font-weight: 700; color: var(--ink-900); line-height: 1; font-family: var(--font-mono); }
+    .kpi-meta { font-size: 12px; color: var(--ink-400); margin-top: 8px; }
+
+    /* Status banner */
+    .status-banner { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--r-pill); font-size: 13px; font-weight: 600; }
+    .status-banner--aberto { background: var(--ok-50); color: var(--ok-700); border: 1px solid var(--ok-200); }
+    .status-banner--fechado { background: var(--ink-50); color: var(--ink-600); border: 1px solid var(--ink-200); }
+    .status-banner--pendente { background: var(--warn-50); color: var(--warn-700); border: 1px solid var(--warn-200); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* Tabela */
+    .tbl-caixa { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+    .tbl-caixa thead th { text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-400); border-bottom: 1px solid var(--ink-100); background: var(--ink-50); }
+    .tbl-caixa thead th:first-child { border-radius: var(--r-sm) 0 0 0; }
+    .tbl-caixa thead th:last-child { border-radius: 0 var(--r-sm) 0 0; }
+    .tbl-caixa tbody tr { transition: background 0.15s; }
+    .tbl-caixa tbody tr:hover { background: var(--ink-50); }
+    .tbl-caixa tbody td { padding: 14px 16px; border-bottom: 1px solid var(--ink-100); vertical-align: middle; }
+    .tbl-caixa tbody tr:last-child td { border-bottom: none; }
+    .tbl-caixa tbody tr:last-child td:first-child { border-radius: 0 0 0 var(--r-sm); }
+    .tbl-caixa tbody tr:last-child td:last-child { border-radius: 0 0 var(--r-sm) 0; }
+
+    /* Badge tipo */
+    .tipo-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 600; }
+    .tipo-badge--abertura { background: var(--navy-50); color: var(--navy-700); }
+    .tipo-badge--entrada { background: var(--ok-50); color: var(--ok-700); }
+    .tipo-badge--saida { background: var(--crit-50); color: var(--crit-700); }
+    .tipo-badge--venda { background: #E0F2FE; color: #0369A1; }
+    .tipo-badge--pagamento { background: #F3E8FF; color: #7C3AED; }
+    .tipo-badge--fechamento { background: var(--ink-100); color: var(--ink-600); }
+
+    /* Valor */
+    .valor-positivo { color: var(--ok-700); font-weight: 600; font-family: var(--font-mono); }
+    .valor-negativo { color: var(--crit-700); font-weight: 600; font-family: var(--font-mono); }
+
+    /* Empty state */
+    .empty-caixa { text-align: center; padding: 48px 24px; }
+    .empty-caixa svg { width: 56px; height: 56px; color: var(--ink-300); margin-bottom: 16px; }
+    .empty-caixa h3 { font-size: 16px; font-weight: 600; color: var(--ink-600); margin-bottom: 4px; }
+    .empty-caixa p { font-size: 14px; color: var(--ink-400); }
+
+    /* Alert cross-day */
+    .alert-crossday { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-radius: var(--r-md); background: var(--warn-50); border: 1px solid var(--warn-200); margin-bottom: 20px; }
+    .alert-crossday svg { flex-shrink: 0; color: var(--warn-600); }
+    .alert-crossday p { font-size: 14px; color: var(--warn-700); line-height: 1.5; }
+
+    /* Toolbar */
+    .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; }
+
+    /* Toggle estado */
+    .estado-toggle { display: flex; gap: 8px; margin-bottom: 20px; padding: 12px; background: var(--ink-50); border-radius: var(--r-md); }
+    .estado-toggle button { padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid var(--ink-200); background: var(--white); color: var(--ink-600); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+    .estado-toggle button:hover { border-color: var(--navy-300); }
+    .estado-toggle button.active { background: var(--navy-600); color: var(--white); border-color: var(--navy-600); }
+
+    [data-theme="dark"] .kpi-card { background: var(--ink-900); border-color: var(--ink-700); }
+    [data-theme="dark"] .tbl-caixa thead th { background: var(--ink-800); color: var(--ink-300); border-color: var(--ink-700); }
+    [data-theme="dark"] .tbl-caixa tbody td { border-color: var(--ink-800); }
+    [data-theme="dark"] .tbl-caixa tbody tr:hover { background: var(--ink-800); }
+    [data-theme="dark"] .empty-caixa svg { color: var(--ink-600); }
+    [data-theme="dark"] .empty-caixa h3 { color: var(--ink-300); }
+    [data-theme="dark"] .empty-caixa p { color: var(--ink-500); }
+    [data-theme="dark"] .alert-crossday { background: rgba(181, 122, 0, 0.1); border-color: rgba(181, 122, 0, 0.3); }
+    [data-theme="dark"] .alert-crossday p { color: var(--warn-200); }
+    [data-theme="dark"] .estado-toggle { background: var(--ink-800); }
+    [data-theme="dark"] .estado-toggle button { background: var(--ink-900); border-color: var(--ink-600); color: var(--ink-300); }
+    [data-theme="dark"] .estado-toggle button.active { background: var(--navy-500); border-color: var(--navy-500); color: var(--white); }
+  </style>
+</head>
+<body>
+
+<div class="proto-app">
+  <!-- Sidebar simplificada -->
+  <aside class="proto-sidebar" style="background: var(--white); border-right: 1px solid var(--ink-100); padding: 20px;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:32px;">
+      <svg width="32" height="32" viewBox="0 0 64 64" fill="none"><path d="M32 6L56 18L32 30L8 18Z" fill="#E85814"/><path d="M8 18L32 30L32 58L8 46Z" fill="#0E2A6E"/><path d="M56 18L32 30L32 58L56 46Z" fill="#06143A"/></svg>
+      <span style="font-weight:700; font-size:18px; color:var(--ink-900);">Easy<span style="color:var(--orange-600);">Stok</span></span>
+    </div>
+    <nav style="display:flex; flex-direction:column; gap:4px;">
+      <a href="#" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; color:var(--ink-500); text-decoration:none; font-size:14px;"><span>📊</span> Dashboard</a>
+      <a href="#" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; color:var(--ink-500); text-decoration:none; font-size:14px;"><span>📋</span> Pedidos</a>
+      <a href="#" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; color:var(--ink-500); text-decoration:none; font-size:14px;"><span>📦</span> Estoque</a>
+      <a href="#" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; background:var(--navy-50); color:var(--navy-700); text-decoration:none; font-size:14px; font-weight:600;"><span>💰</span> Caixa</a>
+      <a href="#" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; color:var(--ink-500); text-decoration:none; font-size:14px;"><span>👥</span> Clientes</a>
+      <a href="#" style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; color:var(--ink-500); text-decoration:none; font-size:14px;"><span>💳</span> Financeiro</a>
+    </nav>
+  </aside>
+
+  <main class="proto-main">
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:16px;">
+      <div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+          <h1 style="font-size:24px; font-weight:700; color:var(--ink-900);">Caixa do dia</h1>
+          <span id="statusBadge" class="status-banner status-banner--aberto"><span class="status-dot"></span>Caixa aberto</span>
+        </div>
+        <p style="font-size:14px; color:var(--ink-400);">segunda-feira, 10 de agosto de 2026</p>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-outline-dark" style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border:1px solid var(--ink-200); border-radius:8px; background:var(--white); color:var(--ink-600); font-size:13px; font-weight:500; cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          Lançamentos do app
+        </button>
+        <button class="btn-outline-dark" style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border:1px solid var(--ink-200); border-radius:8px; background:var(--white); color:var(--ink-600); font-size:13px; font-weight:500; cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Histórico
+        </button>
+      </div>
+    </div>
+
+    <!-- Toggle de estado (protótipo) -->
+    <div class="estado-toggle">
+      <button onclick="setEstado('fechado')" id="btn-fechado">🔒 Fechado</button>
+      <button onclick="setEstado('aberto')" id="btn-aberto" class="active">🔓 Aberto</button>
+      <button onclick="setEstado('crossday')" id="btn-crossday">⚠️ Cross-day</button>
+    </div>
+
+    <!-- Alert cross-day (hidden por padrão) -->
+    <div id="alertCrossday" class="alert-crossday" style="display:none;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <p><strong>Caixa aberto em 09/08/2026</strong>, ainda sem fechamento. Os totais abaixo somam a sessão inteira desde a abertura. Feche o caixa ao concluir o turno.</p>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-card--saldo">
+        <div class="kpi-label">Saldo esperado</div>
+        <div class="kpi-value" id="kpiSaldo">R$ 1.847,50</div>
+        <div class="kpi-meta" id="kpiSaldoMeta">Caixa aberto</div>
+      </div>
+      <div class="kpi-card kpi-card--positivo">
+        <div class="kpi-label">Vendas + pagamentos</div>
+        <div class="kpi-value" id="kpiVendas">R$ 2.340,00</div>
+        <div class="kpi-meta">Vendas: R$ 1.890,00 · Pagamentos: R$ 450,00</div>
+      </div>
+      <div class="kpi-card kpi-card--extra">
+        <div class="kpi-label">Entradas/saídas extras</div>
+        <div class="kpi-value" id="kpiExtras">R$ 120,00</div>
+        <div class="kpi-meta">Entradas: +R$ 200,00 · Saídas: −R$ 80,00</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar" id="toolbar">
+      <button class="app-primary-btn" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--navy-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Lançar entrada/saída
+      </button>
+      <button class="btn-warn-dark" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--warn-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        Fechar caixa
+      </button>
+    </div>
+
+    <!-- Tabela de movimentos -->
+    <div class="ws" style="background:var(--white); border:1px solid var(--ink-100); border-radius:var(--r-md); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--ink-100);">
+        <h2 style="font-size:16px; font-weight:600; color:var(--ink-900);">Movimentos do dia <span style="font-size:13px; font-weight:400; color:var(--ink-400);">(12)</span></h2>
+        <div style="display:flex; gap:8px;">
+          <button style="padding:6px 12px; border:1px solid var(--ink-200); border-radius:6px; background:var(--white); color:var(--ink-500); font-size:12px; cursor:pointer;">Todos</button>
+          <button style="padding:6px 12px; border:1px solid var(--ink-200); border-radius:6px; background:var(--white); color:var(--ink-500); font-size:12px; cursor:pointer;">Entradas</button>
+          <button style="padding:6px 12px; border:1px solid var(--ink-200); border-radius:6px; background:var(--white); color:var(--ink-500); font-size:12px; cursor:pointer;">Saídas</button>
+        </div>
+      </div>
+
+      <div id="tabelaContainer">
+        <table class="tbl-caixa">
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Tipo</th>
+              <th>Valor</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Origem</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">08:00</td>
+              <td><span class="tipo-badge tipo-badge--abertura"><span style="width:6px;height:6px;border-radius:50%;background:var(--navy-600);display:inline-block;"></span>Abertura</span></td>
+              <td class="valor-positivo">+R$ 500,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Saldo inicial em dinheiro</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Manual <div style="color:var(--ink-300);">Thatiane</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">09:15</td>
+              <td><span class="tipo-badge tipo-badge--venda"><span style="width:6px;height:6px;border-radius:50%;background:#0369A1;display:inline-block;"></span>Venda</span></td>
+              <td class="valor-positivo">+R$ 45,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Pedido #1284 — Maria Silva</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Balcão</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">09:42</td>
+              <td><span class="tipo-badge tipo-badge--venda"><span style="width:6px;height:6px;border-radius:50%;background:#0369A1;display:inline-block;"></span>Venda</span></td>
+              <td class="valor-positivo">+R$ 120,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Pedido #1285 — João Oliveira</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Balcão</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">10:30</td>
+              <td><span class="tipo-badge tipo-badge--saida"><span style="width:6px;height:6px;border-radius:50%;background:var(--crit-600);display:inline-block;"></span>Saída</span></td>
+              <td class="valor-negativo">−R$ 50,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Sangria para depósito bancário</td>
+              <td style="font-size:12px; color:var(--ink-400);">Sangria</td>
+              <td style="font-size:12px; color:var(--ink-400);">Manual <div style="color:var(--ink-300);">Thatiane</div></td>
+              <td><button style="font-size:12px; color:var(--ink-400); background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:4px;" onmouseover="this.style.color='var(--crit-600)'" onmouseout="this.style.color='var(--ink-400)'">Estornar</button></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">11:05</td>
+              <td><span class="tipo-badge tipo-badge--pagamento"><span style="width:6px;height:6px;border-radius:50%;background:#7C3AED;display:inline-block;"></span>Pagamento</span></td>
+              <td class="valor-positivo">+R$ 85,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">PIX Pedido #1286 — Ana Costa</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Storefront</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">11:45</td>
+              <td><span class="tipo-badge tipo-badge--entrada"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok-600);display:inline-block;"></span>Entrada</span></td>
+              <td class="valor-positivo">+R$ 200,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Reforço de troco</td>
+              <td style="font-size:12px; color:var(--ink-400);">Reforço</td>
+              <td style="font-size:12px; color:var(--ink-400);">Manual <div style="color:var(--ink-300);">Thatiane</div></td>
+              <td><button style="font-size:12px; color:var(--ink-400); background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:4px;" onmouseover="this.style.color='var(--crit-600)'" onmouseout="this.style.color='var(--ink-400)'">Estornar</button></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">12:20</td>
+              <td><span class="tipo-badge tipo-badge--saida"><span style="width:6px;height:6px;border-radius:50%;background:var(--crit-600);display:inline-block;"></span>Saída</span></td>
+              <td class="valor-negativo">−R$ 30,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Compra de embalagens — mercado local</td>
+              <td style="font-size:12px; color:var(--ink-400);">Embalagem</td>
+              <td style="font-size:12px; color:var(--ink-400);">Manual <div style="color:var(--ink-300);">Thatiane</div></td>
+              <td><button style="font-size:12px; color:var(--ink-400); background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:4px;" onmouseover="this.style.color='var(--crit-600)'" onmouseout="this.style.color='var(--ink-400)'">Estornar</button></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">14:00</td>
+              <td><span class="tipo-badge tipo-badge--venda"><span style="width:6px;height:6px;border-radius:50%;background:#0369A1;display:inline-block;"></span>Venda</span></td>
+              <td class="valor-positivo">+R$ 180,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Pedido #1287 — Carlos Mendes</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Balcão</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">14:35</td>
+              <td><span class="tipo-badge tipo-badge--pagamento"><span style="width:6px;height:6px;border-radius:50%;background:#7C3AED;display:inline-block;"></span>Pagamento</span></td>
+              <td class="valor-positivo">+R$ 250,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Dinheiro Pedido #1288 — Família Souza</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Balcão</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">15:10</td>
+              <td><span class="tipo-badge tipo-badge--saida"><span style="width:6px;height:6px;border-radius:50%;background:var(--crit-600);display:inline-block;"></span>Saída</span></td>
+              <td class="valor-negativo">−R$ 80,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Pagamento fornecedor — Padaria Bella</td>
+              <td style="font-size:12px; color:var(--ink-400);">Fornecedor</td>
+              <td style="font-size:12px; color:var(--ink-400);">Manual <div style="color:var(--ink-300);">Thatiane</div></td>
+              <td><button style="font-size:12px; color:var(--ink-400); background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:4px;" onmouseover="this.style.color='var(--crit-600)'" onmouseout="this.style.color='var(--ink-400)'">Estornar</button></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">16:45</td>
+              <td><span class="tipo-badge tipo-badge--venda"><span style="width:6px;height:6px;border-radius:50%;background:#0369A1;display:inline-block;"></span>Venda</span></td>
+              <td class="valor-positivo">+R$ 95,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Pedido #1289 — Paula Lima</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Storefront</div></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-size:12px; color:var(--ink-400); font-family:var(--font-mono);">17:20</td>
+              <td><span class="tipo-badge tipo-badge--pagamento"><span style="width:6px;height:6px;border-radius:50%;background:#7C3AED;display:inline-block;"></span>Pagamento</span></td>
+              <td class="valor-positivo">+R$ 115,00</td>
+              <td style="font-size:14px; color:var(--ink-600);">Crédito Pedido #1290 — Roberto Dias</td>
+              <td style="font-size:12px; color:var(--ink-400);">—</td>
+              <td style="font-size:12px; color:var(--ink-400);">Pedido <div style="color:var(--ink-300);">Balcão</div></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty state (hidden por padrão) -->
+      <div id="emptyState" class="empty-caixa" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <h3>Nenhum movimento registrado</h3>
+        <p>Abra o caixa e comece a registrar movimentos do dia.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function setEstado(estado) {
+  document.querySelectorAll('.estado-toggle button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + estado).classList.add('active');
+
+  const statusBadge = document.getElementById('statusBadge');
+  const alertCrossday = document.getElementById('alertCrossday');
+  const toolbar = document.getElementById('toolbar');
+  const kpiSaldo = document.getElementById('kpiSaldo');
+  const kpiSaldoMeta = document.getElementById('kpiSaldoMeta');
+
+  alertCrossday.style.display = 'none';
+
+  if (estado === 'fechado') {
+    statusBadge.className = 'status-banner status-banner--fechado';
+    statusBadge.innerHTML = '<span class="status-dot" style="animation:none;"></span>Caixa fechado';
+    toolbar.innerHTML = '<button class="app-primary-btn" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--navy-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Abrir caixa do dia</button><span style="font-size:14px; color:var(--ink-500);">Comece informando o saldo inicial em dinheiro.</span>';
+    kpiSaldo.textContent = 'R$ 0,00';
+    kpiSaldoMeta.textContent = 'Caixa não aberto';
+    document.getElementById('tabelaContainer').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+  } else if (estado === 'aberto') {
+    statusBadge.className = 'status-banner status-banner--aberto';
+    statusBadge.innerHTML = '<span class="status-dot"></span>Caixa aberto';
+    toolbar.innerHTML = '<button class="app-primary-btn" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--navy-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Lançar entrada/saída</button><button class="btn-warn-dark" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--warn-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Fechar caixa</button>';
+    kpiSaldo.textContent = 'R$ 1.847,50';
+    kpiSaldoMeta.textContent = 'Caixa aberto';
+    document.getElementById('tabelaContainer').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
+  } else if (estado === 'crossday') {
+    statusBadge.className = 'status-banner status-banner--pendente';
+    statusBadge.innerHTML = '<span class="status-dot"></span>Caixa aberto (dia anterior)';
+    alertCrossday.style.display = 'flex';
+    toolbar.innerHTML = '<button class="app-primary-btn" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--navy-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Lançar entrada/saída</button><button class="btn-warn-dark" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; background:var(--warn-600); color:var(--white); border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Fechar caixa</button>';
+    kpiSaldo.textContent = 'R$ 3.295,00';
+    kpiSaldoMeta.textContent = 'Aberto desde 09/08';
+  }
+}
+</script>
+
+</body>
+</html>
