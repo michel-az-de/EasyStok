@@ -87,12 +87,14 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new ItemEstoque
                 {
                     Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId1,
+                    QuantidadeInicial = Quantidade.From(10m),
                     QuantidadeAtual = Quantidade.From(10m), CustoUnitario = Dinheiro.FromDecimal(20m),
                     CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
                 },
                 new ItemEstoque
                 {
                     Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId2,
+                    QuantidadeInicial = Quantidade.From(5m),
                     QuantidadeAtual = Quantidade.From(5m), CustoUnitario = Dinheiro.FromDecimal(15m),
                     CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
                 });
@@ -260,7 +262,7 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
             seed.Set<ItemEstoque>().Add(new ItemEstoque
             {
                 Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
-                QuantidadeAtual = Quantidade.From(10m), CustoUnitario = Dinheiro.FromDecimal(50m),
+                QuantidadeInicial = Quantidade.From(10m), QuantidadeAtual = Quantidade.From(10m), CustoUnitario = Dinheiro.FromDecimal(50m),
                 CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
             });
             await seed.SaveChangesAsync();

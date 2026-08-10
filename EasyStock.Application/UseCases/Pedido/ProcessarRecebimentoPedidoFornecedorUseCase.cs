@@ -192,6 +192,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
         pedido.DataRecebimento = dataRecebimento;
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido);
+        await unitOfWork.CommitAsync();
 
         logger.LogInformation(
             "Pedido {PedidoId} status apos recebimento: {Status} (recebido {Recebido} de {Pedido})",
