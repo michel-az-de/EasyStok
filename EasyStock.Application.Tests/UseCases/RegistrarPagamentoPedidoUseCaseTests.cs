@@ -225,4 +225,52 @@ public class RegistrarPagamentoPedidoUseCaseTests
 
         pedido.Pagamentos.Should().HaveCount(1);
     }
+
+    // issue 1029: o PedidoResult devolvido por ExecuteAsync E o corpo da resposta HTTP —
+    // Api/PedidosController.AddPagamento faz DataOk(result), e o cockpit chega ate ele via
+    // Web/PedidosService.PagarAsync, devolvendo PedidoRowDto (que carrega TotalPago e deriva
+    // Excedente) direto pra UI. Ate 4abb7bb5 TODO teste deste arquivo afirmava sobre o AGREGADO
+    // (pedido.Pagamentos / pedido.TotalPago); nenhum afirmava sobre o TotalPago da RESPOSTA. Quando
+    // o `pedido.Pagamentos.Add(pag)` foi removido do use case, o banco continuou correto — o INSERT
+    // sai por AddPagamentoAsync — mas quem registrava o pagamento recebia de volta um pedido sem
+    // ele, e a tela seguia mostrando o pedido como nao-pago.
+    //
+    // A resposta nao estava totalmente descoberta: PedidoVendaCaixaIntegrationTests ja afirmava
+    // result!.TotalPago (80m / 130m) e foi ela que pegou a regressao no CI. Mas essa guarda exige
+    // Postgres e so roda no CI — feedback lento, longe de quem edita o use case. Os dois testes
+    // abaixo trazem a MESMA guarda pro nivel unitario: sao sobre a RESPOSTA, nao sobre o agregado.
+
+    [Fact]
+    public async Task Resposta_devolve_TotalPago_ja_incluindo_o_pagamento_recem_registrado()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+
+        var result = await UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 40m));
+
+        result.Should().NotBeNull();
+        result!.TotalPago.Should().Be(40m,
+            "a resposta tem que refletir o pagamento recem-registrado, nao o estado anterior a ele");
+    }
+
+    [Fact]
+    public async Task Resposta_acumula_o_novo_pagamento_sobre_os_ja_existentes()
+    {
+        // Complementa o teste acima: garante que a resposta SOMA ao que ja havia, em vez de
+        // devolver apenas o valor recem-pago (que passaria no teste anterior por coincidencia).
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+        pedido.Pagamentos.Add(new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 60m, PagoEm = DateTime.UtcNow
+        });
+
+        var result = await UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 40m));
+
+        result.Should().NotBeNull();
+        result!.TotalPago.Should().Be(100m,
+            "60 ja pagos + 40 recem-pagos: a resposta acumula, nao substitui");
+    }
 }

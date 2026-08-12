@@ -98,6 +98,14 @@ public class RegistrarPagamentoPedidoUseCase(
 
             await repo.AddPagamentoAsync(pag);
 
+            // issue 1029: o agregado carregado aqui e RASTREADO (GetByIdWithDetailsAsync nao usa
+            // AsNoTracking — so a query de LISTAGEM usa), e AddPagamentoAsync adiciona ESTA MESMA
+            // instancia ao DbSet. O EF deduplica por referencia, entao isto NAO duplica o INSERT:
+            // mantem o grafo em memoria coerente com o que foi persistido. Sem esta linha,
+            // pedido.TotalPago (derivado de Pagamentos) fica defasado e o Map() logo abaixo
+            // devolve ao chamador uma resposta sem o pagamento que ele acabou de registrar.
+            pedido.Pagamentos.Add(pag);
+
             await repo.AddEventoAsync(new PedidoEvento
             {
                 Id = Guid.NewGuid(),
