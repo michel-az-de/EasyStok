@@ -43,9 +43,8 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var categoriaId = Guid.NewGuid();
         var produtoId1 = Guid.NewGuid();
         var produtoId2 = Guid.NewGuid();
-        var dataPedido = new DateTime(2026, 8, 10, 10, 0, 0, DateTimeKind.Utc);
-        var dataPagamento1 = new DateTime(2026, 8, 10, 11, 0, 0, DateTimeKind.Utc);
-        var dataPagamento2 = new DateTime(2026, 8, 10, 12, 0, 0, DateTimeKind.Utc);
+        // issue 1031: os literais de data que existiam aqui nao chegavam ao pagamento — o use case
+        // usa DateTime.UtcNow — e so alimentavam a assercao do caixa, envelhecendo com o relogio.
 
         // ── 1. Seed: empresa + loja + categoria + 2 produtos com estoque ────
         await using (var seed = fixture.CreateDbContext())
@@ -212,7 +211,15 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
 
             // Caixa: abertura automatica + saldo = 130
             var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(assert);
-            var dataOp = EasyStock.Application.Common.HorarioBrasil.DataOperacional(dataPagamento1);
+            // issue 1031: o dia operacional vem do PagoEm REALMENTE persistido, nao de um literal.
+            // RegistrarPagamentoPedidoUseCase carimba PagoEm = DateTime.UtcNow (nao ha clock
+            // injetavel), enquanto GetTotalPagamentosPedidosDoDiaAsync filtra pela janela UTC do dia
+            // pedido. Derivar de uma data fixa fazia o teste passar so no dia em que foi escrito:
+            // a partir do dia seguinte a janela nao continha mais nenhum pagamento e o total dava 0.
+            // Ler do proprio dado tambem elimina a corrida de meia-noite que HorarioBrasil.Hoje()
+            // ainda teria entre o pagamento e a assercao.
+            var dataOp = EasyStock.Application.Common.HorarioBrasil.DataOperacional(
+                pedido.Pagamentos.Min(p => p.PagoEm));
             var totalPagamentos = await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, dataOp, lojaId);
             totalPagamentos.Should().Be(130m);
 
@@ -231,7 +238,6 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var lojaId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
-        var dataPedido = new DateTime(2026, 8, 10, 10, 0, 0, DateTimeKind.Utc);
 
         // ── Seed ───────────────────────────────────────────────────────────
         await using (var seed = fixture.CreateDbContext())
@@ -324,7 +330,10 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
             pedido.TotalPago.Should().Be(100m);
 
             var caixaRepo = new EasyStock.Infra.Postgre.Repositories.CaixaRepository(assert);
-            var dataOp = EasyStock.Application.Common.HorarioBrasil.DataOperacional(dataPedido);
+            // issue 1031: mesmo motivo do outro teste — dia operacional derivado do PagoEm
+            // persistido, nao de um literal que envelhece.
+            var dataOp = EasyStock.Application.Common.HorarioBrasil.DataOperacional(
+                pedido.Pagamentos.Single().PagoEm);
             var totalPagamentos = await caixaRepo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, dataOp, lojaId);
             totalPagamentos.Should().Be(100m, "caixa nao deve refletir pagamento rejeitado");
         }
