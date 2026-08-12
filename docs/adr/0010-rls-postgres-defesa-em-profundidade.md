@@ -57,6 +57,30 @@ Quatro grupos isentos:
 | Notificações globais seed | `NotificacoesGlobaisSeed.ExecutarAsync` |
 | Reconciliação de fatura | `FaturaReconciliacaoJob.ProcessarReconciliacaoAsync` |
 | Login pré-auth | `UsuarioRepository.GetByEmailAsync` |
+| Webhook fiscal (sem JWT) | `ProcessarWebhookFocusNFeUseCase` — fix B-054 |
+| Reprocessamento de contingência | `ReprocessarContingenciaUseCase` — fix B-053 |
+| **Registro de empresa** | `RegistrarEmpresaUseCase` — issue #1024 |
+
+As duas linhas de fiscal já existiam no código e faltavam nesta tabela; entraram junto com a #1024,
+que as encontrou ao medir quem consome o port.
+
+**Sobre o registro de empresa (#1024).** É o único ponto desta tabela que está no *request path*, o
+que à primeira vista contradiz a regra "bypass só em job/webhook". Não contradiz: a requisição é
+**anônima** e a operação **cria o tenant**, então não existe `app.empresa_id` para o interceptor
+emitir — `NULLIF(current_setting('app.empresa_id', true), '')::uuid` resolve para `NULL` e o
+`WITH CHECK` reprova todo INSERT em tabela tenant-aware (`42501`, medido em `assinaturas_empresa`).
+O critério que separa este caso de um mau uso não é "tem JWT?", e sim **a operação cria ou atravessa
+tenants por natureza?**. Se a resposta for não e a query voltou vazia, o defeito está no contexto de
+tenant, e o bypass apenas o esconderia.
+
+O escopo cobre o use case inteiro, não só os INSERTs: `perfis` tem `EmpresaId`, logo tem RLS, e sem
+bypass o `GetPadroesAsync` volta vazio — o registro criaria um perfil Admin por empresa em vez de
+reusar o padrão, mudando a forma do dado **sem erro nenhum**.
+
+**Portão (#1024).** O que o "ArchitectureTests futuro" previsto abaixo virou:
+`RlsBypassAllowlistTests` trava a lista de arquivos que podem referenciar
+`IRowLevelSecurityBypass` em código. Consumidor novo exige editar a allowlist, o que faz a decisão
+aparecer no diff da PR em vez de escorregar num construtor.
 
 ## Por que app flag e não role com `BYPASSRLS`
 
@@ -89,6 +113,9 @@ Trade-off aceito: um bug que persista o flag (ex.: esquecer o `using`) burla o R
 - `EasyStock.Api/Program.cs` — bypass em migrations, schema bootstrap, super admin seed, seed demo, notificações globais.
 - `EasyStock.Api/BackgroundServices/FaturaReconciliacaoJob.cs` — bypass no `ProcessarReconciliacaoAsync`.
 - `EasyStock.Infra.Postgre.IntegrationTests/Tenancy/RowLevelSecurityTests.cs` — 6 testes cobrindo: sem set→0, tenant A→A, tenant B→B, bypass→tudo, WITH CHECK em INSERT cross-tenant, interceptor emite SET correto.
+- `EasyStock.Application/Ports/Output/Security/IRowLevelSecurityBypass.cs` — port que expõe o bypass à Application (que não pode referenciar a Infra); implementado por `Infra.Postgre/Security/RowLevelSecurityBypass.cs`.
+- `EasyStock.ArchitectureTests/RlsBypassAllowlistTests.cs` — allowlist de quem pode referenciar o port (#1024).
+- `EasyStock.Infra.Postgre.IntegrationTests/Tenancy/RegistrarEmpresaRlsIntegrationTests.cs` — signup sob role `NOSUPERUSER NOBYPASSRLS`, com controle negativo que prova que a RLS está viva no ambiente de teste (#1024).
 
 ## Validação
 
