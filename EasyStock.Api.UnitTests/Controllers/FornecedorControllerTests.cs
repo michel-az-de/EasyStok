@@ -52,7 +52,6 @@ public class FornecedorControllerTests
             Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>());
         var processarRecebimento = new ProcessarRecebimentoPedidoFornecedorUseCase(
             _pedidoFornecedorRepository,
-            Substitute.For<IPedidoFornecedorItemRepository>(),
             entradaUseCase,
             Substitute.For<IMovimentacaoEstoqueRepository>(),
             _unitOfWork,
