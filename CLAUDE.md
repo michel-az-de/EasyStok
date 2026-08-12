@@ -98,6 +98,20 @@ R13 (mantida). Em duvida genuina: PARE, pergunte UMA vez, decisiva. Nao conflita
 
 R14 (mantida). Comunicacao SEMPRE em pt-BR com o Felipe. Codigo/identificadores/commits seguem o padrao do repo.
 
+**R20 (canonica, 2026-08-10).** **PR conflitante nao se entrega ao autor.** Antes de reportar, de
+pedir a label `aprovado` ou de dizer que a tarefa esta pronta, conferir
+`gh pr view <N> --json mergeable,mergeStateStatus` e exigir `MERGEABLE`. `CONFLICTING` significa que
+o trunk andou: trazer com `git merge origin/<TRUNK>`, resolver mantendo os dois lados quando a
+mudanca for aditiva, revalidar pelo R4 e empurrar. **A conferencia vale no instante do relatorio,
+nao no da abertura da PR.** Com mais de uma sessao na maquina o trunk anda entre uma coisa e outra:
+medido em 2026-08-10 no `atlas`, a PR #41 ficou conflitante tres vezes dentro da mesma tarefa, e nas
+tres o conflito nasceu depois de o CI ja ter fechado verde. **CI verde nao e portao completo**,
+porque ele testa a branch e nao a integracao dela com o trunk de agora.
+
+> As regras R15 a R19 da 4.1 ainda nao foram propagadas para este repositorio. A R20 mantem o numero
+> canonico de proposito: o numero identifica a regra em todos os projetos do autor, e o vao aqui e
+> deliberado, nao erro.
+
 ## 2. CICLO DE VIDA DA TAREFA (stage, commit, PR, merge)
 
   1. ISSUE (`gh issue create`, NAO-bloqueante) -- titulo imperativo; body Contexto/Escopo/Aceite (checkboxes); labels modulo+prioridade.
