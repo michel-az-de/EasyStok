@@ -40,6 +40,18 @@ public class RegistrarPagamentoPedidoUseCaseTests
         pedido.Itens.Add(item);
         pedido.RecalcularTotal();
         _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        // issue 1029: modela o RELATIONSHIP FIXUP do EF Core. Em producao o agregado vem
+        // rastreado (GetByIdWithDetailsAsync nao usa AsNoTracking) e, quando AddPagamentoAsync
+        // faz db.Set<PedidoPagamento>().Add(pag), o EF sozinho encaixa pag em pedido.Pagamentos
+        // pela FK PedidoId. O substitute nao fazia isso: a colecao ficava vazia, e os testes
+        // so passavam porque o use case tinha um pedido.Pagamentos.Add(pag) explicito -- que em
+        // producao dobrava o TotalPago (a List<> nao deduplica por referencia). O 4abb7bb5
+        // removeu a linha de producao, corretamente, mas deixou este fake mentindo. Sem esta
+        // linha aqui, o teste mede um mundo que nao existe.
+        _repo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))
+             .Do(ci => pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
+
         return pedido;
     }
 
@@ -229,16 +241,15 @@ public class RegistrarPagamentoPedidoUseCaseTests
     // issue 1029: o PedidoResult devolvido por ExecuteAsync E o corpo da resposta HTTP —
     // Api/PedidosController.AddPagamento faz DataOk(result), e o cockpit chega ate ele via
     // Web/PedidosService.PagarAsync, devolvendo PedidoRowDto (que carrega TotalPago e deriva
-    // Excedente) direto pra UI. Ate 4abb7bb5 TODO teste deste arquivo afirmava sobre o AGREGADO
-    // (pedido.Pagamentos / pedido.TotalPago); nenhum afirmava sobre o TotalPago da RESPOSTA. Quando
-    // o `pedido.Pagamentos.Add(pag)` foi removido do use case, o banco continuou correto — o INSERT
-    // sai por AddPagamentoAsync — mas quem registrava o pagamento recebia de volta um pedido sem
-    // ele, e a tela seguia mostrando o pedido como nao-pago.
+    // Excedente) direto pra UI. Todo teste deste arquivo afirmava sobre o AGREGADO
+    // (pedido.Pagamentos / pedido.TotalPago); nenhum sobre o TotalPago da RESPOSTA.
     //
-    // A resposta nao estava totalmente descoberta: PedidoVendaCaixaIntegrationTests ja afirmava
-    // result!.TotalPago (80m / 130m) e foi ela que pegou a regressao no CI. Mas essa guarda exige
-    // Postgres e so roda no CI — feedback lento, longe de quem edita o use case. Os dois testes
-    // abaixo trazem a MESMA guarda pro nivel unitario: sao sobre a RESPOSTA, nao sobre o agregado.
+    // Isso importa porque o modo de falhar mais provavel aqui e o DUPLO: reintroduzir um
+    // pedido.Pagamentos.Add(pag) no use case "para a resposta refletir o pagamento" parece
+    // inofensivo, mas soma em cima do fixup do EF e dobra o TotalPago. Foi exatamente o que
+    // aconteceu ao tentar consertar esta issue: o CI mediu 160 para um pagamento de 80
+    // (PedidoVendaCaixaIntegrationTests, linha 154). Essa guarda de integracao existe, mas
+    // exige Postgres e so roda no CI. Os dois testes abaixo a trazem pro nivel unitario.
 
     [Fact]
     public async Task Resposta_devolve_TotalPago_ja_incluindo_o_pagamento_recem_registrado()
