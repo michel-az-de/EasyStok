@@ -42,6 +42,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
 ### Fixed
+- `POST /api/empresas/registrar` respondia 500 sob role sem `BYPASSRLS`: registrar empresa e
+  cross-tenant por definicao (CRIA o tenant), entao a requisicao anonima nao tem `app.empresa_id`
+  e a policy `tenant_isolation` recusava os INSERTs com `42501` em `assinaturas_empresa`. O
+  `RegistrarEmpresaUseCase` passa a rodar sob `IRowLevelSecurityBypass.Begin()`, escopado por
+  `using`. O escopo cobre o use case inteiro e nao so os INSERTs: `perfis` tambem tem RLS, e sem
+  bypass `GetPadroesAsync` voltava vazio — o registro criava um perfil Admin por empresa em vez de
+  reusar o padrao, **sem erro nenhum**. Coberto por teste de integracao com role
+  `NOSUPERUSER NOBYPASSRLS` mais um controle negativo que prova que a RLS esta viva no ambiente
+  (sem ele, um verde poderia significar apenas "a policy nao estava valendo"). (#1024)
 - Usuario com 2+ empresas ativas nao conseguia entrar no Web: a Api emite token sem o claim
   `empresaId` nesse caso e o Web tratava como erro terminal ("entre em contato com o suporte").
   O caminho ja existia na Api (`auth/lista-empresas` + `login` aceitando `empresaId`) e nunca
@@ -64,6 +73,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (westus2) descomissionada; observabilidade (Dozzle/Uptime Kuma/OpenObserve) no ar. (#997)
 
 ### Security
+- `RlsBypassAllowlistTests`: allowlist de quem pode referenciar `IRowLevelSecurityBypass` em
+  codigo. O port ja existia e ja tinha consumidores; o que faltava era o portao — injetar uma
+  interface e barato demais para uma decisao que desliga a segunda camada de defesa do ADR-0010.
+  Agora consumidor novo exige editar a lista, e isso aparece no diff da PR. Mencao em `<see cref>`
+  nao conta: falso positivo em guarda de seguranca treina quem mantem o codigo a engordar a
+  allowlist ate calar o teste. (#1024)
 - Bump `System.Security.Cryptography.Xml` 10.0.7 -> 10.0.10 (5 advisories high / NU1903 que
   quebravam todo PR no CI com `-warnaserror`). (#999)
 - Adota o Protocolo Operacional v4.0 (PR-first, issue-driven, auto-merge por tier). Supersede a v3.1

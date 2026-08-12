@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output.Security;
+
 namespace EasyStock.Application.UseCases.RegistrarEmpresa
 {
     public sealed record RegistrarEmpresaCommand(
@@ -24,10 +26,27 @@ namespace EasyStock.Application.UseCases.RegistrarEmpresa
         IUsuarioPerfilRepository usuarioPerfilRepository,
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
+        IRowLevelSecurityBypass rlsBypass,
         ILogger<RegistrarEmpresaUseCase> logger)
     {
         public async Task<RegistrarEmpresaResult> ExecuteAsync(RegistrarEmpresaCommand command)
         {
+            // issue 1024: registrar empresa e cross-tenant POR DEFINICAO — cria o tenant. A
+            // requisicao e anonima, entao o SetTenantOnConnectionInterceptor emite
+            // app.empresa_id = '' e a policy tenant_isolation (WITH CHECK, ADR-0010) recusa os
+            // INSERTs em assinaturas_empresa, perfis, usuarios_empresas e usuarios_perfis:
+            // 42501 new row violates row-level security policy.
+            //
+            // O escopo cobre o metodo INTEIRO, nao so os INSERTs, porque as LEITURAS tambem
+            // sofrem: perfis tem EmpresaId, logo tem RLS, e sem bypass GetPadroesAsync volta
+            // vazio — o use case criaria um perfil Admin por empresa em vez de reusar o padrao,
+            // mudando a forma do dado sem erro nenhum. (empresas e planos nao tem EmpresaId,
+            // entao ficam fora da RLS e nao dependem disto; medido em 2026-08-12.)
+            //
+            // O bypass e aplicado pelo interceptor na PROXIMA abertura de conexao — por isso o
+            // using precisa envolver tambem o CommitAsync la embaixo, que e onde os INSERTs saem.
+            using var _rls = rlsBypass.Begin();
+
             logger.LogInformation("Registrando nova empresa: {NomeEmpresa}", command.NomeEmpresa);
 
             var emailExistente = await usuarioRepository.GetByEmailAsync(command.EmailAdmin);

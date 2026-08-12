@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.RegistrarEmpresa;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,10 @@ public class RegistrarEmpresaUseCaseTests
     {
         var logger = Substitute.For<ILogger<RegistrarEmpresaUseCase>>();
         var hasher = new FakePasswordHasher();
+        // issue 1024: aqui o bypass e so plumbing — estes testes usam substitutes, entao nao ha
+        // RLS para driblar. Quem prova que o bypass funciona de verdade e o teste de integracao
+        // RegistrarEmpresaRlsIntegrationTests, contra Postgres com role NOSUPERUSER NOBYPASSRLS.
+        var rlsBypass = Substitute.For<IRowLevelSecurityBypass>();
         return new RegistrarEmpresaUseCase(
             usuarioRepository,
             planoRepository,
@@ -29,6 +34,7 @@ public class RegistrarEmpresaUseCaseTests
             usuarioPerfilRepository,
             unitOfWork,
             hasher,
+            rlsBypass,
             logger);
     }
 
