@@ -511,13 +511,27 @@ public class PedidoUseCasesTests
         await _uow.DidNotReceive().CommitAsync();
     }
 
+    // issue 1029: arranja o repo para pagamento modelando o RELATIONSHIP FIXUP do EF Core. Em
+    // producao o agregado vem rastreado (GetByIdWithDetailsAsync nao usa AsNoTracking) e, quando
+    // AddPagamentoAsync faz db.Set<PedidoPagamento>().Add(pag), o EF sozinho encaixa pag em
+    // pedido.Pagamentos pela FK PedidoId. O substitute nao fazia isso, entao estes testes so
+    // passavam com um pedido.Pagamentos.Add(pag) explicito no use case -- que em producao somava
+    // em cima do fixup e DOBRAVA o TotalPago (a List<> nao deduplica por referencia). Sem este
+    // arranjo, o teste mede um mundo que nao existe.
+    private void ArranjarRepoParaPagamento(Guid empresaId, Pedido pedido)
+    {
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        _pedidoRepo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))
+                   .Do(ci => pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
+    }
+
     [Fact]
     public async Task RegistrarPagamento_DeveAdicionarPagamentoEEvento_QuandoSucesso()
     {
         var empresaId = Guid.NewGuid();
         var pedido = Pedido.Criar(empresaId);
         pedido.Total = Dinheiro.FromDecimal(100m);
-        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        ArranjarRepoParaPagamento(empresaId, pedido);
 
         PedidoPagamento? pagCapturado = null;
         await _pedidoRepo.AddPagamentoAsync(Arg.Do<PedidoPagamento>(p => pagCapturado = p));
@@ -547,7 +561,7 @@ public class PedidoUseCasesTests
         var pedido = Pedido.Criar(empresaId);
         pedido.Total = Dinheiro.FromDecimal(100m);
         pedido.Pagamentos.Add(new PedidoPagamento { Valor = 30m, Metodo = "dinheiro" });
-        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        ArranjarRepoParaPagamento(empresaId, pedido);
 
         await PagamentoUC().ExecuteAsync(
             new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "credito", 25m));
@@ -592,7 +606,7 @@ public class PedidoUseCasesTests
         var pedido = Pedido.Criar(empresaId);
         pedido.Total = Dinheiro.FromDecimal(100m);
         pedido.Status = statusOp;
-        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        ArranjarRepoParaPagamento(empresaId, pedido);
 
         await PagamentoUC().ExecuteAsync(
             new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 50m));

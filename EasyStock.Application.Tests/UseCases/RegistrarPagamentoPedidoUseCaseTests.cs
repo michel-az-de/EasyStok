@@ -40,6 +40,18 @@ public class RegistrarPagamentoPedidoUseCaseTests
         pedido.Itens.Add(item);
         pedido.RecalcularTotal();
         _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        // issue 1029: modela o RELATIONSHIP FIXUP do EF Core. Em producao o agregado vem
+        // rastreado (GetByIdWithDetailsAsync nao usa AsNoTracking) e, quando AddPagamentoAsync
+        // faz db.Set<PedidoPagamento>().Add(pag), o EF sozinho encaixa pag em pedido.Pagamentos
+        // pela FK PedidoId. O substitute nao fazia isso: a colecao ficava vazia, e os testes
+        // so passavam porque o use case tinha um pedido.Pagamentos.Add(pag) explicito -- que em
+        // producao dobrava o TotalPago (a List<> nao deduplica por referencia). O 4abb7bb5
+        // removeu a linha de producao, corretamente, mas deixou este fake mentindo. Sem esta
+        // linha aqui, o teste mede um mundo que nao existe.
+        _repo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))
+             .Do(ci => pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
+
         return pedido;
     }
 
@@ -224,5 +236,52 @@ public class RegistrarPagamentoPedidoUseCaseTests
         await UC(comCaixa: false).ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 100m));
 
         pedido.Pagamentos.Should().HaveCount(1);
+    }
+
+    // issue 1029: o PedidoResult devolvido por ExecuteAsync E o corpo da resposta HTTP —
+    // Api/PedidosController.AddPagamento faz DataOk(result), e o cockpit chega ate ele via
+    // Web/PedidosService.PagarAsync, devolvendo PedidoRowDto (que carrega TotalPago e deriva
+    // Excedente) direto pra UI. Todo teste deste arquivo afirmava sobre o AGREGADO
+    // (pedido.Pagamentos / pedido.TotalPago); nenhum sobre o TotalPago da RESPOSTA.
+    //
+    // Isso importa porque o modo de falhar mais provavel aqui e o DUPLO: reintroduzir um
+    // pedido.Pagamentos.Add(pag) no use case "para a resposta refletir o pagamento" parece
+    // inofensivo, mas soma em cima do fixup do EF e dobra o TotalPago. Foi exatamente o que
+    // aconteceu ao tentar consertar esta issue: o CI mediu 160 para um pagamento de 80
+    // (PedidoVendaCaixaIntegrationTests, linha 154). Essa guarda de integracao existe, mas
+    // exige Postgres e so roda no CI. Os dois testes abaixo a trazem pro nivel unitario.
+
+    [Fact]
+    public async Task Resposta_devolve_TotalPago_ja_incluindo_o_pagamento_recem_registrado()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+
+        var result = await UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 40m));
+
+        result.Should().NotBeNull();
+        result!.TotalPago.Should().Be(40m,
+            "a resposta tem que refletir o pagamento recem-registrado, nao o estado anterior a ele");
+    }
+
+    [Fact]
+    public async Task Resposta_acumula_o_novo_pagamento_sobre_os_ja_existentes()
+    {
+        // Complementa o teste acima: garante que a resposta SOMA ao que ja havia, em vez de
+        // devolver apenas o valor recem-pago (que passaria no teste anterior por coincidencia).
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId); // Total = 100m
+        pedido.Pagamentos.Add(new PedidoPagamento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "dinheiro", Valor = 60m, PagoEm = DateTime.UtcNow
+        });
+
+        var result = await UC(comCaixa: false).ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 40m));
+
+        result.Should().NotBeNull();
+        result!.TotalPago.Should().Be(100m,
+            "60 ja pagos + 40 recem-pagos: a resposta acumula, nao substitui");
     }
 }
