@@ -37,6 +37,11 @@ public class RazorViewHygieneTests
         // Fase 1 — gallery do DS (hex em side-by-side panes para forcar tema, intencional)
         "Dev/Components.cshtml",
 
+        // Badges --info e --purple do redesign v6 (95238dcc). Nao ha token equivalente no design
+        // system hoje, entao migrar exige criar os tokens antes. Debito rastreado na issue #1027,
+        // que remove esta entrada ao migrar. Ate 2026-08-12 a falha ficou invisivel porque o master
+        // nao compilava e o arch test nunca rodava.
+        "Caixa/Index.cshtml",
     };
 
     [Fact]
