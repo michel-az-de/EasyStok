@@ -96,6 +96,12 @@ public class RegistrarPagamentoPedidoUseCase(
                 RegistradoPorNome = cmd.RegistradoPorNome
             };
 
+            // issue 1029: NAO adicionar pag a pedido.Pagamentos aqui. O agregado e rastreado
+            // (GetByIdWithDetailsAsync nao usa AsNoTracking) e o relationship fixup do EF ja
+            // popula a colecao quando AddPagamentoAsync faz db.Set<PedidoPagamento>().Add(pag).
+            // Um Add explicito entraria DE NOVO na List<> (que nao deduplica por referencia) e
+            // dobraria pedido.TotalPago, que e derivado de Pagamentos -- medido: a resposta
+            // devolvia 160 para um pagamento de 80. Foi por isso que o 4abb7bb5 removeu a linha.
             await repo.AddPagamentoAsync(pag);
 
             await repo.AddEventoAsync(new PedidoEvento
