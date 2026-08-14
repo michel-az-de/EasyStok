@@ -1,0 +1,9 @@
+{
+  "name": "easystok-ux-console-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Prototipo navegavel: padroes Stripe/Twilio aplicados sobre o design system v6 do EasyStok",
+  "scripts": {
+    "dev": "node server.js"
+  }
+}
