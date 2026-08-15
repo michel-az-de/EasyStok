@@ -1,566 +1,753 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light" data-density="comfort">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Casa da Babá — Densidade Controlada (protótipo)</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<title>EasyStok ERP — Densidade Controlada (protótipo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ══════════════════════════════════════════════════════════════
-   TOKENS — alma dark-warm do PWA real (terracota/basil/gold),
-   com a disciplina de tokens dos estudos: semântico antes de
-   primitivo, estado como contrato, uma curva de motion só.
+   TOKENS — os mesmos do DS v6 oficial (EasyStock.Web/wwwroot),
+   mais a camada semântica de USO que os estudos recomendam
+   (Twilio: nome descreve papel+estado, nunca cor)
    ══════════════════════════════════════════════════════════════ */
 :root{
-  --bg:#131009; --surface:#1C1610; --surface-2:#251D14; --surface-3:#2F2519;
-  --ink:#F7F2E8; --ink-2:#CFC5B4; --ink-3:#94886F;
-  --accent:#E76845; --accent-strong:#F08A68; --accent-soft:rgba(231,104,69,.14); --accent-softer:rgba(231,104,69,.07);
-  --btn:#D6552F; --btn-hover:#C24A26; --btn-pressed:#A93E1F;
-  --basil:#4FBF9F; --basil-soft:rgba(79,191,159,.13); --basil-ink:#7FD8BC;
-  --gold:#F0B84A; --gold-soft:rgba(240,184,74,.13); --gold-ink:#F5CB7C;
-  --crit:#E05B4B; --crit-soft:rgba(224,91,75,.14); --crit-ink:#F0927F;
-  --line:rgba(247,242,232,.09); --line-2:rgba(247,242,232,.17);
-  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.30);
-  --shadow-lg:0 2px 4px rgba(0,0,0,.4),0 20px 48px rgba(0,0,0,.42);
-  --ease:cubic-bezier(.4,0,.2,1); --d1:150ms; --d2:300ms;
-  --r-s:10px; --r-m:14px; --r-l:20px; --r-pill:999px;
-  /* escala de densidade — multiplicador único, tudo deriva dele */
-  --dens:1;
+  --ink-900:#0A1530; --ink-800:#122042; --ink-700:#2A3556; --ink-600:#4A5470;
+  --ink-500:#707892; --ink-400:#98A0B4; --ink-300:#C2C8D6; --ink-200:#DEE2EB; --ink-100:#ECEFF5; --ink-50:#F5F7FB;
+  --paper:#F7F9FC; --white:#FFFFFF;
+  --navy-800:#0A1F52; --navy-700:#0E2A6E; --navy-600:#15388A; --navy-500:#1E48A8; --navy-100:#DDE4F2; --navy-50:#EDF1F9;
+  --orange-800:#9F3706; --orange-700:#BF4307; --orange-600:#E85814; --orange-100:#FCDCC8; --orange-50:#FEEFE3;
+  --ok-700:#0E6B3D; --ok-600:#18874E; --ok-200:#BFE0CC; --ok-50:#ECF7F0;
+  --warn-700:#8A5A00; --warn-600:#B57A00; --warn-200:#F0DC9A; --warn-50:#FCF5E0;
+  --crit-700:#8E2A1E; --crit-600:#C03B2A; --crit-200:#EFB7AD; --crit-50:#FBEAE6;
+  --font-sans:'Inter',system-ui,sans-serif; --font-mono:'JetBrains Mono',monospace;
+  --r-xs:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-pill:999px;
+  --ease:cubic-bezier(.4,0,.2,1); --d1:150ms; --d2:250ms;
+  --z-sticky:100; --z-modal:400; --z-popover:500; --z-toast:700;
+
+  /* ── semânticos de uso ── */
+  --surface-page:var(--paper); --surface-card:var(--white); --surface-hover:var(--ink-50); --surface-pressed:var(--ink-100);
+  --text-primary:var(--ink-900); --text-secondary:var(--ink-700); --text-muted:var(--ink-600); --text-faint:var(--ink-500);
+  --text-accent:var(--orange-700);
+  --bg-btn:var(--orange-600); --bg-btn-hover:var(--orange-700); --bg-btn-pressed:var(--orange-800);
+  --accent-soft:var(--orange-50); --accent-ring:rgba(232,88,20,.35);
+  --border:var(--ink-200); --border-strong:var(--ink-300);
+  --shadow-1:0 1px 2px rgba(10,21,48,.06);
+  --shadow-2:0 2px 6px rgba(10,21,48,.06),0 8px 20px rgba(10,21,48,.06);
+  --shadow-3:0 4px 12px rgba(10,21,48,.10),0 16px 40px rgba(10,21,48,.10);
 }
+:root[data-theme="dark"]{
+  --surface-page:#0A1220; --surface-card:#101A2E; --surface-hover:rgba(255,255,255,.045); --surface-pressed:rgba(255,255,255,.08);
+  --text-primary:#EFF2F8; --text-secondary:#C2C8D6; --text-muted:#9AA3B8; --text-faint:#76809A;
+  --text-accent:#F26B25;
+  --accent-soft:rgba(232,88,20,.13);
+  --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.16);
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 2px 6px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.35);
+  --shadow-3:0 4px 12px rgba(0,0,0,.5),0 16px 40px rgba(0,0,0,.45);
+}
+/* ═══ DENSIDADE CONTROLADA — um multiplicador, tudo deriva ═══ */
+:root[data-density="comfort"]{ --row-h:52px; --pad-card:20px; --pad-cell:14px 16px; --gap:16px; --fs:14px; }
+:root[data-density="compact"]{ --row-h:38px; --pad-card:14px; --pad-cell:8px 16px; --gap:10px; --fs:13px; }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
 *{box-sizing:border-box;margin:0;padding:0}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:var(--font-sans);font-size:var(--fs);line-height:1.5;color:var(--text-primary);background:var(--surface-page);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--text-accent);text-decoration:none} a:hover{text-decoration:underline}
 :focus{outline:none}
-:focus-visible{outline:2px solid var(--accent-strong);outline-offset:-2px;border-radius:8px}
-body{font-family:'Inter',system-ui,sans-serif;background:#0C0A07;color:var(--ink);
-  -webkit-font-smoothing:antialiased;min-height:100vh}
-.num{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--orange-600);outline-offset:2px;border-radius:var(--r-xs)}
+.btn:focus-visible,.icon-btn:focus-visible,.chip:focus-visible{outline-offset:-2px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint)}
 
-/* ═══ STAGE (apresentação em desktop; some no celular) ═══ */
-.stage{min-height:100vh;display:grid;grid-template-columns:1fr auto 1fr;gap:56px;align-items:center;
-  justify-items:center;padding:48px 24px;
-  background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(231,104,69,.08), transparent 60%),
-    radial-gradient(900px 500px at 90% 110%, rgba(240,184,74,.05), transparent 60%),
-    #0C0A07}
-.notes{max-width:330px;display:flex;flex-direction:column;gap:18px}
-.notes.right{text-align:left}
-.note-kicker{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
-.note h1{font-size:30px;line-height:1.12;font-weight:900;letter-spacing:-.03em;margin:6px 0 10px}
-.note p{font-size:13.5px;line-height:1.6;color:var(--ink-2)}
-.note p b{color:var(--ink)}
-.note li{font-size:13px;line-height:1.55;color:var(--ink-2);margin:7px 0 7px 18px}
-.note li b{color:var(--ink)}
-.note .src{font-size:11px;color:var(--ink-3);margin-top:2px}
-
-/* ═══ DEVICE FRAME ═══ */
-.device{width:393px;height:820px;border-radius:52px;background:#000;padding:11px;
-  box-shadow:0 0 0 2px #2a231b,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(231,104,69,.07)}
-.screen{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;
-  background:var(--bg);display:flex;flex-direction:column}
-.statusbar{height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
-  padding:0 26px;font-size:13px;font-weight:600}
-.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:110px;height:28px;
-  border-radius:20px;background:#000;z-index:60}
-@media (max-width:1180px){.stage{grid-template-columns:1fr;gap:36px}.notes{max-width:560px}}
-@media (max-width:520px){
-  .stage{padding:0;display:block;background:var(--bg)}
-  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none}
-  .screen{border-radius:0}.island,.notes{display:none}
-}
+.skip-link{position:fixed;top:-48px;left:16px;z-index:var(--z-toast);background:var(--surface-card);padding:8px 16px;border-radius:var(--r-sm);box-shadow:var(--shadow-2);transition:top var(--d2) var(--ease)}
+.skip-link:focus-visible{top:12px}
 </style>
 <style>
-/* ══════════════════════════════════════════════════════════════
-   O APP — header de momento + conteúdo por fase + tab bar
-   ══════════════════════════════════════════════════════════════ */
-.app-head{flex-shrink:0;padding:6px 18px 12px;display:flex;flex-direction:column;gap:12px}
-.head-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.moment-eyebrow{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
-.moment-eyebrow em{font-style:normal;color:var(--gold)}      /* fase sugerida pelo relógio */
-.moment-title{font-size:calc(24px * var(--dens));font-weight:900;letter-spacing:-.03em;line-height:1.1}
-.env-tag{align-self:center;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--gold-ink);background:var(--gold-soft);border:1px solid rgba(240,184,74,.3);
-  padding:3px 8px;border-radius:var(--r-pill)}
+/* ═══ SHELL — sidebar modular (o que já existe no Web) refinada
+   com a disciplina Stripe: objeto central sempre visível, grupos
+   em acordeão, ativo = fundo accent + peso 600 ═══ */
+.app{display:grid;grid-template-columns:244px 1fr;height:100vh}
+.sidebar{display:flex;flex-direction:column;background:var(--surface-card);border-right:1px solid var(--border);min-height:0}
+.side-brand{display:flex;align-items:center;gap:10px;padding:16px;border-bottom:1px solid var(--border)}
+.side-brand .logo{width:32px;height:32px}
+.side-brand .name{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.side-brand .name span{color:var(--orange-600)}
+.side-brand .env{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--warn-700);background:var(--warn-50);border:1px solid var(--warn-200);padding:2px 7px;border-radius:var(--r-pill)}
+:root[data-theme="dark"] .side-brand .env{color:var(--warn-200);background:rgba(181,122,0,.15);border-color:rgba(181,122,0,.3)}
+.sidebar nav{flex:1;overflow-y:auto;padding:10px 10px 4px;scrollbar-width:thin}
+.nav-label{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);padding:14px 8px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;height:32px;padding:0 8px;border-radius:var(--r-xs);
+  color:var(--text-secondary);font-size:13.5px;text-align:left;transition:background var(--d1) var(--ease),color var(--d1) var(--ease)}
+.nav-item:hover{background:var(--surface-hover);color:var(--text-primary)}
+.nav-item.active{background:var(--accent-soft);color:var(--text-accent);font-weight:600}
+.nav-item svg{flex-shrink:0;opacity:.85}
+.nav-item .ct{margin-left:auto;font-size:10.5px;font-weight:700;font-family:var(--font-mono);background:var(--surface-pressed);
+  color:var(--text-muted);border-radius:var(--r-pill);padding:1px 7px}
+.nav-item.active .ct{background:rgba(232,88,20,.15);color:var(--text-accent)}
+.nav-group{margin:1px 0}
+.nav-group>summary{display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:var(--r-xs);
+  color:var(--text-secondary);font-size:13.5px;font-weight:600;cursor:pointer;list-style:none;user-select:none}
+.nav-group>summary::-webkit-details-marker{display:none}
+.nav-group>summary:hover{background:var(--surface-hover)}
+.nav-group>summary .chev{margin-left:auto;color:var(--text-faint);transition:transform var(--d2) var(--ease)}
+.nav-group[open]>summary .chev{transform:rotate(180deg)}
+.nav-group .sub{padding:2px 0 6px}
+.nav-group .sub .nav-item{padding-left:36px;font-weight:400}
+.side-foot{border-top:1px solid var(--border);padding:8px 10px}
 
-/* Seletor de densidade — o conceito em 1 componente: sistema sugere, usuário controla */
-.density{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;background:var(--surface);
-  border:1px solid var(--line);border-radius:var(--r-pill);padding:4px}
-.density button{position:relative;height:34px;border-radius:var(--r-pill);font-size:12.5px;font-weight:700;
-  color:var(--ink-3);transition:color var(--d1) var(--ease),background var(--d1) var(--ease)}
-.density button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-strong);
-  box-shadow:inset 0 0 0 1px rgba(231,104,69,.35)}
-.density .suggested{position:absolute;top:-7px;right:8px;font-size:8.5px;font-weight:800;letter-spacing:.06em;
-  text-transform:uppercase;background:var(--gold);color:#241A06;padding:1px 6px;border-radius:var(--r-pill)}
+/* ═══ TOPBAR ═══ */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:54px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 20px;
+  background:var(--surface-card);border-bottom:1px solid var(--border)}
+.breadcrumb{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-muted)}
+.breadcrumb b{color:var(--text-primary);font-weight:600}
+.breadcrumb .sep{color:var(--text-faint)}
+.topbar .spacer{flex:1}
+.search-trigger{display:flex;align-items:center;gap:9px;height:34px;width:240px;padding:0 12px;border-radius:var(--r-sm);
+  background:var(--surface-hover);border:1px solid var(--border);color:var(--text-muted);font-size:13px;transition:border-color var(--d1) var(--ease)}
+.search-trigger:hover{border-color:var(--border-strong)}
+.search-trigger kbd{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);
+  border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:1px 5px;background:var(--surface-card)}
+.icon-btn{display:grid;place-items:center;width:34px;height:34px;border-radius:var(--r-sm);color:var(--text-muted);
+  position:relative;transition:background var(--d1) var(--ease),color var(--d1) var(--ease)}
+.icon-btn:hover{background:var(--surface-hover);color:var(--text-primary)}
+.icon-btn .dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--orange-600);
+  box-shadow:0 0 0 2px var(--surface-card)}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--navy-700);color:#fff;display:grid;place-items:center;
+  font-size:11.5px;font-weight:700}
 
-.content{flex:1;overflow-y:auto;padding:2px 14px 16px;scrollbar-width:none}
-.content::-webkit-scrollbar{display:none}
-.phase{display:none;flex-direction:column;gap:calc(12px * var(--dens))}
-.phase.active{display:flex}
+/* Toggle de densidade na topbar — controle do usuário, sempre visível */
+.density-toggle{display:flex;align-items:center;gap:2px;background:var(--surface-hover);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:2px}
+.density-toggle button{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:var(--r-xs);
+  font-size:12px;font-weight:600;color:var(--text-muted);transition:all var(--d1) var(--ease)}
+.density-toggle button[aria-pressed="true"]{background:var(--surface-card);color:var(--text-primary);box-shadow:var(--shadow-1)}
+.density-toggle button[title]{cursor:pointer}
 
-/* ═══ CARDS BASE ═══ */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);
-  padding:calc(16px * var(--dens))}
-.card-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
-  display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.card-label a{color:var(--accent-strong);font-weight:700;letter-spacing:0;text-transform:none;font-size:12.5px}
+.content{flex:1;overflow-y:auto;padding:24px 28px 64px}
+.view{max-width:1180px;margin:0 auto}
+.view[hidden]{display:none}
+@media (max-width:960px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+</style>
+<style>
+/* ═══ PAGE HEAD (sticky: corrige o atrito do Stripe) ═══ */
+.page-head{position:sticky;top:-25px;z-index:var(--z-sticky);background:var(--surface-page);
+  margin:-25px -29px 18px;padding:20px 29px 0;border-bottom:1px solid var(--border)}
+.page-head .row{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.page-head h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.page-head .sub{font-size:13px;color:var(--text-muted);margin-top:2px}
+.tabs{display:flex;gap:2px;margin-top:14px}
+.tab{padding:7px 12px;font-size:13.5px;font-weight:500;color:var(--text-muted);border-bottom:2px solid transparent;
+  transition:color var(--d1) var(--ease)}
+.tab:hover{color:var(--text-primary)}
+.tab[aria-selected="true"]{color:var(--text-accent);font-weight:600;border-bottom-color:var(--orange-600)}
 
-/* ═══ FASE PREPARO ═══ */
-.prod-row{display:flex;align-items:center;gap:12px;padding:calc(10px * var(--dens)) 0;border-bottom:1px solid var(--line)}
-.prod-row:last-child{border-bottom:0}
-.prod-emoji{width:40px;height:40px;border-radius:var(--r-s);background:var(--surface-2);display:grid;
-  place-items:center;font-size:20px;flex-shrink:0}
-.prod-info{flex:1;min-width:0}
-.prod-name{font-weight:600;font-size:14.5px}
-.prod-sub{font-size:12px;color:var(--ink-3);margin-top:1px}
-.prod-qty{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;color:var(--ink)}
-.prod-qty .done{color:var(--basil-ink)}
-.stock-warn{display:flex;gap:10px;align-items:center;background:var(--crit-soft);
-  border:1px solid rgba(224,91,75,.25);border-radius:var(--r-m);padding:12px 14px}
-.stock-warn .sw-icon{color:var(--crit-ink);flex-shrink:0}
-.stock-warn p{font-size:13px;line-height:1.4;color:var(--ink-2)}
-.stock-warn p b{color:var(--ink)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r-m);
-  font-weight:700;transition:background var(--d1) var(--ease),transform var(--d1) var(--ease)}
-.btn:active{transform:scale(.97)}
-.btn-primary{background:var(--btn);color:#fff;height:calc(46px * var(--dens));padding:0 18px;font-size:15px}
-.btn-primary:hover{background:var(--btn-hover)}
-.btn-ghost{background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink);height:40px;padding:0 14px;font-size:13.5px}
-.btn-block{width:100%}
+/* ═══ BOTÕES ═══ */
+.btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:var(--r-sm);
+  font-size:13.5px;font-weight:600;transition:background var(--d1) var(--ease),border-color var(--d1) var(--ease),color var(--d1) var(--ease)}
+.btn-primary{background:var(--bg-btn);color:#fff;box-shadow:0 1px 1px rgba(122,42,5,.25)}
+.btn-primary:hover{background:var(--bg-btn-hover)}
+.btn-primary:active{background:var(--bg-btn-pressed)}
+.btn-secondary{background:var(--surface-card);border:1px solid var(--border-strong);color:var(--text-primary);box-shadow:var(--shadow-1)}
+.btn-secondary:hover{border-color:var(--orange-600);color:var(--text-accent)}
+.btn-danger-o{background:transparent;border:1px solid var(--crit-200);color:var(--crit-700)}
+.btn-danger-o:hover{background:var(--crit-50)}
+:root[data-theme="dark"] .btn-danger-o{border-color:rgba(192,59,42,.4);color:#EF9A8C}
+kbd.k{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--border-strong);border-bottom-width:2px;
+  border-radius:4px;padding:1px 5px;color:var(--text-muted);background:var(--surface-card)}
+.btn-primary kbd.k{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff}
 
-/* ═══ FASE OPERAÇÃO — a esteira ═══ */
-.ops-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.ops-stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);
-  padding:calc(10px * var(--dens)) 10px;text-align:center}
-.ops-stat .v{font-size:calc(21px * var(--dens));font-weight:800;letter-spacing:-.02em}
-.ops-stat .l{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
-.ops-stat.hot .v{color:var(--accent-strong)}
+/* ═══ KPI (padrão caixa-v6 + delta + sparkline + frescor — Stripe) ═══ */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--gap);margin-bottom:calc(var(--gap) + 4px)}
+.kpi{background:var(--surface-card);border:1px solid var(--border);border-radius:var(--r-md);padding:var(--pad-card);
+  position:relative;transition:box-shadow var(--d2) var(--ease)}
+.kpi:hover{box-shadow:var(--shadow-2)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r-md) var(--r-md) 0 0;background:var(--kpi-c,var(--navy-600))}
+.kpi .k-label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text-faint)}
+.kpi .k-value{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:calc(26px * var(--fs) / 14px);
+  font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:8px}
+.kpi .k-delta{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;margin-top:6px}
+.k-delta.up{color:var(--ok-700)} .k-delta.down{color:var(--crit-700)}
+:root[data-theme="dark"] .k-delta.up{color:#4CC38A} :root[data-theme="dark"] .k-delta.down{color:#EF9A8C}
+.k-delta .vs{font-weight:400;color:var(--text-faint)}
+.kpi .k-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:9px;
+  border-top:1px solid var(--border);font-size:11px;color:var(--text-faint)}
+.kpi .k-foot a{font-size:11px;font-weight:600}
+.kpi svg.spark{position:absolute;right:14px;bottom:30px;opacity:.9}
+.info-i{display:grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--border-strong);
+  font-size:9.5px;color:var(--text-faint);cursor:help}
 
-.lane-label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--ink-3);margin:6px 2px -4px}
-.lane-label .n{background:var(--surface-2);border-radius:var(--r-pill);padding:1px 8px;color:var(--ink-2);font-size:11px}
-.lane-label.wait{color:var(--gold-ink)} .lane-label.doing{color:var(--accent-strong)} .lane-label.done{color:var(--basil-ink)}
+/* ═══ CHIPS DE FILTRO (Stripe) ═══ */
+.filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 10px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:var(--r-pill);
+  font-size:12.5px;font-weight:600;transition:all var(--d1) var(--ease)}
+.chip-add{border:1px dashed var(--border-strong);color:var(--text-accent)}
+.chip-add:hover{border-color:var(--orange-600);background:var(--accent-soft)}
+.chip-on{border:1px solid rgba(232,88,20,.45);background:var(--accent-soft);color:var(--text-accent)}
+.chip-on .lbl{font-weight:400;color:var(--text-faint)}
+.chip-on .x{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;color:inherit}
+.chip-on .x:hover{background:var(--orange-600);color:#fff}
+.filter-clear{font-size:12.5px;font-weight:600;color:var(--text-accent)}
+.result-count{font-size:12.5px;color:var(--text-muted);margin:0 0 10px}
 
-.order{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);
-  padding:calc(14px * var(--dens));display:flex;flex-direction:column;gap:calc(10px * var(--dens))}
-.order-top{display:flex;align-items:center;gap:10px}
-.order-num{font-size:calc(19px * var(--dens));font-weight:800;letter-spacing:-.02em}
-.order-timer{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;
-  padding:3px 9px;border-radius:var(--r-pill)}
-.order-timer.fresh{background:var(--basil-soft);color:var(--basil-ink)}
-.order-timer.warn{background:var(--gold-soft);color:var(--gold-ink)}
-.order-timer.late{background:var(--crit-soft);color:var(--crit-ink)}
-.order-channel{margin-left:auto}
-.channel{font-size:11px;font-weight:700;padding:3px 9px;border-radius:var(--r-pill);background:var(--surface-2);
-  color:var(--ink-2);border:1px solid var(--line)}
-.channel.ifood{color:var(--crit-ink);border-color:rgba(224,91,75,.3);background:var(--crit-soft)}
-.order-items{font-size:13px;line-height:1.5;color:var(--ink-2)}
-.order-items b{color:var(--ink);font-weight:600}
-.order-act{display:flex;gap:8px}
-.order-act .btn-primary{flex:1;height:calc(44px * var(--dens))}
-.order-act .btn-ghost{flex-shrink:0}
+/* ═══ TABELA — densidade vem de --pad-cell/--row-h ═══ */
+.table-card{background:var(--surface-card);border:1px solid var(--border);border-radius:var(--r-md);overflow:auto}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--fs);min-width:640px}
+thead th{position:sticky;top:0;background:var(--surface-card);text-align:left;padding:10px 16px;font-size:10.5px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);border-bottom:1px solid var(--border);z-index:2}
+tbody td{padding:var(--pad-cell);height:var(--row-h);border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr{transition:background var(--d1) var(--ease)}
+tbody tr:hover{background:var(--surface-hover)}
+tbody tr:last-child td{border-bottom:0}
+.cell-name{font-weight:600;color:var(--text-accent)}
+.cell-id{display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint)}
+.copy-btn{display:grid;place-items:center;width:18px;height:18px;border-radius:4px;color:var(--text-faint)}
+.copy-btn:hover{background:var(--surface-pressed);color:var(--text-primary)}
+.num-r{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 
-/* ═══ FOCO — densidade mínima de elementos, relevância máxima ═══ */
-[data-density="focus"] .lane-label,[data-density="focus"] .ops-strip,
-[data-density="focus"] .order.compactable{display:none}
-.focus-hero{display:none;flex-direction:column;gap:14px;text-align:center;padding:8px 4px}
-[data-density="focus"] .focus-hero{display:flex}
-.focus-hero .fh-label{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
-.focus-hero .fh-num{font-size:64px;font-weight:900;letter-spacing:-.04em;line-height:1}
-.focus-hero .fh-items{font-size:16px;line-height:1.65;color:var(--ink-2)}
-.focus-hero .fh-items b{color:var(--ink)}
-.focus-hero .fh-timer{font-size:15px;font-weight:700}
-.focus-hero .btn-primary{height:60px;font-size:17px;border-radius:var(--r-l)}
-.focus-next{font-size:13px;color:var(--ink-3)}
+/* ═══ PILLS ═══ */
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:var(--r-pill);
+  font-size:12px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill-ok{background:var(--ok-50);color:var(--ok-700)}
+.pill-warn{background:var(--warn-50);color:var(--warn-700)}
+.pill-crit{background:var(--crit-50);color:var(--crit-700)}
+.pill-info{background:var(--navy-50);color:var(--navy-700)}
+.pill-neutral{background:var(--surface-pressed);color:var(--text-muted)}
+:root[data-theme="dark"] .pill-ok{background:rgba(24,135,78,.16);color:#4CC38A}
+:root[data-theme="dark"] .pill-warn{background:rgba(181,122,0,.18);color:#EFC75E}
+:root[data-theme="dark"] .pill-crit{background:rgba(192,59,42,.18);color:#EF9A8C}
+:root[data-theme="dark"] .pill-info{background:rgba(30,72,168,.2);color:#9DB8EC}
 
-/* ═══ RAIO-X — denso, tabular, comparativo ═══ */
-.rx-list{display:none;flex-direction:column}
-[data-density="raiox"] .rx-list{display:flex}
-[data-density="raiox"] .lane-wrap{display:none}
-.rx-row{display:grid;grid-template-columns:52px 1fr 64px 78px;gap:8px;align-items:center;
-  padding:8px 2px;border-bottom:1px solid var(--line);font-size:12.5px}
-.rx-row .mono{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-3)}
+/* ═══ EMPTY STATE (Stripe) ═══ */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 24px}
+.empty .e-icon{width:52px;height:52px;border-radius:var(--r-md);background:var(--accent-soft);display:grid;
+  place-items:center;color:var(--orange-600);margin-bottom:14px}
+.empty h2{font-size:16px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
+.empty p{max-width:400px;color:var(--text-muted);font-size:13.5px}
+.empty .e-actions{display:flex;gap:14px;align-items:center;margin-top:18px}
 
-/* ═══ FASE FECHAMENTO ═══ */
-.cash-big{font-size:40px;font-weight:900;letter-spacing:-.03em;line-height:1}
-.cash-sub{font-size:13px;color:var(--ink-3);margin-top:6px}
-.comp-bar{display:flex;height:12px;border-radius:var(--r-pill);overflow:hidden;margin:16px 0 10px}
-.comp-bar div{height:100%}
-.legend{display:flex;flex-direction:column;gap:7px}
-.legend-row{display:flex;align-items:center;gap:9px;font-size:13.5px}
-.legend-row i{width:9px;height:9px;border-radius:3px;flex-shrink:0}
-.legend-row .v{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600}
-.delta{font-size:12.5px;font-weight:700}
-.delta.up{color:var(--basil-ink)} .delta.down{color:var(--crit-ink)}
+/* ═══ CARDS GENÉRICOS + HUB ═══ */
+.card{background:var(--surface-card);border:1px solid var(--border);border-radius:var(--r-md);padding:var(--pad-card)}
+.card-title{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.section{margin-top:26px}
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--gap);margin-top:12px}
+.hub-card{display:flex;gap:13px;padding:var(--pad-card);background:var(--surface-card);border:1px solid var(--border);
+  border-radius:var(--r-md);text-align:left;transition:box-shadow var(--d2) var(--ease),border-color var(--d2) var(--ease)}
+.hub-card:hover{box-shadow:var(--shadow-2);border-color:rgba(232,88,20,.4)}
+.hub-card:hover .hc-title{color:var(--text-accent)}
+.hc-icon{width:36px;height:36px;border-radius:var(--r-sm);background:var(--accent-soft);display:grid;place-items:center;
+  color:var(--orange-600);flex-shrink:0}
+.hc-title{font-size:13.5px;font-weight:600;display:block}
+.hc-desc{font-size:12.5px;color:var(--text-muted);margin-top:2px;line-height:1.45;display:block}
 
-/* Empty state (Stripe) adaptado à operação: sugere a próxima ação real */
-.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;
-  padding:calc(26px * var(--dens)) 18px;background:var(--surface);border:1px dashed var(--line-2);border-radius:var(--r-l)}
-.empty .e-ico{width:46px;height:46px;border-radius:var(--r-m);background:var(--accent-soft);display:grid;
-  place-items:center;color:var(--accent-strong)}
-.empty h3{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
-.empty p{font-size:13px;color:var(--ink-3);line-height:1.5;max-width:260px}
-.empty a{font-size:13px;font-weight:700;color:var(--accent-strong)}
+/* ═══ ALERTAS / ATENÇÃO ═══ */
+.alert{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-radius:var(--r-md);
+  background:var(--warn-50);border:1px solid var(--warn-200);font-size:13.5px;color:var(--warn-700)}
+.alert b{font-weight:700}
+:root[data-theme="dark"] .alert{background:rgba(181,122,0,.12);border-color:rgba(181,122,0,.3);color:#F0DC9A}
 
-/* ═══ TAB BAR ═══ */
-.tabbar{flex-shrink:0;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;
-  background:rgba(19,16,9,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:8px 8px 18px}
-.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:var(--r-s);
-  font-size:10px;font-weight:700;color:var(--ink-3);position:relative;transition:color var(--d1) var(--ease)}
-.tabbar button.on{color:var(--accent-strong)}
-.tabbar .t-badge{position:absolute;top:0;right:calc(50% - 22px);background:var(--accent);color:#fff;
-  font-size:9px;font-weight:800;min-width:15px;height:15px;border-radius:var(--r-pill);display:grid;place-items:center;padding:0 4px}
-
-/* chips de filtro (Stripe) na tela Pedidos */
-.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--r-pill);
-  font-size:12.5px;font-weight:600;border:1px dashed var(--line-2);color:var(--ink-2)}
-.chip.on{border-style:solid;border-color:rgba(231,104,69,.5);background:var(--accent-soft);color:var(--accent-strong)}
-.chip .x{opacity:.7}
+/* ═══ BUSCA GLOBAL (Twilio side panel + trilha/contagem Stripe) ═══ */
+.search-backdrop{position:fixed;inset:0;background:rgba(10,21,48,.35);z-index:var(--z-modal);opacity:0;
+  pointer-events:none;transition:opacity var(--d1) var(--ease)}
+.search-panel{position:fixed;top:0;right:0;bottom:0;width:min(540px,100vw);z-index:var(--z-modal);
+  background:var(--surface-card);border-left:1px solid var(--border);box-shadow:var(--shadow-3);
+  transform:translateX(100%);transition:transform var(--d2) var(--ease);display:flex;flex-direction:column}
+body.search-open .search-backdrop{opacity:1;pointer-events:auto}
+body.search-open .search-panel{transform:translateX(0)}
+.search-head{padding:14px 16px;border-bottom:1px solid var(--border)}
+.search-input{display:flex;align-items:center;gap:10px;height:42px;padding:0 13px;border-radius:var(--r-sm);
+  background:var(--accent-soft);border:2px solid rgba(232,88,20,.5)}
+.search-input input{flex:1;border:0;background:none;font:inherit;font-size:15px;color:var(--text-primary);outline:none}
+.search-body{flex:1;overflow-y:auto;padding:10px 14px 20px}
+.search-hit{display:flex;flex-direction:column;gap:1px;width:100%;padding:9px 11px;border-radius:var(--r-sm);text-align:left}
+.search-hit:hover{background:var(--surface-hover)}
+.search-hit .h-title{font-weight:600;font-size:13.5px}
+.search-hit .h-path{font-size:11.5px;color:var(--text-faint)}
+.search-hit mark{background:var(--accent-soft);color:var(--text-accent);border-radius:2px}
+.skel{position:relative;overflow:hidden;background:var(--surface-pressed);border-radius:var(--r-xs)}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:shim 1.4s infinite}
+:root[data-theme="dark"] .skel::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent)}
+@keyframes shim{to{transform:translateX(100%)}}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,12px);z-index:var(--z-toast);background:var(--ink-900);
+  color:#EFF2F8;padding:9px 16px;border-radius:var(--r-pill);font-size:13px;font-weight:500;box-shadow:var(--shadow-3);
+  opacity:0;pointer-events:none;transition:opacity var(--d1) var(--ease),transform var(--d1) var(--ease)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
 </style>
 </head>
 <body>
-<div class="stage">
+<a class="skip-link" href="#main">Pular para o conteúdo</a>
 
-  <!-- Notas do conceito (lado esquerdo) -->
-  <div class="notes">
-    <div class="note">
-      <span class="note-kicker">Conceito</span>
-      <h1>Densidade<br>Controlada</h1>
-      <p>A densidade da tela é <b>função do momento da operação</b>, com override manual. O sistema sugere pelo relógio e pela fila; o usuário tem a palavra final.</p>
+<div class="app">
+  <!-- ═══ SIDEBAR: estrutura real do Web (MenuDefinition) ═══ -->
+  <aside class="sidebar">
+    <div class="side-brand">
+      <svg class="logo" viewBox="0 0 64 64" fill="none"><path d="M32 6 56 18 32 30 8 18Z" fill="#E85814"/><path d="M8 18 32 30 32 58 8 46Z" fill="#0E2A6E"/><path d="M56 18 32 30 32 58 56 46Z" fill="#06143A"/></svg>
+      <span class="name">Easy<span>Stok</span></span>
+      <span class="env">Homolog</span>
     </div>
-    <div class="note">
-      <span class="note-kicker">Os 3 níveis</span>
-      <ul>
-        <li><b>Foco</b> — uma coisa por vez. Pico do almoço, mão na massa, celular na bancada.</li>
-        <li><b>Operação</b> — a esteira inteira sem scroll. O default do dia.</li>
-        <li><b>Raio-X</b> — denso e tabular. Fechamento, comparativo, decisão.</li>
-      </ul>
+    <nav aria-label="Navegação principal">
+      <button class="nav-item active" data-view="dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <div class="nav-label">Meu dia</div>
+      <button class="nav-item" data-view="pedidos" style="padding-left:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/><circle cx="12" cy="12" r="3.2"/></svg>
+        Fila de hoje <span class="ct">3</span>
+      </button>
+      <details class="nav-group" open>
+        <summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M13 2 4.5 13.5H11l-1 8.5L18.5 10.5H12l1-8.5Z"/></svg>
+          Operação <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="sub">
+          <button class="nav-item" data-view="pedidos">Pedidos <span class="ct">3</span></button>
+          <button class="nav-item" data-view="pedidos">KDS Operação</button>
+          <button class="nav-item" data-view="pedidos">Caixa</button>
+          <button class="nav-item" data-view="pedidos">Clientes</button>
+          <button class="nav-item" data-view="pedidos">Cardápio</button>
+        </div>
+      </details>
+      <details class="nav-group">
+        <summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+          Produção e estoque <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="sub">
+          <button class="nav-item" data-view="estoque">Validade <span class="ct">2</span></button>
+          <button class="nav-item" data-view="estoque">Posição</button>
+          <button class="nav-item" data-view="estoque">Entradas</button>
+          <button class="nav-item" data-view="estoque">Saídas</button>
+          <button class="nav-item" data-view="estoque">Produtos</button>
+          <button class="nav-item" data-view="estoque">Categorias</button>
+        </div>
+      </details>
+      <details class="nav-group">
+        <summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+          Compras <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="sub">
+          <button class="nav-item" data-view="estoque">Pedidos de compra</button>
+          <button class="nav-item" data-view="estoque">Fornecedores</button>
+        </div>
+      </details>
+      <details class="nav-group">
+        <summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>
+          Financeiro <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="sub">
+          <button class="nav-item" data-view="estoque">Visão geral</button>
+          <button class="nav-item" data-view="estoque">Contas a receber</button>
+          <button class="nav-item" data-view="estoque">Contas a pagar</button>
+          <button class="nav-item" data-view="estoque">Notas fiscais</button>
+        </div>
+      </details>
+      <details class="nav-group">
+        <summary><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>
+          Crescimento <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="sub">
+          <button class="nav-item" data-view="estoque">Análises</button>
+          <button class="nav-item" data-view="estoque">Relatórios</button>
+          <button class="nav-item" data-view="estoque">Anúncios</button>
+        </div>
+      </details>
+    </nav>
+    <div class="side-foot">
+      <button class="nav-item" data-view="estoque">Dispositivos</button>
+      <button class="nav-item" data-view="estoque">Usuários</button>
+      <button class="nav-item" data-view="config">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        Configurações
+      </button>
     </div>
-    <div class="note">
-      <span class="note-kicker">Origem</span>
-      <p class="src">Stripe: “densidade calibrada por contexto — alta em tabelas, baixa em hubs e estados vazios”.<br>Twilio: “legibilidade acima de quantidade por tela”.<br>EasyStok: evolução do <code>cdb-ux-density</code> (calm/full) que já existe no PWA.</p>
-    </div>
-  </div>
+  </aside>
 
-  <!-- DEVICE -->
-  <div class="device">
-    <div class="screen" id="screen" data-density="operacao">
-      <div class="island"></div>
-      <div class="statusbar"><span>11:42</span><span style="letter-spacing:2px">●●●</span></div>
-
-      <!-- Header de momento -->
-      <div class="app-head">
-        <div class="head-row">
-          <span class="moment-eyebrow">Casa da Babá · <em id="phase-hint">sugestão: almoço</em></span>
-          <span class="env-tag">Homolog</span>
-        </div>
-        <div class="head-row">
-          <span class="moment-title" id="moment-title">Operação do almoço</span>
-        </div>
-        <div class="density" role="group" aria-label="Densidade da tela">
-          <button data-d="focus" aria-pressed="false" onclick="setDensity('focus')">Foco</button>
-          <button data-d="operacao" aria-pressed="true" onclick="setDensity('operacao')">Operação</button>
-          <button data-d="raiox" aria-pressed="false" onclick="setDensity('raiox')">Raio-X</button>
-        </div>
-        <!-- simulador de momento (só pra demo; na vida real é o relógio + fila) -->
-        <div class="chips" aria-label="Simular momento do dia">
-          <button class="chip" onclick="setPhase('preparo', this)">☀️ Preparo</button>
-          <button class="chip on" onclick="setPhase('operacao', this)">🍱 Pico</button>
-          <button class="chip" onclick="setPhase('fechamento', this)">🌙 Fechamento</button>
-        </div>
+  <!-- ═══ MAIN ═══ -->
+  <div class="main">
+    <header class="topbar">
+      <nav class="breadcrumb" aria-label="Trilha"><span id="bc-mod">Operação</span><span class="sep">›</span><b id="bc-page">Dashboard</b></nav>
+      <div class="spacer"></div>
+      <button class="search-trigger" onclick="openSearch()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Buscar <kbd>Ctrl K</kbd>
+      </button>
+      <!-- Densidade Controlada: controle do usuário, sempre à mão -->
+      <div class="density-toggle" role="group" aria-label="Densidade das telas">
+        <button data-d="comfort" aria-pressed="true" onclick="setDensity('comfort')" title="Confortável: mais respiro, foco em leitura">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          Confortável
+        </button>
+        <button data-d="compact" aria-pressed="false" onclick="setDensity('compact')" title="Compacto: mais dados por tela, pra quem opera no volume">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 9.5h16M4 14h16M4 18.5h16"/></svg>
+          Compacto
+        </button>
       </div>
+      <button class="icon-btn" aria-label="Notificações" onclick="toast('Painel de notificações')">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="dot" aria-hidden="true"></span>
+      </button>
+      <button class="icon-btn" aria-label="Alternar tema" onclick="toggleTheme()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+      <div class="avatar" title="Felipe Azevedo · Casa da Babá">FA</div>
+    </header>
 
-      <div class="content" id="main">
+    <main class="content" id="main">
 
-        <!-- ════ FASE: PREPARO ════ -->
-        <div class="phase" id="phase-preparo">
-          <div class="card">
-            <div class="card-label"><span>Produção de hoje</span><a href="#" onclick="toast('Abriria a calculadora');return false">Calculadora →</a></div>
-            <div class="prod-row">
-              <div class="prod-emoji">🍛</div>
-              <div class="prod-info"><div class="prod-name">Marmita frango grelhado</div><div class="prod-sub">Lote das 9h · validade 3 dias</div></div>
-              <div class="prod-qty"><span class="done">24</span>/30</div>
-            </div>
-            <div class="prod-row">
-              <div class="prod-emoji">🥩</div>
-              <div class="prod-info"><div class="prod-name">Marmita carne ao molho</div><div class="prod-sub">Lote das 9h30 · validade 3 dias</div></div>
-              <div class="prod-qty"><span class="done">18</span>/25</div>
-            </div>
-            <div class="prod-row">
-              <div class="prod-emoji">🍫</div>
-              <div class="prod-info"><div class="prod-name">Bolo de pote brigadeiro</div><div class="prod-sub">Geladeira 2 · validade 5 dias</div></div>
-              <div class="prod-qty">0/20</div>
-            </div>
+      <!-- ════ DASHBOARD — densidade baixa por padrão (tela de entrada) ════ -->
+      <section class="view" id="view-dashboard">
+        <span class="eyebrow">Meu dia · Casa da Babá</span>
+        <h1 style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin:4px 0 2px">Bom dia, Felipe</h1>
+        <p style="font-size:13px;color:var(--text-muted)">Sexta, 15 de agosto de 2026 · Caixa aberto desde 08h12</p>
+
+        <div class="kpi-grid" style="margin-top:18px">
+          <article class="kpi" style="--kpi-c:var(--navy-600)">
+            <div class="k-label">Vendas de hoje <span class="info-i" title="Pedidos entregues + vendas de balcão no dia">i</span></div>
+            <svg class="spark" width="72" height="24" viewBox="0 0 72 24"><polyline points="0,18 12,15 24,16 36,11 48,13 60,7 72,9" fill="none" stroke="var(--navy-500)" stroke-width="2"/></svg>
+            <div class="k-value mono">R$ 1.284</div>
+            <span class="k-delta up">▲ 12% <span class="vs">vs ontem</span></span>
+            <div class="k-foot"><span>Atualizado há 2 min</span><a href="#" onclick="show('estoque');return false">Detalhes →</a></div>
+          </article>
+          <article class="kpi" style="--kpi-c:var(--orange-600)">
+            <div class="k-label">Pedidos <span class="info-i" title="Todos os canais: iFood, balcão, WhatsApp">i</span></div>
+            <svg class="spark" width="72" height="24" viewBox="0 0 72 24"><polyline points="0,16 12,17 24,12 36,14 48,9 60,11 72,8" fill="none" stroke="var(--orange-600)" stroke-width="2"/></svg>
+            <div class="k-value mono">47</div>
+            <span class="k-delta up">▲ 8% <span class="vs">vs ontem</span></span>
+            <div class="k-foot"><span>3 aguardando agora</span><a href="#" onclick="show('pedidos');return false">Abrir fila →</a></div>
+          </article>
+          <article class="kpi" style="--kpi-c:var(--ok-600)">
+            <div class="k-label">Ticket médio <span class="info-i" title="Vendas ÷ pedidos">i</span></div>
+            <div class="k-value mono">R$ 27,32</div>
+            <span class="k-delta down">▼ 3% <span class="vs">vs ontem</span></span>
+            <div class="k-foot"><span>Atualizado há 2 min</span><a href="#" onclick="return false">Detalhes →</a></div>
+          </article>
+          <article class="kpi" style="--kpi-c:var(--warn-600)">
+            <div class="k-label">Validade <span class="info-i" title="Itens vencendo hoje ou amanhã">i</span></div>
+            <div class="k-value mono">15 <span style="font-size:14px;color:var(--text-faint)">un</span></div>
+            <span class="k-delta" style="color:var(--warn-700)">6 un vencem hoje</span>
+            <div class="k-foot"><span>Perda estimada R$ 41,20</span><a href="#" onclick="show('estoque');return false">Agir →</a></div>
+          </article>
+        </div>
+
+        <div class="alert" role="alert">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+          <p><b>Ontem ficou sem fechamento de caixa.</b> Feche antes das 22h pra manter a margem real do dia correta. <a href="#" onclick="return false" style="color:inherit;font-weight:700">Fechar agora →</a></p>
+        </div>
+
+        <div class="section">
+          <span class="eyebrow">Próximas ações</span>
+          <div class="hub-grid">
+            <button class="hub-card" onclick="show('pedidos')">
+              <span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4.5 13.5H11l-1 8.5L18.5 10.5H12l1-8.5Z"/></svg></span>
+              <span><span class="hc-title">3 pedidos aguardando preparo</span><span class="hc-desc">O mais antigo espera há 21 min. Abra a fila e comece por ele.</span></span>
+            </button>
+            <button class="hub-card" onclick="toast('2 insumos na lista de Compras')">
+              <span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg></span>
+              <span><span class="hc-title">2 insumos faltando pra produção</span><span class="hc-desc">Creme de leite e frango. Jogue em Compras com 1 clique.</span></span>
+            </button>
+            <button class="hub-card" onclick="show('estoque')">
+              <span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+              <span><span class="hc-title">6 itens vencem hoje</span><span class="hc-desc">Pudim do lote 12/08. Descarte ou promoção antes do fim do dia.</span></span>
+            </button>
           </div>
+        </div>
+      </section>
 
-          <div class="stock-warn">
-            <span class="sw-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span>
-            <p><b>Faltam 2 insumos</b> pra fechar a produção: creme de leite (6 cx) e frango (4 kg).</p>
-          </div>
-          <button class="btn btn-primary btn-block" onclick="toast('2 insumos na lista de Compras')">Jogar faltantes em Compras</button>
-
-          <div class="card">
-            <div class="card-label"><span>Validade pedindo atenção</span><a href="#" onclick="toast('Abriria Validade');return false">Ver tudo →</a></div>
-            <div class="prod-row">
-              <div class="prod-emoji">🍮</div>
-              <div class="prod-info"><div class="prod-name">Pudim · lote 12/08</div><div class="prod-sub" style="color:var(--crit-ink);font-weight:600">Vence hoje · 6 un</div></div>
-              <button class="btn btn-ghost" onclick="toast('Abriria descarte/promoção')">Agir</button>
+      <!-- ════ PEDIDOS — tela de AÇÃO: chips + tabela com ação primária ════ -->
+      <section class="view" id="view-pedidos" hidden>
+        <div class="page-head">
+          <div class="row">
+            <div>
+              <span class="eyebrow">Operação</span>
+              <h1>Pedidos</h1>
+              <p class="sub">Fila do dia em tempo real. Estado salvo na URL pra compartilhar a visão.</p>
             </div>
-            <div class="prod-row">
-              <div class="prod-emoji">🎂</div>
-              <div class="prod-info"><div class="prod-name">Bolo de cenoura · lote 13/08</div><div class="prod-sub" style="color:var(--gold-ink);font-weight:600">Vence amanhã · 9 fatias</div></div>
-              <button class="btn btn-ghost" onclick="toast('Abriria descarte/promoção')">Agir</button>
+            <button class="btn btn-primary" onclick="toast('Novo pedido (atalho: n)')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+              Novo pedido <kbd class="k">n</kbd>
+            </button>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Status">
+            <button class="tab" role="tab" aria-selected="true">Em andamento</button>
+            <button class="tab" role="tab" aria-selected="false">Finalizados</button>
+            <button class="tab" role="tab" aria-selected="false">Todos</button>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <button class="chip chip-add" onclick="applyChip(this,'Canal','iFood')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg> Canal
+          </button>
+          <button class="chip chip-add" onclick="applyChip(this,'Pagamento','Pix')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg> Pagamento
+          </button>
+          <button class="chip chip-add" onclick="applyChip(this,'Período','Hoje')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg> Período
+          </button>
+          <button class="chip chip-on"><span><span class="lbl">Status:</span> aguardando + preparando</span><span class="x" role="button" aria-label="Remover filtro" onclick="event.stopPropagation();this.closest('.chip').remove()">×</span></button>
+          <button class="filter-clear" onclick="document.querySelectorAll('#view-pedidos .chip-on').forEach(c=>c.remove());toast('Filtros limpos')">Limpar filtros</button>
+        </div>
+        <p class="result-count">8 resultados · atualizado agora</p>
+
+        <div class="table-card">
+          <table>
+            <thead><tr><th>Pedido</th><th>Cliente</th><th>Canal</th><th>Espera</th><th class="num-r">Total</th><th>Status</th><th style="text-align:right">Ação</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="cell-name">#1042</div><div class="cell-id">ped_9f2k1 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado: ped_9f2k1')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td>
+                <td>Maria Silva</td><td><span class="pill pill-crit">iFood</span></td>
+                <td><span class="mono" style="color:var(--crit-700);font-weight:600">21 min</span></td>
+                <td class="num-r">R$ 42,50</td><td><span class="pill pill-warn">aguardando</span></td>
+                <td style="text-align:right"><button class="btn btn-primary" style="height:30px;font-size:12.5px" onclick="toast('#1042 → preparando')">Preparar →</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-name">#1043</div><div class="cell-id">ped_8e1j0 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado: ped_8e1j0')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td>
+                <td>João Pedro</td><td><span class="pill pill-neutral">Balcão</span></td>
+                <td><span class="mono" style="color:var(--warn-700);font-weight:600">12 min</span></td>
+                <td class="num-r">R$ 28,90</td><td><span class="pill pill-warn">aguardando</span></td>
+                <td style="text-align:right"><button class="btn btn-primary" style="height:30px;font-size:12.5px" onclick="toast('#1043 → preparando')">Preparar →</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-name">#1044</div><div class="cell-id">ped_7d0h9 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado: ped_7d0h9')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td>
+                <td>Ana Costa</td><td><span class="pill pill-neutral">WhatsApp</span></td>
+                <td><span class="mono" style="color:var(--ok-700);font-weight:600">4 min</span></td>
+                <td class="num-r">R$ 51,00</td><td><span class="pill pill-warn">aguardando</span></td>
+                <td style="text-align:right"><button class="btn btn-primary" style="height:30px;font-size:12.5px" onclick="toast('#1044 → preparando')">Preparar →</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-name">#1041</div><div class="cell-id">ped_6c9g8 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado: ped_6c9g8')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td>
+                <td>Pedro Henrique</td><td><span class="pill pill-crit">iFood</span></td>
+                <td><span class="mono">9 min</span></td>
+                <td class="num-r">R$ 67,00</td><td><span class="pill pill-info">preparando</span></td>
+                <td style="text-align:right"><button class="btn btn-secondary" style="height:30px;font-size:12.5px" onclick="toast('#1041 → pronto')">Pronto ✓</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-name">#1040</div><div class="cell-id">ped_5b8f7 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado: ped_5b8f7')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td>
+                <td>Carla Martins</td><td><span class="pill pill-neutral">Balcão</span></td>
+                <td><span class="mono">14 min</span></td>
+                <td class="num-r">R$ 33,50</td><td><span class="pill pill-info">preparando</span></td>
+                <td style="text-align:right"><button class="btn btn-secondary" style="height:30px;font-size:12.5px" onclick="toast('#1040 → pronto')">Pronto ✓</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ════ ESTOQUE / POSIÇÃO — tela de ANÁLISE: aqui a densidade brilha ════ -->
+      <section class="view" id="view-estoque" hidden>
+        <div class="page-head">
+          <div class="row">
+            <div>
+              <span class="eyebrow">Produção e estoque</span>
+              <h1>Posição de estoque</h1>
+              <p class="sub">Alterne <b>Confortável/Compacto</b> na topbar: esta tela mostra a Densidade Controlada trabalhando.</p>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary" onclick="toast('Abriria entrada de estoque')">Dar entrada</button>
+              <button class="btn btn-primary" onclick="toast('Abriria cadastro de produto')">Novo produto <kbd class="k">n</kbd></button>
             </div>
           </div>
         </div>
 
-        <!-- ════ FASE: OPERAÇÃO (pico) ════ -->
-        <div class="phase active" id="phase-operacao">
-          <div class="ops-strip">
-            <div class="ops-stat hot"><div class="v num">3</div><div class="l">Aguardando</div></div>
-            <div class="ops-stat"><div class="v num">2</div><div class="l">Preparando</div></div>
-            <div class="ops-stat"><div class="v num">5</div><div class="l">Prontos</div></div>
-          </div>
+        <div class="filter-bar">
+          <button class="chip chip-add" onclick="applyChip(this,'Categoria','Insumos')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg> Categoria</button>
+          <button class="chip chip-add" onclick="applyChip(this,'Depósito','Geladeira 2')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg> Depósito</button>
+          <button class="chip chip-on"><span><span class="lbl">Alerta:</span> abaixo do mínimo</span><span class="x" role="button" aria-label="Remover filtro" onclick="event.stopPropagation();this.closest('.chip').remove()">×</span></button>
+          <button class="filter-clear" onclick="document.querySelectorAll('#view-estoque .chip-on').forEach(c=>c.remove());toast('Filtros limpos')">Limpar filtros</button>
+        </div>
+        <p class="result-count">23 itens · 2 abaixo do mínimo</p>
 
-          <!-- FOCO: só o próximo passo, gigante -->
-          <div class="focus-hero">
-            <span class="fh-label">Próximo pedido</span>
-            <div class="fh-num num">#1042</div>
-            <span class="fh-timer order-timer late">há 21 min</span>
-            <p class="fh-items"><b>2×</b> Marmita frango grelhado<br><b>1×</b> Bolo de pote brigadeiro<br><b>1×</b> Guaraná lata</p>
-            <button class="btn btn-primary" onclick="toast('#1042 foi pro preparo')">Começar preparo →</button>
-            <span class="focus-next">Depois: #1043 (há 12 min) · #1044 (há 4 min)</span>
-          </div>
-
-          <!-- OPERAÇÃO: a esteira inteira -->
-          <div class="lane-wrap">
-            <div class="lane-label wait">Aguardando <span class="n">3</span></div>
-            <div class="order">
-              <div class="order-top">
-                <span class="order-num num">#1042</span>
-                <span class="order-timer late">há 21 min</span>
-                <span class="order-channel channel ifood">iFood</span>
-              </div>
-              <p class="order-items"><b>2×</b> Marmita frango · <b>1×</b> Bolo de pote · <b>1×</b> Guaraná</p>
-              <div class="order-act">
-                <button class="btn btn-primary" onclick="toast('#1042 foi pro preparo')">Começar preparo →</button>
-                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
-              </div>
-            </div>
-            <div class="order compactable">
-              <div class="order-top">
-                <span class="order-num num">#1043</span>
-                <span class="order-timer warn">há 12 min</span>
-                <span class="order-channel channel">Balcão</span>
-              </div>
-              <p class="order-items"><b>1×</b> Marmita carne ao molho · <b>1×</b> Pudim</p>
-              <div class="order-act">
-                <button class="btn btn-primary" onclick="toast('#1043 foi pro preparo')">Começar preparo →</button>
-                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
-              </div>
-            </div>
-            <div class="order compactable">
-              <div class="order-top">
-                <span class="order-num num">#1044</span>
-                <span class="order-timer fresh">há 4 min</span>
-                <span class="order-channel channel">WhatsApp</span>
-              </div>
-              <p class="order-items"><b>3×</b> Marmita frango · <b>2×</b> Suco natural</p>
-              <div class="order-act">
-                <button class="btn btn-primary" onclick="toast('#1044 foi pro preparo')">Começar preparo →</button>
-                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
-              </div>
-            </div>
-
-            <div class="lane-label doing">Preparando <span class="n">2</span></div>
-            <div class="order compactable">
-              <div class="order-top">
-                <span class="order-num num">#1041</span>
-                <span class="order-timer warn">há 9 min</span>
-                <span class="order-channel channel ifood">iFood</span>
-              </div>
-              <p class="order-items"><b>1×</b> Marmita carne · <b>1×</b> Bolo de pote</p>
-              <div class="order-act">
-                <button class="btn btn-primary" style="background:var(--basil);color:#06251C" onclick="toast('#1041 está pronto')">Marcar pronto ✓</button>
-                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
-              </div>
-            </div>
-
-            <div class="lane-label done">Prontos <span class="n">5</span></div>
-            <div class="empty">
-              <div class="e-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></div>
-              <h3>Esteira limpa</h3>
-              <p>Todos os prontos já foram entregues ou aguardam o motoboy.</p>
-              <a href="#" onclick="toast('Abriria Finalizados');return false">Ver finalizados →</a>
-            </div>
-          </div>
-
-          <!-- RAIO-X: denso e tabular -->
-          <div class="rx-list card" style="padding:8px 14px">
-            <div class="card-label" style="margin:4px 0 2px"><span>Fila em Raio-X</span><span class="num" style="color:var(--ink-3)">10 pedidos</span></div>
-            <div class="rx-row"><span class="mono">#1042</span><span>Maria S. · iFood</span><span class="mono" style="color:var(--crit-ink)">21 min</span><span class="pill-mini" style="color:var(--gold-ink)">aguardando</span></div>
-            <div class="rx-row"><span class="mono">#1043</span><span>João P. · Balcão</span><span class="mono" style="color:var(--gold-ink)">12 min</span><span style="color:var(--gold-ink)">aguardando</span></div>
-            <div class="rx-row"><span class="mono">#1044</span><span>Ana C. · WhatsApp</span><span class="mono" style="color:var(--basil-ink)">4 min</span><span style="color:var(--gold-ink)">aguardando</span></div>
-            <div class="rx-row"><span class="mono">#1041</span><span>Pedro H. · iFood</span><span class="mono">9 min</span><span style="color:var(--accent-strong)">preparando</span></div>
-            <div class="rx-row"><span class="mono">#1040</span><span>Carla M. · Balcão</span><span class="mono">14 min</span><span style="color:var(--accent-strong)">preparando</span></div>
-            <div class="rx-row"><span class="mono">#1039</span><span>Rui A. · iFood</span><span class="mono">—</span><span style="color:var(--basil-ink)">pronto</span></div>
-            <div class="rx-row" style="border-bottom:0"><span class="mono">#1038</span><span>Bia T. · WhatsApp</span><span class="mono">—</span><span style="color:var(--basil-ink)">pronto</span></div>
-          </div>
+        <div class="table-card">
+          <table>
+            <thead><tr><th>Produto</th><th>Categoria</th><th class="num-r">Em estoque</th><th class="num-r">Mínimo</th><th class="num-r">Custo un.</th><th>Validade</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><div class="cell-name">Creme de leite caixa 200g</div><div class="cell-id">ins_4x7q2 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado: ins_4x7q2')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td><td>Laticínios</td><td class="num-r" style="color:var(--crit-700);font-weight:600">2 cx</td><td class="num-r">8 cx</td><td class="num-r">R$ 3,40</td><td>22 ago</td><td><span class="pill pill-crit">abaixo do mínimo</span></td></tr>
+              <tr><td><div class="cell-name">Peito de frango resfriado</div><div class="cell-id">ins_3w6p1 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td><td>Carnes</td><td class="num-r" style="color:var(--crit-700);font-weight:600">1,5 kg</td><td class="num-r">5 kg</td><td class="num-r">R$ 18,90</td><td>18 ago</td><td><span class="pill pill-crit">abaixo do mínimo</span></td></tr>
+              <tr><td><div class="cell-name">Arroz branco tipo 1</div><div class="cell-id">ins_2v5n0 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td><td>Grãos</td><td class="num-r">12 kg</td><td class="num-r">5 kg</td><td class="num-r">R$ 6,20</td><td>04 out</td><td><span class="pill pill-ok">ok</span></td></tr>
+              <tr><td><div class="cell-name">Pudim · lote 12/08</div><div class="cell-id">lot_1u4m9 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td><td>Sobremesas</td><td class="num-r">6 un</td><td class="num-r">—</td><td class="num-r">R$ 4,10</td><td style="color:var(--crit-700);font-weight:600">hoje</td><td><span class="pill pill-crit">vence hoje</span></td></tr>
+              <tr><td><div class="cell-name">Bolo de cenoura · lote 13/08</div><div class="cell-id">lot_9t3l8 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td><td>Sobremesas</td><td class="num-r">9 fatias</td><td class="num-r">—</td><td class="num-r">R$ 2,80</td><td style="color:var(--warn-700);font-weight:600">amanhã</td><td><span class="pill pill-warn">vence amanhã</span></td></tr>
+              <tr><td><div class="cell-name">Queijo mussarela fatiado</div><div class="cell-id">ins_8s2k7 <button class="copy-btn" aria-label="Copiar ID" onclick="toast('Copiado')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div></td><td>Laticínios</td><td class="num-r">3,2 kg</td><td class="num-r">2 kg</td><td class="num-r">R$ 42,00</td><td>30 ago</td><td><span class="pill pill-ok">ok</span></td></tr>
+            </tbody>
+          </table>
         </div>
 
-        <!-- ════ FASE: FECHAMENTO ════ -->
-        <div class="phase" id="phase-fechamento">
-          <div class="card">
-            <div class="card-label"><span>Caixa de hoje</span><span style="color:var(--basil-ink);letter-spacing:0;text-transform:none;font-size:12px">aberto desde 08h12</span></div>
-            <div class="cash-big num">R$ 1.782,40</div>
-            <div class="cash-sub">Saldo em caixa · <span class="delta up">▲ 12% vs ontem</span></div>
-            <div class="comp-bar">
-              <div style="width:68%;background:var(--basil)"></div>
-              <div style="width:21%;background:var(--gold)"></div>
-              <div style="width:11%;background:var(--crit)"></div>
+        <!-- Empty state (Stripe) — aparece quando o filtro não retorna nada -->
+        <div class="table-card" style="margin-top:16px">
+          <div class="empty">
+            <div class="e-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div>
+            <h2>Cadastre o primeiro insumo do depósito</h2>
+            <p>Com o estoque cadastrado, a calculadora de produção aponta o que falta antes de você começar a cozinhar.</p>
+            <div class="e-actions">
+              <button class="btn btn-primary" onclick="toast('Abriria cadastro')">Cadastrar insumo</button>
+              <a href="#" onclick="toast('Abriria a ajuda');return false">Saiba mais →</a>
             </div>
-            <div class="legend">
-              <div class="legend-row"><i style="background:var(--basil)"></i>Entradas <span class="v">R$ 1.902,00</span></div>
-              <div class="legend-row"><i style="background:var(--gold)"></i>Saídas <span class="v">R$ 219,60</span></div>
-              <div class="legend-row"><i style="background:var(--crit)"></i>Sangria <span class="v">R$ 100,00</span></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-label"><span>O dia em números</span></div>
-            <div class="legend">
-              <div class="legend-row">Pedidos entregues <span class="v">47</span></div>
-              <div class="legend-row">Ticket médio <span class="v">R$ 37,92 <span class="delta up" style="font-family:'Inter'">▲ 4%</span></span></div>
-              <div class="legend-row">Margem real do dia <span class="v" style="color:var(--basil-ink)">31,4%</span></div>
-              <div class="legend-row">Perdas (validade) <span class="v" style="color:var(--crit-ink)">R$ 41,20</span></div>
-            </div>
-          </div>
-
-          <button class="btn btn-primary btn-block" onclick="toast('Dia fechado. Resumo enviado.')">Fechar o dia</button>
-        </div>
-
-        <!-- ════ TELA: PEDIDOS (lista densa + chips Stripe) ════ -->
-        <div class="phase" id="phase-pedidos">
-          <div class="chips">
-            <button class="chip on">Status: Todos <span class="x">×</span></button>
-            <button class="chip" onclick="this.classList.toggle('on')">+ Canal</button>
-            <button class="chip" onclick="this.classList.toggle('on')">+ Período</button>
-            <button class="chip" onclick="this.classList.toggle('on')">+ Pagamento</button>
-          </div>
-          <p style="font-size:12px;color:var(--ink-3);margin:2px 2px 8px">8 resultados</p>
-          <div class="card" style="padding:6px 14px">
-            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1042 · Maria Silva</div><div class="prod-sub">iFood · há 21 min · <span style="color:var(--gold-ink)">aguardando</span></div></div><div class="prod-qty">R$ 42,50</div></div>
-            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1041 · João Pedro</div><div class="prod-sub">Balcão · há 32 min · <span style="color:var(--accent-strong)">preparando</span></div></div><div class="prod-qty">R$ 28,90</div></div>
-            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1040 · Ana Costa</div><div class="prod-sub">iFood · há 41 min · <span style="color:var(--basil-ink)">pronto</span></div></div><div class="prod-qty">R$ 67,00</div></div>
-            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1039 · Carlos Lima</div><div class="prod-sub">WhatsApp · há 55 min · <span style="color:var(--basil-ink)">entregue</span></div></div><div class="prod-qty">R$ 19,50</div></div>
-            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1038 · Beatriz Reis</div><div class="prod-sub">Balcão · há 1h02 · <span style="color:var(--basil-ink)">entregue</span></div></div><div class="prod-qty">R$ 51,00</div></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- TAB BAR -->
-      <nav class="tabbar" aria-label="Navegação principal">
-        <button class="on" onclick="setTab(this,'operacao')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M13 2 4.5 13.5H11l-1 8.5L18.5 10.5H12l1-8.5Z"/></svg>Agora</button>
-        <button onclick="setTab(this,'pedidos')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 2 4 6v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4H6Z"/><path d="M4 6h16"/></svg>Pedidos<span class="t-badge">3</span></button>
-        <button onclick="setTab(this,'preparo')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 13.5V3.5M18 3.5v17M13 8h5m-5 4h5"/></svg>Produção</button>
-        <button onclick="setTab(this,'fechamento')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>Caixa</button>
-        <button onclick="toast('Menu Mais')"><svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>Mais</button>
-      </nav>
-    </div>
-  </div>
+      <!-- ════ CONFIGURAÇÕES — hub (Stripe/Twilio) ════ -->
+      <section class="view" id="view-config" hidden>
+        <span class="eyebrow">Administração</span>
+        <h1 style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin:4px 0 2px">Configurações</h1>
+        <p style="font-size:13px;color:var(--text-muted)">Cada cartão explica o que você resolve ali antes de clicar.</p>
 
-  <!-- Notas da aplicação (lado direito) -->
-  <div class="notes right">
-    <div class="note">
-      <span class="note-kicker">Aplicação do conceito</span>
-      <ul>
-        <li><b>Mesma tela, 3 comportamentos:</b> a esteira vira herói único em Foco, board em Operação e tabela tabular em Raio-X.</li>
-        <li><b>O sistema sugere:</b> 7h → Preparo, 11h → Operação em Foco, 18h → Fechamento em Raio-X. Badge “sugestão” no seletor.</li>
-        <li><b>O usuário controla:</b> o seletor fica no topo, persiste por dispositivo, e vence a sugestão.</li>
-      </ul>
-    </div>
-    <div class="note">
-      <span class="note-kicker">Contexto Casa da Babá</span>
-      <ul>
-        <li>Timer do pedido muda de cor pela espera: verde → âmbar → vermelho.</li>
-        <li>Ação primária sempre em full-width, alvo ≥ 44px: mão suja, luva, pressa.</li>
-        <li>Empty state trabalha: esteira limpa sugere adiantar produção.</li>
-        <li>Fechamento responde o que importa: margem real e perda do dia.</li>
-      </ul>
-    </div>
-    <div class="note">
-      <span class="note-kicker">Teste ao vivo</span>
-      <p>Alterne <b>Foco / Operação / Raio-X</b> no topo do aparelho e os chips de momento (☀️ 🍱 🌙) para simular o dia.</p>
-    </div>
+        <div class="section"><span class="eyebrow">Pessoal</span>
+          <div class="hub-grid">
+            <button class="hub-card" onclick="toast('Abriria Perfil')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg></span><span><span class="hc-title">Perfil e acesso</span><span class="hc-desc">Seus dados, senha e sessões ativas nos dispositivos.</span></span></button>
+            <button class="hub-card" onclick="toast('Abriria Notificações')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span><span class="hc-title">Notificações</span><span class="hc-desc">O que chega por push, e-mail e no sino da topbar.</span></span></button>
+          </div>
+        </div>
+        <div class="section"><span class="eyebrow">Da empresa</span>
+          <div class="hub-grid">
+            <button class="hub-card" onclick="toast('Abriria Empresa')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1M9 13h1m4 0h1"/></svg></span><span><span class="hc-title">Empresa e lojas</span><span class="hc-desc">Razão social, CNPJ e as lojas que operam no sistema.</span></span></button>
+            <button class="hub-card" onclick="toast('Abriria Usuários')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.3 2.9-5 6.5-5s6.5 1.7 6.5 5M16 4.5a3.5 3.5 0 0 1 0 7"/></svg></span><span><span class="hc-title">Usuários e permissões</span><span class="hc-desc">Convide a equipe e defina o que cada papel pode fazer.</span></span></button>
+            <button class="hub-card" onclick="toast('Abriria Assinatura')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span><span><span class="hc-title">Assinatura e cobrança</span><span class="hc-desc">Plano atual, próximas faturas e forma de pagamento.</span></span></button>
+          </div>
+        </div>
+        <div class="section"><span class="eyebrow">Do produto</span>
+          <div class="hub-grid">
+            <button class="hub-card" onclick="toast('Abriria Impressão')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span><span><span class="hc-title">Impressão e etiquetas</span><span class="hc-desc">Cupom, etiqueta de validade e layout de impressão.</span></span></button>
+            <button class="hub-card" onclick="toast('Abriria Integrações')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><span><span class="hc-title">Integrações</span><span class="hc-desc">iFood, WhatsApp e as chaves de API do cardápio digital.</span></span></button>
+            <button class="hub-card" onclick="toast('Abriria Fiscal')"><span class="hc-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg></span><span><span class="hc-title">Fiscal</span><span class="hc-desc">Emitente NFC-e, certificado digital e numeração de série.</span></span></button>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 </div>
 
+<!-- ═══ BUSCA GLOBAL ═══ -->
+<div class="search-backdrop" onclick="closeSearch()"></div>
+<aside class="search-panel" role="dialog" aria-modal="true" aria-label="Busca global">
+  <div class="search-head">
+    <div class="search-input">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search-input" type="search" placeholder="Buscar telas, pedidos, produtos, ajuda…" aria-label="Buscar" autocomplete="off">
+      <kbd class="k">esc</kbd>
+    </div>
+  </div>
+  <div class="search-body" id="search-body"></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script>
-/* ═══ DENSIDADE CONTROLADA ═══
-   Sistema sugere pelo momento; usuário controla. Persiste por dispositivo
-   (evolução do cdb-ux-density calm/full que já existe no PWA). */
-const screenEl = document.getElementById('screen');
-const PHASE_META = {
-  preparo:     { title:'Preparo da manhã',   hint:'sugestão: preparo',   dens:'operacao' },
-  operacao:    { title:'Operação do almoço', hint:'sugestão: pico',      dens:'focus'    },
-  fechamento:  { title:'Fechamento do dia',  hint:'sugestão: gestão',    dens:'raiox'    },
-  pedidos:     { title:'Pedidos',            hint:'lista completa',      dens:'operacao' },
-};
-let userLockedDensity = null;
-try { userLockedDensity = localStorage.getItem('cdb-density-v2'); } catch(e) {}
-
-function setDensity(d, fromUser = true){
-  if(fromUser){ userLockedDensity = d; try{ localStorage.setItem('cdb-density-v2', d); }catch(e){} }
-  screenEl.dataset.density = d;
-  document.querySelectorAll('.density button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === d));
-}
-function markSuggested(d){
-  document.querySelectorAll('.density .suggested').forEach(s => s.remove());
-  const btn = document.querySelector(`.density button[data-d="${d}"]`);
-  if(btn){ const tag = document.createElement('span'); tag.className = 'suggested'; tag.textContent = 'sugerido'; btn.appendChild(tag); }
-}
-function setPhase(phase, chipEl){
-  document.querySelectorAll('.phase').forEach(p => p.classList.toggle('active', p.id === 'phase-' + phase));
-  const meta = PHASE_META[phase];
-  if(meta){
-    document.getElementById('moment-title').textContent = meta.title;
-    document.getElementById('phase-hint').textContent = meta.hint;
-    markSuggested(meta.dens);
-    if(!userLockedDensity) setDensity(meta.dens, false);
-  }
-  document.querySelectorAll('.chips [onclick^="setPhase"], .chips button').forEach(c => {
-    if(c.getAttribute('onclick')?.startsWith('setPhase')) c.classList.toggle('on', c === chipEl);
+/* ═══ NAVEGAÇÃO ═══ */
+const VIEWS = { dashboard:['Meu dia','Dashboard'], pedidos:['Operação','Pedidos'], estoque:['Produção e estoque','Posição de estoque'], config:['Administração','Configurações'] };
+function show(v){
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.id !== 'view-'+v);
+  document.querySelectorAll('.nav-item[data-view]').forEach(b => {
+    const on = b.dataset.view === v;
+    b.classList.toggle('active', on);
+    if(on) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    if(on && b.closest('.nav-group')) b.closest('.nav-group').open = true;
   });
+  const [mod, page] = VIEWS[v] || ['EasyStok', v];
+  document.getElementById('bc-mod').textContent = mod;
+  document.getElementById('bc-page').textContent = page;
+  document.title = page + ' · EasyStok [Homolog]';
   document.getElementById('main').scrollTop = 0;
-  syncTabbar(phase);
 }
-function setTab(btn, phase){
-  setPhase(phase, null);
-  syncTabbar(phase);
-}
-function syncTabbar(phase){
-  const map = { operacao:0, pedidos:1, preparo:2, fechamento:3 };
-  document.querySelectorAll('.tabbar button').forEach((b,i) => b.classList.toggle('on', i === (map[phase] ?? -1)));
-}
+document.querySelectorAll('.nav-item[data-view]').forEach(b => b.addEventListener('click', () => show(b.dataset.view)));
 
-/* toast mínimo */
+/* ═══ DENSIDADE CONTROLADA (ERP): controle do usuário, persistido ═══
+   No ERP o conceito vira: telas de AÇÃO (Pedidos, Caixa, KDS) nascem
+   confortáveis; telas de ANÁLISE (Estoque, Financeiro, Relatórios) aceitam
+   compacto; o usuário trava o padrão dele e o sistema lembra. */
+function setDensity(d){
+  document.documentElement.dataset.density = d;
+  document.querySelectorAll('.density-toggle button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === d));
+  try{ localStorage.setItem('es-density', d); }catch(e){}
+  toast(d === 'compact' ? 'Densidade compacta: mais linhas por tela' : 'Densidade confortável: mais respiro');
+}
+try{ const d = localStorage.getItem('es-density'); if(d) setDensity(d); }catch(e){}
+
+/* ═══ TEMA ═══ */
+function toggleTheme(){
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try{ localStorage.setItem('es-theme', next); }catch(e){}
+}
+try{
+  const t = localStorage.getItem('es-theme');
+  if(t) document.documentElement.dataset.theme = t;
+  else if(matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+}catch(e){}
+
+/* ═══ TOAST ═══ */
 let tt;
 function toast(msg){
-  let t = document.getElementById('toast');
-  if(!t){
-    t = document.createElement('div'); t.id = 'toast';
-    t.style.cssText = 'position:absolute;bottom:96px;left:50%;transform:translate(-50%,10px);background:#2F2519;color:#F7F2E8;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;transition:all .2s cubic-bezier(.4,0,.2,1);z-index:70;pointer-events:none;white-space:nowrap';
-    screenEl.appendChild(t);
-  }
-  t.textContent = msg;
-  requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translate(-50%,0)'; });
-  clearTimeout(tt); tt = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translate(-50%,10px)'; }, 2200);
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-/* boot: fase do pico, densidade sugerida (ou a que o usuário travou) */
-setPhase('operacao', document.querySelectorAll('.app-head .chips .chip')[1]);
-if(userLockedDensity) setDensity(userLockedDensity, false);
+/* ═══ CHIPS ═══ */
+function applyChip(btn, label, value){
+  const chip = document.createElement('button');
+  chip.className = 'chip chip-on';
+  chip.innerHTML = `<span><span class="lbl">${label}:</span> ${value}</span><span class="x" role="button" aria-label="Remover filtro ${label}">×</span>`;
+  chip.querySelector('.x').onclick = ev => { ev.stopPropagation(); chip.remove(); };
+  btn.parentNode.insertBefore(chip, btn.parentNode.querySelector('.filter-clear'));
+}
+
+/* ═══ BUSCA GLOBAL — trilha + contagem + quick links ═══ */
+const INDEX = [
+  {t:'Novo pedido',            p:'Operação > Pedidos',          g:'Ações'},
+  {t:'Dar entrada no estoque', p:'Produção e estoque > Entradas', g:'Ações'},
+  {t:'Cadastrar produto',      p:'Produção e estoque > Produtos', g:'Ações'},
+  {t:'Fechar o caixa',         p:'Operação > Caixa',            g:'Ações'},
+  {t:'Fila de pedidos',        p:'Operação > Pedidos',          g:'Ir para', v:'pedidos'},
+  {t:'Validade e perdas',      p:'Produção e estoque > Validade', g:'Ir para', v:'estoque'},
+  {t:'Posição de estoque',     p:'Produção e estoque > Posição',  g:'Ir para', v:'estoque'},
+  {t:'Contas a receber',       p:'Financeiro > Contas a receber', g:'Ir para'},
+  {t:'Pedido #1042 · Maria Silva', p:'Operação > Pedidos > Hoje', g:'Registros', v:'pedidos'},
+  {t:'Creme de leite caixa 200g',  p:'Produção e estoque > Posição > Laticínios', g:'Registros', v:'estoque'},
+  {t:'Como funciona o fechamento de caixa?', p:'Ajuda > Operação', g:'Ajuda'},
+  {t:'Configurar impressora de etiquetas',   p:'Ajuda > Configurações', g:'Ajuda'},
+];
+function openSearch(){ document.body.classList.add('search-open'); renderSearch(''); setTimeout(() => document.getElementById('search-input').focus(), 60); }
+function closeSearch(){ document.body.classList.remove('search-open'); }
+function esc(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function mark(text, q){
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if(i < 0 || !q) return esc(text);
+  return esc(text.slice(0,i)) + '<mark>' + esc(text.slice(i,i+q.length)) + '</mark>' + esc(text.slice(i+q.length));
+}
+function renderSearch(q){
+  const body = document.getElementById('search-body');
+  if(!q){
+    body.innerHTML = '<div style="margin-top:8px"><span class="eyebrow">Atalhos rápidos</span>' +
+      INDEX.filter(i => i.g === 'Ações').map(i =>
+        `<button class="search-hit" onclick="closeSearch();toast('${i.t}')"><span class="h-title">${esc(i.t)}</span><span class="h-path">${esc(i.p)}</span></button>`).join('') + '</div>';
+    return;
+  }
+  const hits = INDEX.filter(i => (i.t + ' ' + i.p).toLowerCase().includes(q.toLowerCase()));
+  const groups = [...new Set(hits.map(h => h.g))];
+  body.innerHTML = `<p class="result-count" style="margin-top:8px">${hits.length} resultado${hits.length===1?'':'s'}</p>` +
+    (groups.map(g => `<div style="margin-top:12px"><span class="eyebrow">${esc(g)}</span>` +
+      hits.filter(h => h.g === g).map(h =>
+        `<button class="search-hit" onclick="closeSearch();${h.v ? `show('${h.v}')` : `toast('${esc(h.t)}')`}"><span class="h-title">${mark(h.t,q)}</span><span class="h-path">${mark(h.p,q)}</span></button>`).join('') + '</div>').join('')
+    || '<p style="color:var(--text-muted);padding:14px 4px;font-size:13px">Nada encontrado. Tente “pedido”, “estoque”, “caixa”.</p>');
+}
+document.getElementById('search-input').addEventListener('input', e => renderSearch(e.target.value.trim()));
+
+/* ═══ TECLADO: Ctrl+K, Esc, acordes ═══ */
+let chord = null;
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){ closeSearch(); return; }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); openSearch(); return; }
+  if(e.target.matches('input,select,textarea')) return;
+  if(chord === 'g'){
+    const map = { d:'dashboard', p:'pedidos', e:'estoque', c:'config' };
+    if(map[e.key.toLowerCase()]) show(map[e.key.toLowerCase()]);
+    chord = null; return;
+  }
+  if(e.key.toLowerCase() === 'g'){ chord = 'g'; setTimeout(() => chord = null, 900); }
+  if(e.key.toLowerCase() === 'n') toast('Novo (atalho n): ação primária da tela atual');
+});
 </script>
 </body>
 </html>

@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casa da Babá — Densidade Controlada (protótipo)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   TOKENS — alma dark-warm do PWA real (terracota/basil/gold),
+   com a disciplina de tokens dos estudos: semântico antes de
+   primitivo, estado como contrato, uma curva de motion só.
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#131009; --surface:#1C1610; --surface-2:#251D14; --surface-3:#2F2519;
+  --ink:#F7F2E8; --ink-2:#CFC5B4; --ink-3:#94886F;
+  --accent:#E76845; --accent-strong:#F08A68; --accent-soft:rgba(231,104,69,.14); --accent-softer:rgba(231,104,69,.07);
+  --btn:#D6552F; --btn-hover:#C24A26; --btn-pressed:#A93E1F;
+  --basil:#4FBF9F; --basil-soft:rgba(79,191,159,.13); --basil-ink:#7FD8BC;
+  --gold:#F0B84A; --gold-soft:rgba(240,184,74,.13); --gold-ink:#F5CB7C;
+  --crit:#E05B4B; --crit-soft:rgba(224,91,75,.14); --crit-ink:#F0927F;
+  --line:rgba(247,242,232,.09); --line-2:rgba(247,242,232,.17);
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.30);
+  --shadow-lg:0 2px 4px rgba(0,0,0,.4),0 20px 48px rgba(0,0,0,.42);
+  --ease:cubic-bezier(.4,0,.2,1); --d1:150ms; --d2:300ms;
+  --r-s:10px; --r-m:14px; --r-l:20px; --r-pill:999px;
+  /* escala de densidade — multiplicador único, tudo deriva dele */
+  --dens:1;
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent-strong);outline-offset:-2px;border-radius:8px}
+body{font-family:'Inter',system-ui,sans-serif;background:#0C0A07;color:var(--ink);
+  -webkit-font-smoothing:antialiased;min-height:100vh}
+.num{font-variant-numeric:tabular-nums}
+
+/* ═══ STAGE (apresentação em desktop; some no celular) ═══ */
+.stage{min-height:100vh;display:grid;grid-template-columns:1fr auto 1fr;gap:56px;align-items:center;
+  justify-items:center;padding:48px 24px;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(231,104,69,.08), transparent 60%),
+    radial-gradient(900px 500px at 90% 110%, rgba(240,184,74,.05), transparent 60%),
+    #0C0A07}
+.notes{max-width:330px;display:flex;flex-direction:column;gap:18px}
+.notes.right{text-align:left}
+.note-kicker{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.note h1{font-size:30px;line-height:1.12;font-weight:900;letter-spacing:-.03em;margin:6px 0 10px}
+.note p{font-size:13.5px;line-height:1.6;color:var(--ink-2)}
+.note p b{color:var(--ink)}
+.note li{font-size:13px;line-height:1.55;color:var(--ink-2);margin:7px 0 7px 18px}
+.note li b{color:var(--ink)}
+.note .src{font-size:11px;color:var(--ink-3);margin-top:2px}
+
+/* ═══ DEVICE FRAME ═══ */
+.device{width:393px;height:820px;border-radius:52px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #2a231b,0 40px 90px rgba(0,0,0,.65),0 0 120px rgba(231,104,69,.07)}
+.screen{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;
+  background:var(--bg);display:flex;flex-direction:column}
+.statusbar{height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:0 26px;font-size:13px;font-weight:600}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:110px;height:28px;
+  border-radius:20px;background:#000;z-index:60}
+@media (max-width:1180px){.stage{grid-template-columns:1fr;gap:36px}.notes{max-width:560px}}
+@media (max-width:520px){
+  .stage{padding:0;display:block;background:var(--bg)}
+  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none}
+  .screen{border-radius:0}.island,.notes{display:none}
+}
+</style>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   O APP — header de momento + conteúdo por fase + tab bar
+   ══════════════════════════════════════════════════════════════ */
+.app-head{flex-shrink:0;padding:6px 18px 12px;display:flex;flex-direction:column;gap:12px}
+.head-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.moment-eyebrow{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.moment-eyebrow em{font-style:normal;color:var(--gold)}      /* fase sugerida pelo relógio */
+.moment-title{font-size:calc(24px * var(--dens));font-weight:900;letter-spacing:-.03em;line-height:1.1}
+.env-tag{align-self:center;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--gold-ink);background:var(--gold-soft);border:1px solid rgba(240,184,74,.3);
+  padding:3px 8px;border-radius:var(--r-pill)}
+
+/* Seletor de densidade — o conceito em 1 componente: sistema sugere, usuário controla */
+.density{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-pill);padding:4px}
+.density button{position:relative;height:34px;border-radius:var(--r-pill);font-size:12.5px;font-weight:700;
+  color:var(--ink-3);transition:color var(--d1) var(--ease),background var(--d1) var(--ease)}
+.density button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-strong);
+  box-shadow:inset 0 0 0 1px rgba(231,104,69,.35)}
+.density .suggested{position:absolute;top:-7px;right:8px;font-size:8.5px;font-weight:800;letter-spacing:.06em;
+  text-transform:uppercase;background:var(--gold);color:#241A06;padding:1px 6px;border-radius:var(--r-pill)}
+
+.content{flex:1;overflow-y:auto;padding:2px 14px 16px;scrollbar-width:none}
+.content::-webkit-scrollbar{display:none}
+.phase{display:none;flex-direction:column;gap:calc(12px * var(--dens))}
+.phase.active{display:flex}
+
+/* ═══ CARDS BASE ═══ */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);
+  padding:calc(16px * var(--dens))}
+.card-label{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.card-label a{color:var(--accent-strong);font-weight:700;letter-spacing:0;text-transform:none;font-size:12.5px}
+
+/* ═══ FASE PREPARO ═══ */
+.prod-row{display:flex;align-items:center;gap:12px;padding:calc(10px * var(--dens)) 0;border-bottom:1px solid var(--line)}
+.prod-row:last-child{border-bottom:0}
+.prod-emoji{width:40px;height:40px;border-radius:var(--r-s);background:var(--surface-2);display:grid;
+  place-items:center;font-size:20px;flex-shrink:0}
+.prod-info{flex:1;min-width:0}
+.prod-name{font-weight:600;font-size:14.5px}
+.prod-sub{font-size:12px;color:var(--ink-3);margin-top:1px}
+.prod-qty{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;color:var(--ink)}
+.prod-qty .done{color:var(--basil-ink)}
+.stock-warn{display:flex;gap:10px;align-items:center;background:var(--crit-soft);
+  border:1px solid rgba(224,91,75,.25);border-radius:var(--r-m);padding:12px 14px}
+.stock-warn .sw-icon{color:var(--crit-ink);flex-shrink:0}
+.stock-warn p{font-size:13px;line-height:1.4;color:var(--ink-2)}
+.stock-warn p b{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r-m);
+  font-weight:700;transition:background var(--d1) var(--ease),transform var(--d1) var(--ease)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--btn);color:#fff;height:calc(46px * var(--dens));padding:0 18px;font-size:15px}
+.btn-primary:hover{background:var(--btn-hover)}
+.btn-ghost{background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink);height:40px;padding:0 14px;font-size:13.5px}
+.btn-block{width:100%}
+
+/* ═══ FASE OPERAÇÃO — a esteira ═══ */
+.ops-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ops-stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);
+  padding:calc(10px * var(--dens)) 10px;text-align:center}
+.ops-stat .v{font-size:calc(21px * var(--dens));font-weight:800;letter-spacing:-.02em}
+.ops-stat .l{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+.ops-stat.hot .v{color:var(--accent-strong)}
+
+.lane-label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin:6px 2px -4px}
+.lane-label .n{background:var(--surface-2);border-radius:var(--r-pill);padding:1px 8px;color:var(--ink-2);font-size:11px}
+.lane-label.wait{color:var(--gold-ink)} .lane-label.doing{color:var(--accent-strong)} .lane-label.done{color:var(--basil-ink)}
+
+.order{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);
+  padding:calc(14px * var(--dens));display:flex;flex-direction:column;gap:calc(10px * var(--dens))}
+.order-top{display:flex;align-items:center;gap:10px}
+.order-num{font-size:calc(19px * var(--dens));font-weight:800;letter-spacing:-.02em}
+.order-timer{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;
+  padding:3px 9px;border-radius:var(--r-pill)}
+.order-timer.fresh{background:var(--basil-soft);color:var(--basil-ink)}
+.order-timer.warn{background:var(--gold-soft);color:var(--gold-ink)}
+.order-timer.late{background:var(--crit-soft);color:var(--crit-ink)}
+.order-channel{margin-left:auto}
+.channel{font-size:11px;font-weight:700;padding:3px 9px;border-radius:var(--r-pill);background:var(--surface-2);
+  color:var(--ink-2);border:1px solid var(--line)}
+.channel.ifood{color:var(--crit-ink);border-color:rgba(224,91,75,.3);background:var(--crit-soft)}
+.order-items{font-size:13px;line-height:1.5;color:var(--ink-2)}
+.order-items b{color:var(--ink);font-weight:600}
+.order-act{display:flex;gap:8px}
+.order-act .btn-primary{flex:1;height:calc(44px * var(--dens))}
+.order-act .btn-ghost{flex-shrink:0}
+
+/* ═══ FOCO — densidade mínima de elementos, relevância máxima ═══ */
+[data-density="focus"] .lane-label,[data-density="focus"] .ops-strip,
+[data-density="focus"] .order.compactable{display:none}
+.focus-hero{display:none;flex-direction:column;gap:14px;text-align:center;padding:8px 4px}
+[data-density="focus"] .focus-hero{display:flex}
+.focus-hero .fh-label{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.focus-hero .fh-num{font-size:64px;font-weight:900;letter-spacing:-.04em;line-height:1}
+.focus-hero .fh-items{font-size:16px;line-height:1.65;color:var(--ink-2)}
+.focus-hero .fh-items b{color:var(--ink)}
+.focus-hero .fh-timer{font-size:15px;font-weight:700}
+.focus-hero .btn-primary{height:60px;font-size:17px;border-radius:var(--r-l)}
+.focus-next{font-size:13px;color:var(--ink-3)}
+
+/* ═══ RAIO-X — denso, tabular, comparativo ═══ */
+.rx-list{display:none;flex-direction:column}
+[data-density="raiox"] .rx-list{display:flex}
+[data-density="raiox"] .lane-wrap{display:none}
+.rx-row{display:grid;grid-template-columns:52px 1fr 64px 78px;gap:8px;align-items:center;
+  padding:8px 2px;border-bottom:1px solid var(--line);font-size:12.5px}
+.rx-row .mono{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-3)}
+
+/* ═══ FASE FECHAMENTO ═══ */
+.cash-big{font-size:40px;font-weight:900;letter-spacing:-.03em;line-height:1}
+.cash-sub{font-size:13px;color:var(--ink-3);margin-top:6px}
+.comp-bar{display:flex;height:12px;border-radius:var(--r-pill);overflow:hidden;margin:16px 0 10px}
+.comp-bar div{height:100%}
+.legend{display:flex;flex-direction:column;gap:7px}
+.legend-row{display:flex;align-items:center;gap:9px;font-size:13.5px}
+.legend-row i{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.legend-row .v{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600}
+.delta{font-size:12.5px;font-weight:700}
+.delta.up{color:var(--basil-ink)} .delta.down{color:var(--crit-ink)}
+
+/* Empty state (Stripe) adaptado à operação: sugere a próxima ação real */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;
+  padding:calc(26px * var(--dens)) 18px;background:var(--surface);border:1px dashed var(--line-2);border-radius:var(--r-l)}
+.empty .e-ico{width:46px;height:46px;border-radius:var(--r-m);background:var(--accent-soft);display:grid;
+  place-items:center;color:var(--accent-strong)}
+.empty h3{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+.empty p{font-size:13px;color:var(--ink-3);line-height:1.5;max-width:260px}
+.empty a{font-size:13px;font-weight:700;color:var(--accent-strong)}
+
+/* ═══ TAB BAR ═══ */
+.tabbar{flex-shrink:0;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;
+  background:rgba(19,16,9,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:8px 8px 18px}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:var(--r-s);
+  font-size:10px;font-weight:700;color:var(--ink-3);position:relative;transition:color var(--d1) var(--ease)}
+.tabbar button.on{color:var(--accent-strong)}
+.tabbar .t-badge{position:absolute;top:0;right:calc(50% - 22px);background:var(--accent);color:#fff;
+  font-size:9px;font-weight:800;min-width:15px;height:15px;border-radius:var(--r-pill);display:grid;place-items:center;padding:0 4px}
+
+/* chips de filtro (Stripe) na tela Pedidos */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--r-pill);
+  font-size:12.5px;font-weight:600;border:1px dashed var(--line-2);color:var(--ink-2)}
+.chip.on{border-style:solid;border-color:rgba(231,104,69,.5);background:var(--accent-soft);color:var(--accent-strong)}
+.chip .x{opacity:.7}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- Notas do conceito (lado esquerdo) -->
+  <div class="notes">
+    <div class="note">
+      <span class="note-kicker">Conceito</span>
+      <h1>Densidade<br>Controlada</h1>
+      <p>A densidade da tela é <b>função do momento da operação</b>, com override manual. O sistema sugere pelo relógio e pela fila; o usuário tem a palavra final.</p>
+    </div>
+    <div class="note">
+      <span class="note-kicker">Os 3 níveis</span>
+      <ul>
+        <li><b>Foco</b> — uma coisa por vez. Pico do almoço, mão na massa, celular na bancada.</li>
+        <li><b>Operação</b> — a esteira inteira sem scroll. O default do dia.</li>
+        <li><b>Raio-X</b> — denso e tabular. Fechamento, comparativo, decisão.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <span class="note-kicker">Origem</span>
+      <p class="src">Stripe: “densidade calibrada por contexto — alta em tabelas, baixa em hubs e estados vazios”.<br>Twilio: “legibilidade acima de quantidade por tela”.<br>EasyStok: evolução do <code>cdb-ux-density</code> (calm/full) que já existe no PWA.</p>
+    </div>
+  </div>
+
+  <!-- DEVICE -->
+  <div class="device">
+    <div class="screen" id="screen" data-density="operacao">
+      <div class="island"></div>
+      <div class="statusbar"><span>11:42</span><span style="letter-spacing:2px">●●●</span></div>
+
+      <!-- Header de momento -->
+      <div class="app-head">
+        <div class="head-row">
+          <span class="moment-eyebrow">Casa da Babá · <em id="phase-hint">sugestão: almoço</em></span>
+          <span class="env-tag">Homolog</span>
+        </div>
+        <div class="head-row">
+          <span class="moment-title" id="moment-title">Operação do almoço</span>
+        </div>
+        <div class="density" role="group" aria-label="Densidade da tela">
+          <button data-d="focus" aria-pressed="false" onclick="setDensity('focus')">Foco</button>
+          <button data-d="operacao" aria-pressed="true" onclick="setDensity('operacao')">Operação</button>
+          <button data-d="raiox" aria-pressed="false" onclick="setDensity('raiox')">Raio-X</button>
+        </div>
+        <!-- simulador de momento (só pra demo; na vida real é o relógio + fila) -->
+        <div class="chips" aria-label="Simular momento do dia">
+          <button class="chip" onclick="setPhase('preparo', this)">☀️ Preparo</button>
+          <button class="chip on" onclick="setPhase('operacao', this)">🍱 Pico</button>
+          <button class="chip" onclick="setPhase('fechamento', this)">🌙 Fechamento</button>
+        </div>
+      </div>
+
+      <div class="content" id="main">
+
+        <!-- ════ FASE: PREPARO ════ -->
+        <div class="phase" id="phase-preparo">
+          <div class="card">
+            <div class="card-label"><span>Produção de hoje</span><a href="#" onclick="toast('Abriria a calculadora');return false">Calculadora →</a></div>
+            <div class="prod-row">
+              <div class="prod-emoji">🍛</div>
+              <div class="prod-info"><div class="prod-name">Marmita frango grelhado</div><div class="prod-sub">Lote das 9h · validade 3 dias</div></div>
+              <div class="prod-qty"><span class="done">24</span>/30</div>
+            </div>
+            <div class="prod-row">
+              <div class="prod-emoji">🥩</div>
+              <div class="prod-info"><div class="prod-name">Marmita carne ao molho</div><div class="prod-sub">Lote das 9h30 · validade 3 dias</div></div>
+              <div class="prod-qty"><span class="done">18</span>/25</div>
+            </div>
+            <div class="prod-row">
+              <div class="prod-emoji">🍫</div>
+              <div class="prod-info"><div class="prod-name">Bolo de pote brigadeiro</div><div class="prod-sub">Geladeira 2 · validade 5 dias</div></div>
+              <div class="prod-qty">0/20</div>
+            </div>
+          </div>
+
+          <div class="stock-warn">
+            <span class="sw-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span>
+            <p><b>Faltam 2 insumos</b> pra fechar a produção: creme de leite (6 cx) e frango (4 kg).</p>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="toast('2 insumos na lista de Compras')">Jogar faltantes em Compras</button>
+
+          <div class="card">
+            <div class="card-label"><span>Validade pedindo atenção</span><a href="#" onclick="toast('Abriria Validade');return false">Ver tudo →</a></div>
+            <div class="prod-row">
+              <div class="prod-emoji">🍮</div>
+              <div class="prod-info"><div class="prod-name">Pudim · lote 12/08</div><div class="prod-sub" style="color:var(--crit-ink);font-weight:600">Vence hoje · 6 un</div></div>
+              <button class="btn btn-ghost" onclick="toast('Abriria descarte/promoção')">Agir</button>
+            </div>
+            <div class="prod-row">
+              <div class="prod-emoji">🎂</div>
+              <div class="prod-info"><div class="prod-name">Bolo de cenoura · lote 13/08</div><div class="prod-sub" style="color:var(--gold-ink);font-weight:600">Vence amanhã · 9 fatias</div></div>
+              <button class="btn btn-ghost" onclick="toast('Abriria descarte/promoção')">Agir</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ════ FASE: OPERAÇÃO (pico) ════ -->
+        <div class="phase active" id="phase-operacao">
+          <div class="ops-strip">
+            <div class="ops-stat hot"><div class="v num">3</div><div class="l">Aguardando</div></div>
+            <div class="ops-stat"><div class="v num">2</div><div class="l">Preparando</div></div>
+            <div class="ops-stat"><div class="v num">5</div><div class="l">Prontos</div></div>
+          </div>
+
+          <!-- FOCO: só o próximo passo, gigante -->
+          <div class="focus-hero">
+            <span class="fh-label">Próximo pedido</span>
+            <div class="fh-num num">#1042</div>
+            <span class="fh-timer order-timer late">há 21 min</span>
+            <p class="fh-items"><b>2×</b> Marmita frango grelhado<br><b>1×</b> Bolo de pote brigadeiro<br><b>1×</b> Guaraná lata</p>
+            <button class="btn btn-primary" onclick="toast('#1042 foi pro preparo')">Começar preparo →</button>
+            <span class="focus-next">Depois: #1043 (há 12 min) · #1044 (há 4 min)</span>
+          </div>
+
+          <!-- OPERAÇÃO: a esteira inteira -->
+          <div class="lane-wrap">
+            <div class="lane-label wait">Aguardando <span class="n">3</span></div>
+            <div class="order">
+              <div class="order-top">
+                <span class="order-num num">#1042</span>
+                <span class="order-timer late">há 21 min</span>
+                <span class="order-channel channel ifood">iFood</span>
+              </div>
+              <p class="order-items"><b>2×</b> Marmita frango · <b>1×</b> Bolo de pote · <b>1×</b> Guaraná</p>
+              <div class="order-act">
+                <button class="btn btn-primary" onclick="toast('#1042 foi pro preparo')">Começar preparo →</button>
+                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
+              </div>
+            </div>
+            <div class="order compactable">
+              <div class="order-top">
+                <span class="order-num num">#1043</span>
+                <span class="order-timer warn">há 12 min</span>
+                <span class="order-channel channel">Balcão</span>
+              </div>
+              <p class="order-items"><b>1×</b> Marmita carne ao molho · <b>1×</b> Pudim</p>
+              <div class="order-act">
+                <button class="btn btn-primary" onclick="toast('#1043 foi pro preparo')">Começar preparo →</button>
+                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
+              </div>
+            </div>
+            <div class="order compactable">
+              <div class="order-top">
+                <span class="order-num num">#1044</span>
+                <span class="order-timer fresh">há 4 min</span>
+                <span class="order-channel channel">WhatsApp</span>
+              </div>
+              <p class="order-items"><b>3×</b> Marmita frango · <b>2×</b> Suco natural</p>
+              <div class="order-act">
+                <button class="btn btn-primary" onclick="toast('#1044 foi pro preparo')">Começar preparo →</button>
+                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
+              </div>
+            </div>
+
+            <div class="lane-label doing">Preparando <span class="n">2</span></div>
+            <div class="order compactable">
+              <div class="order-top">
+                <span class="order-num num">#1041</span>
+                <span class="order-timer warn">há 9 min</span>
+                <span class="order-channel channel ifood">iFood</span>
+              </div>
+              <p class="order-items"><b>1×</b> Marmita carne · <b>1×</b> Bolo de pote</p>
+              <div class="order-act">
+                <button class="btn btn-primary" style="background:var(--basil);color:#06251C" onclick="toast('#1041 está pronto')">Marcar pronto ✓</button>
+                <button class="btn btn-ghost" aria-label="Detalhes do pedido" onclick="toast('Abriria o pedido')">Ver</button>
+              </div>
+            </div>
+
+            <div class="lane-label done">Prontos <span class="n">5</span></div>
+            <div class="empty">
+              <div class="e-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></div>
+              <h3>Esteira limpa</h3>
+              <p>Todos os prontos já foram entregues ou aguardam o motoboy.</p>
+              <a href="#" onclick="toast('Abriria Finalizados');return false">Ver finalizados →</a>
+            </div>
+          </div>
+
+          <!-- RAIO-X: denso e tabular -->
+          <div class="rx-list card" style="padding:8px 14px">
+            <div class="card-label" style="margin:4px 0 2px"><span>Fila em Raio-X</span><span class="num" style="color:var(--ink-3)">10 pedidos</span></div>
+            <div class="rx-row"><span class="mono">#1042</span><span>Maria S. · iFood</span><span class="mono" style="color:var(--crit-ink)">21 min</span><span class="pill-mini" style="color:var(--gold-ink)">aguardando</span></div>
+            <div class="rx-row"><span class="mono">#1043</span><span>João P. · Balcão</span><span class="mono" style="color:var(--gold-ink)">12 min</span><span style="color:var(--gold-ink)">aguardando</span></div>
+            <div class="rx-row"><span class="mono">#1044</span><span>Ana C. · WhatsApp</span><span class="mono" style="color:var(--basil-ink)">4 min</span><span style="color:var(--gold-ink)">aguardando</span></div>
+            <div class="rx-row"><span class="mono">#1041</span><span>Pedro H. · iFood</span><span class="mono">9 min</span><span style="color:var(--accent-strong)">preparando</span></div>
+            <div class="rx-row"><span class="mono">#1040</span><span>Carla M. · Balcão</span><span class="mono">14 min</span><span style="color:var(--accent-strong)">preparando</span></div>
+            <div class="rx-row"><span class="mono">#1039</span><span>Rui A. · iFood</span><span class="mono">—</span><span style="color:var(--basil-ink)">pronto</span></div>
+            <div class="rx-row" style="border-bottom:0"><span class="mono">#1038</span><span>Bia T. · WhatsApp</span><span class="mono">—</span><span style="color:var(--basil-ink)">pronto</span></div>
+          </div>
+        </div>
+
+        <!-- ════ FASE: FECHAMENTO ════ -->
+        <div class="phase" id="phase-fechamento">
+          <div class="card">
+            <div class="card-label"><span>Caixa de hoje</span><span style="color:var(--basil-ink);letter-spacing:0;text-transform:none;font-size:12px">aberto desde 08h12</span></div>
+            <div class="cash-big num">R$ 1.782,40</div>
+            <div class="cash-sub">Saldo em caixa · <span class="delta up">▲ 12% vs ontem</span></div>
+            <div class="comp-bar">
+              <div style="width:68%;background:var(--basil)"></div>
+              <div style="width:21%;background:var(--gold)"></div>
+              <div style="width:11%;background:var(--crit)"></div>
+            </div>
+            <div class="legend">
+              <div class="legend-row"><i style="background:var(--basil)"></i>Entradas <span class="v">R$ 1.902,00</span></div>
+              <div class="legend-row"><i style="background:var(--gold)"></i>Saídas <span class="v">R$ 219,60</span></div>
+              <div class="legend-row"><i style="background:var(--crit)"></i>Sangria <span class="v">R$ 100,00</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-label"><span>O dia em números</span></div>
+            <div class="legend">
+              <div class="legend-row">Pedidos entregues <span class="v">47</span></div>
+              <div class="legend-row">Ticket médio <span class="v">R$ 37,92 <span class="delta up" style="font-family:'Inter'">▲ 4%</span></span></div>
+              <div class="legend-row">Margem real do dia <span class="v" style="color:var(--basil-ink)">31,4%</span></div>
+              <div class="legend-row">Perdas (validade) <span class="v" style="color:var(--crit-ink)">R$ 41,20</span></div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-block" onclick="toast('Dia fechado. Resumo enviado.')">Fechar o dia</button>
+        </div>
+
+        <!-- ════ TELA: PEDIDOS (lista densa + chips Stripe) ════ -->
+        <div class="phase" id="phase-pedidos">
+          <div class="chips">
+            <button class="chip on">Status: Todos <span class="x">×</span></button>
+            <button class="chip" onclick="this.classList.toggle('on')">+ Canal</button>
+            <button class="chip" onclick="this.classList.toggle('on')">+ Período</button>
+            <button class="chip" onclick="this.classList.toggle('on')">+ Pagamento</button>
+          </div>
+          <p style="font-size:12px;color:var(--ink-3);margin:2px 2px 8px">8 resultados</p>
+          <div class="card" style="padding:6px 14px">
+            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1042 · Maria Silva</div><div class="prod-sub">iFood · há 21 min · <span style="color:var(--gold-ink)">aguardando</span></div></div><div class="prod-qty">R$ 42,50</div></div>
+            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1041 · João Pedro</div><div class="prod-sub">Balcão · há 32 min · <span style="color:var(--accent-strong)">preparando</span></div></div><div class="prod-qty">R$ 28,90</div></div>
+            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1040 · Ana Costa</div><div class="prod-sub">iFood · há 41 min · <span style="color:var(--basil-ink)">pronto</span></div></div><div class="prod-qty">R$ 67,00</div></div>
+            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1039 · Carlos Lima</div><div class="prod-sub">WhatsApp · há 55 min · <span style="color:var(--basil-ink)">entregue</span></div></div><div class="prod-qty">R$ 19,50</div></div>
+            <div class="prod-row"><div class="prod-info"><div class="prod-name">#1038 · Beatriz Reis</div><div class="prod-sub">Balcão · há 1h02 · <span style="color:var(--basil-ink)">entregue</span></div></div><div class="prod-qty">R$ 51,00</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB BAR -->
+      <nav class="tabbar" aria-label="Navegação principal">
+        <button class="on" onclick="setTab(this,'operacao')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M13 2 4.5 13.5H11l-1 8.5L18.5 10.5H12l1-8.5Z"/></svg>Agora</button>
+        <button onclick="setTab(this,'pedidos')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 2 4 6v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4H6Z"/><path d="M4 6h16"/></svg>Pedidos<span class="t-badge">3</span></button>
+        <button onclick="setTab(this,'preparo')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 13.5V3.5M18 3.5v17M13 8h5m-5 4h5"/></svg>Produção</button>
+        <button onclick="setTab(this,'fechamento')"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>Caixa</button>
+        <button onclick="toast('Menu Mais')"><svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>Mais</button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Notas da aplicação (lado direito) -->
+  <div class="notes right">
+    <div class="note">
+      <span class="note-kicker">Aplicação do conceito</span>
+      <ul>
+        <li><b>Mesma tela, 3 comportamentos:</b> a esteira vira herói único em Foco, board em Operação e tabela tabular em Raio-X.</li>
+        <li><b>O sistema sugere:</b> 7h → Preparo, 11h → Operação em Foco, 18h → Fechamento em Raio-X. Badge “sugestão” no seletor.</li>
+        <li><b>O usuário controla:</b> o seletor fica no topo, persiste por dispositivo, e vence a sugestão.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <span class="note-kicker">Contexto Casa da Babá</span>
+      <ul>
+        <li>Timer do pedido muda de cor pela espera: verde → âmbar → vermelho.</li>
+        <li>Ação primária sempre em full-width, alvo ≥ 44px: mão suja, luva, pressa.</li>
+        <li>Empty state trabalha: esteira limpa sugere adiantar produção.</li>
+        <li>Fechamento responde o que importa: margem real e perda do dia.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <span class="note-kicker">Teste ao vivo</span>
+      <p>Alterne <b>Foco / Operação / Raio-X</b> no topo do aparelho e os chips de momento (☀️ 🍱 🌙) para simular o dia.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══ DENSIDADE CONTROLADA ═══
+   Sistema sugere pelo momento; usuário controla. Persiste por dispositivo
+   (evolução do cdb-ux-density calm/full que já existe no PWA). */
+const screenEl = document.getElementById('screen');
+const PHASE_META = {
+  preparo:     { title:'Preparo da manhã',   hint:'sugestão: preparo',   dens:'operacao' },
+  operacao:    { title:'Operação do almoço', hint:'sugestão: pico',      dens:'focus'    },
+  fechamento:  { title:'Fechamento do dia',  hint:'sugestão: gestão',    dens:'raiox'    },
+  pedidos:     { title:'Pedidos',            hint:'lista completa',      dens:'operacao' },
+};
+let userLockedDensity = null;
+try { userLockedDensity = localStorage.getItem('cdb-density-v2'); } catch(e) {}
+
+function setDensity(d, fromUser = true){
+  if(fromUser){ userLockedDensity = d; try{ localStorage.setItem('cdb-density-v2', d); }catch(e){} }
+  screenEl.dataset.density = d;
+  document.querySelectorAll('.density button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === d));
+}
+function markSuggested(d){
+  document.querySelectorAll('.density .suggested').forEach(s => s.remove());
+  const btn = document.querySelector(`.density button[data-d="${d}"]`);
+  if(btn){ const tag = document.createElement('span'); tag.className = 'suggested'; tag.textContent = 'sugerido'; btn.appendChild(tag); }
+}
+function setPhase(phase, chipEl){
+  document.querySelectorAll('.phase').forEach(p => p.classList.toggle('active', p.id === 'phase-' + phase));
+  const meta = PHASE_META[phase];
+  if(meta){
+    document.getElementById('moment-title').textContent = meta.title;
+    document.getElementById('phase-hint').textContent = meta.hint;
+    markSuggested(meta.dens);
+    if(!userLockedDensity) setDensity(meta.dens, false);
+  }
+  document.querySelectorAll('.chips [onclick^="setPhase"], .chips button').forEach(c => {
+    if(c.getAttribute('onclick')?.startsWith('setPhase')) c.classList.toggle('on', c === chipEl);
+  });
+  document.getElementById('main').scrollTop = 0;
+  syncTabbar(phase);
+}
+function setTab(btn, phase){
+  setPhase(phase, null);
+  syncTabbar(phase);
+}
+function syncTabbar(phase){
+  const map = { operacao:0, pedidos:1, preparo:2, fechamento:3 };
+  document.querySelectorAll('.tabbar button').forEach((b,i) => b.classList.toggle('on', i === (map[phase] ?? -1)));
+}
+
+/* toast mínimo */
+let tt;
+function toast(msg){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div'); t.id = 'toast';
+    t.style.cssText = 'position:absolute;bottom:96px;left:50%;transform:translate(-50%,10px);background:#2F2519;color:#F7F2E8;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;transition:all .2s cubic-bezier(.4,0,.2,1);z-index:70;pointer-events:none;white-space:nowrap';
+    screenEl.appendChild(t);
+  }
+  t.textContent = msg;
+  requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translate(-50%,0)'; });
+  clearTimeout(tt); tt = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translate(-50%,10px)'; }, 2200);
+}
+
+/* boot: fase do pico, densidade sugerida (ou a que o usuário travou) */
+setPhase('operacao', document.querySelectorAll('.app-head .chips .chip')[1]);
+if(userLockedDensity) setDensity(userLockedDensity, false);
+</script>
+</body>
+</html>
