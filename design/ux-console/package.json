@@ -5,5 +5,8 @@
   "description": "Prototipo navegavel: padroes Stripe/Twilio aplicados sobre o design system v6 do EasyStok",
   "scripts": {
     "dev": "node server.js"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
   }
 }
