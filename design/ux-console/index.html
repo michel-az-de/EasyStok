@@ -297,11 +297,20 @@ body.search-open .search-panel{transform:translateX(0)}
 </svg>
 
 <header class="topbar">
-  <button class="tb-logo" id="tb-logo" onclick="goHome()">
+  <button class="tb-logo" onclick="goHome()">
     <svg width="24" height="24" viewBox="0 0 64 64" fill="none"><path d="M32 6 56 18 32 30 8 18Z" fill="#E85814"/><path d="M8 18 32 30 32 58 8 46Z" fill="#0E2A6E"/><path d="M56 18 32 30 32 58 56 46Z" fill="#06143A"/></svg>
-    <span id="tb-title">Easy<em>Stok</em></span>
+    <span>Easy<em>Stok</em></span>
     <span class="env">Homolog</span>
   </button>
+  <!-- navegação de contextos: sempre visível, 1 clique pra qualquer lugar -->
+  <nav class="ctxnav" aria-label="Contextos" id="ctxnav">
+    <button data-ctx="home" onclick="goHome()">Hoje</button>
+    <button data-ctx="operacao" onclick="openModule('operacao')">Operação</button>
+    <button data-ctx="estoque" onclick="openModule('estoque')">Estoque</button>
+    <button data-ctx="compras" onclick="openModule('compras')">Compras</button>
+    <button data-ctx="financeiro" onclick="openModule('financeiro')">Financeiro</button>
+    <button data-ctx="gestao" onclick="openModule('gestao')">Gestão</button>
+  </nav>
   <div class="spacer"></div>
   <button class="search-trigger" onclick="openSearch()"><svg width="14" height="14"><use href="#i-search"/></svg>Buscar<kbd>⌘K</kbd></button>
   <div class="density-toggle" role="group" aria-label="Densidade">
@@ -312,6 +321,8 @@ body.search-open .search-panel{transform:translateX(0)}
   <button class="icon-btn" aria-label="Alternar tema" onclick="toggleTheme()"><svg width="16" height="16"><use href="#i-moon"/></svg></button>
   <div class="avatar-tb" title="Felipe · Casa da Babá">FA</div>
 </header>
+<!-- segunda faixa: tabs do contexto ativo (sempre visível dentro do módulo) -->
+<div class="subbar" id="subbar" hidden></div>
 
 <div class="stage"><div class="wrap" id="main"></div></div>
 
@@ -446,14 +457,26 @@ function avatarFor(nome){
 }
 </script>
 <script>
+/* ═══ CHROME: contextos na topbar + tabs na subbar, sempre visíveis ═══ */
+function renderChrome(){
+  document.querySelectorAll('#ctxnav button').forEach(b =>
+    b.classList.toggle('on', b.dataset.ctx === (S.module || 'home')));
+  const sb = document.getElementById('subbar');
+  if(!S.module){ sb.hidden = true; return; }
+  const m = MODULES.find(x => x.id === S.module);
+  const cur = S.moduleTab[m.id];
+  sb.hidden = false;
+  sb.innerHTML = m.tabs.map(([t, label]) =>
+    `<button class="subtab ${cur === t ? 'on' : ''}" onclick="setModuleTab('${t}')">${label}${tabCount(t)}</button>`).join('');
+}
+
 /* ═══ HOME — quase vazia. Cada linha trabalha. ═══ */
 function renderHome(){
   const entregues = S.orders.filter(o => o.status === 'entregue');
   const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1200;
   const ag = S.orders.filter(o => o.status === 'aguardando');
   const maior = ag.length ? Math.max(...ag.map(waitMin)) : 0;
-  document.getElementById('tb-logo').classList.remove('back');
-  document.getElementById('tb-title').innerHTML = 'Easy<em>Stok</em>';
+  renderChrome();
   main.innerHTML = `
     <div class="hello-wrap">
       <div class="hello">Bom dia.</div>
@@ -492,6 +515,7 @@ function renderHome(){
 function openModule(id, tab){
   const m = MODULES.find(x => x.id === id);
   S.module = id;
+  S.detail = null;
   S.moduleTab[id] = tab || S.moduleTab[id] || m.tabs[0][0];
   renderModule();
 }
@@ -500,26 +524,27 @@ function setModuleTab(t){ S.moduleTab[S.module] = t; S.detail = null; renderModu
 function renderModule(){
   const m = MODULES.find(x => x.id === S.module);
   const cur = S.moduleTab[m.id];
-  document.getElementById('tb-logo').classList.add('back');
-  document.getElementById('tb-title').innerHTML = `Easy<em>Stok</em> <span style="color:var(--text-4);font-weight:500">· ${m.name}</span>`;
-  /* detalhe de objeto substitui a tab (Stripe/Twilio: página própria do objeto) */
+  renderChrome();
+  /* detalhe de objeto: breadcrumb clicável + chrome intacto */
   if(S.detail){
     main.className = 'wrap';
-    main.innerHTML = `<div class="view-enter">${S.detail.type === 'pedido' ? vPedido(S.detail.id) : vCliente(S.detail.id)}</div>`;
-    document.title = `${S.detail.type === 'pedido' ? 'Pedido' : 'Cliente'} · EasyStok [Homolog]`;
+    const isP = S.detail.type === 'pedido';
+    const o = isP ? S.orders.find(x => x.id === S.detail.id) : null;
+    const c = isP ? null : S.clientes.find(x => x.id === S.detail.id);
+    main.innerHTML = `<div class="view-enter">
+      <nav class="bc" aria-label="Trilha">
+        <a href="#" onclick="goHome();return false">Hoje</a><span class="sep">›</span>
+        <a href="#" onclick="closeDetail();return false">${m.name}</a><span class="sep">›</span>
+        <b>${isP ? (o ? '#' + o.n : 'Pedido') : (c ? esc(c.nome) : 'Cliente')}</b>
+      </nav>
+      ${isP ? vPedido(S.detail.id) : vCliente(S.detail.id)}</div>`;
+    document.title = `${isP ? 'Pedido' : 'Cliente'} · EasyStok [Homolog]`;
     window.scrollTo(0, 0);
     return;
   }
   const narrow = ['novo-pedido','novo-produto','entrada'].includes(cur);
   main.className = narrow ? 'wrap narrow' : 'wrap';
-  main.innerHTML = `
-    <div class="mod-head">
-      <div><h1>${m.name}</h1><div class="mh-sub">${m.state()}</div></div>
-    </div>
-    <div class="mod-tabs" role="tablist">
-      ${m.tabs.map(([t, label]) => `<button class="mtab" role="tab" aria-selected="${cur === t}" onclick="setModuleTab('${t}')">${label}${tabCount(t)}</button>`).join('')}
-    </div>
-    <div class="view-enter">${TABS[cur]()}</div>`;
+  main.innerHTML = `<div class="view-enter">${TABS[cur]()}</div>`;
   document.title = `${m.name} · EasyStok [Homolog]`;
   window.scrollTo(0, 0);
   if(cur === 'novo-pedido') initDraft();
@@ -1001,7 +1026,33 @@ function tClientesTab(){
   background:linear-gradient(135deg,var(--hover),var(--pressed))}
 .ctx-row{border-radius:var(--r-m);padding-left:8px;padding-right:8px;margin:0 -8px}
 .row{border-radius:var(--r-s);padding-left:8px;padding-right:8px;margin:0 -8px}
-.guide-card{background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-l);box-shadow:var(--shadow-pop)}
+/* ═══ NAVEGAÇÃO ONIPRESENTE (v9) ═══ */
+.ctxnav{display:flex;gap:2px;margin-left:20px}
+.ctxnav button{padding:6px 12px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--text-3);
+  transition:color var(--d1) var(--ease),background var(--d1) var(--ease)}
+.ctxnav button:hover{color:var(--text);background:var(--hover)}
+.ctxnav button.on{color:var(--text);background:var(--pressed)}
+.subbar{position:sticky;top:54px;z-index:calc(var(--z-sticky) - 1);display:flex;align-items:center;gap:2px;
+  padding:0 24px;height:44px;background:color-mix(in srgb, var(--page) 88%, transparent);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--hairline)}
+.subbar .subtab{padding:7px 13px;font-size:13px;font-weight:500;color:var(--text-3);border-radius:var(--r-pill);
+  transition:all var(--d1) var(--ease)}
+.subbar .subtab:hover{color:var(--text);background:var(--hover)}
+.subbar .subtab.on{color:var(--text);font-weight:700;background:var(--pressed)}
+.subbar .subtab .ct{font-family:var(--font-mono);font-size:10px;margin-left:4px;color:var(--text-4)}
+.subbar .sub-act{margin-left:auto}
+.bc{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-3);margin-bottom:16px;flex-wrap:wrap}
+.bc a{color:var(--text-3);font-weight:600}
+.bc a:hover{color:var(--text)}
+.bc .sep{color:var(--text-4);font-size:11px}
+.bc b{color:var(--text);font-weight:700}
+/* edição rica */
+.drawer.wide{width:min(520px,100vw)}
+.f-section{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-4);margin:20px 0 12px}
+.f-section:first-child{margin-top:0}
+.f-input.err{border-color:var(--crit);box-shadow:0 0 0 3px var(--crit-soft)}
+.f-err{font-size:12px;color:var(--crit);margin-top:5px;font-weight:600}
+.drawer-foot{position:sticky;bottom:0;display:flex;gap:10px;padding:14px 20px;background:var(--card);border-top:1px solid var(--hairline)}
 
 /* ═══ DETALHE DE OBJETO (Stripe/Twilio) ═══ */
 .detail-head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
@@ -1045,7 +1096,9 @@ function tClientesTab(){
 <script>
 /* ═══ DRAWER ═══ */
 function openDrawer(html){
-  document.getElementById('drawer').innerHTML = html;
+  const d = document.getElementById('drawer');
+  d.classList.remove('wide');
+  d.innerHTML = html;
   document.body.classList.add('drawer-open');
 }
 function closeDrawer(){ document.body.classList.remove('drawer-open'); }
@@ -1183,7 +1236,6 @@ function vPedido(id){
   const idx = steps.indexOf(o.status);
   const move = S.moves.find(m => m.orderId === o.id);
   return `
-    <button class="back-link" onclick="closeDetail()">‹ Pedidos</button>
     <div class="detail-head">
       <div>
         <div class="d-title">#${o.n} <span class="pill ${sm.pill}">${sm.label}</span></div>
@@ -1245,7 +1297,6 @@ function vCliente(id){
   const gasto = pedidos.reduce((s, o) => s + o.total, 0) + c.pedidos * 22; // base histórica simulada
   const ticket = gasto / (c.pedidos + pedidos.length || 1);
   return `
-    <button class="back-link" onclick="closeDetail()">‹ Clientes</button>
     <div class="detail-head">
       <span class="avatar-sm" style="width:52px;height:52px;font-size:17px;background:${avatarColorOf(c.nome)}">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
       <div>
@@ -1277,24 +1328,80 @@ function vCliente(id){
       : `<p class="f-hint">Nenhum pedido recente.</p>`}
     </div>`;
 }
+/* ═══ EDITAR CLIENTE — drawer rico: máscara, validação, dirty state ═══ */
 function editCliente(id){
   const c = S.clientes.find(x => x.id === id);
+  S.editing = { id, orig:{ nome:c.nome, tel:c.tel, end:c.end || '', obs:c.obs || '' } };
   openDrawer(`
-    <div class="drawer-head"><h2>Editar cliente</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-head"><h2>Editar cliente</h2><button class="icon-btn" aria-label="Fechar" onclick="tryCloseEdit()">${ico('x', 15)}</button></div>
     <div class="drawer-body">
-      <div class="f-field"><label class="f-label">Nome</label><input class="f-input" id="ec-nome" value="${esc(c.nome)}"></div>
-      <div class="f-field"><label class="f-label">Telefone / WhatsApp</label><input class="f-input mono" id="ec-tel" value="${c.tel}"></div>
-      <div class="f-field"><label class="f-label">Endereço de entrega</label><input class="f-input" placeholder="Rua, número, complemento"></div>
-      <div class="f-field"><label class="f-label">Observações</label><textarea class="f-input" rows="2" placeholder="ex: portaria 24h, não tocar campainha"></textarea></div>
-      <button class="btn btn-primary btn-block" onclick="saveCliente('${id}')">Salvar</button>
+      <div style="display:flex;align-items:center;gap:13px;margin-bottom:6px">
+        <span class="avatar-sm" id="ec-avatar" style="width:46px;height:46px;font-size:15px;background:${avatarColorOf(c.nome)}">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+        <div><div style="font-weight:700" id="ec-preview">${esc(c.nome)}</div>
+        <div style="font-size:12px;color:var(--text-4)">cliente desde mar/2026 · ${c.pedidos} pedidos</div></div>
+      </div>
+      <div class="f-section">Identificação</div>
+      <div class="f-field"><label class="f-label" for="ec-nome">Nome completo *</label>
+        <input class="f-input" id="ec-nome" value="${esc(c.nome)}" oninput="ecChange()" autocomplete="off">
+        <div class="f-err" id="ec-nome-err" hidden>Sem o nome não dá pra salvar.</div></div>
+      <div class="f-section">Contato</div>
+      <div class="f-field"><label class="f-label" for="ec-tel">Telefone / WhatsApp</label>
+        <input class="f-input mono" id="ec-tel" value="${c.tel}" inputmode="numeric" oninput="ecTel(this)" placeholder="(11) 90000-0000">
+        <div class="f-err" id="ec-tel-err" hidden>Telefone incompleto — DDD + número.</div>
+        <div class="f-hint">É pra lá que vão as atualizações de pedido.</div></div>
+      <div class="f-section">Entrega</div>
+      <div class="f-field"><label class="f-label" for="ec-end">Endereço</label>
+        <input class="f-input" id="ec-end" value="${esc(c.end || '')}" placeholder="Rua, número, complemento" oninput="ecChange()"></div>
+      <div class="f-field"><label class="f-label" for="ec-obs">Observações</label>
+        <textarea class="f-input" id="ec-obs" rows="2" placeholder="ex: portaria 24h, não tocar campainha" oninput="ecChange()">${esc(c.obs || '')}</textarea></div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="tryCloseEdit()">Cancelar</button>
+      <button class="btn btn-primary" style="flex:2;justify-content:center" id="ec-save" disabled onclick="saveCliente('${id}')">Salvar alterações</button>
     </div>`);
+  document.getElementById('drawer').classList.add('wide');
+  setTimeout(() => { const el = document.getElementById('ec-nome'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 60);
+}
+function ecTel(inp){
+  const d = inp.value.replace(/\D/g, '').slice(0, 11);
+  inp.value = d.length <= 2 ? d : d.length <= 6 ? `(${d.slice(0,2)}) ${d.slice(2)}` : d.length <= 10 ? `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}` : `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  ecChange();
+}
+function ecChange(){
+  const e = S.editing; if(!e) return;
+  const nome = document.getElementById('ec-nome').value.trim();
+  const tel = document.getElementById('ec-tel').value;
+  const end = document.getElementById('ec-end').value;
+  const obs = document.getElementById('ec-obs').value;
+  const dirty = nome !== e.orig.nome || tel !== e.orig.tel || end !== e.orig.end || obs !== e.orig.obs;
+  const nomeOk = nome.length > 0;
+  const telOk = tel === '' || tel.replace(/\D/g, '').length >= 10;
+  document.getElementById('ec-nome').classList.toggle('err', !nomeOk);
+  document.getElementById('ec-nome-err').hidden = nomeOk;
+  document.getElementById('ec-tel').classList.toggle('err', !telOk);
+  document.getElementById('ec-tel-err').hidden = telOk;
+  document.getElementById('ec-save').disabled = !(dirty && nomeOk && telOk);
+  document.getElementById('ec-preview').textContent = nome || 'Sem nome';
+  const ini = (nome || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  document.getElementById('ec-avatar').textContent = ini;
+}
+function tryCloseEdit(){
+  const e = S.editing;
+  const dirty = e && (document.getElementById('ec-nome').value.trim() !== e.orig.nome ||
+    document.getElementById('ec-tel').value !== e.orig.tel ||
+    document.getElementById('ec-end').value !== e.orig.end ||
+    document.getElementById('ec-obs').value !== e.orig.obs);
+  if(dirty && !confirm('Descartar as alterações?')) return;
+  S.editing = null;
+  closeDrawer();
 }
 function saveCliente(id){
   const c = S.clientes.find(x => x.id === id);
-  const nome = document.getElementById('ec-nome').value.trim();
-  const tel = document.getElementById('ec-tel').value.trim();
-  if(nome) c.nome = nome;
-  if(tel) c.tel = tel;
+  c.nome = document.getElementById('ec-nome').value.trim();
+  c.tel = document.getElementById('ec-tel').value;
+  c.end = document.getElementById('ec-end').value;
+  c.obs = document.getElementById('ec-obs').value;
+  S.editing = null;
   closeDrawer();
   toast('Cliente atualizado');
   rerender();

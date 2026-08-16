@@ -152,6 +152,58 @@ check('Conta: drawer + pagar funciona', () => {
 check('Busca: abre e acha maria', () => { window.openSearch(); window.renderSearch('maria'); return document.getElementById('search-body').textContent.includes('Maria'); });
 check('Busca: Enter navega', () => { window.runHit(0); return !document.body.classList.contains('search-open'); });
 check('Esc volta ao portal', () => { window.goHome(); return txt().includes('Onde trabalhar'); });
+
+/* ── v9: navegação onipresente ── */
+check('Topbar tem os 6 destinos', () => $$('#ctxnav button').length === 6);
+check('Home marca "Hoje" e esconde subbar', () => document.querySelector('#ctxnav .on')?.textContent === 'Hoje' && document.getElementById('subbar').hidden);
+check('Entrar em Estoque liga subbar com 5 tabs', () => {
+  document.querySelector('#ctxnav [data-ctx="estoque"]').click();
+  return !document.getElementById('subbar').hidden && $$('#subbar .subtab').length === 5 && document.querySelector('#ctxnav .on').textContent === 'Estoque';
+});
+check('Trocar de contexto pela topbar é 1 clique', () => {
+  document.querySelector('#ctxnav [data-ctx="financeiro"]').click();
+  return document.querySelector('#ctxnav .on').textContent === 'Financeiro' && txt().includes('Distribuidora');
+});
+check('Detalhe mostra breadcrumb clicável', () => {
+  window.openModule('operacao', 'pedidos');
+  window.openDetail('pedido', 'ped_8e1j0');
+  const bc = document.querySelector('.bc');
+  return bc && bc.textContent.includes('Operação') && bc.textContent.includes('#1043');
+});
+check('Breadcrumb volta pro contexto sem perder o chrome', () => {
+  window.closeDetail();
+  return !document.getElementById('subbar').hidden && txt().includes('João Pedro');
+});
+check('Qualquer lugar → qualquer lugar: detalhe → Gestão direto', () => {
+  window.openDetail('pedido', 'ped_8e1j0');
+  document.querySelector('#ctxnav [data-ctx="gestao"]').click();
+  return document.querySelector('#ctxnav .on').textContent === 'Gestão' && !window.S.detail;
+});
+
+/* ── v9: edição de cliente rica ── */
+check('Edição: abre com salvar desabilitado (sem mudança)', () => {
+  window.openModule('operacao', 'clientes');
+  window.editCliente('cli_n3j1');
+  return document.getElementById('ec-save').disabled === true;
+});
+check('Edição: máscara de telefone formata ao digitar', () => {
+  const t = document.getElementById('ec-tel');
+  t.value = '11987654321';
+  t.dispatchEvent(new window.Event('input', { bubbles: true }));
+  return t.value === '(11) 98765-4321';
+});
+check('Edição: mudança válida habilita salvar', () => document.getElementById('ec-save').disabled === false);
+check('Edição: telefone incompleto bloqueia', () => {
+  const t = document.getElementById('ec-tel');
+  t.value = '11987'; t.dispatchEvent(new window.Event('input', { bubbles: true }));
+  return document.getElementById('ec-save').disabled === true && !document.getElementById('ec-tel-err').hidden;
+});
+check('Edição: salvar persiste e fecha', () => {
+  const t = document.getElementById('ec-tel');
+  t.value = '11987654321'; t.dispatchEvent(new window.Event('input', { bubbles: true }));
+  window.saveCliente('cli_n3j1');
+  return !document.body.classList.contains('drawer-open') && window.S.clientes.find(c => c.id === 'cli_n3j1').tel === '(11) 98765-4321';
+});
 check('Densidade compacta aplica', () => { window.setDensity('compact'); return document.documentElement.dataset.density === 'compact'; });
 check('Tema dark aplica', () => { window.toggleTheme(); return document.documentElement.dataset.theme === 'dark'; });
 
