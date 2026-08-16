@@ -336,14 +336,14 @@ const NOW = Date.now(), MIN = 60000;
 const S = {
   module:null, moduleTab:{}, orderTab:'andamento',
   orders:[
-    { id:'ped_9f2k1', n:1042, cliente:'Maria Silva',    canal:'iFood',    total:42.50, status:'aguardando', at:NOW-21*MIN, items:[{nome:'Marmita frango grelhado',q:2,p:18.50},{nome:'Bolo de pote brigadeiro',q:1,p:12},{nome:'Guaraná lata',q:1,p:6}] },
-    { id:'ped_8e1j0', n:1043, cliente:'João Pedro',     canal:'Balcão',   total:28.90, status:'aguardando', at:NOW-12*MIN, items:[{nome:'Marmita carne ao molho',q:1,p:21},{nome:'Pudim fatia',q:1,p:8.50}] },
-    { id:'ped_7d0h9', n:1044, cliente:'Ana Costa',      canal:'WhatsApp', total:57.00, status:'aguardando', at:NOW-4*MIN,  items:[{nome:'Marmita frango grelhado',q:3,p:18.50},{nome:'Suco natural 500ml',q:2,p:9}] },
-    { id:'ped_6c9g8', n:1041, cliente:'Pedro Henrique', canal:'iFood',    total:33.00, status:'preparando', at:NOW-9*MIN,  items:[{nome:'Marmita carne ao molho',q:1,p:21},{nome:'Bolo de pote brigadeiro',q:1,p:12}] },
-    { id:'ped_5b8f7', n:1040, cliente:'Carla Martins',  canal:'Balcão',   total:33.50, status:'preparando', at:NOW-14*MIN, items:[{nome:'Marmita frango grelhado',q:2,p:18.50}] },
-    { id:'ped_4a7e6', n:1039, cliente:'Rui Alves',      canal:'iFood',    total:32.00, status:'pronto',     at:NOW-18*MIN, items:[{nome:'Feijoada completa',q:1,p:26},{nome:'Guaraná lata',q:1,p:6}] },
-    { id:'ped_3z6d5', n:1038, cliente:'Bia Teixeira',   canal:'WhatsApp', total:24.00, status:'entregue',   at:NOW-62*MIN, items:[{nome:'Bolo de pote brigadeiro',q:2,p:12}] },
-    { id:'ped_2y5c4', n:1037, cliente:'Diego Ramos',    canal:'Balcão',   total:38.50, status:'entregue',   at:NOW-75*MIN, items:[{nome:'Marmita carne ao molho',q:1,p:21},{nome:'Pudim fatia',q:1,p:8.50},{nome:'Guaraná lata',q:1,p:6}] },
+    { id:'ped_9f2k1', n:1042, cliente:'Maria Silva',    canal:'iFood',    total:42.50, status:'aguardando', at:NOW-21*MIN, pag:'Pix online',    obs:'sem cebola na marmita', items:[{nome:'Marmita frango grelhado',q:2,p:18.50,emoji:'🍛'},{nome:'Bolo de pote brigadeiro',q:1,p:12,emoji:'🍫'},{nome:'Guaraná lata',q:1,p:6,emoji:'🥤'}] },
+    { id:'ped_8e1j0', n:1043, cliente:'João Pedro',     canal:'Balcão',   total:28.90, status:'aguardando', at:NOW-12*MIN, pag:'Dinheiro',      items:[{nome:'Marmita carne ao molho',q:1,p:21,emoji:'🥩'},{nome:'Pudim fatia',q:1,p:8.50,emoji:'🍮'}] },
+    { id:'ped_7d0h9', n:1044, cliente:'Ana Costa',      canal:'WhatsApp', total:57.00, status:'aguardando', at:NOW-4*MIN,  pag:'Pix na entrega', items:[{nome:'Marmita frango grelhado',q:3,p:18.50,emoji:'🍛'},{nome:'Suco natural 500ml',q:2,p:9,emoji:'🧃'}] },
+    { id:'ped_6c9g8', n:1041, cliente:'Pedro Henrique', canal:'iFood',    total:33.00, status:'preparando', at:NOW-9*MIN,  pag:'Pix online',    items:[{nome:'Marmita carne ao molho',q:1,p:21,emoji:'🥩'},{nome:'Bolo de pote brigadeiro',q:1,p:12,emoji:'🍫'}] },
+    { id:'ped_5b8f7', n:1040, cliente:'Carla Martins',  canal:'Balcão',   total:33.50, status:'preparando', at:NOW-14*MIN, pag:'Cartão crédito', items:[{nome:'Marmita frango grelhado',q:2,p:18.50,emoji:'🍛'}] },
+    { id:'ped_4a7e6', n:1039, cliente:'Rui Alves',      canal:'iFood',    total:32.00, status:'pronto',     at:NOW-18*MIN, pag:'Pix online',    items:[{nome:'Feijoada completa',q:1,p:26,emoji:'🍲'},{nome:'Guaraná lata',q:1,p:6,emoji:'🥤'}] },
+    { id:'ped_3z6d5', n:1038, cliente:'Bia Teixeira',   canal:'WhatsApp', total:24.00, status:'entregue',   at:NOW-62*MIN, pag:'Pix',           items:[{nome:'Bolo de pote brigadeiro',q:2,p:12,emoji:'🍫'}] },
+    { id:'ped_2y5c4', n:1037, cliente:'Diego Ramos',    canal:'Balcão',   total:38.50, status:'entregue',   at:NOW-75*MIN, pag:'Cartão débito', items:[{nome:'Marmita carne ao molho',q:1,p:21,emoji:'🥩'},{nome:'Pudim fatia',q:1,p:8.50,emoji:'🍮'},{nome:'Guaraná lata',q:1,p:6,emoji:'🥤'}] },
   ],
   clientes:[
     { id:'cli_m4k2', nome:'Maria Silva',   tel:'(11) 98877-4412', pedidos:32, fav:'Marmita de frango' },
@@ -378,13 +378,19 @@ const S = {
     { id:'prd_a5', nome:'Pudim fatia',             cat:'Sobremesas', preco:8.50,  custo:3.20,  emoji:'🍮' },
   ],
   moves:[
-    { id:'mov_9', tipo:'venda',    desc:'Pedido #1038 · Bia Teixeira',  valor:24.00,  h:'11:38' },
-    { id:'mov_8', tipo:'venda',    desc:'Pedido #1037 · Diego Ramos',   valor:38.50,  h:'11:12' },
-    { id:'mov_7', tipo:'saida',    desc:'Gás 13kg',                     valor:-119.60, h:'10:40' },
+    { id:'mov_9', tipo:'venda',    desc:'Pedido #1038 · Bia Teixeira',  valor:24.00,  h:'11:38', orderId:'ped_3z6d5', forma:'Pix' },
+    { id:'mov_8', tipo:'venda',    desc:'Pedido #1037 · Diego Ramos',   valor:38.50,  h:'11:12', orderId:'ped_2y5c4', forma:'Cartão débito' },
+    { id:'mov_7', tipo:'saida',    desc:'Gás 13kg',                     valor:-119.60, h:'10:40', contaId:'cp_04' },
     { id:'mov_6', tipo:'sangria',  desc:'Sangria · troco',              valor:-100.00, h:'10:05' },
-    { id:'mov_5', tipo:'venda',    desc:'Pedido #1036 · Walk-in',       valor:21.00,  h:'09:58' },
+    { id:'mov_5', tipo:'venda',    desc:'Pedido #1036 · Walk-in',       valor:21.00,  h:'09:58', forma:'Dinheiro' },
     { id:'mov_4', tipo:'saida',    desc:'Hortifruti do Zé',             valor:-100.00, h:'09:20' },
     { id:'mov_3', tipo:'abertura', desc:'Abertura de caixa',            valor:200.00, h:'08:12' },
+  ],
+  stockMoves:[
+    { id:'sm_1', tipo:'entrada', item:'Peito de frango resfriado', qty:'+10 kg',  h:'ontem 16:20', autor:'Felipe', motivo:'Compra · Frigorífico Boa Carne' },
+    { id:'sm_2', tipo:'saida',   item:'Pudim · lote 08/08',        qty:'-4 un',   h:'ontem 19:02', autor:'Thati',  motivo:'Descarte · vencido', perda:16.40 },
+    { id:'sm_3', tipo:'entrada', item:'Embalagem marmita 750ml',   qty:'+200 un', h:'12 ago 10:14', autor:'Felipe', motivo:'Compra · EmbalaForte' },
+    { id:'sm_4', tipo:'saida',   item:'Arroz branco tipo 1',       qty:'-3 kg',   h:'hoje 08:40',  autor:'Cida',   motivo:'Produção do dia' },
   ],
   receber:[
     { id:'cr_01', desc:'Repasse iFood · semana 33', valor:842.30, venc:'hoje',   status:'pendente', obs:'Repasse automático às quintas' },
@@ -418,7 +424,7 @@ const MODULES = [
     state:() => { const ag = S.orders.filter(o => o.status === 'aguardando');
       return ag.length ? `<b>${ag.length}</b> aguardando · mais antigo <b>há ${Math.max(...ag.map(waitMin))} min</b>` : 'fila limpa'; } },
   { id:'estoque', name:'Estoque', icon:'box', tint:'#15388A',
-    tabs:[['posicao','Posição'],['entrada','Dar entrada'],['produtos','Produtos'],['novo-produto','Novo produto']],
+    tabs:[['posicao','Posição'],['entrada','Dar entrada'],['movimentos','Movimentações'],['produtos','Produtos'],['novo-produto','Novo produto']],
     state:() => { const low = S.stock.filter(s => s.qty < s.min).length;
       return low ? `<b>${low}</b> insumos abaixo do mínimo` : 'tudo acima do mínimo'; } },
   { id:'financeiro', name:'Financeiro', icon:'money', tint:'#8A5A00',
@@ -432,10 +438,10 @@ const MODULES = [
 ];
 /* avatar com iniciais + cor determinística pelo nome */
 const AV_COLORS = ['#E85814','#15388A','#0F766E','#8A5A00','#5B21B6','#B3261E'];
+const avatarColorOf = nome => AV_COLORS[[...nome].reduce((s, c) => s + c.charCodeAt(0), 0) % AV_COLORS.length];
 function avatarFor(nome){
-  const h = [...nome].reduce((s, c) => s + c.charCodeAt(0), 0);
   const ini = nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-  return `<span class="avatar-sm" style="background:${AV_COLORS[h % AV_COLORS.length]}">${ini}</span>`;
+  return `<span class="avatar-sm" style="background:${avatarColorOf(nome)}">${ini}</span>`;
 }
 </script>
 <script>
@@ -488,13 +494,21 @@ function openModule(id, tab){
   S.moduleTab[id] = tab || S.moduleTab[id] || m.tabs[0][0];
   renderModule();
 }
-function goHome(){ S.module = null; renderHome(); }
-function setModuleTab(t){ S.moduleTab[S.module] = t; renderModule(); }
+function goHome(){ S.module = null; S.detail = null; renderHome(); }
+function setModuleTab(t){ S.moduleTab[S.module] = t; S.detail = null; renderModule(); }
 function renderModule(){
   const m = MODULES.find(x => x.id === S.module);
   const cur = S.moduleTab[m.id];
   document.getElementById('tb-logo').classList.add('back');
   document.getElementById('tb-title').innerHTML = `Easy<em>Stok</em> <span style="color:var(--text-4);font-weight:500">· ${m.name}</span>`;
+  /* detalhe de objeto substitui a tab (Stripe/Twilio: página própria do objeto) */
+  if(S.detail){
+    main.className = 'wrap';
+    main.innerHTML = `<div class="view-enter">${S.detail.type === 'pedido' ? vPedido(S.detail.id) : vCliente(S.detail.id)}</div>`;
+    document.title = `${S.detail.type === 'pedido' ? 'Pedido' : 'Cliente'} · EasyStok [Homolog]`;
+    window.scrollTo(0, 0);
+    return;
+  }
   const narrow = ['novo-pedido','novo-produto','entrada'].includes(cur);
   main.className = narrow ? 'wrap narrow' : 'wrap';
   main.innerHTML = `
@@ -529,7 +543,7 @@ function tPedidos(){
     <p class="tab-note">${rows.length} pedidos · atualizado agora</p>
     <div class="rows">
       ${rows.map(o => { const m = waitMin(o), sm = STATUS[o.status];
-        return `<div class="row ${o.n === S.lastNew ? 'row-new' : ''}" style="grid-template-columns:auto auto 1fr auto auto auto auto">
+        return `<button class="row ${o.n === S.lastNew ? 'row-new' : ''}" style="grid-template-columns:auto auto 1fr auto auto auto auto;width:100%;text-align:left" onclick="openDetail('pedido','${o.id}')">
           <span class="row-num" style="font-weight:700">#${o.n}</span>
           ${avatarFor(o.cliente)}
           <span><span class="row-main">${esc(o.cliente)}</span>
@@ -539,7 +553,7 @@ function tPedidos(){
           <span class="row-num" style="font-weight:600">${fmt$(o.total)}</span>
           <span style="display:flex;gap:8px;align-items:center"><span class="pill ${sm.pill}">${sm.label}</span>
             ${sm.action ? `<button class="btn btn-dark btn-sm" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}</span>
-        </div>`; }).join('')}
+        </button>`; }).join('')}
     </div>
     ${rows.length ? '' : `<div class="empty"><div class="e-icon">${ico('check', 22)}</div><h2>Fila limpa</h2><p>Nenhum pedido nesse recorte.</p></div>`}`;
 }
@@ -548,7 +562,7 @@ function advance(id){
   const next = STATUS[o.status].next;
   if(!next) return;
   o.status = next; o.at = Date.now();
-  if(next === 'entregue') S.moves.unshift({ id:'mov_' + Math.random().toString(36).slice(2,6), tipo:'venda', desc:`Pedido #${o.n} · ${o.cliente}`, valor:o.total, h:'agora' });
+  if(next === 'entregue') S.moves.unshift({ id:'mov_' + Math.random().toString(36).slice(2, 6), tipo:'venda', desc:`Pedido #${o.n} · ${o.cliente}`, valor:o.total, h:'agora', orderId:o.id, forma:o.pag });
   toast(`#${o.n} → ${STATUS[next].label}`);
   rerender();
 }
@@ -741,6 +755,7 @@ function entrySave(){
   const e = S.entry;
   e.item.qty += parseFloat(e.qty);
   if(parseFloat(e.custo)) e.item.custo = parseFloat(e.custo);
+  S.stockMoves.unshift({ id:'sm_' + Math.random().toString(36).slice(2, 5), tipo:'entrada', item:e.item.nome, qty:'+' + String(e.qty).replace('.', ',') + ' ' + e.item.un, h:'agora', autor:'Felipe', motivo:'Entrada manual' });
   toast(`Entrada confirmada: ${esc(e.item.nome)} agora tem ${String(e.item.qty).replace('.', ',')} ${e.item.un}`);
   S.entry = null;
   S.moduleTab['estoque'] = 'posicao';
@@ -940,19 +955,19 @@ function tAnalises(){
 
 const TABS = {
   'pedidos':tPedidos, 'novo-pedido':tNovoPedido, 'caixa':tCaixa, 'clientes':() => tClientesTab(),
-  'posicao':tPosicao, 'entrada':tEntrada, 'produtos':tProdutos, 'novo-produto':tNovoProduto,
+  'posicao':tPosicao, 'entrada':tEntrada, 'movimentos':tMovimentos, 'produtos':tProdutos, 'novo-produto':tNovoProduto,
   'receber':() => tContas('receber'), 'pagar':() => tContas('pagar'),
   'lista':tComprasLista, 'analises':tAnalises,
 };
 function tClientesTab(){
   return `<p class="tab-note">${S.clientes.length} clientes · o histórico alimenta o “costuma pedir” do novo pedido</p>
     <div class="rows">
-      ${S.clientes.map(c => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+      ${S.clientes.map(c => `<button class="row" style="grid-template-columns:auto 1fr auto auto;width:100%;text-align:left" onclick="openDetail('cliente','${c.id}')">
         ${avatarFor(c.nome)}
         <span><span class="row-main">${esc(c.nome)}</span><div class="row-sub">${c.tel} · costuma pedir ${esc(c.fav)}</div></span>
         <span class="row-num" style="color:var(--text-3)">${c.pedidos} pedidos</span>
-        <button class="btn btn-secondary btn-sm" onclick="openModule('operacao','novo-pedido');S.draft={cliente:S.clientes.find(x=>x.id==='${c.id}'),items:[],obs:'',canal:''};renderModule()">Novo pedido</button>
-      </div>`).join('')}
+        <span style="color:var(--text-4)">›</span>
+      </button>`).join('')}
     </div>`;
 }
 </script>
@@ -984,6 +999,45 @@ function tClientesTab(){
 .ctx-row{border-radius:var(--r-m);padding-left:8px;padding-right:8px;margin:0 -8px}
 .row{border-radius:var(--r-s);padding-left:8px;padding-right:8px;margin:0 -8px}
 .guide-card{background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-l);box-shadow:var(--shadow-pop)}
+
+/* ═══ DETALHE DE OBJETO (Stripe/Twilio) ═══ */
+.detail-head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.detail-head .d-title{font-size:26px;font-weight:800;letter-spacing:-.03em;display:flex;align-items:center;gap:12px}
+.detail-head .d-sub{font-size:13px;color:var(--text-3);margin-top:4px}
+.detail-head .d-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-3);margin-bottom:14px}
+.back-link:hover{color:var(--text)}
+.id-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-4);
+  background:var(--hover);border-radius:var(--r-s);padding:3px 8px}
+.id-chip button{color:var(--text-4);display:grid;place-items:center;width:16px;height:16px;border-radius:4px}
+.id-chip button:hover{background:var(--pressed);color:var(--text)}
+.timeline{display:flex;margin:20px 0 26px}
+.tl-step{flex:1;position:relative;text-align:center}
+.tl-step::before{content:"";position:absolute;top:10px;left:-50%;width:100%;height:2px;background:var(--hairline-2)}
+.tl-step:first-child::before{display:none}
+.tl-step.done::before{background:var(--ok)}
+.tl-dot{position:relative;z-index:1;width:21px;height:21px;border-radius:50%;background:var(--card);border:2px solid var(--hairline-2);
+  display:inline-grid;place-items:center;font-size:10px;font-weight:800;color:var(--text-4)}
+.tl-step.done .tl-dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.tl-step.now .tl-dot{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.tl-l{font-size:11px;font-weight:600;color:var(--text-4);margin-top:6px}
+.tl-t{font-size:10.5px;color:var(--text-4);font-family:var(--font-mono)}
+.tl-step.done .tl-l,.tl-step.now .tl-l{color:var(--text)}
+.d-section{border-top:1px solid var(--hairline);padding:16px 0}
+.d-section>.eyebrow{display:block;margin-bottom:10px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:18px;margin:6px 0 4px}
+.stat .s-v{font-family:var(--font-mono);font-size:21px;font-weight:600;letter-spacing:-.02em}
+.stat .s-l{font-size:11.5px;color:var(--text-3);margin-top:2px}
+
+/* ═══ CUPOM 80mm (preview de impressão fiel) ═══ */
+.receipt{width:280px;margin:0 auto;background:#fff;color:#111;border-radius:4px;box-shadow:var(--shadow-pop);
+  padding:18px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55}
+.receipt .r-center{text-align:center}
+.receipt .r-title{font-size:13px;font-weight:700}
+.receipt .r-line{border-top:1px dashed #999;margin:8px 0}
+.receipt .r-row{display:flex;justify-content:space-between;gap:8px}
+.receipt .r-big{font-size:15px;font-weight:700}
+@media print{body *{visibility:hidden}.receipt,.receipt *{visibility:visible}.receipt{position:fixed;inset:0;box-shadow:none}}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -1111,3 +1165,310 @@ renderHome();
 </script>
 </body>
 </html>
+<script>
+/* ═══ DETALHE DE PEDIDO — timeline viva, vínculo com caixa, impressão ═══ */
+function openDetail(type, id){ S.detail = { type, id }; renderModule(); }
+function closeDetail(){ S.detail = null; renderModule(); }
+function idChip(id){ return `<span class="id-chip">${id} <button aria-label="Copiar" onclick="copyId('${id}')">${ico('copy', 10)}</button></span>`; }
+const REL = m => { const min = waitMin({ at: m }); if(min < 1) return 'agora'; if(min < 60) return `há ${min} min`; const h = Math.floor(min/60); return h < 24 ? `há ${h} h` : 'ontem'; };
+
+function vPedido(id){
+  const o = S.orders.find(x => x.id === id);
+  if(!o) return closeDetail();
+  const sm = STATUS[o.status];
+  const steps = ['aguardando','preparando','pronto','entregue'];
+  const idx = steps.indexOf(o.status);
+  const move = S.moves.find(m => m.orderId === o.id);
+  return `
+    <button class="back-link" onclick="closeDetail()">‹ Pedidos</button>
+    <div class="detail-head">
+      <div>
+        <div class="d-title">#${o.n} <span class="pill ${sm.pill}">${sm.label}</span></div>
+        <div class="d-sub">criado ${REL(o.at)} · ${o.canal} · ${idChip(o.id)}</div>
+      </div>
+      <div class="d-actions">
+        <button class="btn btn-secondary" onclick="toast('Cupom enviado pra impressora')">${ico('print', 14)} Imprimir cupom</button>
+        ${sm.action ? `<button class="btn btn-primary" onclick="advance('${o.id}')">${sm.action}</button>` : ''}
+        ${o.status !== 'entregue' ? `<button class="btn btn-secondary" style="color:var(--crit)" onclick="toast('Abriria cancelamento com motivo')">Cancelar</button>` : ''}
+      </div>
+    </div>
+
+    <div class="timeline">
+      ${steps.map((s, i) => `<div class="tl-step ${i < idx ? 'done' : i === idx ? (o.status === 'entregue' ? 'done' : 'now') : ''}">
+        <span class="tl-dot">${i < idx || o.status === 'entregue' ? '✓' : i + 1}</span>
+        <div class="tl-l">${s}</div>
+        ${i <= idx ? `<div class="tl-t">${REL(o.at)}</div>` : ''}
+      </div>`).join('')}
+    </div>
+
+    <div class="d-section"><span class="eyebrow">Itens · ${o.items.reduce((s, i) => s + i.q, 0)}</span>
+      <div class="rows" style="border-top:0">
+        ${o.items.map(it => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+          <span class="item-thumb">${it.emoji || '🍽️'}</span>
+          <span><span class="row-main">${esc(it.nome)}</span>${it.q > 1 ? `<div class="row-sub mono">${fmt$(it.p)} cada</div>` : ''}</span>
+          <span class="row-num" style="color:var(--text-3)">${it.q}×</span>
+          <span class="row-num" style="font-weight:600;min-width:70px;text-align:right">${fmt$(it.p * it.q)}</span>
+        </div>`).join('')}
+      </div>
+      ${o.obs ? `<p class="f-hint" style="margin-top:10px">✎ ${esc(o.obs)}</p>` : ''}
+    </div>
+
+    <div class="d-section"><span class="eyebrow">Pagamento</span>
+      <div class="dr-row" style="border-top:0"><span class="dr-k">Forma</span><span class="dr-v">${o.pag}</span></div>
+      <div class="dr-row"><span class="dr-k">Total</span><span class="dr-v mono">${fmt$(o.total)}</span></div>
+      <div class="dr-row"><span class="dr-k">No caixa</span><span class="dr-v">${move
+        ? `<a href="#" onclick="closeDetail();openModule('operacao','caixa');setTimeout(()=>openMove('${move.id}'),80);return false">${move.id} · entrou às ${move.h}</a>`
+        : 'entra automaticamente quando for entregue'}</span></div>
+    </div>
+
+    <div class="d-section"><span class="eyebrow">Cliente</span>
+      <div class="row" style="grid-template-columns:auto 1fr auto;border-top:0">
+        ${avatarFor(o.cliente)}
+        <span><span class="row-main">${esc(o.cliente)}</span><div class="row-sub">cliente desde março</div></span>
+        <button class="btn btn-secondary btn-sm" onclick="openClienteByName('${esc(o.cliente)}')">Ver cliente</button>
+      </div>
+    </div>`;
+}
+function openClienteByName(nome){
+  const c = S.clientes.find(x => x.nome === nome);
+  if(c){ S.detail = { type:'cliente', id:c.id }; S.moduleTab['operacao'] = 'clientes'; renderModule(); }
+}
+
+/* ═══ DETALHE DE CLIENTE + EDIÇÃO CALMA ═══ */
+function vCliente(id){
+  const c = S.clientes.find(x => x.id === id);
+  if(!c) return closeDetail();
+  const pedidos = S.orders.filter(o => o.cliente === c.nome).sort((a, b) => b.n - a.n);
+  const gasto = pedidos.reduce((s, o) => s + o.total, 0) + c.pedidos * 22; // base histórica simulada
+  const ticket = gasto / (c.pedidos + pedidos.length || 1);
+  return `
+    <button class="back-link" onclick="closeDetail()">‹ Clientes</button>
+    <div class="detail-head">
+      <span class="avatar-sm" style="width:52px;height:52px;font-size:17px;background:${avatarColorOf(c.nome)}">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+      <div>
+        <div class="d-title">${esc(c.nome)}</div>
+        <div class="d-sub">${c.tel} · cliente desde mar/2026 · ${idChip(c.id)}</div>
+      </div>
+      <div class="d-actions">
+        <button class="btn btn-secondary" onclick="toast('Abriria WhatsApp')">WhatsApp ↗</button>
+        <button class="btn btn-secondary" onclick="editCliente('${c.id}')">Editar</button>
+        <button class="btn btn-primary" onclick="S.draft={cliente:S.clientes.find(x=>x.id==='${c.id}'),items:[],obs:'',canal:''};closeDetail();openModule('operacao','novo-pedido')">${ico('plus', 13)} Novo pedido</button>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="s-v">${c.pedidos + pedidos.length}</div><div class="s-l">pedidos</div></div>
+      <div class="stat"><div class="s-v">${fmt$(gasto)}</div><div class="s-l">total gasto</div></div>
+      <div class="stat"><div class="s-v">${fmt$(ticket)}</div><div class="s-l">ticket médio</div></div>
+      <div class="stat"><div class="s-v" style="font-size:15px;font-family:var(--font-sans);font-weight:700">${esc(c.fav)}</div><div class="s-l">costuma pedir</div></div>
+    </div>
+
+    <div class="d-section" style="margin-top:18px"><span class="eyebrow">Histórico recente</span>
+      ${pedidos.length ? `<div class="rows" style="border-top:0">${pedidos.map(o => `
+        <button class="row" style="grid-template-columns:auto 1fr auto auto;width:100%;text-align:left" onclick="openDetail('pedido','${o.id}')">
+          <span class="row-num" style="font-weight:700">#${o.n}</span>
+          <span class="row-sub">${o.items.map(i => `${i.q}× ${i.nome}`).join(' · ')}</span>
+          <span class="row-num">${fmt$(o.total)}</span>
+          <span class="pill ${STATUS[o.status].pill}">${STATUS[o.status].label}</span>
+        </button>`).join('')}</div>`
+      : `<p class="f-hint">Nenhum pedido recente.</p>`}
+    </div>`;
+}
+function editCliente(id){
+  const c = S.clientes.find(x => x.id === id);
+  openDrawer(`
+    <div class="drawer-head"><h2>Editar cliente</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="f-field"><label class="f-label">Nome</label><input class="f-input" id="ec-nome" value="${esc(c.nome)}"></div>
+      <div class="f-field"><label class="f-label">Telefone / WhatsApp</label><input class="f-input mono" id="ec-tel" value="${c.tel}"></div>
+      <div class="f-field"><label class="f-label">Endereço de entrega</label><input class="f-input" placeholder="Rua, número, complemento"></div>
+      <div class="f-field"><label class="f-label">Observações</label><textarea class="f-input" rows="2" placeholder="ex: portaria 24h, não tocar campainha"></textarea></div>
+      <button class="btn btn-primary btn-block" onclick="saveCliente('${id}')">Salvar</button>
+    </div>`);
+}
+function saveCliente(id){
+  const c = S.clientes.find(x => x.id === id);
+  const nome = document.getElementById('ec-nome').value.trim();
+  const tel = document.getElementById('ec-tel').value.trim();
+  if(nome) c.nome = nome;
+  if(tel) c.tel = tel;
+  closeDrawer();
+  toast('Cliente atualizado');
+  rerender();
+}
+</script>
+<script>
+/* ═══ CAIXA v8 — vendas/lançamentos filtráveis, vínculo financeiro,
+       fechamento com conferência, impressão de fechamento em cupom ═══ */
+function tCaixa(){
+  const f = S.cashFilter || 'todos';
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const saidas = S.moves.filter(m => m.tipo === 'saida').reduce((s, m) => s - m.valor, 0);
+  const sangria = S.moves.filter(m => m.tipo === 'sangria').reduce((s, m) => s - m.valor, 0);
+  const saldo = 200 + vendas - saidas - sangria;
+  const tot = vendas + saidas + sangria;
+  const rows = S.moves.filter(m => f === 'todos' ? true : m.tipo === f);
+  return `<div class="kpis">
+      <div class="kpi"><div class="k-l">Saldo em caixa</div><div class="k-v">${fmt$(saldo)}</div><div class="k-d up">aberto desde 08h12</div></div>
+      <div class="kpi"><div class="k-l">Entradas</div><div class="k-v">${fmt$(vendas)}</div><div class="k-d up">vendas entram sozinhas</div></div>
+      <div class="kpi"><div class="k-l">Saídas + sangria</div><div class="k-v">${fmt$(saidas + sangria)}</div><div class="k-d flat">3 lançamentos manuais</div></div>
+    </div>
+    <div class="comp"><div style="width:${vendas / tot * 100}%;background:var(--ok)"></div><div style="width:${saidas / tot * 100}%;background:var(--warn)"></div><div style="width:${sangria / tot * 100}%;background:var(--crit)"></div></div>
+    <div class="legend" style="margin-bottom:24px">
+      <div class="legend-row"><i style="background:var(--ok)"></i>Entradas<span class="v">${fmt$(vendas)}</span></div>
+      <div class="legend-row"><i style="background:var(--warn)"></i>Saídas<span class="v">${fmt$(saidas)}</span></div>
+      <div class="legend-row"><i style="background:var(--crit)"></i>Sangria<span class="v">${fmt$(sangria)}</span></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="chips-row" style="margin:0">
+        ${[['todos','Todos'],['venda','Vendas'],['saida','Saídas'],['sangria','Sangria'],['abertura','Abertura']].map(([k, l]) =>
+          `<button class="chip ${f === k ? 'on' : ''}" onclick="S.cashFilter='${k}';rerender()">${l}</button>`).join('')}
+      </div>
+      <span style="font-size:12px;color:var(--text-4)">${rows.length} lançamentos · atualizado agora</span>
+    </div>
+    <div class="rows">
+      ${rows.map(m => `<button class="row" style="grid-template-columns:auto 1fr auto auto;width:100%;text-align:left" onclick="openMove('${m.id}')">
+        <span class="pill ${m.tipo === 'venda' ? 'pill-ok' : m.tipo === 'abertura' ? 'pill-neutral' : m.tipo === 'sangria' ? 'pill-crit' : 'pill-warn'}">${m.tipo}</span>
+        <span><span class="row-main" style="font-weight:600">${esc(m.desc)}</span><div class="row-sub">${m.h}${m.forma ? ' · ' + m.forma : ''}</div></span>
+        <span class="row-num" style="font-weight:600;color:${m.valor >= 0 ? 'var(--ok)' : 'var(--crit)'}">${m.valor >= 0 ? '+' : ''}${fmt$(m.valor)}</span>
+        <span style="color:var(--text-4)">›</span>
+      </button>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">
+      <button class="btn btn-secondary" onclick="toast('Abriria lançamento manual')">${ico('plus', 13)} Lançamento</button>
+      <button class="btn btn-secondary" onclick="printFechamento()">${ico('print', 14)} Imprimir resumo</button>
+      <button class="btn btn-dark" onclick="fechamentoFlow()">Fechar o dia</button>
+    </div>`;
+}
+function fechamentoFlow(){
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const esperado = 200 + vendas - 219.60 - 100;
+  openDrawer(`
+    <div class="drawer-head"><h2>Fechar o dia</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <p class="f-hint" style="margin-bottom:16px">Conte o dinheiro físico. O sistema confere com o esperado e mostra a diferença antes de fechar.</p>
+      <div class="dr-row"><span class="dr-k">Vendas do dia</span><span class="dr-v mono">${fmt$(vendas)}</span></div>
+      <div class="dr-row"><span class="dr-k">Esperado em caixa</span><span class="dr-v mono">${fmt$(esperado)}</span></div>
+      <div class="f-field" style="margin-top:16px"><label class="f-label">Contado em dinheiro</label>
+        <input class="f-input big mono" id="fech-contado" type="number" min="0" step="0.01" placeholder="0,00" oninput="fechDiff(${esperado})"></div>
+      <div id="fech-diff"></div>
+      <div class="dr-row" style="margin-top:8px"><span class="dr-k">Margem real do dia</span><span class="dr-v mono" style="color:var(--ok)">31,4%</span></div>
+      <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="closeDrawer();toast('Dia fechado · resumo salvo e enviado')">Confirmar fechamento</button>
+      <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="printFechamento()">${ico('print', 14)} Imprimir fechamento</button>
+    </div>`);
+}
+function fechDiff(esperado){
+  const v = parseFloat(document.getElementById('fech-contado').value);
+  const box = document.getElementById('fech-diff');
+  if(isNaN(v)){ box.innerHTML = ''; return; }
+  const d = v - esperado;
+  box.innerHTML = `<div style="padding:12px 14px;border-radius:var(--r-m);margin-bottom:6px;font-size:13.5px;font-weight:600;
+    background:${Math.abs(d) < 1 ? 'var(--ok-soft)' : 'var(--crit-soft)'};color:${Math.abs(d) < 1 ? 'var(--ok)' : 'var(--crit)'}">
+    ${Math.abs(d) < 1 ? '✓ Confere com o esperado' : (d > 0 ? 'Sobra' : 'Falta') + ' de ' + fmt$(Math.abs(d))}</div>`;
+}
+/* preview fiel do cupom térmico de fechamento */
+function printFechamento(){
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  openDrawer(`
+    <div class="drawer-head"><h2>Imprimir · fechamento</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body" style="background:var(--hover)">
+      <div class="receipt">
+        <div class="r-center r-title">CASA DA BABÁ</div>
+        <div class="r-center">FECHAMENTO DE CAIXA</div>
+        <div class="r-center">15/08/2026 18:30 · Loja Centro</div>
+        <div class="r-line"></div>
+        <div class="r-row"><span>Abertura</span><span>200,00</span></div>
+        <div class="r-row"><span>Vendas (47)</span><span>${(vendas).toFixed(2).replace('.', ',')}</span></div>
+        <div class="r-row"><span>Saídas</span><span>-219,60</span></div>
+        <div class="r-row"><span>Sangria</span><span>-100,00</span></div>
+        <div class="r-line"></div>
+        <div class="r-row r-big"><span>SALDO</span><span>${(200 + vendas - 319.60).toFixed(2).replace('.', ',')}</span></div>
+        <div class="r-row"><span>Margem real</span><span>31,4%</span></div>
+        <div class="r-line"></div>
+        <div class="r-center">Pix 62% · Cartão 28% · Dinheiro 10%</div>
+        <div class="r-center">— confira o físico —</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="toast('Enviado pra Bematech 80mm')">Imprimir</button>
+        <button class="btn btn-secondary" onclick="toast('PDF do fechamento salvo')">Salvar PDF</button>
+      </div>
+    </div>`);
+}
+function openMove(id){
+  const m = S.moves.find(x => x.id === id);
+  const pedido = m.orderId ? S.orders.find(o => o.id === m.orderId) : null;
+  openDrawer(`
+    <div class="drawer-head"><h2>${esc(m.desc)}</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div style="font-family:var(--font-mono);font-size:30px;font-weight:600;letter-spacing:-.02em;color:${m.valor >= 0 ? 'var(--ok)' : 'var(--crit)'};margin-bottom:18px">${m.valor >= 0 ? '+' : ''}${fmt$(m.valor)}</div>
+      <div class="dr-row"><span class="dr-k">Tipo</span><span class="dr-v">${m.tipo}</span></div>
+      <div class="dr-row"><span class="dr-k">Horário</span><span class="dr-v">${m.h}</span></div>
+      ${m.forma ? `<div class="dr-row"><span class="dr-k">Forma</span><span class="dr-v">${m.forma}</span></div>` : ''}
+      <div class="dr-row"><span class="dr-k">Identificador</span><span class="dr-v">${idChip(m.id)}</span></div>
+      <div class="dr-row"><span class="dr-k">Origem</span><span class="dr-v">${m.tipo === 'venda' ? 'Automática · pedido entregue' : 'Manual · operador'}</span></div>
+      ${pedido ? `<div class="dr-row"><span class="dr-k">Pedido</span><span class="dr-v"><a href="#" onclick="closeDrawer();openDetail('pedido','${pedido.id}');return false">#${pedido.n} · ver pedido</a></span></div>` : ''}
+      ${m.contaId ? `<div class="dr-row"><span class="dr-k">Financeiro</span><span class="dr-v"><a href="#" onclick="closeDrawer();openModule('financeiro','pagar');return false">vinculado a contas a pagar</a></span></div>` : ''}
+      <div style="display:flex;gap:10px;margin-top:24px">
+        <button class="btn btn-secondary" onclick="toast('Recibo enviado pra impressora')">${ico('print', 13)} Recibo</button>
+        ${m.tipo !== 'venda' ? `<button class="btn btn-secondary" onclick="toast('Abriria edição')">Editar</button>` : ''}
+      </div>
+    </div>`);
+}
+
+/* ═══ ENTRADAS E SAÍDAS — timeline unificada + descarte inteligente ═══ */
+function tMovimentos(){
+  const f = S.smFilter || 'todos';
+  const rows = S.stockMoves.filter(m => f === 'todos' ? true : m.tipo === f);
+  const low = S.stock.filter(s => s.qty < s.min);
+  return `
+    ${low.length ? `<div class="att-line" style="border-top:0;margin-bottom:14px"><span><b>${low.length} insumos</b> abaixo do mínimo — dar entrada agora evita parar a produção amanhã.</span><a class="a" href="#" onclick="setModuleTab('entrada');return false">Dar entrada →</a></div>` : ''}
+    <div class="chips-row">
+      ${[['todos','Todos'],['entrada','Entradas'],['saida','Saídas']].map(([k, l]) =>
+        `<button class="chip ${f === k ? 'on' : ''}" onclick="S.smFilter='${k}';rerender()">${l}</button>`).join('')}
+      <span style="flex:1"></span>
+      <button class="btn btn-secondary btn-sm" onclick="descarteFlow()">Registrar perda / descarte</button>
+    </div>
+    <div class="rows">
+      ${rows.map(m => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+        <span class="pill ${m.tipo === 'entrada' ? 'pill-ok' : 'pill-warn'}">${m.tipo}</span>
+        <span><span class="row-main">${esc(m.item)}</span><div class="row-sub">${esc(m.motivo)} · ${m.autor} · ${m.h}</div></span>
+        <span class="row-num" style="font-weight:600;color:${m.tipo === 'entrada' ? 'var(--ok)' : 'var(--text)'}">${m.qty}</span>
+        ${m.perda ? `<span class="row-num" style="color:var(--crit);font-weight:600">-${fmt$(m.perda)}</span>` : '<span></span>'}
+      </div>`).join('')}
+    </div>`;
+}
+function descarteFlow(){
+  const alvo = S.stock.find(s => s.nome.includes('Pudim')) || S.stock[0];
+  openDrawer(`
+    <div class="drawer-head"><h2>Registrar perda</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="row" style="grid-template-columns:1fr auto;border-top:0;margin-bottom:14px">
+        <span><span class="row-main">${esc(alvo.nome)}</span><div class="row-sub">em estoque: ${String(alvo.qty).replace('.', ',')} ${alvo.un} · custo ${fmt$(alvo.custo)}</div></span>
+      </div>
+      <div class="f-field"><label class="f-label">Quantidade perdida</label>
+        <input class="f-input mono" id="desc-qty" type="number" min="0" step="any" value="${alvo.qty}" oninput="descPerda(${alvo.custo})"></div>
+      <div class="f-field"><label class="f-label">Motivo</label>
+        <div class="chips-row" id="desc-motivos">${['Vencido','Avariado','Erro de produção','Consumo interno'].map((m, i) =>
+          `<button class="chip ${i === 0 ? 'on' : ''}" onclick="document.querySelectorAll('#desc-motivos .chip').forEach(x=>x.classList.remove('on'));this.classList.add('on')">${m}</button>`).join('')}</div></div>
+      <div id="desc-perda"></div>
+      <p class="f-hint" style="margin:10px 0 16px">A perda entra no relatório de validade e desconta do estoque na hora.</p>
+      <button class="btn btn-primary btn-block" onclick="saveDescarte('${alvo.id}')">Confirmar descarte</button>
+    </div>`);
+  descPerda(alvo.custo);
+}
+function descPerda(custo){
+  const q = parseFloat(document.getElementById('desc-qty').value) || 0;
+  document.getElementById('desc-perda').innerHTML =
+    `<div style="padding:12px 14px;border-radius:var(--r-m);background:var(--crit-soft);color:var(--crit);font-size:13.5px;font-weight:600">Perda estimada: ${fmt$(q * custo)}</div>`;
+}
+function saveDescarte(id){
+  const item = S.stock.find(s => s.id === id);
+  const q = parseFloat(document.getElementById('desc-qty').value) || 0;
+  const motivo = document.querySelector('#desc-motivos .chip.on')?.textContent || 'Descarte';
+  item.qty = Math.max(0, item.qty - q);
+  S.stockMoves.unshift({ id:'sm_' + Math.random().toString(36).slice(2, 5), tipo:'saida', item:item.nome, qty:'-' + String(q).replace('.', ',') + ' ' + item.un, h:'agora', autor:'Felipe', motivo:'Descarte · ' + motivo, perda:q * item.custo });
+  closeDrawer();
+  toast(`Perda registrada: ${fmt$(q * item.custo)} · estoque atualizado`);
+  rerender();
+}
+</script>
