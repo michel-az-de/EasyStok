@@ -591,6 +591,37 @@ check('Cardápio: toggle de canal audita', () => {
   return window.S.audit.length === antes + 1;
 });
 
+/* ── v15: revisão + dia ao vivo ── */
+check('Revisão: home Pede atenção deriva do estado (sem hardcode)', () => {
+  window.goHome();
+  return txt().includes('Pede atenção') && txt().includes('vencem hoje');
+});
+check('Revisão: sem CSS morto crítico (#toast fora do DOM)', () => !document.getElementById('toast'));
+check('Dia ao vivo: liga e executa um passo real', () => {
+  const antes = window.S.orders.length + window.S.eventos.length;
+  window.toggleLiveDay();
+  return window.S.live.on === true && document.getElementById('live-btn').textContent.includes('Ao vivo');
+});
+check('Dia ao vivo: para e limpa', () => {
+  window.stopLiveDay();
+  return window.S.live.on === false;
+});
+check('Dia ao vivo: passo de cozinha avança fila sozinho', () => {
+  const o = window.S.orders.find(x => x.status === 'aguardando');
+  if(!o){ window.simPedido('iFood'); }
+  const filaAntes = window.S.orders.filter(x => x.status === 'aguardando').sort((a,b) => a.at - b.at)[0];
+  const stAntes = filaAntes.status;
+  let guard = 0;
+  while(guard++ < 20 && window.S.orders.find(x => x.id === filaAntes.id).status === stAntes){
+    // força o ramo "cozinha avança" repetindo liveStep até ele acontecer
+    const rollBackup = Math.random;
+    Math.random = () => 0.7;
+    window.eval('liveStep()');
+    Math.random = rollBackup;
+  }
+  return window.S.orders.find(x => x.id === filaAntes.id).status !== stAntes;
+});
+
 /* ── v14: avaliações com utilidade real ── */
 check('Avaliações: mostra impacto na marca', () => {
   window.openModule('clientes', 'avaliacoes');

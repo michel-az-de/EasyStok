@@ -111,14 +111,6 @@ a{color:var(--accent-text);text-decoration:none} a:hover{text-decoration:underli
 .ctx-row:hover .ctx-arrow{transform:translateX(3px);color:var(--text)}
 
 /* ═══ MÓDULO ═══ */
-.mod-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:4px}
-.mod-head h1{font-size:23px;font-weight:800;letter-spacing:-.03em}
-.mod-head .mh-sub{font-size:13px;color:var(--text-3);margin-top:3px}
-.mod-tabs{display:flex;gap:2px;margin:16px 0 22px;border-bottom:1px solid var(--hairline)}
-.mtab{padding:8px 13px;font-size:13.5px;font-weight:500;color:var(--text-3);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--d1) var(--ease)}
-.mtab:hover{color:var(--text)}
-.mtab[aria-selected="true"]{color:var(--text);font-weight:700;border-bottom-color:var(--text)}
-.mtab .ct{font-family:var(--font-mono);font-size:10.5px;margin-left:5px;color:var(--text-4)}
 .tab-note{font-size:13px;color:var(--text-3);margin:-8px 0 16px}
 
 /* ═══ CONTROLES ═══ */
@@ -158,14 +150,6 @@ kbd.k{font-family:var(--font-mono);font-size:10px;color:var(--text-4)}
 .chip.on{background:var(--text);color:var(--page)}
 .chip-add{border:1px dashed var(--hairline-2);background:transparent;color:var(--accent-text)}
 .chip-add:hover{border-color:var(--accent);background:var(--accent-soft)}
-.chip-on{background:var(--accent-soft);color:var(--accent-text)}
-.chip-on .x{display:grid;place-items:center;width:15px;height:15px;border-radius:50%}
-.chip-on .x:hover{background:var(--accent);color:#fff}
-.filter-clear{font-size:12.5px;font-weight:600;color:var(--accent-text)}
-.popover{position:absolute;z-index:var(--z-popover);background:var(--card);border-radius:var(--r-m);box-shadow:var(--shadow-pop);padding:14px;width:224px;animation:fadeUp .18s var(--ease)}
-.popover h3{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-4);margin-bottom:10px}
-.popover select{width:100%;height:34px;padding:0 8px;border:1px solid var(--hairline-2);border-radius:var(--r-s);background:var(--card);font:inherit;font-size:13px;margin-bottom:10px}
-.popover .btn{width:100%;justify-content:center}
 
 /* ═══ FORMS calmos (1 coluna, labels leves) ═══ */
 .f-field{margin-bottom:18px}
@@ -265,18 +249,11 @@ body.search-open .search-panel{transform:translateX(0)}
 .search-hit mark{background:transparent;color:var(--accent-text);font-weight:700}
 .search-hit .enter{margin-left:auto;opacity:0;color:var(--text-4);font-size:10.5px}
 .search-hit.sel .enter{opacity:1}
-.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,12px);z-index:var(--z-toast);background:var(--text);color:var(--page);
-  padding:10px 18px;border-radius:var(--r-pill);font-size:13.5px;font-weight:500;box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transition:all var(--d1) var(--ease)}
-.toast.show{opacity:1;transform:translate(-50%,0)}
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 24px;animation:fadeUp .3s var(--ease)}
 .empty .e-icon{width:48px;height:48px;border-radius:14px;background:var(--hover);display:grid;place-items:center;color:var(--text-3);margin-bottom:14px}
 .empty h2{font-size:16px;font-weight:700;margin-bottom:4px;letter-spacing:-.01em}
 .empty p{max-width:380px;color:var(--text-3);font-size:13.5px}
 .empty .e-actions{display:flex;gap:14px;align-items:center;margin-top:18px}
-.skel{position:relative;overflow:hidden;background:var(--hover);border-radius:var(--r-s)}
-.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:shim 1.3s infinite}
-:root[data-theme="dark"] .skel::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent)}
-@keyframes shim{to{transform:translateX(100%)}}
 @media (max-width:860px){.wrap{padding:22px 16px 70px}}
 </style>
 </head>
@@ -315,6 +292,7 @@ body.search-open .search-panel{transform:translateX(0)}
   </nav>
   <div class="spacer"></div>
   <button class="sim-btn btn btn-secondary" id="sim-btn" data-tip="Simular eventos da operação" onclick="toggleSimMenu()"><svg width="13" height="13"><use href="#i-zap"/></svg>Simular</button>
+  <button class="sim-btn btn btn-secondary" id="live-btn" data-tip="5 min de operação real acontecendo sozinha" onclick="toggleLiveDay()">▶ Dia ao vivo</button>
   <button class="search-trigger" onclick="openSearch()"><svg width="14" height="14"><use href="#i-search"/></svg>Buscar<kbd>⌘K</kbd></button>
   <div class="density-toggle" role="group" aria-label="Densidade">
     <button data-d="comfort" aria-pressed="true" onclick="setDensity('comfort')">Confortável</button>
@@ -344,7 +322,6 @@ body.search-open .search-panel{transform:translateX(0)}
 <div class="drawer-backdrop" onclick="closeDrawer()"></div>
 <aside class="drawer" role="dialog" aria-modal="true" id="drawer"></aside>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 /* ═══ ESTADO ═══ */
 const NOW = Date.now(), MIN = 60000;
@@ -509,6 +486,13 @@ function renderHome(){
   const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1200;
   const ag = S.orders.filter(o => o.status === 'aguardando');
   const maior = ag.length ? Math.max(...ag.map(waitMin)) : 0;
+  /* "Pede atenção" derivado do estado real, nunca decorativo */
+  const vencHoje = S.lotes.filter(l => l.valN === 0);
+  const contaHoje = S.pagar.filter(p => p.venc === 'hoje' && p.status === 'pendente');
+  const atts = [];
+  if(maior > 15) atts.push(`<div class="att-line"><span><b>#${ag.sort((a, b) => a.at - b.at)[0].n}</b> espera há ${maior} min — passou da meta de 15.</span><a class="a" href="#" onclick="openModule('operacao','pedidos');return false">Preparar →</a></div>`);
+  contaHoje.forEach(p => atts.push(`<div class="att-line"><span><b>${esc(p.desc.split('·')[0].trim())}</b> vence hoje · ${fmt$(p.valor)}</span><a class="a" href="#" onclick="openModule('financeiro','pagar');return false">Ver →</a></div>`));
+  vencHoje.forEach(l => atts.push(`<div class="att-line"><span><b>${l.qty} ${l.un} de ${esc(l.prod.split('·')[0].trim().toLowerCase())}</b> vencem hoje.</span><a class="a" href="#" onclick="openModule('estoque','producao');return false">Agir →</a></div>`));
   renderChrome();
   main.innerHTML = `
     <div class="hello-wrap">
@@ -524,14 +508,10 @@ function renderHome(){
       <button class="btn btn-primary" onclick="openModule('operacao','novo-pedido')">${ico('plus', 14)} Novo pedido</button>
       <button class="btn btn-secondary" onclick="openModule('operacao','pedidos')">Ver a fila${ag.length ? ` · ${ag.length}` : ''}</button>
     </div>
-    ${maior > 15 || S.pagar.some(p => p.venc === 'hoje' && p.status === 'pendente') ? `
+    ${atts.length ? `
     <div class="att-block">
       <span class="eyebrow">Pede atenção</span>
-      <div style="margin-top:8px">
-        ${maior > 15 ? `<div class="att-line"><span><b>#${ag.sort((a,b) => a.at - b.at)[0].n}</b> espera há ${maior} min — passou da meta de 15.</span><a class="a" href="#" onclick="openModule('operacao','pedidos');return false">Preparar →</a></div>` : ''}
-        ${S.pagar.filter(p => p.venc === 'hoje' && p.status === 'pendente').map(p => `<div class="att-line"><span><b>${esc(p.desc.split('·')[0].trim())}</b> vence hoje · ${fmt$(p.valor)}</span><a class="a" href="#" onclick="openModule('financeiro','pagar');return false">Ver →</a></div>`).join('')}
-        <div class="att-line"><span><b>6 un de pudim</b> vencem hoje · perda de R$ 24,60 se não agir.</span><a class="a" href="#" onclick="openModule('estoque','posicao');return false">Agir →</a></div>
-      </div>
+      <div style="margin-top:8px">${atts.join('')}</div>
     </div>` : ''}
     <span class="eyebrow">Onde trabalhar</span>
     <div class="ctx-list" style="margin-top:8px">
@@ -1107,8 +1087,6 @@ function tClientesTab(){
 .detail-head .d-title{font-size:26px;font-weight:800;letter-spacing:-.03em;display:flex;align-items:center;gap:12px}
 .detail-head .d-sub{font-size:13px;color:var(--text-3);margin-top:4px}
 .detail-head .d-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-3);margin-bottom:14px}
-.back-link:hover{color:var(--text)}
 .id-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--text-4);
   background:var(--hover);border-radius:var(--r-s);padding:3px 8px}
 .id-chip button{color:var(--text-4);display:grid;place-items:center;width:16px;height:16px;border-radius:4px}
@@ -1328,8 +1306,10 @@ body.ev-open .ev-panel{transform:none}
 .a11y-row .a-d{font-size:12px;color:var(--text-3);margin-top:2px}
 input[type="range"].a-slider{-webkit-appearance:none;width:150px;height:4px;border-radius:99px;background:var(--pressed)}
 input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer}
-:root[data-a11y-contrast="1"]{--hairline:#9AA0AC;--hairline-2:#6E7480}
-:root[data-a11y-contrast="1"][data-theme="dark"],:root[data-a11y-contrast="1"][data-theme="casa"]{--hairline:#5A6170;--hairline-2:#7A8290}
+:root[data-a11y-contrast="1"]{--hairline:#9AA0AC;--hairline-2:#6E7480;--text-3:#4A4A50;--text-4:#5F5F66}
+:root[data-a11y-contrast="1"][data-theme="dark"],:root[data-a11y-contrast="1"][data-theme="casa"]{--hairline:#5A6170;--hairline-2:#8A8290;--text-3:#C7C7CC;--text-4:#A1A1A8}
+.live-on{background:var(--crit-soft)!important;color:var(--crit)!important;border-color:transparent!important;animation:livePulse 1.6s infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(192,59,42,.35)}50%{box-shadow:0 0 0 5px rgba(192,59,42,0)}}
 :root[data-a11y-motion="1"] *{transition-duration:.01ms!important;animation-duration:.01ms!important}
 :root[data-a11y-links="1"] a{text-decoration:underline}
 
@@ -1483,12 +1463,6 @@ try{
   if(t) document.documentElement.dataset.theme = t;
   else if(matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
 }catch(e){}
-let tt;
-function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2400);
-}
 function copyId(id){ navigator.clipboard?.writeText(id).catch(() => {}); toast('Copiado: ' + id); }
 
 /* ═══ TECLADO ═══ */
@@ -2351,14 +2325,6 @@ function tNotifPrefs(){
     </div>`;
 }
 </script>
-<script>
-/* boot: por ultimo, com todos os mocks e renderers carregados;
-   respeita a hash da URL (back/forward do navegador funcionam) */
-applyHash(location.hash);
-syncNav();
-</script>
-</body>
-</html>
 <script>
 /* ═══ MOCKS v11 ═══ */
 S.compras = [
@@ -3373,3 +3339,87 @@ function tVisaoFin(){
     </div>`;
 }
 </script>
+<script>
+/* ═══ DIA AO VIVO — 5 minutos de operação real acontecendo sozinha ═══
+   Pedidos chegando por canal, cozinha avançando a fila como se operasse
+   pelo celular, cliente perguntando no WhatsApp, avaliação caindo. */
+S.live = { on:false, timer:null, until:null };
+function toggleLiveDay(){
+  if(S.live.on){ stopLiveDay(); return; }
+  S.live.on = true;
+  S.live.until = Date.now() + 5 * 60 * 1000;
+  syncLiveBtn();
+  push({ title:'Dia ao vivo ligado', sub:'5 min de operação real acontecendo', icon:'▶️', tint:'var(--accent)' });
+  const tick = () => {
+    if(!S.live.on || Date.now() > S.live.until){ stopLiveDay(); return; }
+    liveStep();
+    S.live.timer = setTimeout(tick, 7000 + Math.random() * 8000);
+  };
+  tick();
+}
+function stopLiveDay(){
+  S.live.on = false;
+  clearTimeout(S.live.timer);
+  syncLiveBtn();
+  push({ title:'Dia ao vivo encerrado', icon:'⏹️' });
+}
+function syncLiveBtn(){
+  const b = document.getElementById('live-btn');
+  if(b){
+    b.innerHTML = S.live.on ? '● Ao vivo' : '▶ Dia ao vivo';
+    b.classList.toggle('live-on', S.live.on);
+    b.setAttribute('data-tip', S.live.on ? 'Parar a simulação' : '5 min de operação real acontecendo sozinha');
+  }
+}
+function liveStep(){
+  const roll = Math.random();
+  if(roll < 0.52){
+    /* pedido chegando por canal variado */
+    const canais = ['iFood','iFood','WhatsApp','Balcão','Keeta','99Food'];
+    simPedido(canais[Math.floor(Math.random() * canais.length)]);
+  } else if(roll < 0.80){
+    /* cozinha operando pelo celular: avança o pedido mais antigo */
+    const fila = S.orders.filter(o => STATUS[o.status].next).sort((a, b) => a.at - b.at);
+    if(fila.length){
+      const o = fila[0];
+      advance(o.id);
+      audit(`Thati moveu #${o.n} pra ${STATUS[o.status].label} pelo celular`);
+    } else {
+      simPedido('Balcão');
+    }
+  } else if(roll < 0.92){
+    simEvento(Math.random() < .5 ? 'wa' : 'pergunta');
+  } else {
+    simEvento('aval');
+  }
+}
+
+/* ═══ Autocorreção: item do draft abre o produto (peek em TODO lugar) ═══ */
+const _tNovoPedidoOrig = tNovoPedido;
+/* embrulho leve: depois do render, liga thumbs/nomes do draft ao peek */
+const _renderModuleOrig = renderModule;
+renderModule = function(){
+  _renderModuleOrig.apply(this, arguments);
+  if(S.module === 'operacao' && S.moduleTab['operacao'] === 'novo-pedido' && S.draft){
+    document.querySelectorAll('#draft-items .order-item').forEach((row, i) => {
+      const it = S.draft.items[i];
+      const prod = S.produtos.find(p => p.nome === it.nome);
+      if(!prod) return;
+      const target = row.querySelector('.item-thumb, .oi-name');
+      if(target){
+        target.style.cursor = 'pointer';
+        target.setAttribute('data-tip', 'Ver o produto');
+        target.addEventListener('click', ev => { ev.stopPropagation(); peek('produto', prod.id); });
+      }
+    });
+  }
+};
+</script>
+<script>
+/* boot: por ultimo de verdade — todos os mocks e renderers carregados.
+   respeita a hash da URL (back/forward do navegador funcionam) */
+applyHash(location.hash);
+syncNav();
+</script>
+</body>
+</html>
