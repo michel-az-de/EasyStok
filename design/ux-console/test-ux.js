@@ -156,9 +156,9 @@ check('Esc volta ao portal', () => { window.goHome(); return txt().includes('Ond
 /* ── v9: navegação onipresente ── */
 check('Topbar tem os 7 destinos', () => $$('#ctxnav button').length === 7);
 check('Home marca "Hoje" e esconde subbar', () => document.querySelector('#ctxnav .on')?.textContent === 'Hoje' && document.getElementById('subbar').hidden);
-check('Entrar em Estoque liga subbar com 5 tabs', () => {
+check('Entrar em Estoque liga subbar com 6 tabs', () => {
   document.querySelector('#ctxnav [data-ctx="estoque"]').click();
-  return !document.getElementById('subbar').hidden && $$('#subbar .subtab').length === 5 && document.querySelector('#ctxnav .on').textContent === 'Estoque';
+  return !document.getElementById('subbar').hidden && $$('#subbar .subtab').length === 6 && document.querySelector('#ctxnav .on').textContent === 'Estoque';
 });
 check('Trocar de contexto pela topbar é 1 clique', () => {
   document.querySelector('#ctxnav [data-ctx="financeiro"]').click();
@@ -304,6 +304,113 @@ check('Tecla 6 abre Clientes', () => {
 check('Tecla 1 volta pro Hoje', () => {
   document.dispatchEvent(new window.KeyboardEvent('keydown', { key:'1', bubbles:true }));
   return txt().includes('Onde trabalhar');
+});
+
+/* ── v11: Produção ── */
+check('Produção: demanda dos pedidos abertos agregada', () => {
+  window.openModule('estoque', 'producao');
+  return txt().includes('Demanda dos pedidos abertos') && txt().includes('Marmita');
+});
+check('Produção: selecionar habilita registrar', () => {
+  window.planoQty('prd_a1', 5, new window.Event('x'));
+  return document.getElementById('plano-save').disabled === false;
+});
+check('Produção: registrar cria lote e baixa insumo', () => {
+  const antes = window.S.lotes.length;
+  const frangoAntes = window.S.stock.find(s => s.id === 'ins_3w6p1').qty;
+  window.registrarProducao();
+  document.getElementById('confirm-go').click();
+  const depois = window.S.stock.find(s => s.id === 'ins_3w6p1').qty;
+  window.closeDrawer();
+  return window.S.lotes.length === antes + 1 && depois < frangoAntes;
+});
+check('Produção: calculadora da demanda mostra o que falta', () => {
+  window.calcDaDemanda();
+  const ok = txt().includes('Insumos da demanda') && (txt().includes('faltam') || txt().includes('cobre'));
+  window.closeDrawer();
+  return ok;
+});
+check('Produção: etiqueta tem a logo CB', () => {
+  window.printLabel(window.S.lotes[0].id);
+  const ok = !!document.querySelector('.label-prev .logo-mark');
+  window.closeDrawer();
+  return ok;
+});
+
+/* ── v11: Compras conectada ── */
+check('Compras: confirmar pedido cria conta a pagar', () => {
+  window.openModule('compras');
+  const antes = window.S.pagar.length;
+  const aberto = window.S.compras.find(c => c.status === 'em aberto');
+  window.confirmCompra(aberto.id);
+  document.getElementById('confirm-go').click();
+  return window.S.pagar.length === antes + 1 && window.S.pagar[0].obs.includes('Compra');
+});
+
+/* ── v11: Financeiro ── */
+check('Reconciliação: mostra divergente com ação', () => {
+  window.openModule('financeiro', 'reconciliacao');
+  return txt().includes('Resolver R$ 124') && txt().includes('confere');
+});
+check('Faturas: lista com status e reenviar', () => {
+  window.setModuleTab('faturas');
+  return txt().includes('Mercado Pago') && txt().includes('Reenviar link');
+});
+
+/* ── v11: Integrações ── */
+check('Integrações: 99Food e Keeta presentes', () => {
+  window.openModule('gestao', 'integracoes');
+  return txt().includes('99Food') && txt().includes('Keeta') && txt().includes('Mercado Pago');
+});
+check('Integrações: conectar muda status', () => {
+  window.S.integracoes.find(i => i.id === 'int_99').status = 'disponivel';
+  const btn = [...document.querySelectorAll('.int-card .btn-primary')][0];
+  btn.click();
+  document.getElementById('confirm-go').click();
+  return window.S.integracoes.find(i => i.id === 'int_99').status === 'conectado';
+});
+
+/* ── v11: centro de eventos + simular ── */
+check('Eventos: sino abre o painel de qualquer lugar', () => {
+  window.goHome();
+  window.toggleEvents(true);
+  return document.body.classList.contains('ev-open') && txt().includes('Acontecendo agora');
+});
+check('Simular: pedido 99Food entra na fila e vira evento', () => {
+  const antes = window.S.orders.length;
+  window.simPedido('99Food');
+  const evOk = window.S.eventos[0].t.includes('99Food');
+  window.toggleEvents(false);
+  return window.S.orders.length === antes + 1 && evOk;
+});
+check('Simular: pergunta no iFood vai pro atendimento', () => {
+  window.simEvento('reclamacao');
+  window.answerEventSim();
+  return document.querySelector('#ctxnav .on').textContent === 'Clientes';
+});
+check('Eventos: marcar tudo lido apaga o ponto do sino', () => {
+  window.toggleEvents(true);
+  window.S.eventos.forEach(e => e.unread = false);
+  window.renderEvents(); window.syncBell();
+  window.toggleEvents(false);
+  return window.S.eventos.every(e => !e.unread);
+});
+
+/* ── v11: peek rico + action tooltip ── */
+check('Peek produto rico: sparkline + ficha técnica', () => {
+  window.peek('produto', 'prd_a1');
+  return txt().includes('Ficha técnica') && txt().includes('7 dias');
+});
+check('Peek: insumo dentro do produto empilha e volta', () => {
+  window.peek('insumo', 'ins_3w6p1');
+  const temVoltar = !!document.querySelector('.peek .peek-back');
+  window.peekBack();
+  return temVoltar && txt().includes('Marmita frango grelhado');
+});
+check('Peek fecha de vez', () => { window.closePeek(); return !document.body.classList.contains('peek-open'); });
+check('Action tooltip na fila tem ações', () => {
+  window.openModule('operacao', 'pedidos');
+  return !!document.querySelector('.actip-pop .btn-dark');
 });
 
 console.log('\n═══ RESULTADOS ═══');
