@@ -500,6 +500,97 @@ check('Auditoria: aparece no registro do cliente', () => {
 });
 check('volta limpa detalhe', () => { window.closeDetail(); return !window.S.detail; });
 
+/* ── v13: navegação com hash ── */
+check('Nav: abrir módulo grava a hash', () => {
+  window.openModule('estoque', 'posicao');
+  return window.location.hash.includes('estoque');
+});
+check('Nav: hashchange volta o estado (voltar do browser)', () => {
+  window.location.hash = '#/operacao/pedidos';
+  window.applyHash('#/operacao/pedidos');
+  return window.S.module === 'operacao' && document.querySelector('#ctxnav .on').textContent === 'Operação';
+});
+check('Nav: detalhe na hash + botão voltar visível', () => {
+  window.openDetail('pedido', 'ped_9f2k1');
+  return window.location.hash.includes('ped_9f2k1') && !document.getElementById('back-btn').hidden;
+});
+check('Nav: home esconde o voltar', () => {
+  window.goHome();
+  return document.getElementById('back-btn').hidden === true;
+});
+check('Nav: subbar mostra o nome do contexto', () => {
+  window.openModule('estoque');
+  return document.getElementById('subbar').textContent.includes('Estoque');
+});
+
+/* ── v13: atendimento multicanal ── */
+check('Atendimento: filtro por canal iFood', () => {
+  window.openModule('clientes', 'atendimento');
+  window.S.attFilter = { canal:'if', tipo:'todos', fila:'todas' };
+  window.rerender();
+  return $$('.inbox-item').length === window.S.conversas.filter(c => c.canal === 'if').length;
+});
+check('Atendimento: filtro por tipo reclamação', () => {
+  window.S.attFilter = { canal:'todos', tipo:'reclamacao', fila:'todas' };
+  window.rerender();
+  return $$('.inbox-item').length >= 1 && txt().includes('reclamacao');
+});
+check('Atendimento: Keeta e Site aparecem como canais', () => {
+  window.S.attFilter = { canal:'todos', tipo:'todos', fila:'todas' };
+  window.rerender();
+  return txt().includes('Keeta') && txt().includes('Site');
+});
+check('Atendimento: origem do contato visível', () => {
+  return txt().includes('anúncio do Instagram') || txt().includes('QR do cardápio');
+});
+check('Atendimento: mudar de fila funciona', () => {
+  const c = window.S.conversas[1];
+  const antes = c.fila;
+  window.moveFila(c.id);
+  return c.fila !== antes;
+});
+check('Atendimento: exportar gera backup', () => {
+  window.URL.createObjectURL = () => 'blob:fake';
+  let clicked = false;
+  const orig = window.HTMLAnchorElement.prototype.click;
+  window.HTMLAnchorElement.prototype.click = function(){ clicked = true; };
+  window.exportChat(window.S.conversas[1].id);
+  window.HTMLAnchorElement.prototype.click = orig;
+  return clicked;
+});
+check('Atendimento: anexar mídia adiciona foto na conversa', () => {
+  const c = window.S.conversas.find(x => x.id === window.S.chatId) || window.S.conversas[0];
+  window.S.chatId = c.id;
+  const antes = c.msgs.length;
+  window.attachMedia();
+  return c.msgs.length === antes + 1 && c.msgs[c.msgs.length - 1].img === '🎂';
+});
+
+/* ── v13: métricas ── */
+check('Métricas: atendimento + marketing + funil ads', () => {
+  window.openModule('clientes', 'metricas');
+  return txt().includes('Tempo de resposta') && txt().includes('Instagram') && txt().includes('Viram o anúncio');
+});
+
+/* ── v13: cardápio inteligente ── */
+check('Cardápio: abre com canais e margem', () => {
+  window.openModule('operacao', 'cardapio');
+  return txt().includes('iFood') && txt().includes('Site');
+});
+check('Cardápio: regra 86 mostra Produzir quando lote zera', () => {
+  window.S.lotes.find(l => l.prod === 'Pudim fatia').qty = 0;
+  window.rerender();
+  const ok = txt().includes('esgotado') && txt().includes('Produzir');
+  window.S.lotes.find(l => l.prod === 'Pudim fatia').qty = 6;
+  return ok;
+});
+check('Cardápio: toggle de canal audita', () => {
+  const antes = window.S.audit.length;
+  const sw = document.querySelector('.ma-card .switch');
+  sw.click();
+  return window.S.audit.length === antes + 1;
+});
+
 console.log('\n═══ RESULTADOS ═══');
 results.forEach(r => console.log(r));
 const failed = results.filter(r => r.startsWith('✗'));

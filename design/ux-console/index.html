@@ -297,6 +297,7 @@ body.search-open .search-panel{transform:translateX(0)}
 </svg>
 
 <header class="topbar">
+  <button class="back-btn" id="back-btn" aria-label="Voltar" data-tip="Voltar (funciona o do navegador também)" onclick="history.back()" hidden>‹</button>
   <button class="tb-logo" onclick="goHome()">
     <svg width="24" height="24" viewBox="0 0 64 64" fill="none"><path d="M32 6 56 18 32 30 8 18Z" fill="#E85814"/><path d="M8 18 32 30 32 58 8 46Z" fill="#0E2A6E"/><path d="M56 18 32 30 32 58 56 46Z" fill="#06143A"/></svg>
     <span>Easy<em>Stok</em></span>
@@ -435,7 +436,7 @@ const main = document.getElementById('main');
 /* ═══ MÓDULOS (contextos calmos) ═══ */
 const MODULES = [
   { id:'operacao', name:'Operação', icon:'zap', tint:'#E85814',
-    tabs:[['pedidos','Pedidos'],['novo-pedido','Novo pedido'],['caixa','Caixa']],
+    tabs:[['pedidos','Pedidos'],['novo-pedido','Novo pedido'],['caixa','Caixa'],['cardapio','Cardápio']],
     state:() => { const ag = S.orders.filter(o => o.status === 'aguardando');
       return ag.length ? `<b>${ag.length}</b> aguardando · mais antigo <b>há ${Math.max(...ag.map(waitMin))} min</b>` : 'fila limpa'; } },
   { id:'estoque', name:'Estoque', icon:'box', tint:'#15388A',
@@ -449,7 +450,7 @@ const MODULES = [
   { id:'compras', name:'Compras', icon:'cart', tint:'#0F766E', tabs:[['lista','Lista']],
     state:() => `<b>2 insumos</b> sugeridos pela produção` },
   { id:'clientes', name:'Clientes', icon:'users', tint:'#C13584',
-    tabs:[['crm-clientes','Clientes'],['funil','Funil'],['atendimento','Atendimento'],['avaliacoes','Avaliações'],['alertas','Alertas']],
+    tabs:[['crm-clientes','Clientes'],['funil','Funil'],['atendimento','Atendimento'],['avaliacoes','Avaliações'],['metricas','Métricas'],['alertas','Alertas']],
     state:() => { const un = S.conversas.reduce((s, c) => s + c.unread, 0);
       return un ? `<b>${un}</b> mensagens sem resposta` : 'atendimento em dia'; } },
   { id:'gestao', name:'Gestão', icon:'chart', tint:'#5B21B6',
@@ -465,6 +466,30 @@ function avatarFor(nome){
 }
 </script>
 <script>
+/* ═══ NAVEGAÇÃO COM HASH — o voltar do navegador funciona ═══ */
+function currentHash(){
+  if(!S.module) return '#/';
+  let h = '#/' + S.module + '/' + (S.moduleTab[S.module] || '');
+  if(S.detail) h += '/' + S.detail.type + '/' + S.detail.id;
+  return h;
+}
+function syncNav(){
+  const h = currentHash();
+  try{ if(location.hash !== h) location.hash = h; }catch(e){}
+  document.getElementById('back-btn').hidden = h === '#/' || h === '' || h === '#';
+}
+function applyHash(h){
+  const parts = (h || '#/').replace(/^#\/?/, '').split('/').filter(Boolean);
+  if(!parts.length){ S.module = null; S.detail = null; renderHome(); return; }
+  const m = MODULES.find(x => x.id === parts[0]);
+  if(!m){ S.module = null; S.detail = null; renderHome(); return; }
+  S.module = m.id;
+  S.moduleTab[m.id] = parts[1] || m.tabs[0][0];
+  S.detail = parts[2] ? { type:parts[2], id:parts[3] } : null;
+  renderModule();
+}
+window.addEventListener('hashchange', () => applyHash(location.hash));
+
 /* ═══ CHROME: contextos na topbar + tabs na subbar, sempre visíveis ═══ */
 function renderChrome(){
   document.querySelectorAll('#ctxnav button').forEach(b =>
@@ -474,7 +499,7 @@ function renderChrome(){
   const m = MODULES.find(x => x.id === S.module);
   const cur = S.moduleTab[m.id];
   sb.hidden = false;
-  sb.innerHTML = m.tabs.map(([t, label]) =>
+  sb.innerHTML = `<span class="ctx-name">${m.name}</span>` + m.tabs.map(([t, label]) =>
     `<button class="subtab ${cur === t ? 'on' : ''}" onclick="setModuleTab('${t}')">${label}${tabCount(t)}</button>`).join('');
 }
 
@@ -526,9 +551,10 @@ function openModule(id, tab){
   S.detail = null;
   S.moduleTab[id] = tab || S.moduleTab[id] || m.tabs[0][0];
   renderModule();
+  syncNav();
 }
-function goHome(){ S.module = null; S.detail = null; renderHome(); }
-function setModuleTab(t){ S.moduleTab[S.module] = t; S.detail = null; renderModule(); }
+function goHome(){ S.module = null; S.detail = null; renderHome(); syncNav(); }
+function setModuleTab(t){ S.moduleTab[S.module] = t; S.detail = null; renderModule(); syncNav(); }
 function renderModule(){
   const m = MODULES.find(x => x.id === S.module);
   const cur = S.moduleTab[m.id];
@@ -1007,6 +1033,7 @@ const TABS = {
   'dashboard':() => tDashboard(), 'relatorios':() => tRelatorios(), 'analises':() => tAnalises(),
   'faturas':() => tFaturas(), 'reconciliacao':() => tReconciliacao(), 'integracoes':() => tIntegracoes(),
   'crm-clientes':() => tCrmClientes(), 'funil':() => tFunil(), 'atendimento':() => tAtendimento(), 'avaliacoes':() => tAvaliacoes(), 'alertas':() => tNotifPrefs(),
+  'metricas':() => tMetricas(), 'cardapio':() => tCardapioAdmin(),
 };
 function tClientesTab(){
   return `<p class="tab-note">${S.clientes.length} clientes · o histórico alimenta o “costuma pedir” do novo pedido</p>
@@ -1167,6 +1194,7 @@ body.confirm-open .confirm{transform:none}
 .unread-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
 .chan-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-pill)}
 .chan-wa{background:#E7F8EE;color:#128C4B}.chan-ig{background:#FCE9F3;color:#C13584}.chan-if{background:var(--crit-soft);color:var(--crit)}
+.chan-kt{background:#F3E8FD;color:#6B2D9B}.chan-st{background:#EDF1F9;color:#15388A}
 .chat{display:flex;flex-direction:column;max-height:520px}
 .chat-head{padding:12px 16px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:10px}
 .chat-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
@@ -1315,6 +1343,39 @@ input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 .meta-window.closing{background:var(--warn-soft);color:var(--warn)}
 .meta-window.closed{background:var(--pressed);color:var(--text-3)}
 .audit-row{font-size:11.5px;color:var(--text-3);padding:6px 0;border-bottom:1px dashed var(--hairline);font-family:var(--font-mono)}
+
+/* ═══ v13: voltar + wayfinding ═══ */
+.back-btn{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:var(--text-3);margin-right:2px;transition:background var(--d1)}
+.back-btn:hover{background:var(--hover);color:var(--text)}
+.subbar .ctx-name{font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--text);margin-right:8px;padding-right:12px;border-right:1px solid var(--hairline)}
+
+/* ═══ v13: atendimento multicanal ═══ */
+.att-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.fila-sel{height:28px;border-radius:var(--r-pill);border:1px solid var(--hairline-2);background:var(--card);font:inherit;font-size:12px;font-weight:600;padding:0 9px;color:var(--text-2)}
+.tipo-tag{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:var(--r-pill)}
+.tipo-elogio{background:var(--ok-soft);color:var(--ok)}
+.tipo-pergunta{background:var(--accent-soft);color:var(--accent-text)}
+.tipo-reclamacao{background:var(--crit-soft);color:var(--crit)}
+.tipo-conversa{background:var(--pressed);color:var(--text-3)}
+.msg-img{width:180px;height:110px;border-radius:12px;background:linear-gradient(135deg,#F5CB7C,#E76845);display:grid;place-items:center;font-size:34px;margin-top:4px}
+.origem-line{font-size:11px;color:var(--text-4);display:flex;align-items:center;gap:5px}
+
+/* ═══ v13: métricas atendimento/marketing ═══ */
+.mk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin:8px 0 22px}
+.mkt-row{display:grid;grid-template-columns:200px 1fr 70px;align-items:center;gap:12px;padding:7px 0}
+.mkt-bar{height:8px;border-radius:99px;background:var(--hover);overflow:hidden}
+.mkt-fill{height:100%;border-radius:99px;background:var(--mc,#C13584)}
+
+/* ═══ v13: cardápio inteligente ═══ */
+.menu-admin{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
+.ma-card{background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-l);padding:15px;transition:box-shadow var(--d2)}
+.ma-card:hover{box-shadow:var(--shadow-card)}
+.ma-card.esgotado{opacity:.72}
+.ma-top{display:flex;gap:11px;align-items:center}
+.ma-price{font-family:var(--font-mono);font-weight:600;margin-top:8px;font-size:14px}
+.ma-stock{font-size:11.5px;color:var(--text-3);margin-top:2px}
+.ma-channels{display:flex;gap:10px;margin-top:11px;padding-top:10px;border-top:1px solid var(--hairline);flex-wrap:wrap}
+.ma-ch{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-3)}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -1460,8 +1521,8 @@ function cancelPedido(id){
   audit(`cancelou o pedido #${n} · itens voltaram ao estoque`);
   toast(`Pedido #${n} cancelado · itens de volta ao estoque`);
 }
-function openDetail(type, id){ S.detail = { type, id }; renderModule(); }
-function closeDetail(){ S.detail = null; renderModule(); }
+function openDetail(type, id){ S.detail = { type, id }; renderModule(); syncNav(); }
+function closeDetail(){ S.detail = null; renderModule(); syncNav(); }
 function idChip(id){ return `<span class="id-chip">${id} <button aria-label="Copiar" onclick="copyId('${id}')">${ico('copy', 10)}</button></span>`; }
 const REL = m => { const min = waitMin({ at: m }); if(min < 1) return 'agora'; if(min < 60) return `há ${min} min`; const h = Math.floor(min/60); return h < 24 ? `há ${h} h` : 'ontem'; };
 
@@ -2266,8 +2327,10 @@ function tNotifPrefs(){
 }
 </script>
 <script>
-/* boot: por ultimo, com todos os mocks e renderers carregados */
-renderHome();
+/* boot: por ultimo, com todos os mocks e renderers carregados;
+   respeita a hash da URL (back/forward do navegador funcionam) */
+applyHash(location.hash);
+syncNav();
 </script>
 </body>
 </html>
@@ -2932,5 +2995,183 @@ function evSendReply(evId, text){
   audit(`resposta rápida pra ${conv.nome}`);
   renderEvents(); syncBell();
   push({ title:'Resposta enviada', sub:`pra ${conv.nome} · sem navegar`, icon:'💬', tint:'#128C4B' });
+}
+</script>
+<script>
+/* ═══ v13 — enriquecer conversas: tipo, origem, fila, histórico, mídia ═══ */
+S.conversas[0].tipo = 'pergunta';   S.conversas[0].origem = 'anúncio do Instagram'; S.conversas[0].fila = 'minha'; S.conversas[0].hist = [];
+S.conversas[1].tipo = 'reclamacao'; S.conversas[1].origem = 'pedido #1041 no iFood'; S.conversas[1].fila = 'minha';
+S.conversas[1].hist = [{ when:'28 jul', resumo:'pergunta sobre entrega' }, { when:'02 jul', resumo:'elogio da feijoada' }];
+S.conversas[2].tipo = 'elogio';     S.conversas[2].origem = 'QR do cardápio impresso'; S.conversas[2].fila = 'thati';
+S.conversas[2].hist = [{ when:'10 jul', resumo:'pergunta sobre encomenda de bolo' }];
+S.conversas.push(
+  { id:'cv_4', nome:'Keeta · novo cliente', canal:'kt', lead:true, unread:1, at:'11:31', tipo:'pergunta', origem:'Keeta (marketplace)', fila:'minha', hist:[],
+    msgs:[{ dir:'in', t:'Vocês têm massa sem glúten? Vi vocês na Keeta', h:'11:31' }] },
+  { id:'cv_5', nome:'Site · visitante', canal:'st', lead:true, unread:0, at:'10:04', tipo:'conversa', origem:'site casadababa (Google)', fila:'thati', hist:[],
+    msgs:[{ dir:'in', t:'Quero encomendar 3 lasanhas pra sábado, como faço?', h:'10:04' },
+          { dir:'out', t:'Oi! Encomenda até quinta 18h pelo cardápio ou por aqui mesmo', h:'10:09' },
+          { dir:'in', t:'Perfeito! vou montar aqui', h:'10:10', img:'🍝' }] },
+);
+
+/* ═══ ATENDIMENTO v13 — multicanal de verdade ═══ */
+function tAtendimento(){
+  const F = S.attFilter || (S.attFilter = { canal:'todos', tipo:'todos', fila:'minha' });
+  const convs = S.conversas.filter(c =>
+    (F.canal === 'todos' || c.canal === F.canal) &&
+    (F.tipo === 'todos' || c.tipo === F.tipo) &&
+    (F.fila === 'todas' || (F.fila === 'minha' ? c.fila !== 'thati' : c.fila === F.fila)));
+  const cur = convs.find(c => c.id === S.chatId) || convs[0];
+  if(cur) S.chatId = cur.id;
+  const cli = cur && S.clientes.find(x => x.nome === cur.nome);
+  const closed = cur && META_WIN[cur.id] === 'closed' && cur.canal === 'wa';
+  const CHAN = { wa:'WhatsApp', ig:'Instagram', if:'iFood', kt:'Keeta', st:'Site' };
+  return `
+    <div class="att-filters">
+      ${[['todos','Todos'],['wa','WhatsApp'],['if','iFood'],['kt','Keeta'],['ig','Instagram'],['st','Site']].map(([k, l]) =>
+        `<button class="chip ${F.canal === k ? 'on' : ''}" onclick="S.attFilter.canal='${k}';rerender()">${l}</button>`).join('')}
+      <span style="width:4px"></span>
+      ${[['todos','Todo tipo'],['elogio','Elogios'],['pergunta','Perguntas'],['reclamacao','Reclamações']].map(([k, l]) =>
+        `<button class="chip ${F.tipo === k ? 'on' : ''}" onclick="S.attFilter.tipo='${k}';rerender()">${l}</button>`).join('')}
+      <span style="flex:1"></span>
+      <select class="fila-sel" aria-label="Fila" onchange="S.attFilter.fila=this.value;rerender()">
+        <option value="minha" ${F.fila === 'minha' ? 'selected' : ''}>Minha fila</option>
+        <option value="thati" ${F.fila === 'thati' ? 'selected' : ''}>Thati</option>
+        <option value="todas" ${F.fila === 'todas' ? 'selected' : ''}>Todas</option>
+      </select>
+    </div>
+    <div class="chat-wrap">
+      <div class="inbox-list">
+        ${convs.length ? convs.map(c => `<button class="inbox-item ${cur && cur.id === c.id ? 'on' : ''}" onclick="S.chatId='${c.id}';rerender()">
+          <span class="avatar-sm" style="background:${c.lead ? 'var(--text-4)' : avatarColorOf(c.nome)};width:34px;height:34px">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+          <span style="min-width:0">
+            <span class="ii-name">${esc(c.nome)}</span><br>
+            <span class="ii-prev">${esc(c.msgs[c.msgs.length - 1].t || '📷 foto')}</span><br>
+            <span class="origem-line">${esc(c.origem)}</span>
+          </span>
+          <span class="ii-meta"><span class="chan-tag chan-${c.canal}">${CHAN[c.canal]}</span><br>
+            <span class="tipo-tag tipo-${c.tipo}">${c.tipo}</span>
+            ${c.unread ? ' <span class="unread-dot"></span>' : ''}</span>
+        </button>`).join('') : `<div class="empty" style="padding:30px 14px"><h2>Nada nesse recorte</h2><p>Troque os filtros ou a fila.</p></div>`}
+      </div>
+      ${cur ? `<div class="chat" style="max-height:560px">
+        <div class="chat-head"><b style="font-size:14px">${esc(cur.nome)}</b>
+          <span class="tipo-tag tipo-${cur.tipo}">${cur.tipo}</span>
+          <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <button class="icon-btn" style="width:28px;height:28px" data-tip="Mover de fila (sua ⇄ Thati)" onclick="moveFila('${cur.id}')">${ico('users', 13)}</button>
+            <button class="icon-btn" style="width:28px;height:28px" data-tip="Exportar conversa (backup .txt)" onclick="exportChat('${cur.id}')">${ico('down', 13)}</button>
+            ${cli ? `<button class="btn btn-secondary btn-sm" onclick="peek('cliente','${cli.id}')">Ver perfil</button>` : ''}
+          </span>
+        </div>
+        ${metaWindow(cur)}
+        <div class="chat-body" id="chat-body">
+          ${cur.msgs.map(m => `<div class="msg ${m.dir}">${m.img ? `<div class="msg-img">${m.img}</div>` : ''}${esc(m.t)}<span class="m-t">${m.h}</span></div>`).join('')}
+        </div>
+        <div class="chat-input">
+          ${closed
+            ? `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="sendTemplate()">📋 Enviar template “Atualização de pedido”</button>`
+            : `<button class="icon-btn" style="width:34px;height:34px" data-tip="Anexar foto" onclick="attachMedia()">${ico('plus', 14)}</button>
+               <input class="f-input" id="chat-in" placeholder="Responder como Casa da Babá…" onkeydown="if(event.key==='Enter')sendChat()">
+               <button class="btn btn-primary" onclick="sendChat()">Enviar</button>`}
+        </div>
+      </div>
+      <div class="dossier">
+        <h4>Dossiê</h4>
+        ${cli ? `
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">${avatarFor(cur.nome)}<div><b style="font-size:13px">${esc(cur.nome)}</b><div style="font-size:11px;color:var(--text-4)">${cli.pedidos} pedidos · ${cli.pedidos >= 20 ? 'fiel' : 'recorrente'}</div></div></div>
+          <h4>Pedidos recentes</h4>
+          ${S.orders.filter(o => o.cliente === cur.nome).slice(0, 3).map(o => `
+            <div class="dr-row" role="button" tabindex="0" style="cursor:pointer" onclick="peek('pedido','${o.id}')"><span class="dr-k">#${o.n}</span><span class="dr-v mono">${fmt$(o.total)}</span></div>`).join('') || '<p class="f-hint">nenhum recente</p>'}
+          <h4>Conversas anteriores</h4>
+          ${(cur.hist || []).map(h => `<div class="dr-row"><span class="dr-k">${h.when}</span><span class="dr-v" style="font-weight:500">${esc(h.resumo)}</span></div>`).join('') || '<p class="f-hint">primeira conversa</p>'}
+          <h4>Notas internas</h4>
+          ${(S.notas[cli.id] || []).slice(0, 2).map(n => `<div class="postit" style="width:100%;min-height:0;margin-bottom:8px">${esc(n.texto)}<div class="pt-meta">${n.by}</div></div>`).join('') || '<p class="f-hint">sem notas</p>'}
+          <h4>Registro</h4>
+          ${auditRows()}` : `
+          <p class="f-hint">Lead novo — veio de <b>${cur.origem}</b>. O que ele conversar aqui já fica na trilha dele.</p>
+          <h4>Registro</h4>${auditRows()}`}
+      </div>` : `<div class="chat"></div><div class="dossier"><h4>Dossiê</h4><p class="f-hint">—</p></div>`}
+    </div>`;
+}
+function moveFila(id){
+  const c = S.conversas.find(x => x.id === id);
+  c.fila = c.fila === 'thati' ? 'minha' : 'thati';
+  audit(`moveu a conversa de ${c.nome} pra fila ${c.fila === 'thati' ? 'da Thati' : 'dele'}`);
+  push({ title:c.fila === 'thati' ? 'Conversa movida pra Thati' : 'Conversa voltou pra sua fila', icon:'🔀' });
+  rerender();
+}
+function exportChat(id){
+  const c = S.conversas.find(x => x.id === id);
+  const body = `CASA DA BABÁ — backup de conversa\n${c.nome} · ${c.canal} · origem: ${c.origem}\nexportado em ${new Date().toLocaleString('pt-BR')}\n\n` +
+    c.msgs.map(m => `[${m.h}] ${m.dir === 'out' ? 'Casa da Babá' : c.nome}: ${m.t}${m.img ? ' [foto]' : ''}`).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([body], { type:'text/plain' }));
+  a.download = `conversa-${c.nome.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}.txt`;
+  a.click();
+  audit(`exportou a conversa de ${c.nome}`);
+  push({ title:'Backup baixado', sub:c.nome + ' · .txt', icon:'💾' });
+}
+function attachMedia(){
+  const cur = S.conversas.find(c => c.id === S.chatId);
+  cur.msgs.push({ dir:'out', t:'', img:'🎂', h:'agora' });
+  audit('anexou foto numa conversa');
+  rerender();
+}
+
+/* ═══ MÉTRICAS de atendimento + marketing ═══ */
+function tMetricas(){
+  return `<div class="mk-grid">
+      <div class="kpi"><div class="k-l">Tempo de resposta</div><div class="k-v">4 min</div><div class="k-d up">meta: até 5</div></div>
+      <div class="kpi"><div class="k-l">1ª resposta no iFood</div><div class="k-v">7 min</div><div class="k-d flat">piora no pico de almoço</div></div>
+      <div class="kpi"><div class="k-l">Satisfação · iFood</div><div class="k-v">4,6 ★</div><div class="k-d up">31 avaliações na semana</div></div>
+      <div class="kpi"><div class="k-l">Conversas resolvidas</div><div class="k-v">96%</div><div class="k-d up">sem reabertura</div></div>
+    </div>
+    <span class="eyebrow">De onde vêm os contatos (30 dias)</span>
+    <div style="margin:10px 0 22px">
+      ${[['Anúncio Instagram (Ads)', 38, '#C13584'], ['iFood / Keeta (marketplace)', 27, '#EA1D2C'], ['WhatsApp direto', 18, '#128C4B'], ['QR do cardápio impresso', 11, '#8A5A00'], ['Google → site', 6, '#15388A']].map(([l, p, c]) => `
+        <div class="mkt-row"><span style="font-size:13px;font-weight:600">${l}</span>
+          <div class="mkt-bar"><div class="mkt-fill" style="--mc:${c};width:${p}%"></div></div>
+          <span class="mono" style="font-size:12px;text-align:right;color:var(--text-3)">${p}%</span></div>`).join('')}
+    </div>
+    <span class="eyebrow">Ads → site → pedido</span>
+    <div class="funnel" style="margin-top:10px">
+      ${[['Viram o anúncio', 1240, '#C13584'], ['Abriram o site/cardápio', 310, '#E85814'], ['Falaram com a gente', 84, '#8A5A00'], ['Pediram', 39, '#18874E']].map((s, i, arr) => `
+        <div class="fun-stage"><span class="f-l">${s[0]}</span>
+          <div class="f-bar"><div class="f-fill" style="--fc:${s[2]};width:${s[1] / arr[0][1] * 100}%"></div></div>
+          <span class="f-n">${s[1]}</span></div>`).join('')}
+    </div>
+    <p class="f-hint" style="margin-top:12px">Cada real no Instagram Ads volta R$ 4,10 em pedido. O QR do cardápio na marmita é o segundo melhor canal — custa quase nada.</p>`;
+}
+
+/* ═══ CARDÁPIO INTELIGENTE — amarrado com produção, pedidos e site ═══ */
+function tCardapioAdmin(){
+  return `<p class="tab-note">O que vende, onde vende. Quando o lote acaba, o item sai do site e dos apps sozinho (regra 86).</p>
+    <div class="menu-admin">
+      ${S.cardapio.map(m => { const lote = S.lotes.find(l => l.prod === m.nome);
+        const rest = lote ? lote.qty : null;
+        const esgotado = rest === 0;
+        const prod = S.produtos.find(p => p.nome === m.nome);
+        const mg = prod ? Math.round((prod.preco - prod.custo) / prod.preco * 100) : null;
+        return `<div class="ma-card ${esgotado ? 'esgotado' : ''}">
+          <div class="ma-top">
+            <span class="item-thumb" style="width:42px;height:42px;font-size:21px">${m.emoji}</span>
+            <span style="flex:1;min-width:0"><b style="font-size:13.5px">${esc(m.nome)}</b>
+              <div class="ma-stock">${rest === null ? 'sob encomenda' : esgotado ? '<b style="color:var(--crit)">esgotado</b> — lote zerou' : `restam ${rest} un do lote de hoje`}</div></span>
+            <button class="icon-btn" style="width:28px;height:28px" data-tip="Ver o produto" onclick="peek('produto','${prod ? prod.id : ''}')">›</button>
+          </div>
+          <div class="ma-price">${fmt$(m.preco)} ${mg !== null ? `<span style="font-size:11px;color:${mg >= 55 ? 'var(--ok)' : 'var(--warn)'};font-weight:700"> · ${mg}%</span>` : ''}</div>
+          <div class="ma-channels">
+            <span class="ma-ch">Site <button class="switch" role="switch" aria-checked="${m.on && !esgotado}" aria-label="No site" onclick="toggleMenuCh('${m.id}','site',this)" ${esgotado ? 'disabled' : ''}></button></span>
+            <span class="ma-ch">iFood <button class="switch" role="switch" aria-checked="${m.on && !esgotado}" aria-label="No iFood" onclick="toggleMenuCh('${m.id}','ifood',this)" ${esgotado ? 'disabled' : ''}></button></span>
+            ${esgotado ? `<button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModule('estoque','producao')">Produzir →</button>` : ''}
+          </div>
+        </div>`; }).join('')}
+    </div>`;
+}
+function toggleMenuCh(id, ch, el){
+  const m = S.cardapio.find(x => x.id === id);
+  m.on = !m.on;
+  el.setAttribute('aria-checked', m.on);
+  audit(`${m.on ? 'ativou' : 'pausou'} ${m.nome} no ${ch === 'site' ? 'Site' : 'iFood'}`);
+  push({ title:m.on ? `${m.nome} no ar no ${ch === 'site' ? 'site' : 'iFood'}` : `${m.nome} pausado no ${ch === 'site' ? 'site' : 'iFood'}`, icon:'📖' });
 }
 </script>
