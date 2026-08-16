@@ -353,14 +353,14 @@ const S = {
     { id:'cli_p1f7', nome:'Carla Martins', tel:'(11) 94433-0099', pedidos:23, fav:'Marmita fit' },
   ],
   cardapio:[
-    { id:'m1', nome:'Marmita frango grelhado', preco:18.50, cat:'Marmitas' },
-    { id:'m2', nome:'Marmita carne ao molho',  preco:21.00, cat:'Marmitas' },
-    { id:'m3', nome:'Feijoada completa',       preco:26.00, cat:'Marmitas' },
-    { id:'m4', nome:'Marmita fit frango',      preco:22.00, cat:'Marmitas' },
-    { id:'m5', nome:'Bolo de pote brigadeiro', preco:12.00, cat:'Sobremesas' },
-    { id:'m6', nome:'Pudim fatia',             preco:8.50,  cat:'Sobremesas' },
-    { id:'m7', nome:'Guaraná lata',            preco:6.00,  cat:'Bebidas' },
-    { id:'m8', nome:'Suco natural 500ml',      preco:9.00,  cat:'Bebidas' },
+    { id:'m1', nome:'Marmita frango grelhado', preco:18.50, cat:'Marmitas', emoji:'🍛' },
+    { id:'m2', nome:'Marmita carne ao molho',  preco:21.00, cat:'Marmitas', emoji:'🥩' },
+    { id:'m3', nome:'Feijoada completa',       preco:26.00, cat:'Marmitas', emoji:'🍲' },
+    { id:'m4', nome:'Marmita fit frango',      preco:22.00, cat:'Marmitas', emoji:'🥗' },
+    { id:'m5', nome:'Bolo de pote brigadeiro', preco:12.00, cat:'Sobremesas', emoji:'🍫' },
+    { id:'m6', nome:'Pudim fatia',             preco:8.50,  cat:'Sobremesas', emoji:'🍮' },
+    { id:'m7', nome:'Guaraná lata',            preco:6.00,  cat:'Bebidas', emoji:'🥤' },
+    { id:'m8', nome:'Suco natural 500ml',      preco:9.00,  cat:'Bebidas', emoji:'🧃' },
   ],
   stock:[
     { id:'ins_4x7q2', nome:'Creme de leite caixa 200g', cat:'Laticínios', qty:2,   un:'cx', min:8,   custo:3.40 },
@@ -371,11 +371,11 @@ const S = {
     { id:'ins_5p9g4', nome:'Embalagem marmita 750ml',   cat:'Embalagens', qty:340, un:'un', min:100, custo:0.62 },
   ],
   produtos:[
-    { id:'prd_a1', nome:'Marmita frango grelhado', cat:'Marmitas',   preco:18.50, custo:7.20 },
-    { id:'prd_a2', nome:'Marmita carne ao molho',  cat:'Marmitas',   preco:21.00, custo:9.10 },
-    { id:'prd_a3', nome:'Feijoada completa',       cat:'Marmitas',   preco:26.00, custo:11.40 },
-    { id:'prd_a4', nome:'Bolo de pote brigadeiro', cat:'Sobremesas', preco:12.00, custo:4.10 },
-    { id:'prd_a5', nome:'Pudim fatia',             cat:'Sobremesas', preco:8.50,  custo:3.20 },
+    { id:'prd_a1', nome:'Marmita frango grelhado', cat:'Marmitas',   preco:18.50, custo:7.20,  emoji:'🍛' },
+    { id:'prd_a2', nome:'Marmita carne ao molho',  cat:'Marmitas',   preco:21.00, custo:9.10,  emoji:'🥩' },
+    { id:'prd_a3', nome:'Feijoada completa',       cat:'Marmitas',   preco:26.00, custo:11.40, emoji:'🍲' },
+    { id:'prd_a4', nome:'Bolo de pote brigadeiro', cat:'Sobremesas', preco:12.00, custo:4.10,  emoji:'🍫' },
+    { id:'prd_a5', nome:'Pudim fatia',             cat:'Sobremesas', preco:8.50,  custo:3.20,  emoji:'🍮' },
   ],
   moves:[
     { id:'mov_9', tipo:'venda',    desc:'Pedido #1038 · Bia Teixeira',  valor:24.00,  h:'11:38' },
@@ -413,23 +413,30 @@ const main = document.getElementById('main');
 
 /* ═══ MÓDULOS (contextos calmos) ═══ */
 const MODULES = [
-  { id:'operacao', name:'Operação', icon:'zap',
+  { id:'operacao', name:'Operação', icon:'zap', tint:'#E85814',
     tabs:[['pedidos','Pedidos'],['novo-pedido','Novo pedido'],['caixa','Caixa'],['clientes','Clientes']],
     state:() => { const ag = S.orders.filter(o => o.status === 'aguardando');
       return ag.length ? `<b>${ag.length}</b> aguardando · mais antigo <b>há ${Math.max(...ag.map(waitMin))} min</b>` : 'fila limpa'; } },
-  { id:'estoque', name:'Estoque', icon:'box',
+  { id:'estoque', name:'Estoque', icon:'box', tint:'#15388A',
     tabs:[['posicao','Posição'],['entrada','Dar entrada'],['produtos','Produtos'],['novo-produto','Novo produto']],
     state:() => { const low = S.stock.filter(s => s.qty < s.min).length;
       return low ? `<b>${low}</b> insumos abaixo do mínimo` : 'tudo acima do mínimo'; } },
-  { id:'financeiro', name:'Financeiro', icon:'money',
+  { id:'financeiro', name:'Financeiro', icon:'money', tint:'#8A5A00',
     tabs:[['receber','A receber'],['pagar','A pagar']],
     state:() => { const hoje = S.pagar.some(p => p.venc === 'hoje' && p.status === 'pendente');
       return hoje ? `<b>1 conta</b> vence hoje` : 'nada vencendo hoje'; } },
-  { id:'compras', name:'Compras', icon:'cart', tabs:[['lista','Lista']],
+  { id:'compras', name:'Compras', icon:'cart', tint:'#0F766E', tabs:[['lista','Lista']],
     state:() => `<b>2 insumos</b> sugeridos pela produção` },
-  { id:'gestao', name:'Gestão', icon:'chart', tabs:[['analises','Análises']],
+  { id:'gestao', name:'Gestão', icon:'chart', tint:'#5B21B6', tabs:[['analises','Análises']],
     state:() => `margem do mês <b>29,8%</b>` },
 ];
+/* avatar com iniciais + cor determinística pelo nome */
+const AV_COLORS = ['#E85814','#15388A','#0F766E','#8A5A00','#5B21B6','#B3261E'];
+function avatarFor(nome){
+  const h = [...nome].reduce((s, c) => s + c.charCodeAt(0), 0);
+  const ini = nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  return `<span class="avatar-sm" style="background:${AV_COLORS[h % AV_COLORS.length]}">${ini}</span>`;
+}
 </script>
 <script>
 /* ═══ HOME — quase vazia. Cada linha trabalha. ═══ */
@@ -441,8 +448,10 @@ function renderHome(){
   document.getElementById('tb-logo').classList.remove('back');
   document.getElementById('tb-title').innerHTML = 'Easy<em>Stok</em>';
   main.innerHTML = `
-    <div class="hello">Bom dia.</div>
-    <p class="hello-sub">Sexta, 15 de agosto · Casa da Babá · caixa aberto desde <b>08h12</b></p>
+    <div class="hello-wrap">
+      <div class="hello">Bom dia.</div>
+      <p class="hello-sub">Sexta, 15 de agosto · Casa da Babá · caixa aberto desde <b>08h12</b></p>
+    </div>
     <div class="now-line">
       <div class="now-item"><div class="n-v mono">${fmt$(vendas)}</div><div class="n-l">vendido hoje</div></div>
       <div class="now-item"><div class="n-v mono">${S.orders.length + 39}</div><div class="n-l">pedidos</div></div>
@@ -463,7 +472,7 @@ function renderHome(){
     </div>` : ''}
     <span class="eyebrow">Onde trabalhar</span>
     <div class="ctx-list" style="margin-top:8px">
-      ${MODULES.map(m => `<button class="ctx-row" onclick="openModule('${m.id}')">
+      ${MODULES.map(m => `<button class="ctx-row" style="--tint:${m.tint}" onclick="openModule('${m.id}')">
         <span class="ctx-ico">${ico(m.icon, 17)}</span>
         <span><span class="ctx-name">${m.name}</span><br><span class="ctx-state">${m.state()}</span></span>
         <span class="ctx-arrow">›</span></button>`).join('')}
@@ -520,8 +529,9 @@ function tPedidos(){
     <p class="tab-note">${rows.length} pedidos · atualizado agora</p>
     <div class="rows">
       ${rows.map(o => { const m = waitMin(o), sm = STATUS[o.status];
-        return `<div class="row ${o.n === S.lastNew ? 'row-new' : ''}" style="grid-template-columns:auto 1fr auto auto auto auto">
+        return `<div class="row ${o.n === S.lastNew ? 'row-new' : ''}" style="grid-template-columns:auto auto 1fr auto auto auto auto">
           <span class="row-num" style="font-weight:700">#${o.n}</span>
+          ${avatarFor(o.cliente)}
           <span><span class="row-main">${esc(o.cliente)}</span>
             <div class="row-sub">${o.items.map(i => `${i.q}× ${i.nome}`).join(' · ')}</div></span>
           <span class="pill pill-neutral">${o.canal}</span>
@@ -578,6 +588,7 @@ function tNovoPedido(){
       <div id="draft-items" style="margin-top:4px">
         ${d.items.length ? d.items.map((it, i) => `
           <div class="order-item">
+            <span class="item-thumb">${it.emoji || '🍽️'}</span>
             <span><span class="oi-name">${esc(it.nome)}</span><div class="oi-price mono">${fmt$(it.preco)}</div></span>
             <span class="qty">
               <button onclick="draftQty(${i}, -1)" aria-label="Diminuir">−</button>
@@ -623,14 +634,14 @@ function itemSearch(q){
   if(!q.trim()){ box.innerHTML = ''; return; }
   const hits = S.cardapio.filter(m => m.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 5);
   box.innerHTML = hits.length ? `<div class="suggest">${hits.map(m =>
-    `<button onclick="pickItem('${m.id}')"><span style="font-weight:600">${esc(m.nome)}</span><span class="s-sub mono">${fmt$(m.preco)}</span></button>`).join('')}</div>` : '';
+    `<button onclick="pickItem('${m.id}')"><span class="item-thumb" style="width:30px;height:30px;font-size:15px">${m.emoji}</span><span style="font-weight:600">${esc(m.nome)}</span><span class="s-sub mono">${fmt$(m.preco)}</span></button>`).join('')}</div>` : '';
 }
 function itemKey(e){ if(e.key === 'Enter'){ e.preventDefault(); document.querySelector('#item-sug .suggest button')?.click(); } }
 function pickItem(id){
   const m = S.cardapio.find(x => x.id === id);
   const ex = S.draft.items.find(i => i.id === id);
   if(ex) ex.q++;
-  else S.draft.items.push({ id, nome:m.nome, preco:m.preco, q:1 });
+  else S.draft.items.push({ id, nome:m.nome, preco:m.preco, q:1, emoji:m.emoji });
   rerender();
   setTimeout(() => { const inp = document.getElementById('item-q'); if(inp){ inp.value = ''; inp.focus(); } }, 0);
 }
@@ -739,7 +750,8 @@ function tProdutos(){
   return `<p class="tab-note">${S.produtos.length} produtos · margem calculada da ficha técnica</p>
     <div class="rows">
       ${S.produtos.map(p => { const mg = Math.round((p.preco - p.custo) / p.preco * 100);
-        return `<div class="row" style="grid-template-columns:1fr auto auto auto">
+        return `<div class="row" style="grid-template-columns:auto 1fr auto auto auto">
+          <span class="item-thumb">${p.emoji || '🍽️'}</span>
           <span><span class="row-main">${esc(p.nome)}</span><div class="row-sub">${p.cat}</div></span>
           <span class="row-num">${fmt$(p.preco)}</span>
           <span class="row-num" style="color:${mg > 55 ? 'var(--ok)' : 'var(--warn)'};font-weight:600">${mg}%</span>
@@ -935,7 +947,8 @@ const TABS = {
 function tClientesTab(){
   return `<p class="tab-note">${S.clientes.length} clientes · o histórico alimenta o “costuma pedir” do novo pedido</p>
     <div class="rows">
-      ${S.clientes.map(c => `<div class="row" style="grid-template-columns:1fr auto auto">
+      ${S.clientes.map(c => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+        ${avatarFor(c.nome)}
         <span><span class="row-main">${esc(c.nome)}</span><div class="row-sub">${c.tel} · costuma pedir ${esc(c.fav)}</div></span>
         <span class="row-num" style="color:var(--text-3)">${c.pedidos} pedidos</span>
         <button class="btn btn-secondary btn-sm" onclick="openModule('operacao','novo-pedido');S.draft={cliente:S.clientes.find(x=>x.id==='${c.id}'),items:[],obs:'',canal:''};renderModule()">Novo pedido</button>
@@ -953,6 +966,24 @@ function tClientesTab(){
 :root[data-density="compact"] .ctx-row{padding:10px 2px}
 :root[data-density="compact"] .f-input{height:38px}
 :root[data-density="compact"] .wrap{padding-top:24px}
+
+/* ═══ AQUECIMENTO — materialidade sem poluir (v7.1) ═══ */
+.hello-wrap{position:relative}
+.hello-wrap::before{content:"";position:absolute;inset:-60px -80px;z-index:0;pointer-events:none;
+  background:radial-gradient(640px 240px at 10% 0%, rgba(232,88,20,.08), transparent 65%)}
+:root[data-theme="dark"] .hello-wrap::before{background:radial-gradient(640px 240px at 10% 0%, rgba(242,107,37,.10), transparent 65%)}
+.hello-wrap>*{position:relative}
+.now-item{flex:1;min-width:150px;background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-l);padding:15px 18px;box-shadow:var(--shadow-card)}
+.kpi{background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-l);padding:16px 18px;box-shadow:var(--shadow-card)}
+.btn-primary{box-shadow:0 4px 14px rgba(232,88,20,.22)}
+:root[data-theme="dark"] .btn-primary{box-shadow:0 4px 16px rgba(242,107,37,.25)}
+.ctx-ico{background:color-mix(in srgb, var(--tint) 11%, transparent);color:var(--tint)}
+.avatar-sm{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.02em}
+.item-thumb{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--hover),var(--pressed))}
+.ctx-row{border-radius:var(--r-m);padding-left:8px;padding-right:8px;margin:0 -8px}
+.row{border-radius:var(--r-s);padding-left:8px;padding-right:8px;margin:0 -8px}
+.guide-card{background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-l);box-shadow:var(--shadow-pop)}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
