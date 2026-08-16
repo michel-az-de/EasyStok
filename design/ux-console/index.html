@@ -309,6 +309,7 @@ body.search-open .search-panel{transform:translateX(0)}
     <button data-ctx="estoque" onclick="openModule('estoque')">Estoque</button>
     <button data-ctx="compras" onclick="openModule('compras')">Compras</button>
     <button data-ctx="financeiro" onclick="openModule('financeiro')">Financeiro</button>
+    <button data-ctx="clientes" onclick="openModule('clientes')">Clientes</button>
     <button data-ctx="gestao" onclick="openModule('gestao')">Gestão</button>
   </nav>
   <div class="spacer"></div>
@@ -432,7 +433,7 @@ const main = document.getElementById('main');
 /* ═══ MÓDULOS (contextos calmos) ═══ */
 const MODULES = [
   { id:'operacao', name:'Operação', icon:'zap', tint:'#E85814',
-    tabs:[['pedidos','Pedidos'],['novo-pedido','Novo pedido'],['caixa','Caixa'],['clientes','Clientes']],
+    tabs:[['pedidos','Pedidos'],['novo-pedido','Novo pedido'],['caixa','Caixa']],
     state:() => { const ag = S.orders.filter(o => o.status === 'aguardando');
       return ag.length ? `<b>${ag.length}</b> aguardando · mais antigo <b>há ${Math.max(...ag.map(waitMin))} min</b>` : 'fila limpa'; } },
   { id:'estoque', name:'Estoque', icon:'box', tint:'#15388A',
@@ -445,8 +446,13 @@ const MODULES = [
       return hoje ? `<b>1 conta</b> vence hoje` : 'nada vencendo hoje'; } },
   { id:'compras', name:'Compras', icon:'cart', tint:'#0F766E', tabs:[['lista','Lista']],
     state:() => `<b>2 insumos</b> sugeridos pela produção` },
-  { id:'gestao', name:'Gestão', icon:'chart', tint:'#5B21B6', tabs:[['analises','Análises']],
-    state:() => `margem do mês <b>29,8%</b>` },
+  { id:'clientes', name:'Clientes', icon:'users', tint:'#C13584',
+    tabs:[['crm-clientes','Clientes'],['funil','Funil'],['atendimento','Atendimento'],['avaliacoes','Avaliações'],['alertas','Alertas']],
+    state:() => { const un = S.conversas.reduce((s, c) => s + c.unread, 0);
+      return un ? `<b>${un}</b> mensagens sem resposta` : 'atendimento em dia'; } },
+  { id:'gestao', name:'Gestão', icon:'chart', tint:'#5B21B6',
+    tabs:[['dashboard','Dashboard'],['relatorios','Relatórios'],['analises','Análises']],
+    state:() => `margem do mês <b>29,8%</b> · semana <b>▲ 9%</b>` },
 ];
 /* avatar com iniciais + cor determinística pelo nome */
 const AV_COLORS = ['#E85814','#15388A','#0F766E','#8A5A00','#5B21B6','#B3261E'];
@@ -555,6 +561,8 @@ function tabCount(t){
   if(t === 'pedidos') n = S.orders.filter(o => o.status !== 'entregue').length;
   if(t === 'pagar') n = S.pagar.filter(p => p.status === 'pendente').length;
   if(t === 'receber') n = S.receber.filter(r => r.status === 'pendente').length;
+  if(t === 'atendimento') n = S.conversas.reduce((s, c) => s + c.unread, 0);
+  if(t === 'avaliacoes') n = S.avaliacoes.filter(a => !a.respondida).length;
   return n ? `<span class="ct">${n}</span>` : '';
 }
 function rerender(){ if(S.module) renderModule(); else renderHome(); }
@@ -714,7 +722,7 @@ function tPosicao(){
   return `<p class="tab-note">${S.stock.length} itens · ${S.stock.filter(s => s.qty < s.min).length} abaixo do mínimo</p>
     <div class="rows">
       ${S.stock.map(s => { const low = s.qty < s.min;
-        return `<div class="row" style="grid-template-columns:1fr auto auto auto">
+        return `<div class="row" role="button" tabindex="0" data-tip="Ver o insumo" style="grid-template-columns:1fr auto auto auto;cursor:pointer" onclick="peek('insumo','${s.id}')" onkeydown="if(event.key==='Enter')peek('insumo','${s.id}')">
           <span><span class="row-main">${esc(s.nome)}</span><div class="row-sub">${s.cat}</div></span>
           <span class="row-num" style="${low ? 'color:var(--crit);font-weight:700' : ''}">${String(s.qty).replace('.', ',')} ${s.un}</span>
           <span class="row-num" style="color:var(--text-3)">mín ${s.min} ${s.un}</span>
@@ -791,12 +799,12 @@ function tProdutos(){
   return `<p class="tab-note">${S.produtos.length} produtos · margem calculada da ficha técnica</p>
     <div class="rows">
       ${S.produtos.map(p => { const mg = Math.round((p.preco - p.custo) / p.preco * 100);
-        return `<div class="row" style="grid-template-columns:auto 1fr auto auto auto">
+        return `<div class="row" role="button" tabindex="0" data-tip="Ver o produto" style="grid-template-columns:auto 1fr auto auto auto;cursor:pointer" onclick="peek('produto','${p.id}')" onkeydown="if(event.key==='Enter')peek('produto','${p.id}')">
           <span class="item-thumb">${p.emoji || '🍽️'}</span>
           <span><span class="row-main">${esc(p.nome)}</span><div class="row-sub">${p.cat}</div></span>
           <span class="row-num">${fmt$(p.preco)}</span>
           <span class="row-num" style="color:${mg > 55 ? 'var(--ok)' : 'var(--warn)'};font-weight:600">${mg}%</span>
-          <button class="btn btn-secondary btn-sm" onclick="toast('Abriria edição de ${esc(p.nome)}')">Editar</button>
+          <span style="color:var(--text-4)">›</span>
         </div>`; }).join('')}
     </div>`;
 }
@@ -982,10 +990,12 @@ function tAnalises(){
 /* lazy de propósito: algumas tabs vivem em scripts carregados depois deste;
    resolver na chamada evita ReferenceError na avaliação do objeto */
 const TABS = {
-  'pedidos':() => tPedidos(), 'novo-pedido':() => tNovoPedido(), 'caixa':() => tCaixa(), 'clientes':() => tClientesTab(),
+  'pedidos':() => tPedidos(), 'novo-pedido':() => tNovoPedido(), 'caixa':() => tCaixa(), 'clientes':() => { openModule('clientes'); return ''; },
   'posicao':() => tPosicao(), 'entrada':() => tEntrada(), 'movimentos':() => tMovimentos(), 'produtos':() => tProdutos(), 'novo-produto':() => tNovoProduto(),
   'receber':() => tContas('receber'), 'pagar':() => tContas('pagar'),
-  'lista':() => tComprasLista(), 'analises':() => tAnalises(),
+  'lista':() => tComprasLista(),
+  'dashboard':() => tDashboard(), 'relatorios':() => tRelatorios(), 'analises':() => tAnalises(),
+  'crm-clientes':() => tCrmClientes(), 'funil':() => tFunil(), 'atendimento':() => tAtendimento(), 'avaliacoes':() => tAvaliacoes(), 'alertas':() => tNotifPrefs(),
 };
 function tClientesTab(){
   return `<p class="tab-note">${S.clientes.length} clientes · o histórico alimenta o “costuma pedir” do novo pedido</p>
@@ -1092,6 +1102,88 @@ function tClientesTab(){
 .receipt .r-row{display:flex;justify-content:space-between;gap:8px}
 .receipt .r-big{font-size:15px;font-weight:700}
 @media print{body *{visibility:hidden}.receipt,.receipt *{visibility:visible}.receipt{position:fixed;inset:0;box-shadow:none}}
+
+/* ═══ PEEK — modal canônica de objeto (a mesma em qualquer lugar) ═══ */
+.peek-backdrop{position:fixed;inset:0;background:rgba(20,20,25,.32);z-index:calc(var(--z-modal) + 10);
+  display:grid;place-items:center;padding:24px;opacity:0;pointer-events:none;transition:opacity var(--d1) var(--ease)}
+.peek{width:min(460px,100%);max-height:82vh;overflow-y:auto;background:var(--card);border-radius:var(--r-xl);
+  box-shadow:var(--shadow-pop);transform:scale(.96) translateY(10px);transition:transform var(--d2) cubic-bezier(.32,.72,0,1)}
+body.peek-open .peek-backdrop{opacity:1;pointer-events:auto}
+body.peek-open .peek{transform:none}
+.peek-head{display:flex;align-items:center;gap:12px;padding:16px 18px 12px;position:sticky;top:0;background:var(--card);z-index:2}
+.peek-head h2{font-size:16px;font-weight:800;letter-spacing:-.02em;flex:1;min-width:0}
+.peek-body{padding:0 18px 16px}
+.peek-foot{display:flex;gap:10px;padding:12px 18px 16px;border-top:1px solid var(--hairline)}
+.peek-back{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:var(--text-3)}
+.peek-back:hover{background:var(--hover);color:var(--text)}
+
+/* ═══ CONFIRMAÇÃO canônica ═══ */
+.confirm-wrap{position:fixed;inset:0;background:rgba(20,20,25,.32);z-index:calc(var(--z-modal) + 20);display:grid;place-items:center;padding:24px;opacity:0;pointer-events:none;transition:opacity var(--d1)}
+.confirm{width:min(380px,100%);background:var(--card);border-radius:var(--r-l);box-shadow:var(--shadow-pop);padding:22px;transform:scale(.96);transition:transform var(--d2) cubic-bezier(.32,.72,0,1)}
+body.confirm-open .confirm-wrap{opacity:1;pointer-events:auto}
+body.confirm-open .confirm{transform:none}
+.confirm h3{font-size:16px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+.confirm p{font-size:13.5px;color:var(--text-3);line-height:1.5}
+.confirm .c-actions{display:flex;gap:10px;margin-top:18px}
+.confirm .c-actions .btn{flex:1;justify-content:center}
+.btn-danger{background:var(--crit);color:#fff}
+.btn-danger:hover{filter:brightness(1.06)}
+
+/* ═══ tooltip calmo ═══ */
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translate(-50%,3px);
+  background:var(--text);color:var(--page);font-size:11px;font-weight:600;padding:4px 9px;border-radius:6px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity var(--d1) var(--ease),transform var(--d1) var(--ease);z-index:700}
+[data-tip]:hover::after,[data-tip]:focus-visible::after{opacity:1;transform:translate(-50%,0)}
+
+/* ═══ funil CRM ═══ */
+.funnel{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.fun-stage{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;gap:14px}
+.fun-stage .f-l{font-size:13px;font-weight:600}
+.fun-stage .f-bar{height:30px;border-radius:8px;background:var(--hover);position:relative;overflow:hidden}
+.fun-stage .f-fill{position:absolute;inset:0;border-radius:8px;background:color-mix(in srgb, var(--fc) 78%, transparent)}
+.fun-stage .f-n{font-family:var(--font-mono);font-size:13px;font-weight:600;text-align:right}
+.fun-conv{font-size:11.5px;color:var(--text-4);padding:2px 0 6px 164px}
+
+/* ═══ atendimento omnichannel ═══ */
+.inbox{display:grid;grid-template-columns:300px 1fr;border:1px solid var(--hairline);border-radius:var(--r-l);overflow:hidden;background:var(--card)}
+.inbox-list{border-right:1px solid var(--hairline);overflow-y:auto;max-height:520px}
+.inbox-item{display:flex;gap:10px;width:100%;padding:12px 14px;text-align:left;border-bottom:1px solid var(--hairline);transition:background var(--d1)}
+.inbox-item:hover{background:var(--hover)}
+.inbox-item.on{background:var(--accent-soft)}
+.inbox-item .ii-name{font-size:13.5px;font-weight:600}
+.inbox-item .ii-prev{font-size:12px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.unread-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.chan-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-pill)}
+.chan-wa{background:#E7F8EE;color:#128C4B}.chan-ig{background:#FCE9F3;color:#C13584}.chan-if{background:var(--crit-soft);color:var(--crit)}
+.chat{display:flex;flex-direction:column;max-height:520px}
+.chat-head{padding:12px 16px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;gap:10px}
+.chat-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:72%;padding:9px 13px;border-radius:16px;font-size:13.5px;line-height:1.45}
+.msg.in{align-self:flex-start;background:var(--hover);border-bottom-left-radius:5px}
+.msg.out{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:5px}
+.msg .m-t{display:block;font-size:10px;opacity:.6;margin-top:3px}
+.chat-input{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--hairline)}
+.chat-input .f-input{flex:1;height:40px}
+
+/* ═══ avaliações ═══ */
+.stars{color:#F5A623;letter-spacing:2px;font-size:14px}
+.review{display:flex;gap:12px;padding:13px 2px;border-bottom:1px solid var(--hairline)}
+.review:last-child{border-bottom:0}
+
+/* ═══ timeline CRM do cliente ═══ */
+.crm-tl{position:relative;padding-left:22px;margin-top:6px}
+.crm-tl::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:1.5px;background:var(--hairline-2)}
+.crm-ev{position:relative;padding:0 0 16px}
+.crm-ev::before{content:"";position:absolute;left:-19px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--card);border:2px solid var(--evc,var(--text-4))}
+.crm-ev .e-t{font-size:13px;font-weight:600;line-height:1.4}
+.crm-ev .e-when{font-size:11px;color:var(--text-4);font-family:var(--font-mono)}
+.crm-ev .e-desc{font-size:12.5px;color:var(--text-3);margin-top:2px;line-height:1.5}
+
+/* ═══ motion Apple: overlays com spring suave ═══ */
+.drawer{transition:transform var(--d2) cubic-bezier(.32,.72,0,1)}
+.search-panel{transition:transform var(--d2) cubic-bezier(.32,.72,0,1)}
+.view-enter{animation:fadeUp .34s cubic-bezier(.32,.72,0,1)}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -1185,9 +1277,12 @@ function copyId(id){ navigator.clipboard?.writeText(id).catch(() => {}); toast('
 /* ═══ TECLADO ═══ */
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){
+    if(document.body.classList.contains('confirm-open')){ closeConfirm(); return; }
+    if(document.body.classList.contains('peek-open')){ peekBack(); return; }
     if(document.body.classList.contains('search-open')){ closeSearch(); return; }
     if(document.body.classList.contains('drawer-open')){ closeDrawer(); return; }
     if(popEl){ closePop(); return; }
+    if(S.detail){ closeDetail(); return; }
     if(S.module){ goHome(); return; }
     return;
   }
@@ -1205,8 +1300,14 @@ document.addEventListener('keydown', e => {
     if(e.key === 'Enter'){ e.preventDefault(); runHit(selIdx); }
     return;
   }
-  if(e.target.matches('input,select,textarea')) return;
-  if(!S.module && ['1','2','3','4','5'].includes(e.key)) openModule(MODULES[Number(e.key) - 1].id);
+  if(e.target instanceof Element && e.target.matches('input,select,textarea')) return;
+  /* 1..7 = os 7 destinos da topbar, na ordem visual */
+  const CTX_KEYS = ['home','operacao','estoque','compras','financeiro','clientes','gestao'];
+  const ki = parseInt(e.key);
+  if(ki >= 1 && ki <= CTX_KEYS.length){
+    ki === 1 ? goHome() : openModule(CTX_KEYS[ki - 1]);
+    return;
+  }
 });
 
 /* popover genérico (não usado neste corte, mantido pro próximo) */
@@ -1215,14 +1316,17 @@ function closePop(){ if(popEl){ popEl.remove(); popEl = null; } }
 
 /* timers ao vivo */
 setInterval(() => { if(S.module && S.moduleTab[S.module] === 'pedidos') renderModule(); }, 30000);
-
-/* boot */
-renderHome();
 </script>
-</body>
-</html>
 <script>
 /* ═══ DETALHE DE PEDIDO — timeline viva, vínculo com caixa, impressão ═══ */
+function cancelPedido(id){
+  const i = S.orders.findIndex(x => x.id === id);
+  if(i < 0) return;
+  const n = S.orders[i].n;
+  S.orders.splice(i, 1);
+  closeDetail();
+  toast(`Pedido #${n} cancelado · itens de volta ao estoque`);
+}
 function openDetail(type, id){ S.detail = { type, id }; renderModule(); }
 function closeDetail(){ S.detail = null; renderModule(); }
 function idChip(id){ return `<span class="id-chip">${id} <button aria-label="Copiar" onclick="copyId('${id}')">${ico('copy', 10)}</button></span>`; }
@@ -1244,7 +1348,7 @@ function vPedido(id){
       <div class="d-actions">
         <button class="btn btn-secondary" onclick="toast('Cupom enviado pra impressora')">${ico('print', 14)} Imprimir cupom</button>
         ${sm.action ? `<button class="btn btn-primary" onclick="advance('${o.id}')">${sm.action}</button>` : ''}
-        ${o.status !== 'entregue' ? `<button class="btn btn-secondary" style="color:var(--crit)" onclick="toast('Abriria cancelamento com motivo')">Cancelar</button>` : ''}
+        ${o.status !== 'entregue' ? `<button class="btn btn-secondary" style="color:var(--crit)" onclick="confirmDlg({title:'Cancelar o pedido #${o.n}?',desc:'O pedido sai da fila e os itens voltam pro estoque. O cliente é avisado no ${o.canal}. Isso fica registrado na linha do tempo dele.',confirmLabel:'Sim, cancelar pedido',danger:true,onConfirm:() => cancelPedido('${o.id}')})">Cancelar</button>` : ''}
       </div>
     </div>
 
@@ -1258,12 +1362,13 @@ function vPedido(id){
 
     <div class="d-section"><span class="eyebrow">Itens · ${o.items.reduce((s, i) => s + i.q, 0)}</span>
       <div class="rows" style="border-top:0">
-        ${o.items.map(it => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+        ${o.items.map(it => { const prod = S.produtos.find(p => p.nome === it.nome);
+          return `<div class="row" role="${prod ? 'button' : 'listitem'}" tabindex="${prod ? '0' : '-1'}" style="grid-template-columns:auto 1fr auto auto;${prod ? 'cursor:pointer' : ''}" ${prod ? `onclick="peek('produto','${prod.id}')" onkeydown="if(event.key==='Enter')peek('produto','${prod.id}')" data-tip="Ver o produto"` : ''}>
           <span class="item-thumb">${it.emoji || '🍽️'}</span>
           <span><span class="row-main">${esc(it.nome)}</span>${it.q > 1 ? `<div class="row-sub mono">${fmt$(it.p)} cada</div>` : ''}</span>
           <span class="row-num" style="color:var(--text-3)">${it.q}×</span>
           <span class="row-num" style="font-weight:600;min-width:70px;text-align:right">${fmt$(it.p * it.q)}</span>
-        </div>`).join('')}
+        </div>`; }).join('')}
       </div>
       ${o.obs ? `<p class="f-hint" style="margin-top:10px">✎ ${esc(o.obs)}</p>` : ''}
     </div>
@@ -1326,6 +1431,16 @@ function vCliente(id){
           <span class="pill ${STATUS[o.status].pill}">${STATUS[o.status].label}</span>
         </button>`).join('')}</div>`
       : `<p class="f-hint">Nenhum pedido recente.</p>`}
+    </div>
+
+    <div class="d-section"><span class="eyebrow">Linha do tempo — tudo que já aconteceu</span>
+      ${(S.timeline[c.id] || []).length ? `<div class="crm-tl">
+        ${S.timeline[c.id].map(ev => `<div class="crm-ev" style="--evc:${ev.c}">
+          <div class="e-when">${ev.when}</div>
+          <div class="e-t">${esc(ev.t)}</div>
+          <div class="e-desc">${esc(ev.desc)}</div>
+        </div>`).join('')}</div>`
+      : `<p class="f-hint">Sem trilha ainda — clientes novos constroem a linha do tempo a cada contato, pedido e avaliação.</p>`}
     </div>`;
 }
 /* ═══ EDITAR CLIENTE — drawer rico: máscara, validação, dirty state ═══ */
@@ -1582,3 +1697,418 @@ function saveDescarte(id){
   rerender();
 }
 </script>
+<script>
+/* ═══ MOCKS CRM (o que o backend ainda não tem — o protótipo define) ═══ */
+S.leads = [
+  { id:'lead_1', nome:'Priscila Mota', origem:'Instagram', desde:'02 ago', comprou:false },
+  { id:'lead_2', nome:'André Vieira',  origem:'WhatsApp',  desde:'09 ago', comprou:false },
+  { id:'lead_3', nome:'Sônia Camargo', origem:'iFood',     desde:'11 ago', comprou:false },
+];
+S.conversas = [
+  { id:'cv_1', nome:'Priscila Mota', canal:'wa', lead:true, unread:2, at:'11:52',
+    msgs:[
+      { dir:'in', t:'Oi! Vocês fazem lasanha pra congelar?', h:'11:48' },
+      { dir:'out', t:'Fazemos sim! Bolonhesa e quatro queijos, 500g e 1kg', h:'11:50' },
+      { dir:'in', t:'Quanto fica a de 1kg bolonhesa? Tem entrega?', h:'11:52' },
+      { dir:'in', t:'?', h:'11:58' },
+    ] },
+  { id:'cv_2', nome:'Ana Costa', canal:'if', lead:false, unread:1, at:'11:40',
+    msgs:[
+      { dir:'in', t:'Meu pedido saiu? Já faz 40 minutos', h:'11:38' },
+      { dir:'out', t:'Ana, saiu sim! O motoboy pegou 11h35, chega aí em 15 min 🙏', h:'11:40' },
+      { dir:'in', t:'Ah tá, obrigada!', h:'11:40' },
+    ] },
+  { id:'cv_3', nome:'Rui Alves', canal:'ig', lead:false, unread:0, at:'ontem',
+    msgs:[
+      { dir:'in', t:'Aquele bolo de pote é o melhor que já comi 😭', h:'ontem 20:14' },
+      { dir:'out', t:'Rui!! Ficamos felizes demais 🧡 semana que vem tem de ninho', h:'ontem 20:31' },
+    ] },
+];
+S.avaliacoes = [
+  { id:'av_1', nome:'Carla M.', nota:5, canal:'iFood', texto:'Comida caseira de verdade, chegou quente.', h:'hoje 13:20', respondida:false },
+  { id:'av_2', nome:'Pedro H.', nota:4, canal:'iFood', texto:'Muito bom, só atrasou um pouco.', h:'ontem 19:02', respondida:true },
+  { id:'av_3', nome:'Anônimo', nota:2, canal:'iFood', texto:'Veio faltando o suco.', h:'ontem 12:44', respondida:false },
+];
+/* linha do tempo CRM: tudo que a pessoa fez, do lead à reclamação */
+S.timeline = {
+  cli_b7h9:[
+    { t:'Chegou pelo Instagram', when:'12 jul', desc:'Clicou no link do cardápio 3 vezes antes de pedir.', c:'#C13584' },
+    { t:'1º pedido · #891', when:'14 jul', desc:'Feijoada completa · R$ 26,00 · iFood.', c:'#E85814' },
+    { t:'Reclamação resolvida', when:'20 jul', desc:'Atraso de 40 min no pico. Respondida em 12 min, cupom de 10% enviado.', c:'#B3261E' },
+    { t:'Avaliou 5★ no iFood', when:'25 jul', desc:'"Melhor marmita da região."', c:'#F5A623' },
+    { t:'Pedido #1044', when:'hoje 11:38', desc:'3× frango + 2× suco · WhatsApp.', c:'#18874E' },
+  ],
+};
+S.notifPrefs = [
+  { k:'np', label:'Novo pedido entra', desc:'Toca na hora em qualquer dispositivo', on:true },
+  { k:'msg', label:'Mensagem sem resposta há 30 min', desc:'WhatsApp, Instagram ou iFood parados', on:true },
+  { k:'aval', label:'Avaliação ≤ 3★', desc:'Pra responder antes de virar problema', on:true },
+  { k:'lead', label:'Lead parado há 3 dias', desc:'Falou e nunca comprou — hora de chamar', on:false },
+  { k:'sumido', label:'Cliente bom sumindo', desc:'Costumava pedir toda semana e sumiu há 15 dias', on:true },
+  { k:'validade', label:'Lote entrando em validade crítica', desc:'3 dias antes de vencer', on:false },
+];
+
+/* ═══ PEEK — a mesma modal pra qualquer objeto, em qualquer lugar ═══ */
+let peekStack = [];
+function peek(kind, id){
+  peekStack.push({ kind, id });
+  renderPeek();
+}
+function peekBack(){ peekStack.pop(); peekStack.length ? renderPeek() : closePeek(); }
+function closePeek(){ peekStack = []; document.body.classList.remove('peek-open'); }
+function renderPeek(){
+  const top = peekStack[peekStack.length - 1];
+  if(!top) return closePeek();
+  let el = document.querySelector('.peek-backdrop');
+  if(!el){
+    el = document.createElement('div');
+    el.className = 'peek-backdrop';
+    el.innerHTML = '<div class="peek" role="dialog" aria-modal="true"></div>';
+    el.addEventListener('click', e => { if(e.target === el) closePeek(); });
+    document.body.appendChild(el);
+  }
+  const box = el.querySelector('.peek');
+  box.innerHTML = peekContent(top.kind, top.id);
+  document.body.classList.add('peek-open');
+  setTimeout(() => box.querySelector('.peek-x, .peek-foot .btn')?.focus(), 80);
+}
+function peekShell(title, back, body, foot){
+  return `<div class="peek-head">
+      ${back ? `<button class="peek-back" aria-label="Voltar" onclick="peekBack()">‹</button>` : ''}
+      <h2>${title}</h2>
+      <button class="icon-btn peek-x" aria-label="Fechar" onclick="closePeek()">${ico('x', 14)}</button>
+    </div>
+    <div class="peek-body">${body}</div>
+    ${foot ? `<div class="peek-foot">${foot}</div>` : ''}`;
+}
+function peekContent(kind, id){
+  const back = peekStack.length > 1;
+  if(kind === 'produto'){
+    const p = S.produtos.find(x => x.id === id);
+    if(!p) return peekShell('Produto', back, '<p class="f-hint">Produto não encontrado.</p>', '');
+    const mg = Math.round((p.preco - p.custo) / p.preco * 100);
+    const vendasSem = 38 + (id.charCodeAt(id.length - 1) % 5) * 9;
+    return peekShell(p.nome, back, `
+      <div style="display:flex;align-items:center;gap:13px;margin-bottom:14px">
+        <span class="item-thumb" style="width:52px;height:52px;font-size:26px">${p.emoji || '🍽️'}</span>
+        <div><span class="pill pill-neutral">${p.cat}</span>
+        <div class="f-hint" style="margin-top:5px">${vendasSem} un vendidas na semana</div></div>
+      </div>
+      <div class="dr-row"><span class="dr-k">Preço</span><span class="dr-v mono">${fmt$(p.preco)}</span></div>
+      <div class="dr-row"><span class="dr-k">Custo</span><span class="dr-v mono">${fmt$(p.custo)}</span></div>
+      <div class="dr-row"><span class="dr-k">Margem</span><span class="dr-v"><span class="pill ${mg >= 55 ? 'pill-ok' : 'pill-warn'}">${mg}% · ${fmt$(p.preco - p.custo)}/un</span></span></div>
+      <div class="dr-row"><span class="dr-k">Identificador</span><span class="dr-v">${idChip(p.id)}</span></div>`,
+      `<button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="closePeek();openModule('estoque','produtos')">Ver em Produtos</button>
+       <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="toast('Abriria edição de produto')">Editar</button>`);
+  }
+  if(kind === 'insumo'){
+    const s = S.stock.find(x => x.id === id);
+    if(!s) return peekShell('Insumo', back, '<p class="f-hint">Não encontrado.</p>', '');
+    const low = s.qty < s.min;
+    const hist = S.stockMoves.filter(m => m.item === s.nome).slice(0, 3);
+    const pct = Math.min(100, s.qty / (s.min * 2 || 1) * 100);
+    return peekShell(s.nome, back, `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span style="color:var(--text-3)">${s.cat}</span>
+          <span class="mono" style="font-weight:700;${low ? 'color:var(--crit)' : ''}">${String(s.qty).replace('.', ',')} ${s.un} <span style="color:var(--text-4);font-weight:400">/ mín ${s.min}</span></span>
+        </div>
+        <div style="height:7px;border-radius:99px;background:var(--hover);overflow:hidden"><div style="height:100%;width:${pct}%;border-radius:99px;background:${low ? 'var(--crit)' : 'var(--ok)'}"></div></div>
+        <p class="f-hint" style="margin-top:7px">${low ? 'Abaixo do mínimo — repõe antes do próximo pico.' : 'Cobertura ok.'}</p>
+      </div>
+      <div class="dr-row"><span class="dr-k">Custo unitário</span><span class="dr-v mono">${fmt$(s.custo)}</span></div>
+      <div class="dr-row"><span class="dr-k">Identificador</span><span class="dr-v">${idChip(s.id)}</span></div>
+      ${hist.length ? `<div class="f-section" style="margin-top:14px">Últimas movimentações</div>
+        ${hist.map(m => `<div class="dr-row"><span class="dr-k">${m.h}</span><span class="dr-v" style="font-weight:500">${m.qty} · ${esc(m.motivo)}</span></div>`).join('')}` : ''}`,
+      `<button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="closePeek();openModule('estoque','entrada')">Dar entrada</button>
+       <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="closePeek();openModule('estoque','movimentos');setTimeout(descarteFlow,60)">Registrar perda</button>`);
+  }
+  if(kind === 'cliente'){
+    const c = S.clientes.find(x => x.id === id);
+    if(!c) return peekShell('Cliente', back, '<p class="f-hint">Não encontrado.</p>', '');
+    return peekShell(c.nome, back, `
+      <div style="display:flex;align-items:center;gap:13px;margin-bottom:14px">
+        ${avatarFor(c.nome)}
+        <div style="font-size:13px;color:var(--text-3)">${c.tel}<br>costuma pedir <b style="color:var(--text)">${esc(c.fav)}</b></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="stat"><div class="s-v">${c.pedidos}</div><div class="s-l">pedidos</div></div>
+        <div class="stat"><div class="s-v">${fmt$(c.pedidos * 27)}</div><div class="s-l">total gasto</div></div>
+        <div class="stat"><div class="s-v">${c.pedidos >= 20 ? 'Fiel' : c.pedidos >= 5 ? 'Recorrente' : 'Novo'}</div><div class="s-l">estágio</div></div>
+      </div>`,
+      `<button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="closePeek();openDetail('cliente','${c.id}')">Perfil completo</button>
+       <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="closePeek();S.draft={cliente:S.clientes.find(x=>x.id==='${c.id}'),items:[],obs:'',canal:''};openModule('operacao','novo-pedido')">Novo pedido</button>`);
+  }
+  if(kind === 'pedido'){
+    const o = S.orders.find(x => x.id === id);
+    if(!o) return peekShell('Pedido', back, '<p class="f-hint">Não encontrado.</p>', '');
+    return peekShell(`Pedido #${o.n}`, back, `
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">
+        <span class="pill ${STATUS[o.status].pill}">${STATUS[o.status].label}</span>
+        <span style="font-size:12.5px;color:var(--text-3)">${o.canal} · ${REL(o.at)}</span>
+      </div>
+      ${o.items.map(i => `<div class="dr-row"><span class="dr-k">${i.q}× ${esc(i.nome)}</span><span class="dr-v mono">${fmt$(i.p * i.q)}</span></div>`).join('')}
+      <div class="dr-row" style="font-weight:700"><span>Total</span><span class="dr-v mono">${fmt$(o.total)}</span></div>`,
+      `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="closePeek();openDetail('pedido','${o.id}')">Abrir pedido completo</button>`);
+  }
+  return peekShell('Objeto', back, '<p class="f-hint">Tipo desconhecido.</p>', '');
+}
+
+/* ═══ CONFIRMAÇÃO canônica (formulários sensíveis + destrutivas) ═══ */
+let confirmFn = null;
+function confirmDlg({ title, desc, confirmLabel = 'Confirmar', danger = false, onConfirm }){
+  confirmFn = onConfirm;
+  let el = document.querySelector('.confirm-wrap');
+  if(!el){
+    el = document.createElement('div');
+    el.className = 'confirm-wrap';
+    el.innerHTML = '<div class="confirm" role="alertdialog" aria-modal="true"></div>';
+    el.addEventListener('click', e => { if(e.target === el) closeConfirm(); });
+    document.body.appendChild(el);
+  }
+  el.querySelector('.confirm').innerHTML = `
+    <h3>${title}</h3><p>${desc}</p>
+    <div class="c-actions">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Voltar</button>
+      <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-go">${confirmLabel}</button>
+    </div>`;
+  document.body.classList.add('confirm-open');
+  document.getElementById('confirm-go').onclick = () => { const fn = confirmFn; closeConfirm(); fn?.(); };
+  setTimeout(() => document.getElementById('confirm-go')?.focus(), 80);
+}
+function closeConfirm(){ document.body.classList.remove('confirm-open'); confirmFn = null; }
+</script>
+<script>
+/* ═══ CAIXA INTELIGENTE: Saldo (onde está o dinheiro) / Extrato (saldo acumulado) ═══ */
+function tCaixa(){
+  const seg = S.cashSeg || 'extrato';
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const saidas = S.moves.filter(m => m.tipo === 'saida').reduce((s, m) => s - m.valor, 0);
+  const sangria = S.moves.filter(m => m.tipo === 'sangria').reduce((s, m) => s - m.valor, 0);
+  const saldo = 200 + vendas - saidas - sangria;
+  const segs = `<div class="chips-row" style="margin:0 0 18px">
+    ${[['extrato','Extrato'],['saldo','Saldo']].map(([k, l]) => `<button class="chip ${seg === k ? 'on' : ''}" onclick="S.cashSeg='${k}';rerender()">${l}</button>`).join('')}
+    <span style="flex:1"></span>
+    <button class="btn btn-secondary btn-sm" onclick="toast('Abriria lançamento manual')">${ico('plus', 12)} Lançamento</button>
+    <button class="btn btn-secondary btn-sm" data-tip="Imprime o resumo do dia na térmica" onclick="printFechamento()">${ico('print', 13)} Imprimir</button>
+    <button class="btn btn-dark btn-sm" onclick="fechamentoFlow()">Fechar o dia</button>
+  </div>`;
+  if(seg === 'saldo'){
+    const onde = [
+      { l:'Gaveta (dinheiro físico)', v:200 + vendas * .10 - sangria, c:'var(--warn)' },
+      { l:'Pix · conta PJ', v:vendas * .62, c:'var(--ok)' },
+      { l:'Cartão · a compensar', v:vendas * .28, c:'var(--text-4)' },
+      { l:'iFood · repasse de quinta', v:842.30, c:'var(--crit)' },
+    ];
+    const tot = onde.reduce((s, o) => s + o.v, 0);
+    return segs + `
+      <div class="kpis">
+        <div class="kpi"><div class="k-l">Total visível</div><div class="k-v">${fmt$(tot)}</div><div class="k-d up">dinheiro + a caminho</div></div>
+        <div class="kpi"><div class="k-l">Na gaveta agora</div><div class="k-v">${fmt$(onde[0].v)}</div><div class="k-d flat">confere no fechamento</div></div>
+        <div class="kpi"><div class="k-l">A caminho</div><div class="k-v">${fmt$(onde[2].v + onde[3].v)}</div><div class="k-d flat">cartão + repasse iFood</div></div>
+      </div>
+      <span class="eyebrow">Onde está o dinheiro</span>
+      <div class="comp" style="margin-top:12px">${onde.map(o => `<div style="width:${o.v / tot * 100}%;background:${o.c}"></div>`).join('')}</div>
+      <div class="legend">${onde.map(o => `<div class="legend-row"><i style="background:${o.c}"></i>${o.l}<span class="v">${fmt$(o.v)}</span></div>`).join('')}</div>
+      <p class="f-hint" style="margin-top:16px">O repasse do iFood já desconta a comissão de 27%. Cai quinta na conta PJ.</p>`;
+  }
+  /* Extrato: saldo acumulado por linha, do mais novo pro mais velho */
+  const f = S.cashFilter || 'todos';
+  const rows = S.moves.filter(m => f === 'todos' ? true : m.tipo === f);
+  let running = 200; // abertura
+  const chron = [...S.moves].reverse(); // cronológico
+  const withBalance = chron.map(m => { running += m.valor; return { ...m, bal: running }; }).reverse();
+  const vis = withBalance.filter(m => f === 'todos' ? true : m.tipo === f);
+  return segs + `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="chips-row" style="margin:0">
+        ${[['todos','Todos'],['venda','Vendas'],['saida','Saídas'],['sangria','Sangria'],['abertura','Abertura']].map(([k, l]) =>
+          `<button class="chip ${f === k ? 'on' : ''}" onclick="S.cashFilter='${k}';rerender()">${l}</button>`).join('')}
+      </div>
+      <span style="font-size:12px;color:var(--text-4)">${vis.length} lançamentos · saldo após cada um →</span>
+    </div>
+    <div class="rows">
+      ${vis.map(m => `<button class="row" style="grid-template-columns:auto 1fr auto auto auto;width:100%;text-align:left" onclick="openMove('${m.id}')">
+        <span class="pill ${m.tipo === 'venda' ? 'pill-ok' : m.tipo === 'abertura' ? 'pill-neutral' : m.tipo === 'sangria' ? 'pill-crit' : 'pill-warn'}">${m.tipo}</span>
+        <span><span class="row-main" style="font-weight:600">${esc(m.desc)}</span><div class="row-sub">${m.h}${m.forma ? ' · ' + m.forma : ''}</div></span>
+        <span class="row-num" style="font-weight:600;color:${m.valor >= 0 ? 'var(--ok)' : 'var(--crit)'}">${m.valor >= 0 ? '+' : ''}${fmt$(m.valor)}</span>
+        <span class="row-num" style="color:var(--text-4);min-width:90px;text-align:right">${fmt$(m.bal)}</span>
+        <span style="color:var(--text-4)">›</span>
+      </button>`).join('')}
+    </div>`;
+}
+
+/* ═══ GESTÃO = DASHBOARD da Casa da Babá (denso inteligente) ═══ */
+function tDashboard(){
+  return `
+    <span class="eyebrow">Decisões de hoje</span>
+    <div style="display:flex;flex-direction:column;gap:0;margin:10px 0 24px">
+      <button class="row" style="grid-template-columns:1fr auto;width:100%;text-align:left" onclick="openModule('estoque','entrada')">
+        <span><span class="row-main">Frango acaba amanhã no ritmo atual</span><div class="row-sub">restam 1,5 kg · consumo de ~4 kg/dia</div></span>
+        <span class="a" style="font-weight:700;font-size:13px;color:var(--accent-text)">Dar entrada →</span></button>
+      <button class="row" style="grid-template-columns:1fr auto;width:100%;text-align:left" onclick="toast('Abriria criador de promoção')">
+        <span><span class="row-main">iFood caiu 18% na semana</span><div class="row-sub">comissão de 27% continua comendo a margem · promoção mirada pode recuperar volume</div></span>
+        <span class="a" style="font-weight:700;font-size:13px;color:var(--accent-text)">Criar promoção →</span></button>
+      <button class="row" style="grid-template-columns:1fr auto;width:100%;text-align:left" onclick="openModule('clientes','crm-clientes')">
+        <span><span class="row-main">5 clientes bons sumiram há 15+ dias</span><div class="row-sub">costumavam pedir toda semana · uma mensagem recupera</div></span>
+        <span class="a" style="font-weight:700;font-size:13px;color:var(--accent-text)">Recuperar →</span></button>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="k-l">Semana vs passada</div><div class="k-v">R$ 7.840</div><div class="k-d up">▲ 9% · R$ 650 a mais</div></div>
+      <div class="kpi"><div class="k-l">Ticket médio</div><div class="k-v">R$ 31,20</div><div class="k-d down">▼ 2% — sobremesa caiu</div></div>
+      <div class="kpi"><div class="k-l">Margem real</div><div class="k-v">29,8%</div><div class="k-d up">▲ 1,4 p.p. vs jul</div></div>
+      <div class="kpi"><div class="k-l">Perda por validade</div><div class="k-v">R$ 218</div><div class="k-d up">▼ 18% vs jul</div></div>
+    </div>
+    <span class="eyebrow">De onde vem o pedido</span>
+    <div style="margin:10px 0 24px">
+      ${[['iFood · comissão ~27%', 44, '#C03B2A', 'R$ 3.450 · taxa R$ 930'],['Balcão', 34, '#18874E', 'R$ 2.665 · margem cheia'],['WhatsApp', 22, '#128C4B', 'R$ 1.725 · margem cheia']].map(([l, p, c, sub]) => `
+        <div style="display:grid;grid-template-columns:190px 1fr 90px;align-items:center;gap:12px;padding:7px 0">
+          <span style="font-size:13px;font-weight:600">${l}</span>
+          <div style="height:8px;border-radius:99px;background:var(--hover)"><div style="height:100%;width:${p}%;border-radius:99px;background:${c}"></div></div>
+          <span class="mono" style="font-size:12px;text-align:right;color:var(--text-3)">${p}%</span>
+        </div>`).join('')}
+      <p class="f-hint" style="margin-top:6px">Cada ponto do iFood pro WhatsApp direto devolve ~27% de margem. O cardápio com link próprio é o caminho.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div><span class="eyebrow">Produtos</span>
+        <div class="rows" style="margin-top:8px;border-top:0">
+          <div class="row" style="grid-template-columns:1fr auto"><span><span class="row-main">🍛 Marmita de frango</span><div class="row-sub">campeã · 212 un/sem</div></span><span class="pill pill-ok">sobe produção</span></div>
+          <div class="row" style="grid-template-columns:1fr auto"><span><span class="row-main">🥗 Marmita fit</span><div class="row-sub">9 un/sem · encalhada</div></span><span class="pill pill-warn">rever ou pausar</span></div>
+        </div>
+      </div>
+      <div><span class="eyebrow">Pico de hoje (pedidos/hora)</span>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:84px;margin-top:14px">
+          ${[4,7,12,26,34,22,9,5].map((v, i) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="width:100%;height:${v * 2.1}px;border-radius:5px;background:${v > 25 ? 'var(--accent)' : 'var(--pressed)'}"></div>
+            <span style="font-size:9.5px;color:var(--text-4)">${9 + i}h</span></div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+function tRelatorios(){
+  const reps = [
+    { id:'r1', nome:'Vendas por canal', desc:'Semana e mês, com comissão do iFood descontada', icon:'chart' },
+    { id:'r2', nome:'Curva ABC de produtos', desc:'Os 20% que fazem 80% do faturamento', icon:'pkg' },
+    { id:'r3', nome:'Perdas por validade', desc:'Por produto, por motivo, por semana', icon:'clock' },
+    { id:'r4', nome:'Fechamentos de caixa', desc:'Conferência dia a dia com diferenças', icon:'caixa' },
+    { id:'r5', nome:'Clientes que sumiram', desc:'Recorrência quebrada pra recuperar', icon:'users' },
+  ];
+  return `<p class="tab-note">Relatórios que respondem uma pergunta, não tabelas por tabelar.</p>
+    <div class="rows">
+      ${reps.map(r => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+        <span class="ctx-ico">${ico(r.icon === 'pkg' || r.icon === 'clock' || r.icon === 'users' ? 'box' : r.icon === 'caixa' ? 'caixa' : r.icon === 'chart' ? 'chart' : 'file', 15)}</span>
+        <span><span class="row-main">${r.nome}</span><div class="row-sub">${r.desc}</div></span>
+        <button class="btn btn-secondary btn-sm" data-tip="Gera e mostra na tela" onclick="toast('Gerando ${r.nome}…')">Gerar</button>
+        <button class="btn btn-secondary btn-sm" data-tip="Imprime ou salva PDF" onclick="toast('${r.nome} enviado pra impressão')">${ico('print', 13)}</button>
+      </div>`).join('')}
+    </div>`;
+}
+
+/* ═══ CRM — contexto Clientes ═══ */
+function tCrmClientes(){
+  return `<p class="tab-note">Estágio vem do comportamento, não de planilha: nunca comprou = lead, 1-4 pedidos = novo, 5-19 = recorrente, 20+ = fiel.</p>
+    <div class="rows">
+      ${S.clientes.map(c => { const st = c.pedidos >= 20 ? ['Fiel','pill-ok'] : c.pedidos >= 5 ? ['Recorrente','pill-neutral'] : ['Novo','pill-warn'];
+        return `<button class="row" style="grid-template-columns:auto 1fr auto auto auto;width:100%;text-align:left" onclick="openDetail('cliente','${c.id}')">
+        ${avatarFor(c.nome)}
+        <span><span class="row-main">${esc(c.nome)}</span><div class="row-sub">${c.tel} · costuma pedir ${esc(c.fav)}</div></span>
+        <span class="row-num" style="color:var(--text-3)">${c.pedidos} pedidos</span>
+        <span class="pill ${st[1]}">${st[0]}</span>
+        <span style="color:var(--text-4)">›</span></button>`; }).join('')}
+      ${S.leads.map(l => `<button class="row" style="grid-template-columns:auto 1fr auto auto auto;width:100%;text-align:left" onclick="toast('Lead ainda não tem perfil — vira cliente no 1º pedido')">
+        <span class="avatar-sm" style="background:var(--text-4)">${l.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+        <span><span class="row-main" style="color:var(--text-3)">${esc(l.nome)}</span><div class="row-sub">chegou pelo ${l.origem} · ${l.desde} · ainda não pediu</div></span>
+        <span class="row-num" style="color:var(--text-4)">—</span>
+        <span class="pill" style="background:var(--accent-soft);color:var(--accent-text)">lead</span>
+        <span style="color:var(--text-4)">›</span></button>`).join('')}
+    </div>`;
+}
+function tFunil(){
+  const f = [
+    { l:'Contatos (leads)', n:34, c:'#A1A1A6' },
+    { l:'Pediram 1×', n:21, c:'#F8884A' },
+    { l:'Voltaram (2-4)', n:13, c:'#E85814' },
+    { l:'Fiéis (5+)', n:8, c:'#18874E' },
+  ];
+  const conv = ['62% pedem depois do 1º contato', '62% voltam depois do 1º pedido', '62% dos recorrentes fidelizam'];
+  return `<p class="tab-note">Quando alguém vira lead? Quando fala com você e não compra. Vira cliente no 1º pedido. O funil mostra onde a gente perde gente.</p>
+    <div class="funnel">
+      ${f.map((s, i) => `
+        <div class="fun-stage"><span class="f-l">${s.l}</span>
+          <div class="f-bar"><div class="f-fill" style="--fc:${s.c};width:${s.n / f[0].n * 100}%"></div></div>
+          <span class="f-n">${s.n}</span></div>
+        ${i < f.length - 1 ? `<div class="fun-conv">↓ ${conv[i]}</div>` : ''}`).join('')}
+    </div>
+    <p class="f-hint" style="margin-top:14px">O gargalo é contato → 1º pedido: 13 leads parados. Uma mensagem com o cardápio da semana costuma converter 1 em 3.</p>`;
+}
+function tAtendimento(){
+  const cur = S.conversas.find(c => c.id === (S.chatId || S.conversas[0].id));
+  return `<p class="tab-note">WhatsApp, Instagram e iFood na mesma caixa. Mensagem sem resposta acende o sino.</p>
+    <div class="inbox">
+      <div class="inbox-list">
+        ${S.conversas.map(c => `<button class="inbox-item ${cur.id === c.id ? 'on' : ''}" onclick="S.chatId='${c.id}';rerender()">
+          <span class="avatar-sm" style="background:${c.lead ? 'var(--text-4)' : avatarColorOf(c.nome)};width:34px;height:34px">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+          <span style="min-width:0">
+            <span class="ii-name">${esc(c.nome)} ${c.lead ? '<span class="chan-tag" style="background:var(--accent-soft);color:var(--accent-text)">lead</span>' : ''}</span><br>
+            <span class="ii-prev">${esc(c.msgs[c.msgs.length - 1].t)}</span>
+          </span>
+          <span class="ii-meta"><span class="chan-tag chan-${c.canal}">${{ wa:'WhatsApp', ig:'Instagram', if:'iFood' }[c.canal]}</span><br>
+            <span style="font-size:10.5px;color:var(--text-4)">${c.at}</span> ${c.unread ? '<span class="unread-dot"></span>' : ''}</span>
+        </button>`).join('')}
+      </div>
+      <div class="chat">
+        <div class="chat-head">
+          <b style="font-size:14px">${esc(cur.nome)}</b>
+          ${cur.lead ? '' : `<button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="peek('cliente','${(S.clientes.find(x => x.nome === cur.nome) || {}).id}')">Ver perfil</button>`}
+        </div>
+        <div class="chat-body" id="chat-body">
+          ${cur.msgs.map(m => `<div class="msg ${m.dir}">${esc(m.t)}<span class="m-t">${m.h}</span></div>`).join('')}
+        </div>
+        <div class="chat-input">
+          <input class="f-input" id="chat-in" placeholder="Responder como Casa da Babá…" onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn btn-primary" onclick="sendChat()">Enviar</button>
+        </div>
+      </div>
+    </div>`;
+}
+function sendChat(){
+  const inp = document.getElementById('chat-in');
+  const t = inp.value.trim();
+  if(!t) return;
+  const cur = S.conversas.find(c => c.id === (S.chatId || S.conversas[0].id));
+  cur.msgs.push({ dir:'out', t, h:'agora' });
+  cur.unread = 0;
+  rerender();
+  setTimeout(() => { const b = document.getElementById('chat-body'); if(b) b.scrollTop = b.scrollHeight; }, 0);
+}
+function tAvaliacoes(){
+  const media = (S.avaliacoes.reduce((s, a) => s + a.nota, 0) / S.avaliacoes.length).toFixed(1);
+  const pend = S.avaliacoes.filter(a => !a.respondida).length;
+  return `<div class="kpis">
+      <div class="kpi"><div class="k-l">Nota média · iFood</div><div class="k-v">${media.replace('.', ',')} <span class="stars" style="font-size:15px">★</span></div><div class="k-d up">meta 4,5</div></div>
+      <div class="kpi"><div class="k-l">Sem resposta</div><div class="k-v">${pend}</div><div class="k-d ${pend ? 'down' : 'up'}">responder em até 24h</div></div>
+    </div>
+    <div class="rows">
+      ${S.avaliacoes.map(a => `<div class="review" style="display:grid;grid-template-columns:1fr auto">
+        <span><span class="stars">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</span> <span style="font-size:12px;color:var(--text-4)">${a.canal} · ${a.h}</span>
+          <div style="font-size:13.5px;margin-top:4px">“${esc(a.texto)}” <b>· ${esc(a.nome)}</b></div></span>
+        <span>${a.respondida ? '<span class="pill pill-ok">respondida</span>' : `<button class="btn btn-secondary btn-sm" onclick="toast('Abriria resposta à avaliação')">Responder</button>`}</span>
+      </div>`).join('')}
+    </div>`;
+}
+function tNotifPrefs(){
+  return `<p class="tab-note">O que merece te interromper. O resto fica quieto no sino.</p>
+    <div class="rows">
+      ${S.notifPrefs.map((p, i) => `<div class="row" style="grid-template-columns:1fr auto">
+        <span><span class="row-main">${p.label}</span><div class="row-sub">${p.desc}</div></span>
+        <button class="switch" role="switch" aria-checked="${p.on}" aria-label="${p.label}" onclick="S.notifPrefs[${i}].on=!S.notifPrefs[${i}].on;this.setAttribute('aria-checked',S.notifPrefs[${i}].on);toast(S.notifPrefs[${i}].on?'Alerta ligado: ${p.label}':'Alerta desligado')"></button>
+      </div>`).join('')}
+    </div>`;
+}
+</script>
+<script>
+/* boot: por ultimo, com todos os mocks e renderers carregados */
+renderHome();
+</script>
+</body>
+</html>

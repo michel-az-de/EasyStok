@@ -28,7 +28,7 @@ const txt = () => document.body.textContent;
 
 // jsdom não executa scripts externos; os inline já rodam via runScripts. Boot acontece no load.
 check('boot: home renderiza saudação', () => txt().includes('Bom dia'));
-check('boot: 5 contextos na home', () => $$('.ctx-row').length === 5);
+check('boot: 6 contextos na home', () => $$('.ctx-row').length === 6);
 check('boot: números do dia presentes', () => $$('.now-item').length === 3);
 
 check('navega Operação > Pedidos', () => { window.openModule('operacao', 'pedidos'); return txt().includes('Pedidos'); });
@@ -87,7 +87,7 @@ check('Novo pedido: salva e cai na fila andamento', () => {
 });
 check('fila cresceu com o pedido salvo', () => $$('#main .rows > .row').length === window.S.orders.filter(o => o.status !== 'entregue').length);
 
-check('Cliente: abre detalhe', () => { window.openModule('operacao', 'clientes'); document.querySelector('#main .rows > .row').click(); return txt().includes('total gasto'); });
+check('Cliente: abre detalhe', () => { window.openModule('clientes', 'crm-clientes'); document.querySelector('#main .rows > .row').click(); return txt().includes('total gasto'); });
 check('Cliente: editar abre drawer e salva', () => {
   window.editCliente('cli_m4k2');
   document.getElementById('ec-tel').value = '(11) 90000-0000';
@@ -154,7 +154,7 @@ check('Busca: Enter navega', () => { window.runHit(0); return !document.body.cla
 check('Esc volta ao portal', () => { window.goHome(); return txt().includes('Onde trabalhar'); });
 
 /* ── v9: navegação onipresente ── */
-check('Topbar tem os 6 destinos', () => $$('#ctxnav button').length === 6);
+check('Topbar tem os 7 destinos', () => $$('#ctxnav button').length === 7);
 check('Home marca "Hoje" e esconde subbar', () => document.querySelector('#ctxnav .on')?.textContent === 'Hoje' && document.getElementById('subbar').hidden);
 check('Entrar em Estoque liga subbar com 5 tabs', () => {
   document.querySelector('#ctxnav [data-ctx="estoque"]').click();
@@ -206,6 +206,105 @@ check('Edição: salvar persiste e fecha', () => {
 });
 check('Densidade compacta aplica', () => { window.setDensity('compact'); return document.documentElement.dataset.density === 'compact'; });
 check('Tema dark aplica', () => { window.toggleTheme(); return document.documentElement.dataset.theme === 'dark'; });
+
+/* ── v10: peek universal ── */
+check('Peek: produto abre a modal canônica', () => {
+  window.setDensity('comfort');
+  window.peek('produto', 'prd_a1');
+  return document.body.classList.contains('peek-open') && txt().includes('Marmita frango grelhado') && txt().includes('Margem');
+});
+check('Peek: insumo mostra barra de cobertura e movimentações', () => {
+  window.closePeek(); window.peek('insumo', 'ins_3w6p1');
+  return txt().includes('Peito de frango') && txt().includes('Cobertura');
+});
+check('Peek: stack — pedido dentro de pedido volta certo', () => {
+  window.closePeek(); window.peek('pedido', 'ped_9f2k1');
+  return txt().includes('#1042');
+});
+check('Peek: Esc fecha o topo sem sair da tela', () => {
+  window.peekBack();
+  return !document.body.classList.contains('peek-open');
+});
+check('Peek: cliente a partir de qualquer lugar', () => {
+  window.peek('cliente', 'cli_b7h9');
+  const ok = txt().includes('Ana Costa') && txt().includes('Fiel');
+  window.closePeek();
+  return ok;
+});
+
+/* ── v10: confirmação canônica ── */
+check('Confirm: cancelar pedido exige confirmação e remove', () => {
+  window.openModule('operacao', 'pedidos');
+  const antes = window.S.orders.length;
+  const alvo = window.S.orders.find(o => o.status === 'aguardando');
+  window.confirmDlg({ title:'x', desc:'y', danger:true, onConfirm:() => window.S.orders.splice(window.S.orders.indexOf(alvo), 1) });
+  document.getElementById('confirm-go').click();
+  return window.S.orders.length === antes - 1 && !document.body.classList.contains('confirm-open');
+});
+
+/* ── v10: caixa inteligente ── */
+check('Caixa Saldo: mostra onde está o dinheiro', () => {
+  window.openModule('operacao', 'caixa');
+  window.S.cashSeg = 'saldo'; window.rerender();
+  return txt().includes('Gaveta') && txt().includes('repasse');
+});
+check('Caixa Extrato: saldo acumulado por linha', () => {
+  window.S.cashSeg = 'extrato'; window.rerender();
+  const rows = $$('#main .rows > .row');
+  return rows.length > 0 && rows[0].textContent.includes('R$');
+});
+
+/* ── v10: Gestão dashboard ── */
+check('Gestão: dashboard com decisões de hoje', () => {
+  window.openModule('gestao', 'dashboard');
+  return txt().includes('Decisões de hoje') && txt().includes('iFood caiu');
+});
+check('Gestão: relatórios com gerar/imprimir', () => {
+  window.setModuleTab('relatorios');
+  return txt().includes('Curva ABC');
+});
+
+/* ── v10: CRM ── */
+check('CRM: contexto Clientes com leads marcados', () => {
+  window.openModule('clientes', 'crm-clientes');
+  return txt().includes('Priscila') && txt().includes('lead');
+});
+check('CRM: funil com estágios e conversões', () => {
+  window.setModuleTab('funil');
+  return txt().includes('Contatos') && txt().includes('Fiéis');
+});
+check('CRM: atendimento envia mensagem', () => {
+  window.setModuleTab('atendimento');
+  const antes = window.S.conversas[0].msgs.length;
+  document.getElementById('chat-in').value = 'Oi! A de 1kg fica R$ 58 e entregamos sim';
+  window.sendChat();
+  return window.S.conversas[0].msgs.length === antes + 1 && txt().includes('R$ 58');
+});
+check('CRM: avaliações com estrelas e pendente', () => {
+  window.setModuleTab('avaliacoes');
+  return txt().includes('Responder') && txt().includes('★');
+});
+check('CRM: alertas ligam/desligam', () => {
+  window.setModuleTab('alertas');
+  const antes = window.S.notifPrefs[3].on;
+  document.querySelectorAll('#main .switch')[3].click();
+  return window.S.notifPrefs[3].on === !antes;
+});
+check('CRM: timeline do cliente (lead → compra → reclamação)', () => {
+  window.openDetail('cliente', 'cli_b7h9');
+  const ok = txt().includes('Linha do tempo') && txt().includes('1º pedido') && txt().includes('Reclamação');
+  window.closeDetail();
+  return ok;
+});
+check('Topbar agora tem 7 destinos', () => $$('#ctxnav button').length === 7);
+check('Tecla 6 abre Clientes', () => {
+  document.dispatchEvent(new window.KeyboardEvent('keydown', { key:'6', bubbles:true }));
+  return document.querySelector('#ctxnav .on')?.textContent === 'Clientes';
+});
+check('Tecla 1 volta pro Hoje', () => {
+  document.dispatchEvent(new window.KeyboardEvent('keydown', { key:'1', bubbles:true }));
+  return txt().includes('Onde trabalhar');
+});
 
 console.log('\n═══ RESULTADOS ═══');
 results.forEach(r => console.log(r));
