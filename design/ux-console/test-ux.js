@@ -436,9 +436,9 @@ check('A11y: painel abre com 4 controles', () => {
   window.openA11y();
   return $$('.drawer .a11y-row').length === 4;
 });
-check('A11y: tamanho do texto aplica no body', () => {
-  window.setA11y('font', 17);
-  const ok = document.body.style.fontSize === '17px';
+check('A11y: tamanho do texto aplica zoom real na UI', () => {
+  window.setA11y('font', 18);
+  const ok = String(document.body.style.zoom) === '1.2';
   window.setA11y('font', 15); window.closeDrawer();
   return ok;
 });
@@ -589,6 +589,57 @@ check('Cardápio: toggle de canal audita', () => {
   const sw = document.querySelector('.ma-card .switch');
   sw.click();
   return window.S.audit.length === antes + 1;
+});
+
+/* ── v14: avaliações com utilidade real ── */
+check('Avaliações: mostra impacto na marca', () => {
+  window.openModule('clientes', 'avaliacoes');
+  return txt().includes('Nota pública') && txt().includes('Temas da semana');
+});
+check('Avaliações: responder publica e marca', () => {
+  const a = window.S.avaliacoes.find(x => !x.respondida);
+  window.revReplySend(a.id, 'Obrigado pelo toque! Já ajustamos o tempo de entrega 🧡');
+  return a.respondida === true && a.resposta.includes('Obrigado');
+});
+check('Avaliações: recuperar cliente 2★ com confirmação', () => {
+  const a = window.S.avaliacoes.find(x => x.nota <= 3 && !x.recuperada);
+  window.recuperarCliente(a.id);
+  document.getElementById('confirm-go').click();
+  return a.recuperada === true;
+});
+
+/* ── v14: peek cliente rico ── */
+check('Peek cliente rico: stats + interações + ações', () => {
+  window.peek('cliente', 'cli_b7h9');
+  const ok = txt().includes('gasto total') && txt().includes('Últimas interações');
+  window.closePeek();
+  return ok;
+});
+
+/* ── v14: CRM com segmentos ── */
+check('CRM: segmentos com contagem', () => {
+  window.openModule('clientes', 'crm-clientes');
+  return $$('#main .chip .seg-count').length === 6;
+});
+check('CRM: filtro Leads mostra só quem nunca comprou', () => {
+  window.S.crmSeg = 'lead'; window.setModuleTab('crm-clientes');
+  const lista = document.getElementById('main').textContent;
+  return lista.includes('Priscila') && !lista.includes('Maria Silva');
+});
+check('CRM: filtro Sumidos + reset', () => {
+  window.S.crmSeg = 'sumido'; window.setModuleTab('crm-clientes');
+  const ok = document.getElementById('main').textContent.includes('15+ dias');
+  window.S.crmSeg = 'todos';
+  return ok;
+});
+
+/* ── v14: financeiro ERP ── */
+check('Financeiro: visão geral com DRE e lucro líquido', () => {
+  window.openModule('financeiro', 'visao');
+  return txt().includes('Lucro líquido') && txt().includes('Taxas de canal');
+});
+check('Financeiro: fluxo de caixa 30d com alerta', () => {
+  return txt().includes('vai faltar caixa') && txt().includes('semana 3');
 });
 
 console.log('\n═══ RESULTADOS ═══');

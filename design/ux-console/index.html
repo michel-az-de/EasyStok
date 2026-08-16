@@ -444,7 +444,7 @@ const MODULES = [
     state:() => { const low = S.stock.filter(s => s.qty < s.min).length;
       return low ? `<b>${low}</b> insumos abaixo do mínimo` : 'tudo acima do mínimo'; } },
   { id:'financeiro', name:'Financeiro', icon:'money', tint:'#8A5A00',
-    tabs:[['receber','A receber'],['pagar','A pagar'],['faturas','Faturas'],['reconciliacao','Reconciliação']],
+    tabs:[['visao','Visão geral'],['receber','A receber'],['pagar','A pagar'],['faturas','Faturas'],['reconciliacao','Reconciliação']],
     state:() => { const hoje = S.pagar.some(p => p.venc === 'hoje' && p.status === 'pendente');
       return hoje ? `<b>1 conta</b> vence hoje` : 'nada vencendo hoje'; } },
   { id:'compras', name:'Compras', icon:'cart', tint:'#0F766E', tabs:[['lista','Lista']],
@@ -1031,7 +1031,7 @@ const TABS = {
   'lista':() => tComprasLista(),
   'producao':() => tProducao(),
   'dashboard':() => tDashboard(), 'relatorios':() => tRelatorios(), 'analises':() => tAnalises(),
-  'faturas':() => tFaturas(), 'reconciliacao':() => tReconciliacao(), 'integracoes':() => tIntegracoes(),
+  'faturas':() => tFaturas(), 'reconciliacao':() => tReconciliacao(), 'integracoes':() => tIntegracoes(), 'visao':() => tVisaoFin(),
   'crm-clientes':() => tCrmClientes(), 'funil':() => tFunil(), 'atendimento':() => tAtendimento(), 'avaliacoes':() => tAvaliacoes(), 'alertas':() => tNotifPrefs(),
   'metricas':() => tMetricas(), 'cardapio':() => tCardapioAdmin(),
 };
@@ -1376,6 +1376,31 @@ input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 .ma-stock{font-size:11.5px;color:var(--text-3);margin-top:2px}
 .ma-channels{display:flex;gap:10px;margin-top:11px;padding-top:10px;border-top:1px solid var(--hairline);flex-wrap:wrap}
 .ma-ch{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-3)}
+
+/* ═══ v14 polish ═══ */
+.rev-reply{margin-top:10px;background:var(--hover);border-radius:var(--r-m);padding:11px 13px;font-size:13px}
+.rev-reply .rr-by{font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:3px}
+.rev-actions{display:flex;gap:8px;margin-top:9px}
+.rev-composer{display:flex;gap:7px;margin-top:9px}
+.rev-composer .f-input{flex:1;height:36px;font-size:13px}
+.theme-tag{display:inline-flex;gap:5px;align-items:center;font-size:11px;font-weight:700;padding:3px 10px;border-radius:var(--r-pill);background:var(--warn-soft);color:var(--warn)}
+.dre{border-top:1px solid var(--hairline);margin-top:6px}
+.dre-row{display:flex;justify-content:space-between;align-items:baseline;padding:10px 2px;border-bottom:1px solid var(--hairline);font-size:13.5px}
+.dre-row .dr-l{color:var(--text-2)}
+.dre-row .dr-l small{display:block;font-size:11px;color:var(--text-4)}
+.dre-row .dr-v{font-family:var(--font-mono);font-weight:600}
+.dre-row.total{border-bottom:0;background:var(--accent-soft);margin:8px -12px -6px;padding:12px 14px;border-radius:var(--r-m)}
+.dre-row.total .dr-l{color:var(--text);font-weight:800}
+.week-bars{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.week-bar{background:var(--card);border:1px solid var(--hairline);border-radius:var(--r-m);padding:12px}
+.week-bar .wb-l{font-size:11px;font-weight:700;color:var(--text-4)}
+.week-bar .wb-v{font-family:var(--font-mono);font-size:16px;font-weight:600;margin-top:4px}
+.peek .stat-grid{gap:10px}
+.peek .stat{background:var(--hover);border-radius:var(--r-m);padding:10px 12px}
+.peek .stat .s-v{font-size:17px}
+.seg-count{font-family:var(--font-mono);font-size:10.5px;color:var(--text-4);margin-left:4px}
+.postit{max-height:150px;overflow:auto}
+.fun-stage .f-l{font-size:12.5px}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -2800,7 +2825,8 @@ const A11Y_KEY = 'es-a11y';
 function getA11y(){ try{ return JSON.parse(localStorage.getItem(A11Y_KEY)) || {}; }catch(e){ return {}; } }
 function applyA11y(){
   const a = getA11y();
-  document.body.style.fontSize = (a.font || 15) + 'px';
+  /* zoom real: escala a UI inteira, como o "Texto maior" do iOS */
+  document.body.style.zoom = ((a.font || 15) / 15);
   document.documentElement.dataset.a11yContrast = a.contrast ? '1' : '';
   document.documentElement.dataset.a11yMotion = a.motion ? '1' : '';
   document.documentElement.dataset.a11yLinks = a.links ? '1' : '';
@@ -3173,5 +3199,177 @@ function toggleMenuCh(id, ch, el){
   el.setAttribute('aria-checked', m.on);
   audit(`${m.on ? 'ativou' : 'pausou'} ${m.nome} no ${ch === 'site' ? 'Site' : 'iFood'}`);
   push({ title:m.on ? `${m.nome} no ar no ${ch === 'site' ? 'site' : 'iFood'}` : `${m.nome} pausado no ${ch === 'site' ? 'site' : 'iFood'}`, icon:'📖' });
+}
+</script>
+<script>
+/* ═══ v14: AVALIAÇÕES com utilidade real — proteger e promover a marca ═══ */
+function tAvaliacoes(){
+  const media = (S.avaliacoes.reduce((s, a) => s + a.nota, 0) / S.avaliacoes.length);
+  const pend = S.avaliacoes.filter(a => !a.respondida);
+  const temas = [['atraso na entrega', 3], ['faltou item', 2], ['comida fria', 1]];
+  return `
+    <div class="kpis">
+      <div class="kpi"><div class="k-l">Nota pública · iFood</div><div class="k-v">${media.toFixed(1).replace('.', ',')} ★</div>
+        <div class="k-d ${media >= 4.5 ? 'up' : 'down'}">${media >= 4.5 ? 'acima da meta — o algoritmo te mostra mais' : 'abaixo de 4,5 o iFood te esconde'}</div></div>
+      <div class="kpi"><div class="k-l">Sem resposta</div><div class="k-v">${pend.length}</div>
+        <div class="k-d ${pend.length ? 'down' : 'up'}">resposta é pública: vira vitrine</div></div>
+      <div class="kpi"><div class="k-l">Recuperações</div><div class="k-v">2</div><div class="k-d up">clientes salvos no mês</div></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+      <span class="eyebrow" style="margin-right:4px">Temas da semana</span>
+      ${temas.map(([t, n]) => `<button class="theme-tag" data-tip="Ver no dashboard de decisões" onclick="openModule('gestao','dashboard')">"${t}" · ${n}×</button>`).join('')}
+    </div>
+    <div class="rows">
+      ${S.avaliacoes.map(a => `<div class="review" style="display:block" id="rev-${a.id}">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="stars">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</span>
+          <b style="font-size:13px">${esc(a.nome)}</b>
+          <span style="font-size:11.5px;color:var(--text-4)">${a.canal} · ${a.h}</span>
+          <span style="margin-left:auto">${a.respondida ? '<span class="pill pill-ok">respondida</span>' : '<span class="pill pill-warn">pública · sem resposta</span>'}</span>
+        </div>
+        <div style="font-size:13.5px;margin-top:6px">“${esc(a.texto)}”</div>
+        ${a.resposta ? `<div class="rev-reply"><div class="rr-by">Resposta da Casa da Babá (pública)</div>${esc(a.resposta)}</div>` : ''}
+        <div class="rev-actions">
+          ${!a.respondida ? `<button class="btn btn-primary btn-sm" onclick="revReplyOpen('${a.id}')">Responder (público)</button>` : ''}
+          ${a.nota <= 3 && !a.recuperada ? `<button class="btn btn-secondary btn-sm" data-tip="Cupom + mensagem no WhatsApp" onclick="recuperarCliente('${a.id}')">Recuperar cliente</button>` : ''}
+          ${a.recuperada ? '<span class="pill pill-ok">recuperação enviada</span>' : ''}
+        </div>
+        <div class="rev-composer" id="revc-${a.id}" hidden>
+          <input class="f-input" placeholder="Resposta pública, humana e curta…" onkeydown="if(event.key==='Enter')revReplySend('${a.id}',this.value)">
+          <button class="btn btn-primary btn-sm" onclick="revReplySend('${a.id}',this.previousElementSibling.value)">Publicar</button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+}
+function revReplyOpen(id){
+  const c = document.getElementById('revc-' + id);
+  c.hidden = !c.hidden;
+  if(!c.hidden) setTimeout(() => c.querySelector('input').focus(), 0);
+}
+function revReplySend(id, text){
+  if(!text.trim()) return;
+  const a = S.avaliacoes.find(x => x.id === id);
+  a.resposta = text.trim(); a.respondida = true;
+  audit(`respondeu avaliação de ${a.nome} (${a.nota}★)`);
+  push({ title:'Resposta publicada', sub:'todo mundo que ler a avaliação vê sua resposta', icon:'⭐', tint:'#F5A623' });
+  rerender();
+}
+function recuperarCliente(id){
+  const a = S.avaliacoes.find(x => x.id === id);
+  confirmDlg({
+    title:'Recuperar esse cliente?',
+    desc:`Avaliação ${a.nota}★ de ${a.nome}: "${a.texto}". Vamos mandar no WhatsApp: desculpa sincera + cupom de 15% na próxima. Recuperar sai mais barato que perder.`,
+    confirmLabel:'Enviar recuperação',
+    onConfirm:() => {
+      a.recuperada = true;
+      audit(`recuperou cliente da avaliação ${a.nota}★ (${a.nome})`);
+      push({ title:'Recuperação enviada', sub:'cupom 15% + mensagem no WhatsApp de ' + a.nome, icon:'🧡' });
+      rerender();
+    },
+  });
+}
+
+/* ═══ v14: PEEK DE CLIENTE rico ═══ */
+const _peekClienteOrig = peekContent;
+peekContent = function(kind, id){
+  if(kind !== 'cliente') return _peekClienteOrig(kind, id);
+  const back = peekStack.length > 1;
+  const c = S.clientes.find(x => x.id === id);
+  if(!c) return peekShell('Cliente', back, '<p class="f-hint">Não encontrado.</p>', '');
+  const pedidos = S.orders.filter(o => o.cliente === c.nome);
+  const conv = S.conversas.find(x => x.nome === c.nome);
+  const aval = S.avaliacoes.find(a => c.nome.startsWith(a.nome.split(' ')[0]));
+  const nota = (S.notas[c.id] || [])[0];
+  const estagio = c.pedidos >= 20 ? ['Fiel','pill-ok'] : c.pedidos >= 5 ? ['Recorrente','pill-neutral'] : ['Novo','pill-warn'];
+  return peekShell(c.nome, back, `
+    <div style="display:flex;align-items:center;gap:13px;margin-bottom:12px">
+      <span class="avatar-sm" style="width:48px;height:48px;font-size:16px;background:${avatarColorOf(c.nome)}">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+      <div><span class="pill ${estagio[1]}">${estagio[0]}</span>
+        <div class="f-hint" style="margin-top:4px">${c.tel} · desde mar/2026</div></div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="stat"><div class="s-v">${c.pedidos}</div><div class="s-l">pedidos</div></div>
+      <div class="stat"><div class="s-v">${fmt$(c.pedidos * 27)}</div><div class="s-l">gasto total</div></div>
+      <div class="stat"><div class="s-v">${fmt$(27)}</div><div class="s-l">ticket médio</div></div>
+    </div>
+    <div class="f-section">Últimas interações</div>
+    ${pedidos.slice(0, 2).map(o => `<div class="dr-row" role="button" tabindex="0" style="cursor:pointer" onclick="peek('pedido','${o.id}')"><span class="dr-k">Pedido #${o.n}</span><span class="dr-v mono">${fmt$(o.total)}</span></div>`).join('')}
+    ${conv ? `<div class="dr-row" role="button" tabindex="0" style="cursor:pointer" onclick="closePeek();openModule('clientes','atendimento')"><span class="dr-k">Conversa · ${conv.canal === 'wa' ? 'WhatsApp' : conv.canal}</span><span class="dr-v" style="font-weight:500">${esc(conv.msgs[conv.msgs.length - 1].t.slice(0, 26))}…</span></div>` : ''}
+    ${aval ? `<div class="dr-row"><span class="dr-k">Avaliação ${aval.nota}★</span><span class="dr-v" style="font-weight:500">"${esc(aval.texto.slice(0, 22))}…"</span></div>` : ''}
+    ${nota ? `<div class="postit" style="width:100%;min-height:0;margin-top:10px">${esc(nota.texto)}<div class="pt-meta">${nota.by}</div></div>` : ''}`,
+    `<button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="closePeek();openDetail('cliente','${c.id}')">Perfil completo</button>
+     <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="closePeek();S.draft={cliente:S.clientes.find(x=>x.id==='${c.id}'),items:[],obs:'',canal:''};openModule('operacao','novo-pedido')">Novo pedido</button>`);
+};
+
+/* ═══ v14: CRM repensado — segmentos acionáveis ═══ */
+function tCrmClientes(){
+  const seg = S.crmSeg || 'todos';
+  const sumidos = ['cli_k2g8'];
+  const segs = [['todos','Todos'],['fiel','Fiéis'],['recorrente','Recorrentes'],['novo','Novos'],['lead','Leads'],['sumido','Sumidos']];
+  const count = k => k === 'todos' ? S.clientes.length + S.leads.length
+    : k === 'lead' ? S.leads.length
+    : k === 'sumido' ? sumidos.length
+    : S.clientes.filter(c => (c.pedidos >= 20 ? 'fiel' : c.pedidos >= 5 ? 'recorrente' : 'novo') === k).length;
+  const showCli = S.clientes.filter(c => {
+    const st = c.pedidos >= 20 ? 'fiel' : c.pedidos >= 5 ? 'recorrente' : 'novo';
+    if(seg === 'todos') return true;
+    if(seg === 'sumido') return sumidos.includes(c.id);
+    if(seg === 'lead') return false;
+    return st === seg;
+  });
+  return `<div class="chips-row">
+      ${segs.map(([k, l]) => `<button class="chip ${seg === k ? 'on' : ''}" onclick="S.crmSeg='${k}';rerender()">${l}<span class="seg-count">${count(k)}</span></button>`).join('')}
+    </div>
+    ${seg === 'sumido' ? `<p class="tab-note">Costumavam pedir toda semana e sumiram há 15+ dias. Uma mensagem recupera 1 em 3.</p>` : ''}
+    ${seg === 'lead' ? `<p class="tab-note">Falaram com você e nunca compraram. O 1º pedido transforma lead em cliente.</p>` : ''}
+    <div class="rows">
+      ${showCli.map(c => { const st = c.pedidos >= 20 ? ['Fiel','pill-ok'] : c.pedidos >= 5 ? ['Recorrente','pill-neutral'] : ['Novo','pill-warn'];
+        return `<button class="row" style="grid-template-columns:auto 1fr auto auto auto;width:100%;text-align:left" onclick="peek('cliente','${c.id}')">
+        ${avatarFor(c.nome)}
+        <span><span class="row-main">${esc(c.nome)}</span><div class="row-sub">costuma pedir ${esc(c.fav)}</div></span>
+        <span class="row-num" style="color:var(--text-3)">${c.pedidos} pedidos</span>
+        <span class="pill ${st[1]}">${st[0]}</span>
+        <span style="color:var(--text-4)">›</span></button>`; }).join('')}
+      ${(seg === 'todos' || seg === 'lead' ? S.leads : []).map(l => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+        <span class="avatar-sm" style="background:var(--text-4)">${l.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+        <span><span class="row-main" style="color:var(--text-3)">${esc(l.nome)}</span><div class="row-sub">${l.origem} · ${l.desde} · ainda não pediu</div></span>
+        <span class="pill" style="background:var(--accent-soft);color:var(--accent-text)">lead</span>
+        <button class="btn btn-dark btn-sm" data-tip="Abrir a conversa dele" onclick="openModule('clientes','atendimento')">Chamar →</button>
+      </div>`).join('')}
+    </div>`;
+}
+
+/* ═══ v14: FINANCEIRO de ERP — DRE simples + fluxo de caixa futuro ═══ */
+function tVisaoFin(){
+  const receita = 14860, taxas = 1240, cmv = 4980, fixas = 3210;
+  const lucro = receita - taxas - cmv - fixas;
+  return `<div class="kpis">
+      <div class="kpi"><div class="k-l">Faturamento · agosto</div><div class="k-v">${fmt$(receita)}</div><div class="k-d up">▲ 9% vs julho</div></div>
+      <div class="kpi"><div class="k-l">Lucro líquido estimado</div><div class="k-v" style="color:var(--ok)">${fmt$(lucro)}</div><div class="k-d up">margem ${(lucro / receita * 100).toFixed(1).replace('.', ',')}%</div></div>
+      <div class="kpi"><div class="k-l">A receber (30d)</div><div class="k-v">${fmt$(1512)}</div><div class="k-d flat">repasse iFood + 2 faturas</div></div>
+      <div class="kpi"><div class="k-l">A pagar (30d)</div><div class="k-v">${fmt$(2583)}</div><div class="k-d down">1 vence hoje</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:start">
+      <div class="card">
+        <div class="card-title">O que sobrou de verdade (DRE do mês)</div>
+        <div class="dre">
+          <div class="dre-row"><span class="dr-l">Receita bruta<small>todas as vendas</small></span><span class="dr-v">${fmt$(receita)}</span></div>
+          <div class="dre-row"><span class="dr-l">(−) Taxas de canal<small>iFood 27% + Mercado Pago 0,99%</small></span><span class="dr-v" style="color:var(--crit)">− ${fmt$(taxas)}</span></div>
+          <div class="dre-row"><span class="dr-l">(−) Insumos (CMV)<small>fichas técnicas baixadas na produção</small></span><span class="dr-v" style="color:var(--crit)">− ${fmt$(cmv)}</span></div>
+          <div class="dre-row"><span class="dr-l">(−) Despesas fixas<small>aluguel, energia, gás, motoboy</small></span><span class="dr-v" style="color:var(--crit)">− ${fmt$(fixas)}</span></div>
+          <div class="dre-row total"><span class="dr-l">Lucro líquido</span><span class="dr-v" style="color:var(--ok)">${fmt$(lucro)}</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Próximos 30 dias — vai faltar caixa?</div>
+        <div class="week-bars">
+          ${[['esta semana', 1240, true], ['semana 2', 380, true], ['semana 3', -420, false], ['semana 4', 690, true]].map(([l, v, ok]) => `
+            <div class="week-bar"><div class="wb-l">${l}</div>
+              <div class="wb-v" style="color:${ok ? 'var(--ok)' : 'var(--crit)'}">${v >= 0 ? '+' : '−'} ${fmt$(Math.abs(v))}</div>
+              <div style="font-size:10.5px;color:var(--text-4);margin-top:3px">${ok ? 'cobre' : 'atenção: aluguel dia 25'}</div></div>`).join('')}
+        </div>
+        <p class="f-hint" style="margin-top:12px">Semana 3 aperta por causa do aluguel. Adiar a nf 4471 (R$ 1.280) em 5 dias resolve — <a href="#" onclick="setModuleTab('pagar');return false">negociar →</a></p>
+      </div>
+    </div>`;
 }
 </script>
