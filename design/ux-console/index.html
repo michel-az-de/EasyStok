@@ -320,7 +320,8 @@ body.search-open .search-panel{transform:translateX(0)}
     <button data-d="compact" aria-pressed="false" onclick="setDensity('compact')">Compacto</button>
   </div>
   <button class="icon-btn" id="bell-btn" aria-label="Eventos" data-tip="2 eventos esperando você" onclick="toggleEvents()"><svg width="16" height="16"><use href="#i-bell"/></svg><span class="dot"></span></button>
-  <button class="icon-btn" aria-label="Alternar tema" onclick="toggleTheme()"><svg width="16" height="16"><use href="#i-moon"/></svg></button>
+  <button class="icon-btn" id="a11y-btn" aria-label="Acessibilidade" data-tip="Acessibilidade" onclick="openA11y()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="5" r="2.2"/><path d="M4 9.5c2.7.8 5.3 1.2 8 1.2s5.3-.4 8-1.2M12 11v4m0 0-3 6m3-6 3 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <button class="icon-btn" id="theme-btn" aria-label="Tema" data-tip="Tema: claro, escuro ou Casa da Babá" onclick="toggleThemeMenu()"><svg width="16" height="16"><use href="#i-moon"/></svg></button>
   <div class="avatar-tb" title="Felipe · Casa da Babá">FA</div>
 </header>
 <!-- segunda faixa: tabs do contexto ativo (sempre visível dentro do módulo) -->
@@ -1254,6 +1255,66 @@ body.ev-open .ev-panel{transform:none}
 .label-prev{width:250px;background:#fff;color:#111;border:1px solid #ccc;border-radius:6px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.5}
 .logo-mark{width:34px;height:34px;border-radius:8px;background:#111;color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.02em}
 .receipt .logo-mark{margin:0 auto 6px}
+
+/* ═══ TEMA CASA DA BABÁ (as cores do PWA: dark warm terracota) ═══ */
+:root[data-theme="casa"]{
+  --page:#131009; --card:#1D1712; --hover:#251D16; --pressed:#2E241B;
+  --text:#F7F2E8; --text-2:#CFC5B4; --text-3:#94886F; --text-4:#6B6252;
+  --hairline:#2E261D; --hairline-2:#3D3327;
+  --accent:#E76845; --accent-hover:#F08A68; --accent-soft:rgba(231,104,69,.15); --accent-text:#F08A68;
+  --ok:#4FBF9F; --ok-soft:rgba(79,191,159,.14); --warn:#F0B84A; --warn-soft:rgba(240,184,74,.14); --crit:#E05B4B; --crit-soft:rgba(224,91,75,.15);
+  --shadow-card:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.3);
+  --shadow-pop:0 4px 14px rgba(0,0,0,.45),0 16px 48px rgba(0,0,0,.5);
+  --flash:rgba(79,191,159,.14);
+}
+
+/* ═══ PUSH — toast e evento no MESMO padrão, no topo, estilo iOS ═══ */
+.push-zone{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:var(--z-toast);display:flex;flex-direction:column;gap:8px;width:min(400px,92vw);pointer-events:none}
+.push{pointer-events:auto;display:flex;align-items:center;gap:11px;background:color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter:blur(18px);border:1px solid var(--hairline);border-radius:18px;box-shadow:var(--shadow-pop);
+  padding:11px 14px;cursor:pointer;animation:pushIn .45s cubic-bezier(.32,.72,0,1)}
+.push.leaving{opacity:0;transform:translateY(-10px);transition:all .25s var(--ease)}
+@keyframes pushIn{from{opacity:0;transform:translateY(-16px) scale(.96)}to{opacity:1;transform:none}}
+.push .p-ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;font-size:14px;background:var(--accent-soft)}
+.push .p-title{font-size:13px;font-weight:700;letter-spacing:-.01em}
+.push .p-sub{font-size:12px;color:var(--text-3);margin-top:1px}
+
+/* ═══ NOTAS POST-IT ═══ */
+.notes-wall{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
+.postit{width:170px;min-height:110px;background:#FFF3B8;color:#5A4A00;border-radius:4px 4px 14px 4px;padding:12px;
+  box-shadow:0 3px 8px rgba(0,0,0,.12);transform:rotate(-1.2deg);position:relative;font-size:12.5px;line-height:1.45}
+.postit:nth-child(2n){transform:rotate(1.1deg);background:#FFE89A}
+.postit:nth-child(3n){transform:rotate(-.6deg);background:#FFF7CC}
+.postit .pt-meta{font-size:10px;opacity:.65;margin-top:8px;font-family:var(--font-mono)}
+.postit .pt-x{position:absolute;top:5px;right:7px;font-size:13px;opacity:.4}
+.postit .pt-x:hover{opacity:1}
+.postit-new{width:170px;min-height:110px;border:1.5px dashed var(--hairline-2);border-radius:4px 4px 14px 4px;padding:12px;
+  display:flex;align-items:center;justify-content:center;color:var(--text-4);font-size:12.5px;transition:all var(--d1)}
+.postit-new:hover{border-color:var(--accent);color:var(--accent-text)}
+.postit-new textarea{width:100%;height:100%;border:0;background:none;resize:none;font:inherit;font-size:12.5px;color:var(--text);outline:none}
+
+/* ═══ A11Y PANEL ═══ */
+.a11y-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid var(--hairline)}
+.a11y-row:last-child{border-bottom:0}
+.a11y-row .a-l{font-size:14px;font-weight:600}
+.a11y-row .a-d{font-size:12px;color:var(--text-3);margin-top:2px}
+input[type="range"].a-slider{-webkit-appearance:none;width:150px;height:4px;border-radius:99px;background:var(--pressed)}
+input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer}
+:root[data-a11y-contrast="1"]{--hairline:#9AA0AC;--hairline-2:#6E7480}
+:root[data-a11y-contrast="1"][data-theme="dark"],:root[data-a11y-contrast="1"][data-theme="casa"]{--hairline:#5A6170;--hairline-2:#7A8290}
+:root[data-a11y-motion="1"] *{transition-duration:.01ms!important;animation-duration:.01ms!important}
+:root[data-a11y-links="1"] a{text-decoration:underline}
+
+/* ═══ DOSSIÊ no atendimento ═══ */
+.chat-wrap{display:grid;grid-template-columns:300px 1fr 250px;border:1px solid var(--hairline);border-radius:var(--r-l);overflow:hidden;background:var(--card)}
+.dossier{border-left:1px solid var(--hairline);overflow-y:auto;max-height:520px;padding:14px}
+.dossier h4{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-4);margin:14px 0 6px}
+.dossier h4:first-child{margin-top:0}
+.meta-window{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12px;font-weight:600;border-bottom:1px solid var(--hairline)}
+.meta-window.open{background:var(--ok-soft);color:var(--ok)}
+.meta-window.closing{background:var(--warn-soft);color:var(--warn)}
+.meta-window.closed{background:var(--pressed);color:var(--text-3)}
+.audit-row{font-size:11.5px;color:var(--text-3);padding:6px 0;border-bottom:1px dashed var(--hairline);font-family:var(--font-mono)}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -1396,6 +1457,7 @@ function cancelPedido(id){
   const n = S.orders[i].n;
   S.orders.splice(i, 1);
   closeDetail();
+  audit(`cancelou o pedido #${n} · itens voltaram ao estoque`);
   toast(`Pedido #${n} cancelado · itens de volta ao estoque`);
 }
 function openDetail(type, id){ S.detail = { type, id }; renderModule(); }
@@ -1512,6 +1574,14 @@ function vCliente(id){
           <div class="e-desc">${esc(ev.desc)}</div>
         </div>`).join('')}</div>`
       : `<p class="f-hint">Sem trilha ainda — clientes novos constroem a linha do tempo a cada contato, pedido e avaliação.</p>`}
+    </div>
+
+    <div class="d-section"><span class="eyebrow">Notas internas · só a equipe vê</span>
+      ${notasWall(c.id)}
+    </div>
+
+    <div class="d-section"><span class="eyebrow">Registro de alterações</span>
+      ${auditRows()}
     </div>`;
 }
 /* ═══ EDITAR CLIENTE — drawer rico: máscara, validação, dirty state ═══ */
@@ -1589,6 +1659,7 @@ function saveCliente(id){
   c.obs = document.getElementById('ec-obs').value;
   S.editing = null;
   closeDrawer();
+  audit(`editou o cliente ${c.nome}`);
   toast('Cliente atualizado');
   rerender();
 }
@@ -1764,6 +1835,7 @@ function saveDescarte(id){
   const motivo = document.querySelector('#desc-motivos .chip.on')?.textContent || 'Descarte';
   item.qty = Math.max(0, item.qty - q);
   S.stockMoves.unshift({ id:'sm_' + Math.random().toString(36).slice(2, 5), tipo:'saida', item:item.nome, qty:'-' + String(q).replace('.', ',') + ' ' + item.un, h:'agora', autor:'Felipe', motivo:'Descarte · ' + motivo, perda:q * item.custo });
+  audit(`registrou perda: ${item.nome} (${q} ${item.un} · ${fmt$(q * item.custo)})`);
   closeDrawer();
   toast(`Perda registrada: ${fmt$(q * item.custo)} · estoque atualizado`);
   rerender();
@@ -2248,7 +2320,7 @@ S.integracoes = [
 ];
 S.eventos = [
   { id:'ev_1', tipo:'pergunta', icon:'❓', tint:'#EA1D2C', t:'Pergunta no iFood: "tem opção sem glúten?"', when:'há 2 min', unread:true, acao:{ l:'Responder', fn:"answerEvent('ev_1')" } },
-  { id:'ev_2', tipo:'pedido', icon:'🧾', tint:'#E85814', t:'Pedido #1044 entrou · WhatsApp · R$ 57,00', when:'há 9 min', unread:true, acao:{ l:'Ver pedido', fn:"goOrder('ped_7d0h9')" } },
+  { id:'ev_2', tipo:'pedido', icon:'🧾', tint:'#E85814', t:'Pedido #1044 entrou · WhatsApp · R$ 57,00', when:'há 9 min', unread:true, orderId:'ped_7d0h9', acao:{ l:'Ver pedido', fn:"goOrder('ped_7d0h9')" } },
   { id:'ev_3', tipo:'avaliacao', icon:'⭐', tint:'#F5A623', t:'Avaliação 2★ no iFood: "veio faltando o suco"', when:'ontem', unread:false, acao:{ l:'Responder', fn:"answerEvent('ev_3')" } },
 ];
 
@@ -2277,13 +2349,15 @@ function renderEvents(){
     </div>
     <div class="ev-list">
       ${S.eventos.length ? S.eventos.map(e => `
-        <div class="ev-item ${e.unread ? 'unread' : ''}">
+        <div class="ev-item ${e.unread ? 'unread' : ''}" data-ev="${e.id}">
           <span class="ev-ico" style="background:color-mix(in srgb, ${e.tint} 12%, transparent)">${e.icon}</span>
           <span style="flex:1;min-width:0">
             <div class="ev-t">${esc(e.t)}</div>
             <div class="ev-when">${e.when}</div>
             <div class="ev-actions">
               <button class="btn btn-dark" onclick="${e.acao.fn}">${e.acao.l}</button>
+              ${e.tipo === 'pedido' && e.orderId && S.orders.find(o => o.id === e.orderId && STATUS[o.status].next) ? `<button class="btn btn-secondary" data-tip="Avança sem sair daqui" onclick="evQuickOrder('${e.orderId}','${e.id}')">Preparar →</button>` : ''}
+              ${['pergunta','reclamacao','mensagem','avaliacao'].includes(e.tipo) ? `<button class="btn btn-secondary" data-tip="Responde sem navegar" onclick="evQuickReply('${e.id}')">Resposta rápida</button>` : ''}
               ${e.unread ? `<button class="btn btn-secondary" onclick="S.eventos.find(x=>x.id==='${e.id}').unread=false;renderEvents();syncBell()">OK, vi</button>` : ''}
             </div>
           </span>
@@ -2340,8 +2414,7 @@ function simPedido(canal){
     items:[{ nome:S.cardapio[Math.floor(Math.random() * 5)].nome, q:1 + Math.floor(Math.random() * 2), p:18.5, emoji:'🍛' }] };
   o.total = o.items.reduce((s, i) => s + i.p * i.q, 0);
   S.orders.push(o); S.lastNew = o.n;
-  pushEvent({ tipo:'pedido', icon:'🧾', tint:'#E85814', t:`Pedido #${o.n} entrou · ${canal} · ${fmt$(o.total)}`, acao:{ l:'Ver pedido', fn:`goOrder('${o.id}')` } });
-  toast(`🔔 Pedido #${o.n} entrou · ${canal}`);
+  pushEvent({ tipo:'pedido', icon:'🧾', tint:'#E85814', t:`Pedido #${o.n} entrou · ${canal} · ${fmt$(o.total)}`, orderId:o.id, acao:{ l:'Ver pedido', fn:`goOrder('${o.id}')` } });
   rerender();
   setTimeout(() => { S.lastNew = null; }, 600);
 }
@@ -2364,7 +2437,6 @@ function simEvento(tipo){
   if(cfg.aval){
     S.avaliacoes.unshift({ id:'av_' + Date.now(), nome:'Anônimo', nota:2, canal:'iFood', texto:'demorou demais', h:'agora', respondida:false });
   }
-  toast('🔔 ' + cfg.e.t);
 }
 function answerEventSim(){ toggleEvents(false); openModule('clientes', 'atendimento'); }
 </script>
@@ -2592,5 +2664,273 @@ function tIntegracoes(){
         </span>
       </div>`).join('')}
     </div>`;
+}
+</script>
+<script>
+/* ═══ PUSH UNIFICADO — toast e evento no mesmo padrão, no topo ═══ */
+function push({ icon = '✓', tint = 'var(--accent)', title, sub = '', onclick = null, sticky = false }){
+  let zone = document.querySelector('.push-zone');
+  if(!zone){
+    zone = document.createElement('div');
+    zone.className = 'push-zone';
+    zone.setAttribute('aria-live', 'polite');
+    document.body.appendChild(zone);
+  }
+  const el = document.createElement('div');
+  el.className = 'push';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<span class="p-ico" style="background:color-mix(in srgb, ${tint} 13%, transparent)">${icon}</span>
+    <span style="flex:1;min-width:0"><div class="p-title">${esc(title)}</div>${sub ? `<div class="p-sub">${esc(sub)}</div>` : ''}</span>`;
+  if(onclick){ el.style.cursor = 'pointer'; el.onclick = () => { dismiss(); onclick(); }; }
+  zone.prepend(el);
+  while(zone.children.length > 3) zone.lastChild.remove();
+  let t;
+  const dismiss = () => { clearTimeout(t); el.classList.add('leaving'); setTimeout(() => el.remove(), 260); };
+  if(!sticky) t = setTimeout(dismiss, 3600);
+  el.onmouseenter = () => clearTimeout(t);
+  el.onmouseleave = () => { if(!sticky) t = setTimeout(dismiss, 1600); };
+  return dismiss;
+}
+/* toast vira push: mesma assinatura, novo padrão */
+function toast(msg){
+  push({ title:msg, icon:'✓', tint:'var(--ok)' });
+}
+/* evento importante = push clicável que leva ao lugar certo */
+function pushEvento(e){
+  push({ icon:e.icon, tint:e.tint, title:e.t, sub:'toque pra ver', onclick:() => eval(e.acao.fn) });
+}
+function pushEvent(e){
+  S.eventos.unshift({ id:'ev_' + Math.random().toString(36).slice(2, 6), when:'agora', unread:true, orderId:e.orderId, ...e });
+  if(document.body.classList.contains('ev-open')) renderEvents();
+  syncBell();
+  pushEvento(e);
+}
+
+/* ═══ 3 TEMAS: claro / escuro / Casa da Babá (cores do PWA) ═══ */
+const THEMES = [['light','Claro','#F6F8FB'],['dark','Escuro','#0A1220'],['casa','Casa da Babá','#E76845']];
+function toggleThemeMenu(){
+  let el = document.querySelector('.theme-menu');
+  if(el){ el.remove(); return; }
+  const btn = document.getElementById('theme-btn');
+  el = document.createElement('div');
+  el.className = 'sim-menu theme-menu';
+  el.innerHTML = `<div class="sm-k">Tema</div>` + THEMES.map(([k, l, c]) =>
+    `<button onclick="setTheme('${k}')"><span class="sm-dot" style="background:${c};border:1px solid var(--hairline-2)"></span>${l}${document.documentElement.dataset.theme === k ? ' <b style="margin-left:auto">✓</b>' : ''}</button>`).join('');
+  btn.parentNode.style.position = 'relative';
+  btn.parentNode.appendChild(el);
+  setTimeout(() => document.addEventListener('click', function h(ev){ if(!el.contains(ev.target) && ev.target !== btn){ el.remove(); document.removeEventListener('click', h); } }), 0);
+}
+function setTheme(k){
+  document.documentElement.dataset.theme = k;
+  try{ localStorage.setItem('es-theme', k); }catch(e){}
+  document.querySelector('.theme-menu')?.remove();
+  push({ title:'Tema: ' + THEMES.find(t => t[0] === k)[1], icon:'🎨' });
+}
+try{
+  const t = localStorage.getItem('es-theme');
+  if(t) document.documentElement.dataset.theme = t;
+  else if(matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+}catch(e){}
+
+/* ═══ ACESSIBILIDADE — conceitos Apple (texto maior, contraste, movimento) ═══ */
+const A11Y_KEY = 'es-a11y';
+function getA11y(){ try{ return JSON.parse(localStorage.getItem(A11Y_KEY)) || {}; }catch(e){ return {}; } }
+function applyA11y(){
+  const a = getA11y();
+  document.body.style.fontSize = (a.font || 15) + 'px';
+  document.documentElement.dataset.a11yContrast = a.contrast ? '1' : '';
+  document.documentElement.dataset.a11yMotion = a.motion ? '1' : '';
+  document.documentElement.dataset.a11yLinks = a.links ? '1' : '';
+}
+function setA11y(k, v){ const a = getA11y(); a[k] = v; try{ localStorage.setItem(A11Y_KEY, JSON.stringify(a)); }catch(e){} applyA11y(); }
+function openA11y(){
+  const a = getA11y();
+  openDrawer(`
+    <div class="drawer-head"><h2>Acessibilidade</h2><button class="icon-btn" aria-label="Fechar" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <p class="f-hint" style="margin-bottom:8px">Aplicam na hora, ficam salvas neste dispositivo.</p>
+      <div class="a11y-row">
+        <span><span class="a-l">Tamanho do texto</span><div class="a-d">o sistema inteiro acompanha</div></span>
+        <span style="display:flex;align-items:center;gap:9px">
+          <span style="font-size:12px;color:var(--text-4)">A</span>
+          <input type="range" class="a-slider" min="13.5" max="18" step="0.5" value="${a.font || 15}" oninput="setA11y('font', parseFloat(this.value));this.nextElementSibling.textContent=this.value" aria-label="Tamanho do texto">
+          <span class="mono" style="font-size:12px;min-width:26px">${a.font || 15}</span>
+        </span>
+      </div>
+      <div class="a11y-row">
+        <span><span class="a-l">Contraste maior</span><div class="a-d">linhas e textos mais fortes</div></span>
+        <button class="switch" role="switch" aria-checked="${!!a.contrast}" aria-label="Contraste maior" onclick="setA11y('contrast',!getA11y().contrast);this.setAttribute('aria-checked',getA11y().contrast)"></button>
+      </div>
+      <div class="a11y-row">
+        <span><span class="a-l">Reduzir movimento</span><div class="a-d">desliga animações e transições</div></span>
+        <button class="switch" role="switch" aria-checked="${!!a.motion}" aria-label="Reduzir movimento" onclick="setA11y('motion',!getA11y().motion);this.setAttribute('aria-checked',getA11y().motion)"></button>
+      </div>
+      <div class="a11y-row">
+        <span><span class="a-l">Sublinhar links</span><div class="a-d">links sempre sublinhados</div></span>
+        <button class="switch" role="switch" aria-checked="${!!a.links}" aria-label="Sublinhar links" onclick="setA11y('links',!getA11y().links);this.setAttribute('aria-checked',getA11y().links)"></button>
+      </div>
+    </div>`);
+}
+applyA11y();
+</script>
+<script>
+/* ═══ AUDITORIA — quem fez o quê, quando ═══ */
+S.audit = S.audit || [
+  { at:'hoje 11:02', quem:'Thati', acao:'editou o cliente Ana Costa' },
+  { at:'ontem 19:02', quem:'Thati', acao:'registrou perda: Pudim lote 08/08 (4 un)' },
+  { at:'ontem 18:40', quem:'Felipe', acao:'fechou o caixa · conferiu R$ 1.912,40' },
+];
+function audit(acao){
+  S.audit.unshift({ at:'agora', quem:'Felipe', acao });
+}
+function auditRows(alvo){
+  return S.audit.slice(0, 5).map(a => `<div class="audit-row">${a.at} · <b>${a.quem}</b> ${esc(a.acao)}</div>`).join('');
+}
+
+/* ═══ NOTAS POST-IT por cliente ═══ */
+S.notas = S.notas || {
+  cli_b7h9:[
+    { id:'n1', texto:'Prefere entrega depois das 18h. Portaria libera.', by:'Thati · 10 ago' },
+    { id:'n2', texto:'Alergia: SEM PIMENTA em nada.', by:'Felipe · 22 jul' },
+  ],
+};
+function addNota(cliId, texto){
+  if(!texto.trim()) return;
+  S.notas[cliId] = S.notas[cliId] || [];
+  S.notas[cliId].unshift({ id:'n' + Date.now(), texto:texto.trim(), by:'Felipe · agora' });
+  audit(`anotou no cliente ${S.clientes.find(c => c.id === cliId)?.nome}`);
+  rerender();
+  push({ title:'Nota salva', icon:'🗒️', tint:'#F0B84A' });
+}
+function delNota(cliId, notaId){
+  confirmDlg({ title:'Apagar esta nota?', desc:'Ela some do perfil e do dossiê de atendimento.', confirmLabel:'Apagar', danger:true,
+    onConfirm:() => {
+      S.notas[cliId] = S.notas[cliId].filter(n => n.id !== notaId);
+      audit('apagou uma nota interna');
+      rerender();
+    } });
+}
+function notasWall(cliId){
+  const notas = S.notas[cliId] || [];
+  return `<div class="notes-wall">
+    ${notas.map(n => `<div class="postit">${esc(n.texto)}<div class="pt-meta">${n.by}</div>
+      <button class="pt-x" aria-label="Apagar nota" onclick="event.stopPropagation();delNota('${cliId}','${n.id}')">×</button></div>`).join('')}
+    <div class="postit-new"><textarea placeholder="+ nota interna (Enter salva)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addNota('${cliId}',this.value)}"></textarea></div>
+  </div>`;
+}
+
+/* ═══ ATENDIMENTO v12 — dossiê do cliente + regras da Meta (janela 24h) ═══ */
+const META_WIN = { cv_1:'open', cv_2:'closing', cv_3:'closed' };
+function metaWindow(conv){
+  const st = META_WIN[conv.id] || 'open';
+  if(conv.canal !== 'wa' && st !== 'closed') return ''; /* regra da Meta é do WhatsApp Business */
+  if(st === 'open') return `<div class="meta-window open">🟢 Janela da Meta aberta — responda livremente até amanhã 11h58</div>`;
+  if(st === 'closing') return `<div class="meta-window closing">🟡 Janela da Meta fecha em 1h12 — depois disso, só template aprovado</div>`;
+  return `<div class="meta-window closed">⚪ Janela da Meta fechada (24h sem resposta dele) — envie um template aprovado pra reabrir</div>`;
+}
+function tAtendimento(){
+  const cur = S.conversas.find(c => c.id === (S.chatId || S.conversas[0].id));
+  const cli = S.clientes.find(x => x.nome === cur.nome);
+  const closed = META_WIN[cur.id] === 'closed' && cur.canal === 'wa';
+  return `<p class="tab-note">WhatsApp, Instagram e iFood na mesma caixa — com o dossiê do cliente do lado.</p>
+    <div class="chat-wrap">
+      <div class="inbox-list">
+        ${S.conversas.map(c => `<button class="inbox-item ${cur.id === c.id ? 'on' : ''}" onclick="S.chatId='${c.id}';rerender()">
+          <span class="avatar-sm" style="background:${c.lead ? 'var(--text-4)' : avatarColorOf(c.nome)};width:34px;height:34px">${c.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+          <span style="min-width:0">
+            <span class="ii-name">${esc(c.nome)} ${c.lead ? '<span class="chan-tag" style="background:var(--accent-soft);color:var(--accent-text)">lead</span>' : ''}</span><br>
+            <span class="ii-prev">${esc(c.msgs[c.msgs.length - 1].t)}</span>
+          </span>
+          <span class="ii-meta"><span class="chan-tag chan-${c.canal}">${{ wa:'WhatsApp', ig:'Instagram', if:'iFood' }[c.canal]}</span><br>
+            <span style="font-size:10.5px;color:var(--text-4)">${c.at}</span> ${c.unread ? '<span class="unread-dot"></span>' : ''}</span>
+        </button>`).join('')}
+      </div>
+      <div class="chat" style="max-height:520px">
+        <div class="chat-head"><b style="font-size:14px">${esc(cur.nome)}</b>
+          ${cli ? `<button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="peek('cliente','${cli.id}')">Ver perfil</button>` : `<span class="chan-tag" style="margin-left:auto;background:var(--accent-soft);color:var(--accent-text)">lead · vira cliente no 1º pedido</span>`}
+        </div>
+        ${metaWindow(cur)}
+        <div class="chat-body" id="chat-body">
+          ${cur.msgs.map(m => `<div class="msg ${m.dir}">${esc(m.t)}<span class="m-t">${m.h}</span></div>`).join('')}
+        </div>
+        <div class="chat-input">
+          ${closed
+            ? `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="sendTemplate()">📋 Enviar template “Atualização de pedido”</button>`
+            : `<input class="f-input" id="chat-in" placeholder="Responder como Casa da Babá…" onkeydown="if(event.key==='Enter')sendChat()">
+               <button class="btn btn-primary" onclick="sendChat()">Enviar</button>`}
+        </div>
+      </div>
+      <div class="dossier">
+        <h4>Dossiê</h4>
+        ${cli ? `
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">${avatarFor(cur.nome)}<div><b style="font-size:13px">${esc(cur.nome)}</b><div style="font-size:11px;color:var(--text-4)">${cli.pedidos} pedidos · ${cli.pedidos >= 20 ? 'fiel' : 'recorrente'}</div></div></div>
+          <h4>Pedidos recentes</h4>
+          ${S.orders.filter(o => o.cliente === cur.nome).slice(0, 3).map(o => `
+            <div class="dr-row" role="button" tabindex="0" style="cursor:pointer" onclick="peek('pedido','${o.id}')"><span class="dr-k">#${o.n}</span><span class="dr-v mono">${fmt$(o.total)}</span></div>`).join('') || '<p class="f-hint">nenhum recente</p>'}
+          <h4>Notas internas</h4>
+          ${(S.notas[cli.id] || []).slice(0, 2).map(n => `<div class="postit" style="width:100%;min-height:0;margin-bottom:8px">${esc(n.texto)}<div class="pt-meta">${n.by}</div></div>`).join('') || '<p class="f-hint">sem notas</p>'}
+          <h4>Registro</h4>
+          ${auditRows()}` : `
+          <p class="f-hint">Lead novo — sem histórico de pedidos ainda. O que ele conversar aqui já fica na trilha.</p>
+          <h4>Registro</h4>${auditRows()}`}
+      </div>
+    </div>`;
+}
+function sendTemplate(){
+  const cur = S.conversas.find(c => c.id === (S.chatId || S.conversas[0].id));
+  cur.msgs.push({ dir:'out', t:'📋 [template] Olá! Aqui é a Casa da Babá. Passando pra atualizar sobre seu pedido…', h:'agora' });
+  META_WIN[cur.id] = 'open';
+  audit(`enviou template Meta pra ${cur.nome}`);
+  rerender();
+  push({ title:'Template enviado', sub:'a janela de 24h reabre quando ele responder', icon:'📋', tint:'#128C4B' });
+}
+function sendChat(){
+  const inp = document.getElementById('chat-in');
+  if(!inp) return;
+  const t = inp.value.trim();
+  if(!t) return;
+  const cur = S.conversas.find(c => c.id === (S.chatId || S.conversas[0].id));
+  cur.msgs.push({ dir:'out', t, h:'agora' });
+  cur.unread = 0;
+  audit(`respondeu ${cur.nome} no ${cur.canal === 'wa' ? 'WhatsApp' : cur.canal === 'ig' ? 'Instagram' : 'iFood'}`);
+  rerender();
+  setTimeout(() => { const b = document.getElementById('chat-body'); if(b) b.scrollTop = b.scrollHeight; }, 0);
+}
+
+/* ═══ ≤3 CLIQUES DE QUALQUER LUGAR — quick actions no feed de eventos ═══ */
+function evQuickOrder(orderId, evId){
+  const o = S.orders.find(x => x.id === orderId);
+  if(!o) return;
+  const next = STATUS[o.status].next;
+  if(next){ o.status = next; o.at = Date.now(); audit(`moveu pedido #${o.n} pra ${next} pelo centro de eventos`); }
+  const e = S.eventos.find(x => x.id === evId);
+  if(e) e.unread = false;
+  renderEvents(); syncBell();
+  push({ title:`#${o.n} → ${STATUS[next]?.label || ''}`, sub:'sem sair da tela', icon:'🧾' });
+  rerender();
+}
+function evQuickReply(evId){
+  const e = S.eventos.find(x => x.id === evId);
+  const box = document.getElementById('evqr-' + evId);
+  if(box){ box.remove(); return; }
+  const item = document.querySelector(`.ev-item[data-ev="${evId}"]`);
+  if(!item) return;
+  const div = document.createElement('div');
+  div.id = 'evqr-' + evId;
+  div.style.cssText = 'margin-top:8px;display:flex;gap:6px';
+  div.innerHTML = `<input class="f-input" style="height:32px;font-size:12.5px;flex:1" placeholder="Resposta rápida…" onkeydown="if(event.key==='Enter')evSendReply('${evId}',this.value)">
+    <button class="btn btn-primary btn-sm" onclick="evSendReply('${evId}',this.previousElementSibling.value)">Enviar</button>`;
+  item.appendChild(div);
+  setTimeout(() => div.querySelector('input').focus(), 0);
+}
+function evSendReply(evId, text){
+  if(!text.trim()) return;
+  const e = S.eventos.find(x => x.id === evId);
+  const conv = S.conversas.find(c => e.t.includes(c.nome)) || S.conversas[0];
+  conv.msgs.push({ dir:'out', t:text.trim(), h:'agora' });
+  e.unread = false;
+  audit(`resposta rápida pra ${conv.nome}`);
+  renderEvents(); syncBell();
+  push({ title:'Resposta enviada', sub:`pra ${conv.nome} · sem navegar`, icon:'💬', tint:'#128C4B' });
 }
 </script>

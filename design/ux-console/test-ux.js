@@ -413,6 +413,93 @@ check('Action tooltip na fila tem ações', () => {
   return !!document.querySelector('.actip-pop .btn-dark');
 });
 
+/* ── v12: push unificado no topo ── */
+check('Push: toast sai no topo no padrão push', () => {
+  window.toast('teste de push');
+  const z = document.querySelector('.push-zone .push');
+  return z && z.textContent.includes('teste de push');
+});
+check('Push: evento novo vira push clicável no topo', () => {
+  window.simPedido('iFood');
+  return document.querySelector('.push-zone .push')?.textContent.includes('iFood');
+});
+
+/* ── v12: temas ── */
+check('Temas: Casa da Babá aplica as cores do PWA', () => {
+  window.setTheme('casa');
+  return document.documentElement.dataset.theme === 'casa';
+});
+check('Temas: volta pro claro', () => { window.setTheme('light'); return document.documentElement.dataset.theme === 'light'; });
+
+/* ── v12: acessibilidade ── */
+check('A11y: painel abre com 4 controles', () => {
+  window.openA11y();
+  return $$('.drawer .a11y-row').length === 4;
+});
+check('A11y: tamanho do texto aplica no body', () => {
+  window.setA11y('font', 17);
+  const ok = document.body.style.fontSize === '17px';
+  window.setA11y('font', 15); window.closeDrawer();
+  return ok;
+});
+
+/* ── v12: atendimento com dossiê + Meta 24h ── */
+check('Atendimento: dossiê do cliente ao lado do chat', () => {
+  window.openModule('clientes', 'atendimento');
+  return !!document.querySelector('.dossier') && txt().includes('Dossiê');
+});
+check('Meta: janela de 24h aparece no WhatsApp', () => {
+  window.S.chatId = 'cv_1'; window.rerender();
+  return txt().includes('Janela da Meta');
+});
+check('Meta: janela fechada oferece template', () => {
+  window.S.chatId = 'cv_3'; window.rerender();
+  return txt().includes('template');
+});
+check('Meta: enviar template reabre a janela', () => {
+  window.sendTemplate();
+  return txt().includes('Janela da Meta aberta');
+});
+
+/* ── v12: ≤3 cliques de qualquer lugar ── */
+check('Eventos: preparar pedido sem sair do painel', () => {
+  window.goHome();
+  const o = window.S.orders.find(x => x.status === 'aguardando');
+  window.S.eventos.unshift({ id:'ev_t', tipo:'pedido', icon:'🧾', tint:'#E85814', t:'Pedido #' + o.n + ' teste', when:'agora', unread:true, orderId:o.id, acao:{ l:'Ver', fn:"goOrder('" + o.id + "')" } });
+  window.toggleEvents(true);
+  window.evQuickOrder(o.id, 'ev_t');
+  const ok = o.status === 'preparando' && document.body.classList.contains('ev-open');
+  window.toggleEvents(false);
+  return ok;
+});
+check('Eventos: resposta rápida inline sem navegar', () => {
+  window.toggleEvents(true);
+  const e = window.S.eventos.find(x => ['pergunta','reclamacao','mensagem','avaliacao'].includes(x.tipo));
+  window.evQuickReply(e.id);
+  const box = document.getElementById('evqr-' + e.id);
+  const antes = window.S.conversas[0].msgs.length;
+  window.evSendReply(e.id, 'Oi! Respondendo rapidinho');
+  window.toggleEvents(false);
+  return box !== null;
+});
+
+/* ── v12: notas post-it + auditoria ── */
+check('Notas: post-it no perfil do cliente', () => {
+  window.openModule('clientes', 'crm-clientes');
+  window.openDetail('cliente', 'cli_b7h9');
+  return !!document.querySelector('.postit') && txt().includes('SEM PIMENTA');
+});
+check('Notas: adicionar via Enter registra auditoria', () => {
+  const antes = window.S.audit.length;
+  window.addNota('cli_b7h9', 'Pediu colher extra da última vez');
+  return window.S.notas['cli_b7h9'][0].texto.includes('colher') && window.S.audit.length === antes + 1;
+});
+check('Auditoria: aparece no registro do cliente', () => {
+  window.rerender();
+  return txt().includes('Registro de alterações') && txt().includes('Felipe');
+});
+check('volta limpa detalhe', () => { window.closeDetail(); return !window.S.detail; });
+
 console.log('\n═══ RESULTADOS ═══');
 results.forEach(r => console.log(r));
 const failed = results.filter(r => r.startsWith('✗'));
