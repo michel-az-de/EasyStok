@@ -291,12 +291,11 @@ body.search-open .search-panel{transform:translateX(0)}
     <button data-ctx="gestao" onclick="openModule('gestao')">Gestão</button>
   </nav>
   <div class="spacer"></div>
-  <button class="sim-btn btn btn-secondary" id="sim-btn" data-tip="Simular eventos da operação" onclick="toggleSimMenu()"><svg width="13" height="13"><use href="#i-zap"/></svg>Simular</button>
-  <button class="sim-btn btn btn-secondary" id="live-btn" data-tip="5 min de operação real acontecendo sozinha" onclick="toggleLiveDay()">▶ Dia ao vivo</button>
+  <button class="sim-btn btn btn-secondary" id="sim-btn" data-tip="Simular eventos e o dia ao vivo" onclick="toggleSimMenu()"><svg width="13" height="13"><use href="#i-zap"/></svg>Simular <span style="font-size:9px;opacity:.6">▾</span></button>
   <button class="search-trigger" onclick="openSearch()"><svg width="14" height="14"><use href="#i-search"/></svg>Buscar<kbd>⌘K</kbd></button>
   <div class="density-toggle" role="group" aria-label="Densidade">
-    <button data-d="comfort" aria-pressed="true" onclick="setDensity('comfort')">Confortável</button>
-    <button data-d="compact" aria-pressed="false" onclick="setDensity('compact')">Compacto</button>
+    <button data-d="comfort" aria-pressed="true" data-tip="Confortável — mais respiro" onclick="setDensity('comfort')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <button data-d="compact" aria-pressed="false" data-tip="Compacto — mais dados por tela" onclick="setDensity('compact')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M4 9.5h16M4 14h16M4 18.5h16"/></svg></button>
   </div>
   <button class="icon-btn" id="bell-btn" aria-label="Eventos" data-tip="2 eventos esperando você" onclick="toggleEvents()"><svg width="16" height="16"><use href="#i-bell"/></svg><span class="dot"></span></button>
   <button class="icon-btn" id="a11y-btn" aria-label="Acessibilidade" data-tip="Acessibilidade" onclick="openA11y()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="5" r="2.2"/><path d="M4 9.5c2.7.8 5.3 1.2 8 1.2s5.3-.4 8-1.2M12 11v4m0 0-3 6m3-6 3 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -1381,6 +1380,53 @@ input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 .seg-count{font-family:var(--font-mono);font-size:10.5px;color:var(--text-4);margin-left:4px}
 .postit{max-height:150px;overflow:auto}
 .fun-stage .f-l{font-size:12.5px}
+
+/* ═══ v16 POLISH — aparar as arestas ═══ */
+/* escala tipográfica consolidada: menos tamanhos, mais ritmo */
+:root{--fs-11:11px;--fs-12:12px;--fs-13:13px;--fs-15:15px;--fs-17:17px;--fs-21:21px;--fs-26:26px}
+body{letter-spacing:-.006em}
+.row-main,.ii-name{font-size:var(--fs-13)}
+.row-sub,.cell-sub,.f-hint{font-size:var(--fs-12)}
+.hello{font-size:28px}
+/* radius e sombra unificados */
+.card,.table-card,.kpi,.now-item,.int-card,.ma-card,.demand,.menu-card{border-radius:14px}
+.prod-tile,.hub-card{border-radius:14px}
+:root[data-theme="light"]{
+  --shadow-card:0 1px 2px rgba(15,24,52,.04),0 6px 18px rgba(15,24,52,.04);
+  --shadow-pop:0 4px 12px rgba(15,24,52,.09),0 18px 44px rgba(15,24,52,.11);
+}
+/* textos longos nunca quebram a linha: truncam com reticências */
+.row-main,.row-sub,.cell-name,.ii-prev,.mc-state,.ev-t,.hc-desc,.ma-stock{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.row>span,.ev-item>span,.inbox-item>span{min-width:0}
+/* subbar rola em vez de esmagar */
+.subbar{overflow-x:auto;scrollbar-width:none}
+.subbar::-webkit-scrollbar{display:none}
+.subbar .subtab{white-space:nowrap;flex-shrink:0}
+/* topbar: ritmo de 8px */
+.topbar{gap:8px}
+/* pills: altura única */
+.pill{height:20px;font-size:var(--fs-11)}
+/* chips: mais calmos */
+.chip{height:27px;font-size:var(--fs-12)}
+/* hero da home mais respirado */
+.now-item{padding:16px 18px}
+.now-line{gap:14px;margin:24px 0 4px}
+.home-cta{margin:20px 0 30px}
+/* rows com hover mais suave */
+.row{transition:background var(--d1) var(--ease),border-radius var(--d1)}
+/* KPI number rhythm */
+.kpi .k-v{font-size:var(--fs-26)}
+.kpi .k-l{font-size:var(--fs-12)}
+/* draft bar não gruda */
+.draft-bar{margin-top:2px}
+/* ctx list mais apertada e editorial */
+.ctx-row{padding:13px 2px}
+/* eventos: menos ruído de borda */
+.ev-item{border-bottom:0;border-radius:10px}
+.ev-item.unread{background:var(--accent-soft)}
+/* avatar com ring sutil */
+.avatar-sm{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -2447,6 +2493,8 @@ function toggleSimMenu(){
   el = document.createElement('div');
   el.className = 'sim-menu';
   el.innerHTML = `
+    <div class="sm-k">Simulação</div>
+    <button onclick="toggleLiveDay();document.querySelector('.sim-menu')?.remove()"><span class="sm-dot" style="background:#E85814"></span><b>${S.live && S.live.on ? '⏹ Parar o dia ao vivo' : '▶ Dia ao vivo (5 min)'}</b></button>
     <div class="sm-k">Pedidos entram na fila</div>
     ${[['iFood','#EA1D2C'],['WhatsApp','#128C4B'],['99Food','#FFCD00'],['Keeta','#6B2D9B'],['Balcão','#707892']].map(([c, cor]) =>
       `<button onclick="simPedido('${c}')"><span class="sm-dot" style="background:${cor}"></span>Pedido via ${c}</button>`).join('')}
@@ -3364,11 +3412,12 @@ function stopLiveDay(){
   push({ title:'Dia ao vivo encerrado', icon:'⏹️' });
 }
 function syncLiveBtn(){
-  const b = document.getElementById('live-btn');
+  const b = document.getElementById('sim-btn');
   if(b){
-    b.innerHTML = S.live.on ? '● Ao vivo' : '▶ Dia ao vivo';
     b.classList.toggle('live-on', S.live.on);
-    b.setAttribute('data-tip', S.live.on ? 'Parar a simulação' : '5 min de operação real acontecendo sozinha');
+    b.innerHTML = S.live.on
+      ? '<svg width="13" height="13"><use href="#i-zap"/></svg>● Ao vivo'
+      : '<svg width="13" height="13"><use href="#i-zap"/></svg>Simular <span style="font-size:9px;opacity:.6">▾</span>';
   }
 }
 function liveStep(){

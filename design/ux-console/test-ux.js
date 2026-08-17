@@ -598,9 +598,8 @@ check('Revisão: home Pede atenção deriva do estado (sem hardcode)', () => {
 });
 check('Revisão: sem CSS morto crítico (#toast fora do DOM)', () => !document.getElementById('toast'));
 check('Dia ao vivo: liga e executa um passo real', () => {
-  const antes = window.S.orders.length + window.S.eventos.length;
   window.toggleLiveDay();
-  return window.S.live.on === true && document.getElementById('live-btn').textContent.includes('Ao vivo');
+  return window.S.live.on === true && document.getElementById('sim-btn').textContent.includes('Ao vivo');
 });
 check('Dia ao vivo: para e limpa', () => {
   window.stopLiveDay();
