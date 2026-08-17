@@ -605,6 +605,61 @@ check('Dia ao vivo: para e limpa', () => {
   window.stopLiveDay();
   return window.S.live.on === false;
 });
+
+/* ── v17: fluidez ── */
+check('Fila fluida: pedido novo entra com animação, sem rerender', () => {
+  window.openModule('operacao', 'pedidos');
+  const list = document.getElementById('orders-live');
+  const antes = list.querySelectorAll('.orow').length;
+  window.simPedido('Keeta');
+  const list2 = document.getElementById('orders-live');
+  const novo = list2.querySelector('.orow.enter');
+  return list === list2 && list2.querySelectorAll('.orow').length === antes + 1 && !!novo;
+});
+check('Fila fluida: advance atualiza a mesma row in-place', () => {
+  const o = window.S.orders.filter(x => x.status !== 'entregue').sort((a,b) => b.n - a.n)[0];
+  const el = document.querySelector(`[data-oid="${o.id}"]`);
+  const stAntes = el.querySelector('.o-status').textContent;
+  window.advance(o.id);
+  const el2 = document.querySelector(`[data-oid="${o.id}"]`);
+  return el === el2 && el2.querySelector('.o-status').textContent !== stAntes;
+});
+check('Fila fluida: pedido entregue sai da aba com animação', () => {
+  window.S.orderTab = 'andamento';
+  window.openModule('operacao', 'pedidos');
+  const o = window.S.orders.find(x => x.status === 'pronto');
+  if(!o) return true;
+  window.advance(o.id);
+  const el = document.querySelector(`[data-oid="${o.id}"]`);
+  return !el || el.classList.contains('leave');
+});
+check('Simulação sem defeito: total do pedido = soma real dos itens', () => {
+  window.simPedido('iFood');
+  const o = window.S.orders[window.S.orders.length - 1];
+  const soma = o.items.reduce((s, i) => s + i.p * i.q, 0);
+  return Math.abs(o.total - soma) < 0.001;
+});
+check('KDS: abre com 3 colunas e relógio', () => {
+  window.openModule('operacao', 'kds');
+  return $$('.kds-col').length === 3 && !!document.getElementById('kds-clock');
+});
+check('KDS: card existe na coluna certa e move ao avançar', () => {
+  window.patchKds();
+  const ag = window.S.orders.filter(o => o.status === 'aguardando')[0];
+  if(!ag){ window.simPedido('Balcão'); return true; }
+  const colAg = document.querySelector('[data-klist="aguardando"]');
+  const temLa = !!colAg.querySelector(`[data-oid="${ag.id}"]`);
+  window.advance(ag.id);
+  const colPrep = document.querySelector('[data-klist="preparando"]');
+  return temLa && !!colPrep.querySelector(`[data-oid="${ag.id}"]`);
+});
+check('LiveStep respeita overlay aberto', () => {
+  document.body.classList.add('drawer-open');
+  const antes = window.S.orders.length;
+  window.eval('liveStep()');
+  document.body.classList.remove('drawer-open');
+  return window.S.orders.length === antes;
+});
 check('Dia ao vivo: passo de cozinha avança fila sozinho', () => {
   const o = window.S.orders.find(x => x.status === 'aguardando');
   if(!o){ window.simPedido('iFood'); }

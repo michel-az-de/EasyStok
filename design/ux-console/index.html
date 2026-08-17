@@ -412,7 +412,7 @@ const main = document.getElementById('main');
 /* ═══ MÓDULOS (contextos calmos) ═══ */
 const MODULES = [
   { id:'operacao', name:'Operação', icon:'zap', tint:'#E85814',
-    tabs:[['pedidos','Pedidos'],['novo-pedido','Novo pedido'],['caixa','Caixa'],['cardapio','Cardápio']],
+    tabs:[['pedidos','Pedidos'],['kds','KDS'],['novo-pedido','Novo pedido'],['caixa','Caixa'],['cardapio','Cardápio']],
     state:() => { const ag = S.orders.filter(o => o.status === 'aguardando');
       return ag.length ? `<b>${ag.length}</b> aguardando · mais antigo <b>há ${Math.max(...ag.map(waitMin))} min</b>` : 'fila limpa'; } },
   { id:'estoque', name:'Estoque', icon:'box', tint:'#15388A',
@@ -1004,7 +1004,7 @@ function tAnalises(){
 /* lazy de propósito: algumas tabs vivem em scripts carregados depois deste;
    resolver na chamada evita ReferenceError na avaliação do objeto */
 const TABS = {
-  'pedidos':() => tPedidos(), 'novo-pedido':() => tNovoPedido(), 'caixa':() => tCaixa(), 'clientes':() => { openModule('clientes'); return ''; },
+  'pedidos':() => tPedidos(), 'kds':() => tKds(), 'novo-pedido':() => tNovoPedido(), 'caixa':() => tCaixa(), 'cardapio':() => tCardapioAdmin(), 'clientes':() => { openModule('clientes'); return ''; },
   'posicao':() => tPosicao(), 'entrada':() => tEntrada(), 'movimentos':() => tMovimentos(), 'produtos':() => tProdutos(), 'novo-produto':() => tNovoProduto(),
   'receber':() => tContas('receber'), 'pagar':() => tContas('pagar'),
   'lista':() => tComprasLista(),
@@ -1427,6 +1427,43 @@ body{letter-spacing:-.006em}
 .ev-item.unread{background:var(--accent-soft)}
 /* avatar com ring sutil */
 .avatar-sm{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+
+/* ═══ v17 FLUIDEZ — nada pisca, tudo desliza ═══ */
+.orow{transition:transform .45s cubic-bezier(.32,.72,0,1),opacity .3s var(--ease)}
+.orow.enter{animation:rowIn .45s cubic-bezier(.32,.72,0,1)}
+.orow.leave{opacity:0;transform:translateX(24px)}
+@keyframes rowIn{from{opacity:0;transform:translateY(-10px) scale(.985)}to{opacity:1;transform:none}}
+.timer-tick{transition:color .4s var(--ease)}
+.kpi .k-v,.now-item .n-v{transition:color .3s var(--ease)}
+.push{will-change:transform,opacity}
+
+/* KDS — tela de TV: escura, grande, tempo real */
+.kds-screen{background:#0E0B08;border-radius:18px;padding:18px;margin:-6px -6px 0;min-height:560px}
+.kds-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;color:#F7F2E8}
+.kds-head .kh-t{font-size:19px;font-weight:800;letter-spacing:-.02em}
+.kds-head .kh-clock{font-family:var(--font-mono);font-size:14px;color:#C9BBA6}
+.kds-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start}
+.kds-col{background:rgba(255,255,255,.045);border-radius:14px;padding:10px;min-height:200px}
+.kds-col .kc-h{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:2px 4px 10px;color:#C9BBA6}
+.kds-col .kc-n{font-family:var(--font-mono);background:rgba(255,255,255,.08);border-radius:99px;padding:1px 8px;color:#F7F2E8}
+.kds-card{background:#1D1712;border:1px solid rgba(247,242,232,.09);border-radius:12px;padding:12px 13px;margin-bottom:9px;
+  transition:transform .45s cubic-bezier(.32,.72,0,1),opacity .3s;cursor:pointer}
+.kds-card:hover{transform:translateY(-2px)}
+.kds-card.enter{animation:rowIn .45s cubic-bezier(.32,.72,0,1)}
+.kds-card.leave{opacity:0;transform:scale(.96)}
+.kds-card .k-top{display:flex;align-items:center;gap:8px}
+.kds-card .k-n{font-size:16px;font-weight:800;color:#F7F2E8;letter-spacing:-.01em}
+.kds-card .k-timer{margin-left:auto;font-family:var(--font-mono);font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px}
+.kds-card .k-items{font-size:12.5px;line-height:1.55;color:#CFC5B4;margin-top:6px}
+.kds-card .k-items b{color:#F7F2E8}
+.kds-card .k-act{width:100%;margin-top:10px;height:34px;border-radius:9px;font-size:12.5px;font-weight:700;
+  background:#E76845;color:#fff;transition:filter .15s}
+.kds-card .k-act:hover{filter:brightness(1.1)}
+.kds-card .k-act.done{background:#4FBF9F;color:#06251C}
+.kds-empty{color:#6B6252;font-size:12px;text-align:center;padding:22px 6px}
+.t-fresh{background:rgba(79,191,159,.16);color:#7FD8BC}
+.t-warn{background:rgba(240,184,74,.16);color:#F5CB7C}
+.t-late{background:rgba(224,91,75,.2);color:#F0927F}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -3472,3 +3509,284 @@ syncNav();
 </script>
 </body>
 </html>
+<script>
+/* ═══ v17: FILA FLUIDA — patch DOM, nada de innerHTML piscando ═══ */
+function orderRowHtml(o){
+  const m = waitMin(o), sm = STATUS[o.status];
+  return `
+    <span class="actip"><span class="row-num" style="font-weight:700">#${o.n}</span>
+      <span class="actip-pop">
+        ${sm.action ? `<button class="btn btn-dark" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}
+        <button class="btn btn-secondary" onclick="event.stopPropagation();toast('Cupom do #${o.n} na impressora')">Imprimir</button>
+        <button class="btn btn-secondary" onclick="event.stopPropagation();openDetail('pedido','${o.id}')">Abrir</button>
+      </span>
+    </span>
+    ${avatarFor(o.cliente)}
+    <span style="min-width:0"><span class="row-main">${esc(o.cliente)}</span>
+      <div class="row-sub">${o.items.map(i => `${i.q}× ${i.nome}`).join(' · ')}</div></span>
+    <span class="pill pill-neutral">${o.canal}</span>
+    <span class="row-num timer-tick o-timer ${o.status === 'entregue' ? '' : waitClass(m)}">${o.status === 'entregue' ? '—' : m + ' min'}</span>
+    <span class="row-num o-total" style="font-weight:600">${fmt$(o.total)}</span>
+    <span class="o-act" style="display:flex;gap:8px;align-items:center"><span class="pill ${sm.pill} o-status">${sm.label}</span>
+      ${sm.action ? `<button class="btn btn-dark btn-sm" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}</span>`;
+}
+function patchOrderList(container, orders){
+  const seen = new Set();
+  orders.forEach((o, idx) => {
+    seen.add(o.id);
+    let el = container.querySelector(`[data-oid="${o.id}"]`);
+    if(!el){
+      el = document.createElement('div');
+      el.className = 'row orow enter';
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.dataset.oid = o.id;
+      el.style.cssText = 'grid-template-columns:auto auto 1fr auto auto auto auto';
+      el.onclick = () => openDetail('pedido', o.id);
+      el.onkeydown = ev => { if(ev.key === 'Enter') openDetail('pedido', o.id); };
+      el.innerHTML = orderRowHtml(o);
+      /* insere na posição certa (a lista já vem ordenada) */
+      const ref = container.children[idx];
+      ref ? container.insertBefore(el, ref) : container.appendChild(el);
+      setTimeout(() => el.classList.remove('enter'), 500);
+    } else {
+      /* já existe: move se preciso e atualiza só as partes variáveis */
+      const cur = container.children[idx];
+      if(cur !== el){
+        const first = el.getBoundingClientRect();
+        container.insertBefore(el, cur || null);
+        const last = el.getBoundingClientRect();
+        el.style.transform = `translateY(${first.top - last.top}px)`;
+        requestAnimationFrame(() => { el.style.transform = ''; });
+      }
+      const t = el.querySelector('.o-timer');
+      const m = waitMin(o);
+      const newTxt = o.status === 'entregue' ? '—' : m + ' min';
+      if(t.textContent !== newTxt){
+        t.textContent = newTxt;
+        t.className = 'row-num timer-tick o-timer ' + (o.status === 'entregue' ? '' : waitClass(m));
+      }
+      const st = el.querySelector('.o-status');
+      if(st.textContent !== STATUS[o.status].label){
+        st.textContent = STATUS[o.status].label;
+        st.className = 'pill o-status ' + STATUS[o.status].pill;
+      }
+      const act = el.querySelector('.o-act .btn');
+      const want = STATUS[o.status].action || '';
+      if(act && !want) act.remove();
+      if(!act && want){
+        const b = document.createElement('button');
+        b.className = 'btn btn-dark btn-sm';
+        b.textContent = want;
+        b.onclick = ev => { ev.stopPropagation(); advance(o.id); };
+        el.querySelector('.o-act').appendChild(b);
+      } else if(act && act.textContent !== want){ act.textContent = want; act.onclick = ev => { ev.stopPropagation(); advance(o.id); }; }
+    }
+  });
+  container.querySelectorAll('[data-oid]').forEach(el => {
+    if(!seen.has(el.dataset.oid)){
+      el.classList.add('leave');
+      setTimeout(() => el.remove(), 320);
+    }
+  });
+}
+function visibleOrders(){
+  const f = S.filters?.orders || {};
+  return S.orders.filter(o => {
+    if(S.orderTab === 'andamento' && o.status === 'entregue') return false;
+    if(S.orderTab === 'finalizados' && o.status !== 'entregue') return false;
+    return true;
+  }).sort((a, b) => b.n - a.n);
+}
+/* rerender inteligente: fila/KDS atualizam por patch; o resto, normal */
+function refreshOrdersUI(){
+  if(S.module === 'operacao' && !S.detail){
+    const tab = S.moduleTab['operacao'];
+    if(tab === 'pedidos'){
+      const list = document.getElementById('orders-live');
+      if(list){ patchOrderList(list, visibleOrders()); updateTabCounts(); return true; }
+    }
+    if(tab === 'kds'){
+      patchKds(); updateTabCounts(); return true;
+    }
+  }
+  return false;
+}
+function updateTabCounts(){
+  document.querySelectorAll('#subbar .subtab').forEach(b => {
+    const isP = b.textContent.includes('Pedidos');
+    if(isP){
+      const n = S.orders.filter(o => o.status !== 'entregue').length;
+      const ct = b.querySelector('.ct');
+      if(ct) ct.textContent = n;
+    }
+  });
+}
+
+/* ═══ FILA como live list (override da versão innerHTML) ═══ */
+tPedidos = function(){
+  const rows = visibleOrders();
+  return `<div class="chips-row">
+      ${['andamento','finalizados','todos'].map(t => `<button class="chip ${S.orderTab === t ? 'on' : ''}" onclick="S.orderTab='${t}';rerender()">${{ andamento:'Em andamento', finalizados:'Finalizados', todos:'Todos' }[t]}</button>`).join('')}
+    </div>
+    <p class="tab-note">${rows.length} pedidos · ao vivo, sem piscar</p>
+    <div class="rows" id="orders-live" style="border-top:1px solid var(--hairline)">
+      ${rows.map(o => `<div class="row orow" role="button" tabindex="0" data-oid="${o.id}" style="grid-template-columns:auto auto 1fr auto auto auto auto" onclick="openDetail('pedido','${o.id}')" onkeydown="if(event.key==='Enter')openDetail('pedido','${o.id}')">${orderRowHtml(o)}</div>`).join('')}
+    </div>
+    ${rows.length ? '' : `<div class="empty"><div class="e-icon">${ico('check', 22)}</div><h2>Fila limpa</h2><p>Nenhum pedido nesse recorte.</p></div>`}`;
+};
+
+/* ═══ KDS — a tela da TV, em tempo real ═══ */
+tKds = function(){
+  const cols = [['aguardando','Aguardando'],['preparando','Preparando'],['pronto','Pronto']];
+  return `<div class="kds-screen">
+    <div class="kds-head">
+      <span class="kh-t">Cozinha · ao vivo</span>
+      <span class="kh-clock" id="kds-clock"></span>
+    </div>
+    <div class="kds-cols">
+      ${cols.map(([st, l]) => `<div class="kds-col" data-kcol="${st}">
+        <div class="kc-h">${l} <span class="kc-n" data-kn="${st}">0</span></div>
+        <div data-klist="${st}"></div>
+      </div>`).join('')}
+    </div>
+    <div style="text-align:center;color:#6B6252;font-size:11px;margin-top:14px">toca no cartão pra abrir o pedido · a TV atualiza sozinha, sem piscar</div>
+  </div>`;
+};
+function kdsCardHtml(o){
+  const m = waitMin(o);
+  const tcls = m > 15 ? 't-late' : m > 8 ? 't-warn' : 't-fresh';
+  const sm = STATUS[o.status];
+  return `<div class="k-top"><span class="k-n">#${o.n}</span>
+    <span class="pill pill-neutral" style="font-size:10px;height:18px">${o.canal}</span>
+    <span class="k-timer ${tcls}" data-ktimer>${m} min</span></div>
+  <div class="k-items">${o.items.map(i => `<b>${i.q}×</b> ${esc(i.nome)}`).join('<br>')}</div>
+  ${sm.action ? `<button class="k-act ${o.status === 'preparando' ? 'done' : ''}" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}`;
+}
+function patchKds(){
+  ['aguardando','preparando','pronto'].forEach(st => {
+    const list = document.querySelector(`[data-klist="${st}"]`);
+    if(!list) return;
+    const orders = S.orders.filter(o => o.status === st).sort((a, b) => a.at - b.at);
+    const count = document.querySelector(`[data-kn="${st}"]`);
+    if(count) count.textContent = orders.length;
+    const seen = new Set();
+    orders.forEach(o => {
+      seen.add(o.id);
+      let el = list.querySelector(`[data-oid="${o.id}"]`);
+      if(!el){
+        el = document.createElement('div');
+        el.className = 'kds-card enter';
+        el.dataset.oid = o.id;
+        el.onclick = () => peek('pedido', o.id);
+        el.innerHTML = kdsCardHtml(o);
+        list.appendChild(el);
+        setTimeout(() => el.classList.remove('enter'), 500);
+      } else {
+        const m = waitMin(o);
+        const t = el.querySelector('[data-ktimer]');
+        const tcls = m > 15 ? 't-late' : m > 8 ? 't-warn' : 't-fresh';
+        if(t.textContent !== m + ' min') t.textContent = m + ' min';
+        t.className = 'k-timer ' + tcls;
+      }
+    });
+    list.querySelectorAll('[data-oid]').forEach(el => {
+      if(!seen.has(el.dataset.oid)){ el.classList.add('leave'); setTimeout(() => el.remove(), 300); }
+    });
+    if(!orders.length && !list.querySelector('.kds-empty')){
+      list.innerHTML = '<div class="kds-empty">nada aqui</div>';
+    } else if(orders.length){
+      list.querySelector('.kds-empty')?.remove();
+    }
+  });
+  const clk = document.getElementById('kds-clock');
+  if(clk) clk.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+
+/* ═══ override do advance: sem rerender bruto quando numa tela viva ═══ */
+const _advanceOrig = advance;
+advance = function(id){
+  const o = S.orders.find(x => x.id === id);
+  const next = STATUS[o.status].next;
+  if(!next) return;
+  o.status = next; o.at = Date.now();
+  if(next === 'entregue') S.moves.unshift({ id:'mov_' + Math.random().toString(36).slice(2, 6), tipo:'venda', desc:`Pedido #${o.n} · ${o.cliente}`, valor:o.total, h:'agora', orderId:o.id, forma:o.pag });
+  if(!refreshOrdersUI()) rerender(true);
+  else push({ title:`#${o.n} → ${STATUS[next].label}`, icon:'🧾' });
+};
+/* timers ao vivo: patch em vez de rerender */
+setInterval(() => {
+  if(S.module === 'operacao' && !S.detail && !refreshOrdersUI()){ /* nada a fazer fora das telas vivas */ }
+  if(S.moduleTab['operacao'] === 'kds' && S.module === 'operacao') patchKds();
+}, 5000);
+</script>
+<script>
+/* ═══ v17 Rev 2: simulação sem defeitos ═══ */
+simPedido = function(canal){
+  document.querySelector('.sim-menu')?.remove();
+  /* itens reais do cardápio, com preço real — nada de valor inventado */
+  const pool = [...S.cardapio].sort(() => Math.random() - .5);
+  const nItems = 1 + Math.floor(Math.random() * 2);
+  const items = pool.slice(0, nItems).map(m => ({ nome:m.nome, q:1 + Math.floor(Math.random() * 2), p:m.preco, emoji:m.emoji }));
+  const o = { id:'ped_' + Math.random().toString(36).slice(2, 7), n:simN++,
+    cliente:NAMES[Math.floor(Math.random() * NAMES.length)], canal,
+    total:items.reduce((s, i) => s + i.p * i.q, 0),
+    status:'aguardando', at:Date.now(),
+    pag:canal === 'Balcão' ? 'Dinheiro' : canal === 'iFood' ? 'Pix online' : 'Na entrega',
+    items };
+  S.orders.push(o); S.lastNew = o.n;
+  pushEvent({ tipo:'pedido', icon:'🧾', tint:'#E85814', t:`Pedido #${o.n} entrou · ${canal} · ${fmt$(o.total)}`, orderId:o.id, acao:{ l:'Ver pedido', fn:`goOrder('${o.id}')` } });
+  if(!refreshOrdersUI()) rerender();
+  setTimeout(() => { S.lastNew = null; }, 600);
+};
+/* feed com limite: os 12 mais recentes */
+const _pushEventBase = pushEvent;
+pushEvent = function(e){
+  _pushEventBase(e);
+  if(S.eventos.length > 12) S.eventos.length = 12;
+};
+/* liveStep: não invade overlay aberto — evento espera você terminar */
+liveStep = function(){
+  const overlayAberto = ['peek-open','confirm-open','drawer-open','search-open','ev-open'].some(c => document.body.classList.contains(c));
+  if(overlayAberto) return; /* respeita o que você está fazendo */
+  const roll = Math.random();
+  if(roll < 0.52){
+    const canais = ['iFood','iFood','WhatsApp','Balcão','Keeta','99Food'];
+    simPedido(canais[Math.floor(Math.random() * canais.length)]);
+  } else if(roll < 0.80){
+    const fila = S.orders.filter(o => STATUS[o.status].next).sort((a, b) => a.at - b.at);
+    if(fila.length){
+      const o = fila[0];
+      advance(o.id);
+      audit(`Thati moveu #${o.n} pra ${STATUS[o.status].label} pelo celular`);
+    } else {
+      simPedido('Balcão');
+    }
+  } else if(roll < 0.92){
+    simEvento(Math.random() < .5 ? 'wa' : 'pergunta');
+  } else {
+    simEvento('aval');
+  }
+};
+/* simEvento não navega nunca sozinho: só empilha no sino + push */
+simEvento = function(tipo){
+  document.querySelector('.sim-menu')?.remove();
+  const map = {
+    pergunta:  { e:{ tipo:'pergunta', icon:'❓', tint:'#EA1D2C', t:'Pergunta no iFood: "vocês entregam no Jardins?"', acao:{ l:'Responder', fn:"answerEventSim('wa')" } } },
+    reclamacao:{ e:{ tipo:'reclamacao', icon:'😟', tint:'#C03B2A', t:'Reclamação no iFood: "pedido veio frio e atrasou"', acao:{ l:'Responder agora', fn:"answerEventSim('if')" } }, msg:{ nome:'Novo contato · iFood', t:'Pedido veio frio e atrasou 40 min. Quero um retorno.' } },
+    wa:        { e:{ tipo:'mensagem', icon:'💬', tint:'#128C4B', t:'WhatsApp de Priscila: "qual o cardápio de amanhã?"', acao:{ l:'Responder', fn:"answerEventSim('wa')" } }, msg:{ nome:'Priscila Mota', t:'qual o cardápio de amanhã? 😋' } },
+    ig:        { e:{ tipo:'mensagem', icon:'💬', tint:'#C13584', t:'DM no Instagram: "esse bolo de pote tem noção? 😍"', acao:{ l:'Responder', fn:"answerEventSim('ig')" } }, msg:{ nome:'@fitness.paulista', t:'esse bolo de pote tem noção? 😍' } },
+    aval:      { e:{ tipo:'avaliacao', icon:'⭐', tint:'#F5A623', t:'Avaliação 2★ no iFood: "demorou demais"', acao:{ l:'Responder', fn:"answerEventSim('if')" } }, aval:true },
+  };
+  const cfg = map[tipo];
+  pushEvent(cfg.e);
+  if(cfg.msg){
+    const conv = S.conversas.find(c => c.nome === cfg.msg.nome) || S.conversas[0];
+    conv.msgs.push({ dir:'in', t:cfg.msg.t, h:'agora' });
+    conv.unread++;
+  }
+  if(cfg.aval){
+    S.avaliacoes.unshift({ id:'av_' + Date.now(), nome:'Anônimo', nota:2, canal:'iFood', texto:'demorou demais', h:'agora', respondida:false });
+  }
+};
+</script>
