@@ -544,7 +544,7 @@ function renderModule(){
     const isP = S.detail.type === 'pedido';
     const o = isP ? S.orders.find(x => x.id === S.detail.id) : null;
     const c = isP ? null : S.clientes.find(x => x.id === S.detail.id);
-    main.innerHTML = `<div class="view-enter">
+    main.innerHTML = `<div class="vt-body">
       <nav class="bc" aria-label="Trilha">
         <a href="#" onclick="goHome();return false">Hoje</a><span class="sep">›</span>
         <a href="#" onclick="closeDetail();return false">${m.name}</a><span class="sep">›</span>
@@ -557,7 +557,7 @@ function renderModule(){
   }
   const narrow = ['novo-pedido','novo-produto','entrada'].includes(cur);
   main.className = narrow ? 'wrap narrow' : 'wrap';
-  main.innerHTML = `<div class="view-enter">${TABS[cur]()}</div>`;
+  main.innerHTML = `<div class="vt-body">${TABS[cur]()}</div>`;
   document.title = `${m.name} · EasyStok [Homolog]`;
   window.scrollTo(0, 0);
   if(cur === 'novo-pedido') initDraft();
@@ -1311,6 +1311,47 @@ input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 @keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(192,59,42,.35)}50%{box-shadow:0 0 0 5px rgba(192,59,42,0)}}
 :root[data-a11y-motion="1"] *{transition-duration:.01ms!important;animation-duration:.01ms!important}
 :root[data-a11y-links="1"] a{text-decoration:underline}
+
+/* ═══ v18 VIDA ═══ */
+main.view-enter{animation:viewIn .34s cubic-bezier(.32,.72,0,1)}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* animações de entrada da home SÓ na navegação — nunca em rerender de ação */
+.att-block,.ctx-list,.now-item{animation:none!important}
+main.view-enter .att-block{animation:fadeUp .45s var(--ease)!important}
+main.view-enter .ctx-list{animation:fadeUp .5s var(--ease)!important}
+main.view-enter .now-item{animation:fadeUp .4s var(--ease)!important}
+.orow{position:relative}
+.orow::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--pc,var(--ok));opacity:.9}
+.kds-card{position:relative;overflow:hidden}
+.kds-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--pc,#4FBF9F)}
+.kds-card.late{animation:latePulse 1.8s infinite;border-color:rgba(224,91,75,.5)}
+@keyframes latePulse{0%,100%{box-shadow:0 0 0 0 rgba(224,91,75,.3)}50%{box-shadow:0 0 0 6px rgba(224,91,75,0)}}
+.sla-tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:99px;margin-top:7px}
+.sla-ok{background:rgba(79,191,159,.14);color:#4FBF9F}
+.sla-warn{background:rgba(240,184,74,.15);color:#F0B84A}
+.sla-late{background:rgba(224,91,75,.2);color:#F0927F}
+.kds-card[draggable="true"]{cursor:grab}
+.kds-card.dragging{opacity:.45;transform:scale(.97) rotate(1deg)}
+.kds-col.dragover{background:rgba(231,104,69,.1);outline:2px dashed rgba(231,104,69,.5);outline-offset:-6px}
+.kds-card.moved{animation:cardLand .5s cubic-bezier(.32,.72,0,1)}
+@keyframes cardLand{0%{transform:translateY(-14px) scale(1.03);box-shadow:0 14px 30px rgba(0,0,0,.4)}100%{transform:none}}
+.num-anim{transition:color .35s var(--ease)}
+.num-anim.bump-up{color:var(--ok)}
+.num-anim.bump-down{color:var(--crit)}
+.live-feed{display:flex;flex-direction:column;margin-top:8px}
+.lf-item{display:flex;gap:10px;align-items:center;padding:9px 2px;border-top:1px solid var(--hairline);font-size:13px;animation:rowIn .5s cubic-bezier(.32,.72,0,1)}
+.lf-item .lf-ico{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;flex-shrink:0}
+.lf-item .lf-when{margin-left:auto;font-size:11px;color:var(--text-4);font-family:var(--font-mono)}
+.ma-card{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.ma-cover{height:86px;display:grid;place-items:center;font-size:36px;position:relative;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--mc,#E85814) 16%,transparent),color-mix(in srgb,var(--mc,#E85814) 4%,transparent))}
+.ma-body{padding:12px 14px 14px}
+.ma-esgotado{position:absolute;inset:0;background:rgba(20,15,10,.5);display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+:root[data-a11y-targets="1"] .btn{min-height:44px}
+:root[data-a11y-targets="1"] .row{padding-top:16px;padding-bottom:16px}
+:root[data-a11y-targets="1"] .chip{height:34px}
+:root[data-a11y-targets="1"] .icon-btn{width:42px;height:42px}
+:root[data-a11y-noblur="1"] *{backdrop-filter:none!important}
 
 /* ═══ DOSSIÊ no atendimento ═══ */
 .chat-wrap{display:grid;grid-template-columns:300px 1fr 250px;border:1px solid var(--hairline);border-radius:var(--r-l);overflow:hidden;background:var(--card)}
@@ -3789,4 +3830,341 @@ simEvento = function(tipo){
     S.avaliacoes.unshift({ id:'av_' + Date.now(), nome:'Anônimo', nota:2, canal:'iFood', texto:'demorou demais', h:'agora', respondida:false });
   }
 };
+</script>
+<script>
+/* ═══ v18.1 — TRANSIÇÕES SEM PISCADA ═══
+   Navegação anima (view-enter); ação local troca direto, sem flash. */
+const _rmV15 = renderModule;
+const _rhOrig = renderHome;
+renderModule = function(){
+  const anim = !!S._navAnim; S._navAnim = false;
+  _rmV15.apply(this, arguments);
+  if(anim){
+    main.classList.add('view-enter');
+    setTimeout(() => main.classList.remove('view-enter'), 500);
+  }
+};
+renderHome = function(){
+  const anim = !!S._navAnim; S._navAnim = false;
+  _rhOrig.apply(this, arguments);
+  if(anim){
+    main.classList.add('view-enter');
+    setTimeout(() => main.classList.remove('view-enter'), 550);
+  }
+};
+function markNav(orig){
+  return function(){ S._navAnim = true; return orig.apply(this, arguments); };
+}
+openModule = markNav(openModule);
+goHome = markNav(goHome);
+setModuleTab = markNav(setModuleTab);
+openDetail = markNav(openDetail);
+closeDetail = markNav(closeDetail);
+</script>
+<script>
+/* ═══ v18.2 — SLA POR CANAL + PRIORIDADE QUE O OLHO ACOMPANHA ═══ */
+const SLA_MIN = { 'iFood':25, 'Keeta':30, '99Food':30, 'WhatsApp':35, 'Balcão':20 };
+function slaInfo(o){
+  const prazo = SLA_MIN[o.canal] || 30;
+  const esp = waitMin(o);
+  const rest = prazo - esp;
+  return { prazo, esp, rest, state:o.status === 'entregue' ? 'done' : rest < 0 ? 'late' : rest <= 5 ? 'warn' : 'ok' };
+}
+const SLA_COLOR = { ok:'#18874E', warn:'#B57A00', late:'#C03B2A', done:'#707892' };
+function slaTag(o){
+  const s = slaInfo(o);
+  if(s.state === 'done') return '';
+  if(s.state === 'late') return `<span class="sla-tag sla-late">⚠ ${o.canal} · atrasado ${-s.rest} min</span>`;
+  return `<span class="sla-tag sla-${s.state}">${o.canal} · estoura em ${s.rest} min</span>`;
+}
+/* fila ordenada por URGÊNCIA (o que estoura primeiro vem primeiro) */
+visibleOrders = function(){
+  return S.orders.filter(o => {
+    if(S.orderTab === 'andamento' && o.status === 'entregue') return false;
+    if(S.orderTab === 'finalizados' && o.status !== 'entregue') return false;
+    return true;
+  }).sort((a, b) => {
+    if(S.orderTab === 'andamento') return slaInfo(a).rest - slaInfo(b).rest;
+    return b.n - a.n;
+  });
+};
+/* row da fila com barra de prioridade + tag de prazo */
+orderRowHtml = function(o){
+  const s = slaInfo(o);
+  const sm = STATUS[o.status];
+  return `
+    <span class="actip"><span class="row-num" style="font-weight:700">#${o.n}</span>
+      <span class="actip-pop">
+        ${sm.action ? `<button class="btn btn-dark" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}
+        <button class="btn btn-secondary" onclick="event.stopPropagation();toast('Cupom do #${o.n} na impressora')">Imprimir</button>
+        <button class="btn btn-secondary" onclick="event.stopPropagation();openDetail('pedido','${o.id}')">Abrir</button>
+      </span>
+    </span>
+    ${avatarFor(o.cliente)}
+    <span style="min-width:0"><span class="row-main">${esc(o.cliente)}</span>
+      <div class="row-sub">${o.items.map(i => `${i.q}× ${i.nome}`).join(' · ')}</div>
+      ${s.state !== 'done' ? slaTag(o) : ''}</span>
+    <span class="pill pill-neutral">${o.canal}</span>
+    <span class="row-num timer-tick o-timer ${s.state === 'late' ? 'wait-late' : s.state === 'warn' ? 'wait-warn' : 'wait-fresh'}">${o.status === 'entregue' ? '—' : s.esp + ' min'}</span>
+    <span class="row-num o-total" style="font-weight:600">${fmt$(o.total)}</span>
+    <span class="o-act" style="display:flex;gap:8px;align-items:center"><span class="pill ${sm.pill} o-status">${sm.label}</span>
+      ${sm.action ? `<button class="btn btn-dark btn-sm" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}</span>`;
+};
+/* patch aplica a cor de prioridade no elemento */
+const _patchOrderListOrig = patchOrderList;
+patchOrderList = function(container, orders){
+  _patchOrderListOrig(container, orders);
+  orders.forEach(o => {
+    const el = container.querySelector(`[data-oid="${o.id}"]`);
+    if(el) el.style.setProperty('--pc', SLA_COLOR[slaInfo(o).state]);
+  });
+};
+
+/* ═══ v18.3 — KDS com DRAG&DROP, SLA e inteligência de atraso ═══ */
+function moveOrderTo(id, st){
+  const o = S.orders.find(x => x.id === id);
+  if(!o || o.status === st) return;
+  const from = o.status;
+  o.status = st; o.at = Date.now();
+  if(st === 'entregue') S.moves.unshift({ id:'mov_' + Math.random().toString(36).slice(2, 6), tipo:'venda', desc:`Pedido #${o.n} · ${o.cliente}`, valor:o.total, h:'agora', orderId:o.id, forma:o.pag });
+  audit(`arrastou #${o.n} de ${from} pra ${st} no KDS`);
+  patchKds();
+  const el = document.querySelector(`[data-klist="${st}"] [data-oid="${id}"]`);
+  if(el){ el.classList.add('moved'); setTimeout(() => el.classList.remove('moved'), 500); }
+  push({ title:`#${o.n} → ${STATUS[st].label}`, sub:'arrastado no KDS', icon:'🍳' });
+}
+kdsCardHtml = function(o){
+  const s = slaInfo(o);
+  const tcls = s.state === 'late' ? 't-late' : s.state === 'warn' ? 't-warn' : 't-fresh';
+  const sm = STATUS[o.status];
+  return `<div class="k-top"><span class="k-n">#${o.n}</span>
+    <span class="pill pill-neutral" style="font-size:10px;height:18px">${o.canal}</span>
+    <span class="k-timer ${tcls}" data-ktimer>${s.esp} min</span></div>
+  <div class="k-items">${o.items.map(i => `<b>${i.q}×</b> ${esc(i.nome)}`).join('<br>')}</div>
+  ${slaTag(o)}
+  ${sm.action ? `<button class="k-act ${o.status === 'preparando' ? 'done' : ''}" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}`;
+};
+patchKds = function(){
+  ['aguardando','preparando','pronto'].forEach(st => {
+    const list = document.querySelector(`[data-klist="${st}"]`);
+    if(!list) return;
+    const col = list.closest('.kds-col');
+    /* ordenado por urgência: atrasado sobe, o olho vai nele primeiro */
+    const orders = S.orders.filter(o => o.status === st).sort((a, b) => slaInfo(a).rest - slaInfo(b).rest);
+    const late = orders.filter(o => slaInfo(o).state === 'late').length;
+    const count = document.querySelector(`[data-kn="${st}"]`);
+    if(count){
+      count.textContent = orders.length;
+      count.style.background = late ? 'rgba(224,91,75,.35)' : '';
+      count.style.color = late ? '#F0927F' : '';
+    }
+    /* dnd da coluna, ligado 1x */
+    if(col && !col.dataset.dnd){
+      col.dataset.dnd = '1';
+      col.addEventListener('dragover', ev => { ev.preventDefault(); col.classList.add('dragover'); });
+      col.addEventListener('dragleave', () => col.classList.remove('dragover'));
+      col.addEventListener('drop', ev => {
+        ev.preventDefault(); col.classList.remove('dragover');
+        const id = ev.dataTransfer.getData('text/plain');
+        if(id) moveOrderTo(id, st);
+      });
+    }
+    const seen = new Set();
+    orders.forEach(o => {
+      seen.add(o.id);
+      const s = slaInfo(o);
+      let el = list.querySelector(`[data-oid="${o.id}"]`);
+      if(!el){
+        el = document.createElement('div');
+        el.className = 'kds-card enter';
+        el.dataset.oid = o.id;
+        el.draggable = true;
+        el.addEventListener('dragstart', ev => { ev.dataTransfer.setData('text/plain', o.id); el.classList.add('dragging'); });
+        el.addEventListener('dragend', () => el.classList.remove('dragging'));
+        el.onclick = () => peek('pedido', o.id);
+        el.innerHTML = kdsCardHtml(o);
+        list.appendChild(el);
+        setTimeout(() => el.classList.remove('enter'), 500);
+      } else {
+        const t = el.querySelector('[data-ktimer]');
+        if(t.textContent !== s.esp + ' min') t.textContent = s.esp + ' min';
+        t.className = 'k-timer ' + (s.state === 'late' ? 't-late' : s.state === 'warn' ? 't-warn' : 't-fresh');
+        el.classList.toggle('late', s.state === 'late');
+        /* move na ordem de urgência se mudou de lugar */
+        const idx = orders.indexOf(o);
+        if(list.children[idx] !== el) list.insertBefore(el, list.children[idx] || null);
+      }
+      el.style.setProperty('--pc', SLA_COLOR[s.state]);
+    });
+    list.querySelectorAll('[data-oid]').forEach(el => {
+      if(!seen.has(el.dataset.oid)){ el.classList.add('leave'); setTimeout(() => el.remove(), 300); }
+    });
+    if(!orders.length && !list.querySelector('.kds-empty')) list.innerHTML = '<div class="kds-empty">nada aqui — arraste pra cá</div>';
+    else if(orders.length) list.querySelector('.kds-empty')?.remove();
+  });
+  const clk = document.getElementById('kds-clock');
+  if(clk) clk.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+};
+
+/* ═══ v18.4 — CANCELAMENTO VISÍVEL ═══ */
+const _cancelOrig = cancelPedido;
+cancelPedido = function(id){
+  const o = S.orders.find(x => x.id === id);
+  if(!o) return;
+  const n = o.n;
+  /* anima a saída onde o card estiver visível */
+  document.querySelectorAll(`[data-oid="${id}"]`).forEach(el => { el.classList.add('leave'); });
+  setTimeout(() => {
+    const i = S.orders.findIndex(x => x.id === id);
+    if(i >= 0) S.orders.splice(i, 1);
+    S.detail = null;
+    audit(`cancelou o pedido #${n} · itens voltaram ao estoque`);
+    pushEvent({ tipo:'reclamacao', icon:'🚫', tint:'#C03B2A', t:`Pedido #${n} cancelado · itens voltaram ao estoque`, acao:{ l:'Ver fila', fn:"openModule('operacao','pedidos')" } });
+    rerender();
+    if(S.moduleTab['operacao'] === 'kds') patchKds();
+  }, 300);
+};
+</script>
+<script>
+/* ═══ v18.5 — CAIXA ANIMADO (count-up inteligente) ═══ */
+function animateNum(el, from, to, fmt){
+  if(!el || from === to) { if(el) el.textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = 550;
+  const step = t => {
+    const p = Math.min(1, (t - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(from + (to - from) * e);
+    if(p < 1) requestAnimationFrame(step);
+    else { el.classList.add(to > from ? 'bump-up' : 'bump-down'); setTimeout(() => el.classList.remove('bump-up', 'bump-down'), 400); }
+  };
+  requestAnimationFrame(step);
+}
+S._saldoShown = null;
+const _tCaixaOrig = tCaixa;
+tCaixa = function(){
+  const html = _tCaixaOrig();
+  setTimeout(() => {
+    const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+    const saldo = 200 + vendas - 219.60 - 100;
+    const firstKpi = document.querySelector('#main .kpi .k-v');
+    if(firstKpi && (S.cashSeg || 'extrato') === 'extrato'){
+      if(S._saldoShown === null) S._saldoShown = saldo;
+      else animateNum(firstKpi, S._saldoShown, saldo, v => fmt$(v));
+      S._saldoShown = saldo;
+    }
+  }, 30);
+  return html;
+};
+
+/* ═══ v18.6 — HOME VIVA (feed da operação em tempo real) ═══ */
+const _rhV18 = renderHome;
+renderHome = function(){
+  _rhV18.apply(this, arguments);
+  const feed = S.eventos.slice(0, 4);
+  const anchor = main.querySelector('.att-block, .eyebrow');
+  const existing = main.querySelector('.live-feed-wrap');
+  if(existing) existing.remove();
+  const wrap = document.createElement('div');
+  wrap.className = 'live-feed-wrap';
+  wrap.innerHTML = `<span class="eyebrow" style="display:block;margin:26px 0 2px">Acontecendo agora</span>
+    <div class="live-feed">
+      ${feed.length ? feed.map(e => `<div class="lf-item">
+        <span class="lf-ico" style="background:color-mix(in srgb, ${e.tint} 12%, transparent)">${e.icon}</span>
+        <span>${esc(e.t)}</span><span class="lf-when">${e.when}</span>
+      </div>`).join('') : '<p class="f-hint" style="padding:8px 2px">Tudo quieto — liga o “Dia ao vivo” pra ver a operação respirar.</p>'}
+    </div>`;
+  const ctxTitle = [...main.querySelectorAll('.eyebrow')].find(e => e.textContent.includes('Onde trabalhar'));
+  if(ctxTitle) ctxTitle.before(wrap); else main.appendChild(wrap);
+};
+/* home reage a evento sem re-render: bump no número de pedidos/vendas */
+const _pushEventV17 = pushEvent;
+pushEvent = function(e){
+  _pushEventV17(e);
+  if(!S.module){
+    /* home aberta: atualiza os números com animação, sem re-render */
+    const feed = document.querySelector('.live-feed');
+    if(feed){
+      const item = document.createElement('div');
+      item.className = 'lf-item';
+      item.innerHTML = `<span class="lf-ico" style="background:color-mix(in srgb, ${e.tint} 12%, transparent)">${e.icon}</span><span>${esc(e.t)}</span><span class="lf-when">agora</span>`;
+      feed.prepend(item);
+      while(feed.children.length > 4) feed.lastChild.remove();
+    }
+    const nowVals = main.querySelectorAll('.now-item .n-v');
+    const entregues = S.orders.filter(o => o.status === 'entregue');
+    const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1200;
+    if(nowVals[0]) animateNum(nowVals[0], parseFloat(nowVals[0].dataset.v || vendas), vendas, v => { nowVals[0].dataset.v = v; return fmt$(v); });
+    if(nowVals[1]) animateNum(nowVals[1], parseFloat(nowVals[1].dataset.v || 0) || (S.orders.length + 39 - 1), S.orders.length + 39, v => { nowVals[1].dataset.v = v; return Math.round(v); });
+  }
+};
+
+/* ═══ v18.7 — CARDÁPIO BONITO ═══ */
+tCardapioAdmin = function(){
+  const catColor = { 'Marmitas':'#E85814', 'Sobremesas':'#8A5A00', 'Bebidas':'#15388A' };
+  return `<p class="tab-note">O que vende, onde vende. Lote zerou → sai do ar sozinho (regra 86).</p>
+    <div class="menu-admin">
+      ${S.cardapio.map(m => { const lote = S.lotes.find(l => l.prod === m.nome);
+        const rest = lote ? lote.qty : null;
+        const esgotado = rest === 0;
+        const prod = S.produtos.find(p => p.nome === m.nome);
+        const mg = prod ? Math.round((prod.preco - prod.custo) / prod.preco * 100) : null;
+        return `<div class="ma-card ${esgotado ? 'esgotado' : ''}" style="--mc:${catColor[m.cat] || '#E85814'}">
+          <div class="ma-cover">${m.emoji}
+            ${esgotado ? '<div class="ma-esgotado">esgotado</div>' : ''}
+            ${mg !== null ? `<span class="pill ${mg >= 55 ? 'pill-ok' : 'pill-warn'}" style="position:absolute;top:8px;right:8px">${mg}%</span>` : ''}
+          </div>
+          <div class="ma-body">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+              <b style="font-size:13.5px;min-width:0">${esc(m.nome)}</b>
+              <span class="mono" style="font-weight:700;font-size:14px">${fmt$(m.preco)}</span>
+            </div>
+            <div class="ma-stock">${rest === null ? 'sob encomenda' : esgotado ? 'lote zerou' : `restam ${rest} un do lote de hoje`}</div>
+            <div class="ma-channels">
+              <span class="ma-ch">Site <button class="switch" role="switch" aria-checked="${m.on && !esgotado}" aria-label="No site" onclick="toggleMenuCh('${m.id}','site',this)" ${esgotado ? 'disabled' : ''}></button></span>
+              <span class="ma-ch">iFood <button class="switch" role="switch" aria-checked="${m.on && !esgotado}" aria-label="No iFood" onclick="toggleMenuCh('${m.id}','ifood',this)" ${esgotado ? 'disabled' : ''}></button></span>
+              ${esgotado ? `<button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModule('estoque','producao')">Produzir →</button>` : `<button class="icon-btn" style="width:26px;height:26px;margin-left:auto" data-tip="Ver o produto" onclick="peek('produto','${prod ? prod.id : ''}')">›</button>`}
+            </div>
+          </div>
+        </div>`; }).join('')}
+    </div>`;
+};
+
+/* ═══ v18.8 — A11Y COMPLETO (6 controles, tudo aplicando de verdade) ═══ */
+applyA11y = function(){
+  const a = getA11y();
+  document.body.style.zoom = ((a.font || 15) / 15);
+  const r = document.documentElement.dataset;
+  r.a11yContrast = a.contrast ? '1' : '';
+  r.a11yMotion = a.motion ? '1' : '';
+  r.a11yLinks = a.links ? '1' : '';
+  r.a11yTargets = a.targets ? '1' : '';
+  r.a11yNoblur = a.noblur ? '1' : '';
+};
+openA11y = function(){
+  const a = getA11y();
+  const tog = (k, label, desc) => `
+    <div class="a11y-row">
+      <span><span class="a-l">${label}</span><div class="a-d">${desc}</div></span>
+      <button class="switch" role="switch" aria-checked="${!!a[k]}" aria-label="${label}" onclick="setA11y('${k}',!getA11y().${k});this.setAttribute('aria-checked',getA11y().${k})"></button>
+    </div>`;
+  openDrawer(`
+    <div class="drawer-head"><h2>Acessibilidade</h2><button class="icon-btn" aria-label="Fechar" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <p class="f-hint" style="margin-bottom:8px">Aplicam na hora, ficam salvas neste dispositivo.</p>
+      <div class="a11y-row">
+        <span><span class="a-l">Tamanho do texto</span><div class="a-d">escala a interface inteira, como no iOS</div></span>
+        <span style="display:flex;align-items:center;gap:9px">
+          <span style="font-size:12px;color:var(--text-4)">A</span>
+          <input type="range" class="a-slider" min="13.5" max="18" step="0.5" value="${a.font || 15}" oninput="setA11y('font', parseFloat(this.value));this.nextElementSibling.textContent=this.value" aria-label="Tamanho do texto">
+          <span class="mono" style="font-size:12px;min-width:26px">${a.font || 15}</span>
+        </span>
+      </div>
+      ${tog('contrast', 'Contraste maior', 'linhas e textos mais fortes')}
+      ${tog('motion', 'Reduzir movimento', 'desliga animações e transições')}
+      ${tog('targets', 'Alvos maiores', 'botões e linhas mais altos — bom pra toque')}
+      ${tog('noblur', 'Reduzir transparência', 'tira o desfoque dos painéis')}
+      ${tog('links', 'Sublinhar links', 'links sempre sublinhados')}
+    </div>`);
+};
+applyA11y();
 </script>

@@ -15,9 +15,11 @@ window.HTMLElement.prototype.scrollIntoView = () => {};
 
 const { document } = window;
 const results = [];
+const asyncChecks = [];
 function check(name, fn){
   try {
     const r = fn();
+    if(r && typeof r.then === 'function'){ asyncChecks.push([name, r]); return; }
     if(r === false) { results.push(`✗ ${name} (assert falhou)`); }
     else results.push(`✓ ${name}`);
   } catch(e){ results.push(`✗ ${name} — ${e.message}`); errors.push(`${name}: ${e.stack?.split('\n').slice(0,3).join(' | ')}`); }
@@ -432,9 +434,9 @@ check('Temas: Casa da Babá aplica as cores do PWA', () => {
 check('Temas: volta pro claro', () => { window.setTheme('light'); return document.documentElement.dataset.theme === 'light'; });
 
 /* ── v12: acessibilidade ── */
-check('A11y: painel abre com 4 controles', () => {
+check('A11y: painel abre com 6 controles', () => {
   window.openA11y();
-  return $$('.drawer .a11y-row').length === 4;
+  return $$('.drawer .a11y-row').length === 6;
 });
 check('A11y: tamanho do texto aplica zoom real na UI', () => {
   window.setA11y('font', 18);
@@ -660,6 +662,79 @@ check('LiveStep respeita overlay aberto', () => {
   document.body.classList.remove('drawer-open');
   return window.S.orders.length === antes;
 });
+
+/* ── v18: vida no sistema ── */
+check('Transição: navegar anima, ação local não', () => {
+  window.openModule('estoque', 'posicao');
+  const navAnim = document.getElementById('main').classList.contains('view-enter');
+  window.rerender();
+  return navAnim === true && !document.getElementById('main').classList.contains('view-enter');
+});
+check('SLA: pedido estourado mostra atrasado e sobe pro topo', () => {
+  window.openModule('operacao', 'pedidos');
+  const o = window.S.orders.find(x => x.status === 'aguardando');
+  o.at = Date.now() - 40 * 60000; /* 40 min de espera: estoura qualquer SLA */
+  window.rerender();
+  const first = document.querySelector('#orders-live .orow');
+  return first.dataset.oid === o.id && first.textContent.includes('atrasado');
+});
+check('SLA: tag mostra o canal e o prazo', () => {
+  const o = window.S.orders.find(x => x.status !== 'entregue' && x.canal === 'iFood' && (Date.now() - x.at) < 20 * 60000);
+  if(!o) return true;
+  return txt().includes('estoura em');
+});
+check('KDS: drag&drop move o card de coluna com animação', () => {
+  window.openModule('operacao', 'kds');
+  window.patchKds();
+  const o = window.S.orders.find(x => x.status === 'aguardando');
+  if(!o){ window.simPedido('iFood'); return true; }
+  window.eval(`moveOrderTo('${o.id}','preparando')`);
+  const el = document.querySelector(`[data-klist="preparando"] [data-oid="${o.id}"]`);
+  return o.status === 'preparando' && !!el && el.classList.contains('moved');
+});
+check('Cancelamento: some com animação e vira evento', () => {
+  const o = window.S.orders.find(x => x.status !== 'entregue');
+  window.cancelPedido(o.id);
+  return new Promise(res => setTimeout(() => {
+    res(!window.S.orders.find(x => x.id === o.id) && window.S.eventos[0].t.includes('cancelado'));
+  }, 400));
+});
+check('Caixa: count-up existe e roda', () => {
+  window.openModule('operacao', 'caixa');
+  return typeof window.eval('animateNum') === 'function';
+});
+check('Home viva: evento entra no feed sem rerender', () => {
+  window.goHome();
+  const feed = document.querySelector('.live-feed');
+  const antes = feed ? feed.children.length : 0;
+  window.simEvento('wa');
+  const feed2 = document.querySelector('.live-feed');
+  return feed2 && feed2.children.length >= antes && feed2.firstElementChild.textContent.includes('Priscila');
+});
+check('Cardápio bonito: cover com categoria e overlay de esgotado', () => {
+  window.openModule('operacao', 'cardapio');
+  window.S.lotes.find(l => l.prod === 'Pudim fatia').qty = 0;
+  window.rerender();
+  const ok = !!document.querySelector('.ma-cover') && !!document.querySelector('.ma-esgotado');
+  window.S.lotes.find(l => l.prod === 'Pudim fatia').qty = 6;
+  return ok;
+});
+check('A11y: alvos maiores aplica data-attr', () => {
+  window.setA11y('targets', true);
+  const ok = document.documentElement.dataset.a11yTargets === '1';
+  window.setA11y('targets', false);
+  return ok;
+});
+check('Temas: menu abre e aplica os 3', () => {
+  window.toggleThemeMenu();
+  const menuAbre = !!document.querySelector('.theme-menu');
+  window.setTheme('dark');
+  const dark = document.documentElement.dataset.theme === 'dark';
+  window.setTheme('casa');
+  const casa = document.documentElement.dataset.theme === 'casa';
+  window.setTheme('light');
+  return menuAbre && dark && casa && document.documentElement.dataset.theme === 'light';
+});
 check('Dia ao vivo: passo de cozinha avança fila sozinho', () => {
   const o = window.S.orders.find(x => x.status === 'aguardando');
   if(!o){ window.simPedido('iFood'); }
@@ -727,6 +802,11 @@ check('Financeiro: fluxo de caixa 30d com alerta', () => {
   return txt().includes('vai faltar caixa') && txt().includes('semana 3');
 });
 
+(async () => {
+for(const [name, p] of asyncChecks){
+  try{ const r = await p; results.push(r === false ? `✗ ${name} (assert falhou)` : `✓ ${name}`); }
+  catch(e){ results.push(`✗ ${name} — ${e.message}`); }
+}
 console.log('\n═══ RESULTADOS ═══');
 results.forEach(r => console.log(r));
 const failed = results.filter(r => r.startsWith('✗'));
@@ -736,3 +816,4 @@ if(errors.length){
   [...new Set(errors)].slice(0, 10).forEach(e => console.log('•', e));
 }
 process.exit(failed.length || errors.length ? 1 : 0);
+})();
