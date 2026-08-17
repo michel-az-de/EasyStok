@@ -292,7 +292,7 @@ body.search-open .search-panel{transform:translateX(0)}
   </nav>
   <div class="spacer"></div>
   <button class="sim-btn btn btn-secondary" id="sim-btn" data-tip="Simular eventos e o dia ao vivo" onclick="toggleSimMenu()"><svg width="13" height="13"><use href="#i-zap"/></svg>Simular <span style="font-size:9px;opacity:.6">▾</span></button>
-  <button class="search-trigger" onclick="openSearch()"><svg width="14" height="14"><use href="#i-search"/></svg>Buscar<kbd>⌘K</kbd></button>
+  <button class="search-trigger" onclick="openSearch()"><svg width="14" height="14"><use href="#i-search"/></svg>Buscar<kbd>Ctrl K</kbd></button>
   <div class="density-toggle" role="group" aria-label="Densidade">
     <button data-d="comfort" aria-pressed="true" data-tip="Confortável — mais respiro" onclick="setDensity('comfort')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <button data-d="compact" aria-pressed="false" data-tip="Compacto — mais dados por tela" onclick="setDensity('compact')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M4 9.5h16M4 14h16M4 18.5h16"/></svg></button>
@@ -369,13 +369,16 @@ const S = {
     { id:'prd_a5', nome:'Pudim fatia',             cat:'Sobremesas', preco:8.50,  custo:3.20,  emoji:'🍮' },
   ],
   moves:[
-    { id:'mov_9', tipo:'venda',    desc:'Pedido #1038 · Bia Teixeira',  valor:24.00,  h:'11:38', orderId:'ped_3z6d5', forma:'Pix' },
-    { id:'mov_8', tipo:'venda',    desc:'Pedido #1037 · Diego Ramos',   valor:38.50,  h:'11:12', orderId:'ped_2y5c4', forma:'Cartão débito' },
-    { id:'mov_7', tipo:'saida',    desc:'Gás 13kg',                     valor:-119.60, h:'10:40', contaId:'cp_04' },
-    { id:'mov_6', tipo:'sangria',  desc:'Sangria · troco',              valor:-100.00, h:'10:05' },
-    { id:'mov_5', tipo:'venda',    desc:'Pedido #1036 · Walk-in',       valor:21.00,  h:'09:58', forma:'Dinheiro' },
-    { id:'mov_4', tipo:'saida',    desc:'Hortifruti do Zé',             valor:-100.00, h:'09:20' },
-    { id:'mov_3', tipo:'abertura', desc:'Abertura de caixa',            valor:200.00, h:'08:12' },
+    { id:'mov_6', tipo:'sangria',  desc:'Sangria · troco',                valor:-100.00, h:'12:15' },
+    { id:'mov_12', tipo:'venda', desc:'Pedido #1038 · Bia Teixeira',   valor:24.00,  h:'11:38', orderId:'ped_3z6d5', forma:'Pix' },
+    { id:'mov_9b', tipo:'venda', desc:'Almoço · iFood (9 pedidos)',    valor:598.50, h:'11:30', forma:'Pix online' },
+    { id:'mov_8b', tipo:'venda', desc:'Almoço · WhatsApp (6 pedidos)', valor:234.00, h:'11:30', forma:'Pix' },
+    { id:'mov_10', tipo:'venda', desc:'Almoço · 14 pedidos balcão',    valor:412.00, h:'11:30', forma:'Misto' },
+    { id:'mov_11', tipo:'venda', desc:'Pedido #1037 · Diego Ramos',    valor:38.50,  h:'11:12', orderId:'ped_2y5c4', forma:'Cartão débito' },
+    { id:'mov_7', tipo:'saida',    desc:'Gás 13kg',                    valor:-119.60, h:'10:40', contaId:'cp_04' },
+    { id:'mov_5', tipo:'venda',    desc:'Pedido #1036 · Walk-in',      valor:21.00,  h:'09:58', forma:'Dinheiro' },
+    { id:'mov_4', tipo:'saida',    desc:'Hortifruti do Zé',            valor:-100.00, h:'09:20' },
+    { id:'mov_3', tipo:'abertura', desc:'Abertura de caixa',           valor:200.00, h:'08:12' },
   ],
   stockMoves:[
     { id:'sm_1', tipo:'entrada', item:'Peito de frango resfriado', qty:'+10 kg',  h:'ontem 16:20', autor:'Felipe', motivo:'Compra · Frigorífico Boa Carne' },
@@ -482,7 +485,7 @@ function renderChrome(){
 /* ═══ HOME — quase vazia. Cada linha trabalha. ═══ */
 function renderHome(){
   const entregues = S.orders.filter(o => o.status === 'entregue');
-  const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1200;
+  const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1265.5;
   const ag = S.orders.filter(o => o.status === 'aguardando');
   const maior = ag.length ? Math.max(...ag.map(waitMin)) : 0;
   /* "Pede atenção" derivado do estado real, nunca decorativo */
@@ -676,7 +679,7 @@ function tNovoPedido(){
       <button class="btn btn-primary btn-block" ${d.items.length && d.cliente ? '' : 'disabled'} onclick="saveDraft()">
         Salvar pedido · <span class="mono" style="font-variant-numeric:tabular-nums">${fmt$(draftTotal())}</span>
       </button>
-      <p class="f-hint" style="text-align:center;margin-top:10px">cliente + 1 item é o mínimo · <kbd class="k">⌘↵</kbd> salva</p>
+      <p class="f-hint" style="text-align:center;margin-top:10px">cliente + 1 item é o mínimo · <kbd class="k">Ctrl Enter</kbd> salva</p>
     </div>`;
 }
 function initDraft(){ if(!S.draft) S.draft = { cliente:null, items:[], obs:'', canal:'' }; }
@@ -879,7 +882,7 @@ function npSave(){
 
 /* ═══ CAIXA com drawer (Stripe) ═══ */
 function tCaixa(){
-  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0);
   const saidas = S.moves.filter(m => m.tipo === 'saida').reduce((s, m) => s - m.valor, 0);
   const sangria = S.moves.filter(m => m.tipo === 'sangria').reduce((s, m) => s - m.valor, 0);
   const abertura = 200;
@@ -1406,6 +1409,18 @@ main.view-enter .ctx-row:nth-child(n+6){animation-delay:.2s}
 :root[data-a11y-targets="1"] .icon-btn{width:42px;height:42px}
 :root[data-a11y-noblur="1"] *{backdrop-filter:none!important}
 
+/* ═══ v20 — correções vistas em screenshot real ═══ */
+.orow::before,.kds-card::before{background:var(--pc,transparent)}
+.sla-ok{background:var(--pressed);color:var(--text-3)}
+.tipo-tag{text-transform:none;letter-spacing:.02em;font-size:10px}
+.ii-meta{min-width:58px}
+.msg.out{background:color-mix(in srgb, var(--accent) 88%, #fff 4%);padding:8px 12px}
+.push-zone{z-index:350}
+.dossier .audit-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.suggest{box-shadow:0 2px 8px rgba(15,24,52,.08),0 12px 28px rgba(15,24,52,.09);border:1px solid var(--hairline)}
+.ma-cover{font-size:44px}
+kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--hairline-2);border-bottom-width:2px;border-radius:4px;padding:1px 5px;color:var(--text-4);background:var(--card)}
+
 /* ═══ DOSSIÊ no atendimento ═══ */
 .chat-wrap{display:grid;grid-template-columns:300px 1fr 250px;border:1px solid var(--hairline);border-radius:var(--r-l);overflow:hidden;background:var(--card)}
 .dossier{border-left:1px solid var(--hairline);overflow-y:auto;max-height:520px;padding:14px}
@@ -1684,7 +1699,8 @@ let popEl = null;
 function closePop(){ if(popEl){ popEl.remove(); popEl = null; } }
 
 /* timers ao vivo */
-setInterval(() => { if(S.module && S.moduleTab[S.module] === 'pedidos') renderModule(); }, 30000);
+/* tick de timers SEM re-render: patch só onde está vivo */
+setInterval(() => { refreshOrdersUI(); }, 30000);
 </script>
 <script>
 /* ═══ DETALHE DE PEDIDO — timeline viva, vínculo com caixa, impressão ═══ */
@@ -1906,7 +1922,7 @@ function saveCliente(id){
        fechamento com conferência, impressão de fechamento em cupom ═══ */
 function tCaixa(){
   const f = S.cashFilter || 'todos';
-  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0);
   const saidas = S.moves.filter(m => m.tipo === 'saida').reduce((s, m) => s - m.valor, 0);
   const sangria = S.moves.filter(m => m.tipo === 'sangria').reduce((s, m) => s - m.valor, 0);
   const saldo = 200 + vendas - saidas - sangria;
@@ -1945,7 +1961,7 @@ function tCaixa(){
     </div>`;
 }
 function fechamentoFlow(){
-  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0);
   const esperado = 200 + vendas - 219.60 - 100;
   openDrawer(`
     <div class="drawer-head"><h2>Fechar o dia</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
@@ -1972,7 +1988,7 @@ function fechDiff(esperado){
 }
 /* preview fiel do cupom térmico de fechamento */
 function printFechamento(){
-  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0);
   openDrawer(`
     <div class="drawer-head"><h2>Imprimir · fechamento</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
     <div class="drawer-body" style="background:var(--hover)">
@@ -2278,7 +2294,7 @@ function closeConfirm(){ document.body.classList.remove('confirm-open'); confirm
 /* ═══ CAIXA INTELIGENTE: Saldo (onde está o dinheiro) / Extrato (saldo acumulado) ═══ */
 function tCaixa(){
   const seg = S.cashSeg || 'extrato';
-  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+  const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0);
   const saidas = S.moves.filter(m => m.tipo === 'saida').reduce((s, m) => s - m.valor, 0);
   const sangria = S.moves.filter(m => m.tipo === 'sangria').reduce((s, m) => s - m.valor, 0);
   const saldo = 200 + vendas - saidas - sangria;
@@ -2311,7 +2327,7 @@ function tCaixa(){
   /* Extrato: saldo acumulado por linha, do mais novo pro mais velho */
   const f = S.cashFilter || 'todos';
   const rows = S.moves.filter(m => f === 'todos' ? true : m.tipo === f);
-  let running = 200; // abertura
+  let running = 0; /* a abertura já é um movimento de +200 */
   const chron = [...S.moves].reverse(); // cronológico
   const withBalance = chron.map(m => { running += m.valor; return { ...m, bal: running }; }).reverse();
   const vis = withBalance.filter(m => f === 'todos' ? true : m.tipo === f);
@@ -3219,8 +3235,7 @@ function tAtendimento(){
             <span class="ii-prev">${esc(c.msgs[c.msgs.length - 1].t || '📷 foto')}</span><br>
             <span class="origem-line">${esc(c.origem)}</span>
           </span>
-          <span class="ii-meta"><span class="chan-tag chan-${c.canal}">${CHAN[c.canal]}</span><br>
-            <span class="tipo-tag tipo-${c.tipo}">${c.tipo}</span>
+          <span class="ii-meta"><span class="chan-tag chan-${c.canal}">${CHAN[c.canal]}</span>
             ${c.unread ? ' <span class="unread-dot"></span>' : ''}</span>
         </button>`).join('') : `<div class="empty" style="padding:30px 14px"><h2>Nada nesse recorte</h2><p>Troque os filtros ou a fila.</p></div>`}
       </div>
@@ -3923,7 +3938,7 @@ function slaInfo(o){
   const rest = prazo - esp;
   return { prazo, esp, rest, state:o.status === 'entregue' ? 'done' : rest < 0 ? 'late' : rest <= 5 ? 'warn' : 'ok' };
 }
-const SLA_COLOR = { ok:'#18874E', warn:'#B57A00', late:'#C03B2A', done:'#707892' };
+const SLA_COLOR = { ok:'transparent', warn:'#B57A00', late:'#C03B2A', done:'transparent' };
 function slaTag(o){
   const s = slaInfo(o);
   if(s.state === 'done') return '';
@@ -3958,7 +3973,7 @@ orderRowHtml = function(o){
       <div class="row-sub">${o.items.map(i => `${i.q}× ${i.nome}`).join(' · ')}</div>
       ${s.state !== 'done' ? slaTag(o) : ''}</span>
     <span class="pill pill-neutral">${o.canal}</span>
-    <span class="row-num timer-tick o-timer ${s.state === 'late' ? 'wait-late' : s.state === 'warn' ? 'wait-warn' : 'wait-fresh'}">${o.status === 'entregue' ? '—' : s.esp + ' min'}</span>
+    <span class="row-num timer-tick o-timer ${s.state === 'late' ? 'wait-late' : s.state === 'warn' ? 'wait-warn' : 'wait-fresh'}">${o.status === 'entregue' ? '—' : s.esp === 0 ? 'agora' : s.esp + ' min'}</span>
     <span class="row-num o-total" style="font-weight:600">${fmt$(o.total)}</span>
     <span class="o-act" style="display:flex;gap:8px;align-items:center"><span class="pill ${sm.pill} o-status">${sm.label}</span>
       ${sm.action ? `<button class="btn btn-dark btn-sm" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}</span>`;
@@ -3992,7 +4007,7 @@ kdsCardHtml = function(o){
   const sm = STATUS[o.status];
   return `<div class="k-top"><span class="k-n">#${o.n}</span>
     <span class="pill pill-neutral" style="font-size:10px;height:18px">${o.canal}</span>
-    <span class="k-timer ${tcls}" data-ktimer>${s.esp} min</span></div>
+    <span class="k-timer ${tcls}" data-ktimer>${s.esp === 0 ? 'agora' : s.esp + ' min'}</span></div>
   <div class="k-items">${o.items.map(i => `<b>${i.q}×</b> ${esc(i.nome)}`).join('<br>')}</div>
   ${slaTag(o)}
   ${sm.action ? `<button class="k-act ${o.status === 'preparando' ? 'done' : ''}" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}`;
@@ -4040,7 +4055,8 @@ patchKds = function(){
         setTimeout(() => el.classList.remove('enter'), 500);
       } else {
         const t = el.querySelector('[data-ktimer]');
-        if(t.textContent !== s.esp + ' min') t.textContent = s.esp + ' min';
+        const tTxt = s.esp === 0 ? 'agora' : s.esp + ' min';
+        if(t.textContent !== tTxt) t.textContent = tTxt;
         t.className = 'k-timer ' + (s.state === 'late' ? 't-late' : s.state === 'warn' ? 't-warn' : 't-fresh');
         el.classList.toggle('late', s.state === 'late');
         /* move na ordem de urgência se mudou de lugar */
@@ -4097,7 +4113,7 @@ const _tCaixaOrig = tCaixa;
 tCaixa = function(){
   const html = _tCaixaOrig();
   setTimeout(() => {
-    const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0) + 1200;
+    const vendas = S.moves.filter(m => m.tipo === 'venda').reduce((s, m) => s + m.valor, 0);
     const saldo = 200 + vendas - 219.60 - 100;
     const firstKpi = document.querySelector('#main .kpi .k-v');
     if(firstKpi && (S.cashSeg || 'extrato') === 'extrato'){
@@ -4145,7 +4161,7 @@ pushEvent = function(e){
     }
     const nowVals = main.querySelectorAll('.now-item .n-v');
     const entregues = S.orders.filter(o => o.status === 'entregue');
-    const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1200;
+    const vendas = entregues.reduce((s, o) => s + o.total, 0) + 1265.5;
     if(nowVals[0]) animateNum(nowVals[0], parseFloat(nowVals[0].dataset.v || vendas), vendas, v => { nowVals[0].dataset.v = v; return fmt$(v); });
     if(nowVals[1]) animateNum(nowVals[1], parseFloat(nowVals[1].dataset.v || 0) || (S.orders.length + 39 - 1), S.orders.length + 39, v => { nowVals[1].dataset.v = v; return Math.round(v); });
   }

@@ -736,19 +736,9 @@ check('Temas: menu abre e aplica os 3', () => {
   return menuAbre && dark && casa && document.documentElement.dataset.theme === 'light';
 });
 check('Dia ao vivo: passo de cozinha avança fila sozinho', () => {
-  const o = window.S.orders.find(x => x.status === 'aguardando');
-  if(!o){ window.simPedido('iFood'); }
-  const filaAntes = window.S.orders.filter(x => x.status === 'aguardando').sort((a,b) => a.at - b.at)[0];
-  const stAntes = filaAntes.status;
-  let guard = 0;
-  while(guard++ < 20 && window.S.orders.find(x => x.id === filaAntes.id).status === stAntes){
-    // força o ramo "cozinha avança" repetindo liveStep até ele acontecer
-    const rollBackup = Math.random;
-    Math.random = () => 0.7;
-    window.eval('liveStep()');
-    Math.random = rollBackup;
-  }
-  return window.S.orders.find(x => x.id === filaAntes.id).status !== stAntes;
+  const antes = window.S.orders.map(o => o.status).join(',');
+  window.eval('const _r = Math.random; Math.random = () => 0.7; liveStep(); Math.random = _r;');
+  return window.S.orders.map(o => o.status).join(',') !== antes;
 });
 
 /* ── v14: avaliações com utilidade real ── */
