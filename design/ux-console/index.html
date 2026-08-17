@@ -1313,13 +1313,66 @@ input[type="range"].a-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 :root[data-a11y-links="1"] a{text-decoration:underline}
 
 /* ═══ v18 VIDA ═══ */
-main.view-enter{animation:viewIn .34s cubic-bezier(.32,.72,0,1)}
 @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* animações de entrada da home SÓ na navegação — nunca em rerender de ação */
 .att-block,.ctx-list,.now-item{animation:none!important}
 main.view-enter .att-block{animation:fadeUp .45s var(--ease)!important}
 main.view-enter .ctx-list{animation:fadeUp .5s var(--ease)!important}
 main.view-enter .now-item{animation:fadeUp .4s var(--ease)!important}
+
+/* ═══ v19 DANÇA — motion system único ═══
+   O container NUNCA anima. Os filhos entram em cascata (stagger 34ms),
+   deslizam 6px com fade, numa curva spring só. */
+:root{--spring:cubic-bezier(.22,1,.36,1);--spring-in:cubic-bezier(.32,.72,.24,1)}
+main.view-enter{animation:none!important}
+@keyframes childIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+main.view-enter>*{animation:childIn .42s var(--spring) both}
+main.view-enter>.vt-body>*{animation:childIn .42s var(--spring) both}
+main.view-enter>*:nth-child(2),main.view-enter>.vt-body>*:nth-child(2){animation-delay:.04s}
+main.view-enter>*:nth-child(3),main.view-enter>.vt-body>*:nth-child(3){animation-delay:.08s}
+main.view-enter>*:nth-child(4),main.view-enter>.vt-body>*:nth-child(4){animation-delay:.12s}
+main.view-enter>*:nth-child(5),main.view-enter>.vt-body>*:nth-child(5){animation-delay:.16s}
+main.view-enter>*:nth-child(n+6),main.view-enter>.vt-body>*:nth-child(n+6){animation-delay:.20s}
+/* listas entram em cascata por linha — o efeito "dança" */
+main.view-enter .rows>.row,main.view-enter .kpi,main.view-enter .ctx-row,
+main.view-enter .menu-admin>*,main.view-enter .prod-grid>*,main.view-enter .kds-card{
+  animation:childIn .4s var(--spring) both}
+main.view-enter .rows>.row:nth-child(2){animation-delay:.035s}
+main.view-enter .rows>.row:nth-child(3){animation-delay:.07s}
+main.view-enter .rows>.row:nth-child(4){animation-delay:.105s}
+main.view-enter .rows>.row:nth-child(5){animation-delay:.14s}
+main.view-enter .rows>.row:nth-child(6){animation-delay:.175s}
+main.view-enter .rows>.row:nth-child(7){animation-delay:.21s}
+main.view-enter .rows>.row:nth-child(n+8){animation-delay:.245s}
+main.view-enter .kpi:nth-child(2){animation-delay:.04s}
+main.view-enter .kpi:nth-child(3){animation-delay:.08s}
+main.view-enter .kpi:nth-child(4){animation-delay:.12s}
+main.view-enter .ctx-row:nth-child(2){animation-delay:.04s}
+main.view-enter .ctx-row:nth-child(3){animation-delay:.08s}
+main.view-enter .ctx-row:nth-child(4){animation-delay:.12s}
+main.view-enter .ctx-row:nth-child(5){animation-delay:.16s}
+main.view-enter .ctx-row:nth-child(n+6){animation-delay:.2s}
+/* fila/KDS: entrada desliza da esquerda; saída colapsa o espaço (JS mede) */
+.orow,.kds-card{transition:transform .42s var(--spring),opacity .28s var(--spring)}
+.orow.enter{animation:orowIn .45s var(--spring)}
+@keyframes orowIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+.orow.leave,.kds-card.leave{transition:height .34s var(--spring-in),opacity .24s var(--spring-in),
+  transform .3s var(--spring-in),padding .34s var(--spring-in),margin .34s var(--spring-in);
+  opacity:0;transform:translateX(14px);overflow:hidden;pointer-events:none}
+.kds-card.enter{animation:orowIn .45s var(--spring)}
+.kds-card.moved{animation:cardLand .5s var(--spring)}
+/* pushes e overlays na mesma spring */
+.push{animation:pushIn .42s var(--spring)}
+@keyframes pushIn{from{opacity:0;transform:translateY(-10px) scale(.97)}to{opacity:1;transform:none}}
+.push.leaving{transition:opacity .22s var(--spring-in),transform .22s var(--spring-in)}
+.peek{transition:transform .3s var(--spring)}
+.confirm{transition:transform .26s var(--spring)}
+.drawer,.search-panel,.ev-panel{transition:transform .32s var(--spring)}
+/* pulsares suavizados */
+@keyframes latePulse{0%,100%{box-shadow:0 0 0 0 rgba(224,91,75,.22)}50%{box-shadow:0 0 0 4px rgba(224,91,75,0)}}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 rgba(192,59,42,.25)}50%{box-shadow:0 0 0 4px rgba(192,59,42,0)}}
+/* respeito absoluto ao reduzir movimento */
+:root[data-a11y-motion="1"] *{animation:none!important;transition:none!important}
 .orow{position:relative}
 .orow::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--pc,var(--ok));opacity:.9}
 .kds-card{position:relative;overflow:hidden}
@@ -3732,7 +3785,7 @@ function patchKds(){
       }
     });
     list.querySelectorAll('[data-oid]').forEach(el => {
-      if(!seen.has(el.dataset.oid)){ el.classList.add('leave'); setTimeout(() => el.remove(), 300); }
+      if(!seen.has(el.dataset.oid) && !el.classList.contains('leave')) collapseRemove(el, 300);
     });
     if(!orders.length && !list.querySelector('.kds-empty')){
       list.innerHTML = '<div class="kds-empty">nada aqui</div>';
@@ -3997,7 +4050,7 @@ patchKds = function(){
       el.style.setProperty('--pc', SLA_COLOR[s.state]);
     });
     list.querySelectorAll('[data-oid]').forEach(el => {
-      if(!seen.has(el.dataset.oid)){ el.classList.add('leave'); setTimeout(() => el.remove(), 300); }
+      if(!seen.has(el.dataset.oid) && !el.classList.contains('leave')) collapseRemove(el, 300);
     });
     if(!orders.length && !list.querySelector('.kds-empty')) list.innerHTML = '<div class="kds-empty">nada aqui — arraste pra cá</div>';
     else if(orders.length) list.querySelector('.kds-empty')?.remove();
@@ -4167,4 +4220,146 @@ openA11y = function(){
     </div>`);
 };
 applyA11y();
+</script>
+<script>
+/* ═══ v19 — FLIP real + saída que colapsa o espaço (a "dança") ═══ */
+function flipSiblings(container, mutate){
+  const before = new Map();
+  [...container.children].forEach(el => { if(el.dataset.oid) before.set(el.dataset.oid, el.getBoundingClientRect().top); });
+  mutate();
+  [...container.children].forEach(el => {
+    const id = el.dataset.oid;
+    if(!id || !before.has(id)) return;
+    const d = before.get(id) - el.getBoundingClientRect().top;
+    if(Math.abs(d) > 1){
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${d}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform .42s cubic-bezier(.22,1,.36,1)';
+        el.style.transform = '';
+      });
+    }
+  });
+}
+function collapseRemove(el, delay = 300){
+  el.style.height = el.offsetHeight + 'px';
+  el.classList.add('leave');
+  el.getBoundingClientRect(); /* reflow */
+  requestAnimationFrame(() => {
+    el.style.height = '0px';
+    el.style.paddingTop = '0'; el.style.paddingBottom = '0';
+    el.style.marginTop = '0'; el.style.marginBottom = '0';
+    el.style.borderBottom = '0';
+  });
+  setTimeout(() => el.remove(), delay + 60);
+}
+
+/* fila: patch com FLIP na reordenação e colapso na saída */
+patchOrderList = function(container, orders){
+  const seen = new Set(orders.map(o => o.id));
+  /* 1. saídas colapsam o espaço — as outras linhas sobem suavemente */
+  container.querySelectorAll('[data-oid]').forEach(el => {
+    if(!seen.has(el.dataset.oid) && !el.classList.contains('leave')) collapseRemove(el, 320);
+  });
+  /* 2. entradas e atualizações */
+  orders.forEach(o => {
+    let el = container.querySelector(`[data-oid="${o.id}"]`);
+    if(!el){
+      el = document.createElement('div');
+      el.className = 'row orow enter';
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.dataset.oid = o.id;
+      el.style.cssText = 'grid-template-columns:auto auto 1fr auto auto auto auto';
+      el.onclick = () => openDetail('pedido', o.id);
+      el.onkeydown = ev => { if(ev.key === 'Enter') openDetail('pedido', o.id); };
+      el.innerHTML = orderRowHtml(o);
+      el.style.setProperty('--pc', SLA_COLOR[slaInfo(o).state]);
+      container.appendChild(el);
+      setTimeout(() => el.classList.remove('enter'), 500);
+    } else {
+      const s = slaInfo(o);
+      el.style.setProperty('--pc', SLA_COLOR[s.state]);
+      const t = el.querySelector('.o-timer');
+      const newTxt = o.status === 'entregue' ? '—' : s.esp + ' min';
+      if(t.textContent !== newTxt) t.textContent = newTxt;
+      t.className = 'row-num timer-tick o-timer ' + (s.state === 'late' ? 'wait-late' : s.state === 'warn' ? 'wait-warn' : s.state === 'done' ? '' : 'wait-fresh');
+      const st = el.querySelector('.o-status');
+      if(st.textContent !== STATUS[o.status].label){
+        st.textContent = STATUS[o.status].label;
+        st.className = 'pill o-status ' + STATUS[o.status].pill;
+      }
+      const act = el.querySelector('.o-act .btn');
+      const want = STATUS[o.status].action || '';
+      if(act && !want) act.remove();
+      if(!act && want){
+        const b = document.createElement('button');
+        b.className = 'btn btn-dark btn-sm';
+        b.textContent = want;
+        b.onclick = ev => { ev.stopPropagation(); advance(o.id); };
+        el.querySelector('.o-act').appendChild(b);
+      } else if(act && act.textContent !== want){ act.textContent = want; act.onclick = ev => { ev.stopPropagation(); advance(o.id); }; }
+    }
+  });
+  /* 3. reordenação com FLIP: cada linha desliza pro lugar novo */
+  flipSiblings(container, () => {
+    orders.forEach(o => {
+      const el = container.querySelector(`[data-oid="${o.id}"]`);
+      if(el) container.appendChild(el); /* reanexa na ordem de urgência */
+    });
+    /* appendChild joga tudo pro fim na ordem certa; mas mantém .leave por último */
+  });
+};
+
+/* KDS: movimento entre colunas com FLIP cross-container */
+function flipMoveCard(card, targetList){
+  const first = card.getBoundingClientRect();
+  targetList.appendChild(card);
+  const last = card.getBoundingClientRect();
+  const dx = first.left - last.left, dy = first.top - last.top;
+  card.style.transition = 'none';
+  card.style.transform = `translate(${dx}px, ${dy}px)`;
+  card.classList.add('moved');
+  requestAnimationFrame(() => {
+    card.style.transition = 'transform .45s cubic-bezier(.22,1,.36,1)';
+    card.style.transform = '';
+    setTimeout(() => { card.style.transition = ''; card.classList.remove('moved'); }, 500);
+  });
+}
+const _moveOrderToOrig = moveOrderTo;
+moveOrderTo = function(id, st){
+  const o = S.orders.find(x => x.id === id);
+  if(!o || o.status === st) return;
+  const from = o.status;
+  const card = document.querySelector(`[data-klist="${from}"] [data-oid="${id}"]`);
+  const target = document.querySelector(`[data-klist="${st}"]`);
+  o.status = st; o.at = Date.now();
+  if(st === 'entregue') S.moves.unshift({ id:'mov_' + Math.random().toString(36).slice(2, 6), tipo:'venda', desc:`Pedido #${o.n} · ${o.cliente}`, valor:o.total, h:'agora', orderId:o.id, forma:o.pag });
+  audit(`arrastou #${o.n} de ${from} pra ${st} no KDS`);
+  if(card && target){
+    /* atualiza o conteúdo do card pro novo status e desliza entre colunas */
+    card.innerHTML = kdsCardHtml(o);
+    card.style.setProperty('--pc', SLA_COLOR[slaInfo(o).state]);
+    card.classList.toggle('late', slaInfo(o).state === 'late');
+    flipMoveCard(card, target);
+    const count = document.querySelector(`[data-kn="${from}"]`);
+    const count2 = document.querySelector(`[data-kn="${st}"]`);
+    if(count) count.textContent = S.orders.filter(x => x.status === from).length;
+    if(count2) count2.textContent = S.orders.filter(x => x.status === st).length;
+  } else {
+    patchKds();
+  }
+  push({ title:`#${o.n} → ${STATUS[st].label}`, sub:'arrastado no KDS', icon:'🍳' });
+};
+/* advance dentro do KDS também desliza entre colunas */
+const _advanceV17 = advance;
+advance = function(id){
+  const o = S.orders.find(x => x.id === id);
+  if(!o) return;
+  const next = STATUS[o.status].next;
+  if(!next) return;
+  const onKds = S.module === 'operacao' && S.moduleTab['operacao'] === 'kds' && document.querySelector(`[data-oid="${id}"]`);
+  if(onKds){ moveOrderTo(id, next); return; }
+  _advanceV17(id);
+};
 </script>
