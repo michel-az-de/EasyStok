@@ -1573,6 +1573,22 @@ body{letter-spacing:-.006em}
 .t-fresh{background:rgba(79,191,159,.16);color:#7FD8BC}
 .t-warn{background:rgba(240,184,74,.16);color:#F5CB7C}
 .t-late{background:rgba(224,91,75,.2);color:#F0927F}
+
+/* ═══ v21 KDS PDV ═══ */
+.k-brand{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 6px;border-radius:8px;
+  font-size:10.5px;font-weight:800;color:#fff;letter-spacing:.02em}
+.k-num-big{font-size:22px;font-weight:800;color:#F7F2E8;letter-spacing:-.02em}
+.k-who{font-size:13px;font-weight:600;color:#E8DEC9;margin-top:2px}
+.kds-card .k-top{display:flex;align-items:center;gap:8px}
+.kds-card .k-timer{margin-left:auto}
+/* ═══ v21 dataGrid ═══ */
+.dg-foot{display:flex;align-items:center;gap:10px;padding:10px 2px;font-size:12px;color:var(--text-3)}
+.dg-foot .dg-pages{display:flex;gap:4px;margin-left:auto}
+.dg-page{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--text-3)}
+.dg-page:hover{background:var(--hover)}
+.dg-page.on{background:var(--text);color:var(--page)}
+.dg-search{height:32px;padding:0 12px;border:1px solid var(--hairline-2);border-radius:var(--r-pill);background:var(--card);font:inherit;font-size:12.5px;width:220px}
+.dg-search:focus{border-color:var(--accent)}
 </style>
 <script>
 /* ═══ DRAWER ═══ */
@@ -2210,7 +2226,7 @@ function peekContent(kind, id){
             <span class="dr-v" style="${low ? 'color:var(--crit)' : ''}">${String(r.q).replace('.', ',')} ${r.un}/un ${low ? '· repor' : ''}</span>
           </div>`; }).join('')}` : ''}
       <div class="dr-row"><span class="dr-k">Identificador</span><span class="dr-v">${idChip(p.id)}</span></div>`,
-      `<button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="toast('Abriria edição de produto')">Editar</button>
+      `<button class="btn btn-secondary" style="flex:1;justify-content:center" onclick="editarProduto('${p.id}')">Editar</button>
        <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="closePeek();openModule('estoque','producao')">Produzir</button>`);
   }
   if(kind === 'insumo'){
@@ -2301,7 +2317,7 @@ function tCaixa(){
   const segs = `<div class="chips-row" style="margin:0 0 18px">
     ${[['extrato','Extrato'],['saldo','Saldo']].map(([k, l]) => `<button class="chip ${seg === k ? 'on' : ''}" onclick="S.cashSeg='${k}';rerender()">${l}</button>`).join('')}
     <span style="flex:1"></span>
-    <button class="btn btn-secondary btn-sm" onclick="toast('Abriria lançamento manual')">${ico('plus', 12)} Lançamento</button>
+    <button class="btn btn-secondary btn-sm" onclick="novoLancamento()">${ico('plus', 12)} Lançamento</button>
     <button class="btn btn-secondary btn-sm" data-tip="Imprime o resumo do dia na térmica" onclick="printFechamento()">${ico('print', 13)} Imprimir</button>
     <button class="btn btn-dark btn-sm" onclick="fechamentoFlow()">Fechar o dia</button>
   </div>`;
@@ -2883,7 +2899,7 @@ function tReconciliacao(){
 }
 function tFaturas(){
   return `<p class="tab-note">Cobranças emitidas por link Mercado Pago ou Pix recorrente. Paga cai no caixa sozinha.</p>
-    <div style="margin-bottom:14px"><button class="btn btn-primary btn-sm" onclick="toast('Abriria nova cobrança: valor, descrição, link MP')">${ico('plus', 12)} Nova cobrança</button></div>
+    <div style="margin-bottom:14px"><button class="btn btn-primary btn-sm" onclick="novaCobranca()">${ico('plus', 12)} Nova cobrança</button></div>
     <div class="rows">
       ${S.faturas.map(f => `<div class="row" style="grid-template-columns:1fr auto auto auto">
         <span><span class="row-main">${esc(f.desc)}</span><div class="row-sub">${f.metodo} · criada ${f.criada} · vence ${f.venc}</div></span>
@@ -3907,6 +3923,7 @@ const _rhOrig = renderHome;
 renderModule = function(){
   const anim = !!S._navAnim; S._navAnim = false;
   _rmV15.apply(this, arguments);
+  if(S.module === 'operacao' && S.moduleTab['operacao'] === 'kds' && !S.detail) patchKds();
   if(anim){
     main.classList.add('view-enter');
     setTimeout(() => main.classList.remove('view-enter'), 500);
@@ -3923,11 +3940,12 @@ renderHome = function(){
 function markNav(orig){
   return function(){ S._navAnim = true; return orig.apply(this, arguments); };
 }
+/* animação de entrada SÓ muda de contexto (home↔módulo↔módulo).
+   Trocar de tab ou abrir/fechar detalhe = instantâneo, sem onda. */
 openModule = markNav(openModule);
 goHome = markNav(goHome);
-setModuleTab = markNav(setModuleTab);
 openDetail = markNav(openDetail);
-closeDetail = markNav(closeDetail);
+/* setModuleTab e closeDetail ficam instantâneos de propósito */
 </script>
 <script>
 /* ═══ v18.2 — SLA POR CANAL + PRIORIDADE QUE O OLHO ACOMPANHA ═══ */
@@ -4377,5 +4395,357 @@ advance = function(id){
   const onKds = S.module === 'operacao' && S.moduleTab['operacao'] === 'kds' && document.querySelector(`[data-oid="${id}"]`);
   if(onKds){ moveOrderTo(id, next); return; }
   _advanceV17(id);
+};
+</script>
+<script>
+/* ═══ v21.1 — KDS ESTILO PDV DE FASTFOOD ═══
+   Número gigante, nome com frase amigável, badge de marca do canal,
+   "preparando agora" em destaque. Legível a 3 metros, sem piscar. */
+const CANAL_BRAND = {
+  'iFood':    { sigla:'iF', cor:'#EA1D2C' },
+  'Keeta':    { sigla:'K',  cor:'#6B2D9B' },
+  '99Food':   { sigla:'99', cor:'#FFCD00', texto:'#111' },
+  'WhatsApp': { sigla:'WA', cor:'#128C4B' },
+  'Balcão':   { sigla:'BA', cor:'#4A5470' },
+};
+kdsCardHtml = function(o){
+  const s = slaInfo(o);
+  const sm = STATUS[o.status];
+  const brand = CANAL_BRAND[o.canal] || CANAL_BRAND['Balcão'];
+  const tcls = s.state === 'late' ? 't-late' : s.state === 'warn' ? 't-warn' : 't-fresh';
+  const primeiro = o.cliente.split(' ')[0];
+  return `<div class="k-top">
+      <span class="k-brand" style="background:${brand.cor};${brand.texto ? 'color:' + brand.texto : ''}">${brand.sigla}</span>
+      <span class="k-num-big">#${o.n}</span>
+      <span class="k-timer ${tcls}" data-ktimer>${s.esp === 0 ? 'agora' : s.esp + ' min'}</span>
+    </div>
+    <div class="k-who">Pedido d${primeiro.endsWith('a') ? 'a' : 'o'} ${esc(primeiro)}</div>
+    <div class="k-items">${o.items.map(i => `<b>${i.q}×</b> ${esc(i.nome)}`).join('<br>')}</div>
+    ${slaTag(o)}
+    ${sm.action ? `<button class="k-act ${o.status === 'preparando' ? 'done' : ''}" onclick="event.stopPropagation();advance('${o.id}')">${sm.action}</button>` : ''}`;
+};
+/* patchKds já faz patch por coluna — mantido. Só garante a ordem por urgência. */
+
+/* ═══ v21.2 — PUSH SEM PISCAR: nunca em cima do que você faz ═══ */
+const _pushBase = push;
+push = function(opts){
+  const overlayAberto = ['peek-open','confirm-open','drawer-open','search-open','ev-open'].some(c => document.body.classList.contains(c));
+  if(overlayAberto) return () => {}; /* vai só pro sino, sem interromper */
+  return _pushBase(opts);
+};
+
+/* ═══ v21.3 — PERSISTÊNCIA LOCAL de verdade ═══ */
+const UI_KEY = 'es-ui';
+function saveUI(){
+  try{ localStorage.setItem(UI_KEY, JSON.stringify({ tabs:S.moduleTab, orderTab:S.orderTab, crmSeg:S.crmSeg, cashSeg:S.cashSeg, attFilter:S.attFilter })); }catch(e){}
+}
+try{
+  const ui = JSON.parse(localStorage.getItem(UI_KEY) || 'null');
+  if(ui){
+    if(ui.tabs) S.moduleTab = ui.tabs;
+    if(ui.orderTab) S.orderTab = ui.orderTab;
+    if(ui.crmSeg) S.crmSeg = ui.crmSeg;
+    if(ui.cashSeg) S.cashSeg = ui.cashSeg;
+    if(ui.attFilter) S.attFilter = ui.attFilter;
+  }
+}catch(e){}
+function wrapSave(fn){
+  return function(){ const r = fn.apply(this, arguments); saveUI(); return r; };
+}
+openModule = wrapSave(openModule);
+goHome = wrapSave(goHome);
+setModuleTab = wrapSave(setModuleTab);
+openDetail = wrapSave(openDetail);
+closeDetail = wrapSave(closeDetail);
+</script>
+<script>
+/* ═══ v21.4 — TELAS REAIS pros botões que só davam toast ═══ */
+
+/* Nova cobrança (Financeiro > Faturas) */
+function novaCobranca(){
+  openDrawer(`
+    <div class="drawer-head"><h2>Nova cobrança</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="f-field"><label class="f-label">Cliente</label>
+        <select class="f-input" id="nc-cli">${S.clientes.map(c => `<option>${esc(c.nome)}</option>`).join('')}</select></div>
+      <div class="f-field"><label class="f-label">Descrição</label>
+        <input class="f-input" id="nc-desc" placeholder="ex: Encomenda 50 doces + 2 bolos"></div>
+      <div class="f-grid2">
+        <div class="f-field"><label class="f-label">Valor (R$) *</label>
+          <input class="f-input mono" id="nc-valor" type="number" min="0" step="0.01" placeholder="0,00"></div>
+        <div class="f-field"><label class="f-label">Vencimento</label>
+          <input class="f-input" id="nc-venc" type="date"></div>
+      </div>
+      <div class="f-field"><label class="f-label">Método</label>
+        <div class="chips-row" id="nc-met">${['Link Mercado Pago','Pix recorrente','Dinheiro'].map((m, i) =>
+          `<button class="chip ${i === 0 ? 'on' : ''}" onclick="document.querySelectorAll('#nc-met .chip').forEach(x=>x.classList.remove('on'));this.classList.add('on')">${m}</button>`).join('')}</div>
+        <p class="f-hint">O link vai pronto no WhatsApp do cliente. Quando pagar, cai no caixa sozinho.</p></div>
+      <button class="btn btn-primary btn-block" onclick="saveCobranca()">Emitir cobrança</button>
+    </div>`);
+}
+function saveCobranca(){
+  const valor = parseFloat(document.getElementById('nc-valor').value);
+  const desc = document.getElementById('nc-desc').value.trim();
+  if(!valor || !desc){ push({ title:'Descrição e valor são o mínimo', icon:'⚠️', tint:'var(--warn)' }); return; }
+  S.faturas.unshift({ id:'fat_' + Math.random().toString(36).slice(2, 5), desc:desc + ' · ' + document.getElementById('nc-cli').value,
+    valor, metodo:document.querySelector('#nc-met .chip.on').textContent, status:'pendente', criada:'agora', venc:document.getElementById('nc-venc').value || '7 dias' });
+  closeDrawer();
+  audit(`emitiu cobrança de ${fmt$(valor)} (${desc})`);
+  push({ title:'Cobrança emitida', sub:fmt$(valor) + ' · link pronto pra enviar', icon:'💳' });
+  if(S.module === 'financeiro') rerender();
+}
+
+/* Venda avulsa / lançamento manual (Caixa > Lançamento) */
+function novoLancamento(){
+  openDrawer(`
+    <div class="drawer-head"><h2>Lançamento no caixa</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="f-field"><label class="f-label">Tipo</label>
+        <div class="chips-row" id="nl-tipo">${[['venda','Venda avulsa'],['saida','Saída'],['sangria','Sangria']].map(([k, l], i) =>
+          `<button class="chip ${i === 0 ? 'on' : ''}" data-k="${k}" onclick="document.querySelectorAll('#nl-tipo .chip').forEach(x=>x.classList.remove('on'));this.classList.add('on')">${l}</button>`).join('')}</div></div>
+      <div class="f-field"><label class="f-label">Descrição</label>
+        <input class="f-input" id="nl-desc" placeholder="ex: Venda direta vizinha do 42"></div>
+      <div class="f-grid2">
+        <div class="f-field"><label class="f-label">Valor (R$) *</label>
+          <input class="f-input mono" id="nl-valor" type="number" min="0" step="0.01" placeholder="0,00"></div>
+        <div class="f-field"><label class="f-label">Canal</label>
+          <select class="f-input" id="nl-canal"><option>Balcão</option><option>iFood</option><option>99Food</option><option>Keeta</option><option>WhatsApp</option></select></div>
+      </div>
+      <p class="f-hint">Venda avulsa entra no extrato e sobe no saldo na hora — sem passar pela fila.</p>
+      <button class="btn btn-primary btn-block" onclick="saveLancamento()">Lançar</button>
+    </div>`);
+}
+function saveLancamento(){
+  const tipo = document.querySelector('#nl-tipo .chip.on').dataset.k;
+  const valor = parseFloat(document.getElementById('nl-valor').value);
+  const desc = document.getElementById('nl-desc').value.trim() || document.getElementById('nl-canal').value;
+  if(!valor){ push({ title:'Informe o valor', icon:'⚠️', tint:'var(--warn)' }); return; }
+  S.moves.unshift({ id:'mov_' + Math.random().toString(36).slice(2, 5), tipo, desc:tipo === 'venda' ? desc + ' · ' + document.getElementById('nl-canal').value : desc,
+    valor:tipo === 'venda' ? valor : -valor, h:'agora', forma:'Manual' });
+  closeDrawer();
+  audit(`lançou ${tipo} de ${fmt$(valor)} no caixa`);
+  push({ title:tipo === 'venda' ? 'Venda lançada' : 'Lançamento feito', sub:fmt$(valor) + ' · já no extrato', icon:'🧾' });
+  if(S.moduleTab['operacao'] === 'caixa') rerender();
+}
+
+/* Novo cliente (CRM) */
+function novoCliente(){
+  openDrawer(`
+    <div class="drawer-head"><h2>Novo cliente</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="f-field"><label class="f-label">Nome *</label><input class="f-input" id="ncl-nome" placeholder="Nome completo"></div>
+      <div class="f-field"><label class="f-label">Telefone / WhatsApp</label><input class="f-input mono" id="ncl-tel" inputmode="numeric" placeholder="(11) 90000-0000" oninput="ecTel(this)"></div>
+      <div class="f-field"><label class="f-label">Como chegou</label>
+        <div class="chips-row" id="ncl-orig">${['Instagram','iFood','WhatsApp','Indicação','Passou na frente'].map((m, i) =>
+          `<button class="chip ${i === 0 ? 'on' : ''}" onclick="document.querySelectorAll('#ncl-orig .chip').forEach(x=>x.classList.remove('on'));this.classList.add('on')">${m}</button>`).join('')}</div></div>
+      <button class="btn btn-primary btn-block" onclick="saveClienteNovo()">Cadastrar</button>
+    </div>`);
+}
+function saveClienteNovo(){
+  const nome = document.getElementById('ncl-nome').value.trim();
+  if(!nome){ push({ title:'Nome é o mínimo', icon:'⚠️', tint:'var(--warn)' }); return; }
+  S.clientes.unshift({ id:'cli_' + Math.random().toString(36).slice(2, 5), nome, tel:document.getElementById('ncl-tel').value, pedidos:0, fav:'—', total:0 });
+  closeDrawer();
+  audit(`cadastrou o cliente ${nome}`);
+  push({ title:nome + ' cadastrad' + (nome.endsWith('a') ? 'a' : 'o'), icon:'👤' });
+  rerender();
+}
+
+/* Novo usuário + Editar produto */
+function novoUsuario(){
+  openDrawer(`
+    <div class="drawer-head"><h2>Convidar usuário</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="f-field"><label class="f-label">Nome *</label><input class="f-input" id="nu-nome" placeholder="Quem vai operar"></div>
+      <div class="f-field"><label class="f-label">Papel</label>
+        <div class="chips-row" id="nu-papel">${[['Operador','pedidos, produção e caixa'],['Gerente','tudo + financeiro'],['Entrega','só rotas de entrega']].map(([k, d], i) =>
+          `<button class="chip ${i === 0 ? 'on' : ''}" data-k="${k}" data-tip="${d}" onclick="document.querySelectorAll('#nu-papel .chip').forEach(x=>x.classList.remove('on'));this.classList.add('on')">${k}</button>`).join('')}</div>
+        <p class="f-hint">Papel define o que a pessoa vê e pode fazer.</p></div>
+      <div class="f-field"><label class="f-label">PIN de acesso (4 dígitos)</label><input class="f-input mono" id="nu-pin" inputmode="numeric" maxlength="4" placeholder="0000"></div>
+      <button class="btn btn-primary btn-block" onclick="saveUsuario()">Enviar convite</button>
+    </div>`);
+}
+function saveUsuario(){
+  const nome = document.getElementById('nu-nome').value.trim();
+  if(!nome){ push({ title:'Nome é o mínimo', icon:'⚠️', tint:'var(--warn)' }); return; }
+  S.usuarios.unshift({ id:'usr_' + Math.random().toString(36).slice(2, 5), nome, papel:document.querySelector('#nu-papel .chip.on').dataset.k, acesso:'nunca', ativo:true });
+  closeDrawer();
+  audit(`convidou ${nome} como ${S.usuarios[0].papel}`);
+  push({ title:'Convite enviado pra ' + nome, icon:'👥' });
+  rerender();
+}
+function editarProduto(id){
+  const p = S.produtos.find(x => x.id === id);
+  openDrawer(`
+    <div class="drawer-head"><h2>Editar produto</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
+    <div class="drawer-body">
+      <div class="f-field"><label class="f-label">Nome</label><input class="f-input" id="ep-nome" value="${esc(p.nome)}"></div>
+      <div class="f-grid2">
+        <div class="f-field"><label class="f-label">Preço</label><input class="f-input mono" id="ep-preco" type="number" step="0.01" value="${p.preco}" oninput="epMargem(${p.custo})"></div>
+        <div class="f-field"><label class="f-label">Custo</label><input class="f-input mono" id="ep-custo" type="number" step="0.01" value="${p.custo}" oninput="epMargem()"></div>
+      </div>
+      <div id="ep-margem"></div>
+      <button class="btn btn-primary btn-block" onclick="saveProduto('${id}')">Salvar produto</button>
+    </div>`);
+  epMargem();
+}
+function epMargem(){
+  const p = parseFloat(document.getElementById('ep-preco').value);
+  const c = parseFloat(document.getElementById('ep-custo').value);
+  const box = document.getElementById('ep-margem');
+  if(p > 0 && !isNaN(c)){
+    const mg = (p - c) / p * 100;
+    box.innerHTML = `<div style="padding:11px 2px;margin-bottom:12px;border-top:1px solid var(--hairline)">
+      <span class="mono" style="font-size:20px;font-weight:600;color:${mg >= 55 ? 'var(--ok)' : mg >= 35 ? 'var(--warn)' : 'var(--crit)'}">${mg.toFixed(0)}%</span>
+      <span style="font-size:13px;color:var(--text-3)"> de margem · ${fmt$(p - c)}/un</span></div>`;
+  }
+}
+function saveProduto(id){
+  const p = S.produtos.find(x => x.id === id);
+  p.nome = document.getElementById('ep-nome').value.trim() || p.nome;
+  p.preco = parseFloat(document.getElementById('ep-preco').value) || p.preco;
+  p.custo = parseFloat(document.getElementById('ep-custo').value) || 0;
+  closeDrawer();
+  audit(`editou o produto ${p.nome}`);
+  push({ title:p.nome + ' atualizado', icon:'📦' });
+  closePeek();
+  rerender();
+}
+</script>
+<script>
+/* ═══ v21.5 — GESTÃO completa: Usuários + Config no padrão das referências ═══ */
+S.usuarios = S.usuarios || [
+  { id:'usr_1', nome:'Felipe Azevedo', papel:'Admin',    acesso:'agora',     ativo:true },
+  { id:'usr_2', nome:'Thati',          papel:'Gerente',  acesso:'há 20 min', ativo:true },
+  { id:'usr_3', nome:'Dona Cida',      papel:'Operador', acesso:'há 2 h',    ativo:true },
+];
+MODULES.find(m => m.id === 'gestao').tabs = [['dashboard','Dashboard'],['relatorios','Relatórios'],['integracoes','Integrações'],['usuarios','Usuários'],['config','Configurações'],['analises','Análises']];
+TABS['usuarios'] = () => tUsuariosV2();
+TABS['config'] = () => tConfigHub();
+function tUsuariosV2(){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <p class="tab-note" style="margin:0">Quem opera o sistema e com qual papel.</p>
+      <button class="btn btn-primary btn-sm" onclick="novoUsuario()">${ico('plus', 12)} Convidar</button>
+    </div>
+    <div class="rows">
+      ${S.usuarios.map(u => `<div class="row" style="grid-template-columns:auto 1fr auto auto">
+        <span class="avatar-sm" style="background:${avatarColorOf(u.nome)}">${u.nome.split(' ').map(p => p[0]).slice(0, 2).join('')}</span>
+        <span><span class="row-main">${esc(u.nome)}</span><div class="row-sub">último acesso: ${u.acesso}</div></span>
+        <span class="pill ${u.papel === 'Admin' ? 'pill-vio' : u.papel === 'Gerente' ? 'pill-info' : 'pill-neutral'}">${u.papel}</span>
+        <span class="pill ${u.ativo ? 'pill-ok' : 'pill-neutral'}">${u.ativo ? 'ativo' : 'inativo'}</span>
+      </div>`).join('')}
+    </div>`;
+}
+function tConfigHub(){
+  const grp = (label, cards) => `<div class="section" style="margin-top:22px"><span class="eyebrow">${label}</span>
+    <div class="hub-grid">${cards.join('')}</div></div>`;
+  const c = (icon, t, d, fn) => `<button class="hub-card" onclick="${fn}"><span class="hc-icon">${ico(icon, 16)}</span><span><span class="hc-title">${t}</span><span class="hc-desc">${d}</span></span></button>`;
+  return `<p class="tab-note">Tudo que se configura, agrupado por escopo — cada cartão diz o que você resolve ali.</p>` +
+    grp('Pessoal', [
+      c('users','Perfil e acesso','Seus dados, senha, PIN e sessões nos dispositivos.','toast(\'Perfil\')'),
+      c('bell','Notificações','O que te interrompe e por qual canal.','openModule(\'clientes\',\'alertas\')')]) +
+    grp('Da empresa', [
+      c('home','Empresa e lojas','Razão social, CNPJ, endereços e lojas.','toast(\'Empresa\')'),
+      c('users','Usuários e permissões','Convites e papéis da equipe.','setModuleTab(\'usuarios\')'),
+      c('money','Assinatura EasyStok','Plano, faturas e forma de pagamento.','toast(\'Assinatura\')')]) +
+    grp('Da operação', [
+      c('print','Impressão e etiquetas','Cupom 80mm, etiqueta de lote, logo e cópias.','toast(\'Impressão\')'),
+      c('book','Cardápio digital e site','Link público, fotos e disponibilidade.','openModule(\'operacao\',\'cardapio\')'),
+      c('zap','Integrações','Mercado Pago, iFood, 99Food, Keeta, WhatsApp, Instagram.','setModuleTab(\'integracoes\')'),
+      c('file','Fiscal','Emitente NFC-e, certificado e série.','toast(\'Fiscal\')')]);
+}
+
+/* ═══ v21.6 — CRM com Novo cliente ═══ */
+const _tCrmOrig = tCrmClientes;
+tCrmClientes = function(){
+  const html = _tCrmOrig();
+  return html.replace('<div class="rows">',
+    `<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-primary btn-sm" onclick="novoCliente()">${ico('plus', 12)} Novo cliente</button></div><div class="rows">`);
+};
+
+/* ═══ v21.7 — Cardápio com estoque E vendas por item ═══ */
+function vendasHoje(nomeProd){
+  let n = 0;
+  S.orders.forEach(o => o.items.forEach(i => { if(i.nome === nomeProd) n += i.q; }));
+  return n + (nomeProd.includes('frango') ? 9 : nomeProd.includes('carne') ? 6 : 2); /* base do dia */
+}
+const _tCardapioV18 = tCardapioAdmin;
+tCardapioAdmin = function(){
+  return _tCardapioV18().replace(/<div class="ma-stock">(.*?)<\/div>/g, (m, inner) => {
+    const nome = m.match(/data-prod="([^"]+)"/);
+    return m; /* placeholder: enriquecido abaixo */
+  });
+};
+/* reescrevo direto com a info que faltava */
+tCardapioAdmin = function(){
+  const catColor = { 'Marmitas':'#E85814', 'Sobremesas':'#8A5A00', 'Bebidas':'#15388A' };
+  return `<p class="tab-note">Cada item com estoque do lote e vendas de hoje — o cardápio conversa com produção e pedidos.</p>
+    <div class="menu-admin">
+      ${S.cardapio.map(m => { const lote = S.lotes.find(l => l.prod === m.nome);
+        const rest = lote ? lote.qty : null;
+        const esgotado = rest === 0;
+        const prod = S.produtos.find(p => p.nome === m.nome);
+        const mg = prod ? Math.round((prod.preco - prod.custo) / prod.preco * 100) : null;
+        const vend = vendasHoje(m.nome);
+        return `<div class="ma-card ${esgotado ? 'esgotado' : ''}" style="--mc:${catColor[m.cat] || '#E85814'}">
+          <div class="ma-cover">${m.emoji}
+            ${esgotado ? '<div class="ma-esgotado">esgotado</div>' : ''}
+            ${mg !== null ? `<span class="pill ${mg >= 55 ? 'pill-ok' : 'pill-warn'}" style="position:absolute;top:8px;right:8px">${mg}%</span>` : ''}
+          </div>
+          <div class="ma-body">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+              <b style="font-size:13.5px;min-width:0">${esc(m.nome)}</b>
+              <span class="mono" style="font-weight:700;font-size:14px">${fmt$(m.preco)}</span>
+            </div>
+            <div class="ma-stock">${rest === null ? 'sob encomenda' : esgotado ? '<b style="color:var(--crit)">lote zerou</b>' : `restam <b>${rest}</b> un`} · <b>${vend}</b> vendidas hoje</div>
+            <div class="ma-channels">
+              <span class="ma-ch">Site <button class="switch" role="switch" aria-checked="${m.on && !esgotado}" aria-label="No site" onclick="toggleMenuCh('${m.id}','site',this)" ${esgotado ? 'disabled' : ''}></button></span>
+              <span class="ma-ch">iFood <button class="switch" role="switch" aria-checked="${m.on && !esgotado}" aria-label="No iFood" onclick="toggleMenuCh('${m.id}','ifood',this)" ${esgotado ? 'disabled' : ''}></button></span>
+              ${esgotado ? `<button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModule('estoque','producao')">Produzir →</button>` : `<button class="icon-btn" style="width:26px;height:26px;margin-left:auto" data-tip="Ver o produto" onclick="peek('produto','${prod ? prod.id : ''}')">›</button>`}
+            </div>
+          </div>
+        </div>`; }).join('')}
+    </div>`;
+};
+
+/* ═══ v21.8 — dataGrid: paginação + busca, reutilizável ═══ */
+const DG = {};
+function dataGrid(id, cols, allRows, pageSize = 6){
+  const st = DG[id] || (DG[id] = { page:0, q:'' });
+  const rows = allRows.filter(r => !st.q || r.join(' ').toLowerCase().includes(st.q.toLowerCase()));
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  st.page = Math.min(st.page, pages - 1);
+  const vis = rows.slice(st.page * pageSize, (st.page + 1) * pageSize);
+  return `
+    <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--text-3)">${rows.length} registros</span>
+      <input class="dg-search" placeholder="Filtrar…" value="${esc(st.q)}" oninput="DG['${id}'].q=this.value;DG['${id}'].page=0;rerender()">
+    </div>
+    <div class="table-card"><table>
+      <thead><tr>${cols.map(c => `<th${c.r ? ' class="num-r"' : ''}>${c.l}</th>`).join('')}</tr></thead>
+      <tbody>${vis.map(r => `<tr>${r.map((c, i) => `<td${cols[i].r ? ' class="num-r"' : ''}>${c}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+    <div class="dg-foot">
+      <span>página ${st.page + 1} de ${pages}</span>
+      <div class="dg-pages">
+        ${Array.from({ length:pages }, (_, i) => `<button class="dg-page ${i === st.page ? 'on' : ''}" onclick="DG['${id}'].page=${i};rerender()">${i + 1}</button>`).join('')}
+      </div>
+    </div>`;
+}
+tMovimentos = function(){
+  const low = S.stock.filter(s => s.qty < s.min);
+  const rows = S.stockMoves.map(m => [
+    `<span class="pill ${m.tipo === 'entrada' ? 'pill-ok' : 'pill-warn'}">${m.tipo}</span>`,
+    `<span class="cell-name">${esc(m.item)}</span>`,
+    `<span class="mono">${m.qty}</span>`,
+    esc(m.motivo), m.autor, m.h,
+    m.perda ? `<span class="mono" style="color:var(--crit);font-weight:600">-${fmt$(m.perda)}</span>` : '—',
+  ]);
+  return `
+    ${low.length ? `<div class="att-line" style="border-top:0;margin-bottom:14px"><span><b>${low.length} insumos</b> abaixo do mínimo — repor antes do pico.</span><a class="a" href="#" onclick="setModuleTab('entrada');return false">Dar entrada →</a></div>` : ''}
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-secondary btn-sm" onclick="descarteFlow()">Registrar perda / descarte</button>
+    </div>
+    ${dataGrid('mov', [{ l:'Tipo' }, { l:'Item' }, { l:'Qtd', r:1 }, { l:'Motivo' }, { l:'Autor' }, { l:'Quando' }, { l:'Perda', r:1 }], rows, 6)}`;
 };
 </script>

@@ -735,6 +735,70 @@ check('Temas: menu abre e aplica os 3', () => {
   window.setTheme('light');
   return menuAbre && dark && casa && document.documentElement.dataset.theme === 'light';
 });
+
+/* ── v21: telas reais, não toasts ── */
+check('Nova cobrança: emite e entra na lista', () => {
+  window.openModule('financeiro', 'faturas');
+  window.novaCobranca();
+  document.getElementById('nc-desc').value = 'Encomenda teste';
+  document.getElementById('nc-valor').value = '150';
+  const antes = window.S.faturas.length;
+  window.saveCobranca();
+  return window.S.faturas.length === antes + 1 && window.S.faturas[0].valor === 150;
+});
+check('Venda avulsa: entra no extrato com valor certo', () => {
+  const antes = window.S.moves.length;
+  window.novoLancamento();
+  document.getElementById('nl-valor').value = '55';
+  document.getElementById('nl-desc').value = 'Venda direta teste';
+  window.saveLancamento();
+  return window.S.moves.length === antes + 1 && window.S.moves[0].valor === 55 && window.S.moves[0].tipo === 'venda';
+});
+check('Novo cliente: cadastro funcional', () => {
+  const antes = window.S.clientes.length;
+  window.novoCliente();
+  document.getElementById('ncl-nome').value = 'Teste da Silva';
+  window.saveClienteNovo();
+  return window.S.clientes.length === antes + 1;
+});
+check('Convidar usuário: entra na lista de usuários', () => {
+  window.openModule('gestao', 'usuarios');
+  const antes = window.S.usuarios.length;
+  window.novoUsuario();
+  document.getElementById('nu-nome').value = 'Novo Operador';
+  window.saveUsuario();
+  return window.S.usuarios.length === antes + 1 && txt().includes('Novo Operador');
+});
+check('Editar produto: drawer com margem e salva', () => {
+  window.editarProduto('prd_a1');
+  document.getElementById('ep-preco').value = '19.90';
+  document.getElementById('ep-preco').dispatchEvent(new window.Event('input', { bubbles:true }));
+  window.saveProduto('prd_a1');
+  return window.S.produtos.find(p => p.id === 'prd_a1').preco === 19.9;
+});
+check('Config hub: grupos por escopo com descrição', () => {
+  window.openModule('gestao', 'config');
+  return txt().includes('Da empresa') && txt().includes('Integrações');
+});
+check('Cardápio: mostra vendas de hoje por item', () => {
+  window.openModule('operacao', 'cardapio');
+  return txt().includes('vendidas hoje');
+});
+check('dataGrid: pagina e filtra Movimentações', () => {
+  window.openModule('estoque', 'movimentos');
+  const temPaginacao = !!document.querySelector('.dg-pages');
+  window.eval("DG['mov'].q='frango'; DG['mov'].page=0;");
+  window.rerender();
+  const main = document.getElementById('main').textContent;
+  const filtrou = main.includes('frango') && !main.includes('Embalagem');
+  window.eval("DG['mov'].q='';");
+  return temPaginacao && filtrou;
+});
+check('Persistência: saveUI grava tabs no localStorage', () => {
+  window.setModuleTab('posicao');
+  const ui = JSON.parse(window.localStorage.getItem('es-ui'));
+  return ui && ui.tabs && ui.tabs.estoque === 'posicao';
+});
 check('Dia ao vivo: passo de cozinha avança fila sozinho', () => {
   const antes = window.S.orders.map(o => o.status).join(',');
   window.eval('const _r = Math.random; Math.random = () => 0.7; liveStep(); Math.random = _r;');
