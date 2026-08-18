@@ -42,7 +42,7 @@ public sealed class AdminBulkIntegrationTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_bulk_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("EasyStock-IT-NonDefault-2026!")
                 .Build();
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();

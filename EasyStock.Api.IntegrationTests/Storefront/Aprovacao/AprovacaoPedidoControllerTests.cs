@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using DotNet.Testcontainers.Builders;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -16,11 +15,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 
@@ -42,63 +39,26 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 ///   <item>Motivo inválido em recusar — 422.</item>
 /// </list>
 /// </summary>
-public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
+[Collection("ApiIntegration")]
+public sealed class AprovacaoPedidoControllerTests(SharedApiPostgresFixture fixture)
 {
-    private PostgreSqlContainer? _pg;
-    private bool _isAvailable;
+    private readonly SharedApiPostgresFixture _fixture = fixture;
 
     private static readonly Guid EmpresaId = Guid.NewGuid();
     private static readonly Guid UsuarioBabaId = Guid.NewGuid();
     private const string UsuarioBabaNome = "Babá Maria";
 
-    public async Task InitializeAsync()
-    {
-        try
-        {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_aprovacao_tests")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-
-            await _pg.StartAsync();
-            _isAvailable = true;
-        }
-        catch (DockerUnavailableException)
-        {
-            _isAvailable = false;
-        }
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_pg is not null)
-            await _pg.DisposeAsync();
-    }
-
     private WebApplicationFactory<Program> CriarFactory(bool autenticado = true)
     {
-        if (_pg is null) throw new InvalidOperationException("Postgres test container indisponível.");
+        // Env vars build-time apontando para o container COMPARTILHADO, logo antes de criar
+        // a factory (execucao serial => sem contaminacao entre classes). Ver ApiTestEnv.
+        ApiTestEnv.Aplicar(_fixture.ConnString
+            ?? throw new InvalidOperationException("Postgres compartilhado indisponível."));
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
-                b.ConfigureAppConfiguration((_, cfg) =>
-                {
-                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["Database:Provider"] = "PostgreSql",
-                        ["ConnectionStrings:DefaultConnection"] = _pg!.GetConnectionString(),
-                        ["ConnectionStrings:Redis"] = "localhost:6379",
-                        ["Jwt:Issuer"] = "EasyStock",
-                        ["Jwt:Audience"] = "EasyStock",
-                        ["Jwt:SecretKey"] = "EasyStock-Test-SuperSecretKey-Min32Chars!!",
-                        ["Jwt:ExpirationMinutes"] = "60",
-                        ["Anthropic:Enabled"] = "false",
-                        ["FileStorage:Provider"] = "Local",
-                    });
-                });
 
                 b.ConfigureTestServices(services =>
                 {
@@ -168,7 +128,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostAprovar_HappyPath_Retorna200ETransitaPedidoParaAprovadoBaba()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -198,7 +158,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostRecusar_HappyPath_Retorna200ECancelaPedido()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -234,7 +194,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostAprovar_SemAuth_Retorna401()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory(autenticado: false);
         using var client = factory.CreateClient();
@@ -249,7 +209,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostAprovar_PedidoInexistente_Retorna404()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -264,7 +224,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostAprovar_TenantMismatch_Retorna404()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -284,7 +244,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostAprovar_PedidoJaAprovado_Retorna409ComStatusAtual()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
@@ -303,7 +263,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     [SkippableFact]
     public async Task PostRecusar_MotivoInvalido_Retorna422()
     {
-        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        Skip.If(!_fixture.Disponivel, "Docker/PostgreSQL unavailable");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();

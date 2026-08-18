@@ -1,7 +1,7 @@
 using DotNet.Testcontainers.Builders;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -41,43 +41,51 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Prioridade 1: Postgres externo via env var EASYSTOCK_IT_PG (CI ou ambiente
-        // sem Docker — ex.: Postgres local/WSL). Permite rodar a integração web→API
-        // DE VERDADE onde o Testcontainers não consegue subir um container.
-        var externalPg = Environment.GetEnvironmentVariable("EASYSTOCK_IT_PG");
-        if (!string.IsNullOrWhiteSpace(externalPg))
-        {
-            _connString = externalPg;
-            // WebApplicationFactory + Minimal API top-level: o ConfigureAppConfiguration
-            // nem sempre sobrescreve o que o Program lê no startup (o GetConnectionString
-            // saía null → AddNpgSql quebrava). Env vars são lidas pelo CreateBuilder de
-            // forma confiável (precedência alta, cedo).
-            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", externalPg);
-            Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
-            Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
-            Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
-            // Production exige a senha do bootstrap de SuperAdmin via env var.
-            Environment.SetEnvironmentVariable("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
-            _isAvailable = true;
-            return;
-        }
-
-        // Prioridade 2: Testcontainers (Docker disponível).
+        // Testcontainers com senha NAO-default: o StartupHardening da API recusa subir com
+        // Username=postgres + Password=postgres (credencial default). Container proprio =>
+        // isolado do banco do Inventario.IntegrationTests, sem contencao de migrations no CI
+        // (o incidente do #824 tinha 56 falhas de creds default + colisao no easystock_ci
+        // compartilhado). NAO usa EASYSTOCK_IT_PG de proposito: aquele aponta pro service do
+        // ci.yml (postgres/postgres) que a guarda barraria ao subir o app. Espelha o padrao
+        // ja provado do BannerE2ETests. Sem Docker (ex.: dotnet Windows local) os testes SKIPam.
         try
         {
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_api_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("api_it_secret_pwd")
                 .Build();
 
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
+            await AguardarPostgresProntoAsync(_connString);
             _isAvailable = true;
         }
         catch (DockerUnavailableException)
         {
             _isAvailable = false;
+        }
+    }
+
+    /// <summary>
+    /// Abre conexoes ate o Postgres aceitar, ANTES de a app subir — o
+    /// DatabaseProviderResolver faz um probe com timeout curto no startup e falharia se o
+    /// container ainda estivesse esquentando (espelha BannerE2ETests).
+    /// </summary>
+    private static async Task AguardarPostgresProntoAsync(string connectionString)
+    {
+        for (var tentativa = 0; tentativa < 30; tentativa++)
+        {
+            try
+            {
+                await using var conn = new Npgsql.NpgsqlConnection(connectionString);
+                await conn.OpenAsync();
+                return;
+            }
+            catch
+            {
+                await Task.Delay(500);
+            }
         }
     }
 
@@ -91,37 +99,23 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     {
         if (_connString is null) throw new InvalidOperationException("PostgreSQL de teste não disponível.");
 
-        return new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(b =>
-            {
-                // Development (padrão do WebApplicationFactory): roda migrations + seed
-                // demo (cria o admin de teste) no startup e liga ValidateOnBuild — que
-                // valida o container REAL de produção (branch postgresql). A connection
-                // string vai via env var (ConnectionStrings__DefaultConnection, ver
-                // InitializeAsync) — sem ela o resolver da-fail-fast (sem fallback, #261).
-                b.ConfigureAppConfiguration((_, cfg) =>
-                {
-                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["Database:Provider"]                      = "PostgreSql",
-                        ["ConnectionStrings:DefaultConnection"]     = _connString,
-                        // Production não roda migrations no startup por padrão; forçamos
-                        // p/ o banco de teste vazio receber o schema completo (inclui RLS).
-                        ["RunMigrationsOnStartup"]                  = "true",
-                        // Em Production a app exige Mobile:ApiKey com >= 24 chars.
-                        ["Mobile:ApiKey"]                           = "easystock-integration-test-mobile-key-0001",
-                        ["ConnectionStrings:Redis"]                 = "localhost:6379",
-                        ["Jwt:Issuer"]                             = JwtIssuer,
-                        ["Jwt:Audience"]                           = JwtAudience,
-                        ["Jwt:SecretKey"]                          = JwtSecret,
-                        ["Jwt:ExpirationMinutes"]                  = "60",
-                        ["Anthropic:Enabled"]                      = "false",
-                        ["FileStorage:Provider"]                   = "Local",
-                        // Desabilitar Redis real nos testes
-                        ["ConnectionStrings:Redis"]                = "localhost:6379"
-                    });
-                });
-            });
+        // Env vars vencem o appsettings.Development.json (precedencia do host builder); o
+        // ConfigureAppConfiguration in-memory sozinho era sobrescrito pelo appsettings (a
+        // connection string saia null -> AddNpgSql quebrava, #261). Mesmo padrao do
+        // BannerE2ETests. A senha do _connString e nao-default (Testcontainers), entao o
+        // StartupHardening passa. Development: roda migrations + seed demo no startup.
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _connString);
+        Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
+        Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
+        Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
+        Environment.SetEnvironmentVariable("Jwt__Issuer", JwtIssuer);
+        Environment.SetEnvironmentVariable("Jwt__Audience", JwtAudience);
+        Environment.SetEnvironmentVariable("Jwt__SecretKey", JwtSecret);
+        Environment.SetEnvironmentVariable("Jwt__ExpirationMinutes", "60");
+        Environment.SetEnvironmentVariable("FileStorage__Provider", "Local");
+        Environment.SetEnvironmentVariable("Anthropic__Enabled", "false");
+
+        return new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseEnvironment("Development"));
     }
 
     private async Task<HttpClient> ClienteAutenticadoAdminAsync(WebApplicationFactory<Program> factory)
