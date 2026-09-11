@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
