@@ -1,4 +1,4 @@
-﻿using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
@@ -10,11 +10,12 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Postgre.Data.Configurations.Mobile;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Postgre.Data
 {
-    public class EasyStockDbContext : DbContext, IUnitOfWork
+    public class EasyStockDbContext : DbContext, IUnitOfWork, IDataProtectionKeyContext
     {
         private readonly ILogger<EasyStockDbContext>? _logger;
         private readonly ICurrentUserAccessor? _currentUser;
@@ -321,6 +322,13 @@ namespace EasyStock.Infra.Postgre.Data
         // Storefront — autenticação (TASK-EZ-005)
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteOtp> ClienteOtps { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteSession> ClienteSessions { get; set; } = null!;
+
+        // Key ring do ASP.NET DataProtection (IDataProtectionKeyContext). Tabela GLOBAL:
+        // nao tem EmpresaId, entao fica fora do query filter de tenant e fora do RLS
+        // (a migration AddRowLevelSecurity so alcanca tabelas com coluna EmpresaId).
+        // Compartilhar o key ring e o que permite a Api cifrar o certificado A1 e o
+        // Worker decifrar o mesmo payload na emissao fiscal.
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
         public async Task<int> CommitAsync()
         {
