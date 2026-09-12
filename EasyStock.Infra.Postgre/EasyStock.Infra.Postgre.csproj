@@ -13,6 +13,16 @@
          Relational 9.0.4 (downgrade silencioso, warning MSB3277). Fixar 9.0.4 unifica
          a versão em todos os dependentes e destrava o startup. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.7" />
+    <!-- Key ring do DataProtection no proprio banco: Api e Worker sao processos
+         separados e precisam ler as MESMAS chaves para cifrar/decifrar o certificado
+         A1 em credencial_integracao.payload_cifrado. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.7" />
+    <!-- CVE sweep: DataProtection.EntityFrameworkCore puxa Xml 10.0.7 transitiva
+         (GHSA-23rf-6693-g89p / GHSA-8q5v-6pqq-x66h / GHSA-cvvh-rhrc-wg4q /
+         GHSA-g8r8-53c2-pm3f / GHSA-mmjf-rqrv-855v, HIGH). Mesmo override top-level ja
+         usado em EasyStock.Infra.Integrations — aqui cobre quem chega por Infra.Postgre
+         (Infra.Async.UnitTests, Inventario.IntegrationTests). -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.7">

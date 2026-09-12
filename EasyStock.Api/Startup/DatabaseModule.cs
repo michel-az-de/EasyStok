@@ -76,7 +76,11 @@ public static class DatabaseModule
                 // (captive dependency / lifetime mismatch) — só não explodia em prod porque
                 // ValidateOnBuild fica off lá. Os consumidores (use cases fiscais) são Scoped.
                 builder.Services.AddScoped<IGatewayFiscalFactory, GatewayFiscalFactory>();
-                builder.Services.AddDataProtection();
+                // Key ring compartilhado com o Worker via Postgres (#1035). O certificado A1
+                // cifrado aqui e decifrado la na emissao/reprocessamento fiscal — com o
+                // registro default cada processo tinha o seu key ring e o Unprotect cruzado
+                // era impossivel.
+                builder.Services.AddEasyStockDataProtection();
                 break;
 
             default:

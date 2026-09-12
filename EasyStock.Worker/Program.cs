@@ -164,7 +164,9 @@ builder.Services.AddMockFiscalGateway();
 // a factory scoped resolve corretamente dentro do scope.
 builder.Services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGatewayFiscalFactory,
     EasyStock.Infra.Integrations.Fiscal.GatewayFiscalFactory>();
-builder.Services.AddDataProtection();
+// Key ring compartilhado com a Api via Postgres (#1035) — sem isso o Worker nao
+// decifra o certificado A1 que a Api gravou em credencial_integracao.
+builder.Services.AddEasyStockDataProtection();
 builder.Services.AddHostedService<ReprocessarContingenciaBackgroundService>();
 builder.Services.AddHostedService<RenovacaoCertificadoA1BackgroundService>();
 
