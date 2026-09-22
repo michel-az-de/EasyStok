@@ -82,22 +82,22 @@ Cobre US-007, US-015 a US-019, US-046 a US-050, RN-08, RN-12 a RN-14, RN-34 a RN
 
 ### S27 · Ocorrência e reembolso
 
-**Problema.** US-049, US-050, RN-35, RN-36, UC-06: reclamação abre janela ligada ao pedido; a resolução é humana; comida não volta, devolve o dinheiro com motivo gravado no pedido e no cadastro. `IEfiPixService.EstornarAsync(e2eId, idSolicitacao, valor)` existe; `CobrancaPedido.E2eId` (S11) guarda o que ele precisa.
+**Problema.** US-049, US-050, RN-35, RN-36, UC-06: reclamação abre janela ligada ao pedido; a resolução é humana; comida não volta, devolve o dinheiro com motivo gravado no pedido e no cadastro. O estorno vai pelo Mercado Pago (`POST v1/payments/{id}/refunds`, S32) com o `PagamentoExternoId` da `CobrancaPedido` (S11).
 **Abordagem.** Entidade própria e enxuta. Não reaproveitar `AdminTicket` (suporte SaaS com SLA). Abertura automática (avaliação negativa ou agente detectando reclamação); resolução só por ação da dona no console.
 **Escopo.**
 - Criar `Domain/Entities/Atendimento/Ocorrencia.cs`: `Id`, `EmpresaId`, `PedidoId`, `ClienteId`, `ConversaId?`, `Origem` (`avaliacao`, `agente`, `dona`), `Categoria` (`produto_improprio`, `atraso`, `preferencia`, `outro`), `Relato`, `Status` (`Aberta`, `Resolvida`), `Resolucao?`, `ReembolsoValor?`, `ReembolsoIdSolicitacao?`, `ReembolsoEm?`, `CriadaEm`, `ResolvidaEm?`, `ResolvidaPorUsuarioId?`. Migration `AddOcorrencia`.
-- `App/UseCases/Atendimento/Ocorrencias/AbrirOcorrenciaUseCase.cs` (também usado pela ferramenta `abrir_ocorrencia(motivo)` do agente quando classificar a mensagem como reclamação, S06), `ResolverOcorrenciaUseCase.cs` (com ou sem reembolso), `ReembolsarPedidoUseCase.cs` (busca `CobrancaPedido` paga do pedido; `EstornarAsync(E2eId, idSolicitacao = ocorrenciaId em formato N, valor)`; grava resultado; publica evento de notificação `ReembolsoEfetuado = 43` para avisar o cliente; cria `ClienteNota` automática "reembolso de R$ X: <motivo>").
+- `App/UseCases/Atendimento/Ocorrencias/AbrirOcorrenciaUseCase.cs` (também usado pela ferramenta `abrir_ocorrencia(motivo)` do agente quando classificar a mensagem como reclamação, S06), `ResolverOcorrenciaUseCase.cs` (com ou sem reembolso), `ReembolsarPedidoUseCase.cs` (busca `CobrancaPedido` paga do pedido; `IMercadoPagoClient.EstornarAsync(PagamentoExternoId, valor)` com `X-Idempotency-Key = ocorrenciaId` (S32); grava resultado; publica evento de notificação `ReembolsoEfetuado = 43` para avisar o cliente; cria `ClienteNota` automática "reembolso de R$ X: <motivo>").
 - Ao abrir: `EscalarConversaUseCase` (S07) e SSE `ocorrencia.aberta` (S18).
 - `Api/Controllers/OcorrenciasController.cs`: `GET api/ocorrencias?status=`, `GET api/ocorrencias/{id}`, `POST api/ocorrencias` (dona abre na mão), `POST api/ocorrencias/{id}/resolver { resolucao, reembolsar: bool, valor? }`.
-- Pedido pago no Mercado Pago (site): reembolso fica manual; `ReembolsarPedidoUseCase` responde `reembolso_manual_necessario` e a ocorrência guarda o valor para conferência.
+- Pedido antigo pago fora do gateway (dinheiro, Pix manual): `ReembolsarPedidoUseCase` responde `reembolso_manual_necessario` e a ocorrência guarda o valor para conferência.
 **Fora.** Devolução parcial por item; classificação automática de sentimento (US-051, Could).
 **Aceite.**
 - [ ] Avaliação negativa cria ocorrência `Aberta` com `Origem=avaliacao` e escala a conversa.
-- [ ] Resolver com reembolso: `EstornarAsync` chamado com `E2eId` da cobrança paga e o valor; ocorrência `Resolvida` com `ReembolsoEm`; `ClienteNota` criada; cliente avisado.
-- [ ] Resolver sem reembolso grava `Resolucao` e não chama a Efi.
+- [ ] Resolver com reembolso: `EstornarAsync` do Mercado Pago chamado com o `PagamentoExternoId` da cobrança paga e o valor; ocorrência `Resolvida` com `ReembolsoEm`; `ClienteNota` criada; cliente avisado.
+- [ ] Resolver sem reembolso grava `Resolucao` e não chama o gateway.
 - [ ] Reembolso maior que o pago → 400.
-**Testes (Red).** `AbrirOcorrenciaUseCaseTests.EscalaConversa`, `ReembolsarPedidoUseCaseTests.ChamaEfiComE2eId`, `...ValorMaiorQuePagoRejeita`, `ResolverOcorrenciaUseCaseTests.SemReembolsoNaoChamaEfi`.
+**Testes (Red).** `AbrirOcorrenciaUseCaseTests.EscalaConversa`, `ReembolsarPedidoUseCaseTests.ChamaMercadoPagoComPagamentoExternoId`, `...ValorMaiorQuePagoRejeita`, `ResolverOcorrenciaUseCaseTests.SemReembolsoNaoChamaGateway`.
 **Rollback.** Migration `Down`.
-**Depende de.** S07, S11, S24.
-**Leitura mínima.** `App/Ports/Output/IEfiPixService.cs` (método `EstornarAsync`); `App/UseCases/Financeiro/Pagamentos/EstornarPagamentoParcelaUseCase.cs` (padrão de estorno); `Domain/Entities/Pagamentos/CobrancaPedido.cs` (S11); `App/UseCases/Atendimento/EscalarConversaUseCase.cs` (S07).
+**Depende de.** S07, S11, S32, S24.
+**Leitura mínima.** `Integrations/Pagamentos/MercadoPago/MercadoPagoClient.cs` (método `EstornarAsync`, S32); `App/UseCases/Financeiro/Pagamentos/EstornarPagamentoParcelaUseCase.cs` (padrão de estorno); `Domain/Entities/Pagamentos/CobrancaPedido.cs` (S11); `App/UseCases/Atendimento/EscalarConversaUseCase.cs` (S07).
 **Tamanho.** M. **Tier.** alto (migration, pagamento).

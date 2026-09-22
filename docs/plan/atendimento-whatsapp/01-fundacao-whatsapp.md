@@ -143,7 +143,7 @@ Dependências externas: onda 0.1, 0.2, 0.3, 0.5, 0.8 do README.
 | `validar_endereco(rua, numero, complemento, bairro, cep)` | normaliza, checa área, devolve taxa e tempo | S14 |
 | `confirmar_endereco(...)` | grava `ClienteEndereco` padrão | S14 |
 | `listar_janelas(data?)` | janelas com vaga respeitando a antecedência | S16 |
-| `criar_pedido(itens[], janela_id, data_entrega, observacao?)` | pedido + cobrança Pix; devolve resumo, total, copia-e-cola e QR | S10, S11 |
+| `criar_pedido(itens[], janela_id, data_entrega, observacao?)` | pedido + link de pagamento do Mercado Pago (Pix ou cartão na página do MP); devolve resumo, total e link | S10, S11, S32 |
 | `consultar_pedido(pedido_id?)` | status e previsão do último pedido | `ObterPedidoDetalhes` |
 | `registrar_restricao(tag)` / `registrar_interesse(item)` / `registrar_nota(texto)` | CRM | S24, S31 |
 | `escalar_para_dona(motivo)` | `Conversa.Assumir()` + aviso à dona | S07 |

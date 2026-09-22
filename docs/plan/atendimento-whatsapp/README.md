@@ -13,15 +13,15 @@ operador é outra tecnologia e outro repositório. O site casadababa.com continu
 | Onda | Arquivo | Specs | Entrega |
 |---|---|---|---|
 | 1 | [01-fundacao-whatsapp.md](01-fundacao-whatsapp.md) | S01–S09 | Meta Cloud API conectada, conversa persistida, agente respondendo, handoff pelo console, provider de notificações com janela de 24 h |
-| 2 | [02-pedido-e-cobranca.md](02-pedido-e-cobranca.md) | S10–S16 | Pedido criado na conversa antes do pagamento, Pix conciliado, esteira sem aprovação manual, avisos de status |
+| 2 | [02-pedido-e-cobranca.md](02-pedido-e-cobranca.md) | S10–S16 | Pedido criado na conversa antes do pagamento, cobrança do Mercado Pago conciliada, esteira sem aprovação manual, avisos de status |
 | 3 | [03-esteira-e-cozinha.md](03-esteira-e-cozinha.md) | S17–S21 | Estoque avisa e não trava, SSE de operação, KDS sobre `Pedido`, canhoto e fila de impressão, atraso |
 | 4 | [04-estoque-minimo.md](04-estoque-minimo.md) | S22–S23 | Alerta de desacerto com ajuste, produção em porções gerando estoque |
 | 5 | [05-crm-e-pos-venda.md](05-crm-e-pos-venda.md) | S24–S27 | Tags, notas, bloqueio, preferências, dossiê, avaliação em 2 botões, ocorrência e reembolso |
 | 6 | [06-campanhas.md](06-campanhas.md) | S28–S31 | Campanha com público filtrado, exclusões, limite semanal, ondas, lembrete, interesse |
 | 7 | [07-poda.md](07-poda.md) | P01–P06 | Remoção do que é SaaS, fiscal, MAUI e alvos de deploy extras |
-| MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno, e a decisão de gateway único |
+| MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno; opção A adotada: gateway único |
 
-Ordem: 1 → 2 → 3 → 4 → 5 → 6. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
+Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 
 ## Onda 0 — o que só o Felipe destrava (fora do código)
 
@@ -30,7 +30,7 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. A onda 7 pode correr em paralelo a parti
 | 0.1 | Verificação da empresa na Meta (bloqueio casa-da-baba #6) e app no `developers.facebook.com` com o produto WhatsApp; número da Casa da Baba registrado na Cloud API com nome de exibição aprovado. O número sai do app WhatsApp Business do celular; verificar antes se a "coexistência" app + API está disponível no Brasil | S03 em produção |
 | 0.2 | Usuário de sistema com token permanente (`Notifications:WhatsApp:Meta:AccessToken`), `AppSecret` do app, `VerifyToken` gerado por você, e a URL `https://<api>/api/webhooks/whatsapp` assinada no campo `messages` do webhook | S01, S03 |
 | 0.3 | Templates aprovados no WhatsApp Manager, idioma `pt_BR`: `pedido_pago`, `pedido_em_preparo`, `pedido_saiu`, `pedido_entregue` (utilidade), `avaliacao` (utilidade, com 2 botões de resposta rápida), `campanha_generica` (marketing, com imagem no cabeçalho) | S13, S26, S30 fora da janela de 24 h |
-| 0.4 | Credenciais Efi Pix de produção (`Efi:ClientId`, `Efi:ClientSecret`, `Efi:ChavePix`, `Efi:WebhookSecret`) e URL do webhook Pix cadastrada na Efi | S11 |
+| 0.4 | Efi Pix deixa de bloquear o pedido (opção A: gateway único Mercado Pago). Credenciais da Efi só para contas a receber da FMA | nada do atendimento |
 | 0.5 | Chave Anthropic (`Anthropic:ApiKey`) | S06 |
 | 0.6 | Modelo da impressora térmica (USB, Bluetooth, rede, ou com polling em nuvem) | S20 (decide o consumidor da fila) |
 | 0.7 | Ligar `ENABLE_VIACEP_LOOKUP` e `ENABLE_NOMINATIM_GEOCODING` no ambiente | S14 |

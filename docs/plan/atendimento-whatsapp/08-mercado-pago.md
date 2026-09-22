@@ -27,10 +27,10 @@ validado e gravado, e nada confirma o pagamento.
 | **A. Mercado Pago como gateway único de pedidos** (site e conversa) | O agente manda o link `init_point` da preferência; o cliente escolhe Pix ou cartão na página do MP. Efi fica só para contas a receber (FMA) | Uma integração, um webhook, um estorno, uma conciliação. Cartão de graça. Assinatura HMAC pronta. O site já usa | Um toque a mais no chat (abre página). Taxa de Pix maior que na Efi |
 | **B. Mercado Pago no site, Efi Pix na conversa** (como o plano está em S11) | Duas integrações vivas | Pix copia-e-cola direto no chat | Dois webhooks, dois estornos, duas conciliações, duas credenciais para manter |
 
-Recomendação: **A**. A justificativa é a mesma do ADR-0048: operação solo, resultado mais rápido. O
+**Decisão do Felipe (22/09/2026): A.** A justificativa é a mesma do ADR-0048: operação solo, resultado mais rápido. O
 código que falta para o MP (S32) tem de ser escrito de qualquer jeito para o site funcionar; com ele
-pronto, a conversa custa uma spec pequena (S33). Se A for a escolha, S11 muda de "cobrança Pix Efi" para
-"preferência MP" e `CobrancaPedido` guarda `PreferenceId` e `PaymentId` em vez de `Txid`/`E2eId`.
+pronto, a conversa não custa nada a mais (S33 absorvida por S11). Com A, S11 já está escrito como cobrança pelo Mercado Pago e
+`CobrancaPedido` guarda `ReferenciaExterna` (preferência) e `PagamentoExternoId` (pagamento).
 
 ## 3. Cadastro no Mercado Pago (onda 0.9, fora do código)
 
@@ -95,20 +95,9 @@ por redirecionamento não precisa dela.
 **Leitura mínima.** `Integrations/Pagamentos/MercadoPago/MercadoPagoClient.cs`, `MercadoPagoOptions.cs`, `StubMercadoPagoClient.cs`; `Async/Pagamentos/Webhooks/EfiPixWebhookProcessor.cs` (padrão); `Async/Pagamentos/Webhooks/MercadoPagoSignatureValidator.cs`; `Api/Controllers/WebhookGatewayController.cs`; `Async/DependencyInjection/ServiceCollectionExtensions.cs` (linhas 95-110 e 170-182); `App/UseCases/Storefront/Aprovacao/AprovarPedidoStorefrontUseCase.cs` (padrão de lock).
 **Tamanho.** M. **Tier.** alto (pagamento).
 
-### S33 · Cobrança do pedido da conversa pelo Mercado Pago (só na opção A)
+### S33 · Cobrança do pedido da conversa pelo Mercado Pago (absorvida por S11)
 
-**Problema.** Com A, `criar_pedido` (S06) precisa devolver o link de pagamento do MP em vez do Pix da Efi.
-**Abordagem.** `GerarCobrancaPedidoUseCase` (S11) ganha o provedor `mercadopago`: cria a preferência com `external_reference = PedidoId`, `expires = true`, `expiration_date_to = agora + 30 min`, itens do pedido e frete, e devolve `init_point`. A mensagem ao cliente traz o link e a frase "Pix ou cartão, como preferir". `CobrancaPedido` guarda `Provedor`, `PreferenceId`, `InitPoint`, `ExpiraEm`; `PaymentId` chega pelo webhook (S32).
-**Escopo.** `CobrancaPedido` com `Provedor` e `ReferenciaExterna` (migration aditiva); `GerarCobrancaPedidoUseCase` com estratégia por provedor (`ConfiguracaoAtendimento.GatewayPedido`, default `mercadopago` na opção A); ferramenta `criar_pedido` monta a resposta com o link; `CobrancaPedidoJob` expira pela `expiration_date_to`.
-**Aceite.**
-- [ ] `criar_pedido` devolve `init_point` e o cliente recebe o link na conversa.
-- [ ] Preferência criada com `external_reference` do pedido, itens, frete e expiração de 30 min.
-- [ ] Pagamento aprovado no MP confirma o pedido pelo mesmo caminho de S32 (nenhum código específico do chat).
-**Testes (Red).** `GerarCobrancaPedidoUseCaseTests.MercadoPagoCriaPreferenciaComExternalReference`, `CriarPedidoFerramentaTests.RespostaTrazLink`.
-**Rollback.** `GatewayPedido=efi`.
-**Depende de.** S11, S32.
-**Leitura mínima.** `App/UseCases/Pedidos/Cobranca/GerarCobrancaPixPedidoUseCase.cs` (S11); `Integrations/Pagamentos/MercadoPago/MercadoPagoClient.cs`.
-**Tamanho.** P. **Tier.** alto.
+Com a opção A, S11 já cria a preferência do Mercado Pago para todo pedido (site e conversa) e a ferramenta `criar_pedido` (S06) devolve o link. Não há trabalho próprio nesta spec; o número fica reservado para não renumerar as referências.
 
 ## 6. Roteiro de validação em sandbox (antes de produção)
 
