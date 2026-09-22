@@ -28,6 +28,12 @@ namespace EasyStock.Domain.Entities
         public bool OnboardingCompleto { get; set; } = false;
         public DateTime? OnboardingCompletoEm { get; set; }
 
+        /// <summary>
+        /// phone_number_id da Cloud API da Meta vinculado a esta empresa — usado pelo webhook
+        /// (S03) para rotear metadata.phone_number_id ate o tenant certo.
+        /// </summary>
+        public string? WhatsAppPhoneNumberId { get; set; }
+
         public static Empresa Criar(string nome, string? documento)
         {
             var agora = DateTime.UtcNow;
@@ -46,6 +52,12 @@ namespace EasyStock.Domain.Entities
             if (OnboardingCompleto) return;
             OnboardingCompleto = true;
             OnboardingCompletoEm = DateTime.UtcNow;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void VincularWhatsApp(string phoneNumberId)
+        {
+            WhatsAppPhoneNumberId = phoneNumberId;
             AlteradoEm = DateTime.UtcNow;
         }
 
