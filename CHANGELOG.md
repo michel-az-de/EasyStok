@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Plano executavel do backend para o atendimento da Casa da Baba via **Huggy** (ADR-0049,
+  `docs/plan/atendimento-huggy/`): 31 specs em 6 ondas (fundacao Huggy, pedido e cobranca Pix,
+  esteira e cozinha, estoque minimo, CRM e pos-venda, campanhas) + 6 specs de poda, cada uma com
+  Problema/Abordagem/Escopo/Aceite/Rollback, testes Red e leitura minima, escritas para execucao
+  por um modelo mais barato, uma spec por sessao. Somente documentacao. (#1040)
 - Cadastro de cliente **pessoa juridica** (ADR-0048, item 1 do epico #1013): `TipoPessoa`,
   `NomeFantasia` e `InscricaoEstadual` no `Cliente`, com o formulario do Web alternando entre
   PF e PJ (rotulo, placeholder e campos condicionais). CNPJ ja era aceito antes — o que
