@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Cliente da Cloud API da Meta para o atendimento WhatsApp (S02, onda 1, ADR-0050):
+  `IWhatsAppCloudClient` (texto, imagem, botões interativos, template, marcar como lida, baixar
+  mídia) com categoria de resiliência Polly própria (`whatsapp`) — erro de aplicação da Meta
+  (ex.: `131047`, fora da janela de 24h) nunca é reenviado automaticamente. `MetaCloudWhatsAppProvider`
+  passa a delegar a esse cliente em vez de falar HTTP direto. `ArmazenadorMidiaWhatsApp` guarda a
+  mídia recebida no storage privado. (#1048)
 - Plano do atendimento revisado para **Meta Cloud API direto** (ADR-0050 supersede ADR-0049):
   pasta renomeada para `docs/plan/atendimento-whatsapp/`, onda 1 reescrita (credenciais da Meta,
   cliente Graph com botoes e midia, webhook com `hub.challenge` e HMAC, conversa por `wa_id`,
