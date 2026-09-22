@@ -37,14 +37,14 @@ Dependências externas: onda 0.6 (modelo da impressora) decide o consumidor da f
 **Escopo.**
 - Criar `App/Ports/Output/Operacao/IOperacaoEventPublisher.cs` e a implementação sobre `MobileEventBroker` (mover o broker para `Api/Services/Operacao/OperacaoEventBroker.cs`; o controller mobile continua funcionando apontando para a mesma instância até P05).
 - Criar `Api/Controllers/OperacaoEventosController.cs` (`GET api/operacao/eventos`, `text/event-stream`, heartbeat a cada 25 s, `Last-Event-ID` ignorado nesta versão).
-- Publicar em: `ConfirmarPagamentoPixPedidoUseCase` (S11) e no handler do Mercado Pago (`pedido.pago`); `AtualizarStatusPedidoUseCase` (`pedido.mudou_status`); S03 (`conversa.mensagem_recebida`); S17 (`estoque.desacerto`).
+- Publicar em: `ConfirmarPagamentoPedidoUseCase` (S11, chamado pelo processor de S32) (`pedido.pago`); `AtualizarStatusPedidoUseCase` (`pedido.mudou_status`); S03 (`conversa.mensagem_recebida`); S17 (`estoque.desacerto`).
 - Publicação **após** o commit (evento de UI, não de negócio): usar o padrão de "seam pós-commit" já discutido em #702 ou simplesmente chamar o publisher depois do `CommitAsync` no use case.
 **Fora.** Redis pub/sub multi-instância; replay.
 **Aceite.**
 - [ ] Cliente SSE autenticado da empresa A recebe `pedido.pago` de A e não recebe de B.
 - [ ] Sem JWT → 401. Heartbeat chega a cada 25 s.
 - [ ] Publicação acontece só quando o commit teve sucesso (teste: exceção no commit → nenhum evento).
-**Testes (Red).** `OperacaoEventBrokerTests.FiltraPorEmpresa`, `OperacaoEventosControllerTests.SemJwt401`, `ConfirmarPagamentoPixPedidoUseCaseTests.PublicaPedidoPagoAposCommit`.
+**Testes (Red).** `OperacaoEventBrokerTests.FiltraPorEmpresa`, `OperacaoEventosControllerTests.SemJwt401`, `ConfirmarPagamentoPedidoUseCaseTests.PublicaPedidoPagoAposCommit`.
 **Rollback.** Remover controller e porta; mobile inalterado.
 **Depende de.** S11.
 **Leitura mínima.** `Api/Mobile/Services/MobileEventBroker.cs`; `Api/Mobile/Controllers/OperationController.cs` (linhas 380-420); `App/UseCases/AtualizarStatusPedido/AtualizarStatusPedidoUseCase.cs` (linhas 100-140).
@@ -81,7 +81,7 @@ Dependências externas: onda 0.6 (modelo da impressora) decide o consumidor da f
 **Abordagem.** Backend agnóstico do dispositivo: uma fila persistida e dois formatos do canhoto. Quem consome a fila é decidido pela onda 0.6: bridge local (mini PC polling + ESC/POS), impressora com polling em nuvem, ou a aba do console imprimindo via navegador. Todos leem o mesmo endpoint.
 **Escopo.**
 - Criar `Domain/Entities/Operacao/ImpressaoPendente.cs`: `Id`, `EmpresaId`, `LojaId?`, `PedidoId`, `Tipo` (`canhoto`), `Status` (`Pendente`, `Impressa`, `Falhou`), `CriadaEm`, `ImpressaEm?`, `Tentativas`, `Erro?`. Migration `AddImpressaoPendente`. Índice `(EmpresaId, Status, CriadaEm)`.
-- Enfileirar em `ConfirmarPagamentoPixPedidoUseCase` e no handler do Mercado Pago (S11/S12), na mesma transação do pedido pago; publicar `impressao.pendente` no SSE (S18) após commit.
+- Enfileirar em `ConfirmarPagamentoPedidoUseCase` (S11, S32), na mesma transação do pedido pago; publicar `impressao.pendente` no SSE (S18) após commit.
 - Criar `App/UseCases/Operacao/Impressao/MontarCanhotoUseCase.cs` → modelo `CanhotoDto` {cabeçalho: nome da casa, nº curto, cliente, telefone, endereço completo, janela e data, pago em; grupos por linha com itens (nome, variação/porção, qtd, molho (`SugestaoMolho` ou observação), observação); observações do pedido; rodapé: "imprima este canhoto: ele basta para produzir"}.
 - `Api/Controllers/ImpressaoController.cs`: `GET api/pedidos/{id}/canhoto?formato=html|texto` (`html` = página 80 mm com `@media print`, reaproveitando `EasyStock.Web/wwwroot/css/recibo.css` copiado para a Api; `texto` = 42 colunas, sem acentos, pronto para ESC/POS); `GET api/impressao/pendentes?limite=10` (policy `Operador` **ou** header `X-Impressao-Api-Key` para o bridge, config `Impressao:ApiKey`); `POST api/impressao/{id}/impressa`; `POST api/impressao/{id}/falhou {erro}`; `POST api/pedidos/{id}/reimprimir`.
 - Job `ImpressaoPendenteAlertaJob` (a cada 2 min): pendente há mais de 3 min → SSE `impressao.atrasada` (o console avisa a dona).
@@ -91,7 +91,7 @@ Dependências externas: onda 0.6 (modelo da impressora) decide o consumidor da f
 - [ ] `canhoto?formato=texto` agrupa por linha, um item por linha com qtd, porção, molho e observação; cabe em 42 colunas.
 - [ ] `pendentes` com API key do bridge devolve só da empresa configurada; sem credencial → 401.
 - [ ] `impressa` é idempotente.
-**Testes (Red).** `MontarCanhotoUseCaseTests.AgrupaPorLinhaComObservacao`, `ImpressaoControllerTests.TextoCabeEm42Colunas`, `ConfirmarPagamentoPixPedidoUseCaseTests.EnfileiraImpressaoNaMesmaTransacao`, `ImpressaoControllerTests.ImpressaIdempotente`.
+**Testes (Red).** `MontarCanhotoUseCaseTests.AgrupaPorLinhaComObservacao`, `ImpressaoControllerTests.TextoCabeEm42Colunas`, `ConfirmarPagamentoPedidoUseCaseTests.EnfileiraImpressaoNaMesmaTransacao`, `ImpressaoControllerTests.ImpressaIdempotente`.
 **Rollback.** Migration `Down`; sem consumidor a fila só acumula.
 **Depende de.** S11, S15, S18.
 **Leitura mínima.** `EasyStock.Web/Views/Pedidos/Recibo.cshtml` (só a estrutura do canhoto) e `EasyStock.Web/wwwroot/css/recibo.css`; `App/UseCases/ObterPedidoDetalhes/*.cs`; `Api/Middleware/IdempotencyMiddleware.cs` (linhas 200-240, `IdempotencyOptions.Add`).
@@ -105,7 +105,7 @@ Dependências externas: onda 0.6 (modelo da impressora) decide o consumidor da f
 **Abordagem.** Calcular e persistir `InicioPrevistoEm` no pedido quando ele é pago (S11/S12): `inicio da janela na data − PrazoMinimo(itens)` (S15). `Atrasado` é derivado: `Status == Aguardando && agora > InicioPrevistoEm`. Um avaliador leve publica `pedido.atrasado` uma vez por pedido.
 **Escopo.**
 - `Pedido.InicioPrevistoEm` (DateTime?) + `Pedido.AtrasoNotificadoEm` (DateTime?); migration `AddInicioPrevistoPedido`.
-- Preenchido em `ConfirmarPagamentoPixPedidoUseCase` e no handler do Mercado Pago, lendo `VagaOcupada → JanelaEntrega.HoraInicio` e `CalculadoraPrazoPedido`.
+- Preenchido em `ConfirmarPagamentoPedidoUseCase` (S11, S32), lendo `VagaOcupada → JanelaEntrega.HoraInicio` e `CalculadoraPrazoPedido`.
 - `KdsPedidoDto.inicioPrevistoEm` e `atrasado` (S19).
 - `Api/BackgroundServices/PedidoAtrasoJob.cs` (a cada 60 s): pedidos `Aguardando` com `InicioPrevistoEm < agora` e `AtrasoNotificadoEm == null` → marca e publica `pedido.atrasado` (S18).
 - Recalcular quando `AlterarAgendamentoPedidoUseCase` mudar a janela.
@@ -114,7 +114,7 @@ Dependências externas: onda 0.6 (modelo da impressora) decide o consumidor da f
 - [ ] Pedido pago para janela 12:00 com prazo 100 min → `InicioPrevistoEm = 10:20` no fuso da loja.
 - [ ] Job publica `pedido.atrasado` uma única vez por pedido.
 - [ ] Reagendar recalcula e zera `AtrasoNotificadoEm`.
-**Testes (Red).** `ConfirmarPagamentoPixPedidoUseCaseTests.CalculaInicioPrevisto`, `PedidoAtrasoJobTests.NotificaUmaVez`, `AlterarAgendamentoPedidoUseCaseTests.RecalculaInicioPrevisto`.
+**Testes (Red).** `ConfirmarPagamentoPedidoUseCaseTests.CalculaInicioPrevisto`, `PedidoAtrasoJobTests.NotificaUmaVez`, `AlterarAgendamentoPedidoUseCaseTests.RecalculaInicioPrevisto`.
 **Rollback.** Migration `Down`; job desligado por flag.
 **Depende de.** S15, S18, S19.
 **Leitura mínima.** `App/UseCases/AlterarAgendamentoPedido/*.cs`; `Domain/Entities/Storefront/JanelaEntrega.cs`; `App/Common/HorarioBrasil.cs`; `Api/BackgroundServices/BackgroundJobServiceCollectionExtensions.cs` (registro de job).
