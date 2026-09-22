@@ -1,7 +1,7 @@
 # Onda 2 — Pedido e cobrança na conversa (S10–S16)
 
 Objetivo: o agente cria o pedido antes do pagamento, a cobrança Pix é conciliada sem a dona, o pedido
-pago entra direto na fila e o cliente recebe os avisos de status pela Huggy.
+pago entra direto na fila e o cliente recebe os avisos de status pelo WhatsApp.
 Cobre US-011, US-012, US-014, US-021 (lado API), US-024, US-026, US-027, US-028, US-031, US-032,
 US-039, US-040, US-045, RN-06, RN-09, RN-10, RN-21 a RN-24, RN-27, RN-32, D9.
 
@@ -42,7 +42,7 @@ Dependências externas: onda 0.4, 0.7, 0.8.
 - Criar `App/UseCases/Pedidos/Cobranca/GerarCobrancaPixPedidoUseCase.cs` (txid `pd{empresa6}{pedido18}` + sufixo da tentativa, ≤ 35 chars, mesmo padrão de `GerarPixQrParcelaReceberUseCase.cs:50`; expiração 30 min; idempotente por pedido+tentativa).
 - Criar `ConfirmarPagamentoPixPedidoUseCase.cs` (lock em `Txid` via `GetByTxidComLockAsync` no repositório novo; valida `valorPago >= Valor`; transição; `RegistrarPagamentoPedidoUseCase`; `PedidoPagoEvent` no outbox antes do commit).
 - `Api/Controllers/WebhookPixController.cs`: em `ProcessarPagamentoAsync`, `txid.StartsWith("pd")` → `ConfirmarPagamentoPixPedidoUseCase`. Extrair `endToEndId` do item do payload. **Corrigir #953 no mesmo PR:** falha em um txid não pode responder 200 silencioso; gravar `WebhookRecebido` com `Sucesso=false` e responder 500 para a Efi reenviar.
-- Criar `Api/BackgroundServices/CobrancaPedidoJob.cs` (a cada 60 s): `ConsultarCobrancaAsync` para pendentes com `ExpiraEm < agora + 2 min` (reconciliação de webhook perdido); expiradas: tentativa 1 → gera nova cobrança e envia mensagem na conversa (via `IHuggyClient`, texto de S08); tentativa 2 → `CancelarPedidoUseCase` com motivo `pagamento_expirado` e mensagem ao cliente.
+- Criar `Api/BackgroundServices/CobrancaPedidoJob.cs` (a cada 60 s): `ConsultarCobrancaAsync` para pendentes com `ExpiraEm < agora + 2 min` (reconciliação de webhook perdido); expiradas: tentativa 1 → gera nova cobrança e envia mensagem na conversa (via `IWhatsAppCloudClient`, texto de S08); tentativa 2 → `CancelarPedidoUseCase` com motivo `pagamento_expirado` e mensagem ao cliente.
 - `Api/Controllers/PedidosController.cs`: `POST api/pedidos/{id}/cobranca-pix` (policy `Operador`) para o console e para reenviar na mão.
 - Ferramenta `criar_pedido` (S06) passa a chamar S10 + este use case e a responder com resumo, total, copia-e-cola e QR (imagem via `EnviarArquivoAsync`).
 **Fora.** Cartão (Mercado Pago continua no site como está); pagamento parcial.
@@ -83,10 +83,10 @@ Dependências externas: onda 0.4, 0.7, 0.8.
 
 ---
 
-### S13 · Avisos de status ao cliente pela Huggy
+### S13 · Avisos de status ao cliente pelo WhatsApp
 
 **Problema.** #585 aberta: transição de status não avisa o cliente. US-039, US-040, US-045, RN-32 (só quando a dona marca), RN-05 (sai mesmo com a conversa assumida), RN-37 (agradecimento nunca desliga).
-**Abordagem.** Consumidor de `PedidoMudouStatusEvent` (outbox `"pedido.mudou_status"`, já existe com `PedidoMudouStatusLogHandler`) que publica no **outbox de notificações** (retry, log, janela) um evento por status relevante, canal WhatsApp, provider Huggy (S09). Templates Scriban seedados. Preferência do cliente (S24) filtra preparo e saída; agradecimento sempre. Até S24 existir, o filtro é `Cliente.ConsentiuMarketing`? Não: avisos são transacionais; até S24, enviar sempre.
+**Abordagem.** Consumidor de `PedidoMudouStatusEvent` (outbox `"pedido.mudou_status"`, já existe com `PedidoMudouStatusLogHandler`) que publica no **outbox de notificações** (retry, log, janela) um evento por status relevante, canal WhatsApp, provider Meta (S09; texto na janela de 24 h, template fora). Templates Scriban seedados. Preferência do cliente (S24) filtra preparo e saída; agradecimento sempre. Até S24 existir, o filtro é `Cliente.ConsentiuMarketing`? Não: avisos são transacionais; até S24, enviar sempre.
 **Escopo.**
 - `Domain/Enums/Notifications/TipoEventoNotificacao.cs`: `PedidoPagoConfirmado = 38`, `PedidoEmPreparo = 39`, `PedidoSaiuParaEntrega = 40`, `PedidoEntregue = 41`.
 - Criar `App/Events/Pedidos/Handlers/NotificarClienteStatusPedidoHandler.cs`: `Preparando` → `PedidoEmPreparo` com `{previsao}` = label da janela do pedido (`VagaOcupada` → `JanelaEntrega.Label` + data); `SaiuParaEntrega` → `PedidoSaiuParaEntrega`; `Entregue` → `PedidoEntregue` (agradecimento + convite às redes, `Storefront` ganha `LinksRedesJson`? Não: usar `Storefront.SubtituloPublico` como texto e um campo novo `Storefront.InstagramUrl`; migration pequena).

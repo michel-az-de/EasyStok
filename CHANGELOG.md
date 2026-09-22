@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Plano do atendimento revisado para **Meta Cloud API direto** (ADR-0050 supersede ADR-0049):
+  pasta renomeada para `docs/plan/atendimento-whatsapp/`, onda 1 reescrita (credenciais da Meta,
+  cliente Graph com botoes e midia, webhook com `hub.challenge` e HMAC, conversa por `wa_id`,
+  handoff pelo console, provider com regra da janela de 24 h) e ajustes nas ondas 2, 5, 6 e 7.
+  Somente documentacao. (#1042)
 - Plano executavel do backend para o atendimento da Casa da Baba via **Huggy** (ADR-0049,
   `docs/plan/atendimento-huggy/`): 31 specs em 6 ondas (fundacao Huggy, pedido e cobranca Pix,
   esteira e cozinha, estoque minimo, CRM e pos-venda, campanhas) + 6 specs de poda, cada uma com

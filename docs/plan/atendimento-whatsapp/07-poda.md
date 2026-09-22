@@ -10,7 +10,7 @@ projetos; as tabelas ficam até uma migration única de limpeza (`P06`), para qu
 Aceite comum a todos os P: `gate.ps1` verde; `dotnet test EasyStok.CI.slnf` verde; contagem de controllers
 (`ls EasyStock.Api/Controllers | wc -l`) e de endpoints (`git grep -c "\[Http" EasyStock.Api/Controllers`)
 menor que antes, registrada no PR; smoke manual: `GET /api/storefront/{slug}/menu` responde 200 e o
-webhook da Huggy (S03) responde ao handshake. Tier: `chore` = baixo, exceto quando remove migration ou
+webhook da Meta (S03) responde à verificação. Tier: `chore` = baixo, exceto quando remove migration ou
 toca `Program.cs` (alto).
 
 ---
@@ -18,7 +18,7 @@ toca `Program.cs` (alto).
 ### P01 · Remover `EasyStock.Admin` e os controllers `Admin*`
 
 **Medido.** Admin: 145 arquivos, ~30 k linhas; API: 25 controllers `Admin*`, 146 endpoints.
-**Pré-condição.** As quatro funções que o Admin ainda entrega precisam de endpoint tenant (policy `Admin`, não `SuperAdmin`) para o console novo: templates e rotinas de notificação (`AdminNotificacoesController`, 20 endpoints → mover os de template/rotina/canal para `NotificacoesController`), configuração de storefront e janelas/frete (`AdminStorefrontController` → `TenantVitrineCardapioController` já cobre cardápio; criar `StorefrontConfiguracaoController` com `GET|PUT` de storefront, janelas, bloqueios, zonas), diagnóstico de WhatsApp (cai: a Huggy tem o dela), feature flags (`FeatureFlagsController` já é tenant).
+**Pré-condição.** As quatro funções que o Admin ainda entrega precisam de endpoint tenant (policy `Admin`, não `SuperAdmin`) para o console novo: templates e rotinas de notificação (`AdminNotificacoesController`, 20 endpoints → mover os de template/rotina/canal para `NotificacoesController`), configuração de storefront e janelas/frete (`AdminStorefrontController` → `TenantVitrineCardapioController` já cobre cardápio; criar `StorefrontConfiguracaoController` com `GET|PUT` de storefront, janelas, bloqueios, zonas), diagnóstico de WhatsApp (vira `GET api/integracoes/whatsapp/status`, S01), feature flags (`FeatureFlagsController` já é tenant).
 **Escopo.** Remover projeto `EasyStock.Admin`, `EasyStock.Admin.UnitTests`, `fly.admin.toml`, `Dockerfile.cloudrun.admin`, serviço `admin` em `render.yaml`/`docker-compose.azure.yml`, os 25 controllers `Admin*`, `App/UseCases/Admin/**` (1.549 linhas) exceto o que os endpoints tenant novos reusam, entidades `AdminAuditLog`, `AdminImpersonationLog`, `AdminAcessoPiiLog`, `AdminNotaTenant` (código; tabelas em P06), `SubscriptionGateMiddleware`? Não: é P02. Atualizar `EasyStok.sln` e `EasyStok.CI.slnf`.
 **Aceite.** Além do comum: os endpoints tenant novos têm teste de autorização (empresa A não altera storefront de B).
 **Rollback.** `git revert` do PR.
@@ -77,7 +77,7 @@ toca `Program.cs` (alto).
 
 **Escopo.**
 - Projetos: `EasyStock.Contracts` (4 arquivos, só `Infra.Integrations` referencia), `Infra.MongoDb.IntegrationTests` vazio (#780).
-- Providers: `StripeGatewayAdapter` (stub declarado), `ZenviaSmsProvider`, `TwilioWhatsAppProvider`, `MetaCloudWhatsAppProvider`, `StubWhatsAppOtpSender`? (OTP do site continua: manter), `MercadoPagoGatewayAdapter`/`PagamentoGatewayRouter`/`GatewayRoutingRule`/`GatewayHealthSnapshot`/`PaymentAttempt*` — **decisão do Felipe** (D2 do doc 04): se o site migrar para Pix (S11 no checkout), o Mercado Pago sai inteiro; senão fica só `MercadoPagoClient` + webhook, sem roteador. Fecha #783 como "Huggy".
+- Providers: `StripeGatewayAdapter` (stub declarado), `ZenviaSmsProvider`, `TwilioWhatsAppProvider` (o `MetaCloudWhatsAppProvider` fica: é o provider oficial, S09), `StubWhatsAppOtpSender`? (OTP do site continua: manter), `MercadoPagoGatewayAdapter`/`PagamentoGatewayRouter`/`GatewayRoutingRule`/`GatewayHealthSnapshot`/`PaymentAttempt*` — **decisão do Felipe** (D2 do doc 04): se o site migrar para Pix (S11 no checkout), o Mercado Pago sai inteiro; senão fica só `MercadoPagoClient` + webhook, sem roteador. Fecha #783 como "Meta direto".
 - Compras: `Fornecedor`, `PedidoFornecedor`, `DocumentoEntrada`, `SugestaoCompra` (1.410 linhas, 16 endpoints) saem; `ListasCompras` e reposição (ADR-0039) ficam como "lista do dia de produção".
 - Rotulagem P-02: `ProdutoFichaTecnica` nutricional, `EtiquetaTemplateSistema`, editor de etiqueta e ADR-0021 ficam **fora** do roadmap; etiqueta simples de lote (produto, validade, instrução) permanece. Marcar ADR-0021 como Superseded por ADR-0049.
 - Deploy: manter **um** alvo (medir qual serve produção: `docker-compose.azure.yml` + Caddy na VM é o único que serve `casadababa.com`); remover `fly.toml`, `fly.web.toml`, `render.yaml`, `k8s/`, `azure-pipelines.yml`, `docker-compose.azure.images.yml`/`.noedge.yml` se não usados, workflows `deploy-render.yml`, `preview-render.yml`; `README.md` (Azure App Service, .NET 9) e `CLAUDE.md` (.NET 8, Fly) corrigidos para a realidade.

@@ -1,6 +1,6 @@
 # ADR-0049 — Huggy como canal de atendimento, EasyStok como cérebro
 
-- Status: Proposto (vira Aceito no merge da issue #1040)
+- Status: Superseded por ADR-0050 em 2026-09-22 (decisão trocada para Meta Cloud API direto antes de qualquer implementação)
 - Data: 2026-09-22
 - Contexto: levantamento com a Tatiana em 21/09/2026 (docs 01-03) e análise do backend em 22/09 (doc 04), ambos em `C:\Users\felip\Downloads\`
 - Relacionados: ADR-0048 (plataforma única, sem SaaS), ADR-0042 (esteira canônica), ADR-0030 (outbox transacional), ADR-0010 (RLS), decisão de 08/08/2026 de manter notificações internas (sem Hiram)
