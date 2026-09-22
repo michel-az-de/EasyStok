@@ -1,59 +1,28 @@
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
-using EasyStock.Infra.Notifications.Options;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Polly;
-using Polly.Retry;
 
 namespace EasyStock.Infra.Notifications.WhatsApp;
 
+/// <summary>
+/// Delega ao <see cref="IWhatsAppCloudClient"/> (S02) — não fala HTTP direto com a Meta.
+/// Retry de rede/timeout é responsabilidade do pipeline Polly de dentro do cliente; erro de
+/// aplicação da Meta (<see cref="WhatsAppCloudException"/>) vira <see cref="ResultadoEnvio"/> com
+/// falha, sem exceção subir para o dispatcher de notificações.
+/// </summary>
 public sealed class MetaCloudWhatsAppProvider(
-    IHttpClientFactory httpClientFactory,
-    IOptions<MetaCloudWhatsAppOptions> options,
+    IWhatsAppCloudClient cloudClient,
     ILogger<MetaCloudWhatsAppProvider> logger) : IProvedorWhatsApp
 {
     public string Nome => "meta";
 
-    private static readonly ResiliencePipeline Pipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 3,
-            BackoffType = DelayBackoffType.Exponential,
-            Delay = TimeSpan.FromSeconds(1),
-            ShouldHandle = new PredicateBuilder().Handle<HttpRequestException>()
-        })
-        .Build();
-
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
-        var opts = options.Value;
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
-            await Pipeline.ExecuteAsync(async pollyToken =>
-            {
-                using var client = httpClientFactory.CreateClient("MetaWhatsApp");
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", opts.AccessToken);
-
-                var url = $"{opts.BaseUrl}/{opts.PhoneNumberId}/messages";
-                var body = JsonSerializer.Serialize(new
-                {
-                    messaging_product = "whatsapp",
-                    to = mensagem.Destinatario,
-                    type = "text",
-                    text = new { body = mensagem.Corpo }
-                });
-
-                var content = new StringContent(body, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync(url, content, pollyToken);
-                response.EnsureSuccessStatusCode();
-            }, ct);
-
+            await cloudClient.EnviarTextoAsync(mensagem.Destinatario, mensagem.Corpo, ct: ct);
             sw.Stop();
             return new ResultadoEnvio(Sucesso: true, ProviderUsado: "meta", DuracaoMs: sw.ElapsedMilliseconds);
         }
@@ -83,46 +52,11 @@ public sealed class MetaCloudWhatsAppProvider(
         string languageCode = "pt_BR",
         CancellationToken ct = default)
     {
-        var opts = options.Value;
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
-            await Pipeline.ExecuteAsync(async pollyToken =>
-            {
-                using var client = httpClientFactory.CreateClient("MetaWhatsApp");
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", opts.AccessToken);
-
-                var url = $"{opts.BaseUrl}/{opts.PhoneNumberId}/messages";
-                var parameters = vars.Select(v => new { type = "text", text = v }).ToArray();
-                var components = vars.Count > 0
-                    ? new object[] { new { type = "body", parameters } }
-                    : Array.Empty<object>();
-
-                var body = JsonSerializer.Serialize(new
-                {
-                    messaging_product = "whatsapp",
-                    to = destino,
-                    type = "template",
-                    template = new
-                    {
-                        name = templateName,
-                        language = new { code = languageCode },
-                        components
-                    }
-                });
-
-                var content = new StringContent(body, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync(url, content, pollyToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var detalhe = await response.Content.ReadAsStringAsync(pollyToken);
-                    throw new InvalidOperationException(
-                        $"Meta WhatsApp retornou HTTP {(int)response.StatusCode}: {detalhe}");
-                }
-            }, ct);
-
+            await cloudClient.EnviarTemplateAsync(destino, templateName, languageCode, vars, ct: ct);
             sw.Stop();
             return new ResultadoEnvio(Sucesso: true, ProviderUsado: "meta:template", DuracaoMs: sw.ElapsedMilliseconds);
         }

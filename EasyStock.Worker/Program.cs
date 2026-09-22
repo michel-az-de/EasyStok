@@ -157,6 +157,8 @@ builder.Services.AddSingleton<EasyStock.Application.Ports.Output.ICacheService, 
 builder.Services.AddEasyStockIntegrationResilience();
 builder.Services.AddFocusNFeAdapter(builder.Configuration);
 builder.Services.AddMockFiscalGateway();
+// Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
+builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
 // Scoped (não Singleton): a factory consome IGatewayFiscal Scoped — como Singleton
 // capturava gateways scoped (captive dependency / lifetime mismatch). Mesmo fix da
 // API (#193). Os jobs (hosted services) já resolvem os use cases fiscais via
