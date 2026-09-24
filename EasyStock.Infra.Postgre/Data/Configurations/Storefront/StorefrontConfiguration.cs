@@ -39,6 +39,7 @@ public class StorefrontConfiguration : IEntityTypeConfiguration<StorefrontEntity
         builder.Property(s => s.CorPrimaria).HasMaxLength(7);
         builder.Property(s => s.WhatsappPedidos).HasMaxLength(20);
         builder.Property(s => s.MensagemForaArea).HasMaxLength(500);
+        builder.Property(s => s.CardapioImagemUrl).HasMaxLength(500);
 
         builder.Property(s => s.PedidoMinimoEntrega)
             .HasColumnType("decimal(10,2)")
