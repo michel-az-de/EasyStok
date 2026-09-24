@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Configuração do atendimento por WhatsApp por empresa (S08, onda 1, ADR-0050):
+  `ConfiguracaoAtendimento` (tom, nível de sugestão, saudações, frase de espera, mensagem fora de
+  área, respiro e tempo de preparo padrão), `GET|PUT api/atendimento/configuracao` (Admin — GET
+  nunca 404, devolve o padrão) e `Storefront.CardapioImagemUrl`. `PromptAtendimento` compõe o
+  cabeçalho do system prompt do agente a partir de tom e nível de sugestão (S06 estende). (#1050)
 - Plano do atendimento revisado para **Meta Cloud API direto** (ADR-0050 supersede ADR-0049):
   pasta renomeada para `docs/plan/atendimento-whatsapp/`, onda 1 reescrita (credenciais da Meta,
   cliente Graph com botoes e midia, webhook com `hub.challenge` e HMAC, conversa por `wa_id`,
