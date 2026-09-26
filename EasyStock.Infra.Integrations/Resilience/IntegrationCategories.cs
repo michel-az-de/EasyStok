@@ -17,9 +17,10 @@ public static class IntegrationCategories
     public const string Fiscal = "fiscal";
     public const string Marketplace = "marketplace";
     public const string Logistics = "logistics";
+    public const string WhatsApp = "whatsapp";
 
     public static readonly IReadOnlyCollection<string> All = new[]
     {
-        Payments, Fiscal, Marketplace, Logistics,
+        Payments, Fiscal, Marketplace, Logistics, WhatsApp,
     };
 }
