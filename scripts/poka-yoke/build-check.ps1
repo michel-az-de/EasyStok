@@ -28,6 +28,20 @@ if (-not (Test-Path $slnf)) {
     exit 2
 }
 
+# Hook pre-commit (ADR-0040): sem core.hooksPath=.husky o gate nao roda no commit (issue 1058).
+# Clone novo nao instala sozinho; o passo 0 roda este script em toda sessao, entao corrige aqui.
+Push-Location $repoRoot
+try {
+    if ((git config core.hooksPath) -ne '.husky') {
+        Write-Host "[build-check] hook pre-commit ausente -- instalando Husky.Net." -ForegroundColor Yellow
+        dotnet tool restore | Out-Null
+        dotnet husky install
+        if ((git config core.hooksPath) -ne '.husky') {
+            Write-Host "[build-check] FALHOU instalar o Husky -- commits vao passar SEM gate." -ForegroundColor Red
+        }
+    }
+} finally { Pop-Location }
+
 Write-Host "[build-check] solution filter: $slnf"
 Write-Host "[build-check] saida temporaria: $outDir (fora dos bins do ambiente local)"
 
