@@ -1,3 +1,6 @@
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.AcoesBotao;
@@ -27,7 +30,7 @@ public class RoteadorAcoesBotaoTests
         // resolvida pelo handler. A prova de que o webhook não enfileira o turno do agente para
         // "acao:" está em ProcessarEventoWhatsAppUseCaseTests.BotaoAcaoNaoChamaAgente.
         var roteador = new RoteadorAcoesBotao(
-            [new ConfirmarEnderecoAcaoBotao(new EscaladorConversa(_conversaRepository))],
+            [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()))],
             NullLogger<RoteadorAcoesBotao>.Instance);
         var conversa = NovaConversa();
 

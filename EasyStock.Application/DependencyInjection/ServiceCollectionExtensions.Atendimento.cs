@@ -5,6 +5,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.AcoesBotao;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -28,7 +29,7 @@ public static partial class ServiceCollectionExtensions
         // S06: agente de atendimento (LLM com ferramentas) e roteador de botões sem LLM.
         services.AddScoped<AgenteAtendimentoService>();
         services.AddScoped<ProcessarTurnoAgenteUseCase>();
-        services.AddScoped<IEscaladorConversa, EscaladorConversa>(); // TODO(S07): EscalarConversaUseCase (push + SSE)
+        services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE
         services.AddScoped<RoteadorAcoesBotao>();
         services.AddScoped<IAcaoBotaoHandler, ConfirmarEnderecoAcaoBotao>();
         // TODO(S16): acao:escolher_janela; TODO(S26): acao:avaliacao.
@@ -42,6 +43,12 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IFerramentaAgente, ConsultarPedidoFerramenta>();
         services.AddScoped<IFerramentaAgente, EscalarParaDonaFerramenta>();
         services.AddScoped<IFerramentaAgente, EncerrarConversaFerramenta>();
+
+        // S07: handoff pelo console (inbox, envio da dona, assumir, liberar, encerrar, marcar lida).
+        services.AddScoped<ListarConversasAtendimentoUseCase>();
+        services.AddScoped<ListarMensagensConversaUseCase>();
+        services.AddScoped<EnviarMensagemConsoleUseCase>();
+        services.AddScoped<GerenciarConversaAtendimentoUseCase>();
 
         return services;
     }

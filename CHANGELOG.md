@@ -6,6 +6,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Handoff pelo console do atendimento (S07, ADR-0050): `api/atendimento/conversas` (policy
+  `Operador`) com inbox (última mensagem, não lidas, busca por nome ou contato), histórico
+  paginado por `antesDe`, envio de texto e imagem pela porta do canal (S34) como
+  `Mensagem(Saida, Dona)` que deixa a conversa `Assumida` e cala o agente, `assumir`,
+  `liberar-automatico` (nota interna com o usuário), `encerrar` e `marcar-lida`. Fora da janela de
+  24 h (domínio ou erro 131047 da Meta): 409 `{ erro: "fora_da_janela_24h", sugestao: "template" }`
+  e nada gravado. `EscalarConversaUseCase` completa a porta `IEscaladorConversa` da S06: evento
+  `ConversaEscalada = 46` no outbox, Web Push para todas as subscriptions da empresa (destinatário
+  `empresa:{id}`) e SSE `conversa.escalada` (no-op até S18). (#1068)
 - Identidade da conversa **por canal** e porta de envio (S34, ADR-0051): `CanalConversa` ganha
   Instagram, Messenger, ChatSite, Email e Sms; `CapacidadesCanal` diz o que cada um aceita (janela,
   modelo, tag fora da janela, mídia, botões). `Conversa.ContatoWaId` vira `ContatoIdExterno`

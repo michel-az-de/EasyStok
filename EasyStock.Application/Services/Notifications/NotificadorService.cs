@@ -208,7 +208,7 @@ public sealed class NotificadorService(
             return;
         }
 
-        var destinatario = ResolverDestinatario(vars, canalPrimario);
+        var destinatario = ResolverDestinatario(vars, canalPrimario, evento.EmpresaId);
         if (string.IsNullOrWhiteSpace(destinatario))
         {
             logger.LogWarning(
@@ -294,8 +294,18 @@ public sealed class NotificadorService(
 
     private static string ResolverDestinatario(
         IDictionary<string, object?> vars,
-        CanalNotificacao canal)
+        CanalNotificacao canal,
+        Guid empresaId)
     {
+        // Web Push (S07): o usuario do payload recebe em todos os dispositivos dele; sem usuario,
+        // todas as subscriptions ativas da empresa (convencao "usuario:"/"empresa:" do WebPushCanal).
+        if (canal == CanalNotificacao.Push)
+        {
+            return vars.TryGetValue("usuarioId", out var uid) && uid is string u && Guid.TryParse(u, out var usuarioId)
+                ? $"usuario:{usuarioId}"
+                : $"empresa:{empresaId}";
+        }
+
         var chaves = canal switch
         {
             CanalNotificacao.Email => new[] { "email", "emailDestino", "usuarioEmail" },

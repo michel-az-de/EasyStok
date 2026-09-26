@@ -70,6 +70,74 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<ConversaInboxItem>> ListarInboxAsync(
+        Guid empresaId,
+        SituacaoConversa? situacao,
+        string? busca,
+        int pagina,
+        int tamanhoPagina,
+        CancellationToken ct = default)
+    {
+        var paginaEfetiva = Math.Max(pagina, 1);
+        var tamanho = Math.Clamp(tamanhoPagina, 1, MaxPagina);
+
+        var query = db.AtendimentoConversas
+            .AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId);
+
+        if (situacao is { } s)
+            query = query.Where(c => c.Situacao == s);
+
+        if (!string.IsNullOrWhiteSpace(busca))
+        {
+            var padrao = $"%{busca.Trim()}%";
+            query = query.Where(c => EF.Functions.ILike(c.ContatoNome ?? string.Empty, padrao)
+                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao));
+        }
+
+        var linhas = await query
+            .OrderByDescending(c => c.UltimaMensagemEm)
+            .Skip((paginaEfetiva - 1) * tamanho)
+            .Take(tamanho)
+            .Select(c => new
+            {
+                Conversa = c,
+                UltimoTexto = db.AtendimentoMensagens
+                    .Where(m => m.EmpresaId == empresaId && m.ConversaId == c.Id)
+                    .OrderByDescending(m => m.EnviadaEm)
+                    .ThenByDescending(m => m.Id)
+                    .Select(m => m.Texto)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        return linhas.Select(l => new ConversaInboxItem(l.Conversa, l.UltimoTexto)).ToList();
+    }
+
+    public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
+        Guid empresaId,
+        Guid conversaId,
+        DateTime? antesDe,
+        int limite,
+        CancellationToken ct = default)
+    {
+        var query = db.AtendimentoMensagens
+            .AsNoTracking()
+            .Where(m => m.EmpresaId == empresaId && m.ConversaId == conversaId);
+
+        if (antesDe is { } cursor) // UTC: o use case normaliza
+            query = query.Where(m => m.EnviadaEm < cursor);
+
+        var pagina = await query
+            .OrderByDescending(m => m.EnviadaEm)
+            .ThenByDescending(m => m.Id)
+            .Take(Math.Clamp(limite, 1, MaxMensagens))
+            .ToListAsync(ct);
+
+        pagina.Reverse(); // cronologica: a mais nova por ultimo
+        return pagina;
+    }
+
     public async Task<IReadOnlyList<Conversa>> ListarPorClienteAsync(Guid empresaId, Guid clienteId, int max = 5, CancellationToken ct = default) =>
         await db.AtendimentoConversas
             .AsNoTracking()
