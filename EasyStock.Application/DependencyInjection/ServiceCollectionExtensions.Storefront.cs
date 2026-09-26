@@ -41,6 +41,11 @@ public static partial class ServiceCollectionExtensions
         // Checkout (CHECKOUT-001 base + WEBHOOK-001)
         services.AddScoped<CheckoutIdempotencyService>();
         services.AddScoped<IniciarCheckoutUseCase>();
+
+        // S40: expediente da loja (abrir e fechar, horário por dia).
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.ObterExpedienteLojaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.AtualizarExpedienteLojaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.DefinirControleExpedienteUseCase>();
         services.AddScoped<LiberarVagaOnPedidoCanceladoHandler>();
 
         // #680 — checkout GUEST sem login + token de acompanhamento.
