@@ -100,7 +100,9 @@ public sealed class MetaCloudWhatsAppProvider(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             sw.Stop();
-            logger.LogError(ex, "Falha Meta WhatsApp template {Template}.", templateName);
+            // Nome do template pode vir do diagnóstico do admin: sem quebra de linha no log (log forging).
+            logger.LogError(ex, "Falha Meta WhatsApp template {Template}.",
+                templateName.Replace("\r", "", StringComparison.Ordinal).Replace("\n", "", StringComparison.Ordinal));
             return new ResultadoEnvio(Sucesso: false, ProviderUsado: "meta:template",
                 ErroDetalhado: ex.Message, DuracaoMs: sw.ElapsedMilliseconds);
         }
