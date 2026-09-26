@@ -8,9 +8,8 @@ public static class FilaAtendimentoNomes
 }
 
 /// <summary>
-/// Enfileirado pelo webhook (S03) para o agente (S06) responder fora da requisição. S06 ainda não
-/// existe: por ora nada drena esta fila além dos testes, que chamam <see cref="Ports.Output.IQueueService.ProcessQueueAsync{T}"/>
-/// diretamente para provar que o job enfileirado é processável.
+/// Enfileirado pelo webhook (S03/S05) para o agente (S06) responder fora da requisição. Consumido por
+/// <c>AtendimentoFilaTurnoAgenteBackgroundService</c> (Api), que chama <c>ProcessarTurnoAgenteUseCase</c>.
 /// </summary>
 public sealed record ProcessarTurnoAgenteJob(Guid EmpresaId, Guid ConversaId);
 

@@ -13,6 +13,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   rename (não perde dados) e o Down recusa com conversa de outro canal. `GarantirPodeEnviarTextoLivre`
   recusa texto livre fora da janela sem tag válida. `ICanalMensageria` + `ResolvedorCanal` +
   adaptador `CanalWhatsApp`. (#1065)
+- Agente de atendimento por WhatsApp com LLM e ferramentas (S06, onda 1, ADR-0050):
+  `AgenteAtendimentoService` responde fora da requisição (fila `TurnoAgente`, consumida na Api)
+  com a API Messages da Anthropic (`AnthropicMessagesClient`, modelo em `Anthropic:ModeloAgente`,
+  padrão `claude-sonnet-5`), até 6 iterações de ferramenta; ao estourar, envia a frase de espera e
+  escala. Ferramentas desta fatia: `consultar_cardapio`, `enviar_cardapio_imagem`,
+  `consultar_pedido`, `escalar_para_dona` (mínimo; aviso por push/SSE na S07) e
+  `encerrar_conversa`; pedido, endereço, janelas e CRM entram com a onda 2. Prompt com RN-01 a
+  RN-08 e D3 (snapshot), notas internas marcadas `[interno]`, consumo em `UsoIa`.
+  `RoteadorAcoesBotao` resolve `acao:<nome>:<payload>` sem LLM. Desligado com
+  `Anthropic:Enabled=false`, `Anthropic:AgenteAtendimentoEnabled=false` ou sem chave. (#1064)
+- Identificação do cliente ou lead pelo telefone no atendimento por WhatsApp (S05, onda 1,
+  ADR-0050): na primeira mensagem de uma conversa nova, `IdentificarClientePorTelefoneUseCase`
+  procura o `Cliente` pelo `TelefoneHash` do OTP e pelo `Telefone` do cadastro (E.164 e dígitos
+  nacionais, com a variante do nono dígito que a Meta omite em celulares antigos) ou cria o lead
+  com o telefone marcado como WhatsApp; a conversa é vinculada ao cadastro. A saudação
+  (`SaudacaoAtendimento`: primeiro contato ou retorno com `{nome}`, link do cardápio e frase de
+  espera) sai antes do agente e fica gravada como `Mensagem(Saida, Sistema)`.
+  `NormalizadorTelefone` passa a ser a normalização E.164 única do OTP e do atendimento. (#1062)
 - Webhook da Meta Cloud API (S03, onda 1, ADR-0050): `GET|POST api/webhooks/whatsapp` — GET
   responde a verificação, POST valida `X-Hub-Signature-256` (HMAC-SHA256, tempo constante) e
   devolve 200 quando a assinatura é válida, ou 503 quando uma mensagem falhou por motivo que um

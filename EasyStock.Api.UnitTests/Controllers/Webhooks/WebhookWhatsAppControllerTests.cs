@@ -5,6 +5,9 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities;
@@ -12,6 +15,7 @@ using EasyStock.Infra.Notifications.Options;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -42,6 +46,12 @@ public class WebhookWhatsAppControllerTests
             Substitute.For<IOperacaoEventPublisher>(),
             Substitute.For<ITenantContextAccessor>(),
             _unitOfWork,
+            new IdentificarClientePorTelefoneUseCase(
+                Substitute.For<IClienteRepository>(),
+                Substitute.For<IClienteStorefrontRepository>(),
+                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            new SaudacaoAtendimento(Substitute.For<IStorefrontRepository>(), new ConfigurationBuilder().Build()),
+            new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 
         var metaOptions = Options.Create(new MetaCloudWhatsAppOptions { VerifyToken = VerifyToken, AppSecret = AppSecret });

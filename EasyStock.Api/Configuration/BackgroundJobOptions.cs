@@ -67,4 +67,10 @@ public sealed class BackgroundJobOptions
     /// (só notifica, não fecha — ADR-0034 / issue #641). Default true em producao.
     /// </summary>
     public bool EnableCaixaEsquecidoJob { get; set; } = true;
+
+    /// <summary>
+    /// Drena a fila em memória do turno do agente de atendimento (S06). Roda na Api porque o webhook
+    /// que enfileira está aqui e <c>BackgroundQueueService</c> não atravessa processos.
+    /// </summary>
+    public bool EnableAtendimentoTurnoAgente { get; set; } = true;
 }

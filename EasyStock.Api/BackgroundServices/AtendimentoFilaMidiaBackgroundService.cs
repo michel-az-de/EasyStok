@@ -5,7 +5,7 @@ namespace EasyStock.Api.BackgroundServices;
 /// <summary>
 /// Drena a fila em processo <see cref="FilaAtendimentoNomes.MidiaWhatsApp"/> (S03): o webhook
 /// enfileira, este loop chama <see cref="ProcessarMidiaWhatsAppJobUseCase"/> fora da requisição.
-/// <see cref="FilaAtendimentoNomes.TurnoAgente"/> ainda não tem consumidor — entra com S06.
+/// <see cref="FilaAtendimentoNomes.TurnoAgente"/> tem consumidor próprio (<c>AtendimentoFilaTurnoAgenteBackgroundService</c>, S06).
 /// Roda no processo da API, e não no Worker, porque <c>BackgroundQueueService</c> é em memória: só o
 /// processo que enfileira enxerga a fila. Não sobrevive a restart; perda de job nesta janela
 /// é aceitável para mídia (o texto da mensagem já foi salvo, só o anexo atrasa).
