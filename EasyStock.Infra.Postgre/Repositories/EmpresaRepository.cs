@@ -15,6 +15,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                 : dbContext.Empresas.AsNoTracking()
                     .FirstOrDefaultAsync(e => e.Documento == documento);
 
+        public Task<Empresa?> GetByWhatsAppPhoneNumberIdAsync(string phoneNumberId, CancellationToken ct = default) =>
+            string.IsNullOrWhiteSpace(phoneNumberId)
+                ? Task.FromResult<Empresa?>(null)
+                : dbContext.Empresas.AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.WhatsAppPhoneNumberId == phoneNumberId, ct);
+
         public async Task<IEnumerable<Empresa>> GetAllAsync() =>
             await dbContext.Empresas.AsNoTracking().ToListAsync();
 
