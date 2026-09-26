@@ -2,11 +2,17 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Webhook;
 
@@ -25,6 +31,9 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly IOperacaoEventPublisher _eventPublisher = Substitute.For<IOperacaoEventPublisher>();
     private readonly ITenantContextAccessor _tenantContext = Substitute.For<ITenantContextAccessor>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
+    private readonly IClienteRepository _clienteRepository = Substitute.For<IClienteRepository>();
+    private readonly IClienteStorefrontRepository _clienteStorefrontRepository = Substitute.For<IClienteStorefrontRepository>();
+    private readonly IStorefrontRepository _storefrontRepository = Substitute.For<IStorefrontRepository>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly ProcessarEventoWhatsAppUseCase _useCase;
 
@@ -33,7 +42,15 @@ public class ProcessarEventoWhatsAppUseCaseTests
         _useCase = new ProcessarEventoWhatsAppUseCase(
             _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
             _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext,
-            _unitOfWork, NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
+            _unitOfWork,
+            new IdentificarClientePorTelefoneUseCase(
+                _clienteRepository, _clienteStorefrontRepository,
+                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
+            NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
+
+        _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.saida"));
 
         var empresa = Empresa.Criar("Casa da Baba", "11111111000191");
         empresa.Id = _empresaId;
@@ -197,6 +214,85 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
             Arg.Any<Guid>(), sucesso: false, "empresa_desconhecida", Arg.Any<CancellationToken>());
         await _conversaRepository.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagemSaudaAntesDoAgente()
+    {
+        var existente = ClienteEntity.Criar(_empresaId, "Maria Silva");
+        _clienteStorefrontRepository
+            .GetByTelefoneHashAsync(_empresaId, ClienteOtp.CalcularTelefoneHash("+" + ContatoWaId), Arg.Any<CancellationToken>())
+            .Returns(existente);
+
+        var ordem = new List<string>();
+        var relogio = System.Diagnostics.Stopwatch.StartNew();
+        TimeSpan? saudacaoEm = null;
+        string? textoSaudacao = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                saudacaoEm ??= relogio.Elapsed;
+                textoSaudacao = ci.ArgAt<string>(1);
+                ordem.Add("saudacao");
+                return new EnvioWhatsAppResult("wamid.saudacao");
+            });
+        await _queueService.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Do<ProcessarTurnoAgenteJob>(_ => ordem.Add("agente")));
+        Conversa? conversaAberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => conversaAberta = c), Arg.Any<CancellationToken>());
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.primeira", "Oi"));
+
+        ordem.Should().Equal("saudacao", "agente");
+        saudacaoEm.Should().NotBeNull().And.BeLessThan(TimeSpan.FromSeconds(5));
+        textoSaudacao.Should().Contain("Maria").And.Contain("/cardapio");
+        conversaAberta!.ClienteId.Should().Be(existente.Id);
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Sistema
+                                  && m.ExternoId == "wamid.saudacao" && m.Texto == textoSaudacao),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagemDeDesconhecidoSaudaPrimeiroContatoECriaLead()
+    {
+        string? textoSaudacao = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Do<string>(t => textoSaudacao = t), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.saudacao"));
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.lead", "Oi"));
+
+        await _clienteRepository.Received(1).AddAsync(Arg.Is<ClienteEntity>(c => c.Nome == "Fulano" && c.OrderCount == 0));
+        textoSaudacao.Should().StartWith(ConfiguracaoAtendimento.CriarPadrao(_empresaId).SaudacaoPrimeiroContato.Split('{')[0]);
+    }
+
+    [Fact]
+    public async Task ConversaAbertaNaoRepeteSaudacao()
+    {
+        var aberta = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddMinutes(-5), "Fulano");
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(aberta);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.segunda", "Quero um bolo"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task FalhaNaSaudacaoNaoImpedeAgente()
+    {
+        _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<EnvioWhatsAppResult>(_ => throw new HttpRequestException("meta fora"));
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.falha", "Oi"));
+
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema && m.Status == StatusMensagem.Falhou),
+            Arg.Any<CancellationToken>());
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _webhookRecebidoRepository.DidNotReceive().MarcarProcessadoAsync(
+            Arg.Any<Guid>(), sucesso: false, Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
