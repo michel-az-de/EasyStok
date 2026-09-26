@@ -14,6 +14,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.Property(e => e.Telefone).HasMaxLength(30);
             builder.Property(e => e.Segmento).HasMaxLength(40);
             builder.Property(e => e.OnboardingCompleto).HasDefaultValue(false);
+
+            builder.Property(e => e.WhatsAppPhoneNumberId).HasMaxLength(32);
+            builder.HasIndex(e => e.WhatsAppPhoneNumberId)
+                .IsUnique()
+                .HasFilter("\"WhatsAppPhoneNumberId\" IS NOT NULL");
         }
     }
 }

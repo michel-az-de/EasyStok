@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Fundacao da integracao com a **Meta Cloud API** (S01, onda 1 do atendimento WhatsApp,
+  ADR-0050): `MetaCloudWhatsAppOptions` ganha `AppSecret`, `VerifyToken`, `ApiVersion` e
+  `WabaId`, com o startup falhando cedo (nomeando a chave) quando o provider `meta` esta ligado
+  sem credencial. `Empresa.WhatsAppPhoneNumberId` (indice unico parcial) roteia o webhook (S03)
+  ate o tenant. Flag `modulo.atendimento` em `FeatureCatalogo` (ADR-0048) e
+  `GET api/integracoes/whatsapp/status` (Admin) expondo o status por tenant, 404 sem a flag.
+  (#1046)
 - Agregado **Conversa/Mensagem** do atendimento por WhatsApp (S04, ADR-0050): entidades com
   situacao (automatica, assumida, encerrada), janela de 24 h contada da ultima mensagem do cliente,
   contexto JSON e status de entrega monotono; tabelas `atendimento_conversas` e

@@ -92,11 +92,15 @@ public static class FeatureCatalogo
     public const string ModuloComercial = "modulo.comercial";
     public const string ModuloCrm = "modulo.crm";
 
+    /// <summary>Atendimento por WhatsApp (ADR-0050): agente, conversa e handoff pelo console.</summary>
+    public const string ModuloAtendimento = "modulo.atendimento";
+
     /// <summary>Features conhecidas, na ordem em que aparecem no back-office.</summary>
     public static IReadOnlyList<FeatureConhecida> Conhecidas { get; } =
     [
         new(ModuloComercial, "Propostas, contratos e catálogo de serviços (B2B)."),
         new(ModuloCrm, "Clientes PJ, pipeline e oportunidades (B2B)."),
+        new(ModuloAtendimento, "Atendimento por WhatsApp: agente, conversa e handoff pelo console."),
     ];
 
     /// <summary>
