@@ -10,7 +10,7 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
         builder.HasKey(c => c.Id);
 
         builder.Property(c => c.EmpresaId).IsRequired();
-        builder.Property(c => c.ContatoWaId).IsRequired().HasMaxLength(Conversa.ContatoWaIdTamanhoMaximo + 5);
+        builder.Property(c => c.ContatoIdExterno).IsRequired().HasMaxLength(Conversa.ContatoIdExternoTamanhoMaximo);
         builder.Property(c => c.ContatoNome).HasMaxLength(Conversa.ContatoNomeTamanhoMaximo);
         builder.Property(c => c.Canal).HasConversion<int>().IsRequired();
         builder.Property(c => c.Situacao).HasConversion<int>().IsRequired();
@@ -19,12 +19,13 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
         builder.Property(c => c.UltimaMensagemEm).IsRequired();
         builder.Property(c => c.NaoLidas).IsRequired();
 
-        // Invariante: uma conversa aberta por contato e empresa. Encerrada (3) sai do indice,
-        // entao o mesmo contato pode abrir outra depois de encerrar (S04).
-        builder.HasIndex(c => new { c.EmpresaId, c.ContatoWaId })
+        // Invariante: uma conversa aberta por canal, contato e empresa. Encerrada (3) sai do indice,
+        // entao o mesmo contato pode abrir outra depois de encerrar (S04). O mesmo id em canais
+        // diferentes sao contatos diferentes (S34).
+        builder.HasIndex(c => new { c.EmpresaId, c.Canal, c.ContatoIdExterno })
             .IsUnique()
             .HasFilter("\"Situacao\" <> 3")
-            .HasDatabaseName("uq_atendimento_conversas_empresa_contato_aberta");
+            .HasDatabaseName("uq_atendimento_conversas_empresa_canal_contato_aberta");
 
         // Listagem do console: mais recentes primeiro.
         builder.HasIndex(c => new { c.EmpresaId, c.UltimaMensagemEm })

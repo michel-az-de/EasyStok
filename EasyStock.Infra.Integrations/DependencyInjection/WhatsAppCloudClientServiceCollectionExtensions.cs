@@ -37,6 +37,9 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         else
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<StubWhatsAppCloudClient>());
 
+        // Porta de canal (S34, ADR-0051): o WhatsApp e um dos adaptadores que o ResolvedorCanal escolhe.
+        services.AddScoped<ICanalMensageria, CanalWhatsApp>();
+
         return services;
     }
 }

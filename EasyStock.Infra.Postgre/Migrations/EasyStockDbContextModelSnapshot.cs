@@ -669,14 +669,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("ClienteId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ContatoIdExterno")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("ContatoNome")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
-
-                    b.Property<string>("ContatoWaId")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("ContextoJson")
                         .IsRequired()
@@ -713,14 +713,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("EmpresaId", "ClienteId")
                         .HasDatabaseName("ix_atendimento_conversas_empresa_cliente");
 
-                    b.HasIndex("EmpresaId", "ContatoWaId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_atendimento_conversas_empresa_contato_aberta")
-                        .HasFilter("\"Situacao\" <> 3");
-
                     b.HasIndex("EmpresaId", "UltimaMensagemEm")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_atendimento_conversas_empresa_ultima_msg");
+
+                    b.HasIndex("EmpresaId", "Canal", "ContatoIdExterno")
+                        .IsUnique()
+                        .HasDatabaseName("uq_atendimento_conversas_empresa_canal_contato_aberta")
+                        .HasFilter("\"Situacao\" <> 3");
 
                     b.ToTable("atendimento_conversas", (string)null);
                 });

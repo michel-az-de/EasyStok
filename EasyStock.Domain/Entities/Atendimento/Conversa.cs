@@ -1,17 +1,18 @@
 using System.Text.Json;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities.Atendimento;
 
 /// <summary>
-/// Conversa de atendimento com um contato de WhatsApp (S04, ADR-0050).
+/// Conversa de atendimento com um contato num canal (S04, ADR-0050; multicanal na S34, ADR-0051).
 ///
 /// <para>
 /// E o estado que o agente e o console precisam: se a dona assumiu (o agente cala,
 /// RN-04), qual pedido esta em andamento, o contexto do carrinho e a janela de 24 h
 /// da Meta (contada da ultima mensagem de entrada). Uma conversa fica aberta ate ser
 /// encerrada; a proxima mensagem do contato abre outra. A unicidade "uma aberta por
-/// contato e empresa" e garantida por indice parcial no banco.
+/// canal, contato e empresa" e garantida por indice parcial no banco.
 /// </para>
 ///
 /// <para>
@@ -20,21 +21,22 @@ namespace EasyStock.Domain.Entities.Atendimento;
 /// </summary>
 public class Conversa
 {
-    public const int JanelaAtendimentoHoras = 24;
     public const int ContatoWaIdTamanhoMinimo = 8;
     public const int ContatoWaIdTamanhoMaximo = 15;
+    public const int ContatoIdExternoTamanhoMaximo = 256;
     public const int ContatoNomeTamanhoMaximo = 120;
-
-    private static readonly TimeSpan JanelaAtendimento = TimeSpan.FromHours(JanelaAtendimentoHoras);
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid? ClienteId { get; private set; }
 
-    /// <summary>Numero do contato como a Meta entrega (<c>wa_id</c>): so digitos E.164, sem <c>+</c>.</summary>
-    public string ContatoWaId { get; private set; } = null!;
+    /// <summary>
+    /// Quem e o contato no canal: <c>wa_id</c> e telefone de SMS em digitos E.164, IGSID do
+    /// Instagram, PSID do Messenger, sessao do chat do site ou e-mail minusculo.
+    /// </summary>
+    public string ContatoIdExterno { get; private set; } = null!;
 
-    /// <summary>Nome do perfil do WhatsApp, quando informado.</summary>
+    /// <summary>Nome do perfil no canal, quando informado.</summary>
     public string? ContatoNome { get; private set; }
 
     public CanalConversa Canal { get; private set; }
@@ -61,7 +63,7 @@ public class Conversa
 
     public static Conversa Abrir(
         Guid empresaId,
-        string contatoWaId,
+        string contatoIdExterno,
         DateTime agora,
         string? contatoNome = null,
         Guid? clienteId = null,
@@ -78,7 +80,7 @@ public class Conversa
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ClienteId = clienteId,
-            ContatoWaId = NormalizarWaId(contatoWaId),
+            ContatoIdExterno = NormalizarContato(canal, contatoIdExterno),
             ContatoNome = NormalizarNome(contatoNome),
             Canal = canal,
             Situacao = SituacaoConversa.Automatica,
@@ -90,17 +92,47 @@ public class Conversa
         };
     }
 
+    /// <summary>Forma canonica do contato no canal. Usado tambem pelo repositorio para o lookup.</summary>
+    public static string NormalizarContato(CanalConversa canal, string? contato)
+    {
+        _ = CapacidadesCanal.Para(canal); // canal nao declarado nao abre conversa
+        return canal switch
+        {
+            CanalConversa.WhatsApp or CanalConversa.Sms => NormalizarWaId(contato),
+            CanalConversa.Email => NormalizarEmail(contato),
+            _ => NormalizarOpaco(contato),
+        };
+    }
+
     /// <summary>
     /// Reduz qualquer grafia (<c>+55 (11) 99999-0001</c>) aos digitos do <c>wa_id</c>.
-    /// Entre 8 e 15 digitos (E.164). Usado tambem pelo repositorio para o lookup.
+    /// Entre 8 e 15 digitos (E.164).
     /// </summary>
-    public static string NormalizarWaId(string? waId)
+    private static string NormalizarWaId(string? waId)
     {
         var digitos = new string((waId ?? string.Empty).Where(char.IsDigit).ToArray());
         if (digitos.Length < ContatoWaIdTamanhoMinimo || digitos.Length > ContatoWaIdTamanhoMaximo)
             throw new RegraDeDominioVioladaException(
                 $"ContatoWaId invalido: esperado entre {ContatoWaIdTamanhoMinimo} e {ContatoWaIdTamanhoMaximo} digitos (recebido '{waId}').");
         return digitos;
+    }
+
+    private static string NormalizarEmail(string? email)
+    {
+        var limpo = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var arroba = limpo.IndexOf('@');
+        if (arroba <= 0 || arroba == limpo.Length - 1 || limpo.Length > ContatoIdExternoTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"E-mail do contato invalido (recebido '{email}').");
+        return limpo;
+    }
+
+    /// <summary>IGSID, PSID ou sessao do site: identificador opaco do canal, so sem espacos nas pontas.</summary>
+    private static string NormalizarOpaco(string? id)
+    {
+        var limpo = (id ?? string.Empty).Trim();
+        if (limpo.Length == 0 || limpo.Length > ContatoIdExternoTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"Identificador do contato invalido (recebido '{id}').");
+        return limpo;
     }
 
     public void VincularCliente(Guid clienteId)
@@ -190,12 +222,40 @@ public class Conversa
         PedidoEmAndamentoId = pedidoId;
     }
 
+    public CapacidadesCanal Capacidades => CapacidadesCanal.Para(Canal);
+
     /// <summary>
-    /// Janela de atendimento da Meta: texto livre so pode ser enviado ate 24 h depois
-    /// da ultima mensagem do cliente; fora dela e preciso template aprovado.
+    /// Janela de atendimento do canal: no WhatsApp, Instagram e Messenger texto livre so sai ate
+    /// 24 h depois da ultima mensagem do cliente. Canal sem janela (site, e-mail, SMS) esta
+    /// sempre dentro.
     /// </summary>
-    public bool DentroDaJanela24h(DateTime agora) =>
-        UltimaMensagemEntradaEm is { } ultima && Utc(agora) - ultima < JanelaAtendimento;
+    public bool DentroDaJanela(DateTime agora)
+    {
+        if (Capacidades.HorasJanela is not { } horas) return true;
+        return UltimaMensagemEntradaEm is { } ultima && Utc(agora) - ultima < TimeSpan.FromHours(horas);
+    }
+
+    /// <summary>
+    /// Recusa texto livre fora da janela. Fora dela so passa com <paramref name="tag"/> que o canal
+    /// aceita e dentro do prazo da tag; no WhatsApp o caminho e o modelo aprovado, que nao passa
+    /// por aqui.
+    /// </summary>
+    public void GarantirPodeEnviarTextoLivre(DateTime agora, string? tag = null)
+    {
+        if (DentroDaJanela(agora)) return;
+
+        var capacidades = Capacidades;
+        var tagValida = tag is not null
+            && capacidades.TagsForaDaJanela.Contains(tag, StringComparer.Ordinal)
+            && capacidades.DiasMaximosComTag is { } dias
+            && UltimaMensagemEntradaEm is { } ultima
+            && Utc(agora) - ultima < TimeSpan.FromDays(dias);
+        if (tagValida) return;
+
+        throw new RegraDeDominioVioladaException(capacidades.AceitaModelo
+            ? "Fora da janela de atendimento: use um modelo aprovado."
+            : "Fora da janela de atendimento: o canal so aceita resposta humana com tag valida dentro do prazo.");
+    }
 
     private void GarantirAberta(string acao)
     {

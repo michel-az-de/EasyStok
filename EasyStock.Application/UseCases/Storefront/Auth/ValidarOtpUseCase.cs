@@ -1,5 +1,5 @@
-using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
@@ -47,15 +47,12 @@ public sealed class ValidarOtpUseCase(
 {
     public const int MaxAgeSecs = 60 * 60 * 24 * 30; // 30 dias
 
-    private static readonly Regex TelefoneE164BrRegex =
-        new(@"^\+55[1-9][0-9]\d{8,9}$", RegexOptions.Compiled);
-
     public async Task<ValidarOtpResult> ExecuteAsync(ValidarOtpInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
 
         // ── 1. Normalizar + validar telefone ────────────────────────────
-        var telefoneE164 = NormalizarTelefone(input.Telefone);
+        var telefoneE164 = NormalizadorTelefone.NormalizarE164Br(input.Telefone);
         var telefoneMascarado = MascararTelefone(telefoneE164);
 
         // ── 2. Resolver storefront → empresaId ──────────────────────────
@@ -174,43 +171,6 @@ public sealed class ValidarOtpUseCase(
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
-
-    private static string NormalizarTelefone(string telefone)
-    {
-        if (string.IsNullOrWhiteSpace(telefone))
-            throw new TelefoneInvalidoException();
-
-        var span = telefone.Trim();
-        var digitos = new System.Text.StringBuilder(span.Length);
-        var primeiro = true;
-        foreach (var c in span)
-        {
-            if (primeiro && c == '+')
-                digitos.Append('+');
-            else if (char.IsDigit(c))
-                digitos.Append(c);
-            else if (c is ' ' or '(' or ')' or '-' or '.')
-            { /* skip */ }
-            else
-                throw new TelefoneInvalidoException();
-
-            primeiro = false;
-        }
-
-        var normalizado = digitos.ToString();
-        if (!normalizado.StartsWith('+'))
-        {
-            if (normalizado.Length is 10 or 11)
-                normalizado = "+55" + normalizado;
-            else
-                throw new TelefoneInvalidoException();
-        }
-
-        if (!TelefoneE164BrRegex.IsMatch(normalizado))
-            throw new TelefoneInvalidoException();
-
-        return normalizado;
-    }
 
     private static string MascararTelefone(string telefoneE164)
     {

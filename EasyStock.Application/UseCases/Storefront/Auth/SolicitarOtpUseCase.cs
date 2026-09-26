@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
-using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Messaging;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -59,19 +59,12 @@ public sealed class SolicitarOtpUseCase(
     /// <summary>Cota máxima de OTPs por janela (incl. consumidos/expirados).</summary>
     public const int MaxOtpsPorJanela = 3;
 
-    /// <summary>
-    /// E.164 BR: <c>+55</c> + DDD (2 dígitos) + número (8 ou 9 dígitos) =
-    /// 13 ou 14 chars total.
-    /// </summary>
-    private static readonly Regex TelefoneE164BrRegex =
-        new(@"^\+55[1-9][0-9]\d{8,9}$", RegexOptions.Compiled);
-
     public async Task<SolicitarOtpResult> ExecuteAsync(SolicitarOtpInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
         // ── 1. Normalizar + validar telefone ────────────────────────────
-        var telefoneE164 = NormalizarTelefone(input.Telefone);
+        var telefoneE164 = NormalizadorTelefone.NormalizarE164Br(input.Telefone);
         var telefoneMascarado = MascararTelefone(telefoneE164);
 
         // ── 2. Resolver storefront → empresaId ──────────────────────────
@@ -141,63 +134,6 @@ public sealed class SolicitarOtpUseCase(
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Aceita formatos comuns:
-    /// <c>"+5511997573992"</c>, <c>"(11) 99757-3992"</c>, <c>"11 99757-3992"</c>,
-    /// <c>"+55 11 9 9757 3992"</c>. Lança <see cref="TelefoneInvalidoException"/>
-    /// se não bater <see cref="TelefoneE164BrRegex"/> após normalização.
-    /// </summary>
-    private static string NormalizarTelefone(string telefone)
-    {
-        if (string.IsNullOrWhiteSpace(telefone))
-            throw new TelefoneInvalidoException();
-
-        // Mantém apenas dígitos e o '+' inicial (se houver). Espaços, hífens,
-        // parênteses, pontos somem.
-        var span = telefone.Trim();
-        var digitos = new System.Text.StringBuilder(span.Length);
-        var primeiro = true;
-        foreach (var c in span)
-        {
-            if (primeiro && c == '+')
-            {
-                digitos.Append('+');
-            }
-            else if (char.IsDigit(c))
-            {
-                digitos.Append(c);
-            }
-            else if (c is ' ' or '(' or ')' or '-' or '.')
-            {
-                // skip
-            }
-            else
-            {
-                // caractere inválido — não-dígito, não-separador comum
-                throw new TelefoneInvalidoException();
-            }
-            primeiro = false;
-        }
-
-        var normalizado = digitos.ToString();
-
-        // Aceita também input sem prefixo: "11997573992" → "+5511997573992"
-        if (!normalizado.StartsWith('+'))
-        {
-            // Só aceita se o usuário já incluiu o 55 implicitamente OU se for um
-            // DDD + número BR puro (10-11 dígitos).
-            if (normalizado.Length is 10 or 11)
-                normalizado = "+55" + normalizado;
-            else
-                throw new TelefoneInvalidoException();
-        }
-
-        if (!TelefoneE164BrRegex.IsMatch(normalizado))
-            throw new TelefoneInvalidoException();
-
-        return normalizado;
-    }
 
     /// <summary>
     /// Mascarar para logs: <c>+5511997573992</c> → <c>+5511*****3992</c>.

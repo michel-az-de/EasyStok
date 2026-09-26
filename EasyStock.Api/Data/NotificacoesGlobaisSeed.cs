@@ -33,7 +33,8 @@ public static class NotificacoesGlobaisSeed
             .Select(c => c.Canal)
             .ToListAsync();
 
-        var canais = new[] { CanalNotificacao.Email, CanalNotificacao.Sms, CanalNotificacao.WhatsApp, CanalNotificacao.InApp };
+        // Push (S07): so a rotina de ConversaEscalada o usa; sem VAPID configurado o WebPushCanal falha limpo.
+        var canais = new[] { CanalNotificacao.Email, CanalNotificacao.Sms, CanalNotificacao.WhatsApp, CanalNotificacao.InApp, CanalNotificacao.Push };
         var adicionados = false;
 
         foreach (var canal in canais)
@@ -460,6 +461,16 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Caixa aberto desde {{ data_abertura }}",
             corpoTemplate: "O caixa segue aberto desde {{ data_abertura }} (saldo de abertura {{ valor_abertura }}). Feche-o para nao acumular vendas no dia errado.");
 
+        // ===== Atendimento por WhatsApp (S07): o agente escalou a conversa para a dona. Push para todas
+        // as subscriptions da empresa (payload sem usuarioId => destinatario "empresa:{id}"). =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "conversa_escalada_push_v1",
+            nome: "Conversa Escalada — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.ConversaEscalada,
+            assuntoTemplate: "{{ cliente }} precisa de você",
+            corpoTemplate: "{{ cliente }} precisa de você: {{ motivo }}");
+
         // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
         // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
         // ativar o canal em ConfiguracaoCanal (AtivoNoTenant); o objetivo aqui e cobrir o filtro
@@ -675,6 +686,11 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("caixa_esquecido_aberto_global", "Caixa Esquecido Aberto",
             TipoEventoNotificacao.CaixaAbertoEsquecido, "caixa_esquecido_aberto_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]");
+
+        // ===== Atendimento por WhatsApp (S07) =====
+        yield return MakeRotina("conversa_escalada_global", "Conversa Escalada para a Dona",
+            TipoEventoNotificacao.ConversaEscalada, "conversa_escalada_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
     }
 
     private static RotinaNotificacao MakeRotina(

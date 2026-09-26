@@ -6,6 +6,46 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Provider da Meta no outbox de notificações e regra da janela de 24 h (S09): `MensagemPronta.Metadados`
+  (`template`, `idioma`, `param1..N`); `MetaCloudWhatsAppProvider` envia pela porta de canal (S34) texto
+  dentro da janela e template fora dela ou sem conversa aberta; fora da janela sem template (ou 131047
+  da Meta) vira `ResultadoEnvio.FalhaPermanente` e o outbox não reagenda; com conversa aberta a saída
+  entra no histórico como `Mensagem(Saida, Sistema)` com o `wamid`. O provider continua `stub` por
+  padrão: liga com `Notifications__WhatsApp__Provider=meta` junto das credenciais da Meta.
+- Handoff pelo console do atendimento (S07, ADR-0050): `api/atendimento/conversas` (policy
+  `Operador`) com inbox (última mensagem, não lidas, busca por nome ou contato), histórico
+  paginado por `antesDe`, envio de texto e imagem pela porta do canal (S34) como
+  `Mensagem(Saida, Dona)` que deixa a conversa `Assumida` e cala o agente, `assumir`,
+  `liberar-automatico` (nota interna com o usuário), `encerrar` e `marcar-lida`. Fora da janela de
+  24 h (domínio ou erro 131047 da Meta): 409 `{ erro: "fora_da_janela_24h", sugestao: "template" }`
+  e nada gravado. `EscalarConversaUseCase` completa a porta `IEscaladorConversa` da S06: evento
+  `ConversaEscalada = 46` no outbox, Web Push para todas as subscriptions da empresa (destinatário
+  `empresa:{id}`) e SSE `conversa.escalada` (no-op até S18). (#1068)
+- Identidade da conversa **por canal** e porta de envio (S34, ADR-0051): `CanalConversa` ganha
+  Instagram, Messenger, ChatSite, Email e Sms; `CapacidadesCanal` diz o que cada um aceita (janela,
+  modelo, tag fora da janela, mídia, botões). `Conversa.ContatoWaId` vira `ContatoIdExterno`
+  normalizado por canal, com índice aberto `(EmpresaId, Canal, ContatoIdExterno)`; a migration é
+  rename (não perde dados) e o Down recusa com conversa de outro canal. `GarantirPodeEnviarTextoLivre`
+  recusa texto livre fora da janela sem tag válida. `ICanalMensageria` + `ResolvedorCanal` +
+  adaptador `CanalWhatsApp`. (#1065)
+- Agente de atendimento por WhatsApp com LLM e ferramentas (S06, onda 1, ADR-0050):
+  `AgenteAtendimentoService` responde fora da requisição (fila `TurnoAgente`, consumida na Api)
+  com a API Messages da Anthropic (`AnthropicMessagesClient`, modelo em `Anthropic:ModeloAgente`,
+  padrão `claude-sonnet-5`), até 6 iterações de ferramenta; ao estourar, envia a frase de espera e
+  escala. Ferramentas desta fatia: `consultar_cardapio`, `enviar_cardapio_imagem`,
+  `consultar_pedido`, `escalar_para_dona` (mínimo; aviso por push/SSE na S07) e
+  `encerrar_conversa`; pedido, endereço, janelas e CRM entram com a onda 2. Prompt com RN-01 a
+  RN-08 e D3 (snapshot), notas internas marcadas `[interno]`, consumo em `UsoIa`.
+  `RoteadorAcoesBotao` resolve `acao:<nome>:<payload>` sem LLM. Desligado com
+  `Anthropic:Enabled=false`, `Anthropic:AgenteAtendimentoEnabled=false` ou sem chave. (#1064)
+- Identificação do cliente ou lead pelo telefone no atendimento por WhatsApp (S05, onda 1,
+  ADR-0050): na primeira mensagem de uma conversa nova, `IdentificarClientePorTelefoneUseCase`
+  procura o `Cliente` pelo `TelefoneHash` do OTP e pelo `Telefone` do cadastro (E.164 e dígitos
+  nacionais, com a variante do nono dígito que a Meta omite em celulares antigos) ou cria o lead
+  com o telefone marcado como WhatsApp; a conversa é vinculada ao cadastro. A saudação
+  (`SaudacaoAtendimento`: primeiro contato ou retorno com `{nome}`, link do cardápio e frase de
+  espera) sai antes do agente e fica gravada como `Mensagem(Saida, Sistema)`.
+  `NormalizadorTelefone` passa a ser a normalização E.164 única do OTP e do atendimento. (#1062)
 - Webhook da Meta Cloud API (S03, onda 1, ADR-0050): `GET|POST api/webhooks/whatsapp` — GET
   responde a verificação, POST valida `X-Hub-Signature-256` (HMAC-SHA256, tempo constante) e
   devolve 200 quando a assinatura é válida, ou 503 quando uma mensagem falhou por motivo que um

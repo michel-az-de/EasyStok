@@ -29,4 +29,9 @@
     <ProjectReference Include="..\EasyStock.TestHelpers\EasyStock.TestHelpers.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Snapshot do system prompt do agente (S06). -->
+    <None Update="Services\Atendimento\*.snapshot.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
