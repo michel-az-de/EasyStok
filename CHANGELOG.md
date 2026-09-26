@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
+  da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
+  horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`
+  e `POST api/atendimento/expediente/controle` (Admin), evento `expediente.alterado`. O checkout do
+  site devolve 409 só com a loja fechada na mão (o pedido é agendado; o horário governa o
+  atendimento). Tabela `expedientes_loja` com RLS. (#1074)
 - Handoff pelo console do atendimento (S07, ADR-0050): `api/atendimento/conversas` (policy
   `Operador`) com inbox (última mensagem, não lidas, busca por nome ou contato), histórico
   paginado por `antesDe`, envio de texto e imagem pela porta do canal (S34) como

@@ -210,6 +210,12 @@ Tentativas, CriadaPorUsuarioId)`.
 
 ### S40 · Expediente da loja (abrir e fechar)
 
+> **Entregue na #1074, com um refinamento:** o checkout do site é sempre agendado (data e janela),
+> então **só a pausa manual (`ForcarFechada`) devolve 409**. O horário não bloqueia o checkout. Ele
+> governa o atendimento, com a mensagem de "fora do horário" do agente e das automações (S42). O
+> expediente fica em `Domain/Entities/Storefront/ExpedienteLoja.cs`, com uma linha por empresa, no
+> molde da S08.
+
 **Problema.** O protótipo tem horário por dia, com virada da meia-noite e padrão de 08 a 22 h
 (`dominio/funcionamento.js`), e um controle manual `lojaAberta` que pode ser `null`, `true` ou
 `false`. O manual vence o relógio e não volta sozinho (`Moldura.jsx:287`, ações `ALTERNAR_LOJA` e
