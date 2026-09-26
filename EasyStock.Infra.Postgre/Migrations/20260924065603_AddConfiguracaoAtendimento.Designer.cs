@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924065603_AddConfiguracaoAtendimento")]
+    partial class AddConfiguracaoAtendimento
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -652,144 +655,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasKey("EmpresaId");
 
                     b.ToTable("configuracoes_atendimento", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Conversa", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AssumidaPorUsuarioId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Canal")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("ClienteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ContatoNome")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("ContatoWaId")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("ContextoJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("EncerradaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("IniciadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("NaoLidas")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("PedidoEmAndamentoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Situacao")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UltimaMensagemEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UltimaMensagemEntradaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClienteId");
-
-                    b.HasIndex("EmpresaId", "ClienteId")
-                        .HasDatabaseName("ix_atendimento_conversas_empresa_cliente");
-
-                    b.HasIndex("EmpresaId", "ContatoWaId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_atendimento_conversas_empresa_contato_aberta")
-                        .HasFilter("\"Situacao\" <> 3");
-
-                    b.HasIndex("EmpresaId", "UltimaMensagemEm")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("ix_atendimento_conversas_empresa_ultima_msg");
-
-                    b.ToTable("atendimento_conversas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Mensagem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Autor")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("BotaoId")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid>("ConversaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Direcao")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("EnviadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Erro")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("ExternoId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("MidiaChave")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("MidiaMime")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("ProcessadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Texto")
-                        .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
-
-                    b.Property<int>("TipoConteudo")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversaId", "EnviadaEm")
-                        .HasDatabaseName("ix_atendimento_mensagens_conversa_enviada");
-
-                    b.HasIndex("EmpresaId", "ExternoId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_atendimento_mensagens_empresa_externo")
-                        .HasFilter("\"ExternoId\" IS NOT NULL");
-
-                    b.ToTable("atendimento_mensagens", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AuditLog", b =>
@@ -1735,18 +1600,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("WhatsAppPhoneNumberId")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Documento")
                         .IsUnique();
-
-                    b.HasIndex("WhatsAppPhoneNumberId")
-                        .IsUnique()
-                        .HasFilter("\"WhatsAppPhoneNumberId\" IS NOT NULL");
 
                     b.ToTable("empresas", (string)null);
                 });
@@ -9692,23 +9549,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .WithMany()
                         .HasForeignKey("EmpresaId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Conversa", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
-                        .WithMany()
-                        .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Mensagem", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Conversa", null)
-                        .WithMany()
-                        .HasForeignKey("ConversaId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

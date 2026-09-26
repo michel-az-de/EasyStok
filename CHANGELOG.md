@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Configuração do atendimento por WhatsApp por empresa (S08, onda 1, ADR-0050):
+  `ConfiguracaoAtendimento` (tom, nível de sugestão, saudações, frase de espera, mensagem fora de
+  área, respiro e tempo de preparo padrão), `GET|PUT api/atendimento/configuracao` (Admin — GET
+  nunca 404, devolve o padrão) e `Storefront.CardapioImagemUrl`. `PromptAtendimento` compõe o
+  cabeçalho do system prompt do agente a partir de tom e nível de sugestão (S06 estende). (#1050)
 - Cliente da Cloud API da Meta para o atendimento WhatsApp (S02, onda 1, ADR-0050):
   `IWhatsAppCloudClient` (texto, imagem, botões interativos, template, marcar como lida, baixar
   mídia) com categoria de resiliência Polly própria (`whatsapp`) — erro de aplicação da Meta
