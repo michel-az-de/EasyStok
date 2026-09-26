@@ -123,6 +123,8 @@ builder.Services.AddHostedService<EndpointHealthMonitorService>();
 // OutboxEventoIntegracao e despacha via handlers registrados.
 // Pode ser desligado via Integration:Outbox:Enabled=false (default true).
 builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
+// Atendimento WhatsApp (S03) — drena a fila de midia enfileirada pelo webhook.
+builder.Services.AddHostedService<AtendimentoFilaMidiaBackgroundService>();
 
 // Storage de arquivos (IFileStorage): o motor de relatórios escreve/lê artefatos via
 // IFileStorage. As implementações vivem em Infra.Async.Storage (compartilhadas com a API).
