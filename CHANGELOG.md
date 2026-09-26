@@ -6,6 +6,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Identificação do cliente ou lead pelo telefone no atendimento por WhatsApp (S05, onda 1,
+  ADR-0050): na primeira mensagem de uma conversa nova, `IdentificarClientePorTelefoneUseCase`
+  procura o `Cliente` pelo `TelefoneHash` do OTP e pelo `Telefone` do cadastro (E.164 e dígitos
+  nacionais, com a variante do nono dígito que a Meta omite em celulares antigos) ou cria o lead
+  com o telefone marcado como WhatsApp; a conversa é vinculada ao cadastro. A saudação
+  (`SaudacaoAtendimento`: primeiro contato ou retorno com `{nome}`, link do cardápio e frase de
+  espera) sai antes do agente e fica gravada como `Mensagem(Saida, Sistema)`.
+  `NormalizadorTelefone` passa a ser a normalização E.164 única do OTP e do atendimento. (#1062)
 - Webhook da Meta Cloud API (S03, onda 1, ADR-0050): `GET|POST api/webhooks/whatsapp` — GET
   responde a verificação, POST valida `X-Hub-Signature-256` (HMAC-SHA256, tempo constante) e
   sempre devolve 200 quando a assinatura é válida. `ProcessarEventoWhatsAppUseCase` resolve o

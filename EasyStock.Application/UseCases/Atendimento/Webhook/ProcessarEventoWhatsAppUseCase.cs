@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -26,6 +27,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IOperacaoEventPublisher eventPublisher,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
+    IdentificarClientePorTelefoneUseCase identificarCliente,
+    SaudacaoAtendimento saudacao,
     ILogger<ProcessarEventoWhatsAppUseCase> logger)
 {
     private const string Provedor = "meta_whatsapp";
@@ -102,10 +105,18 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
             var conversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, msg.De, ct);
             var conversaNova = conversa is null;
+            IdentificacaoCliente? identificacao = null;
             if (conversa is null)
             {
                 var contato = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De);
                 conversa = Conversa.Abrir(empresaId, msg.De, agora, contato?.Nome);
+
+                // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
+                identificacao = await identificarCliente.ExecuteAsync(
+                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoWaId, contato?.Nome), ct);
+                conversa.VincularCliente(identificacao.Cliente.Id);
+                // TODO(S24) #1062: cliente bloqueado não recebe saudação automática; em vez dela,
+                // Conversa.Assumir() + Mensagem(Sistema, "cliente bloqueado: <motivo>") + notificação à dona (S07).
             }
 
             conversa.RegistrarEntrada(agora);
@@ -120,7 +131,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             var mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, agora, tipoConteudo, texto, msg.Wamid, botaoId);
             await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
 
-            await AtualizarUltimaMensagemRecebidaAsync(empresaId, agora);
+            var configuracao = await AtualizarUltimaMensagemRecebidaAsync(empresaId, agora);
 
             await unitOfWork.CommitAsync();
             await webhookRecebidoRepository.MarcarProcessadoAsync(registro!.Id, sucesso: true, ct: ct);
@@ -134,6 +145,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 await queueService.EnqueueAsync(FilaAtendimentoNomes.MidiaWhatsApp,
                     new ArmazenarMidiaWhatsAppJob(empresaId, conversa.Id, msg.Wamid, msg.MidiaId));
             }
+
+            // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s.
+            if (identificacao is not null)
+                await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, ct);
 
             if (acaoDeBotao)
             {
@@ -183,7 +198,43 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             await webhookRecebidoRepository.MarcarProcessadoAsync(registro.Id, sucesso: false, erro, ct);
     }
 
-    private async Task AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)
+    /// <summary>
+    /// Envia a saudação e grava como <c>Mensagem(Saida, Sistema)</c>. Falha aqui nunca derruba o
+    /// processamento: a mensagem de entrada já foi confirmada e o agente ainda precisa ser enfileirado.
+    /// </summary>
+    private async Task EnviarSaudacaoAsync(
+        Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+    {
+        try
+        {
+            var texto = await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
+
+            Mensagem saida;
+            try
+            {
+                var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoWaId, texto, ct: ct);
+                saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
+                    TipoConteudoMensagem.Texto, texto, envio.Wamid);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Webhook WhatsApp: falha ao enviar a saudação da conversa {ConversaId}.", conversa.Id);
+                saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
+                    TipoConteudoMensagem.Texto, texto);
+                saida.AtualizarStatusEntrega(StatusMensagem.Falhou, ex.Message);
+            }
+
+            conversa.RegistrarSaida(saida.EnviadaEm);
+            await conversaRepository.AddMensagemAsync(saida, ct);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Webhook WhatsApp: falha registrando a saudação da conversa {ConversaId}.", conversa.Id);
+        }
+    }
+
+    private async Task<ConfiguracaoAtendimento> AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)
     {
         var configuracao = await configuracaoAtendimentoRepository.GetByEmpresaIdAsync(empresaId);
         var nova = configuracao is null;
@@ -194,6 +245,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             await configuracaoAtendimentoRepository.AddAsync(configuracao);
         else
             await configuracaoAtendimentoRepository.UpdateAsync(configuracao);
+
+        return configuracao;
     }
 
     private static TipoConteudoMensagem MapearTipoConteudo(string tipo) => tipo switch
