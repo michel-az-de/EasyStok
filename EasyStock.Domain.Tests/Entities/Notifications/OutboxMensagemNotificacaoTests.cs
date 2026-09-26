@@ -82,6 +82,20 @@ public class OutboxMensagemNotificacaoTests
     }
 
     [Fact]
+    public void FalhaPermanenteNaoReagenda()
+    {
+        // S09: erro que nunca vai passar (ex.: fora da janela de 24 h sem template) nao volta
+        // para Pendente, mesmo sobrando tentativas.
+        var m = Novo(canal: CanalNotificacao.WhatsApp);
+
+        m.MarcarFalhaTentativa("fora_da_janela_24h_sem_template", TimeSpan.FromMinutes(1), permanente: true);
+
+        m.Tentativas.Should().Be(1);
+        m.Status.Should().Be(StatusOutbox.Falhado);
+        m.ErroUltimaTentativa.Should().Be("fora_da_janela_24h_sem_template");
+    }
+
+    [Fact]
     public void MarcarEnviado_seta_provider_e_data()
     {
         var m = Novo();
