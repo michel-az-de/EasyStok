@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Provider da Meta no outbox de notificações e regra da janela de 24 h (S09): `MensagemPronta.Metadados`
+  (`template`, `idioma`, `param1..N`); `MetaCloudWhatsAppProvider` envia pela porta de canal (S34) texto
+  dentro da janela e template fora dela ou sem conversa aberta; fora da janela sem template (ou 131047
+  da Meta) vira `ResultadoEnvio.FalhaPermanente` e o outbox não reagenda; com conversa aberta a saída
+  entra no histórico como `Mensagem(Saida, Sistema)` com o `wamid`. O provider continua `stub` por
+  padrão: liga com `Notifications__WhatsApp__Provider=meta` junto das credenciais da Meta.
 - Handoff pelo console do atendimento (S07, ADR-0050): `api/atendimento/conversas` (policy
   `Operador`) com inbox (última mensagem, não lidas, busca por nome ou contato), histórico
   paginado por `antesDe`, envio de texto e imagem pela porta do canal (S34) como
