@@ -115,6 +115,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   quebrava ao mesmo tempo o filtro de vencidos e o modulo. (#1007)
 
 ### Changed
+- Plano do atendimento: a spec S11 passa a cobrir a troca da forma de pagamento com a cobrança já
+  enviada e o desfazer de pagamento registrado à mão, defeito achado pela operadora no protótipo. (#1072)
 - Home autenticada passa a ser `/launcher` em todos os pontos (landing logada, onboarding,
   cardapio, lojas, 404 e primeiro slot do bottom nav mobile). Deep link continua vencendo:
   `returnUrl` valido tem precedencia sobre o portal. (#1007)
