@@ -198,4 +198,99 @@ public class ProcessarEventoWhatsAppUseCaseTests
             Arg.Any<Guid>(), sucesso: false, "empresa_desconhecida", Arg.Any<CancellationToken>());
         await _conversaRepository.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
     }
+
+    [Fact]
+    public async Task UsaInstanteDaMetaNaMensagemENaJanela()
+    {
+        // A Meta reentrega com atraso (API fora do ar): a janela de 24 h conta do envio do cliente,
+        // não do processamento — senão o console manda texto livre que a Meta recusa (131047).
+        var enviadaPeloCliente = DateTimeOffset.FromUnixTimeSeconds(1700000000).UtcDateTime;
+        Conversa? aberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => aberta = c), Arg.Any<CancellationToken>());
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.atrasada", "Oi"));
+
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.EnviadaEm == enviadaPeloCliente), Arg.Any<CancellationToken>());
+        aberta!.UltimaMensagemEntradaEm.Should().Be(enviadaPeloCliente);
+    }
+
+    [Fact]
+    public async Task FalhaDePersistenciaDescartaAlteracoesEPedeReenvio()
+    {
+        // Ex.: dois POSTs concorrentes da 1ª mensagem de um contato novo — o segundo viola o índice
+        // único da conversa aberta. Sem reenvio da Meta a mensagem se perderia.
+        _unitOfWork.CommitAsync().Returns<int>(_ => throw new InvalidOperationException("23505 unique_violation"));
+
+        var completo = await _useCase.ExecuteAsync(PayloadTexto("wamid.corrida", "quero pedir"));
+
+        completo.Should().BeFalse();
+        _unitOfWork.Received(1).DescartarAlteracoesPendentes();
+        await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
+            Arg.Any<Guid>(), sucesso: false, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FalhaNaPrimeiraMensagemNaoImpedeAsDemaisDoPayload()
+    {
+        var chamadas = 0;
+        _unitOfWork.CommitAsync().Returns<int>(_ => ++chamadas == 1 ? throw new InvalidOperationException("falha") : 1);
+        var payload = """
+            {"entry":[{"changes":[{"value":{
+                "metadata":{"phone_number_id":"__PHONE__"},
+                "contacts":[{"profile":{"name":"Fulano"},"wa_id":"__WAID__"}],
+                "messages":[
+                  {"from":"__WAID__","id":"wamid.a","timestamp":"1700000000","type":"text","text":{"body":"um"}},
+                  {"from":"__WAID__","id":"wamid.b","timestamp":"1700000001","type":"text","text":{"body":"dois"}}]
+            }}]}]}
+            """.Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId);
+
+        var completo = await _useCase.ExecuteAsync(payload);
+
+        completo.Should().BeFalse();
+        await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
+            Arg.Any<Guid>(), sucesso: true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task MensagemJaGravadaNaoDuplicaEMarcaSucesso()
+    {
+        // Reentrega de um wamid cuja mensagem já foi gravada (1ª tentativa em voo ou marcada como
+        // falha depois do commit): não insere de novo — senão viola o índice único para sempre.
+        var wamid = "wamid.jagravada";
+        var registroEmVoo = WebhookRecebido.Criar("meta_whatsapp", wamid, "hash");
+        _webhookRecebidoRepository
+            .TryRegistrarAsync("meta_whatsapp", wamid, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((WebhookRecebido?)null);
+        _webhookRecebidoRepository.ObterAsync("meta_whatsapp", wamid, Arg.Any<CancellationToken>())
+            .Returns(registroEmVoo);
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, wamid, Arg.Any<CancellationToken>())
+            .Returns(Mensagem.Entrada(_empresaId, Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Texto, "Oi", wamid));
+
+        var completo = await _useCase.ExecuteAsync(PayloadTexto(wamid, "Oi"));
+
+        completo.Should().BeTrue();
+        await _conversaRepository.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+        await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(default!, default(ProcessarTurnoAgenteJob)!);
+        await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
+            registroEmVoo.Id, sucesso: true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegraDeDominioVioladaNaoPedeReenvio()
+    {
+        // wa_id inválido nunca vai passar: pedir reenvio travaria o payload por 7 dias de retry.
+        var payload = """
+            {"entry":[{"changes":[{"value":{
+                "metadata":{"phone_number_id":"__PHONE__"},
+                "messages":[{"from":"123","id":"wamid.curto","timestamp":"1700000000","type":"text","text":{"body":"oi"}}]
+            }}]}]}
+            """.Replace("__PHONE__", PhoneNumberId);
+
+        var completo = await _useCase.ExecuteAsync(payload);
+
+        completo.Should().BeTrue();
+        await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
+            Arg.Any<Guid>(), sucesso: false, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
 }

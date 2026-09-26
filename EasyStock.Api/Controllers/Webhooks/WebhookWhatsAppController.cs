@@ -56,11 +56,11 @@ public class WebhookWhatsAppController(
             return Forbid();
         }
 
-        await processarUseCase.ExecuteAsync(rawBody, ct);
+        var completo = await processarUseCase.ExecuteAsync(rawBody, ct);
 
-        // Sempre 200 quando a assinatura é válida: a Meta reenvia em não-200, e o
-        // reprocessamento é seguro pela idempotência por wamid dentro do use case.
-        return Ok();
+        // Não-200 faz a Meta reenviar o payload inteiro; o reprocessamento é seguro porque o use
+        // case pula pelo wamid o que já gravou. Só pede reenvio quando algo pode passar na próxima.
+        return completo ? Ok() : StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
     private bool AssinaturaValida(string rawBody, string appSecret)
