@@ -208,6 +208,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.CheckoutIdempotencyRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IPedidoAvaliacaoRepository,
                 Repositories.Storefront.PedidoAvaliacaoRepository>();
+            // Atendimento (S04, ADR-0050)
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
+                Repositories.Atendimento.ConversaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)
