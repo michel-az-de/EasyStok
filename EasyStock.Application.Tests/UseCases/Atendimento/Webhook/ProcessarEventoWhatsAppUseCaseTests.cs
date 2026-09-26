@@ -41,7 +41,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         _featureFlagRepository.ListarAtivasAsync(_empresaId, Arg.Any<CancellationToken>())
             .Returns(new[] { FeatureCatalogo.ModuloAtendimento });
         _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
-        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, ContatoWaId, Arg.Any<CancellationToken>())
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
             .Returns((Conversa?)null);
 
         // Idempotência: primeira vez sempre registra com sucesso.

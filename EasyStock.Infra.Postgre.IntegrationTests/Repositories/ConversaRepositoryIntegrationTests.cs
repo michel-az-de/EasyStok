@@ -22,6 +22,7 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
     private const string MigrationAnterior = "20260809132157_AddClientePessoaJuridica";
+    private const string MigrationAntesDaS34 = "20260924065603_AddConfiguracaoAtendimento";
     private static readonly DateTime Agora = new(2026, 9, 22, 12, 0, 0, DateTimeKind.Utc);
 
     [SkippableFact]
@@ -52,9 +53,59 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         await db.SaveChangesAsync();
 
         var repo = new ConversaRepository(db);
-        var aberta = await repo.ObterAbertaPorContatoAsync(empresa, wa);
+        var aberta = await repo.ObterAbertaPorContatoAsync(empresa, CanalConversa.WhatsApp, wa);
         aberta.Should().NotBeNull();
         aberta!.Id.Should().Be(seguinte.Id, "apos encerrar, o mesmo contato pode abrir outra conversa");
+    }
+
+    [SkippableFact]
+    public async Task MesmoIdEmCanaisDiferentesSaoContatosDiferentes()
+    {
+        // S34: o indice aberto e por (empresa, canal, contato). Um numero pode estar no WhatsApp e
+        // no SMS ao mesmo tempo, com uma conversa aberta em cada.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        const string numero = "5511999990009";
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var whats = Conversa.Abrir(empresa, numero, Agora);
+        var sms = Conversa.Abrir(empresa, numero, Agora, canal: CanalConversa.Sms);
+        db.AtendimentoConversas.AddRange(whats, sms);
+        await db.SaveChangesAsync();
+
+        var repo = new ConversaRepository(db);
+        (await repo.ObterAbertaPorContatoAsync(empresa, CanalConversa.WhatsApp, numero))!.Id.Should().Be(whats.Id);
+        (await repo.ObterAbertaPorContatoAsync(empresa, CanalConversa.Sms, numero))!.Id.Should().Be(sms.Id);
+        (await repo.ObterAbertaPorContatoAsync(empresa, CanalConversa.Instagram, numero)).Should().BeNull();
+
+        // O Down da S34 recusa rodar com conversa de outro canal: limpa para o teste de migration.
+        db.AtendimentoConversas.Remove(sms);
+        await db.SaveChangesAsync();
+    }
+
+    [SkippableFact]
+    public async Task MigrationS34_PreservaContatoDasConversasExistentes()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var id = Guid.NewGuid();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var migrator = db.GetService<IMigrator>();
+
+        await migrator.MigrateAsync(MigrationAntesDaS34);
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO atendimento_conversas (\"Id\", \"EmpresaId\", \"ContatoWaId\", \"Canal\", \"Situacao\", \"ContextoJson\", \"IniciadaEm\", \"UltimaMensagemEm\", \"NaoLidas\") " +
+            "VALUES ({0}, {1}, '5511977776666', 1, 1, '{{}}', now(), now(), 0)", id, empresa);
+
+        await migrator.MigrateAsync();
+
+        var repo = new ConversaRepository(db);
+        var migrada = await repo.ObterAbertaPorContatoAsync(empresa, CanalConversa.WhatsApp, "5511977776666");
+        migrada.Should().NotBeNull("o rename nao pode apagar o contato (o EF gera drop + add)");
+        migrada!.Id.Should().Be(id);
     }
 
     [SkippableFact]
@@ -91,12 +142,12 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         daEmpresaA.Select(c => c.Id).Should().Contain(idA).And.NotContain(idB);
 
         (await repo.ObterPorIdAsync(empresaA, idB)).Should().BeNull("conversa de outra empresa e invisivel");
-        (await repo.ObterAbertaPorContatoAsync(empresaA, wa))!.Id.Should().Be(idA);
+        (await repo.ObterAbertaPorContatoAsync(empresaA, CanalConversa.WhatsApp, wa))!.Id.Should().Be(idA);
 
         await using var semTenant = fixture.CreateDbContext();
-        (await semTenant.AtendimentoConversas.CountAsync(c => c.ContatoWaId == wa))
+        (await semTenant.AtendimentoConversas.CountAsync(c => c.ContatoIdExterno == wa))
             .Should().Be(0, "sem tenant na sessao o filtro global e fail-closed");
-        (await semTenant.AtendimentoConversas.IgnoreQueryFilters().CountAsync(c => c.ContatoWaId == wa))
+        (await semTenant.AtendimentoConversas.IgnoreQueryFilters().CountAsync(c => c.ContatoIdExterno == wa))
             .Should().Be(2);
     }
 

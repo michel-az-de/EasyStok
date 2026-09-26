@@ -122,7 +122,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         Mensagem mensagemEntidade;
         try
         {
-            var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, msg.De, ct);
+            var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
             conversa = existenteConversa
                 ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome);
 

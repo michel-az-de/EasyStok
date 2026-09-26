@@ -15,8 +15,8 @@ public interface IConversaRepository
 {
     Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
-    /// <summary>Conversa nao encerrada do contato. O <paramref name="contatoWaId"/> e normalizado para digitos.</summary>
-    Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, string contatoWaId, CancellationToken ct = default);
+    /// <summary>Conversa nao encerrada do contato no canal. O <paramref name="contatoIdExterno"/> e normalizado conforme o canal.</summary>
+    Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
 
     Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default);
 
