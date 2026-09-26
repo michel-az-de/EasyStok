@@ -181,6 +181,58 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
     }
 
     [SkippableFact]
+    public async Task Inbox_TrazUltimaMensagemEFiltraPorBusca()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var maria = Conversa.Abrir(empresa, "5511999990011", Agora, "Maria Souza");
+        var joao = Conversa.Abrir(empresa, "5511999990012", Agora, "Joao");
+        maria.RegistrarEntrada(Agora.AddMinutes(2));
+        joao.RegistrarEntrada(Agora.AddMinutes(1));
+        db.AtendimentoConversas.AddRange(maria, joao);
+        db.AtendimentoMensagens.Add(Mensagem.Entrada(empresa, maria.Id, Agora.AddMinutes(1), TipoConteudoMensagem.Texto, "primeira", externoId: "wamid.i1"));
+        db.AtendimentoMensagens.Add(Mensagem.Entrada(empresa, maria.Id, Agora.AddMinutes(2), TipoConteudoMensagem.Texto, "ultima", externoId: "wamid.i2"));
+        await db.SaveChangesAsync();
+
+        var repo = new ConversaRepository(db);
+        var todas = await repo.ListarInboxAsync(empresa, situacao: null, busca: null, pagina: 1, tamanhoPagina: 10);
+        todas.Select(i => i.Conversa.Id).Should().ContainInOrder(maria.Id, joao.Id);
+        todas[0].UltimaMensagemTexto.Should().Be("ultima");
+        todas[1].UltimaMensagemTexto.Should().BeNull();
+
+        var busca = await repo.ListarInboxAsync(empresa, null, "souza", 1, 10);
+        busca.Should().ContainSingle(i => i.Conversa.Id == maria.Id);
+        (await repo.ListarInboxAsync(empresa, null, "990012", 1, 10)).Should().ContainSingle(i => i.Conversa.Id == joao.Id);
+    }
+
+    [SkippableFact]
+    public async Task ListarMensagens_PaginaParaTrasPeloCursor()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var conversa = Conversa.Abrir(empresa, "5511999990013", Agora);
+        db.AtendimentoConversas.Add(conversa);
+        for (var i = 0; i < 5; i++)
+            db.AtendimentoMensagens.Add(Mensagem.Entrada(empresa, conversa.Id, Agora.AddMinutes(i), TipoConteudoMensagem.Texto, $"m{i}", externoId: $"wamid.c{i}"));
+        await db.SaveChangesAsync();
+
+        var repo = new ConversaRepository(db);
+        var ultimas = await repo.ListarMensagensAsync(empresa, conversa.Id, antesDe: null, limite: 2);
+        ultimas.Select(m => m.Texto).Should().Equal("m3", "m4");
+
+        var anteriores = await repo.ListarMensagensAsync(empresa, conversa.Id, antesDe: ultimas[0].EnviadaEm, limite: 2);
+        anteriores.Select(m => m.Texto).Should().Equal("m1", "m2");
+
+        (await repo.ListarMensagensAsync(Guid.NewGuid(), conversa.Id, null, 10)).Should().BeEmpty("empresaId vai no WHERE");
+    }
+
+    [SkippableFact]
     public async Task ExternoId_UnicoPorEmpresa()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");

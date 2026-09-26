@@ -6,6 +6,9 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 /// <summary>Conversa com as ultimas N mensagens em ordem cronologica (a mais nova por ultimo).</summary>
 public sealed record ConversaComMensagens(Conversa Conversa, IReadOnlyList<Mensagem> Mensagens);
 
+/// <summary>Linha da inbox do console (S07): a conversa e o texto da ultima mensagem, quando houver.</summary>
+public sealed record ConversaInboxItem(Conversa Conversa, string? UltimaMensagemTexto);
+
 /// <summary>
 /// Persistencia do agregado Conversa/Mensagem (S04, ADR-0050). Toda consulta recebe o
 /// <c>empresaId</c> e o poe no WHERE alem do filtro global e do RLS (ADR-0010, defesa em
@@ -26,6 +29,29 @@ public interface IConversaRepository
         SituacaoConversa? situacao,
         int pagina,
         int tamanhoPagina,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Inbox do console (S07): mais recentes primeiro, com o texto da ultima mensagem.
+    /// <paramref name="busca"/> filtra por nome ou identificador do contato (sem diferenciar caixa).
+    /// </summary>
+    Task<IReadOnlyList<ConversaInboxItem>> ListarInboxAsync(
+        Guid empresaId,
+        SituacaoConversa? situacao,
+        string? busca,
+        int pagina,
+        int tamanhoPagina,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Historico paginado para tras (S07): as <paramref name="limite"/> mensagens anteriores a
+    /// <paramref name="antesDe"/> (ou as ultimas, sem cursor), em ordem cronologica.
+    /// </summary>
+    Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
+        Guid empresaId,
+        Guid conversaId,
+        DateTime? antesDe,
+        int limite,
         CancellationToken ct = default);
 
     Task<IReadOnlyList<Conversa>> ListarPorClienteAsync(Guid empresaId, Guid clienteId, int max = 5, CancellationToken ct = default);

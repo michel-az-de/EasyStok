@@ -5,6 +5,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.AcoesBotao;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -42,6 +43,12 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IFerramentaAgente, ConsultarPedidoFerramenta>();
         services.AddScoped<IFerramentaAgente, EscalarParaDonaFerramenta>();
         services.AddScoped<IFerramentaAgente, EncerrarConversaFerramenta>();
+
+        // S07: handoff pelo console (inbox, envio da dona, assumir, liberar, encerrar, marcar lida).
+        services.AddScoped<ListarConversasAtendimentoUseCase>();
+        services.AddScoped<ListarMensagensConversaUseCase>();
+        services.AddScoped<EnviarMensagemConsoleUseCase>();
+        services.AddScoped<GerenciarConversaAtendimentoUseCase>();
 
         return services;
     }

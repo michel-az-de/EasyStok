@@ -19,6 +19,9 @@ public sealed record UploadedFileResult(
 /// </summary>
 public sealed record BannerImagemUploadResult(string StorageKey, string Url, string ContentType, long Size);
 
+/// <summary>Imagem do console de atendimento (S07): a chave vai para a mensagem, a URL pública para a Meta.</summary>
+public sealed record ImagemAtendimentoUploadResult(string StorageKey, string Url, string ContentType);
+
 public sealed class GerenciarUploadsUseCase(
     IFileStorage fileStorage,
     IImageProcessor imageProcessor,
@@ -230,6 +233,32 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         return new BannerImagemUploadResult(stored.StorageKey, stored.Url, optContentType, stored.Size);
+    }
+
+    /// <summary>
+    /// Imagem que a dona manda pelo console para o cliente (S07). Mesma validação e otimização das
+    /// demais; fica pública porque a Meta busca a imagem pela URL (<c>image.link</c> HTTPS).
+    /// Não persiste nada: quem chama grava a mensagem com a chave.
+    /// </summary>
+    public async Task<ImagemAtendimentoUploadResult> UploadImagemAtendimentoAsync(
+        Guid empresaId, Guid conversaId, string fileName, string contentType, byte[] content,
+        CancellationToken cancellationToken = default)
+    {
+        ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
+
+        var (optimized, optContentType, optExt) = await Task.Run(
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            cancellationToken);
+
+        var stored = await fileStorage.UploadAsync(
+            new FileUploadRequest(
+                $"atendimento/{empresaId}/{conversaId}",
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
+            cancellationToken);
+
+        return new ImagemAtendimentoUploadResult(stored.StorageKey, stored.Url, optContentType);
     }
 
     /// <summary>
