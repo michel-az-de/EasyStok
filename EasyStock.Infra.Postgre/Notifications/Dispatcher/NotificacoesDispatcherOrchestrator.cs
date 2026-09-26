@@ -156,7 +156,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
                 _ => TimeSpan.FromMinutes(30)
             };
 
-            mensagem.MarcarFalhaTentativa(resultado.ErroDetalhado ?? "Erro desconhecido", backoff);
+            mensagem.MarcarFalhaTentativa(resultado.ErroDetalhado ?? "Erro desconhecido", backoff, resultado.FalhaPermanente);
             FailedCounter.Add(1, new TagList { { "canal", mensagem.Canal.ToString() }, { "provider", resultado.ProviderUsado ?? "unknown" } });
 
             var logFalha = LogEnvioNotificacao.RegistrarFalha(
@@ -169,7 +169,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
             await logRepo.AddAsync(logFalha, ct);
 
-            if (mensagem.TentativasEsgotadas())
+            if (mensagem.Status == StatusOutbox.Falhado)
                 await TentarFallbackCanalAsync(mensagem, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
         }
 

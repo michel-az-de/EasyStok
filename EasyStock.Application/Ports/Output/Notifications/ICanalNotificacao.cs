@@ -10,7 +10,14 @@ public sealed record MensagemPronta(
     string Corpo,
     CanalNotificacao Canal,
     CategoriaConteudoNotificacao Categoria,
-    string? ProviderOverride = null);
+    string? ProviderOverride = null)
+{
+    /// <summary>
+    /// Dados do envio que o canal interpreta (S09). No WhatsApp da Meta: <c>template</c>,
+    /// <c>idioma</c>, <c>param1..paramN</c> e <c>botao1..botao3</c> para envio fora da janela de 24 h.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Metadados { get; init; }
+}
 
 public sealed record ResultadoEnvio(
     bool Sucesso,
@@ -18,7 +25,8 @@ public sealed record ResultadoEnvio(
     string? ErroDetalhado = null,
     int? StatusHttp = null,
     string? RespostaProviderJson = null,
-    long DuracaoMs = 0);
+    long DuracaoMs = 0,
+    bool FalhaPermanente = false);
 
 public interface ICanalNotificacao
 {

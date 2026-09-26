@@ -91,12 +91,16 @@ public class OutboxMensagemNotificacao
         ErroUltimaTentativa = null;
     }
 
-    public void MarcarFalhaTentativa(string erro, TimeSpan backoff)
+    /// <summary>
+    /// <paramref name="permanente"/> = erro que nunca vai passar (ex.: fora da janela de 24 h sem
+    /// template, S09): vira <see cref="StatusOutbox.Falhado"/> sem reagendar.
+    /// </summary>
+    public void MarcarFalhaTentativa(string erro, TimeSpan backoff, bool permanente = false)
     {
         Tentativas++;
         ErroUltimaTentativa = erro;
         ProximaTentativaEm = DateTime.UtcNow.Add(backoff);
-        Status = Tentativas >= MaxTentativas ? StatusOutbox.Falhado : StatusOutbox.Pendente;
+        Status = permanente || Tentativas >= MaxTentativas ? StatusOutbox.Falhado : StatusOutbox.Pendente;
     }
 
     public void Cancelar()
