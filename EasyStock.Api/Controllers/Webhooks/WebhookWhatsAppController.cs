@@ -15,6 +15,7 @@ namespace EasyStock.Api.Controllers.Webhooks;
 [ApiController]
 [Route("api/webhooks/whatsapp")]
 [AllowAnonymous]
+[IgnoreAntiforgeryToken] // Webhook servidor-a-servidor autenticado por HMAC (X-Hub-Signature-256), sem cookie/sessão — CSRF não se aplica.
 public class WebhookWhatsAppController(
     ProcessarEventoWhatsAppUseCase processarUseCase,
     IOptions<MetaCloudWhatsAppOptions> metaOptions,
@@ -32,7 +33,7 @@ public class WebhookWhatsAppController(
             || string.IsNullOrEmpty(tokenConfigurado)
             || !FixedTimeEquals(verifyToken ?? "", tokenConfigurado))
         {
-            logger.LogWarning("Webhook WhatsApp: verificação recusada (mode={Mode}).", mode);
+            logger.LogWarning("Webhook WhatsApp: verificação recusada (mode={Mode}).", SanitizarParaLog(mode));
             return Forbid();
         }
 
@@ -86,4 +87,8 @@ public class WebhookWhatsAppController(
         var bb = Encoding.UTF8.GetBytes(b);
         return ba.Length == bb.Length && CryptographicOperations.FixedTimeEquals(ba, bb);
     }
+
+    /// <summary>Remove quebra de linha/retorno de carro de valor vindo da requisição antes de logar — evita log forging (entradas fabricadas no arquivo de log).</summary>
+    private static string SanitizarParaLog(string? valor) =>
+        (valor ?? "").Replace("\r", "").Replace("\n", "");
 }
