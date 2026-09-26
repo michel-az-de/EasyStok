@@ -83,6 +83,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableCaixaEsquecidoJob)
             services.AddHostedService<CaixaEsquecidoJob>();
 
+        // Atendimento WhatsApp (S03): drena a fila de midia que o webhook enfileira. Precisa ficar
+        // neste processo porque a fila e em memoria (BackgroundQueueService).
+        services.AddHostedService<AtendimentoFilaMidiaBackgroundService>();
+
+        // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
         if (options.EnableAtendimentoTurnoAgente)
             services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
 

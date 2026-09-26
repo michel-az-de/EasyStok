@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -41,7 +42,8 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var armazenador = new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage);
         var processador = new ProcessarMidiaWhatsAppJobUseCase(
-            conversaRepository, armazenador, unitOfWork, NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance);
+            conversaRepository, armazenador, Substitute.For<ITenantContextAccessor>(), unitOfWork,
+            NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance);
 
         // O enfileiramento em si já é coberto por ProcessarEventoWhatsAppUseCaseTests.ImagemArmazena;
         // aqui prova-se que DRENAR o job (o que o AtendimentoFilaMidiaBackgroundService faz em
@@ -51,5 +53,26 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
         mensagem.MidiaChave.Should().Be($"atendimento/{empresaId}/{conversaId}/{wamid}.jpg");
         mensagem.MidiaMime.Should().Be("image/jpeg");
         await unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task DefineTenantAntesDeBuscarMensagem()
+    {
+        // O job roda num escopo sem JWT: sem o tenant, o filtro global e a RLS zeram a consulta.
+        var empresaId = Guid.NewGuid();
+        var conversaRepository = Substitute.For<IConversaRepository>();
+        var tenantContext = Substitute.For<ITenantContextAccessor>();
+        var processador = new ProcessarMidiaWhatsAppJobUseCase(
+            conversaRepository,
+            new ArmazenadorMidiaWhatsApp(Substitute.For<IWhatsAppCloudClient>(), Substitute.For<IFileStorage>()),
+            tenantContext, Substitute.For<IUnitOfWork>(), NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance);
+
+        await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(empresaId, Guid.NewGuid(), "wamid.x", "media-x"));
+
+        Received.InOrder(() =>
+        {
+            tenantContext.SetCurrentTenant(empresaId);
+            conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, "wamid.x", Arg.Any<CancellationToken>());
+        });
     }
 }

@@ -24,6 +24,10 @@ public sealed class FakeUnitOfWork : IUnitOfWork
         return Task.FromResult(0);
     }
 
+    public int DescartesCount { get; private set; }
+
+    public void DescartarAlteracoesPendentes() => DescartesCount++;
+
     public Task<IDbTransactionScope> BeginTransactionAsync(CancellationToken ct = default)
         => Task.FromResult<IDbTransactionScope>(new FakeTransactionScope());
 
