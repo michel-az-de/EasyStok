@@ -30,7 +30,7 @@ public sealed class EnviarMensagemConsoleUseCase(
     IUnitOfWork unitOfWork)
 {
     /// <summary>Código da Cloud API para mensagem fora da janela de 24 h sem modelo.</summary>
-    public const int CodigoMetaForaDaJanela = 131047;
+    public const int CodigoMetaForaDaJanela = WhatsAppCloudException.CodigoForaDaJanela;
 
     public async Task<MensagemAtendimentoResult> EnviarTextoAsync(EnviarTextoConsoleCommand command, CancellationToken ct = default)
     {

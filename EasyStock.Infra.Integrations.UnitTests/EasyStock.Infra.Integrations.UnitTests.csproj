@@ -15,6 +15,8 @@
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <ProjectReference Include="..\EasyStock.Infra.Integrations\EasyStock.Infra.Integrations.csproj" />
+    <!-- S09: provider da Meta do outbox de notificações usa a porta de canal (S34). -->
+    <ProjectReference Include="..\EasyStock.Infra.Notifications\EasyStock.Infra.Notifications.csproj" />
     <!-- EphemeralDataProtectionProvider (round-trip do cert) vive no shared framework. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
