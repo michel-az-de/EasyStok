@@ -19,6 +19,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ProcessarEventoWhatsAppUseCase>();
         services.AddScoped<ProcessarMidiaWhatsAppJobUseCase>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
+        services.AddScoped<ResolvedorCanal>();
 
         return services;
     }
