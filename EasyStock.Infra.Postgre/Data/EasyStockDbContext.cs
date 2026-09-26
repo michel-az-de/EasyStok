@@ -1,4 +1,4 @@
-﻿using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Financeiro;
 using EasyStock.Domain.Financeiro.Events;
@@ -192,6 +192,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<PedidoFornecedor> PedidosFornecedor { get; set; } = null!;
         public DbSet<ConfiguracaoLoja> ConfiguracoesLoja { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento> ConfiguracoesAtendimento { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ConsentimentoContato> ConsentimentosContato { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
