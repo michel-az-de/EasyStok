@@ -83,6 +83,9 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableCaixaEsquecidoJob)
             services.AddHostedService<CaixaEsquecidoJob>();
 
+        if (options.EnableAtendimentoTurnoAgente)
+            services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
+
         return services;
     }
 }

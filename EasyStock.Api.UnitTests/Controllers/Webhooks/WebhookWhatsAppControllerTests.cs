@@ -46,6 +46,7 @@ public class WebhookWhatsAppControllerTests
                 Substitute.For<IClienteStorefrontRepository>(),
                 NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(Substitute.For<IStorefrontRepository>(), new ConfigurationBuilder().Build()),
+            new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 
         var metaOptions = Options.Create(new MetaCloudWhatsAppOptions { VerifyToken = VerifyToken, AppSecret = AppSecret });
