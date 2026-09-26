@@ -34,33 +34,38 @@ do cliente. As demais fatias correm em paralelo às ondas 2 e 3 conforme as depe
 **Problema.** `Conversa.ContatoWaId` (`Conversa.cs:35`) e `CanalConversa { WhatsApp = 1 }` amarram a
 conversa ao WhatsApp. No go-live entram Instagram, Messenger, chat do site, e-mail e SMS (ADR-0051,
 itens 1 a 4).
+> **Entregue na #1065, com abordagem mais simples que a primeira versão desta spec.** A entidade
+> `IdentidadeContato` ficou para a S05. Ligar várias identidades a um mesmo cliente é o problema
+> dela, e na S34 a tabela seria só migration sem consumidor. O texto abaixo descreve o que foi feito.
+
 **Abordagem.**
-- Criar a porta `ICanalMensageria` em `App/Ports/Output/Atendimento/`, com os métodos `EnviarTexto`,
-  `EnviarMidia`, `EnviarBotoes`, `EnviarModelo` e `MarcarLida`, e com `Capacidades`: `TemJanela`,
-  `HorasJanela`, `AceitaModelo`, `TagsForaDaJanela[]`, `AceitaMidia{Imagem, Audio, Documento, Figurinha}` e
-  `AceitaBotoes`.
-- O `IWhatsAppCloudClient` (S02) passa a ser usado pelo adaptador `CanalWhatsApp`.
-- Um `ResolvedorCanal` escolhe o adaptador pelo `CanalConversa`. Canal sem adaptador lança
-  `CanalNaoSuportadoException`, que é o `CANAL_DESCONHECIDO` do protótipo.
-- Identidade: a nova entidade `IdentidadeContato (EmpresaId, Canal, IdExterno, ClienteId?, Nome)`
-  tem índice único `(EmpresaId, Canal, IdExterno)`. A `Conversa` troca `ContatoWaId` por
-  `IdentidadeContatoId` e mantém `Canal`.
-- `DentroDaJanela24h` vira `DentroDaJanela(capacidades)`.
-**Escopo.** Entidade, configuração EF e migration, com o backfill de `ContatoWaId` para uma
-`IdentidadeContato(Canal=WhatsApp)`. Enum `CanalConversa += Instagram=2, Messenger=3, ChatSite=4,
-Email=5, Sms=6`. Porta, resolvedor, adaptador do WhatsApp e ajuste do webhook S03 (se o S03 já
-estiver mergeado; se não estiver, a S34 espera o S03). R8: todos os call-sites de `ContatoWaId`
-mudam no mesmo commit.
-**Fora.** Adaptadores dos outros canais (S35–S37).
+- `CapacidadesCanal` (Domain, `ValueObjects/`) diz, por canal, se há janela e de quantas horas, se
+  aceita modelo, quais tags valem fora da janela e por quantos dias, que mídia aceita e se aceita
+  botões. Canal não declarado lança exceção.
+- A `Conversa` troca `ContatoWaId` por `ContatoIdExterno`, normalizado por canal: dígitos E.164 no
+  WhatsApp e no SMS, minúsculas no e-mail, id opaco nos demais. O índice aberto passa a ser
+  `(EmpresaId, Canal, ContatoIdExterno)`.
+- `DentroDaJanela24h` vira `DentroDaJanela(agora)`, que lê as capacidades do próprio canal.
+  `GarantirPodeEnviarTextoLivre(agora, tag?)` recusa no domínio.
+- Porta `ICanalMensageria` (`App/Ports/Output/Atendimento/`), `ResolvedorCanal` (lança
+  `CanalNaoSuportadoException`, que é o `CANAL_DESCONHECIDO` do protótipo) e adaptador `CanalWhatsApp`
+  sobre o `IWhatsAppCloudClient`.
+**Escopo.** Enum, VO, `Conversa`, configuração EF e migration. **A migration é escrita à mão como
+`RenameColumn`**, porque o EF gera drop mais add e apagaria o contato. Também repositório, webhook
+(R8), porta, resolvedor, adaptador e DI.
+**Fora.** Adaptadores dos outros canais (S35–S37). Gravar `StatusMensagem.Falhou` quando o canal
+não tem adaptador fica com o use case de envio do console (S07), que ainda não existe.
 **Aceite.**
-- [ ] Conversas existentes migram sem perda (a integração conta as linhas antes e depois).
-- [ ] Mensagem do WhatsApp continua entrando e saindo pelo webhook e pelo console.
-- [ ] Envio num canal sem adaptador falha com `CanalNaoSuportadoException` e grava `StatusMensagem.Falhou`.
-- [ ] Texto livre com a janela vencida numa porta com `TemJanela=true` e sem tag é recusado no domínio.
-**Testes (Red).** `ConversaTests.DentroDaJanelaUsaCapacidadeDoCanal`,
-`IdentidadeContatoTests.UnicaPorCanalEIdExterno`, `ResolvedorCanalTests.CanalSemAdaptadorLanca`,
-`MigracaoIdentidadeIntegrationTests.BackfillPreservaConversas`.
-**Rollback.** Migration `Down` que recria `ContatoWaId` a partir da identidade WhatsApp.
+- [x] Conversas existentes migram sem perda (`MigrationS34_PreservaContatoDasConversasExistentes`).
+- [x] Mensagem do WhatsApp continua entrando pelo webhook (testes do use case do webhook).
+- [x] Envio num canal sem adaptador lança `CanalNaoSuportadoException`.
+- [x] Texto livre com a janela vencida e sem tag válida é recusado no domínio.
+**Testes (Red).** `ConversaTests.DentroDaJanelaUsaCapacidadeDoCanal`, `...Abrir_NormalizaContatoConformeOCanal`,
+`...TextoLivreForaDaJanela_SemTag_Recusa`, `...InstagramComHumanAgent_PermiteAteSeteDias`,
+`ResolvedorCanalTests.CanalSemAdaptadorLanca`, `CanalWhatsAppTests`,
+`ConversaRepositoryIntegrationTests.MesmoIdEmCanaisDiferentesSaoContatosDiferentes` e `...MigrationS34_PreservaContatoDasConversasExistentes`.
+**Rollback.** Migration `Down`, que volta o nome e o índice e recusa rodar se houver conversa de
+outro canal, em vez de apagar dados.
 **Depende de.** S03 (PR #1053).
 **Leitura mínima.** `Domain/Entities/Atendimento/Conversa.cs`, `Domain/Enums/Atendimento/CanalConversa.cs`,
 `Postgre/Data/Configurations/Atendimento/ConversaConfiguration.cs`, `App/Ports/Output/Atendimento/IWhatsAppCloudClient.cs`,

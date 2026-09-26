@@ -32,7 +32,7 @@ public sealed class EnviarCardapioImagemFerramenta(
             return FerramentaJson.Serializar(new { enviado = false, motivo = "sem_imagem_configurada", link });
 
         var conversa = contexto.Conversa;
-        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoWaId, storefront.CardapioImagemUrl, link, ct);
+        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, storefront.CardapioImagemUrl, link, ct);
 
         if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);
         await conversaRepository.AddMensagemAsync(

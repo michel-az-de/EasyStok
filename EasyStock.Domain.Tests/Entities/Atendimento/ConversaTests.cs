@@ -1,6 +1,7 @@
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace EasyStock.Domain.Tests.Entities.Atendimento;
@@ -32,7 +33,7 @@ public class ConversaTests
 
         conversa.Id.Should().NotBeEmpty();
         conversa.EmpresaId.Should().Be(Empresa);
-        conversa.ContatoWaId.Should().Be(WaId, "so digitos, sem '+', espacos ou mascara");
+        conversa.ContatoIdExterno.Should().Be(WaId, "so digitos, sem '+', espacos ou mascara");
         conversa.ContatoNome.Should().Be("Tatiana");
         conversa.Canal.Should().Be(CanalConversa.WhatsApp);
         conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
@@ -136,12 +137,101 @@ public class ConversaTests
         var conversa = Nova();
         var entrada = Agora.AddMinutes(10);
 
-        conversa.DentroDaJanela24h(Agora).Should().BeFalse("sem mensagem de entrada nao ha janela");
+        conversa.DentroDaJanela(Agora).Should().BeFalse("sem mensagem de entrada nao ha janela");
 
         conversa.RegistrarEntrada(entrada);
 
-        conversa.DentroDaJanela24h(entrada.AddHours(23)).Should().BeTrue();
-        conversa.DentroDaJanela24h(entrada.AddHours(25)).Should().BeFalse();
+        conversa.DentroDaJanela(entrada.AddHours(23)).Should().BeTrue();
+        conversa.DentroDaJanela(entrada.AddHours(25)).Should().BeFalse();
+    }
+
+    // ── Canal (S34, ADR-0051) ──────────────────────────────────────────
+
+    [Fact]
+    public void DentroDaJanelaUsaCapacidadeDoCanal()
+    {
+        // Chat do site nao tem janela: a dona responde a qualquer hora.
+        var site = Conversa.Abrir(Empresa, "sessao-abc", Agora, canal: CanalConversa.ChatSite);
+
+        site.DentroDaJanela(Agora.AddDays(30)).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(CanalConversa.Instagram, "  17841400000000001 ", "17841400000000001")]
+    [InlineData(CanalConversa.Messenger, "6543210987654321", "6543210987654321")]
+    [InlineData(CanalConversa.Email, "  Fulana@Exemplo.COM ", "fulana@exemplo.com")]
+    [InlineData(CanalConversa.Sms, "+55 (11) 98888-7777", "5511988887777")]
+    public void Abrir_NormalizaContatoConformeOCanal(CanalConversa canal, string bruto, string esperado)
+    {
+        var conversa = Conversa.Abrir(Empresa, bruto, Agora, canal: canal);
+
+        conversa.ContatoIdExterno.Should().Be(esperado);
+        conversa.Canal.Should().Be(canal);
+    }
+
+    [Fact]
+    public void Abrir_EmailSemArroba_Lanca()
+    {
+        var act = () => Conversa.Abrir(Empresa, "fulana.exemplo.com", Agora, canal: CanalConversa.Email);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void TextoLivreForaDaJanela_SemTag_Recusa()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+
+        var act = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25));
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*modelo aprovado*");
+    }
+
+    [Fact]
+    public void TextoLivreDentroDaJanela_Permite()
+    {
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+
+        var act = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(23));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void WhatsAppNaoAceitaTagForaDaJanela()
+    {
+        // No WhatsApp o caminho fora da janela e o modelo aprovado, nao tag.
+        var conversa = Nova();
+        conversa.RegistrarEntrada(Agora);
+
+        var act = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25), tag: "HUMAN_AGENT");
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void InstagramComHumanAgent_PermiteAteSeteDias()
+    {
+        var conversa = Conversa.Abrir(Empresa, "17841400000000001", Agora, canal: CanalConversa.Instagram);
+        conversa.RegistrarEntrada(Agora);
+
+        var comTag25h = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25), tag: "HUMAN_AGENT");
+        var semTag25h = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddHours(25));
+        var comTag8d = () => conversa.GarantirPodeEnviarTextoLivre(Agora.AddDays(8), tag: "HUMAN_AGENT");
+
+        comTag25h.Should().NotThrow();
+        semTag25h.Should().Throw<RegraDeDominioVioladaException>();
+        comTag8d.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void CapacidadesDeCanalNaoDeclarado_Lanca()
+    {
+        var act = () => CapacidadesCanal.Para((CanalConversa)99);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
     }
 
     // ── Mensagens ──────────────────────────────────────────────────────

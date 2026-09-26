@@ -17,12 +17,13 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
     public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.AtendimentoConversas.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id, ct);
 
-    public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, string contatoWaId, CancellationToken ct = default)
+    public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
     {
-        var waId = Conversa.NormalizarWaId(contatoWaId);
+        var contato = Conversa.NormalizarContato(canal, contatoIdExterno);
         return db.AtendimentoConversas.FirstOrDefaultAsync(
             c => c.EmpresaId == empresaId
-                 && c.ContatoWaId == waId
+                 && c.Canal == canal
+                 && c.ContatoIdExterno == contato
                  && c.Situacao != SituacaoConversa.Encerrada,
             ct);
     }

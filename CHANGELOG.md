@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Identidade da conversa **por canal** e porta de envio (S34, ADR-0051): `CanalConversa` ganha
+  Instagram, Messenger, ChatSite, Email e Sms; `CapacidadesCanal` diz o que cada um aceita (janela,
+  modelo, tag fora da janela, mídia, botões). `Conversa.ContatoWaId` vira `ContatoIdExterno`
+  normalizado por canal, com índice aberto `(EmpresaId, Canal, ContatoIdExterno)`; a migration é
+  rename (não perde dados) e o Down recusa com conversa de outro canal. `GarantirPodeEnviarTextoLivre`
+  recusa texto livre fora da janela sem tag válida. `ICanalMensageria` + `ResolvedorCanal` +
+  adaptador `CanalWhatsApp`. (#1065)
 - Agente de atendimento por WhatsApp com LLM e ferramentas (S06, onda 1, ADR-0050):
   `AgenteAtendimentoService` responde fora da requisição (fila `TurnoAgente`, consumida na Api)
   com a API Messages da Anthropic (`AnthropicMessagesClient`, modelo em `Anthropic:ModeloAgente`,

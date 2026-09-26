@@ -62,7 +62,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         _featureFlagRepository.ListarAtivasAsync(_empresaId, Arg.Any<CancellationToken>())
             .Returns(new[] { FeatureCatalogo.ModuloAtendimento });
         _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
-        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, ContatoWaId, Arg.Any<CancellationToken>())
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
             .Returns((Conversa?)null);
 
         // Idempotência: primeira vez sempre registra com sucesso.
@@ -277,7 +277,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     public async Task ConversaAbertaNaoRepeteSaudacao()
     {
         var aberta = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddMinutes(-5), "Fulano");
-        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, ContatoWaId, Arg.Any<CancellationToken>())
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
             .Returns(aberta);
 
         await _useCase.ExecuteAsync(PayloadTexto("wamid.segunda", "Quero um bolo"));

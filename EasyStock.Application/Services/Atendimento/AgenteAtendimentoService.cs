@@ -55,7 +55,7 @@ public sealed class AgenteAtendimentoService(
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
         var conversa = dados.Conversa;
-        if (conversa.Situacao != SituacaoConversa.Automatica || !conversa.DentroDaJanela24h(agora))
+        if (conversa.Situacao != SituacaoConversa.Automatica || !conversa.DentroDaJanela(agora))
             return ResultadoTurnoAgente.Ignorado;
 
         var mensagens = MontarConversacao(dados.Mensagens);
@@ -161,7 +161,7 @@ public sealed class AgenteAtendimentoService(
         var enviou = false;
         try
         {
-            var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoWaId, texto, ct: ct);
+            var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
             saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto, envio.Wamid);
             enviou = true;
         }

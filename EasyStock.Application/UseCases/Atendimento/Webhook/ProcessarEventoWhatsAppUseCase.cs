@@ -128,7 +128,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         IdentificacaoCliente? identificacao = null;
         try
         {
-            var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, msg.De, ct);
+            var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
             var nomePerfil = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome;
             conversa = existenteConversa ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, nomePerfil);
 
@@ -136,7 +136,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
                 identificacao = await identificarCliente.ExecuteAsync(
-                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoWaId, nomePerfil), ct);
+                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
                 conversa.VincularCliente(identificacao.Cliente.Id);
                 // TODO(S24) #1062: cliente bloqueado não recebe saudação automática; em vez dela,
                 // Conversa.Assumir() + Mensagem(Sistema, "cliente bloqueado: <motivo>") + notificação à dona (S07).
@@ -275,7 +275,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             Mensagem saida;
             try
             {
-                var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoWaId, texto, ct: ct);
+                var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
                 saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
                     TipoConteudoMensagem.Texto, texto, envio.Wamid);
             }

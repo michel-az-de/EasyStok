@@ -74,9 +74,10 @@ Em 26/09/2026 o Felipe decidiu três coisas:
   `instagram_manage_messages` e `pages_manage_metadata` na app (é provável que exijam acesso
   avançado por App Review, a confirmar na S35), conta Twilio com número remetente para SMS, e
   domínio de e-mail com SPF, DKIM e DMARC.
-- **O S04 e o S05 mudam de chave.** A identidade do cliente deixa de ser só o `wa_id` e passa a ser
-  `(Canal, IdExterno)`. Um cliente pode ter várias identidades (telefone, PSID do Messenger, IGSID
-  do Instagram, sessão do site, e-mail). O S34 faz a migração antes do S05.
+- **O S04 e o S05 mudam de chave.** A identidade da conversa deixa de ser só o `wa_id` e passa a
+  ser `(Canal, ContatoIdExterno)`, o que o S34 fez (#1065). Um cliente pode ter várias identidades
+  (telefone, PSID do Messenger, IGSID do Instagram, sessão do site, e-mail), e quem as liga ao
+  `Cliente` é o S05.
 - **O prazo do go-live cresce.** As 14 fatias novas somam cerca de 3 ondas. A tabela de ordem
   está no README do plano.
 - **Resposta do cliente por SMS e por e-mail** não abre conversa no go-live. Se houver demanda,
