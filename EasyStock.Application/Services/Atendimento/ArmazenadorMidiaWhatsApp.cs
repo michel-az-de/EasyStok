@@ -10,7 +10,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, IFileStorage fileStorage)
 {
-    public async Task<string> ArmazenarAsync(
+    public async Task<(string Chave, string Mime)> ArmazenarAsync(
         Guid empresaId, Guid conversaId, string wamid, string mediaId, CancellationToken ct = default)
     {
         var (conteudo, mime) = await cloudClient.BaixarMidiaAsync(mediaId, ct);
@@ -25,7 +25,7 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
         var resultado = await fileStorage.UploadAsync(
             new FileUploadRequest(bucketPath, fileName, mime, memoria.ToArray(), IsPublic: false), ct);
 
-        return resultado.StorageKey;
+        return (resultado.StorageKey, resultado.ContentType);
     }
 
     private static string ExtensaoPara(string mimeType) => mimeType switch

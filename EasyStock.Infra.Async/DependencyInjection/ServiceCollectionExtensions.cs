@@ -30,6 +30,9 @@ public static class ServiceCollectionExtensions
         // Queue Service
         services.AddSingleton<IQueueService, BackgroundQueueService>();
 
+        // Evento de operação (SSE, S18) — no-op até S18 existir.
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher, NoOpOperacaoEventPublisher>();
+
         // Email Service — Onda 1.3: switch por Email:Provider em {smtp, sendgrid, console}.
         // Compat: se Email:Provider nao setado, mantem comportamento legado (Smtp se existir, senao console).
         var emailProvider = (configuration["Email:Provider"] ?? "").Trim().ToLowerInvariant();

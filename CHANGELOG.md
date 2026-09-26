@@ -6,6 +6,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Webhook da Meta Cloud API (S03, onda 1, ADR-0050): `GET|POST api/webhooks/whatsapp` — GET
+  responde a verificação, POST valida `X-Hub-Signature-256` (HMAC-SHA256, tempo constante) e
+  devolve 200 quando a assinatura é válida, ou 503 quando uma mensagem falhou por motivo que um
+  reenvio da Meta resolve (corrida na 1ª mensagem do contato, banco); regra de domínio não pede reenvio. `ProcessarEventoWhatsAppUseCase` resolve o
+  tenant por `phone_number_id`, idempotência por `wamid` (reaproveitando `WebhookRecebido`), abre
+  `Conversa`/grava `Mensagem`, marca como lida (best-effort), enfileira mídia e turno do agente
+  (stub — S06 ainda não existe). `ITenantContextAccessor` liga o filtro de tenant e a RLS para o
+  webhook, que não tem claim JWT — mesmo mecanismo do módulo Mobile. Fila de mídia com consumidor
+  real (`AtendimentoFilaMidiaBackgroundService`, no processo da API porque a fila é em memória, com o
+  tenant definido no job); fila do agente ainda sem consumidor. A janela de 24 h conta do instante
+  da mensagem na Meta, não do processamento; wamid já gravado não é reinserido.
+  (#1052)
 - Plano do atendimento ampliado para **multicanal e sistema completo do protótipo** (ADR-0051,
   que amplia o ADR-0050): onda 8 com S34–S47 em `docs/plan/atendimento-whatsapp/09-sistema-completo.md`
   (canal como porta, Instagram, Messenger, chat do site, e-mail e SMS, consentimento por canal,
