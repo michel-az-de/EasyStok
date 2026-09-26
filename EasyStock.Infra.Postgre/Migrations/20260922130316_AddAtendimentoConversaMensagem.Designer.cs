@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922130316_AddAtendimentoConversaMensagem")]
+    partial class AddAtendimentoConversaMensagem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1670,18 +1673,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("WhatsAppPhoneNumberId")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Documento")
                         .IsUnique();
-
-                    b.HasIndex("WhatsAppPhoneNumberId")
-                        .IsUnique()
-                        .HasFilter("\"WhatsAppPhoneNumberId\" IS NOT NULL");
 
                     b.ToTable("empresas", (string)null);
                 });

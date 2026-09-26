@@ -68,4 +68,37 @@ public static class StartupHardening
                 $"CRITICAL: fuso de Brasilia degradado em producao (fonte={fonte}, offset={offsetMinutos}min). " +
                 "A imagem provavelmente esta sem tzdata; rebuild com 'apt-get install -y tzdata'.");
     }
+
+    /// <summary>
+    /// Com o provider WhatsApp "meta" ligado, AccessToken/AppSecret/VerifyToken sao obrigatorios:
+    /// sem AppSecret nao ha como validar a assinatura do webhook (S03); sem VerifyToken a Meta
+    /// nunca completa a verificacao do endpoint.
+    /// </summary>
+    public static void ValidateWhatsAppMeta(WebApplicationBuilder builder)
+        => ValidateWhatsAppMeta(
+            builder.Configuration["Notifications:WhatsApp:Provider"],
+            builder.Configuration["Notifications:WhatsApp:Meta:AccessToken"],
+            builder.Configuration["Notifications:WhatsApp:Meta:AppSecret"],
+            builder.Configuration["Notifications:WhatsApp:Meta:VerifyToken"]);
+
+    /// <summary>Nucleo puro/testavel de <see cref="ValidateWhatsAppMeta(WebApplicationBuilder)"/>.</summary>
+    public static void ValidateWhatsAppMeta(string? provider, string? accessToken, string? appSecret, string? verifyToken)
+    {
+        if (!string.Equals(provider, "meta", StringComparison.OrdinalIgnoreCase)) return;
+        ValidateWhatsAppMetaCore(accessToken, appSecret, verifyToken);
+    }
+
+    /// <summary>Nucleo puro/testavel que assume o provider "meta" ja ligado.</summary>
+    public static void ValidateWhatsAppMetaCore(string? accessToken, string? appSecret, string? verifyToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+            throw new InvalidOperationException(
+                "Notifications:WhatsApp:Meta:AccessToken is required when Notifications:WhatsApp:Provider=meta.");
+        if (string.IsNullOrWhiteSpace(appSecret))
+            throw new InvalidOperationException(
+                "Notifications:WhatsApp:Meta:AppSecret is required when Notifications:WhatsApp:Provider=meta.");
+        if (string.IsNullOrWhiteSpace(verifyToken))
+            throw new InvalidOperationException(
+                "Notifications:WhatsApp:Meta:VerifyToken is required when Notifications:WhatsApp:Provider=meta.");
+    }
 }

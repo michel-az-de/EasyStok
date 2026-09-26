@@ -202,6 +202,8 @@ if (resolvedProvider is "postgresql")
 StartupHardening.Validate(builder, postgresConnectionString);
 // Fuso de Brasilia: em producao recusa subir se degradou (ex.: imagem sem tzdata).
 StartupHardening.ValidateTimezone(builder.Environment);
+// WhatsApp Meta: com o provider "meta" ligado, credenciais sao obrigatorias.
+StartupHardening.ValidateWhatsAppMeta(builder);
 
 Log.Information("""
 
