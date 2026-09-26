@@ -41,6 +41,9 @@ public sealed record EnvioWhatsAppResult(string Wamid);
 public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehPermanente)
     : Exception(mensagem)
 {
+    /// <summary>Mensagem livre fora da janela de 24 h (só template passa).</summary>
+    public const int CodigoForaDaJanela = 131047;
+
     public int Codigo { get; } = codigo;
     public bool EhPermanente { get; } = ehPermanente;
 }
