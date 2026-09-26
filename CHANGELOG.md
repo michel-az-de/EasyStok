@@ -8,12 +8,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ### Added
 - Webhook da Meta Cloud API (S03, onda 1, ADR-0050): `GET|POST api/webhooks/whatsapp` — GET
   responde a verificação, POST valida `X-Hub-Signature-256` (HMAC-SHA256, tempo constante) e
-  sempre devolve 200 quando a assinatura é válida. `ProcessarEventoWhatsAppUseCase` resolve o
+  devolve 200 quando a assinatura é válida, ou 503 quando uma mensagem falhou por motivo que um
+  reenvio da Meta resolve (corrida na 1ª mensagem do contato, banco); regra de domínio não pede reenvio. `ProcessarEventoWhatsAppUseCase` resolve o
   tenant por `phone_number_id`, idempotência por `wamid` (reaproveitando `WebhookRecebido`), abre
   `Conversa`/grava `Mensagem`, marca como lida (best-effort), enfileira mídia e turno do agente
   (stub — S06 ainda não existe). `ITenantContextAccessor` liga o filtro de tenant e a RLS para o
   webhook, que não tem claim JWT — mesmo mecanismo do módulo Mobile. Fila de mídia com consumidor
-  real (`AtendimentoFilaMidiaBackgroundService`, Worker); fila do agente ainda sem consumidor.
+  real (`AtendimentoFilaMidiaBackgroundService`, no processo da API porque a fila é em memória, com o
+  tenant definido no job); fila do agente ainda sem consumidor. A janela de 24 h conta do instante
+  da mensagem na Meta, não do processamento; wamid já gravado não é reinserido.
   (#1052)
 - Configuração do atendimento por WhatsApp por empresa (S08, onda 1, ADR-0050):
   `ConfiguracaoAtendimento` (tom, nível de sugestão, saudações, frase de espera, mensagem fora de
