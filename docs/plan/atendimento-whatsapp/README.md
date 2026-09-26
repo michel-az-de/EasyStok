@@ -20,8 +20,10 @@ operador é outra tecnologia e outro repositório. O site casadababa.com continu
 | 6 | [06-campanhas.md](06-campanhas.md) | S28–S31 | Campanha com público filtrado, exclusões, limite semanal, ondas, lembrete, interesse |
 | 7 | [07-poda.md](07-poda.md) | P01–P06 | Remoção do que é SaaS, fiscal, MAUI e alvos de deploy extras |
 | MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno; opção A adotada: gateway único |
+| 8 | [09-sistema-completo.md](09-sistema-completo.md) | S34–S47 | ADR-0051: canal como porta, Instagram, Messenger, chat do site, e-mail e SMS, consentimento por canal, mensagem programada, expediente da loja, atendentes, respostas prontas e automações, lembretes, entregadores e viagens, cadastros, lote de papel, assistente |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
+**Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).
 
 ## Onda 0 — o que só o Felipe destrava (fora do código)
 
@@ -36,6 +38,9 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo ap
 | 0.7 | Ligar `ENABLE_VIACEP_LOOKUP` e `ENABLE_NOMINATIM_GEOCODING` no ambiente | S14 |
 | 0.8 | Storage S3 compatível configurado (`FileStorage:S3:*`, já existe) para a mídia recebida, e `PublicBaseUrl` para a imagem do cardápio | S02, S06 |
 | 0.9 | Mercado Pago: conta, aplicação Checkout Pro, credenciais de teste e produção, webhook com assinatura secreta, usuários de teste (roteiro completo em [08-mercado-pago.md](08-mercado-pago.md); fecha casa-da-baba #10) | S32, S33 e o checkout do site |
+| 0.10 | Página do Facebook e conta profissional do Instagram vinculadas ao mesmo Business da 0.1. Na mesma app: produtos Messenger e Instagram, permissões `pages_messaging`, `instagram_manage_messages` e `pages_manage_metadata` (é provável que o acesso avançado exija App Review; confirmar), page access token de longa duração e webhook assinado nos objetos `page` e `instagram` | S35 em produção |
+| 0.11 | Conta Twilio com número remetente de SMS no Brasil (`Notifications:Sms:Twilio:*`) | S37 (SMS) |
+| 0.12 | Domínio de e-mail com SPF, DKIM e DMARC e credenciais SMTP | S37 (e-mail) |
 
 ## Convenções do executor (vinculantes, resumo do CLAUDE.md v4.0)
 

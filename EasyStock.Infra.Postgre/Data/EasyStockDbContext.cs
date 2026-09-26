@@ -335,6 +335,8 @@ namespace EasyStock.Infra.Postgre.Data
         // Worker decifrar o mesmo payload na emissao fiscal.
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
+        public void DescartarAlteracoesPendentes() => ChangeTracker.Clear();
+
         public async Task<int> CommitAsync()
         {
             try

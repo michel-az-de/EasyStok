@@ -34,6 +34,21 @@ public class BackgroundJobRegistrationTests
     }
 
     [Fact]
+    public void AddEasyStockBackgroundJobs_RegistraDrenoDaFilaDeMidiaDoAtendimento_NoProcessoDaApi()
+    {
+        // A fila é em memória (BackgroundQueueService singleton): quem drena precisa estar no mesmo
+        // processo que o webhook enfileira. No Worker ela nunca recebia nada.
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        services.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+
+        services.Where(d => d.ServiceType == typeof(IHostedService))
+            .Select(d => d.ImplementationType)
+            .Should().Contain(typeof(AtendimentoFilaMidiaBackgroundService));
+    }
+
+    [Fact]
     public void AddEasyStockBackgroundJobs_DeveRegistrarJobsLegados_QuandoFlagsEstiveremHabilitadas()
     {
         var services = new ServiceCollection();

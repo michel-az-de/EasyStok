@@ -10,11 +10,15 @@ namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 public sealed class ProcessarMidiaWhatsAppJobUseCase(
     IConversaRepository conversaRepository,
     ArmazenadorMidiaWhatsApp armazenador,
+    ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     ILogger<ProcessarMidiaWhatsAppJobUseCase> logger)
 {
     public async Task ExecuteAsync(ArmazenarMidiaWhatsAppJob job, CancellationToken ct = default)
     {
+        // Escopo do job não tem JWT: sem isto o filtro global e a RLS (ADR-0010) zeram a consulta.
+        tenantContext.SetCurrentTenant(job.EmpresaId);
+
         var mensagem = await conversaRepository.ObterMensagemPorExternoIdAsync(job.EmpresaId, job.Wamid, ct);
         if (mensagem is null)
         {

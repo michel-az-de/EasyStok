@@ -9,6 +9,8 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
+using EasyStock.Application.UseCases.FeatureFlags;
+using EasyStock.Domain.Entities;
 using EasyStock.Infra.Notifications.Options;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -26,13 +28,16 @@ public class WebhookWhatsAppControllerTests
     private const string AppSecret = "app-secret-teste";
 
     private readonly IWebhookRecebidoRepository _webhookRecebidoRepository = Substitute.For<IWebhookRecebidoRepository>();
+    private readonly IEmpresaRepository _empresaRepository = Substitute.For<IEmpresaRepository>();
+    private readonly ITenantFeatureFlagRepository _featureFlagRepository = Substitute.For<ITenantFeatureFlagRepository>();
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly WebhookWhatsAppController _controller;
 
     public WebhookWhatsAppControllerTests()
     {
         var processarUseCase = new ProcessarEventoWhatsAppUseCase(
-            Substitute.For<IEmpresaRepository>(),
-            Substitute.For<ITenantFeatureFlagRepository>(),
+            _empresaRepository,
+            _featureFlagRepository,
             Substitute.For<IConfiguracaoAtendimentoRepository>(),
             Substitute.For<IConversaRepository>(),
             _webhookRecebidoRepository,
@@ -40,7 +45,7 @@ public class WebhookWhatsAppControllerTests
             Substitute.For<IQueueService>(),
             Substitute.For<IOperacaoEventPublisher>(),
             Substitute.For<ITenantContextAccessor>(),
-            Substitute.For<IUnitOfWork>(),
+            _unitOfWork,
             new IdentificarClientePorTelefoneUseCase(
                 Substitute.For<IClienteRepository>(),
                 Substitute.For<IClienteStorefrontRepository>(),
@@ -93,6 +98,23 @@ public class WebhookWhatsAppControllerTests
         var result = await _controller.Receber(CancellationToken.None);
 
         result.Should().BeOfType<OkResult>();
+    }
+
+    [Fact]
+    public async Task FalhaQueUmReenvioResolveDevolve503()
+    {
+        // 503 faz a Meta reenviar; 200 perderia a mensagem (ex.: corrida na 1ª mensagem do contato).
+        var empresa = Empresa.Criar("Casa da Baba", "11111111000191");
+        _empresaRepository.GetByWhatsAppPhoneNumberIdAsync("PHONE123", Arg.Any<CancellationToken>()).Returns(empresa);
+        _featureFlagRepository.ListarAtivasAsync(empresa.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { FeatureCatalogo.ModuloAtendimento });
+        _unitOfWork.CommitAsync().Returns<int>(_ => throw new InvalidOperationException("23505"));
+        const string payload = "{\"entry\":[{\"changes\":[{\"value\":{\"metadata\":{\"phone_number_id\":\"PHONE123\"},\"messages\":[{\"from\":\"5511999998888\",\"id\":\"wamid.c\",\"timestamp\":\"1700000000\",\"type\":\"text\",\"text\":{\"body\":\"oi\"}}]}}]}]}";
+        SetRequestBody(payload, assinaturaValida: true);
+
+        var result = await _controller.Receber(CancellationToken.None);
+
+        result.Should().BeOfType<StatusCodeResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
     }
 
     private void SetRequestBody(string body, bool assinaturaValida)
