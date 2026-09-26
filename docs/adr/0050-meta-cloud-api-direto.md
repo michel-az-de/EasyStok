@@ -1,6 +1,6 @@
 # ADR-0050 — WhatsApp direto na Meta Cloud API (supersede ADR-0049)
 
-- Status: Aceito
+- Status: Aceito, com os itens 5 e 6 substituídos pelo ADR-0051 em 26/09/2026 (multicanal no go-live e SMS pela Twilio)
 - Data: 2026-09-22
 - Supersede: ADR-0049 (Huggy como canal). Mantém tudo o mais do ADR-0049: EasyStok é o cérebro, sem Hiram, front do operador em outra tecnologia, módulo gated por tenant.
 - Relacionados: ADR-0048, ADR-0042, ADR-0030, ADR-0010; issue #1042

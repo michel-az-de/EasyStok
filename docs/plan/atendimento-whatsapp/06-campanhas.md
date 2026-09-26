@@ -65,7 +65,7 @@ aceita template; o custo por conversa de marketing é maior que o de utilidade. 
 - Callback do outbox: quando a mensagem é enviada, `CampanhaDestinatario.Status = Enviado`, `EnviadoEm`; falha → `Falhou`. Ponto de extensão: `NotificadorService` já grava `LogEnvioNotificacao`; adicionar um `IOutboxEnvioObserver` simples chamado no mesmo lugar (verificar se já existe hook; se não, criar).
 - `Api/BackgroundServices/CampanhaJob.cs` (a cada 60 s): dispara onda 1 das `Agendada` vencidas; ao chegar `EncerramentoEm`, marca `Encerrada` e enfileira o lembrete para `Enviado` sem `PedidoId` (com `EnviarLembreteEncerramento`).
 - Atribuição de pedido: ao criar pedido (S10) de cliente com destinatário `Enviado` em campanha `Enviando`/`Enviada` nos últimos 7 dias → `Status = Pediu`, `PedidoId` (métrica de conversão para US-030 futuro).
-**Fora.** Relatório de conversão; Instagram.
+**Fora.** Relatório de conversão. Pelo ADR-0051 a campanha é multicanal: o disparo usa `ICanalMensageria` (S34) e o filtro de consentimento por canal (S38), e o Instagram entra com a regra de janela e de tag do S35.
 **Aceite.**
 - [ ] Campanha com 50 pendentes e `TamanhoOnda=30`: onda 1 enfileira 30 com os que já compraram o item primeiro; 20 continuam `Pendente`; nada dispara sozinho depois.
 - [ ] `POST ondas` enfileira a onda 2; `DisparoEm` no passado não reativa a onda 1.
