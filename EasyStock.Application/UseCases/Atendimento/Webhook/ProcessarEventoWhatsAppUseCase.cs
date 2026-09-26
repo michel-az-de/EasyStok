@@ -29,6 +29,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IUnitOfWork unitOfWork,
     IdentificarClientePorTelefoneUseCase identificarCliente,
     SaudacaoAtendimento saudacao,
+    RoteadorAcoesBotao roteadorAcoes,
     ILogger<ProcessarEventoWhatsAppUseCase> logger)
 {
     private const string Provedor = "meta_whatsapp";
@@ -199,8 +200,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
             if (mensagem.BotaoId is { } botaoId && botaoId.StartsWith("acao:", StringComparison.Ordinal))
             {
-                // TODO(S06): RoteadorAcoesBotao resolve "acao:<nome>:<payload>" sem chamar o LLM.
-                logger.LogInformation("Webhook WhatsApp: ação de botão {BotaoId} recebida (S06 ainda não implementa o roteador).", botaoId);
+                // S06: "acao:<nome>:<payload>" é resolvido sem LLM; o turno do agente não é enfileirado.
+                await ExecutarAcaoDeBotaoAsync(empresaId, conversa, botaoId!, ct);
             }
             else
             {
@@ -214,6 +215,23 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: mensagem {Wamid} gravada, mas falhou ao enfileirar o que vem depois.", msg.Wamid);
+        }
+    }
+
+    /// <summary>
+    /// Roda a ação do botão e confirma. Falha aqui não derruba o webhook: a mensagem já foi gravada
+    /// e a dona a vê no console.
+    /// </summary>
+    private async Task ExecutarAcaoDeBotaoAsync(Guid empresaId, Conversa conversa, string botaoId, CancellationToken ct)
+    {
+        try
+        {
+            if (await roteadorAcoes.ExecutarAsync(empresaId, conversa, botaoId, DateTime.UtcNow, ct))
+                await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Webhook WhatsApp: falha executando ação de botão na conversa {ConversaId}.", conversa.Id);
         }
     }
 

@@ -87,6 +87,10 @@ public static class BackgroundJobServiceCollectionExtensions
         // neste processo porque a fila e em memoria (BackgroundQueueService).
         services.AddHostedService<AtendimentoFilaMidiaBackgroundService>();
 
+        // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
+        if (options.EnableAtendimentoTurnoAgente)
+            services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
+
         return services;
     }
 }

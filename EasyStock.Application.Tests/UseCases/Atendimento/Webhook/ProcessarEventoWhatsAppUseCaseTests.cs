@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Atendimento.AcoesBotao;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
@@ -47,6 +48,9 @@ public class ProcessarEventoWhatsAppUseCaseTests
                 _clienteRepository, _clienteStorefrontRepository,
                 NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
+            new RoteadorAcoesBotao(
+                [new ConfirmarEnderecoAcaoBotao(new EscaladorConversa(_conversaRepository))],
+                NullLogger<RoteadorAcoesBotao>.Instance),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 
         _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -129,6 +133,10 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, default(ProcessarTurnoAgenteJob)!);
         await _conversaRepository.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.BotaoId == "acao:confirmar_endereco:123"), Arg.Any<CancellationToken>());
+        // S06: o roteador resolveu a ação (stub que escala até a S14) sem enfileirar o agente.
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema && m.Texto!.Contains("confirmou o endereço 123")),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

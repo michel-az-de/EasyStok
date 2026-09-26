@@ -72,6 +72,8 @@ public static class DatabaseModule
                 builder.Services.AddMockFiscalGateway();
                 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
                 builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
+                // Atendimento WhatsApp (S06) — LLM do agente (Anthropic:*; desligado sem chave).
+                builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
                 // Scoped (não Singleton): a factory consome IEnumerable<IGatewayFiscal>, e os
                 // adapters (Focus/Mock) são Scoped (dependem de serviços scoped como
                 // INfeCertificadoA1Service). Como Singleton, capturava gateways scoped

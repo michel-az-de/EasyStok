@@ -49,7 +49,8 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
             : $"{saudacao}\n\n{configuracao.FraseEspera}";
     }
 
-    private async Task<string> ResolverLinkCardapioAsync(Guid empresaId, CancellationToken ct)
+    /// <summary>Link público do cardápio; também é a legenda de <c>enviar_cardapio_imagem</c> (S06).</summary>
+    public async Task<string> ResolverLinkCardapioAsync(Guid empresaId, CancellationToken ct = default)
     {
         var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
         var baseUrl = !string.IsNullOrWhiteSpace(storefront?.DominioCustom)
