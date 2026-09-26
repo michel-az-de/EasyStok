@@ -6,6 +6,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Agente de atendimento por WhatsApp com LLM e ferramentas (S06, onda 1, ADR-0050):
+  `AgenteAtendimentoService` responde fora da requisição (fila `TurnoAgente`, consumida na Api)
+  com a API Messages da Anthropic (`AnthropicMessagesClient`, modelo em `Anthropic:ModeloAgente`,
+  padrão `claude-sonnet-5`), até 6 iterações de ferramenta; ao estourar, envia a frase de espera e
+  escala. Ferramentas desta fatia: `consultar_cardapio`, `enviar_cardapio_imagem`,
+  `consultar_pedido`, `escalar_para_dona` (mínimo; aviso por push/SSE na S07) e
+  `encerrar_conversa`; pedido, endereço, janelas e CRM entram com a onda 2. Prompt com RN-01 a
+  RN-08 e D3 (snapshot), notas internas marcadas `[interno]`, consumo em `UsoIa`.
+  `RoteadorAcoesBotao` resolve `acao:<nome>:<payload>` sem LLM. Desligado com
+  `Anthropic:Enabled=false`, `Anthropic:AgenteAtendimentoEnabled=false` ou sem chave. (#1064)
 - Identificação do cliente ou lead pelo telefone no atendimento por WhatsApp (S05, onda 1,
   ADR-0050): na primeira mensagem de uma conversa nova, `IdentificarClientePorTelefoneUseCase`
   procura o `Cliente` pelo `TelefoneHash` do OTP e pelo `Telefone` do cadastro (E.164 e dígitos
