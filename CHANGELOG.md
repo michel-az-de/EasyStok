@@ -13,6 +13,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   ate o tenant. Flag `modulo.atendimento` em `FeatureCatalogo` (ADR-0048) e
   `GET api/integracoes/whatsapp/status` (Admin) expondo o status por tenant, 404 sem a flag.
   (#1046)
+- Agregado **Conversa/Mensagem** do atendimento por WhatsApp (S04, ADR-0050): entidades com
+  situacao (automatica, assumida, encerrada), janela de 24 h contada da ultima mensagem do cliente,
+  contexto JSON e status de entrega monotono; tabelas `atendimento_conversas` e
+  `atendimento_mensagens` com indice parcial "uma conversa aberta por contato", `wamid` unico por
+  empresa, filtro global de tenant e policy de RLS; `IConversaRepository` + repositorio Postgres.
+  Nada consome ainda: e a fundacao de S03/S05/S06. (#1044)
 - Plano do atendimento revisado para **Meta Cloud API direto** (ADR-0050 supersede ADR-0049):
   pasta renomeada para `docs/plan/atendimento-whatsapp/`, onda 1 reescrita (credenciais da Meta,
   cliente Graph com botoes e midia, webhook com `hub.challenge` e HMAC, conversa por `wa_id`,
