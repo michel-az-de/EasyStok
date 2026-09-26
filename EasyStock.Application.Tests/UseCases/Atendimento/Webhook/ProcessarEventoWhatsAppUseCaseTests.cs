@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -49,7 +50,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
                 NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
             new RoteadorAcoesBotao(
-                [new ConfirmarEnderecoAcaoBotao(new EscaladorConversa(_conversaRepository))],
+                [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()))],
                 NullLogger<RoteadorAcoesBotao>.Instance),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 

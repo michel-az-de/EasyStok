@@ -50,5 +50,9 @@ public enum TipoEventoNotificacao
     ParcelaRecebida = 36,
 
     // Caixa esquecido aberto de um dia anterior (CaixaEsquecidoJob — só notifica, não fecha).
-    CaixaAbertoEsquecido = 37
+    CaixaAbertoEsquecido = 37,
+
+    // Atendimento por WhatsApp (S07): o agente passou a conversa para a dona. 38-45 reservados pelo
+    // plano (docs/plan/atendimento-whatsapp: status de pedido, avaliacao, reembolso, campanhas).
+    ConversaEscalada = 46
 }
