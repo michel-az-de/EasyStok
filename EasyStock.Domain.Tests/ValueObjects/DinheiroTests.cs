@@ -100,6 +100,8 @@ public class DinheiroTests
     [Fact]
     public void Deve_retornar_string_formatada()
     {
+        using var _ = CulturaCorrente.PtBr();
+
         var dinheiro = Dinheiro.FromDecimal(10.50m);
 
         var str = dinheiro.ToString();
