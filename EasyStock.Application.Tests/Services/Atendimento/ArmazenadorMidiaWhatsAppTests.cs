@@ -27,9 +27,10 @@ public class ArmazenadorMidiaWhatsAppTests
 
         var armazenador = new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage);
 
-        var chave = await armazenador.ArmazenarAsync(empresaId, conversaId, "wamid.123", "media-1");
+        var (chave, mime) = await armazenador.ArmazenarAsync(empresaId, conversaId, "wamid.123", "media-1");
 
         chave.Should().Be($"atendimento/{empresaId}/{conversaId}/wamid.123.jpg");
+        mime.Should().Be("image/jpeg");
         await fileStorage.Received(1).UploadAsync(
             Arg.Is<FileUploadRequest>(r =>
                 r.BucketPath == $"atendimento/{empresaId}/{conversaId}" &&
