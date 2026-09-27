@@ -11,6 +11,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   link em HTML escapado, pelo `IEmailService`). O `ResolvedorCanal` passa a achar `Sms` e `Email`.
   Falha do provedor vira `EnvioCanalFalhouException`; operação que o canal não suporta lança
   `NotSupportedException`. (#1080)
+- **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
+  da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
+  horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`
+  e `POST api/atendimento/expediente/controle` (Admin), evento `expediente.alterado`. O checkout do
+  site devolve 409 só com a loja fechada na mão (o pedido é agendado; o horário governa o
+  atendimento). Tabela `expedientes_loja` com RLS. (#1074)
 - Provider da Meta no outbox de notificações e regra da janela de 24 h (S09): `MensagemPronta.Metadados`
   (`template`, `idioma`, `param1..N`); `MetaCloudWhatsAppProvider` envia pela porta de canal (S34) texto
   dentro da janela e template fora dela ou sem conversa aberta; fora da janela sem template (ou 131047
@@ -160,6 +166,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   quebrava ao mesmo tempo o filtro de vencidos e o modulo. (#1007)
 
 ### Changed
+- Plano do atendimento: a spec S11 passa a cobrir a troca da forma de pagamento com a cobrança já
+  enviada e o desfazer de pagamento registrado à mão, defeito achado pela operadora no protótipo. A S44
+  ganha veículo, placa e empresa do entregador, retrato do entregador por parada e relatório de
+  entregas por bairro; a S48 nova liga o cardápio que o cliente marca à conversa. (#1072)
 - Home autenticada passa a ser `/launcher` em todos os pontos (landing logada, onboarding,
   cardapio, lojas, 404 e primeiro slot do bottom nav mobile). Deep link continua vencendo:
   `returnUrl` valido tem precedencia sobre o portal. (#1007)
