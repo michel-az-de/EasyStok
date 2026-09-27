@@ -139,6 +139,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
 ### Fixed
+- `ToString` de `Quantidade`, `Dinheiro` e `Dimensoes` dependia da cultura do host (`1,5` no
+  Windows pt-BR, `1.5` no CI Linux) e passa a ser invariante, como a Api ja produzia no container.
+  O teste de wiring de metricas coleta so o proprio reader InMemory: o `ForceFlush` do provider
+  esperava ~4 s pelo OTLP sem coletor e, sob carga, pulava o InMemory. (#1075)
 - `POST /api/empresas/registrar` respondia 500 sob role sem `BYPASSRLS`: registrar empresa e
   cross-tenant por definicao (CRIA o tenant), entao a requisicao anonima nao tem `app.empresa_id`
   e a policy `tenant_isolation` recusava os INSERTs com `42501` em `assinaturas_empresa`. O
