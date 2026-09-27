@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
+  da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
+  horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`
+  e `POST api/atendimento/expediente/controle` (Admin), evento `expediente.alterado`. O checkout do
+  site devolve 409 só com a loja fechada na mão (o pedido é agendado; o horário governa o
+  atendimento). Tabela `expedientes_loja` com RLS. (#1074)
 - Provider da Meta no outbox de notificações e regra da janela de 24 h (S09): `MensagemPronta.Metadados`
   (`template`, `idioma`, `param1..N`); `MetaCloudWhatsAppProvider` envia pela porta de canal (S34) texto
   dentro da janela e template fora dela ou sem conversa aberta; fora da janela sem template (ou 131047

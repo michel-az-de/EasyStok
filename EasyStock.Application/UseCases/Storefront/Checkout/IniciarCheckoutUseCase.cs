@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -42,6 +42,7 @@ public sealed class IniciarCheckoutUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     CheckoutIdempotencyService idempotencyService,
     IMercadoPagoClient mercadoPagoClient,
+    IExpedienteLojaRepository expedienteLojaRepository,
     ILogger<IniciarCheckoutUseCase> logger)
 {
     private static readonly TimeSpan MpTimeout = TimeSpan.FromSeconds(5);
@@ -85,6 +86,13 @@ public sealed class IniciarCheckoutUseCase(
         var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException(input.Slug);
+
+        // ── Loja fechada na mão (S40) ─────────────────────────────────────
+        // Só a pausa manual recusa: o pedido do site é agendado (data + janela), então o horário
+        // de funcionamento governa o atendimento, não o checkout.
+        var expediente = await expedienteLojaRepository.GetPublicoAsync(storefront.EmpresaId, ct);
+        if (expediente?.ControleManual == Domain.Enums.Storefront.ControleManualLoja.ForcarFechada)
+            throw new LojaFechadaException(expediente.MensagemLojaFechada);
 
         // ── Validar cobertura de CEP ──────────────────────────────────────
         var zonas = await freteZonaRepository.GetAtivasDoStorefrontOrdenadasAsync(storefront.Id, ct);
