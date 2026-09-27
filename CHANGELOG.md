@@ -6,6 +6,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
+  (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
+  novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp
+  exige modelo e Instagram e Messenger recusam; marketing sem consentimento no canal é recusado
+  (S38). O destino vem da conversa aberta ou do cadastro (telefone para WhatsApp e SMS, e-mail
+  para e-mail). Disparador no processo da API (`MensagensProgramadasBackgroundService`, desliga
+  com `BackgroundJobs:EnableMensagensProgramadas=false`), com reserva `FOR UPDATE SKIP LOCKED` que
+  não duplica entre processos. A saída entra no histórico com `Mensagem.Programada`.
+  `POST|GET|DELETE api/atendimento/mensagens-programadas` (Operador). (#1082)
 - **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
   (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
   só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
