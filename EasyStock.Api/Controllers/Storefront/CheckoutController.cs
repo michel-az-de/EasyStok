@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -125,6 +125,18 @@ public sealed class CheckoutController(
         catch (StorefrontNaoEncontradoException ex)
         {
             return DataNotFound(ex.Message);
+        }
+        catch (LojaFechadaException ex)
+        {
+            // S40: a dona fechou a loja na mão; a mensagem é a de "loja fechada" configurada.
+            return StatusCode(
+                StatusCodes.Status409Conflict,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Loja fechada",
+                    Detail = ex.Message,
+                });
         }
         catch (JanelaSemVagasException ex)
         {

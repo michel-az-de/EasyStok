@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
@@ -52,6 +52,7 @@ public class IniciarCheckoutUseCaseTests
         IPedidoStorefrontRepository PedidoRepo,
         CheckoutIdempotencyService IdempotencyService,
         IMercadoPagoClient MpClient,
+        IExpedienteLojaRepository ExpedienteRepo,
         StorefrontEntity Storefront,
         CardapioItem CardapioItem1,
         JanelaEntrega Janela,
@@ -156,8 +157,11 @@ public class IniciarCheckoutUseCaseTests
         mpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
             .Returns(new PreferenceCriadaResult("pref-123", "https://mp.com/checkout/pref-123"));
 
+        // Sem registro de expediente = padrão automático (S40): não bloqueia o checkout.
+        var expedienteRepo = Substitute.For<IExpedienteLojaRepository>();
+
         return new Fakes(storefrontRepo, cardapioRepo, janelaRepo, bloqueioRepo,
-            freteZonaRepo, vagaRepo, pedidoRepo, idempotencyService, mpClient,
+            freteZonaRepo, vagaRepo, pedidoRepo, idempotencyService, mpClient, expedienteRepo,
             storefront, cardapioItem, janela, freteZona);
     }
 
@@ -171,6 +175,7 @@ public class IniciarCheckoutUseCaseTests
         f.PedidoRepo,
         f.IdempotencyService,
         f.MpClient,
+        f.ExpedienteRepo,
         NullLogger<IniciarCheckoutUseCase>.Instance);
 
     private static IniciarCheckoutInput InputValido() => new(
@@ -182,6 +187,34 @@ public class IniciarCheckoutUseCaseTests
         Cep: CepValido);
 
     // ── Testes ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExecuteAsync_LojaFechadaNaMao_LancaLojaFechadaSemCriarPedido()
+    {
+        // S40: a pausa manual da dona recusa pedido novo do site; o horário não (checkout é agendado).
+        var f = BuildFakes();
+        var expediente = ExpedienteLoja.CriarPadrao(f.Storefront.EmpresaId);
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarFechada, null, DateTime.UtcNow);
+        f.ExpedienteRepo.GetPublicoAsync(f.Storefront.EmpresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+
+        var act = () => BuildUseCase(f).ExecuteAsync(InputValido());
+
+        await act.Should().ThrowAsync<LojaFechadaException>();
+        await f.PedidoRepo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ForaDoHorarioSemPausaManual_NaoBloqueia()
+    {
+        var f = BuildFakes();
+        var expediente = ExpedienteLoja.CriarPadrao(f.Storefront.EmpresaId);
+        expediente.DefinirHorarios([]); // nenhum turno: fora do horário o tempo todo
+        f.ExpedienteRepo.GetPublicoAsync(f.Storefront.EmpresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+
+        var resultado = await BuildUseCase(f).ExecuteAsync(InputValido());
+
+        resultado.PedidoId.Should().NotBeEmpty();
+    }
 
     [Fact]
     public async Task ExecuteAsync_HappyPath_RetornaPedidoIdEInitPointUrl()
