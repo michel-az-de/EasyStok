@@ -148,6 +148,8 @@ public class QuantidadeTests
     [Fact]
     public void Deve_retornar_string_do_valor_decimal()
     {
+        using var _ = CulturaCorrente.PtBr();
+
         var quantidade = Quantidade.From(1.5m);
 
         quantidade.ToString().Should().Be("1.5");

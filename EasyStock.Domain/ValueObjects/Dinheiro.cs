@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -32,7 +33,7 @@ namespace EasyStock.Domain.ValueObjects
         public static implicit operator decimal(Dinheiro d) => d.Valor;
         public static implicit operator decimal?(Dinheiro? d) => d?.Valor;
 
-        public override string ToString() => Valor.ToString("F2");
+        public override string ToString() => Valor.ToString("F2", CultureInfo.InvariantCulture);
 
         private sealed class DinheiroJsonConverter : JsonConverter<Dinheiro>
         {
