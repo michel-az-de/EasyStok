@@ -219,6 +219,12 @@ Tentativas, CriadaPorUsuarioId)`.
 
 ### S40 · Expediente da loja (abrir e fechar)
 
+> **Entregue na #1074, com um refinamento:** o checkout do site é sempre agendado (data e janela),
+> então **só a pausa manual (`ForcarFechada`) devolve 409**. O horário não bloqueia o checkout. Ele
+> governa o atendimento, com a mensagem de "fora do horário" do agente e das automações (S42). O
+> expediente fica em `Domain/Entities/Storefront/ExpedienteLoja.cs`, com uma linha por empresa, no
+> molde da S08.
+
 **Problema.** O protótipo tem horário por dia, com virada da meia-noite e padrão de 08 a 22 h
 (`dominio/funcionamento.js`), e um controle manual `lojaAberta` que pode ser `null`, `true` ou
 `false`. O manual vence o relógio e não volta sozinho (`Moldura.jsx:287`, ações `ALTERNAR_LOJA` e
@@ -320,19 +326,29 @@ ordenadas, rota no Maps, chamado de entregador e marcos de tempo (`dominio/viage
 `SAIR_PARA_ENTREGA`, `MARCAR_PARADA_ENTREGUE` e `DESFAZER_VIAGEM`). RN-32: sem entregador resolvido,
 nenhum aviso sai (US-040).
 **Abordagem.** Três entidades novas:
-- `Entregador (EmpresaId, Nome, Tipo, Telefone, Ativo)`;
+- `Entregador (EmpresaId, Nome, Tipo, Empresa (propria | 99 | lalamove | ifood | outra), Telefone, Veiculo?, Placa?, Ativo)`;
 - `Viagem (EmpresaId, EntregadorId?, Situacao, SaiuEm, Paradas[PedidoId, Ordem, EntregueEm])`;
 - `ChamadoEntregador`, em texto livre e com situação.
 "Sair para entrega" da viagem transita todos os pedidos (S12) e publica os avisos (S13) somente se
 houver entregador.
+Feedback da operadora (26/09/2026): o entregador de plataforma identifica o pedido pelo **número do
+pedido**, não pelo nome do cliente nem pela comanda (interna), e com três "José" no mesmo dia é preciso
+saber quem levou cada pedido. Por isso cada parada guarda um **retrato do entregador** no momento da
+saída (`EntregadorNome`, `Veiculo`, `Placa`, `Empresa`), que não muda se o cadastro for editado depois.
 **Escopo.** Entidades e migration, `api/atendimento/entregadores` (CRUD) e `api/atendimento/viagens`
 (criar, incluir e retirar parada, reordenar, sair, marcar parada entregue, desfazer). O link de rota é
-uma URL do Google Maps montada com os endereços, sem chave de API.
+uma URL do Google Maps montada com os endereços, sem chave de API. O despacho devolve, por parada, o
+número público do pedido, o entregador, o veículo e a placa. `GET api/atendimento/relatorios/entregas-por-bairro?de=&ate=`
+(policy `Admin`): pedidos entregues e valor por bairro no período, ordenado do maior para o menor.
+Integração com 99, Lalamove e iFood Entregas fica fora: o cadastro é manual e já tem os campos que a
+integração vai preencher.
 **Aceite.**
 - [ ] Viagem com 3 paradas: "sair" leva os 3 pedidos para "saiu para entrega" e cada cliente recebe um aviso.
 - [ ] Viagem sem entregador: "sair" é recusado com o motivo (RN-32).
 - [ ] Cliente bloqueado impede o pedido de entrar na viagem (RN-14, igual ao protótipo `casos/entregas.js:192`).
-**Testes (Red).** `ViagemTests.SairSemEntregadorRecusa`, `...ClienteBloqueadoNaoEntra`, `SairParaEntregaUseCaseTests.AvisaCadaParada`.
+- [ ] Editar a placa do entregador depois da saída não altera o retrato gravado nas paradas já despachadas.
+- [ ] Relatório por bairro soma só pedidos entregues no período e respeita o tenant.
+**Testes (Red).** `ViagemTests.SairSemEntregadorRecusa`, `...ClienteBloqueadoNaoEntra`, `...RetratoDoEntregadorNaSaida`, `SairParaEntregaUseCaseTests.AvisaCadaParada`, `EntregasPorBairroQueryTests.SomaSoEntreguesNoPeriodo`.
 **Rollback.** Remover as entidades. A esteira volta a transitar pedido a pedido.
 **Depende de.** S12, S13 e S24 (bloqueio). **Tamanho.** G. **Tier.** alto.
 
@@ -383,3 +399,26 @@ e sem ferramentas de escrita. **Nada sai para o cliente.** Custo e latência sã
 - [ ] Sem `Anthropic:ApiKey`, devolve 503 com a mensagem clara.
 **Testes (Red).** `AssistenteDonaUseCaseTests.NaoGravaMensagem`, `...SemChave503`.
 **Depende de.** S06. **Tamanho.** P. **Tier.** alto.
+
+---
+
+### S48 · Cardápio que o cliente marca, ligado à conversa
+
+**Problema.** Feedback da operadora (26/09/2026): mandar só o link do cardápio obriga o cliente a
+digitar o pedido no chat e a operadora a montá-lo. Ela quer uma página com fotos onde o cliente marca
+itens e quantidades, como no iFood, e o pedido volta pronto para a conversa.
+**Abordagem.** O site (casadababa.com) já tem cardápio, carrinho e checkout. Em vez de uma página nova,
+o link enviado na conversa leva um token de curta duração (`?c=<token>`, 24 h, uso único após o envio)
+que amarra o carrinho à `Conversa`. Ao enviar, o site chama a API, que cria o pedido pelo mesmo caminho
+da conversa (S10), vincula a `Conversa.PedidoEmAndamentoId`, grava `Mensagem(Sistema)` com o resumo e
+segue para a cobrança (S11) com a forma escolhida.
+**Escopo.** `LinkCardapioConversaService` (gera e valida o token, sem PII na URL);
+`POST api/storefront/cardapio-conversa/{token}/pedido` (anônimo, rate limit `public-post`); a ferramenta
+`enviar_cardapio_imagem`/envio do cardápio (S06) passa a mandar o link com token; itens indisponíveis
+chegam desabilitados (`ListarCardapioPublicoUseCase`).
+**Aceite.**
+- [ ] Pedido enviado pela página aparece na conversa certa com o resumo e o pedido vinculado.
+- [ ] Token vencido ou já usado → 410 e a página orienta a pedir um link novo na conversa.
+- [ ] A URL não carrega telefone, nome nem id interno legível.
+**Testes (Red).** `LinkCardapioConversaServiceTests.TokenVencidoRecusa`, `...UsoUnico`, `CriarPedidoPeloCardapioConversaUseCaseTests.VinculaAConversa`.
+**Depende de.** S06, S10 e S11. **Tamanho.** M. **Tier.** alto.
