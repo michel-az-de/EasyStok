@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Storefront;
@@ -166,16 +167,18 @@ public class IniciarCheckoutUseCaseTests
     }
 
     private static IniciarCheckoutUseCase BuildUseCase(Fakes f) => new(
-        f.StorefrontRepo,
-        f.CardapioRepo,
-        f.JanelaRepo,
-        f.BloqueioRepo,
-        f.FreteZonaRepo,
-        f.VagaRepo,
-        f.PedidoRepo,
+        new CheckoutCoreService(
+            f.StorefrontRepo,
+            f.CardapioRepo,
+            f.JanelaRepo,
+            f.BloqueioRepo,
+            f.FreteZonaRepo,
+            f.VagaRepo,
+            f.PedidoRepo,
+            f.ExpedienteRepo,
+            NullLogger<CheckoutCoreService>.Instance),
         f.IdempotencyService,
         f.MpClient,
-        f.ExpedienteRepo,
         NullLogger<IniciarCheckoutUseCase>.Instance);
 
     private static IniciarCheckoutInput InputValido() => new(
@@ -396,5 +399,39 @@ public class IniciarCheckoutUseCaseTests
 
         await uc.Invoking(u => u.ExecuteAsync(InputValido()))
             .Should().ThrowAsync<MercadoPagoIndisponivelException>();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MesmaIdempotencyKey_DevolveOMesmoPedidoSemNovaReserva()
+    {
+        // S10: a idempotência continua antes do núcleo; o replay não cria pedido nem ocupa vaga.
+        var registros = new List<CheckoutIdempotency>();
+        var idempotencyRepo = Substitute.For<ICheckoutIdempotencyRepository>();
+        idempotencyRepo.GetByKeyAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(ci => registros.Where(r => r.Key == ci.ArgAt<Guid>(0)).ToList());
+        idempotencyRepo.TentarReservarAsync(Arg.Any<CheckoutIdempotency>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var p = ci.Arg<CheckoutIdempotency>();
+                registros.Add(p);
+                return (true, p);
+            });
+        idempotencyRepo.GetByKeyHashAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => registros.FirstOrDefault(r => r.Confere(ci.ArgAt<Guid>(0), ci.ArgAt<string>(1))));
+        var f = BuildFakes() with
+        {
+            IdempotencyService = new CheckoutIdempotencyService(
+                idempotencyRepo, NullLogger<CheckoutIdempotencyService>.Instance),
+        };
+        var input = InputValido() with { IdempotencyKey = Guid.NewGuid() };
+        input = input with { ContentHash = CheckoutContentHasher.ComputarHash(input) };
+
+        var primeira = await BuildUseCase(f).ExecuteAsync(input);
+        var segunda = await BuildUseCase(f).ExecuteAsync(input);
+
+        segunda.PedidoId.Should().Be(primeira.PedidoId);
+        segunda.InitPointUrl.Should().Be(primeira.InitPointUrl);
+        await f.PedidoRepo.Received(1).AddAsync(Arg.Any<EasyStock.Domain.Entities.Pedido>(), Arg.Any<CancellationToken>());
+        await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

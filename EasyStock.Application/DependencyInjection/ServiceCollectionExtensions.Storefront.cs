@@ -40,6 +40,7 @@ public static partial class ServiceCollectionExtensions
 
         // Checkout (CHECKOUT-001 base + WEBHOOK-001)
         services.AddScoped<CheckoutIdempotencyService>();
+        services.AddScoped<EasyStock.Application.Services.Storefront.CheckoutCoreService>(); // S10: fases 1-2
         services.AddScoped<IniciarCheckoutUseCase>();
 
         // S40: expediente da loja (abrir e fechar, horário por dia).
