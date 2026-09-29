@@ -207,3 +207,15 @@ Antes de operar em area sensivel:
 **PS5. Registra trade-offs no lugar certo.** Decisao com 2+ opcoes -> justificativa na issue (ou ADR se arquitetural), nao so no commit.
 **PS6. Self-review do plano antes de apresentar.** Roda as 5 perguntas (contradicao, premissas nao-medidas, capacidade, correlacao, pior cenario).
 **PS7. Pausa quando estado contradiz premissa.** working tree/git log/build contradiz o assumido -> PARA, reporta, espera direcao.
+
+<!-- BEGIN CASA-BABA-HUB -->
+## Contexto compartilhado da Casa da Baba
+
+Para demandas da Casa da Baba, leia o [contexto comum a Codex e Claude](https://github.com/michel-az-de/casa-da-baba-conhecimento/blob/master/hub-projeto/CONTEXTO-COMPARTILHADO.md) e o [mapa de repositórios e memórias](https://github.com/michel-az-de/casa-da-baba-conhecimento/blob/master/hub-projeto/REPOSITORIOS-VINCULADOS.md).
+
+O hub é um repositório privado; os links exigem acesso autorizado à conta ou ao repositório. Como opção local, clone `michel-az-de/casa-da-baba-conhecimento` em uma pasta irmã chamada `casa-da-baba-conhecimento` e leia os mesmos arquivos em `../casa-da-baba-conhecimento/hub-projeto/`.
+
+O hub reúne estudos, marca, desenhos, operação e a relação entre os sistemas. Código, contratos, decisões técnicas e regras continuam nas fontes deste repositório. Memórias históricas devem ser confrontadas com o checkout, as ADRs e as evidências atuais. O vínculo não sincroniza conversas nem modifica permissões.
+
+Este bloco acrescenta navegação e não substitui as regras locais. Preserve alterações em andamento e siga o fluxo deste repositório ao executar demandas.
+<!-- END CASA-BABA-HUB -->
