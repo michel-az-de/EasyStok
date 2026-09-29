@@ -14,6 +14,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
+  (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
+  só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
+  mensagem programada e as campanhas. "SAIR", "PARAR" ou "STOP" sozinhos no WhatsApp revogam o
+  marketing daquele canal, confirmam ao cliente e não acionam o agente.
+  `GET|PUT api/atendimento/clientes/{id}/consentimentos` (Admin). Tabela `consentimentos_contato`
+  com RLS e backfill de `ConsentiuMarketing=true` para WhatsApp e e-mail. (#1078)
 - **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
   da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
   horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`
