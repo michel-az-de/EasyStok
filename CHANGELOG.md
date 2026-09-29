@@ -144,6 +144,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
 ### Fixed
+- `SeedSchemaBootstrap` rodava `ALTER TABLE "Empresas"` (a tabela e `empresas`) e falhava com 42P01
+  a cada startup, quebrando todo seed pelo painel admin no passo 1. O `ALTER` sai: `IsSeedData` foi
+  dropada pela migration `20260507011959` e e `[NotMapped]` no dominio. (#1092)
 - `ToString` de `Quantidade`, `Dinheiro` e `Dimensoes` dependia da cultura do host (`1,5` no
   Windows pt-BR, `1.5` no CI Linux) e passa a ser invariante, como a Api ja produzia no container.
   O teste de wiring de metricas coleta so o proprio reader InMemory: o `ForceFlush` do provider
