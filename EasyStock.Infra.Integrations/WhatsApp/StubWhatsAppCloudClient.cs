@@ -4,7 +4,8 @@ using EasyStock.Application.Ports.Output.Atendimento;
 namespace EasyStock.Infra.Integrations.WhatsApp;
 
 /// <summary>
-/// Registrado quando <c>Notifications:WhatsApp:Provider=stub</c>. Não bate na rede; grava cada
+/// Registrado quando nem <c>Atendimento:WhatsApp:Cliente</c> nem <c>Notifications:WhatsApp:Provider</c>
+/// são <c>meta</c>. Não bate na rede; grava cada
 /// chamada em memória para os testes de integração inspecionarem o que foi "enviado".
 /// </summary>
 public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
