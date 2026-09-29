@@ -222,6 +222,8 @@ public static class PipelineExtensions
         Mobile.MobileModule.UseMobilePwa(app);
 
         app.UseCors();
+        // CSRF do storefront (#1088, ADR-0053): POST com cookie __Host-cdb_* so da mesma origem.
+        app.UseMiddleware<ProtecaoCsrfCookieMiddleware>();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
