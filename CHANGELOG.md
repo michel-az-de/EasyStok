@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- CodeQL: `cs/web/missing-token-validation` filtrada na Api bearer (CSRF não se aplica a JWT) e
+  mantida nos 4 controllers do storefront que usam cookie; `CodeQlCsrfFilterTests` amarra a lista
+  do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
+
 ### Added
 - **Atendentes e atribuição de conversa** (S41, ADR-0051): permissão `AtenderConversas` (Operador,
   Gerente e Admin pelo nível; perfil com permissões explícitas só se a tiver). Assumir, responder,
