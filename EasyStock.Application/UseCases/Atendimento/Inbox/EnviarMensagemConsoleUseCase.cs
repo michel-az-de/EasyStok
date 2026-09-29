@@ -4,6 +4,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
@@ -41,10 +42,17 @@ public sealed class EnviarMensagemConsoleUseCase(
             throw new UseCaseValidationException($"Texto excede {Mensagem.TextoTamanhoMaximo} caracteres.");
 
         var agora = DateTime.UtcNow;
-        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        var conversa = await ObterAbertaAsync(command.EmpresaId, command.ConversaId, ct);
         var canal = resolvedorCanal.Obter(conversa.Canal);
 
-        var externoId = await EnviarAsync(() => canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct));
+        // Fora da janela, Instagram e Messenger aceitam resposta humana com HUMAN_AGENT (S35). O console
+        // é humano; o domínio confere se a tag vale e se ainda está no prazo dela.
+        var tag = TagHumanaForaDaJanela(conversa, canal, agora);
+        GarantirJanela(conversa, agora, tag);
+
+        var externoId = await EnviarAsync(() => tag is not null && canal is ICanalComTagHumana comTag
+            ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, ct)
+            : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct));
 
         var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
             TipoConteudoMensagem.Texto, texto, externoId);
@@ -76,22 +84,38 @@ public sealed class EnviarMensagemConsoleUseCase(
 
     private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
     {
+        var conversa = await ObterAbertaAsync(empresaId, conversaId, ct);
+        GarantirJanela(conversa, agora, tag: null);
+        return conversa;
+    }
+
+    private async Task<Conversa> ObterAbertaAsync(Guid empresaId, Guid conversaId, CancellationToken ct)
+    {
         var conversa = await conversaRepository.ObterPorIdAsync(empresaId, conversaId, ct)
             ?? throw new ConversaNaoEncontradaException(conversaId);
         if (!conversa.EstaAberta)
             throw new RegraDeDominioVioladaException("Conversa encerrada: a próxima mensagem do cliente abre outra.");
+        return conversa;
+    }
 
+    private static void GarantirJanela(Conversa conversa, DateTime agora, string? tag)
+    {
         try
         {
-            conversa.GarantirPodeEnviarTextoLivre(agora);
+            conversa.GarantirPodeEnviarTextoLivre(agora, tag);
         }
         catch (RegraDeDominioVioladaException ex)
         {
             throw new ForaDaJanelaAtendimentoException(ex.Message, ex);
         }
-
-        return conversa;
     }
+
+    private static string? TagHumanaForaDaJanela(Conversa conversa, ICanalMensageria canal, DateTime agora) =>
+        !conversa.DentroDaJanela(agora)
+        && canal is ICanalComTagHumana
+        && conversa.Capacidades.TagsForaDaJanela.Contains(CapacidadesCanal.TagAgenteHumano, StringComparer.Ordinal)
+            ? CapacidadesCanal.TagAgenteHumano
+            : null;
 
     private static async Task<string> EnviarAsync(Func<Task<string>> envio)
     {

@@ -5,6 +5,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
+  `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
+  `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na
+  porta de canal (Send API v25.0, page token em `Atendimento:MetaMensageria`, stub sem provider `meta`).
+  Fora da janela o console responde com `HUMAN_AGENT` até 7 dias; depois, 409. A conversa entra na
+  fila humana e o agente não responde fora do WhatsApp. Flags `atendimento.canal.instagram` e
+  `atendimento.canal.messenger`. (#1103)
+
 ### Security
 - CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
   (`Sec-Fetch-Site` `same-origin`/`none`, ou `Origin` igual ao `Host`); outro site recebe 403.

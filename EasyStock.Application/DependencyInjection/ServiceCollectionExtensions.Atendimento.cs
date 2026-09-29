@@ -20,6 +20,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AtualizarConfiguracaoAtendimentoUseCase>();
         services.AddScoped<ObterStatusIntegracaoWhatsAppUseCase>();
         services.AddScoped<ProcessarEventoWhatsAppUseCase>();
+        services.AddScoped<ProcessarEventoMensageriaMetaUseCase>(); // S35: Instagram e Messenger
         services.AddScoped<ProcessarMidiaWhatsAppJobUseCase>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
         services.AddScoped<ResolvedorCanal>();
