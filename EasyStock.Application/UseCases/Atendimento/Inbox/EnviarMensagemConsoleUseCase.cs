@@ -112,6 +112,7 @@ public sealed class EnviarMensagemConsoleUseCase(
     private async Task<MensagemAtendimentoResult> RegistrarAsync(
         Conversa conversa, Mensagem mensagem, Guid usuarioId, DateTime agora, CancellationToken ct)
     {
+        mensagem.RegistrarEnviadaPor(usuarioId);
         conversa.Assumir(agora, usuarioId);
         conversa.RegistrarSaida(agora);
         await conversaRepository.AddMensagemAsync(mensagem, ct);

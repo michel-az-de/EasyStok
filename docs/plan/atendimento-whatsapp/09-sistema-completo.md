@@ -242,6 +242,10 @@ evento `expediente.alterado` no SSE (S18) e a leitura de `EstaAberta` no `Inicia
 
 ### S41 · Atendentes e atribuição de conversa
 
+> **Entregue na #1085.** Sem perfil padrão `Atendente` semeado: nenhum perfil tem permissões
+> explícitas hoje e a criação de usuário escolhe o perfil padrão pelo nível, então um segundo padrão
+> Operador a tornaria ambígua. A permissão vem pelo nível (Operador para cima).
+
 **Problema.** O protótipo fixa uma atendente (`reducer.js:48`) e muda o responsável ao escrever ou
 assumir (RN-04). No EasyStok existe `Conversa.AssumidaPorUsuarioId` (`Conversa.cs:55`), mas falta
 papel de atendente, transferência e o autor da mensagem.
