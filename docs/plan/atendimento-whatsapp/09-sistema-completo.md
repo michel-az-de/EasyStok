@@ -351,6 +351,9 @@ integração vai preencher.
 
 ### S45 · Cadastros operacionais completos
 
+> **Parte 1 entregue na #1095** (janelas, zonas e bloqueios; medido: não havia CRUD em controller
+> nenhum). A parte 2, `CanalEmpresa`, espera S37–S39 entrarem, porque mexe no `ResolvedorCanal`.
+
 **Problema.** No protótipo, canais, janelas com capacidade e zona por prefixo de CEP são só semente
 (`catalogo.js:15,82,267`). No EasyStok, `JanelaEntrega`, `BloqueioEntrega` e `FreteZona` existem, mas
 `AgendamentoController` e `FreteController` (Storefront) só têm `GET`. Não foi medido se há CRUD admin
