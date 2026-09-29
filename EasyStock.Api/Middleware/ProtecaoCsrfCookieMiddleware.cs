@@ -39,7 +39,8 @@ public sealed class ProtecaoCsrfCookieMiddleware(RequestDelegate next, ILogger<P
 
         logger.LogWarning(
             "CSRF: {Method} {Path} com cookie do storefront recusado. Sec-Fetch-Site={SecFetchSite} Origin={Origin}",
-            request.Method, request.Path, request.Headers["Sec-Fetch-Site"].ToString(), request.Headers.Origin.ToString());
+            SanitizarParaLog(request.Method), SanitizarParaLog(request.Path.Value),
+            SanitizarParaLog(request.Headers["Sec-Fetch-Site"].ToString()), SanitizarParaLog(request.Headers.Origin.ToString()));
 
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(new ProblemDetails
@@ -71,4 +72,8 @@ public sealed class ProtecaoCsrfCookieMiddleware(RequestDelegate next, ILogger<P
         return Uri.TryCreate(origin, UriKind.Absolute, out var uri)
             && string.Equals(uri.Authority, request.Host.Value, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>Tira quebra de linha de valor vindo do cliente antes de logar: evita log forging (#1098).</summary>
+    private static string SanitizarParaLog(string? valor) =>
+        (valor ?? "").Replace("\r", "").Replace("\n", "");
 }
