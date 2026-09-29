@@ -40,6 +40,8 @@ public class CodeQlCsrfFilterTests
         "EasyStock.Api/Authentication/ClienteSessionAuthenticationHandler.cs",
         "EasyStock.Api/Configuration/ApiServiceCollectionExtensions.cs",
         "EasyStock.Api/Middleware/ClienteSessionMiddleware.cs",
+        // A propria defesa CSRF (ADR-0053): le o cookie so para decidir se exige mesma origem.
+        "EasyStock.Api/Middleware/ProtecaoCsrfCookieMiddleware.cs",
     };
 
     [Fact]
