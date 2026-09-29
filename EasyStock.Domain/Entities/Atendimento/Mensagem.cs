@@ -46,6 +46,9 @@ public class Mensagem
     public DateTime EnviadaEm { get; private set; }
     public DateTime? ProcessadaEm { get; private set; }
 
+    /// <summary>Usuario do console que enviou a mensagem (S41). So em saida humana (<see cref="AutorMensagem.Dona"/>).</summary>
+    public Guid? EnviadaPorUsuarioId { get; private set; }
+
     // EF Core ctor sem parametros
     private Mensagem() { }
 
@@ -121,6 +124,15 @@ public class Mensagem
     }
 
     public void MarcarProcessada(DateTime em) => ProcessadaEm = Utc(em);
+
+    public void RegistrarEnviadaPor(Guid usuarioId)
+    {
+        if (Autor != AutorMensagem.Dona)
+            throw new RegraDeDominioVioladaException("So mensagem enviada por humano da empresa guarda quem enviou.");
+        if (usuarioId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Usuario que enviou e obrigatorio.");
+        EnviadaPorUsuarioId = usuarioId;
+    }
 
     private static Mensagem Criar(
         Guid empresaId,
