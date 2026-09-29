@@ -5,6 +5,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
+  criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
+  a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
+  da empresa do token e id de outra loja devolve 404. Canais por empresa ficam para a parte 2. (#1095)
+
 ### Security
 - CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
   (`Sec-Fetch-Site` `same-origin`/`none`, ou `Origin` igual ao `Host`); outro site recebe 403.
