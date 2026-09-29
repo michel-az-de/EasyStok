@@ -15,6 +15,7 @@ using EasyStock.Infra.Notifications.Options;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -116,6 +117,20 @@ public class WebhookWhatsAppControllerTests
         var result = await _controller.Receber(CancellationToken.None);
 
         result.Should().BeOfType<StatusCodeResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Fact]
+    public void RecebimentoUsaRateLimitDedicadoDaMeta()
+    {
+        // A Meta entrega em rajada a partir de poucos IPs; o balde "public-post" (5/min)
+        // devolvia 429 e a Meta acabava desativando a assinatura (issue 1105).
+        var atributo = typeof(WebhookWhatsAppController)
+            .GetMethod(nameof(WebhookWhatsAppController.Receber))!
+            .GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: true)
+            .Cast<EnableRateLimitingAttribute>()
+            .Single();
+
+        atributo.PolicyName.Should().Be("webhook-meta");
     }
 
     private void SetRequestBody(string body, bool assinaturaValida)
