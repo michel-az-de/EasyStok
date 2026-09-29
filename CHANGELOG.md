@@ -6,6 +6,27 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
+  criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
+  a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
+  da empresa do token e id de outra loja devolve 404. Canais por empresa ficam para a parte 2. (#1095)
+
+### Security
+- CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
+  (`Sec-Fetch-Site` `same-origin`/`none`, ou `Origin` igual ao `Host`); outro site recebe 403.
+  O front é same-origin e não muda; chamadas bearer do Web e do Admin seguem livres (ADR-0053). (#1088)
+- CodeQL: `cs/web/missing-token-validation` filtrada na Api bearer (CSRF não se aplica a JWT) e
+  mantida nos 4 controllers do storefront que usam cookie; `CodeQlCsrfFilterTests` amarra a lista
+  do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
+
+### Added
+- **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
+  (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
+  só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
+  mensagem programada e as campanhas. "SAIR", "PARAR" ou "STOP" sozinhos no WhatsApp revogam o
+  marketing daquele canal, confirmam ao cliente e não acionam o agente.
+  `GET|PUT api/atendimento/clientes/{id}/consentimentos` (Admin). Tabela `consentimentos_contato`
+  com RLS e backfill de `ConsentiuMarketing=true` para WhatsApp e e-mail. (#1078)
 - **E-mail e SMS na porta de canal do atendimento** (S37, ADR-0051): `CanalSms` (texto pelo
   `IProvedorSms` ativo, Twilio em produção, com `+` no número) e `CanalEmail` (texto, ou imagem por
   link em HTML escapado, pelo `IEmailService`). O `ResolvedorCanal` passa a achar `Sms` e `Email`.
@@ -144,6 +165,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
 ### Fixed
+- `ToString` de `Quantidade`, `Dinheiro` e `Dimensoes` dependia da cultura do host (`1,5` no
+  Windows pt-BR, `1.5` no CI Linux) e passa a ser invariante, como a Api ja produzia no container.
+  O teste de wiring de metricas coleta so o proprio reader InMemory: o `ForceFlush` do provider
+  esperava ~4 s pelo OTLP sem coletor e, sob carga, pulava o InMemory. (#1075)
 - `POST /api/empresas/registrar` respondia 500 sob role sem `BYPASSRLS`: registrar empresa e
   cross-tenant por definicao (CRIA o tenant), entao a requisicao anonima nao tem `app.empresa_id`
   e a policy `tenant_isolation` recusava os INSERTs com `42501` em `assinaturas_empresa`. O

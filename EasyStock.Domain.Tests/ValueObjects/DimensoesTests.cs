@@ -96,6 +96,8 @@ public class DimensoesTests
     [Fact]
     public void Deve_retornar_string_formatada()
     {
+        using var _ = CulturaCorrente.PtBr();
+
         var dimensoes = Dimensoes.From(1.234m, 10.55m, 5.67m, 20.89m);
 
         var str = dimensoes.ToString();

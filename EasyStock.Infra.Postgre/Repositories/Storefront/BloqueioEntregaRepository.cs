@@ -25,4 +25,10 @@ public sealed class BloqueioEntregaRepository(EasyStockDbContext db) : IBloqueio
         db.BloqueiosEntrega.Add(bloqueio);
         return Task.CompletedTask;
     }
+
+    public Task RemoveAsync(BloqueioEntrega bloqueio, CancellationToken ct = default)
+    {
+        db.BloqueiosEntrega.Remove(bloqueio);
+        return Task.CompletedTask;
+    }
 }
