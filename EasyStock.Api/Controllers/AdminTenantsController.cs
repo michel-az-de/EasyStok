@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
 using EasyStock.Application.UseCases.Admin.ExportarTenantsCsv;
+using EasyStock.Application.UseCases.Admin.VincularWhatsAppTenant;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Infra.Postgre.Data;
@@ -29,6 +30,7 @@ public class AdminTenantsController(
     ExportarTenantsCsvUseCase exportarTenantsCsvUseCase,
     ListarFeaturesDoTenantUseCase listarFeaturesUseCase,
     DefinirFeatureDoTenantUseCase definirFeatureUseCase,
+    VincularWhatsAppDoTenantUseCase vincularWhatsAppUseCase,
     ILogger<AdminTenantsController> logger) : EasyStockControllerBase
 {
     /// <summary>Exporta clientes filtrados (ou os <c>ids</c> selecionados) como CSV.</summary>
@@ -393,6 +395,43 @@ public class AdminTenantsController(
         return DataOk(alterado);
     }
 
+    /// <summary>
+    /// Vincula o <c>phone_number_id</c> da Cloud API da Meta à empresa (#1102), ou desvincula com
+    /// <c>null</c>. O número roteia o webhook para o tenant e é o remetente das respostas, então
+    /// número já usado por outra empresa é 409. Auditado como o toggle de feature.
+    /// </summary>
+    [HttpPut("{id:guid}/whatsapp")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> PutWhatsApp(
+        Guid id, [FromBody] PutTenantWhatsAppRequest req, CancellationToken ct)
+    {
+        VinculoWhatsAppResultado resultado;
+        try
+        {
+            resultado = await vincularWhatsAppUseCase.ExecuteAsync(
+                new VincularWhatsAppDoTenantCommand(id, req?.PhoneNumberId), ct);
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+
+        switch (resultado.Status)
+        {
+            case StatusVinculoWhatsApp.EmpresaNaoEncontrada:
+                return DataNotFound("Tenant não encontrado.");
+            case StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa:
+                return DataConflict("Este phone_number_id já está vinculado a outra empresa.");
+        }
+
+        await audit.LogAsync(
+            resultado.Status == StatusVinculoWhatsApp.Desvinculado ? "TenantWhatsAppDesvinculado" : "TenantWhatsAppVinculado",
+            $"PhoneNumberId={resultado.PhoneNumberId ?? "(nenhum)"}",
+            id);
+
+        return DataOk(new { phoneNumberId = resultado.PhoneNumberId });
+    }
+
     [HttpPost("{id:guid}/impersonate")]
     public async Task<IActionResult> Impersonate(Guid id)
     {
@@ -657,6 +696,7 @@ public class AdminTenantsController(
 public record PatchTenantStatusRequest(string Status, string? Motivo);
 
 public record PatchTenantFeatureRequest(bool Ativo);
+public record PutTenantWhatsAppRequest(string? PhoneNumberId);
 public record PatchTenantPlanoRequest(Guid PlanoId);
 public record GrantTrialRequest(int DiasTrial);
 public record AplicarCupomRequest(string Codigo);
