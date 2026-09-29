@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Chat do site** (S36, ADR-0051): canal `ChatSite` público por loja em `api/public/chat/{slug}`.
+  `POST sessoes` devolve um token (só o hash fica no banco, vale 24 h renovadas no uso), `POST|GET
+  mensagens` com header `X-Chat-Token` e `GET stream` (SSE que lê do banco a cada 1 s, funciona
+  com várias instâncias). A conversa entra na fila humana sem responsável; o agente ainda não responde
+  no site. Flag `atendimento.canal.chatsite`, rate limit por IP e por sessão, tabela
+  `sessoes_chat_site` com RLS e limpeza das vencidas de hora em hora. (#1097)
+
 ### Security
 - CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
   (`Sec-Fetch-Site` `same-origin`/`none`, ou `Origin` igual ao `Host`); outro site recebe 403.

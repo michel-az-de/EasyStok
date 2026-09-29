@@ -50,6 +50,13 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EnviarMensagemConsoleUseCase>();
         services.AddScoped<GerenciarConversaAtendimentoUseCase>();
 
+        // S36: chat do site (canal próprio, sem provedor externo)
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, CanalChatSite>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.AcessoChatSite>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.AbrirSessaoChatSiteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.EnviarMensagemVisitanteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.ListarMensagensChatSiteUseCase>();
+
         return services;
     }
 }

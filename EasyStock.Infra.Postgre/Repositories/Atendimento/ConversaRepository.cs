@@ -138,6 +138,27 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         return pagina;
     }
 
+    public async Task<IReadOnlyList<Mensagem>> ListarMensagensDepoisAsync(
+        Guid empresaId,
+        Guid conversaId,
+        DateTime? depoisDe,
+        int limite,
+        CancellationToken ct = default)
+    {
+        var query = db.AtendimentoMensagens
+            .AsNoTracking()
+            .Where(m => m.EmpresaId == empresaId && m.ConversaId == conversaId);
+
+        if (depoisDe is { } cursor) // UTC: o use case normaliza
+            query = query.Where(m => m.EnviadaEm > cursor);
+
+        return await query
+            .OrderBy(m => m.EnviadaEm)
+            .ThenBy(m => m.Id)
+            .Take(Math.Clamp(limite, 1, MaxMensagens))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<Conversa>> ListarPorClienteAsync(Guid empresaId, Guid clienteId, int max = 5, CancellationToken ct = default) =>
         await db.AtendimentoConversas
             .AsNoTracking()

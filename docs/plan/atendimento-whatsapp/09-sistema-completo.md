@@ -112,6 +112,11 @@ e remover os adaptadores.
 
 ### S36 · Chat do site
 
+> **Entregue na #1097.** O stream lê do banco (o broker SSE que existe é em memória e só serve uma
+> instância). O token vai no header, não na URL, então o widget usa `fetch` e não `EventSource`. A
+> conversa do site vai para a fila humana: o agente envia direto pelo WhatsApp e só responde no site
+> quando passar a enviar pela porta de canal. Vincular o cliente logado ficou para depois.
+
 **Problema.** O protótipo tem o canal "Chat do site", sem janela e só com texto. O casadababa.com
 hoje manda o cliente para o WhatsApp.
 **Abordagem.** Canal próprio do EasyStok.
