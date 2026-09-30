@@ -75,6 +75,7 @@ public class PedidosControllerTests
             Substitute.For<IConfiguracaoLojaRepository>(),
             gerarContaReceber,
             Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>(),
             _uow,
             NullLogger<AtualizarStatusPedidoUseCase>.Instance);
 
