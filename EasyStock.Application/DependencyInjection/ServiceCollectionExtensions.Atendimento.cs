@@ -1,4 +1,4 @@
-// Atendimento por WhatsApp (ADR-0050) — configuração por tenant (S08), status da integração
+﻿// Atendimento por WhatsApp (ADR-0050) — configuração por tenant (S08), status da integração
 // (S01) e agente/conversa (S02, S06, S07 adicionam mais).
 
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -64,6 +64,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RoteadorAcoesBotao>();
         services.AddScoped<IAcaoBotaoHandler, ConfirmarEnderecoAcaoBotao>();
         services.AddScoped<IAcaoBotaoHandler, EscolherJanelaAcaoBotao>(); // S16: devolve a vez ao agente
+        services.AddScoped<IAcaoBotaoHandler, AvaliacaoAcaoBotao>(); // S26: avaliacao de um toque
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Avaliacao.RegistrarAvaliacaoSimplesUseCase>();
         // TODO(S26): acao:avaliacao.
 
         // Ferramentas do agente. As demais da tabela da S06 dependem da onda 2 e entram aqui quando
@@ -77,6 +79,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IFerramentaAgente, EncerrarConversaFerramenta>();
         services.AddScoped<IFerramentaAgente, RegistrarRestricaoFerramenta>(); // S24: tag com origem agente
         services.AddScoped<IFerramentaAgente, RegistrarNotaFerramenta>(); // S24: nota interna
+        services.AddScoped<IFerramentaAgente, RegistrarAvaliacaoFerramenta>(); // S26: avaliacao em texto livre
 
         // S07: handoff pelo console (inbox, envio da dona, assumir, liberar, encerrar, marcar lida).
         services.AddScoped<ListarConversasAtendimentoUseCase>();

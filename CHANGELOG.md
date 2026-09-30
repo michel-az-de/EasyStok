@@ -11,6 +11,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Avaliação em dois botões** (S26): `PedidoAvaliacao` ganha `Resultado` (positiva/negativa) e
+  `Estrelas` passa a nullable (migration `AddResultadoPedidoAvaliacao`). O botão
+  `acao:avaliacao:<resultado>:<pedidoId>` grava a avaliação sem LLM e responde ao cliente; a ferramenta
+  `registrar_avaliacao` cobre o texto livre. Negativa passa a conversa para a dona até a S27. O
+  agendamento +30 min após `Entregue` depende da S13. (#1185)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42

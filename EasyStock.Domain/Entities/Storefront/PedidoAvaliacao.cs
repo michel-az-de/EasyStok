@@ -1,4 +1,6 @@
-﻿namespace EasyStock.Domain.Entities.Storefront;
+﻿using EasyStock.Domain.Enums.Storefront;
+
+namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
 /// Avaliação do cliente sobre um pedido entregue.
@@ -28,8 +30,11 @@ public class PedidoAvaliacao
     public Guid ClienteId { get; private set; }
     public Guid EmpresaId { get; private set; }
 
-    /// <summary>Nota de 1 a 5 estrelas — invariante validado no factory.</summary>
-    public int Estrelas { get; private set; }
+    /// <summary>Nota de 1 a 5 estrelas (avaliação pelo site). Null na avaliação de um toque (S26).</summary>
+    public int? Estrelas { get; private set; }
+
+    /// <summary>Positiva ou negativa, pelos botões do WhatsApp (S26). Null nas avaliações por estrelas.</summary>
+    public ResultadoAvaliacao? Resultado { get; private set; }
 
     /// <summary>Comentário público do cliente. Null = não comentou.</summary>
     public string? Comentario { get; private set; }
@@ -92,6 +97,42 @@ public class PedidoAvaliacao
             OcultadoEm = null,
             RespostaDaBaba = null,
             RespondidaEmPorBaba = null,
+        };
+    }
+
+    /// <summary>
+    /// Avaliação de um toque (S26): o cliente tocou em "gostei" ou "não gostei" no WhatsApp, ou disse
+    /// isso em texto livre ao agente. Sem estrelas; o comentário é opcional.
+    /// </summary>
+    public static PedidoAvaliacao CriarSimples(
+        Guid pedidoId,
+        Guid clienteId,
+        Guid empresaId,
+        ResultadoAvaliacao resultado,
+        string? comentario,
+        DateTime solicitadoEm)
+    {
+        if (pedidoId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("PedidoId é obrigatório.");
+        if (clienteId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("ClienteId é obrigatório.");
+        if (empresaId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("EmpresaId é obrigatório.");
+        if (!Enum.IsDefined(resultado))
+            throw new RegraDeDominioVioladaException($"Resultado de avaliação inválido: {resultado}.");
+
+        return new PedidoAvaliacao
+        {
+            Id = Guid.NewGuid(),
+            PedidoId = pedidoId,
+            ClienteId = clienteId,
+            EmpresaId = empresaId,
+            Estrelas = null,
+            Resultado = resultado,
+            Comentario = NormalizarComentario(comentario),
+            RecomendariaParaAmigos = resultado == ResultadoAvaliacao.Positiva,
+            SolicitadoEm = DateTime.SpecifyKind(solicitadoEm, DateTimeKind.Utc),
+            RespondidoEm = DateTime.UtcNow,
         };
     }
 
