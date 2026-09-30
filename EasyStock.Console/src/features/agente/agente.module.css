@@ -1,0 +1,105 @@
+/* Bloco recolhível, não faixa fixa. Aberto ele tinha 1244 px de conteúdo na
+   coluna do meio e empurrava o composer para fora da tela. Agora o cabeçalho é
+   sempre a mesma linha e o corpo é uma gaveta com teto e rolagem própria. */
+.painel {
+  border-top: var(--b-1) solid var(--linha); background: var(--papel);
+  padding: var(--e-3) var(--e-4); flex-shrink: 0;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.corpo { min-height: 0; }
+.cabeca { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; flex-shrink: 0; }
+/* Resumo do que está pendente com a gaveta fechada: número e palavra, para o
+   recolhido não virar um silêncio. */
+.resumoFechado { font-size: var(--t-apoio); color: var(--tinta-2); }
+.resumoFechado.pendente { color: var(--atencao); font-weight: 600; }
+.cabeca h3 {
+  margin: 0; font-size: var(--t-apoio); font-weight: 700;
+  display: flex; align-items: center; gap: var(--e-2); line-height: var(--lh-compacto);
+}
+.cabeca .direita {
+  margin-left: auto; display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
+}
+.seletor {
+  padding: var(--e-1) var(--e-2); border-radius: var(--r-1);
+  border: var(--b-1) solid var(--linha-forte);
+  background: var(--papel); color: var(--tinta); font-size: var(--t-apoio);
+  min-height: var(--toque);
+}
+
+.tranquilo {
+  display: flex; align-items: center; gap: var(--e-2);
+  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--ok);
+}
+
+.sugestao {
+  margin: var(--e-2) 0 0; padding: var(--e-3);
+  background: var(--elevado); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--linha-forte);
+  font-size: var(--t-corpo); color: var(--tinta);
+}
+.sugestao p { margin: 0; }
+.rotuloSugestao {
+  font-size: var(--t-apoio); color: var(--tinta-2); font-weight: 700;
+  margin-bottom: var(--e-1) !important;
+}
+.rotuloSugestao span { font-weight: 400; }
+.rodapeSugestao {
+  display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap; margin-top: var(--e-2);
+}
+.pensando { color: var(--tinta-3); font-size: var(--t-apoio); margin: var(--e-2) 0 0; }
+
+/* Falha de transporte: fica na tela, com texto, em vez de um "Lendo" eterno. */
+.erro {
+  display: flex; align-items: flex-start; gap: var(--e-2);
+  margin: var(--e-2) 0 0; padding: var(--e-2) var(--e-3);
+  font-size: var(--t-apoio); color: var(--parado);
+  border-left: var(--trilho) solid var(--parado); background: var(--elevado);
+  border-radius: var(--r-1);
+}
+
+/* Resposta que o automático não pode dar sozinho: restrição alimentar,
+   item sem saldo, reclamação. Mesmo bloco, cor de aviso, sem "Enviar assim". */
+.sugestaoDona {
+  margin: var(--e-2) 0 0; padding: var(--e-3);
+  background: var(--elevado); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--atencao);
+  font-size: var(--t-corpo); color: var(--tinta);
+}
+.sugestaoDona p { margin: 0; }
+.sugestaoDona .rotuloSugestao { color: var(--atencao); }
+
+/* Linha de teste da massa: só aparece em conversa que traz resultado esperado,
+   e agora dentro da bancada, porque é dado de quem constrói, não de quem atende. */
+.cenario { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+.bateu { color: var(--ok); font-weight: 700; }
+.errou { color: var(--perigo); font-weight: 700; }
+
+.prompt {
+  margin: var(--e-2) 0 0; font-family: var(--f-dado); font-size: var(--t-apoio);
+  color: var(--tinta-2); background: var(--semola); border-radius: var(--r-1);
+  padding: var(--e-2) var(--e-3); white-space: pre-wrap; max-height: 160px; overflow-y: auto;
+}
+
+/* Uma pílula por linha. A medida técnica saiu das pílulas e virou rodapé em
+   fonte de dado, dentro da bancada de teste. */
+.marcaSugestao { margin: var(--e-2) 0 0 !important; }
+.medida {
+  margin: var(--e-2) 0 0; font-family: var(--f-dado); font-size: var(--t-apoio);
+  color: var(--tinta-3);
+}
+
+/* Bancada de teste: modo de conexão, cenário da massa, medida e prompt. Tudo
+   que serve a quem constrói o protótipo, e nada que sirva a quem atende, mora
+   aqui dentro, recolhido. */
+.bancada { margin-top: var(--e-2); }
+.bancada summary {
+  font-size: var(--t-apoio); color: var(--tinta-3); cursor: pointer;
+  min-height: var(--toque); display: flex; align-items: center;
+}
+.bancada summary:hover { color: var(--tinta); }
+.linhaBancada {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  margin: var(--e-2) 0 0;
+}
+/* Modo de conexão: dado de bancada, em texto, não pílula. */
+.conexao { font-size: var(--t-apoio); color: var(--tinta-2); }

@@ -263,6 +263,31 @@ namespace EasyStock.Infra.Postgre.Repositories
                     g => (IReadOnlyCollection<ItemEstoque>)g.ToList());
         }
 
+        public async Task<IReadOnlyDictionary<Guid, decimal>> GetSaldoDisponivelPorProdutosAsync(
+            Guid empresaId, IReadOnlyCollection<Guid> produtoIds, CancellationToken ct = default)
+        {
+            var ids = produtoIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return new Dictionary<Guid, decimal>();
+
+            // #1171: caller anonimo (cardapio publico) nao tem tenant no contexto; o filtro
+            // global zeraria tudo. Isolamento pelo EmpresaId explicito, vindo do storefront.
+            // Vencido fica fora pelo mesmo corte de data civil do FEFO (#983).
+            var hoje = HorarioBrasil.HojeInstanteUtc();
+            var saldos = await dbContext.ItensEstoque
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId
+                    && ids.Contains(i.ProdutoId)
+                    && (decimal)i.QuantidadeAtual > 0
+                    && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje))
+                .GroupBy(i => i.ProdutoId)
+                .Select(g => new { ProdutoId = g.Key, Saldo = g.Sum(i => (decimal)i.QuantidadeAtual) })
+                .ToListAsync(ct);
+
+            return saldos.ToDictionary(s => s.ProdutoId, s => s.Saldo);
+        }
+
         public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false)
         {
             // FOR UPDATE serializa concorrentes — lock adquirido no raw SQL DENTRO da
@@ -372,6 +397,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             dbContext.ItensEstoque.Update(itemEstoque);
             return Task.CompletedTask;
         }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetLotesParaAjusteAsync(
+            Guid empresaId, Guid produtoId, Guid? lojaId, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId
+                    && i.ProdutoId == produtoId
+                    && i.Status != StatusItemEstoque.Descartado
+                    && (lojaId == null || i.LojaId == lojaId))
+                .OrderBy(i => i.EntradaEm)
+                .ThenBy(i => i.CriadoEm)
+                .ToListAsync(ct);
 
         public Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque)
         {

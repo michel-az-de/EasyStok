@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -40,8 +40,13 @@ public sealed class AvisoStatusPedidoCliente(
     /// Enfileira o aviso <paramref name="tipo"/> do pedido. <paramref name="marco"/> identifica o fato no pedido
     /// (status novo, ou <c>pago</c>) e compõe a chave de idempotência. Retorna se enfileirou.
     /// </summary>
+    /// <param name="enviarApos">Quando informado, a mensagem só sai a partir desse instante (S26).</param>
+    /// <param name="respeitaPreferenciaAvisos">
+    /// Pós-venda (S26): não enfileira quando o cliente desligou os avisos (<c>Cliente.AvisosStatusAtivos</c>).
+    /// </param>
     public async Task<bool> EnfileirarAsync(
-        TipoEventoNotificacao tipo, Guid empresaId, Guid pedidoId, string marco, CancellationToken ct)
+        TipoEventoNotificacao tipo, Guid empresaId, Guid pedidoId, string marco, CancellationToken ct,
+        DateTime? enviarApos = null, bool respeitaPreferenciaAvisos = false)
     {
         // O dispatcher de integração roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
         tenantContext.SetCurrentTenant(empresaId);
@@ -56,6 +61,12 @@ public sealed class AvisoStatusPedidoCliente(
         var cliente = pedido.ClienteId is { } clienteId
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
             : null;
+
+        if (respeitaPreferenciaAvisos && cliente is { AvisosStatusAtivos: false })
+        {
+            logger.LogInformation("Aviso {Tipo} não enfileirado: cliente do pedido {PedidoId} desligou os avisos", tipo, pedidoId);
+            return false;
+        }
 
         var telefone = TelefoneE164(cliente?.Telefone) ?? TelefoneE164(pedido.ClienteTelefone);
         if (telefone is null)
@@ -81,6 +92,9 @@ public sealed class AvisoStatusPedidoCliente(
             ["previsao"] = await PrevisaoAsync(pedido.Id, ct),
             [NotificadorService.ChaveIdempotenciaPayload] = $"{pedido.Id:N}|{marco}",
         };
+        if (enviarApos is { } instante)
+            payload[NotificadorService.EnviarAposPayload] = DateTime.SpecifyKind(instante, DateTimeKind.Utc)
+                .ToString("O", CultureInfo.InvariantCulture);
         if (tipo == TipoEventoNotificacao.PedidoEntregue)
             payload["instagram"] = (await storefrontRepository.GetByEmpresaAsync(empresaId, ct))?.InstagramUrl ?? string.Empty;
 

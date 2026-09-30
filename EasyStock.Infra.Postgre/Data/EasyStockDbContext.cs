@@ -202,6 +202,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Atendimento.Lembrete> Lembretes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.RespostaPronta> RespostasProntas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.RegraAutomatica> RegrasAutomaticas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Entregador> Entregadores { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Viagem> Viagens { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ParadaViagem> ParadasViagem { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.ChamadoEntregador> ChamadosEntregador { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ExpedienteLoja> ExpedientesLoja { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;

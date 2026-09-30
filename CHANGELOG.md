@@ -23,14 +23,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
-- **Respostas prontas e mensagens automáticas** (S42): `RespostaPronta` (atalho único por empresa, 409
-  no duplicado) e `RegraAutomatica` (uma por gatilho: primeiro contato, fora do horário, loja fechada,
-  pagamento confirmado, pós-entrega e encerramento). CRUD em `api/atendimento/respostas-prontas` (com
-  `GET {id}/render?conversaId=` que recusa variável sem valor) e `api/atendimento/automacoes`. O
-  disparo roda nos handlers do outbox (`conversa.aberta`, `conversa.encerrada`, `pedido.pago`,
-  `pedido.mudou_status` entregue), só dentro da janela do canal e com consentimento transacional; na
-  entrada sai uma só (loja fechada > fora do horário > primeiro contato). Migration
-  `AddRespostasProntasEAutomacoes` com RLS. (#1182)
+- **Alerta de desacerto e ajuste rápido de saldo** (S22): `GET api/estoque/desacertos` lista os
+  produtos com `QuantidadeDescoberta > 0` com texto legível citando os pedidos (sem tabela nova).
+  `POST api/estoque/desacertos/{produtoId}/ajustar` recebe a contagem e o motivo, reusa
+  `ItemEstoque.AplicarAjusteContagem` numa contagem de um produto já aplicada, grava `AjusteInventario`
+  e movimentação de ajuste por lote, zera o descoberto e publica `estoque.desacerto_resolvido`.
+  Exige `GerenciarEstoque`. (#1181)
 - **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
   `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
   Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.

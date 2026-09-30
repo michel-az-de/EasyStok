@@ -34,7 +34,7 @@ public class CriarPedidoAtendimentoUseCaseTests
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
 
         var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -80,7 +80,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -115,7 +115,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -149,7 +149,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -202,6 +202,52 @@ public class CriarPedidoAtendimentoUseCaseTests
             "pedido fora de área pago espera a dona, não vai direto para a cozinha");
     }
 
+    [Fact]
+    public async Task MarcaDestinatarioComoPediu()
+    {
+        // S30: quem recebeu campanha nos últimos 7 dias e pede pela conversa conta como conversão.
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var agora = c.Relogio.GetUtcNow().UtcDateTime;
+        var campanha = EasyStock.Domain.Entities.Campanhas.Campanha.Criar(empresaId, Guid.NewGuid(),
+            new EasyStock.Domain.Entities.Campanhas.DadosCampanha("Bolo de fubá", "Oi {{nome}}", null, null,
+                EasyStock.Domain.Entities.Campanhas.FiltroCampanha.ParaTodos, [], null, false, null),
+            agora.AddDays(-3));
+        var destinatario = EasyStock.Domain.Entities.Campanhas.CampanhaDestinatario.Criar(campanha, cliente.Id);
+        destinatario.Enfileirar(1, Guid.NewGuid());
+        destinatario.MarcarEnviado(agora.AddDays(-2));
+        c.CampanhaRepo.ObterEnviadoParaAtribuirAsync(empresaId, cliente.Id, agora.AddDays(-7), Arg.Any<CancellationToken>())
+            .Returns(destinatario);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = new CriarPedidoAtendimentoUseCase(
+            c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork, c.Atribuicao());
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        destinatario.Status.Should().Be(EasyStock.Domain.Enums.Campanhas.StatusCampanhaDestinatario.Pediu);
+        destinatario.PedidoId.Should().Be(reservado.Pedido.Id);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
     private static async Task<(PedidoReservado Reservado, Conversa Conversa)> CriarNaConversa(bool? foraDeAreaLiberado)
     {
         var c = new CheckoutCoreServiceTests.Cenario();
@@ -219,7 +265,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var useCase = new CriarPedidoAtendimentoUseCase(
-            c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, Substitute.For<IUnitOfWork>());
+            c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, Substitute.For<IUnitOfWork>(), c.Atribuicao());
 
         var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,

@@ -4,13 +4,12 @@
     Substitui CACHE_VERSION nos service workers do PWA pelo SHA do commit.
 
 .DESCRIPTION
-    Roda no CI antes do build do container e do APK. Garante que o PWA servido
-    em produção e o APK Capacitor reportem a mesma versão de bundle, que o
-    PwaVersionProvider lê dinamicamente e expõe via /api/mobile/version.
+    Roda no CI antes do build do container. Garante que o PWA servido em
+    produção reporte a versão do bundle, que o PwaVersionProvider lê
+    dinamicamente e expõe via /api/mobile/version.
 
     Atualiza:
       - EasyStock.Api/wwwroot/pwa/sw.js          (servido pela API)
-      - casa-da-baba-mobile/apk/web/sw.js        (snapshot copiado para o APK)
 
     A pattern aceita CACHE_VERSION = 'qualquer-coisa' entre aspas simples.
 
@@ -41,8 +40,7 @@ $short = ($Sha -replace '[^0-9a-fA-F]', '').Substring(0, [Math]::Min(12, $Sha.Le
 $newVersion = "cdb-$short"
 
 $targets = @(
-    (Join-Path $Root 'EasyStock.Api/wwwroot/pwa/sw.js'),
-    (Join-Path $Root 'casa-da-baba-mobile/apk/web/sw.js')
+    (Join-Path $Root 'EasyStock.Api/wwwroot/pwa/sw.js')
 )
 
 $pattern = "const CACHE_VERSION = '[^']+';"

@@ -16,6 +16,8 @@
 /// visual ("esgotado" via <see cref="Disponivel"/>).
 /// Null para itens avulsos (sem vínculo com ERP); frontend usa <see cref="Disponivel"/>
 /// como sinal canônico (esgotado = disponivel === false).
+/// Vinculado (#1171): saldo dos lotes do produto com saldo e não vencidos. É informativo:
+/// saldo 0 não muda <see cref="Disponivel"/>, que segue a flag manual.
 /// </para>
 /// </summary>
 public sealed record CardapioItemPublicoDto(

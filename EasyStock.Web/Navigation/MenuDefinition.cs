@@ -122,8 +122,6 @@ public static class MenuDefinition
     /// <summary>Rodape fixo (com borda superior).</summary>
     public static readonly IReadOnlyList<MenuItem> Footer = new[]
     {
-        new MenuItem("dispositivos", "Dispositivos", "monitor", "/dispositivos",
-            new[] { "Dispositivos", "Operacao" }),
         new MenuItem("usuarios", "Usuários", "user-cog", "/usuarios",
             new[] { "Usuarios" }),
         new MenuItem("configuracoes", "Configurações", "settings", "/configuracoes",

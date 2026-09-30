@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Entities.Notifications;
@@ -24,6 +24,11 @@ public sealed class NotificadorService(
     /// <c>IdempotencyKey</c> do outbox no lugar do id do evento.
     /// </summary>
     public const string ChaveIdempotenciaPayload = "chaveIdempotencia";
+
+    /// <summary>
+    /// Instante UTC (ISO 8601) a partir do qual a mensagem pode sair (S26). Sem a chave, sai na hora.
+    /// </summary>
+    public const string EnviarAposPayload = "enviarApos";
 
     private static readonly JsonSerializerOptions EnumOptions = new()
     {
@@ -273,6 +278,11 @@ public sealed class NotificadorService(
             canaisFallbackRestantesJson: canaisFallbackJson,
             metadadosJson: metadadosJson,
             chaveIdempotencia: chaveIdempotencia);
+
+        if (vars.TryGetValue(EnviarAposPayload, out var enviarApos) && enviarApos is string instante
+            && DateTime.TryParse(instante, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var enviarAposUtc))
+            outbox.AgendarPara(DateTime.SpecifyKind(enviarAposUtc, DateTimeKind.Utc));
 
         await outboxRepository.AddAsync(outbox, ct);
 

@@ -6,8 +6,8 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace EasyStock.Api.Controllers;
 
 /// <summary>
-/// Campanhas da dona (S28): cadastro, agendamento e cancelamento. Público (S29) e disparo (S30) ficam
-/// fora. A arte sobe por <c>POST api/uploads/campanha/arte</c> e a URL devolvida vai em <c>imagemUrl</c>.
+/// Campanhas da dona (S28): cadastro, agendamento e cancelamento; público com exclusões e limite
+/// semanal (S29); próxima onda pela dona (S30: a primeira sai sozinha pelo <c>CampanhaJob</c>). A arte sobe por <c>POST api/uploads/campanha/arte</c> e a URL devolvida vai em <c>imagemUrl</c>.
 /// Policy <c>Gerente</c>: campanha de marketing custa por mensagem na Meta.
 /// </summary>
 [SwaggerTag("Campaigns")]
@@ -21,6 +21,9 @@ public class CampanhasController(
     CriarCampanhaUseCase criarUseCase,
     AtualizarCampanhaUseCase atualizarUseCase,
     CancelarCampanhaUseCase cancelarUseCase,
+    CalcularPublicoCampanhaUseCase calcularPublicoUseCase,
+    ListarDestinatariosCampanhaUseCase listarDestinatariosUseCase,
+    DispararOndaCampanhaUseCase dispararOndaUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List campaigns (most recent first, up to 100)")]
@@ -65,6 +68,35 @@ public class CampanhasController(
     [HttpPost("{id:guid}/cancelar")]
     public Task<IActionResult> Cancelar(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         Executar(empresaId, async emp => DataOk(await cancelarUseCase.ExecuteAsync(emp, id, ct)));
+
+    [SwaggerOperation(Summary = "Recalculate campaign audience",
+        Description = "Refaz pendentes e excluídos (bloqueado, sem_consentimento, restricao, limite_semanal, sem_telefone) " +
+                      "e preserva quem já saiu. Devolve total, pendentes, excluídos por motivo e amostra de 10 nomes.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id:guid}/publico")]
+    public Task<IActionResult> CalcularPublico(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        Executar(empresaId, async emp => DataOk(await calcularPublicoUseCase.ExecuteAsync(emp, id, ct)));
+
+    [SwaggerOperation(Summary = "List campaign recipients (by name, up to 500)")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}/destinatarios")]
+    public Task<IActionResult> ListarDestinatarios(
+        Guid id, [FromQuery] StatusCampanhaDestinatario? status, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        Executar(empresaId, async emp => DataOk(await listarDestinatariosUseCase.ExecuteAsync(emp, id, status, ct)));
+
+    [SwaggerOperation(Summary = "Send next campaign wave (owner decision)",
+        Description = "RN-42: só a dona abre a onda seguinte; a primeira sai no horário agendado. Enfileira até tamanhoOnda " +
+                      "pendentes (quem já comprou o item primeiro) no outbox do WhatsApp, reconferindo bloqueio, consentimento, " +
+                      "limite semanal e telefone. Exige a onda anterior concluída.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id:guid}/ondas")]
+    public Task<IActionResult> DispararOnda(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        Executar(empresaId, async emp => DataOk(await dispararOndaUseCase.ExecuteAsync(emp, id, OrigemOndaCampanha.Dona, ct)));
 
     private SalvarCampanhaCommand Comando(Guid empresaId, CampanhaBody body)
     {

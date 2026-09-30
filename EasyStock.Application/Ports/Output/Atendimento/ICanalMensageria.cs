@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Atendimento;
+﻿using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.Ports.Output.Atendimento;
 
@@ -22,6 +22,15 @@ public interface ICanalMensageria
     /// <summary>Modelo aprovado (fora da janela). Só em canal com <c>AceitaModelo</c>.</summary>
     Task<string> EnviarModeloAsync(
         string contatoIdExterno, string nome, string idioma, IReadOnlyList<string> parametros, CancellationToken ct = default);
+
+    /// <summary>
+    /// Modelo aprovado com botões de resposta rápida (S26: avaliação fora da janela); o payload de cada botão
+    /// volta no webhook em <c>button.payload</c>. Canal sem suporte a quick reply manda o modelo sem botões.
+    /// </summary>
+    Task<string> EnviarModeloAsync(
+        string contatoIdExterno, string nome, string idioma, IReadOnlyList<string> parametros,
+        IReadOnlyList<(string Id, string Titulo)>? botoes, CancellationToken ct = default) =>
+        EnviarModeloAsync(contatoIdExterno, nome, idioma, parametros, ct);
 
     Task MarcarComoLidaAsync(string idMensagemExterna, CancellationToken ct = default);
 }

@@ -16,6 +16,7 @@ using EasyStock.Application.UseCases.AdicionarClienteDocumento;
 using EasyStock.Application.UseCases.RemoverClienteDocumento;
 using EasyStock.Application.UseCases.ObterClienteDetalhes;
 using EasyStock.Application.UseCases.ClienteCrm;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.UseCases.Campanhas;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 
@@ -68,6 +69,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterCampanhaUseCase>();
         services.AddScoped<ListarCampanhasUseCase>();
         services.AddScoped<CancelarCampanhaUseCase>();
+        // Público, exclusões e limite semanal (S29)
+        services.AddScoped<CalcularPublicoCampanhaUseCase>();
+        services.AddScoped<ListarDestinatariosCampanhaUseCase>();
+        // Disparo, ondas, encerramento, lembrete e atribuição do pedido (S30)
+        services.AddScoped<EnfileiradorMensagensCampanha>();
+        services.AddScoped<AtribuicaoPedidoCampanha>();
+        services.AddScoped<DispararOndaCampanhaUseCase>();
+        services.AddScoped<ProcessarCampanhaUseCase>();
         // Dossiê do cliente ao lado da conversa (S25)
         services.AddScoped<ObterDossieClienteUseCase>();
 

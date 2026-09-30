@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
@@ -481,6 +481,25 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Lembrete",
             corpoTemplate: "{{ texto }}");
 
+        // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
+        // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
+        // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "campanha_marketing_whatsapp_v1",
+            nome: "Campanha — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.CampanhaMarketing,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ mensagem }}\n\nPara não receber mais, responda SAIR.");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "campanha_lembrete_whatsapp_v1",
+            nome: "Campanha Lembrete de Encerramento — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.CampanhaLembreteEncerramento,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, a campanha {{ campanha }} está terminando. Ainda dá tempo de pedir!\n\nPara não receber mais, responda SAIR.");
+
         // ===== Avisos de status do pedido ao cliente pelo WhatsApp (S13). Corpo = texto dentro da janela de
         // 24 h; MetadadosJson = template aprovado na Meta (onda 0.3) e parametros, usados fora da janela. =====
         yield return ComMetadados(TemplateNotificacao.Criar(
@@ -518,6 +537,17 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "",
             corpoTemplate: """Pedido nº {{ numero }} entregue. Obrigada pela preferência, {{ nome }}!{{ if instagram != "" }} Siga a gente no Instagram: {{ instagram }}{{ end }}"""),
             """{"template":"pedido_entregue","idioma":"pt_BR","param1":"{{ nome }}"}""");
+
+        // S26: avaliação em dois botões 30 min após a entrega. Dentro da janela sai interativa com os botões;
+        // fora, o template "avaliacao" com os mesmos payloads como quick reply (voltam em button.payload).
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "avaliacao_whatsapp_v1",
+            nome: "Pedido de Avaliação — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.AvaliacaoSolicitada,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, o que achou do pedido nº {{ numero }}? É só tocar num botão."),
+            """{"template":"avaliacao","idioma":"pt_BR","param1":"{{ nome }}","botao1":"acao:avaliacao:positiva:{{ pedidoId }}|Gostei","botao2":"acao:avaliacao:negativa:{{ pedidoId }}|Não gostei"}""");
 
         // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
         // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
@@ -758,6 +788,9 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_entregue_global", "Pedido Entregue — Agradecimento ao Cliente",
             TipoEventoNotificacao.PedidoEntregue, "pedido_entregue_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("avaliacao_solicitada_global", "Pedido de Avaliação — 30 min após a entrega",
+            TipoEventoNotificacao.AvaliacaoSolicitada, "avaliacao_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
     }
 
