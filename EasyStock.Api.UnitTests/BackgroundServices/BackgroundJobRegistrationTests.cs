@@ -49,6 +49,22 @@ public class BackgroundJobRegistrationTests
     }
 
     [Fact]
+    public void AddEasyStockBackgroundJobs_RegistraDisparadorDeMensagensProgramadas_EDesligaPorFlag()
+    {
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var desligado = new ServiceCollection().AddLogging();
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableMensagensProgramadas"] = "false" })
+            .Build());
+
+        ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().Contain(typeof(MensagensProgramadasBackgroundService));
+        desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().NotContain(typeof(MensagensProgramadasBackgroundService));
+    }
+
+    [Fact]
     public void AddEasyStockBackgroundJobs_DeveRegistrarJobsLegados_QuandoFlagsEstiveremHabilitadas()
     {
         var services = new ServiceCollection();

@@ -1,10 +1,6 @@
 using EasyStock.Api.Observability;
 using EasyStock.Api.Observability.HealthChecks;
-using EasyStock.Application.Ports.Output.Fiscal;
 using EasyStock.Infra.Integrations.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal;
-using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using Serilog;
@@ -13,8 +9,8 @@ namespace EasyStock.Api.Startup;
 
 /// <summary>
 /// Resolve qual banco usar (PostgreSQL é o único transacional suportado — ADR 0001)
-/// e registra todos os services dependentes: EF Core, repos, health checks, módulo
-/// Fiscal NFC-e (Polly + Focus NFe + Mock + Cert A1), DataProtection.
+/// e registra todos os services dependentes: EF Core, repos, health checks, Polly,
+/// DataProtection.
 ///
 /// Em produção com provider explicitamente "PostgreSQL", pula a checagem de auto-detect
 /// (custa 3-5s no cold start).
@@ -66,21 +62,13 @@ public static class DatabaseModule
                     .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
                     .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
                     .AddNotificationsHosting();
-                // Modulo Fiscal NFC-e (F2) — Polly pipelines + adapters Focus NFe + Mock + cert A1
+                // Polly pipelines compartilhados pelas integracoes HTTP
                 builder.Services.AddEasyStockIntegrationResilience();
-                builder.Services.AddFocusNFeAdapter(builder.Configuration);
-                builder.Services.AddMockFiscalGateway();
                 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
                 builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
                 builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
                 // Atendimento WhatsApp (S06) — LLM do agente (Anthropic:*; desligado sem chave).
                 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
-                // Scoped (não Singleton): a factory consome IEnumerable<IGatewayFiscal>, e os
-                // adapters (Focus/Mock) são Scoped (dependem de serviços scoped como
-                // INfeCertificadoA1Service). Como Singleton, capturava gateways scoped
-                // (captive dependency / lifetime mismatch) — só não explodia em prod porque
-                // ValidateOnBuild fica off lá. Os consumidores (use cases fiscais) são Scoped.
-                builder.Services.AddScoped<IGatewayFiscalFactory, GatewayFiscalFactory>();
                 // Key ring compartilhado com o Worker via Postgres (#1035). O certificado A1
                 // cifrado aqui e decifrado la na emissao/reprocessamento fiscal — com o
                 // registro default cada processo tinha o seu key ring e o Unprotect cruzado

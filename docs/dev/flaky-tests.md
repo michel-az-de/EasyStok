@@ -19,6 +19,24 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#1117) — gate de worktrees paralelos compartilhava a pasta de build
+
+Visto em `MigrationDesignerHygieneTests` (qualquer arch-test pode ser a vitima).
+
+- **Por que era flaky:** `gate.ps1` e `build-check.ps1` (ADR-0040/ADR-0029) compilavam com
+  `-o %TEMP%\easystok-build-check`, pasta unica para todos os worktrees da maquina. Em 2026-09-29, com
+  sessoes paralelas, o pre-commit de `chat-site-1097` falhou com `ReflectionTypeLoadException`
+  (`ISessaoChatSiteRepository`/`SessaoChatSite` nao encontrados) e o stack trace apontava para
+  `gate-zero-arch-tests`: o build do outro worktree sobrescreveu a saida entre o build e o robocopy.
+  Reexecutar passava. Corrida, nao regressao.
+- **Fix (#1117):** `scripts/poka-yoke/build-out-dir.ps1` deriva a pasta de um hash do caminho do repo:
+  `%TEMP%\easystok-build-check-<hash8>`. Estavel no mesmo worktree (incremental preservado), distinta
+  entre worktrees. As pastas antigas/orfas em `%TEMP%` podem ser apagadas a mao sem risco.
+- **Se voltar a falhar:** confira se o stack trace aponta para outro caminho de repo; se sim, alguem
+  reintroduziu pasta de saida fixa.
+
+---
+
 ## ✅ CORRIGIDO (#910) — timeout 500ms do ScribanRenderer no CI
 
 Afetava dois testes, mesma causa: `ScribanRendererTests.Templates_diferentes_geram_resultados_independentes`
@@ -34,6 +52,22 @@ e `EmailTemplateRenderSmokeTests.Template_de_email_renderiza_sem_erro_de_sintaxe
   sanidade não foi diluída, só o piso do runner lento do CI.
 - **Se voltar a falhar mesmo com 2s:** aí é renderização de fato lenta (regressão), não timing —
   investigar o template, não subir mais o teto.
+
+---
+
+## ⚠️ AMBIENTE (#1110) — Smart App Control bloqueia a DLL dos arch-tests no gate
+
+Não é teste flaky, é bloqueio da máquina local. Fica aqui porque aparece como "gate estranho" no pre-commit.
+
+- **Sintoma:** em 2026-09-29 o Windows Smart App Control bloqueou
+  `.build\arch-gate\EasyStock.ArchitectureTests.dll` ("Uma política de Controle de Aplicativo bloqueou
+  este arquivo", `0x800711C7`). O vstest pulou o assembly, disse "Nenhum teste corresponde ao filtro
+  `Category=Architecture`" e **saiu 0**. O `gate.ps1` confiava só no exit code e dava VERDE falso.
+- **Fix (#1110):** o `gate.ps1` grava TRX em `.build\arch-gate-results\arch.trx` e exige
+  `Counters/@executed > 0`. Zero testes executados agora é VERMELHO com **exit 4**.
+- **Se o gate der exit 4:** confira a mensagem do vstest. Com `0x800711C7`, o bloqueio é do Smart App
+  Control (Segurança do Windows > Controle de aplicativos e navegador); rode de novo ou valide pelo CI.
+  **Não** contorne com `--no-verify` nem afrouxe a checagem do TRX.
 
 ---
 
