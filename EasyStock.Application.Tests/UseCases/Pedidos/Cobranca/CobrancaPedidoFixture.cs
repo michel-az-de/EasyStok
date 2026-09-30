@@ -62,6 +62,9 @@ internal sealed class CobrancaPedidoFixture
     public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
 
+    /// <summary>Estorno do pagamento que chega depois do cancelamento; aceita por padrão.</summary>
+    public IEstornoPedidoGateway Estorno { get; } = Substitute.For<IEstornoPedidoGateway>();
+
     /// <summary>O que <c>payments/search?external_reference=</c> devolve (S32).</summary>
     public List<PagamentoMercadoPago> PagamentosNoMercadoPago { get; } = new();
 
@@ -113,7 +116,10 @@ internal sealed class CobrancaPedidoFixture
         MpClient.BuscarPagamentosPorReferenciaAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_ => PagamentosNoMercadoPago.ToList());
 
-        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>();
+        Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Ok("estorno-1"));
+
+        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?, Guid?)>();
         Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<CobrancaPedidoResult>();
         Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?)>();
@@ -164,7 +170,7 @@ internal sealed class CobrancaPedidoFixture
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
             Publicador, OperacaoEventos, ImpressaoRepo, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(PrazoQueries));
+            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso());
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);

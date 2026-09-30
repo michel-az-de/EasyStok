@@ -32,6 +32,11 @@ public sealed class AvisoCobrancaConversa(
         ? "O pagamento não foi aprovado. Você pode tentar de novo com outro cartão ou pelo Pix."
         : $"O pagamento não foi aprovado. Você pode tentar de novo com outro cartão ou pelo Pix, no mesmo link: {link}";
 
+    /// <summary>O pagamento chegou depois do cancelamento e foi devolvido automaticamente.</summary>
+    public const string TextoPagamentoTardioEstornado =
+        "Recebemos seu pagamento, mas o pedido já tinha sido cancelado porque o prazo para pagar acabou. " +
+        "Já devolvemos o valor pelo Mercado Pago. Se ainda quiser, é só pedir de novo por aqui.";
+
     public const string TextoPedidoCancelado =
         "Seu pedido foi cancelado porque o pagamento não foi confirmado a tempo. Se ainda quiser, é só pedir de novo por aqui.";
 
