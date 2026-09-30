@@ -206,7 +206,6 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Atendimento.ChamadoEntregador> ChamadosEntregador { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ExpedienteLoja> ExpedientesLoja { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
-        public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
         public DbSet<ProdutoAlteracao> ProdutoAlteracoes { get; set; } = null!;
         public DbSet<ProdutoComposicao> ProdutosComposicao { get; set; } = null!;
@@ -228,34 +227,14 @@ namespace EasyStock.Infra.Postgre.Data
         // Admin Module DbSets
         public DbSet<SystemErrorLog> SystemErrorLogs { get; set; } = null!;
         public DbSet<SeedRunLog> SeedRunLogs { get; set; } = null!;
-        public DbSet<AdminTicket> AdminTickets { get; set; } = null!;
-        public DbSet<AdminTicketMensagem> AdminTicketMensagens { get; set; } = null!;
-        public DbSet<TicketAnexo> TicketAnexos { get; set; } = null!;
-        public DbSet<TicketHistorico> TicketHistoricos { get; set; } = null!;
-        public DbSet<AdminTicketTecnicoMeta> AdminTicketTecnicoMetas { get; set; } = null!;
-        public DbSet<SlaConfiguracao> SlaConfiguracoes { get; set; } = null!;
 
-        // FAQ — base global publica (sem multi-tenant)
-        public DbSet<FaqCategoria> FaqCategorias { get; set; } = null!;
-        public DbSet<FaqItem> FaqItens { get; set; } = null!;
-        public DbSet<FaqVisualizacao> FaqVisualizacoes { get; set; } = null!;
-        public DbSet<FaqFeedback> FaqFeedbacks { get; set; } = null!;
-
-        // Banners — broadcast global de plataforma (sem multi-tenant, sem RLS). Ver #869.
-        public DbSet<EasyStock.Domain.Entities.Banners.Banner> Banners { get; set; } = null!;
-        public DbSet<EasyStock.Domain.Entities.Banners.BannerConfirmacao> BannerConfirmacoes { get; set; } = null!;
-
-        public DbSet<AdminImpersonationLog> AdminImpersonationLogs { get; set; } = null!;
         public DbSet<AdminAuditLog> AdminAuditLogs { get; set; } = null!;
-        public DbSet<AdminAcessoPiiLog> AdminAcessosPiiLogs { get; set; } = null!;
-        public DbSet<AdminNotaTenant> AdminNotasTenant { get; set; } = null!;
         public DbSet<Cupom> Cupons { get; set; } = null!;
 
         // Endpoint health monitoring (Worker EndpointHealthMonitorService)
         public DbSet<EndpointHealthState> EndpointHealthStates { get; set; } = null!;
 
         // Releases de APK distribuidos via CapacitorUpdater (Casa da Baba e outros).
-        public DbSet<EasyStock.Domain.Entities.Mobile.ApkRelease> ApkReleases { get; set; } = null!;
 
         // Identity / SaaS DbSets
         public DbSet<Usuario> Usuarios { get; set; } = null!;
@@ -315,7 +294,6 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Financeiro.ContaFinanceiraEvento> ContasFinanceirasEventos { get; set; } = null!;
 
         // Landing publica — leads capturados sem multi-tenant (sem EmpresaId).
-        public DbSet<LeadPublico> LeadsPublicos { get; set; } = null!;
 
         // Modulo Integration (F3+) — credenciais cifradas (AES-256-GCM) por tenant
         public DbSet<CredencialIntegracao> CredenciaisIntegracao { get; set; } = null!;
@@ -324,7 +302,6 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<OutboxEventoIntegracao> OutboxEventosIntegracao { get; set; } = null!;
 
         // Modulo Fiscal (NFC-e Corte 1) — fundacao Domain pra emissao via Focus/eNotas
-        public DbSet<EmpresaConfiguracaoFiscal> EmpresaConfiguracoesFiscais { get; set; } = null!;
         public DbSet<NfeDocumento> NfeDocumentos { get; set; } = null!;
         public DbSet<NfeItem> NfeItens { get; set; } = null!;
         public DbSet<NfeEvento> NfeEventos { get; set; } = null!;
@@ -583,8 +560,7 @@ namespace EasyStock.Infra.Postgre.Data
             // FaturaContador — tabela auxiliar com PK composta (EmpresaId, Ano).
             // Acesso direto via SQL raw (INSERT...ON CONFLICT) ou lookup por PK no
             // fallback; sem necessidade de filter.
-            return clrType == typeof(AdminImpersonationLog)
-                || clrType == typeof(TenantFeatureFlag)
+            return clrType == typeof(TenantFeatureFlag)
                 || clrType == typeof(GatewayRoutingRule)
                 || clrType == typeof(FaturaContador);
         }
