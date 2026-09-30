@@ -79,7 +79,9 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .AsNoTracking()
             .Where(p => p.Status == StatusPedidoMapper.AguardandoPagamento
                      && p.Origem == "storefront"
-                     && p.CriadoEm < criadoAntesDe)
+                     && p.CriadoEm < criadoAntesDe
+                     // S11: pedido com CobrancaPedido é do CobrancaPedidoJob (expira pelo link, não pela criação).
+                     && !db.CobrancasPedido.IgnoreQueryFilters().Any(c => c.PedidoId == p.Id))
             .OrderBy(p => p.CriadoEm)
             .Take(maxBatch)
             .ToListAsync(ct)

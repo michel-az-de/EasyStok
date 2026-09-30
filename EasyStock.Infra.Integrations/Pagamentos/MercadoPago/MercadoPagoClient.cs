@@ -19,6 +19,8 @@ public sealed class MercadoPagoClient(
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        // Campo opcional ausente não vai no corpo (ex.: expiration_date_to sem expiração).
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
     public async Task<PreferenceCriadaResult> CriarPreferenceAsync(
@@ -43,11 +45,16 @@ public sealed class MercadoPagoClient(
                 pending = options.Value.BackUrlPending,
             },
             auto_return = "approved",
+            // S11: o link vale 30 min (a expiração vem do use case de cobrança).
+            expires = command.ExpiraEm.HasValue,
+            expiration_date_to = command.ExpiraEm.HasValue ? FormatarDataMp(command.ExpiraEm.Value) : null,
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "v1/payments/preferences");
         request.Content = JsonContent.Create(payload, options: JsonOpts);
         request.Headers.Add("Authorization", $"Bearer {options.Value.AccessToken}");
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+            request.Headers.Add("X-Idempotency-Key", command.IdempotencyKey);
 
         using var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
@@ -67,4 +74,8 @@ public sealed class MercadoPagoClient(
 
         return new PreferenceCriadaResult(id, initPoint);
     }
+
+    /// <summary>ISO 8601 com milissegundos e offset, formato que o Mercado Pago aceita (<c>2026-09-29T12:30:00.000+00:00</c>).</summary>
+    private static string FormatarDataMp(DateTime utc) =>
+        new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", System.Globalization.CultureInfo.InvariantCulture);
 }

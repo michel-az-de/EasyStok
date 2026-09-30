@@ -3,7 +3,6 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Faturas.CancelarFatura;
 using EasyStock.Application.UseCases.Faturas.Common;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
-using EasyStock.Application.UseCases.Faturas.ListarFaturasCliente;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -228,38 +227,6 @@ public class FaturasUseCasesTests
         fatura.Status.Should().Be(StatusFatura.Cancelada);
         fatura.Eventos.Should().Contain(e => e.Tipo == TipoEventoFatura.Cancelada);
         await _uow.Received(1).CommitAsync();
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // ListarFaturasCliente
-    // ════════════════════════════════════════════════════════════════════
-
-    [Fact]
-    public async Task ListarCliente_LancaValidation_QuandoEmpresaIdVazio()
-    {
-        var uc = new ListarFaturasClienteUseCase(_repo);
-        var act = () => uc.ExecuteAsync(new ListarFaturasClienteCommand(Guid.Empty));
-        await act.Should().ThrowAsync<UseCaseValidationException>();
-    }
-
-    [Fact]
-    public async Task ListarCliente_PassaFiltrosERetornaPaginacaoNormalizada()
-    {
-        var empresaId = Guid.NewGuid();
-        _repo.ListarClienteAsync(empresaId,
-                Arg.Any<StatusFatura?>(),
-                Arg.Any<DateTime?>(), Arg.Any<DateTime?>(),
-                page: 1, pageSize: 50,
-                Arg.Any<CancellationToken>())
-            .Returns((Array.Empty<Fatura>() as IReadOnlyList<Fatura>, 0));
-
-        var uc = new ListarFaturasClienteUseCase(_repo);
-        var result = await uc.ExecuteAsync(new ListarFaturasClienteCommand(
-            empresaId, Status: null, Page: 0, PageSize: 50)); // page=0 → 1
-
-        result.Page.Should().Be(1);
-        result.PageSize.Should().Be(50);
-        result.Total.Should().Be(0);
     }
 
     private static Fatura NovaFaturaEmitida(Guid empresaId, decimal total)

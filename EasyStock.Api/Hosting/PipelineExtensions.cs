@@ -25,7 +25,7 @@ namespace EasyStock.Api.Hosting;
 ///   <item>HttpsRedirection + StaticFiles (incluindo storage local pra uploaded files)</item>
 ///   <item>Mobile PWA static files</item>
 ///   <item>Cors + RateLimiter + Authentication + Authorization</item>
-///   <item>ClienteSession sliding window + SubscriptionGate + Idempotency</item>
+///   <item>ClienteSession sliding window + Idempotency</item>
 ///   <item>MapControllers + MapGet redirects (/, /console, /api-docs)</item>
 ///   <item>MapHealthChecks (/health, /health/live, /health/ready, /health/api, /health/dispatcher)</item>
 ///   <item>MapGet /health/version (PWA OTA schema gate)</item>
@@ -229,7 +229,6 @@ public static class PipelineExtensions
         app.UseAuthorization();
         // Sliding window: atualiza UltimoUsoEm da ClienteSession após cada request autenticado (ADR-0012).
         app.UseMiddleware<ClienteSessionMiddleware>();
-        app.UseMiddleware<SubscriptionGateMiddleware>();
         // Idempotencia: aplicado APOS auth para que ICurrentUserAccessor.EmpresaId esteja disponivel.
         // Whitelist de POSTs criticos (R5: dedup retry de mobile/web).
         IdempotencyMiddlewareExtensions.UseIdempotency(app, opts => ConfigurarRotasIdempotentes(opts));

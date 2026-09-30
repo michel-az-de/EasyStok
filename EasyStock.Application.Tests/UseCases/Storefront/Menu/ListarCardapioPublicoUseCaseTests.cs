@@ -378,4 +378,24 @@ public class ListarCardapioPublicoUseCaseTests
 
         result.Itens.Should().HaveCount(2, "mix avulso+vinculado não lança e mantém ambos");
     }
+
+    // ── S15: linha e tempo de preparo no contrato público ─────────────
+
+    [Fact]
+    public async Task EmiteLinhaETempo()
+    {
+        var f = BuildFakes();
+        var item = CriarItemAvulso(f.Storefront.Id, "nhoque congelado", 30m);
+        item.DefinirPreparo(EasyStock.Domain.Enums.Storefront.LinhaProduto.PrepararEmCasa, 45, null);
+        var semLinha = CriarItemAvulso(f.Storefront.Id, "lasanha", 35m, ordem: 1);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { item, semLinha });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens[0].Linha.Should().Be("prepararEmCasa");
+        result.Itens[0].TempoPreparoMinutos.Should().Be(45);
+        result.Itens[1].Linha.Should().Be("paraServir");
+        result.Itens[1].TempoPreparoMinutos.Should().BeNull();
+    }
 }
