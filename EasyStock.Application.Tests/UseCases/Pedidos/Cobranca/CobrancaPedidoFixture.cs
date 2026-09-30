@@ -9,8 +9,10 @@ using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.Operacao.Atraso;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
@@ -55,6 +57,7 @@ internal sealed class CobrancaPedidoFixture
     public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
     public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
     public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+    public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
 
     /// <summary>O que <c>payments/search?external_reference=</c> devolve (S32).</summary>
@@ -105,6 +108,7 @@ internal sealed class CobrancaPedidoFixture
         Uow.SetupExecuteInTransactionSemRetry<DesfazerPagamentoManualResult>();
         Uow.SetupExecuteInTransactionSemRetry<(ResultadoExpiracaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
+        Uow.SetupExecuteInTransactionSemRetry<PedidoAtrasadoOperacao?>();
     }
 
     private PedidoItem Item(string nome, decimal qtd, decimal preco)
@@ -147,7 +151,11 @@ internal sealed class CobrancaPedidoFixture
     public ConfirmarPagamentoPedidoUseCase Confirmar() =>
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
-            Publicador, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance);
+            Publicador, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(PrazoQueries));
+
+    public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
+        new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
