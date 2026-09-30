@@ -68,6 +68,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterCampanhaUseCase>();
         services.AddScoped<ListarCampanhasUseCase>();
         services.AddScoped<CancelarCampanhaUseCase>();
+        // Público, exclusões e limite semanal (S29)
+        services.AddScoped<CalcularPublicoCampanhaUseCase>();
+        services.AddScoped<ListarDestinatariosCampanhaUseCase>();
         // Dossiê do cliente ao lado da conversa (S25)
         services.AddScoped<ObterDossieClienteUseCase>();
 

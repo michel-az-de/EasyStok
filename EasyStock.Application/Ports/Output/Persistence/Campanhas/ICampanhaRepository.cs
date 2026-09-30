@@ -16,4 +16,12 @@ public interface ICampanhaRepository
 
     /// <summary>Destinatários ainda pendentes da campanha, rastreados (o cancelamento os exclui).</summary>
     Task<IReadOnlyList<CampanhaDestinatario>> ListarPendentesAsync(Guid empresaId, Guid campanhaId, CancellationToken ct = default);
+
+    /// <summary>Todos os destinatários da campanha, rastreados (o cálculo do público os reclassifica).</summary>
+    Task<IReadOnlyList<CampanhaDestinatario>> ListarDestinatariosAsync(Guid empresaId, Guid campanhaId, CancellationToken ct = default);
+
+    Task AddDestinatariosAsync(IEnumerable<CampanhaDestinatario> destinatarios, CancellationToken ct = default);
+
+    /// <summary>Tira da campanha quem saiu do público (só pendentes e excluídos chegam aqui).</summary>
+    void RemoverDestinatarios(IEnumerable<CampanhaDestinatario> destinatarios);
 }
