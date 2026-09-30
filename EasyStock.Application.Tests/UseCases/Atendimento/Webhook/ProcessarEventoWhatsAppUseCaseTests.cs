@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Services.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -56,7 +57,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
                 NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
             new RoteadorAcoesBotao(
-                [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()))],
+                [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()), ConfirmacaoEnderecoFake.Nova(), _conversaRepository)],
                 NullLogger<RoteadorAcoesBotao>.Instance),
             new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),
                 _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
