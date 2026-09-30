@@ -48,7 +48,7 @@ public sealed class PedidoGuestTrackingControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_guest_tracking_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("EasyStock-IT-NonDefault-2026!")
                 .Build();
 
             await _pg.StartAsync();

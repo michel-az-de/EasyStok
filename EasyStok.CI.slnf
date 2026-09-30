@@ -22,7 +22,8 @@
       "EasyStock.Infra.Async.UnitTests\\EasyStock.Infra.Async.UnitTests.csproj",
       "EasyStock.Infra.Integrations.UnitTests\\EasyStock.Infra.Integrations.UnitTests.csproj",
       "EasyStock.Inventario.IntegrationTests\\EasyStock.Inventario.IntegrationTests.csproj",
-      "EasyStock.Infra.Postgre.IntegrationTests\\EasyStock.Infra.Postgre.IntegrationTests.csproj"
+      "EasyStock.Infra.Postgre.IntegrationTests\\EasyStock.Infra.Postgre.IntegrationTests.csproj",
+      "EasyStock.Api.IntegrationTests\\EasyStock.Api.IntegrationTests.csproj"
     ]
   }
 }

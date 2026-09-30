@@ -52,7 +52,7 @@ public sealed class CardapioItemFotoUploadE2ETests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_upload_e2e_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("EasyStock-IT-NonDefault-2026!")
                 .Build();
 
             await _pg.StartAsync();
