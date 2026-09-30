@@ -32,6 +32,7 @@ public class LancarLotePapelUseCaseTests
             NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
         var integ = new PedidoEstoqueIntegrationService(Substitute.For<IItemEstoqueRepository>(),
             Substitute.For<IMovimentacaoEstoqueRepository>(),
+            _publicador,
             Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = true }),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var atualizar = new AtualizarStatusPedidoUseCase(_pedidoRepo, integ, configRepo, gerarCr, _publicador,
