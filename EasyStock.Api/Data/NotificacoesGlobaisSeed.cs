@@ -471,6 +471,44 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "{{ cliente }} precisa de você",
             corpoTemplate: "{{ cliente }} precisa de você: {{ motivo }}");
 
+        // ===== Avisos de status do pedido ao cliente pelo WhatsApp (S13). Corpo = texto dentro da janela de
+        // 24 h; MetadadosJson = template aprovado na Meta (onda 0.3) e parametros, usados fora da janela. =====
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "pedido_pago_whatsapp_v1",
+            nome: "Pedido Pago — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PedidoPagoConfirmado,
+            assuntoTemplate: "",
+            corpoTemplate: "Oi, {{ nome }}! Recebemos seu pagamento. Pedido nº {{ numero }} confirmado, previsão de entrega: {{ previsao }}. Obrigada pela preferência!"),
+            """{"template":"pedido_pago","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
+
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "pedido_em_preparo_whatsapp_v1",
+            nome: "Pedido Em Preparo — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PedidoEmPreparo,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} já está em preparo na nossa cozinha. Previsão de entrega: {{ previsao }}."),
+            """{"template":"pedido_em_preparo","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""");
+
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "pedido_saiu_whatsapp_v1",
+            nome: "Pedido Saiu Para Entrega — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PedidoSaiuParaEntrega,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} saiu para entrega e logo chega até você."),
+            """{"template":"pedido_saiu","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}"}""");
+
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "pedido_entregue_whatsapp_v1",
+            nome: "Pedido Entregue — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.PedidoEntregue,
+            assuntoTemplate: "",
+            corpoTemplate: """Pedido nº {{ numero }} entregue. Obrigada pela preferência, {{ nome }}!{{ if instagram != "" }} Siga a gente no Instagram: {{ instagram }}{{ end }}"""),
+            """{"template":"pedido_entregue","idioma":"pt_BR","param1":"{{ nome }}"}""");
+
         // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
         // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
         // ativar o canal em ConfiguracaoCanal (AtivoNoTenant); o objetivo aqui e cobrir o filtro
@@ -691,6 +729,27 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("conversa_escalada_global", "Conversa Escalada para a Dona",
             TipoEventoNotificacao.ConversaEscalada, "conversa_escalada_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+
+        // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
+        // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====
+        yield return MakeRotina("pedido_pago_confirmado_global", "Pedido Pago — Aviso ao Cliente",
+            TipoEventoNotificacao.PedidoPagoConfirmado, "pedido_pago_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("pedido_em_preparo_global", "Pedido Em Preparo — Aviso ao Cliente",
+            TipoEventoNotificacao.PedidoEmPreparo, "pedido_em_preparo_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("pedido_saiu_para_entrega_global", "Pedido Saiu Para Entrega — Aviso ao Cliente",
+            TipoEventoNotificacao.PedidoSaiuParaEntrega, "pedido_saiu_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("pedido_entregue_global", "Pedido Entregue — Agradecimento ao Cliente",
+            TipoEventoNotificacao.PedidoEntregue, "pedido_entregue_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+    }
+
+    private static TemplateNotificacao ComMetadados(TemplateNotificacao template, string metadadosJson)
+    {
+        template.DefinirMetadados(metadadosJson);
+        return template;
     }
 
     private static RotinaNotificacao MakeRotina(
