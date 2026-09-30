@@ -17,7 +17,7 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 /// <para>
 /// Janela e endereço são opcionais: sem janela, vale a única ativa do dia; sem endereço, o padrão (ou o
 /// único) do cliente. Havendo mais de uma opção, devolve a lista para o agente perguntar
-/// (<c>listar_janelas</c> e <c>validar_endereco</c> chegam na S16 e na S14).
+/// (<c>listar_janelas</c>, S16, oferece só janelas no prazo; <c>validar_endereco</c> chega na S14).
 /// </para>
 /// </summary>
 public sealed class CriarPedidoFerramenta(
