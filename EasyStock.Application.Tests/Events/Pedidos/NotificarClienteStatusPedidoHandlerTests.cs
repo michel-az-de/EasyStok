@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Events.Pedidos.Handlers;
 using EasyStock.Application.Ports.Output;
@@ -80,6 +80,9 @@ public class NotificarClienteStatusPedidoHandlerTests
             "{{ nome }}, seu pedido nº {{ numero }} saiu para entrega.");
         Configurar(TipoEventoNotificacao.PedidoEntregue, "pedido_entregue_whatsapp_v1",
             "Obrigada, {{ nome }}! Siga a gente: {{ instagram }}");
+        Configurar(TipoEventoNotificacao.AvaliacaoSolicitada, "avaliacao_whatsapp_v1",
+            "{{ nome }}, como foi o pedido nº {{ numero }}?",
+            """{"template":"avaliacao","param1":"{{ nome }}","botao1":"acao:avaliacao:positiva:{{ pedidoId }}|Gostei","botao2":"acao:avaliacao:negativa:{{ pedidoId }}|Não gostei"}""");
 
         _cliente = Cliente.Criar(_empresaId, "Maria Souza");
         _cliente.Telefone = "(11) 99999-0001";
@@ -121,8 +124,34 @@ public class NotificarClienteStatusPedidoHandlerTests
 
         await MudarStatusAsync(StatusPedidoMapper.SaiuParaEntrega, StatusPedidoMapper.Entregue);
 
-        var mensagem = _outbox.Should().ContainSingle().Subject;
+        var mensagem = _outbox.Should().ContainSingle(m => m.CorpoRenderizado.Contains("Obrigada")).Subject;
         mensagem.CorpoRenderizado.Should().Contain("Obrigada, Maria").And.Contain("https://instagram.com/casadababa");
+    }
+
+    [Fact]
+    public async Task EntregueAgendaAvaliacaoEm30Min()
+    {
+        var entregueEm = new DateTime(2026, 10, 1, 13, 0, 0, DateTimeKind.Utc);
+
+        await MudarStatusAsync(StatusPedidoMapper.SaiuParaEntrega, StatusPedidoMapper.Entregue, entregueEm);
+
+        var avaliacao = _outbox.Should().ContainSingle(m => m.CorpoRenderizado.Contains("como foi")).Subject;
+        avaliacao.ProximaTentativaEm.Should().Be(new DateTime(2026, 10, 1, 13, 30, 0, DateTimeKind.Utc));
+        var metadados = avaliacao.LerMetadados()!;
+        metadados["template"].Should().Be("avaliacao");
+        metadados["botao1"].Should().Be($"acao:avaliacao:positiva:{_pedido.Id}|Gostei");
+        metadados["botao2"].Should().Be($"acao:avaliacao:negativa:{_pedido.Id}|Não gostei");
+        _outbox.Should().Contain(m => m.CorpoRenderizado.Contains("Obrigada"), "o agradecimento sai na hora");
+    }
+
+    [Fact]
+    public async Task AvisosDesligadosNaoPedeAvaliacaoMasAgradece()
+    {
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+
+        await MudarStatusAsync(StatusPedidoMapper.SaiuParaEntrega, StatusPedidoMapper.Entregue);
+
+        _outbox.Should().ContainSingle().Which.CorpoRenderizado.Should().Contain("Obrigada");
     }
 
     [Fact]
@@ -188,10 +217,10 @@ public class NotificarClienteStatusPedidoHandlerTests
             $"{_pedido.Id:N}|pago", CanalNotificacao.WhatsApp));
     }
 
-    private async Task MudarStatusAsync(string antigo, string novo)
+    private async Task MudarStatusAsync(string antigo, string novo, DateTime? ocorridoEm = null)
     {
         var handler = new NotificarClienteStatusPedidoHandler(Aviso());
-        var payload = new PedidoMudouStatusEvent(_pedido.Id, _empresaId, null, antigo, novo, "web", null, "Dona", DateTime.UtcNow);
+        var payload = new PedidoMudouStatusEvent(_pedido.Id, _empresaId, null, antigo, novo, "web", null, "Dona", ocorridoEm ?? DateTime.UtcNow);
 
         await handler.HandleAsync(Evento("pedido.mudou_status", payload), CancellationToken.None);
         await AvaliarEventosAsync();
@@ -210,13 +239,18 @@ public class NotificarClienteStatusPedidoHandlerTests
     private OutboxEventoIntegracao Evento<T>(string tipo, T payload) =>
         OutboxEventoIntegracao.Criar(_empresaId, tipo, "pedido", _pedido.Id, JsonSerializer.Serialize(payload, Camel));
 
-    private void Configurar(TipoEventoNotificacao tipo, string templateCodigo, string corpo)
+    private void Configurar(TipoEventoNotificacao tipo, string templateCodigo, string corpo, string? metadadosJson = null)
     {
         var rotina = RotinaNotificacao.Criar(templateCodigo + "_rotina", templateCodigo, tipo, TriggerTipoRotina.Evento,
             templateCodigo, CategoriaConteudoNotificacao.Transacional);
         rotina.DefinirFallback("[\"WhatsApp\"]", "system");
         _rotinaRepository.ListarAtivasAsync(tipo, Arg.Any<CancellationToken>()).Returns([rotina]);
         _templateRepository.GetAtivoAsync(templateCodigo, CanalNotificacao.WhatsApp, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
-            .Returns(TemplateNotificacao.Criar(templateCodigo, templateCodigo, CanalNotificacao.WhatsApp, tipo, "", corpo));
+            .Returns(_ =>
+            {
+                var template = TemplateNotificacao.Criar(templateCodigo, templateCodigo, CanalNotificacao.WhatsApp, tipo, "", corpo);
+                if (metadadosJson is not null) template.DefinirMetadados(metadadosJson);
+                return template;
+            });
     }
 }
