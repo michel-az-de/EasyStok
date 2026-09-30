@@ -93,9 +93,7 @@ public static class WebHttpServicesExtensions
         services.AddScoped<CardapioService>();
         services.AddScoped<BuscaUnificadaService>();
         services.AddScoped<InteligenciaLojasService>();
-        services.AddScoped<MobileDevicesService>();
         services.AddScoped<MobileProductsService>();
-        services.AddScoped<OperacaoMobileService>();
         services.AddScoped<RelatoriosService>();
 
         // 6d. Menu lateral (ADR-0032, fatia 2): badges agregados com cache curto (60s)
