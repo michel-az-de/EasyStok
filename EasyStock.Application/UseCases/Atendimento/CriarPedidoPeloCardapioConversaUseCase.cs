@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
@@ -100,7 +98,8 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         conversa.RegistrarSaida(agora);
         await conversaRepository.AddMensagemAsync(
             Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-                Resumo(reservado, input.DataEntrega, forma)),
+                ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
+                    "Pedido montado pelo cliente no cardápio do site:")),
             ct);
         await unitOfWork.CommitAsync();
 
@@ -125,25 +124,5 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
             logger.LogWarning(ex, "Cardapio da conversa: pedido {PedidoId} criado sem link de pagamento.", reservado.Pedido.Id);
             return null;
         }
-    }
-
-    private static string Resumo(PedidoReservado reservado, DateOnly dataEntrega, string forma)
-    {
-        var reais = CultureInfo.GetCultureInfo("pt-BR");
-        var sb = new StringBuilder("Pedido montado pelo cliente no cardápio do site:");
-        foreach (var item in reservado.Itens)
-        {
-            sb.Append(CultureInfo.InvariantCulture, $"\n- {item.Quantidade:0.##}x {item.Nome}");
-            if (!string.IsNullOrWhiteSpace(item.Observacao)) sb.Append($" ({item.Observacao})");
-            sb.Append(": ").Append(item.Subtotal.ToString("C", reais));
-        }
-        sb.Append("\nFrete: ").Append(reservado.ItemFrete.PrecoUnitario.ToString("C", reais));
-        sb.Append("\nTotal: ").Append(reservado.Total.ToString("C", reais));
-        sb.Append("\nEntrega: ").Append(dataEntrega.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
-        sb.Append(forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-            ? "\nPagamento: na entrega"
-            : "\nPagamento: link online (Pix ou cartão)");
-        var texto = sb.ToString();
-        return texto.Length > Mensagem.TextoTamanhoMaximo ? texto[..Mensagem.TextoTamanhoMaximo] : texto;
     }
 }
