@@ -127,6 +127,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
+            services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
