@@ -146,6 +146,13 @@ public class Campanha
         return OndaAtual;
     }
 
+    /// <summary>O público (S29) só é recalculado enquanto a campanha pode mandar mais alguma onda.</summary>
+    public void GarantirPublicoRecalculavel()
+    {
+        if (Status is StatusCampanha.Encerrada or StatusCampanha.Cancelada)
+            throw new RegraDeDominioVioladaException($"Campanha {Status} não recalcula o público.");
+    }
+
     public void Encerrar()
     {
         if (Status is not (StatusCampanha.Enviando or StatusCampanha.Enviada))

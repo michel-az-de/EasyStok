@@ -177,4 +177,36 @@ public class CampanhaTests
         excluirEnfileirado.Should().Throw<RegraDeDominioVioladaException>();
         destinatario.Onda.Should().Be(1);
     }
+
+    [Fact]
+    public void ReclassificarVaiEVoltaEntrePendenteEExcluidoSemTocarEmQuemSaiu()
+    {
+        var campanha = Nova();
+        var destinatario = CampanhaDestinatario.Criar(campanha, Guid.NewGuid());
+
+        destinatario.Reclassificar(MotivoExclusaoCampanha.LimiteSemanal);
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Excluido);
+        destinatario.MotivoExclusao.Should().Be(MotivoExclusaoCampanha.LimiteSemanal);
+
+        destinatario.Reclassificar(null);
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pendente);
+        destinatario.MotivoExclusao.Should().BeNull();
+        destinatario.Recalculavel.Should().BeTrue();
+
+        destinatario.Enfileirar(1, Guid.NewGuid());
+        destinatario.Recalculavel.Should().BeFalse();
+        var reclassificarEnfileirado = () => destinatario.Reclassificar(MotivoExclusaoCampanha.Bloqueado);
+        reclassificarEnfileirado.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void PublicoSoRecalculaEnquantoACampanhaNaoAcabou()
+    {
+        var campanha = Nova();
+        campanha.GarantirPublicoRecalculavel();
+
+        campanha.Cancelar([]);
+        var recalcularCancelada = () => campanha.GarantirPublicoRecalculavel();
+        recalcularCancelada.Should().Throw<RegraDeDominioVioladaException>();
+    }
 }

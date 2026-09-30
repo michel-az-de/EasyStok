@@ -59,6 +59,25 @@ public class CampanhaDestinatario
         MotivoExclusao = motivo;
     }
 
+    /// <summary>Ainda não saiu: o cálculo do público (S29) pode refazê-lo ou tirá-lo da campanha.</summary>
+    public bool Recalculavel => Status is StatusCampanhaDestinatario.Pendente or StatusCampanhaDestinatario.Excluido;
+
+    /// <summary>
+    /// Recálculo do público (S29): volta a <see cref="StatusCampanhaDestinatario.Pendente"/> sem motivo
+    /// ou passa a <see cref="StatusCampanhaDestinatario.Excluido"/> com o motivo novo. Quem já foi
+    /// enfileirado ou enviado não muda.
+    /// </summary>
+    public void Reclassificar(string? motivo)
+    {
+        if (!Recalculavel)
+            throw new RegraDeDominioVioladaException($"Destinatário {Status} já saiu e não é recalculado.");
+        if (motivo is not null && !MotivoExclusaoCampanha.EhValido(motivo))
+            throw new RegraDeDominioVioladaException($"Motivo de exclusão inválido: {motivo}.");
+        Status = StatusCampanhaDestinatario.Pendente;
+        MotivoExclusao = null;
+        if (motivo is not null) Excluir(motivo);
+    }
+
     public void Enfileirar(int onda, Guid outboxMensagemId)
     {
         if (onda <= 0) throw new RegraDeDominioVioladaException("Onda precisa ser maior que zero.");

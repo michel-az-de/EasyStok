@@ -28,4 +28,16 @@ public sealed class CampanhaRepository(EasyStockDbContext db) : ICampanhaReposit
             .Where(d => d.EmpresaId == empresaId && d.CampanhaId == campanhaId
                 && d.Status == StatusCampanhaDestinatario.Pendente)
             .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<CampanhaDestinatario>> ListarDestinatariosAsync(
+        Guid empresaId, Guid campanhaId, CancellationToken ct = default) =>
+        await db.CampanhaDestinatarios
+            .Where(d => d.EmpresaId == empresaId && d.CampanhaId == campanhaId)
+            .ToListAsync(ct);
+
+    public Task AddDestinatariosAsync(IEnumerable<CampanhaDestinatario> destinatarios, CancellationToken ct = default) =>
+        db.CampanhaDestinatarios.AddRangeAsync(destinatarios, ct);
+
+    public void RemoverDestinatarios(IEnumerable<CampanhaDestinatario> destinatarios) =>
+        db.CampanhaDestinatarios.RemoveRange(destinatarios);
 }
