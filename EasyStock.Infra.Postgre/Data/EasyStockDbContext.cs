@@ -280,6 +280,9 @@ namespace EasyStock.Infra.Postgre.Data
 
         // S11: cobrança do pedido (Mercado Pago ou na entrega)
         public DbSet<CobrancaPedido> CobrancasPedido { get; set; } = null!;
+
+        // S20: fila de impressão do canhoto
+        public DbSet<EasyStock.Domain.Entities.Operacao.ImpressaoPendente> ImpressoesPendentes { get; set; } = null!;
         public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;
         public DbSet<GatewayRoutingRule> GatewayRoutingRules { get; set; } = null!;
         public DbSet<GatewayHealthSnapshot> GatewayHealthSnapshots { get; set; } = null!;

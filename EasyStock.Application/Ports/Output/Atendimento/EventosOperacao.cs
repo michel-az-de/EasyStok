@@ -8,6 +8,8 @@ public static class EventosOperacao
 {
     public const string PedidoPago = "pedido.pago";
     public const string PedidoMudouStatus = "pedido.mudou_status";
+    public const string ImpressaoPendente = "impressao.pendente";
+    public const string ImpressaoAtrasada = "impressao.atrasada";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -17,3 +19,9 @@ public sealed record PedidoPagoOperacao(Guid PedidoId, string Numero, string? Cl
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoMudouStatus"/>: a cozinha move o card sem recarregar.</summary>
 public sealed record PedidoMudouStatusOperacao(Guid PedidoId, string StatusAntigo, string StatusNovo);
+
+/// <summary>Payload de <see cref="EventosOperacao.ImpressaoPendente"/> (S20): a aba do console que imprime busca a fila.</summary>
+public sealed record ImpressaoPendenteOperacao(Guid ImpressaoId, Guid PedidoId);
+
+/// <summary>Payload de <see cref="EventosOperacao.ImpressaoAtrasada"/> (S20): canhoto parado na fila, o console avisa a dona.</summary>
+public sealed record ImpressaoAtrasadaOperacao(Guid ImpressaoId, Guid PedidoId, DateTime CriadaEm);

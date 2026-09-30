@@ -1,6 +1,8 @@
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Entities.Operacao;
+using EasyStock.Domain.Enums.Operacao;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 
@@ -153,5 +155,70 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 20m));
 
         f.OperacaoEventos.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EnfileiraImpressaoNaMesmaTransacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var ordem = new List<string>();
+        ImpressaoPendente? enfileirada = null;
+        f.Uow.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async ci =>
+            {
+                ordem.Add("abre transacao");
+                var r = await ci.Arg<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>>>()(ci.Arg<CancellationToken>());
+                ordem.Add("fecha transacao");
+                return r;
+            });
+        f.ImpressaoRepo.When(r => r.AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>()))
+            .Do(ci => { enfileirada = ci.Arg<ImpressaoPendente>(); ordem.Add("enfileira"); });
+        f.Uow.When(u => u.CommitAsync()).Do(_ => ordem.Add("commit"));
+        f.OperacaoEventos.When(p => p.PublicarAsync(EventosOperacao.ImpressaoPendente, Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("sse impressao"));
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        enfileirada.Should().NotBeNull("pedido pago entra na fila de impressão");
+        enfileirada!.PedidoId.Should().Be(f.Pedido.Id);
+        enfileirada.EmpresaId.Should().Be(f.EmpresaId);
+        enfileirada.Tipo.Should().Be(TipoImpressao.Canhoto);
+        enfileirada.Status.Should().Be(StatusImpressao.Pendente);
+        // O flush do RegistrarPagamentoPedido e o commit final ficam dentro da mesma transação.
+        ordem.Distinct().Should().Equal(
+            new[] { "abre transacao", "enfileira", "commit", "fecha transacao", "sse impressao" },
+            "a impressão é gravada dentro da transação do pagamento e só vira evento de UI depois dela");
+        await f.OperacaoEventos.Received(1).PublicarAsync(
+            EventosOperacao.ImpressaoPendente, f.EmpresaId,
+            Arg.Is<ImpressaoPendenteOperacao>(e => e.ImpressaoId == enfileirada.Id && e.PedidoId == f.Pedido.Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SemConfirmacaoNaoEnfileiraImpressao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 20m));
+
+        await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RepetidoNaoEnfileiraDeNovo()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var uc = f.Confirmar();
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+        f.ImpressaoRepo.ClearReceivedCalls();
+
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
     }
 }
