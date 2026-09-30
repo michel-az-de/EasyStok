@@ -52,6 +52,27 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.ConcluirLembreteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.MarcarLembretesVistosUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.AvaliarLembretesUseCase>();
+
+        // S44: entregadores, viagens, chamado e relatório de entregas por bairro.
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.CriarEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.AtualizarEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.AlterarAtivoEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ListarEntregadoresUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ObterEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ObterViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ListarViagensUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.CriarViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.DefinirEntregadorViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.IncluirParadaViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.RetirarParadaViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ReordenarParadaViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.DesfazerViagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.SairParaEntregaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.MarcarParadaEntregueUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.AbrirChamadoEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ResolverChamadoEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.ListarChamadosEntregadorUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.EntregasPorBairroUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.ListarConsentimentosClienteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.DefinirConsentimentosClienteUseCase>();
         services.AddScoped<IdentificarClientePorTelefoneUseCase>();
