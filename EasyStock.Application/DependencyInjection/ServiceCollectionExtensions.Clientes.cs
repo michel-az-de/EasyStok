@@ -16,6 +16,7 @@ using EasyStock.Application.UseCases.AdicionarClienteDocumento;
 using EasyStock.Application.UseCases.RemoverClienteDocumento;
 using EasyStock.Application.UseCases.ObterClienteDetalhes;
 using EasyStock.Application.UseCases.ClienteCrm;
+using EasyStock.Application.UseCases.Campanhas;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -59,6 +60,13 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AdicionarNotaClienteUseCase>();
         services.AddScoped<DefinirBloqueioClienteUseCase>();
         services.AddScoped<DefinirPreferenciasClienteUseCase>();
+
+        // Campanhas (S28): cadastro, agendamento e cancelamento
+        services.AddScoped<CriarCampanhaUseCase>();
+        services.AddScoped<AtualizarCampanhaUseCase>();
+        services.AddScoped<ObterCampanhaUseCase>();
+        services.AddScoped<ListarCampanhasUseCase>();
+        services.AddScoped<CancelarCampanhaUseCase>();
 
         return services;
     }
