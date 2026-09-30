@@ -383,6 +383,12 @@ public class AtendimentoConversasControllerTests
                 .Where(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && (antesDe is null || m.EnviadaEm < antesDe))
                 .OrderBy(m => m.EnviadaEm).TakeLast(limite).ToList());
 
+        public Task<IReadOnlyList<Mensagem>> ListarMensagensDepoisAsync(
+            Guid empresaId, Guid conversaId, DateTime? depoisDe, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens
+                .Where(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && (depoisDe is null || m.EnviadaEm > depoisDe))
+                .OrderBy(m => m.EnviadaEm).Take(limite).ToList());
+
         public Task<IReadOnlyList<Conversa>> ListarPorClienteAsync(Guid empresaId, Guid clienteId, int max = 5, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Conversa>>(Conversas.Where(c => c.EmpresaId == empresaId && c.ClienteId == clienteId).ToList());
 

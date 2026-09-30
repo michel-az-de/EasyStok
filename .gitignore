@@ -412,3 +412,6 @@ EasyStock.Api/easystock.db*
 # Previews locais do design system Deck do Admin (server.js + *.html de showcase).
 # Ferramenta de verificacao no browser (issue 730); nao faz parte do deploy nem do build.
 EasyStock.Admin/wwwroot/dev/
+
+# Cache NuGet local acidental (nunca deve existir no repo)
+.nuget/

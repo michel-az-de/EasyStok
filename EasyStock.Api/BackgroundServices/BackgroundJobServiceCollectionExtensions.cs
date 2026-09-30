@@ -76,6 +76,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableAtendimentoTurnoAgente)
             services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
 
+        // Chat do site (S36): apaga as sessões vencidas.
+        if (options.EnableLimpezaSessoesChatSite)
+            services.AddHostedService<LimpezaSessoesChatSiteBackgroundService>();
+
         return services;
     }
 }
