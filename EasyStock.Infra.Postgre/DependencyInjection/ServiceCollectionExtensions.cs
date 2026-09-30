@@ -163,6 +163,10 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // "sem handler"; a Onda 5 (#867) pluga Hiram/marketplace ao lado deste.
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.PedidoMudouStatusLogHandler>("pedido.mudou_status");
+            // estoque.desacerto (S17): observabilidade até S18/S22 plugarem consumidores reais.
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Estoque.Handlers.EstoqueDesacertadoLogHandler>(
+                EasyStock.Application.Events.Estoque.EstoqueDesacertadoEvent.TipoEventoOutbox);
 
             services.AddScoped<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass,
                 Security.RowLevelSecurityBypass>();

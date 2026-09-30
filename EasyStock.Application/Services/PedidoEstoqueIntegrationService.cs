@@ -1,3 +1,5 @@
+using EasyStock.Application.Events.Estoque;
+using EasyStock.Application.Ports.Output.Integration;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
 namespace EasyStock.Application.Services;
@@ -9,10 +11,11 @@ namespace EasyStock.Application.Services;
 public sealed class PedidoEstoqueOptions
 {
     /// <summary>
-    /// Quando true, descontar pode resultar em saldo zero (clamp). Default false:
-    /// throw EstoqueInsuficienteException; status update é abortado.
+    /// Default true (S17 / RN-48): falta de saldo não trava o pedido — o saldo vai a zero,
+    /// a falta vira <c>QuantidadeDescoberta</c> no lote e sai <c>estoque.desacerto</c>.
+    /// false (rollback): throw EstoqueInsuficienteException; status update é abortado.
     /// </summary>
-    public bool PermiteEstoqueNegativo { get; set; }
+    public bool PermiteEstoqueNegativo { get; set; } = true;
 
     /// <summary>
     /// Quando true, exige ItemEstoque para todo item com ProdutoId. Default false:
@@ -44,6 +47,7 @@ public sealed class PedidoEstoqueOptions
 public sealed class PedidoEstoqueIntegrationService(
     IItemEstoqueRepository itemEstoqueRepo,
     IMovimentacaoEstoqueRepository movRepo,
+    IPublicadorEventoIntegracao publicadorEventos,
     Microsoft.Extensions.Options.IOptions<PedidoEstoqueOptions> options,
     ILogger<PedidoEstoqueIntegrationService> logger)
 {
@@ -102,25 +106,32 @@ public sealed class PedidoEstoqueIntegrationService(
 
             var atual = alvo.QuantidadeAtual?.Value ?? 0m;
 
-            // Estoque insuficiente: throw por padrão (status não muda),
-            // ou clamp se PermiteEstoqueNegativo=true.
+            var agora = DateTime.UtcNow;
+            var falta = 0m;
+
+            // Estoque insuficiente (S17 / RN-48): por padrão avisa e não trava — saldo vai
+            // a 0 e a falta vira QuantidadeDescoberta (#540). Rollback: PermiteEstoqueNegativo=false lança.
             if (atual < qtd)
             {
                 if (!PermiteEstoqueNegativo)
                     throw new EstoqueInsuficienteException(
                         item.ProdutoId.Value, qtd, atual);
 
+                falta = qtd - atual;
                 logger.LogWarning(
-                    "Pedido {Id}: produto {ProdId} estoque insuficiente (atual={Atual}, pedido={Qty}) — descontando só {AtualDescontado} (PermiteEstoqueNegativo=true).",
-                    pedido.Id, item.ProdutoId, atual, qtd, atual);
-                qtd = atual; // só desconta o que tem
+                    "Pedido {Id}: produto {ProdId} estoque insuficiente (atual={Atual}, pedido={Qty}) — {Falta} un a descoberto.",
+                    pedido.Id, item.ProdutoId, atual, qtd, falta);
+                // Cozinha já produziu: vencido não barra aqui (só Bloqueado/Descartado).
+                alvo.RegistrarSaidaPermitindoDescoberto(
+                    EasyStock.Domain.ValueObjects.Quantidade.From(qtd), agora, agora, permitirVencido: true);
             }
-
-            alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual - qtd);
+            else
+            {
+                alvo.QuantidadeAtual = EasyStock.Domain.ValueObjects.Quantidade.From(atual - qtd);
+            }
 
             // Atualiza velocidade de saída (média 30 dias) para manter rotatividade
             // correta no estoque — o caminho RegistrarSaidaEstoqueUseCase faz o mesmo.
-            var agora = DateTime.UtcNow;
             const int janelaDias = 30;
             var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
                 pedido.EmpresaId, item.ProdutoId.Value,
@@ -143,9 +154,23 @@ public sealed class PedidoEstoqueIntegrationService(
                 ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * qtd),
                 DocumentoReferencia = refDocItem,
                 DataMovimentacao = agora,
-                Descricao = $"Pedido {pedido.Id} item {item.Id}",
+                Descricao = falta > 0m
+                    ? $"pedido {pedido.Id}: {falta} un a descoberto"
+                    : $"Pedido {pedido.Id} item {item.Id}",
                 CriadoEm = agora
             });
+
+            // Mesma transação do caller (outbox antes do CommitAsync, ADR-0030).
+            if (falta > 0m)
+                await publicadorEventos.PublicarAsync(
+                    pedido.EmpresaId,
+                    EstoqueDesacertadoEvent.TipoEventoOutbox,
+                    "Pedido",
+                    pedido.Id,
+                    new EstoqueDesacertadoEvent(
+                        pedido.EmpresaId, pedido.LojaId, item.ProdutoId.Value, alvo.Id,
+                        pedido.Id, falta, agora),
+                    ct: ct);
         }
     }
 
