@@ -19,6 +19,24 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#1117) — gate de worktrees paralelos compartilhava a pasta de build
+
+Visto em `MigrationDesignerHygieneTests` (qualquer arch-test pode ser a vitima).
+
+- **Por que era flaky:** `gate.ps1` e `build-check.ps1` (ADR-0040/ADR-0029) compilavam com
+  `-o %TEMP%\easystok-build-check`, pasta unica para todos os worktrees da maquina. Em 2026-09-29, com
+  sessoes paralelas, o pre-commit de `chat-site-1097` falhou com `ReflectionTypeLoadException`
+  (`ISessaoChatSiteRepository`/`SessaoChatSite` nao encontrados) e o stack trace apontava para
+  `gate-zero-arch-tests`: o build do outro worktree sobrescreveu a saida entre o build e o robocopy.
+  Reexecutar passava. Corrida, nao regressao.
+- **Fix (#1117):** `scripts/poka-yoke/build-out-dir.ps1` deriva a pasta de um hash do caminho do repo:
+  `%TEMP%\easystok-build-check-<hash8>`. Estavel no mesmo worktree (incremental preservado), distinta
+  entre worktrees. As pastas antigas/orfas em `%TEMP%` podem ser apagadas a mao sem risco.
+- **Se voltar a falhar:** confira se o stack trace aponta para outro caminho de repo; se sim, alguem
+  reintroduziu pasta de saida fixa.
+
+---
+
 ## ✅ CORRIGIDO (#910) — timeout 500ms do ScribanRenderer no CI
 
 Afetava dois testes, mesma causa: `ScribanRendererTests.Templates_diferentes_geram_resultados_independentes`

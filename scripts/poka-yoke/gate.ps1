@@ -24,7 +24,8 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $slnf     = Join-Path $repoRoot 'EasyStok.CI.slnf'
-$buildOut = Join-Path $env:TEMP 'easystok-build-check'
+. (Join-Path $PSScriptRoot 'build-out-dir.ps1')
+$buildOut = Get-BuildOutDir $repoRoot   # unica por worktree (issue 1117)
 $gateDir  = Join-Path $repoRoot '.build\arch-gate'
 
 if (-not (Test-Path $slnf)) {
