@@ -1,8 +1,10 @@
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Services.Operacao;
 using EasyStock.Api.Services.Storefront;
 using EasyStock.Application.Validators;
 using FluentValidation;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Api.DependencyInjection;
 
@@ -38,7 +40,10 @@ public static class ApiServicesExtensions
         // Onda 5: SSE realtime entre devices da mesma loja.
         // Broker é Singleton — listeners persistem cross-request via dictionary in-memory.
         // Em multi-instance, evoluir pra Redis pubsub.
-        services.AddSingleton<MobileEventBroker>();
+        services.AddSingleton<OperacaoEventBroker>();
+        // S18: a mesma instância alimenta o SSE do console (api/operacao/eventos); troca o no-op da Application.
+        services.Replace(ServiceDescriptor.Singleton<
+            EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher, OperacaoEventPublisher>());
         // SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
         services.AddScoped<SyncMutationDispatcher>();
         services.AddScoped<SyncAutoLinker>();

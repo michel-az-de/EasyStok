@@ -32,6 +32,7 @@ public class CheckoutCoreServiceTests
         public IPedidoStorefrontRepository PedidoRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
         public IExpedienteLojaRepository ExpedienteRepo { get; } = Substitute.For<IExpedienteLojaRepository>();
         public StorefrontEntity Storefront { get; }
+        public CardapioItem CardapioItem { get; }
         public Guid JanelaId => CheckoutCoreServiceTests.JanelaId;
         public Guid CardapioItemId => CheckoutCoreServiceTests.CardapioItemId;
         public DateOnly DataEntrega => CheckoutCoreServiceTests.DataEntrega;
@@ -54,6 +55,7 @@ public class CheckoutCoreServiceTests
             var cardapioItem = CardapioItem.CriarAPartirDeProduto(Storefront.Id, produto);
             cardapioItem.TornarVisivel();
             cardapioItem.Produto = produto;
+            CardapioItem = cardapioItem;
             typeof(CardapioItem).GetProperty("Id")!.SetValue(cardapioItem, CheckoutCoreServiceTests.CardapioItemId);
             CardapioRepo.GetByIdAsync(Storefront.Id, CheckoutCoreServiceTests.CardapioItemId, Arg.Any<CancellationToken>())
                 .Returns(cardapioItem);
@@ -155,5 +157,20 @@ public class CheckoutCoreServiceTests
 
         reservado.Itens[0].LinhaSnapshot.Should().Be("paraServir");
         reservado.ItemFrete.LinhaSnapshot.Should().BeNull("frete não é produto");
+    }
+
+    [Fact]
+    public async Task ItemEsgotadoRecusaOCheckout()
+    {
+        var c = new Cenario();
+        c.CardapioItem.MarcarEsgotado();
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>()
+            .WithMessage($"*{CardapioItemId}*indisponível*");
+        c.PedidosAdicionados.Should().BeEmpty("item esgotado não pode virar pedido");
+        await c.VagaRepo.DidNotReceive().OcuparAsync(
+            Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

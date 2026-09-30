@@ -1,15 +1,18 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace EasyStock.Api.Mobile.Services;
+namespace EasyStock.Api.Services.Operacao;
 
 /// <summary>
-/// Onda 5 — broker de eventos in-memory pra Server-Sent Events.
+/// Broker de eventos in-memory para Server-Sent Events. Atende dois canais sobre a mesma instância:
 ///
-/// PWA conecta em <c>GET /api/mobile/operation/stream?apiKey=...</c> que
-/// mantém connection HTTP aberta com <c>Content-Type: text/event-stream</c>.
-/// Quando uma mutation chega no servidor (Push do SyncController), service
-/// publica evento <c>mutations-applied</c> pros listeners da mesma loja.
+/// <list type="bullet">
+///   <item><b>Mobile</b> (Onda 5): o PWA conecta em <c>GET /api/mobile/operation/stream</c> e recebe
+///     <c>mutations-applied</c>, <c>command-queued</c> e <c>order.ready</c> da própria loja, como frame só com
+///     <c>data:</c> (o PWA escuta <c>onmessage</c>). Sai em P05.</item>
+///   <item><b>Operação</b> (S18): o console conecta em <c>GET api/operacao/eventos</c> com JWT e recebe
+///     eventos nomeados (<c>event: pedido.pago</c>) da empresa da claim.</item>
+/// </list>
 ///
 /// Decisões:
 ///   - In-memory: serve 1 instância de API. Em multi-instance, evoluir
@@ -20,21 +23,26 @@ namespace EasyStock.Api.Mobile.Services;
 ///   - Fila bounded por listener (max 50 events) — descarta antigos se
 ///     listener pendurar. Sem leak.
 ///
-/// FAIL-SAFE: NÃO é fonte da verdade. Se broker cair, polling 30s do PWA
+/// FAIL-SAFE: NÃO é fonte da verdade. Se broker cair, polling do cliente
 /// continua resolvendo. Eventos perdidos são recuperados pelo próximo pull.
 /// </summary>
-public class MobileEventBroker(ILogger<MobileEventBroker> log)
+public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
 {
-    private readonly ILogger<MobileEventBroker> _log = log;
+    private static readonly JsonSerializerOptions JsonWeb = new(JsonSerializerDefaults.Web);
+
+    private readonly ILogger<OperacaoEventBroker> _log = log;
 
     private readonly ConcurrentDictionary<string, ListenerSlot> _listeners = new();
+
+    /// <summary>Quantidade de ouvintes conectados (os dois canais).</summary>
+    public int Ouvintes => _listeners.Count;
 
     /// <summary>Tudo que o broker propaga.</summary>
     public class Subscription : IDisposable
     {
-        private readonly MobileEventBroker _broker;
+        private readonly OperacaoEventBroker _broker;
         private readonly string _key;
-        public Subscription(MobileEventBroker broker, string key, ListenerSlot slot)
+        public Subscription(OperacaoEventBroker broker, string key, ListenerSlot slot)
         {
             _broker = broker;
             _key = key;
@@ -47,12 +55,27 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
         }
     }
 
+    public enum CanalSse
+    {
+        Mobile = 1,
+        Operacao = 2,
+    }
+
+    /// <summary>Um frame SSE. Sem <see cref="Evento"/>, sai só com <c>data:</c> (formato do canal mobile).</summary>
+    public sealed record MensagemSse(string? Evento, string Dados)
+    {
+        public string ParaFrame() => Evento is null
+            ? $"data: {Dados}\n\n"
+            : $"event: {Evento}\ndata: {Dados}\n\n";
+    }
+
     public class ListenerSlot
     {
+        public CanalSse Canal { get; init; } = CanalSse.Mobile;
         public Guid? EmpresaId { get; init; }
         public Guid? LojaId { get; init; }
         public string? DeviceId { get; init; }
-        public ConcurrentQueue<string> Queue { get; } = new();
+        public ConcurrentQueue<MensagemSse> Queue { get; } = new();
         public SemaphoreSlim Signal { get; } = new(0);
         public bool Cancelled { get; private set; }
         public void Cancel()
@@ -63,17 +86,34 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
     }
 
     /// <summary>
-    /// Registra um listener pra empresa/loja. Chave é uma string única
+    /// Registra um listener mobile pra empresa/loja. Chave é uma string única
     /// (connectionId). Retorna <see cref="Subscription"/> que ao Dispose
     /// remove o listener.
     /// </summary>
     public Subscription Subscribe(string key, Guid? empresaId, Guid? lojaId, string? deviceId)
     {
-        var slot = new ListenerSlot { EmpresaId = empresaId, LojaId = lojaId, DeviceId = deviceId };
+        var slot = new ListenerSlot { Canal = CanalSse.Mobile, EmpresaId = empresaId, LojaId = lojaId, DeviceId = deviceId };
         _listeners[key] = slot;
         _log.LogDebug("SSE listener inscrito: key={Key} loja={LojaId} device={DeviceId} total={Total}",
             key, lojaId, deviceId, _listeners.Count);
         return new Subscription(this, key, slot);
+    }
+
+    /// <summary>Registra um ouvinte do console (S18) que recebe os eventos de operação da empresa.</summary>
+    public Subscription SubscribeOperacao(string key, Guid empresaId)
+    {
+        var slot = new ListenerSlot { Canal = CanalSse.Operacao, EmpresaId = empresaId };
+        _listeners[key] = slot;
+        _log.LogDebug("SSE operacao inscrito: key={Key} empresa={EmpresaId} total={Total}",
+            key, empresaId, _listeners.Count);
+        return new Subscription(this, key, slot);
+    }
+
+    /// <summary>Publica um evento nomeado para os ouvintes do console da empresa (S18).</summary>
+    public void PublicarOperacao(Guid empresaId, string evento, object payload)
+    {
+        var mensagem = new MensagemSse(evento, JsonSerializer.Serialize(payload, JsonWeb));
+        Broadcast(slot => slot.Canal == CanalSse.Operacao && slot.EmpresaId == empresaId, mensagem);
     }
 
     /// <summary>
@@ -97,8 +137,9 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
         });
 
         Broadcast(slot =>
+            slot.Canal == CanalSse.Mobile &&
             slot.LojaId == lojaId &&
-            slot.DeviceId != originDeviceId, data);
+            slot.DeviceId != originDeviceId, new MensagemSse(null, data));
         return Task.CompletedTask;
     }
 
@@ -112,7 +153,7 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
             commandType,
             serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
-        Broadcast(slot => slot.DeviceId == deviceId, data);
+        Broadcast(slot => slot.Canal == CanalSse.Mobile && slot.DeviceId == deviceId, new MensagemSse(null, data));
         return Task.CompletedTask;
     }
 
@@ -143,12 +184,13 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
             serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
         Broadcast(slot =>
+            slot.Canal == CanalSse.Mobile &&
             slot.LojaId == lojaId &&
-            slot.DeviceId != originDeviceId, data);
+            slot.DeviceId != originDeviceId, new MensagemSse(null, data));
         return Task.CompletedTask;
     }
 
-    private void Broadcast(Func<ListenerSlot, bool> predicate, string data)
+    private void Broadcast(Func<ListenerSlot, bool> predicate, MensagemSse mensagem)
     {
         var sent = 0;
         foreach (var (key, slot) in _listeners)
@@ -157,7 +199,7 @@ public class MobileEventBroker(ILogger<MobileEventBroker> log)
             if (!predicate(slot)) continue;
             // Cap fila pra evitar memory leak se cliente travar
             if (slot.Queue.Count > 50) slot.Queue.TryDequeue(out _);
-            slot.Queue.Enqueue(data);
+            slot.Queue.Enqueue(mensagem);
             try { slot.Signal.Release(); } catch { }
             sent++;
         }

@@ -199,6 +199,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
                 Repositories.Atendimento.SessaoChatSiteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILinkCardapioConversaRepository,
+                Repositories.Atendimento.LinkCardapioConversaRepository>();
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
             services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
                 Services.Atendimento.RemetenteWhatsAppDoTenant>();

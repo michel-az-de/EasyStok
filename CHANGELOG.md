@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **SSE de operação do console** (S18): `GET api/operacao/eventos` com JWT no header `Authorization`
+  (sem token, 401; token sem empresa, 403), eventos nomeados só da empresa da claim e heartbeat a cada
+  25 s. `ConfirmarPagamentoPedidoUseCase` publica `pedido.pago {pedidoId, numero, cliente, total, janela}`
+  e `AtualizarStatusPedidoUseCase` publica `pedido.mudou_status`, sempre depois do commit. O broker
+  in-memory do mobile virou `Api/Services/Operacao/OperacaoEventBroker` e atende os dois canais; o SSE
+  mobile não muda. `IOperacaoEventPublisher` deixa de ser no-op na Api (Worker segue no-op). (#1146)
 - **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
   `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
   `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na
