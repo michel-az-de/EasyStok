@@ -1,0 +1,14 @@
+.escolha { display: flex; flex-direction: column; gap: var(--e-2); margin-top: var(--e-2); }
+.pergunta { margin: 0; font-size: var(--t-corpo); font-weight: 600; }
+.opcoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+/* Rodada 12 (issue #17): nome, veículo, placa e empresa. Grade que desce para
+   uma coluna quando o cartão é estreito (coluna da cozinha, celular). */
+.formulario { display: flex; flex-direction: column; gap: var(--e-2); }
+.campos {
+  display: grid; gap: var(--e-2);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+.campos :global(input), .campos :global(select) { width: 100%; }
+.rodape { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.motivo { margin: 0; color: var(--perigo); font-weight: 600; }
+.aviso { margin: 0; color: var(--tinta-2); font-size: var(--t-15); }

@@ -14,12 +14,6 @@ generated_files:
     mechanism: "msbuild target CopyEtiquetaAssets (EasyStock.Web/EasyStock.Web.csproj, BeforeTargets=Build)"
     severity: block
     evidence: "#527: commit saiu com 4 de 6 arquivos (a copia foi revertida pelo build)"
-  - id: etiqueta-mobile-mirror
-    path: EasyStok.Mobile/Resources/Raw/pwa/**
-    source: EasyStock.Api/wwwroot/pwa/**
-    mechanism: "manual-mirror (sem target MSBuild); gate CI dual-frontend-drift.yml"
-    severity: block
-    status_ci: GREEN  # Fatia 4 sincronizou os 3 arquivos divergentes (2026-06-08)
   - id: tailwind-web
     path: EasyStock.Web/wwwroot/css/tailwind.dist.css
     source: "tailwind.config.js + Views/**/*.cshtml + wwwroot/js/**/*.js"

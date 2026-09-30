@@ -1,0 +1,145 @@
+/* Frente 7 · Menu de simulações (rodada 5, seção 7). Gaveta pela esquerda,
+   NÃO modal: sem cortina, o Balcão continua clicável ao lado (seção 7,
+   "Painel"). */
+
+.gaveta {
+  position: fixed;
+  /* Com a faixa de queda no topo (lote de papel), a gaveta desce a altura
+     dela, como o resto da tela; senão o "Fechar" ficava por baixo (registro 101). */
+  inset: var(--faixa-offline, 0px) auto 0 0;
+  width: min(420px, 100vw - 32px);
+  background: var(--papel);
+  border-right: var(--b-1) solid var(--linha);
+  box-shadow: var(--sombra-alta);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+}
+/* Rodada 10 (registro 79, notificações achado 8): a decisão 19 pede "sobre o
+   Balcão", com o balcão (e o trilho ao lado dele) clicável. No desktop
+   (>= 1024px, mesmo corte de `app/moldura.module.css`) o trilho de navegação
+   tem 84px fixos; sem este deslocamento a gaveta nascia em `left: 0` e
+   cobria o trilho inteiro, travando "Automáticas" e o sino atrás dela. */
+@media (min-width: 1024px) {
+  .gaveta {
+    left: 84px;
+    width: min(420px, calc(100vw - 84px - 32px));
+  }
+}
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-2);
+  padding: var(--e-3) var(--e-4);
+  border-bottom: var(--b-1) solid var(--linha);
+  font-size: var(--t-titulo);
+  font-weight: 600;
+}
+
+.rolavel {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--e-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-5);
+}
+
+.relogio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  padding: var(--e-3);
+  background: var(--elevado);
+  border-radius: var(--r-2);
+}
+
+.horaAtual {
+  font-family: var(--f-dado);
+  font-size: var(--t-21);
+}
+
+.botoesRelogio {
+  display: flex;
+  gap: var(--e-2);
+}
+
+.emCurso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  padding: var(--e-3);
+  background: var(--info-fundo);
+  border-radius: var(--r-2);
+  font-size: var(--t-apoio);
+}
+
+.grupo h3 {
+  margin: 0 0 var(--e-2);
+  font-size: var(--t-apoio);
+  color: var(--tinta-2);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.listaCenarios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+}
+
+.cenario {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--e-1);
+  width: 100%;
+  padding: var(--e-3);
+  border: var(--b-1) solid transparent;
+  border-radius: var(--r-2);
+  background: var(--papel);
+  box-shadow: var(--sombra);
+  text-align: left;
+  cursor: pointer;
+  min-height: var(--toque);
+}
+
+.cenario:hover {
+  box-shadow: var(--sombra-media);
+}
+
+.cenario strong {
+  font-size: var(--t-forte);
+  font-weight: 600;
+}
+
+.cenario span {
+  color: var(--tinta-2);
+  font-size: var(--t-apoio);
+}
+
+.esconder {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-size: var(--t-apoio);
+  color: var(--tinta-2);
+}
+
+.rodape {
+  display: flex;
+  gap: var(--e-2);
+  padding: var(--e-3) var(--e-4);
+  border-top: var(--b-1) solid var(--linha);
+}
+
+.confirmar {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-size: var(--t-apoio);
+}
