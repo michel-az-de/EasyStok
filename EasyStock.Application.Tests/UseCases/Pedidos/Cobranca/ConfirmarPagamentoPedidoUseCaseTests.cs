@@ -1,6 +1,10 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Entities.Operacao;
+using EasyStock.Domain.Enums.Operacao;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 
@@ -43,6 +47,40 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         await f.Publicador.Received(1).PublicarAsync(
             f.EmpresaId, "pedido.mudou_status", "pedido", f.Pedido.Id, Arg.Any<PedidoMudouStatusEvent>(),
             Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CalculaInicioPrevisto()
+    {
+        // S21: janela de 12:00 (Brasília) e prazo de 100 min (maior preparo 60 + respiro 40) → começa 10:20.
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var dia = new DateOnly(2026, 9, 30);
+        f.PrazoQueries.ObterAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(dia, new TimeOnly(12, 0), [45, null],
+                TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        f.Pedido.InicioPrevistoEm.Should().Be(new DateTime(2026, 9, 30, 13, 20, 0, DateTimeKind.Utc));
+        HorarioBrasil.ConverterParaBrasilia(f.Pedido.InicioPrevistoEm!.Value)
+            .Should().Be(new DateTime(2026, 9, 30, 10, 20, 0), "10:20 no fuso da loja");
+        f.Pedido.AtrasoNotificadoEm.Should().BeNull();
+        await f.PedidoStorefrontRepo.Received().UpdateAsync(f.Pedido, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SemJanelaNemAgendamento_SemInicioPrevisto()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        f.PrazoQueries.ObterAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], 60, 40));
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Pedido.InicioPrevistoEm.Should().BeNull("pedido para já não tem janela para atrasar");
     }
 
     [Fact]
@@ -153,5 +191,70 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 20m));
 
         f.OperacaoEventos.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task EnfileiraImpressaoNaMesmaTransacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var ordem = new List<string>();
+        ImpressaoPendente? enfileirada = null;
+        f.Uow.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async ci =>
+            {
+                ordem.Add("abre transacao");
+                var r = await ci.Arg<Func<CancellationToken, Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>>>()(ci.Arg<CancellationToken>());
+                ordem.Add("fecha transacao");
+                return r;
+            });
+        f.ImpressaoRepo.When(r => r.AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>()))
+            .Do(ci => { enfileirada = ci.Arg<ImpressaoPendente>(); ordem.Add("enfileira"); });
+        f.Uow.When(u => u.CommitAsync()).Do(_ => ordem.Add("commit"));
+        f.OperacaoEventos.When(p => p.PublicarAsync(EventosOperacao.ImpressaoPendente, Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("sse impressao"));
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        enfileirada.Should().NotBeNull("pedido pago entra na fila de impressão");
+        enfileirada!.PedidoId.Should().Be(f.Pedido.Id);
+        enfileirada.EmpresaId.Should().Be(f.EmpresaId);
+        enfileirada.Tipo.Should().Be(TipoImpressao.Canhoto);
+        enfileirada.Status.Should().Be(StatusImpressao.Pendente);
+        // O flush do RegistrarPagamentoPedido e o commit final ficam dentro da mesma transação.
+        ordem.Distinct().Should().Equal(
+            new[] { "abre transacao", "enfileira", "commit", "fecha transacao", "sse impressao" },
+            "a impressão é gravada dentro da transação do pagamento e só vira evento de UI depois dela");
+        await f.OperacaoEventos.Received(1).PublicarAsync(
+            EventosOperacao.ImpressaoPendente, f.EmpresaId,
+            Arg.Is<ImpressaoPendenteOperacao>(e => e.ImpressaoId == enfileirada.Id && e.PedidoId == f.Pedido.Id),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SemConfirmacaoNaoEnfileiraImpressao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 20m));
+
+        await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RepetidoNaoEnfileiraDeNovo()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var uc = f.Confirmar();
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+        f.ImpressaoRepo.ClearReceivedCalls();
+
+        await uc.ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        await f.ImpressaoRepo.DidNotReceive().AddAsync(Arg.Any<ImpressaoPendente>(), Arg.Any<CancellationToken>());
     }
 }

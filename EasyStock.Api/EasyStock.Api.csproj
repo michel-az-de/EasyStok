@@ -76,6 +76,11 @@
     <EmbeddedResource Include="Data\Templates\Email\*.html">
       <LogicalName>EmailTemplates.%(Filename).html</LogicalName>
     </EmbeddedResource>
+    <!-- S20: CSS do canhoto de 80 mm (copiado de EasyStock.Web/wwwroot/css/recibo.css), lido por
+         Services\Impressao\CanhotoHtml.cs via GetManifestResourceStream("Impressao.canhoto.css"). -->
+    <EmbeddedResource Include="Data\Templates\Impressao\canhoto.css">
+      <LogicalName>Impressao.canhoto.css</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

@@ -84,7 +84,9 @@ public class PedidosControllerTests
             _uow, NullLogger<CancelarPedidoUseCase>.Instance);
 
         var agendamento = new AlterarAgendamentoPedidoUseCase(
-            _pedidoRepo, _uow, NullLogger<AlterarAgendamentoPedidoUseCase>.Instance);
+            _pedidoRepo, _uow, NullLogger<AlterarAgendamentoPedidoUseCase>.Instance,
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(
+                Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
         var listar = new ListarPedidosUseCase(_pedidoRepo);
 
