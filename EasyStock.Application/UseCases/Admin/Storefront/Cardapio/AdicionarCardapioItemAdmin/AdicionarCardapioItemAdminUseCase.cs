@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -39,7 +40,11 @@ public sealed record AdicionarCardapioItemAdminCommand(
     Guid? EmpresaId = null,
     // ADR-0035 (#652): opções do item guarda-chuva e seção. Opcionais (null = não usa).
     IReadOnlyList<CardapioItemVariacaoInput>? Opcoes = null,
-    Guid? SecaoId = null) : ICommand;
+    Guid? SecaoId = null,
+    // S15: linha, preparo numérico e instrução de finalização. null = não mexe.
+    LinhaProduto? Linha = null,
+    int? TempoPreparoMinutos = null,
+    string? InstrucaoFinalizacao = null) : ICommand;
 
 public sealed record AdicionarCardapioItemAdminResult(Guid ItemId, Guid StorefrontId, Guid? ProdutoId);
 
@@ -167,6 +172,13 @@ public class AdicionarCardapioItemAdminUseCase(
         if (command.SecaoId.HasValue)
             item.DefinirSecao(command.SecaoId);
         CardapioVariacaoSync.Reconciliar(item, command.Opcoes);
+
+        // S15: linha e preparo numérico.
+        if (command.Linha.HasValue || command.TempoPreparoMinutos.HasValue || command.InstrucaoFinalizacao is not null)
+        {
+            UseCaseGuards.EnsureSemTagsHtml(command.InstrucaoFinalizacao, "Instrução de finalização");
+            item.DefinirPreparo(command.Linha, command.TempoPreparoMinutos, command.InstrucaoFinalizacao);
+        }
 
         await cardapioRepository.AddAsync(item);
         await unitOfWork.CommitAsync();

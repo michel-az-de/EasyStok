@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyStock.Domain.Enums.Storefront;
 
 namespace EasyStock.Domain.Entities.Storefront;
 
@@ -82,6 +83,18 @@ public class CardapioItem
     public string? Alergenos { get; private set; }
     public string? SugestaoMolho { get; private set; }
     public string? TempoPreparo { get; private set; }
+
+    /// <summary>Linha do item (S15, US-024). Default <see cref="LinhaProduto.ParaServir"/>.</summary>
+    public LinhaProduto Linha { get; private set; } = LinhaProduto.ParaServir;
+
+    /// <summary>
+    /// Preparo em minutos (S15, RN-06). Null = usa <c>ConfiguracaoAtendimento.TempoPreparoPadraoMinutos</c>.
+    /// <see cref="TempoPreparo"/> continua sendo só o texto de exibição.
+    /// </summary>
+    public int? TempoPreparoMinutos { get; private set; }
+
+    /// <summary>Como o cliente finaliza em casa (RN-18). Faz sentido na linha <see cref="LinhaProduto.PrepararEmCasa"/>.</summary>
+    public string? InstrucaoFinalizacao { get; private set; }
     public string? FotoUrl { get; private set; }
 
     /// <summary>Override do preço do <see cref="Produto"/>. Null = usa <c>Produto.PrecoReferencia</c>.</summary>
@@ -369,6 +382,36 @@ public class CardapioItem
         {
             ValidarTamanho(pesoExibicao, max: 50, nome: "Peso de exibição");
             PesoExibicao = pesoExibicao.Trim();
+        }
+
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Define linha, preparo numérico e instrução de finalização (S15). Cada parâmetro null deixa o
+    /// campo como está; instrução vazia limpa.
+    /// </summary>
+    public void DefinirPreparo(LinhaProduto? linha, int? tempoPreparoMinutos, string? instrucaoFinalizacao)
+    {
+        if (linha.HasValue)
+        {
+            if (!Enum.IsDefined(linha.Value))
+                throw new RegraDeDominioVioladaException($"Linha de produto inválida: {(int)linha.Value}.");
+            Linha = linha.Value;
+        }
+
+        if (tempoPreparoMinutos.HasValue)
+        {
+            if (tempoPreparoMinutos.Value is <= 0 or > 1440)
+                throw new RegraDeDominioVioladaException(
+                    $"Tempo de preparo deve ficar entre 1 e 1440 minutos (recebido: {tempoPreparoMinutos.Value}).");
+            TempoPreparoMinutos = tempoPreparoMinutos.Value;
+        }
+
+        if (instrucaoFinalizacao is not null)
+        {
+            ValidarTamanho(instrucaoFinalizacao, max: 500, nome: "Instrução de finalização");
+            InstrucaoFinalizacao = string.IsNullOrWhiteSpace(instrucaoFinalizacao) ? null : instrucaoFinalizacao.Trim();
         }
 
         AlteradoEm = DateTime.UtcNow;

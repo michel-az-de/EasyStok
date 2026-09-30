@@ -116,6 +116,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             // escalares (sem navegação → sem relacionamento EF). Só os snapshots de texto têm tamanho.
             b.Property(x => x.VariacaoRotuloSnapshot).HasMaxLength(60);
             b.Property(x => x.SkuSnapshot).HasMaxLength(100);
+            b.Property(x => x.LinhaSnapshot).HasMaxLength(30);
 
             b.HasOne(x => x.Produto)
                 .WithMany()
