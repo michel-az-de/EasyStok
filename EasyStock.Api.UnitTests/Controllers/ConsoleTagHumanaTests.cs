@@ -48,6 +48,7 @@ public class ConsoleTagHumanaTests
             new ListarMensagensConversaUseCase(_conversas),
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
             new GerenciarConversaAtendimentoUseCase(_conversas, _uow),
+            new TransferirConversaUseCase(_conversas, Substitute.For<IAtendenteRepository>(), _uow),
             currentUser);
     }
 
