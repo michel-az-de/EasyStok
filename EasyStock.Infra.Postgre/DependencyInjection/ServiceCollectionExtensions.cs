@@ -77,10 +77,15 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IMensagemProgramadaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.MensagemProgramadaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILembreteRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.LembreteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICandidatosLembreteQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CandidatosLembreteQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IExpedienteLojaRepository, EasyStock.Infra.Postgre.Repositories.Storefront.ExpedienteLojaRepository>();
             services.AddScoped<IPreferenciaMenuRepository, PreferenciaMenuRepository>();
             services.AddScoped<IFornecedorRepository, FornecedorRepository>();
             services.AddScoped<IClienteRepository, ClienteRepository>();
+            services.AddScoped<IClienteCrmRepository, ClienteCrmRepository>(); // S24
+            services.AddScoped<IHistoricoPedidosClienteQueries, EasyStock.Infra.Postgre.Queries.HistoricoPedidosClienteQueries>(); // S25
+            services.AddScoped<IDomicilioQueries, EasyStock.Infra.Postgre.Queries.DomicilioQueries>(); // S25
             services.AddScoped<IPedidoRepository, PedidoRepository>();
             services.AddScoped<ICaixaRepository, CaixaRepository>();
             services.AddScoped<ILoteRepository, LoteRepository>();
@@ -126,6 +131,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
+            services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
@@ -201,6 +207,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
                 Repositories.Atendimento.SessaoChatSiteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILinkCardapioConversaRepository,
+                Repositories.Atendimento.LinkCardapioConversaRepository>();
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
             services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
                 Services.Atendimento.RemetenteWhatsAppDoTenant>();
