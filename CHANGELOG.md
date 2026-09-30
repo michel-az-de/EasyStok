@@ -26,8 +26,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - **Avaliação em dois botões** (S26): `PedidoAvaliacao` ganha `Resultado` (positiva/negativa) e
   `Estrelas` passa a nullable (migration `AddResultadoPedidoAvaliacao`). O botão
   `acao:avaliacao:<resultado>:<pedidoId>` grava a avaliação sem LLM e responde ao cliente; a ferramenta
-  `registrar_avaliacao` cobre o texto livre. Negativa passa a conversa para a dona até a S27. O
-  agendamento +30 min após `Entregue` depende da S13. (#1185)
+  `registrar_avaliacao` cobre o texto livre. `Entregue` agenda o pedido de avaliação no outbox para
+  +30 min (`enviarApos` no payload vira `ProximaTentativaEm`), respeitando `AvisosStatusAtivos`; o
+  provider da Meta manda botões dentro da janela e o template `avaliacao` com quick replies fora. Negativa
+  passa a conversa para a dona até a S27. (#1185)
 - **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
   `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
   Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.

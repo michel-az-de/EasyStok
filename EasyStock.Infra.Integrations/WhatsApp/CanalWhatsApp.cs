@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Atendimento;
+﻿using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Infra.Integrations.WhatsApp;
@@ -21,6 +21,11 @@ public sealed class CanalWhatsApp(IWhatsAppCloudClient cloud) : ICanalMensageria
     public async Task<string> EnviarModeloAsync(
         string contatoIdExterno, string nome, string idioma, IReadOnlyList<string> parametros, CancellationToken ct = default) =>
         (await cloud.EnviarTemplateAsync(contatoIdExterno, nome, idioma, parametros, null, ct)).Wamid;
+
+    public async Task<string> EnviarModeloAsync(
+        string contatoIdExterno, string nome, string idioma, IReadOnlyList<string> parametros,
+        IReadOnlyList<(string Id, string Titulo)>? botoes, CancellationToken ct = default) =>
+        (await cloud.EnviarTemplateAsync(contatoIdExterno, nome, idioma, parametros, botoes, ct)).Wamid;
 
     public Task MarcarComoLidaAsync(string idMensagemExterna, CancellationToken ct = default) =>
         cloud.MarcarComoLidaAsync(idMensagemExterna, ct);
