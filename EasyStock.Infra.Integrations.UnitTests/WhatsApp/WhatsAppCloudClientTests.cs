@@ -26,7 +26,8 @@ public class WhatsAppCloudClientTests
         return BuildClient(handler);
     }
 
-    private static WhatsAppCloudClient BuildClient(SequenceHandler handler)
+    private static WhatsAppCloudClient BuildClient(
+        SequenceHandler handler, string? phoneNumberIdDoTenant = null, string phoneNumberIdGlobal = "1234567890")
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://graph.test/v19.0/") };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "token-teste");
@@ -34,14 +35,71 @@ public class WhatsAppCloudClientTests
         var options = Options.Create(new WhatsAppCloudOptions
         {
             AccessToken = "token-teste",
-            PhoneNumberId = "1234567890",
+            PhoneNumberId = phoneNumberIdGlobal,
             BaseUrl = "https://graph.test/v19.0"
         });
+
+        var remetente = Substitute.For<IRemetenteWhatsApp>();
+        remetente.ObterPhoneNumberIdAsync(Arg.Any<CancellationToken>()).Returns(phoneNumberIdDoTenant);
 
         var pipelineProvider = Substitute.For<ResiliencePipelineProvider<string>>();
         pipelineProvider.GetPipeline(Arg.Any<string>()).Returns(ResiliencePipeline.Empty);
 
-        return new WhatsAppCloudClient(http, options, pipelineProvider, NullLogger<WhatsAppCloudClient>.Instance);
+        return new WhatsAppCloudClient(http, options, remetente, pipelineProvider, NullLogger<WhatsAppCloudClient>.Instance);
+    }
+
+    private const string RespostaEnvioOk =
+        """{"messaging_product":"whatsapp","contacts":[{"wa_id":"5511999998888"}],"messages":[{"id":"wamid.X"}]}""";
+
+    [Fact]
+    public async Task EnviaPeloPhoneNumberIdDaEmpresaDoTenant()
+    {
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111");
+
+        await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        handler.UltimaUrl.Should().Be("https://graph.test/v19.0/5550001111/messages",
+            "a resposta da empresa X tem que sair pelo número da empresa X, não pelo global");
+    }
+
+    [Fact]
+    public async Task SemNumeroNoTenantUsaOGlobal()
+    {
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var client = BuildClient(handler, phoneNumberIdDoTenant: null);
+
+        await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        handler.UltimaUrl.Should().Be("https://graph.test/v19.0/1234567890/messages");
+    }
+
+    [Fact]
+    public async Task MarcarComoLidaTambemUsaONumeroDoTenant()
+    {
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, """{"success":true}""");
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111");
+
+        await client.MarcarComoLidaAsync("wamid.X");
+
+        handler.UltimaUrl.Should().Be("https://graph.test/v19.0/5550001111/messages");
+    }
+
+    [Fact]
+    public async Task SemNenhumNumeroLancaErroClaroSemChamarARede()
+    {
+        var handler = new SequenceHandler();
+        var client = BuildClient(handler, phoneNumberIdDoTenant: null, phoneNumberIdGlobal: "");
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        var ex = await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ex.Which.Message.Should().Contain("phone_number_id");
+        ex.Which.EhPermanente.Should().BeTrue();
+        handler.Chamadas.Should().Be(0, "sem número não pode haver POST em \"/messages\"");
     }
 
     [Fact]
@@ -114,6 +172,7 @@ public class WhatsAppCloudClientTests
 
         public int Chamadas { get; private set; }
         public string? UltimoCorpo { get; private set; }
+        public string? UltimaUrl { get; private set; }
         public bool TodosComBearer { get; private set; } = true;
 
         public void Enfileirar(HttpStatusCode status, string body) => _respostas.Enqueue((status, body));
@@ -121,6 +180,7 @@ public class WhatsAppCloudClientTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Chamadas++;
+            UltimaUrl = request.RequestUri?.ToString();
             if (request.Headers.Authorization is not { Scheme: "Bearer" })
                 TodosComBearer = false;
 

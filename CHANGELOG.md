@@ -20,6 +20,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **WhatsApp por empresa** (#1102): a resposta sai pelo `phone_number_id` da empresa do tenant
+  (`IRemetenteWhatsApp`), com fallback para `Notifications:WhatsApp:Meta:PhoneNumberId` e erro
+  permanente, sem chamar a Meta, quando não há nenhum. Chave nova `Atendimento__WhatsApp__Cliente=meta`
+  liga o cliente real da Cloud API sem trocar o provider de notificações (que segue `stub`);
+  `Provider=meta` continua ligando o cliente real. O `StartupHardening` exige AccessToken, AppSecret
+  e VerifyToken com qualquer uma das duas em `meta`. `PUT api/admin/tenants/{id}/whatsapp`
+  (`{ phoneNumberId }`, `null` desvincula, 409 se outra empresa já usa) e card "WhatsApp" na aba
+  Features do detalhe do tenant no Admin.
 - **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
   (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
   só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
