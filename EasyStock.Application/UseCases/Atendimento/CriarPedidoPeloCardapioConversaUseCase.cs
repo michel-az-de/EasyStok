@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
@@ -33,7 +34,9 @@ public sealed record PedidoPeloCardapioConversaResult(
 /// carrinho à <see cref="Conversa"/>: o pedido nasce pelo caminho da conversa (S10,
 /// <see cref="CriarPedidoAtendimentoUseCase"/>, que grava <c>Conversa.PedidoEmAndamentoId</c>), o resumo
 /// fica como <c>Mensagem(Sistema)</c> sem id externo (nota para a operadora e para o agente, não sai
-/// para o cliente) e a cobrança segue pela S11 na forma escolhida.
+/// para o cliente) e a cobrança segue pela S11 na forma escolhida. Depois do commit, o console é avisado
+/// pelo SSE (S18) com <see cref="EventosOperacao.ConversaPedidoPelaPagina"/> e
+/// <see cref="EventosOperacao.ConversaMensagemRecebida"/> (a mensagem de resumo).
 ///
 /// <para>
 /// A requisição é anônima: o link encontrado pelo hash do token liga o tenant (RLS). O uso é marcado
@@ -49,6 +52,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
     CriarPedidoAtendimentoUseCase criarPedido,
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
+    IOperacaoEventPublisher eventPublisher,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<CriarPedidoPeloCardapioConversaUseCase> logger)
@@ -96,16 +100,34 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         }
 
         conversa.RegistrarSaida(agora);
-        await conversaRepository.AddMensagemAsync(
-            Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-                ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
-                    "Pedido montado pelo cliente no cardápio do site:")),
-            ct);
+        var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+            ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
+                "Pedido montado pelo cliente no cardápio do site:"));
+        await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();
+        await AvisarConsoleAsync(reservado, resumo, ct);
 
         var cobranca = await CobrarAsync(reservado, conversa.Id, forma, ct);
         return new PedidoPeloCardapioConversaResult(
             reservado.Pedido.Id, reservado.Total, forma, cobranca?.LinkPagamento, cobranca?.ExpiraEm);
+    }
+
+    /// <summary>Evento de UI depois do commit: se o aviso falhar, o pedido já gravado segue (a inbox vê ao recarregar).</summary>
+    private async Task AvisarConsoleAsync(PedidoReservado reservado, Mensagem resumo, CancellationToken ct)
+    {
+        var pedido = reservado.Pedido;
+        try
+        {
+            await eventPublisher.PublicarAsync(EventosOperacao.ConversaPedidoPelaPagina, pedido.EmpresaId,
+                new ConversaPedidoPelaPaginaOperacao(resumo.ConversaId, pedido.Id,
+                    pedido.Id.ToString("N")[..8].ToUpperInvariant(), reservado.Total), ct);
+            await eventPublisher.PublicarAsync(EventosOperacao.ConversaMensagemRecebida, pedido.EmpresaId,
+                new { conversaId = resumo.ConversaId, mensagemId = resumo.Id }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Cardapio da conversa: pedido {PedidoId} gravado, aviso ao console falhou.", pedido.Id);
+        }
     }
 
     private async Task<CobrancaPedidoResult?> CobrarAsync(

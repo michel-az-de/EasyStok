@@ -1,6 +1,7 @@
 using System.Reflection;
 using EasyStock.Api.Controllers.Storefront;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -36,7 +37,8 @@ public class CardapioConversaControllerTests
         // Criar pedido e cobrar não são alcançados: o token é recusado antes.
         var useCase = new CriarPedidoPeloCardapioConversaUseCase(
             linkService, Substitute.For<ITenantContextAccessor>(), Substitute.For<IConversaRepository>(),
-            Substitute.For<IClienteRepository>(), null!, null!, null!, Substitute.For<IUnitOfWork>(), TimeProvider.System,
+            Substitute.For<IClienteRepository>(), null!, null!, null!, Substitute.For<IOperacaoEventPublisher>(),
+            Substitute.For<IUnitOfWork>(), TimeProvider.System,
             NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance);
         _controller = new CardapioConversaController(useCase)
         {
