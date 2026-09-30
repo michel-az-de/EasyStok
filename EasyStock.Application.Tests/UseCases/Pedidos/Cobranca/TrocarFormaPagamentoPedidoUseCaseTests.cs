@@ -80,4 +80,44 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
         naEntrega.Motivo.Should().Contain("pago_por_outra_cobranca");
         f.Pedido.Pagamentos.Should().ContainSingle(p => p.Referencia == "pay-7");
     }
+
+    /// <summary>S32: o link antigo para de aceitar pagamento quando a forma muda.</summary>
+    [Fact]
+    public async Task TrocaExpiraAPreferenciaAnteriorNoMercadoPago()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline(referencia: "pref-antiga");
+
+        await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        await f.MpClient.Received(1).ExpirarPreferenciaAsync("pref-antiga", CobrancaPedidoFixture.Agora, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FalhaAoExpirarPreferencia_NaoDesfazATroca()
+    {
+        var f = new CobrancaPedidoFixture();
+        var antiga = f.AdicionarOnline(referencia: "pref-antiga");
+        f.MpClient.ExpirarPreferenciaAsync(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new HttpRequestException("mp fora"));
+
+        var r = await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        antiga.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+    }
+
+    [Fact]
+    public async Task TrocaSemCobrancaOnlineAnterior_NaoChamaOMercadoPago()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarNaEntrega();
+
+        await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "online", Usuario, "Operadora"));
+
+        await f.MpClient.DidNotReceiveWithAnyArgs().ExpirarPreferenciaAsync(default!, default, default);
+    }
 }
