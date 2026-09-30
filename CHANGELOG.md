@@ -11,6 +11,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
+  `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
+  Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.
+  Saem com a conversa assumida; só a revogação do transacional no WhatsApp bloqueia. Idempotente por
+  pedido + status. O outbox passa a persistir os metadados do envio (template da Meta e parâmetros),
+  fechando a pendência da S09; `Storefront.InstagramUrl` novo. Pedido pago com `RequerAprovacao` (S12)
+  vai para `AguardandoAprovacaoBaba`. Migration `AddAvisosStatusPedido` (3 colunas nulas).
 - **Webhook do Mercado Pago de ponta a ponta** (S32): `POST /api/webhooks/mercadopago` ganha o
   `MercadoPagoWebhookProcessor` (antes respondia 500). Só o tópico `payment`; o `data.id` do corpo
   dispara `GET v1/payments/{id}` e só o que a fonte devolve vale. `approved` confirma o pedido pela S11

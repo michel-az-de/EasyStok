@@ -118,4 +118,46 @@ public class OutboxMensagemNotificacaoTests
         m.Status.Should().Be(StatusOutbox.Suprimido);
         m.ErroUltimaTentativa.Should().Be("opt-out marketing");
     }
+
+    // ===== S13: metadados do envio e chave de idempotencia do negocio =====
+
+    [Fact]
+    public void Metadados_persistidos_voltam_como_dicionario()
+    {
+        var m = OutboxMensagemNotificacao.Criar(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CanalNotificacao.WhatsApp, "+5511999990001",
+            "", "corpo", CategoriaConteudoNotificacao.Transacional,
+            metadadosJson: """{"template":"pedido_em_preparo","param1":"Maria"}""");
+
+        m.LerMetadados().Should().BeEquivalentTo(new Dictionary<string, string>
+        {
+            ["template"] = "pedido_em_preparo",
+            ["param1"] = "Maria",
+        });
+    }
+
+    [Fact]
+    public void Sem_metadados_ou_json_invalido_le_nulo()
+    {
+        Novo().LerMetadados().Should().BeNull();
+        var invalido = Novo();
+        invalido.MetadadosJson = "nao-e-json";
+        invalido.LerMetadados().Should().BeNull();
+    }
+
+    [Fact]
+    public void Chave_de_idempotencia_do_negocio_ignora_o_evento()
+    {
+        OutboxMensagemNotificacao Com(string chave) => OutboxMensagemNotificacao.Criar(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CanalNotificacao.WhatsApp, "+5511999990001",
+            "", "corpo", CategoriaConteudoNotificacao.Transacional, chaveIdempotencia: chave);
+
+        var a = Com("pedido:abc|preparando");
+        var b = Com("pedido:abc|preparando");
+        var c = Com("pedido:abc|entregue");
+
+        a.IdempotencyKey.Should().Be(b.IdempotencyKey, "reprocessar o mesmo status do pedido gera a mesma chave");
+        a.IdempotencyKey.Should().NotBe(c.IdempotencyKey);
+        a.IdempotencyKey.Should().HaveLength(64);
+    }
 }
