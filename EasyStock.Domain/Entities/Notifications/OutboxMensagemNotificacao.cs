@@ -1,4 +1,4 @@
-using EasyStock.Domain.Enums.Notifications;
+﻿using EasyStock.Domain.Enums.Notifications;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -91,6 +91,16 @@ public class OutboxMensagemNotificacao
             ShardKey = Convert.FromHexString(idempotencyKey)[0] % 4,
             MetadadosJson = string.IsNullOrWhiteSpace(metadadosJson) ? null : metadadosJson
         };
+    }
+
+    /// <summary>
+    /// Adia o primeiro envio para <paramref name="instanteUtc"/> (S26: pedido de avaliação 30 min após a
+    /// entrega). Instante no passado não antecipa nada: a mensagem já está elegível.
+    /// </summary>
+    public void AgendarPara(DateTime instanteUtc)
+    {
+        var instante = instanteUtc.Kind == DateTimeKind.Utc ? instanteUtc : instanteUtc.ToUniversalTime();
+        if (instante > ProximaTentativaEm) ProximaTentativaEm = instante;
     }
 
     public void MarcarEmEnvio()
