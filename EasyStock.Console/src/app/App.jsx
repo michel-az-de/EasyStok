@@ -28,6 +28,8 @@ import { ModalGestao } from '../features/gestao/ModalGestao'
 import { ModalBiblioteca } from '../features/respostas/ModalBiblioteca'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
+import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
+import { TelaEntregasApi } from '../features/entregas/TelaEntregasApi'
 import { TelaCozinha } from '../features/cozinha/TelaCozinha'
 import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
@@ -202,7 +204,7 @@ function Composicao({ aoSair }) {
 
       {/* Rodada 5, seção 6 (passo zero): gaveta vazia, a F6 desenha a tela de
           verdade. `PainelEntregas.jsx` fica no lugar até a F6 apagar. */}
-      {modal === 'entregas' && <GavetaEntregas aoFechar={fechar} />}
+      {modal === 'entregas' && (FONTE_API ? <GavetaEntregasApi aoFechar={fechar} /> : <GavetaEntregas aoFechar={fechar} />)}
 
       {/* Rodada 5, seção 5 (passo zero): abre de qualquer lugar por
           `ui.encerrando`, hoje vazia até a F5 construir o resumo. */}
@@ -271,10 +273,17 @@ function CozinhaApi() {
   return <TelaCozinhaApi key={sessao.token} />
 }
 
+// Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
+function EntregasApi() {
+  const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
+  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  return <TelaEntregasApi key={sessao.token} />
+}
+
 export function App() {
   const hash = useHash()
   const rota = rotaDaHash(hash)
-  if (rota.tipo === ROTA_ENTREGAS) return <TelaEntregas />
+  if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi /> : <TelaEntregas />
   if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi /> : <TelaCozinha />
   if (rota.tipo === ROTA_CARDAPIO_LINK) return <TelaCardapioLink />
   return <AppPrincipal />

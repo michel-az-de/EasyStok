@@ -161,6 +161,46 @@ public class KdsControllerTests : IDisposable
         cards[comecado.Id].Atrasado.Should().BeFalse("o preparo já começou");
     }
 
+    [Fact]
+    public async Task AprovacaoTrazMotivoEEnderecoSoDaEmpresa()
+    {
+        // F04 (#1221): a gaveta de Entregas lê do KDS o endereço do cliente (S14) e o motivo da
+        // aprovação manual (S12). Pedido e cliente de outra empresa não aparecem.
+        var cliente = Cliente.Criar(EmpresaA, "Ana");
+        cliente.Endereco = "Rua das Flores, 10";
+        cliente.Bairro = "Centro";
+        cliente.Cidade = "Niterói";
+        _db.Clientes.Add(cliente);
+        var foraDeArea = PedidoPersistido(EmpresaA, StatusPedidoMapper.AguardandoAprovacaoBaba, "paraServir");
+        foraDeArea.ClienteId = cliente.Id;
+        foraDeArea.MarcarRequerAprovacao("fora_de_area");
+        var outra = PedidoPersistido(EmpresaB, StatusPedidoMapper.AguardandoAprovacaoBaba, "paraServir");
+        outra.MarcarRequerAprovacao("fora_de_area");
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetPedidos(
+            status: StatusPedidoMapper.AguardandoAprovacaoBaba, linha: null, data: null, empresaId: null, CancellationToken.None);
+
+        var card = OkData<IReadOnlyList<KdsPedidoDto>>(result).Should().ContainSingle().Subject;
+        card.Id.Should().Be(foraDeArea.Id);
+        card.RequerAprovacao.Should().BeTrue();
+        card.MotivoRequerAprovacao.Should().Be("fora_de_area");
+        card.Endereco.Should().Be("Rua das Flores, 10, Centro, Niterói");
+    }
+
+    [Fact]
+    public async Task SemClienteEnderecoNulo()
+    {
+        PedidoPersistido(EmpresaA, StatusPedidoMapper.Pronto, "paraServir");
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetPedidos(status: null, linha: null, data: null, empresaId: null, CancellationToken.None);
+
+        var card = OkData<IReadOnlyList<KdsPedidoDto>>(result).Should().ContainSingle().Subject;
+        card.Endereco.Should().BeNull();
+        card.RequerAprovacao.Should().BeFalse();
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static T OkData<T>(IActionResult result)

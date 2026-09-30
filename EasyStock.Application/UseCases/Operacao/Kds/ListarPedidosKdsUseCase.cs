@@ -87,6 +87,9 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
             Atrasado: Atrasado(p, status, hoje, agora),
             PagoEm: p.PagoEm,
             CriadoEm: p.CriadoEm,
-            Observacoes: p.Observacoes);
+            Observacoes: p.Observacoes,
+            Endereco: p.Endereco,
+            RequerAprovacao: p.RequerAprovacao,
+            MotivoRequerAprovacao: p.MotivoRequerAprovacao);
     }
 }
