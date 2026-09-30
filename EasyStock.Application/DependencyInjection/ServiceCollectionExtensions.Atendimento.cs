@@ -61,6 +61,12 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AgenteAtendimentoService>();
         services.AddScoped<ProcessarTurnoAgenteUseCase>();
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE
+
+        // S27: ocorrência e reembolso.
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Ocorrencias.AbrirOcorrenciaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Ocorrencias.ReembolsarPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Ocorrencias.ResolverOcorrenciaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Ocorrencias.ConsultarOcorrenciasUseCase>();
         services.AddScoped<RoteadorAcoesBotao>();
         services.AddScoped<IAcaoBotaoHandler, ConfirmarEnderecoAcaoBotao>();
         services.AddScoped<IAcaoBotaoHandler, EscolherJanelaAcaoBotao>(); // S16: devolve a vez ao agente

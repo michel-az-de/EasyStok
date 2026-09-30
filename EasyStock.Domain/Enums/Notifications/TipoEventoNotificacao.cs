@@ -54,6 +54,9 @@ public enum TipoEventoNotificacao
 
     // Atendimento por WhatsApp (S07): o agente passou a conversa para a dona. 38-45 reservados pelo
     // plano (docs/plan/atendimento-whatsapp: status de pedido, avaliacao, reembolso, campanhas).
+    // Ocorrencia (S27): reembolso confirmado pelo gateway; avisa o cliente.
+    ReembolsoEfetuado = 43,
+
     ConversaEscalada = 46,
 
     // Lembretes da dona (S43): lembrete venceu (manual) ou nasceu do avaliador (pagamento sem baixa,

@@ -127,6 +127,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // S20: fila de impressão do canhoto
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IImpressaoPendenteRepository,
                 Repositories.Operacao.ImpressaoPendenteRepository>();
+            // S27: ocorrência e reembolso
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IOcorrenciaRepository,
+                Repositories.Atendimento.OcorrenciaRepository>();
 
             // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
             services.AddScoped<IContaPagarRepository, ContaPagarRepository>();

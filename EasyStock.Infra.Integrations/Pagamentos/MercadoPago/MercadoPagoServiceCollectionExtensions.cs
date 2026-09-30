@@ -32,6 +32,9 @@ public static class MercadoPagoServiceCollectionExtensions
             services.AddScoped<IMercadoPagoClient, MercadoPagoClient>();
         }
 
+        // S27: estorno de pedido. Troca pelo adaptador do Mercado Pago quando a S32 entrar.
+        services.AddScoped<IEstornoPedidoGateway, EstornoPedidoIndisponivelGateway>();
+
         return services;
     }
 }

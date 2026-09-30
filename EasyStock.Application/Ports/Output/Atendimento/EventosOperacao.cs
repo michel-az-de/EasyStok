@@ -11,6 +11,7 @@ public static class EventosOperacao
     public const string ImpressaoPendente = "impressao.pendente";
     public const string ImpressaoAtrasada = "impressao.atrasada";
     public const string PedidoAtrasado = "pedido.atrasado";
+    public const string OcorrenciaAberta = "ocorrencia.aberta";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -31,3 +32,6 @@ public sealed record ImpressaoAtrasadaOperacao(Guid ImpressaoId, Guid PedidoId, 
 /// <param name="Numero">Número curto do pedido, o mesmo de <see cref="PedidoPagoOperacao.Numero"/>.</param>
 /// <param name="InicioPrevistoEm">Instante (UTC) em que o preparo deveria ter começado.</param>
 public sealed record PedidoAtrasadoOperacao(Guid PedidoId, string Numero, string? Cliente, DateTime InicioPrevistoEm);
+
+/// <summary>Payload de <see cref="EventosOperacao.OcorrenciaAberta"/> (S27): o console mostra a reclamação nova.</summary>
+public sealed record OcorrenciaAbertaOperacao(Guid OcorrenciaId, Guid PedidoId, Guid? ConversaId, string Origem, string Categoria);

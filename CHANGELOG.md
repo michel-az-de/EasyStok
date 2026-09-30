@@ -11,6 +11,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Ocorrência e reembolso** (S27): tabela `ocorrencias` (RLS) e `api/ocorrencias` (listar, obter, abrir,
+  resolver). Abrir com conversa escala para a dona e publica `ocorrencia.aberta`. Resolver com reembolso
+  estorna a cobrança paga (idempotência pelo id da ocorrência), grava `ClienteNota` e enfileira
+  `ReembolsoEfetuado`; valor acima do pago dá 400; pago fora do gateway responde
+  `reembolso_manual_necessario`. O estorno automático fica recusado até a S32 entrar. (#1186)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
