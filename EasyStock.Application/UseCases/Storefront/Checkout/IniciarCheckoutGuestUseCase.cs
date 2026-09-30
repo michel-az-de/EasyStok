@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -37,6 +38,8 @@ public sealed class IniciarCheckoutGuestUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     IUnitOfWork unitOfWork,
     AcompanhamentoTokenService tokenService,
+    AtribuicaoPedidoCampanha atribuicaoCampanha,
+    ITenantContextAccessor tenantContext,
     TimeProvider timeProvider,
     ILogger<IniciarCheckoutGuestUseCase> logger)
 {
@@ -133,6 +136,11 @@ public sealed class IniciarCheckoutGuestUseCase(
         pedido.RecalcularTotal();
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
+
+        // #1226: mesma conversão da campanha que o pedido da conversa (S30); requisição anônima, o tenant
+        // da loja liga o filtro e a RLS.
+        tenantContext.SetCurrentTenant(storefront.EmpresaId);
+        await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, cliente.Id, pedido.Id, ct);
 
         await unitOfWork.CommitAsync();
 
