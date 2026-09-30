@@ -81,6 +81,22 @@ public class BackgroundJobRegistrationTests
     }
 
     [Fact]
+    public void AddEasyStockBackgroundJobs_RegistraPedidoAtrasoJob_EDesligaPorFlag()
+    {
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var desligado = new ServiceCollection().AddLogging();
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnablePedidoAtraso"] = "false" })
+            .Build());
+
+        ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().Contain(typeof(PedidoAtrasoJob));
+        desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().NotContain(typeof(PedidoAtrasoJob), "desligar o job é o rollback da S21");
+    }
+
+    [Fact]
     public void AddEasyStockBackgroundJobs_DeveRegistrarJobsLegados_QuandoFlagsEstiveremHabilitadas()
     {
         var services = new ServiceCollection();
