@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Sales;
@@ -67,6 +68,7 @@ public sealed record ConfirmarPagamentoPedidoResult(
 ///   <item><c>AguardandoPagamento → Aguardando</c> (pedido já na fila só recebe o pagamento), cobrança
 ///     <c>Paga</c>, demais pendentes canceladas, <c>PedidoPagoEvent</c> e <c>pedido.mudou_status</c> no
 ///     outbox e <c>PedidoPagamento</c> pelo <see cref="RegistrarPagamentoPedidoUseCase"/>.</item>
+///   <item><c>InicioPrevistoEm</c> pela <see cref="CalculadoraInicioPrevistoPedido"/> (S21).</item>
 /// </list>
 ///
 /// <para>
@@ -93,7 +95,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<ConfirmarPagamentoPedidoUseCase> logger)
+    ILogger<ConfirmarPagamentoPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto)
 {
     public const string StatusAprovado = "approved";
     private const string Origem = "mercadopago";
@@ -166,11 +169,16 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         foreach (var outra in cobrancas.Where(c => c.EstaPendente && c.Id != alvo.Id))
             outra.Cancelar($"pago_por_outra_cobranca: {alvo.Id}", agora);
 
+        // S21: com o pagamento, a janela vira compromisso; o card do KDS atrasa a partir daqui.
+        pedido.DefinirInicioPrevisto(await inicioPrevisto.CalcularAsync(pedido, ct));
+
         var statusAntigo = pedido.Status;
-        if (pedido.StatusEnum == StatusPedido.AguardandoPagamento)
-        {
+        var transitou = pedido.StatusEnum == StatusPedido.AguardandoPagamento;
+        if (transitou)
             pedido.MudarStatus(StatusPedido.Aguardando);
-            await pedidoRepository.UpdateAsync(pedido, ct);
+        await pedidoRepository.UpdateAsync(pedido, ct);
+        if (transitou)
+        {
             await publicador.PublicarAsync(
                 empresaId, "pedido.mudou_status", "pedido", pedido.Id,
                 new PedidoMudouStatusEvent(pedido.Id, empresaId, pedido.LojaId, statusAntigo, pedido.Status,
