@@ -12,6 +12,7 @@ public static class EventosOperacao
     public const string ImpressaoPendente = "impressao.pendente";
     public const string ImpressaoAtrasada = "impressao.atrasada";
     public const string PedidoAtrasado = "pedido.atrasado";
+    public const string OcorrenciaAberta = "ocorrencia.aberta";
     public const string EstoqueDesacertoResolvido = "estoque.desacerto_resolvido";
 }
 
@@ -40,5 +41,7 @@ public sealed record ImpressaoAtrasadaOperacao(Guid ImpressaoId, Guid PedidoId, 
 /// <param name="InicioPrevistoEm">Instante (UTC) em que o preparo deveria ter começado.</param>
 public sealed record PedidoAtrasadoOperacao(Guid PedidoId, string Numero, string? Cliente, DateTime InicioPrevistoEm);
 
+/// <summary>Payload de <see cref="EventosOperacao.OcorrenciaAberta"/> (S27): o console mostra a reclamação nova.</summary>
+public sealed record OcorrenciaAbertaOperacao(Guid OcorrenciaId, Guid PedidoId, Guid? ConversaId, string Origem, string Categoria);
 /// <summary>Payload de <see cref="EventosOperacao.EstoqueDesacertoResolvido"/> (S22): o alerta do produto some do console.</summary>
 public sealed record EstoqueDesacertoResolvidoOperacao(Guid ProdutoId, decimal QuantidadeAtual);

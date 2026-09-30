@@ -59,6 +59,8 @@ public enum TipoEventoNotificacao
     PedidoSaiuParaEntrega = 40,
     PedidoEntregue = 41,
 
+    // Ocorrencia (S27): reembolso confirmado pelo gateway; avisa o cliente.
+    ReembolsoEfetuado = 43,
     // Campanhas (S30): a mensagem da onda e o lembrete do encerramento ao cliente, pelo WhatsApp.
     CampanhaMarketing = 44,
     CampanhaLembreteEncerramento = 45,

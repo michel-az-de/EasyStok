@@ -32,6 +32,7 @@ public static partial class ServiceCollectionExtensions
         // S06: agente de atendimento (LLM com ferramentas) e roteador de botões sem LLM.
         services.AddScoped<AgenteAtendimentoService>();
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE
+
         services.AddScoped<RoteadorAcoesBotao>();
         services.AddScoped<ConfirmarEnderecoPendente>(); // S14
 
