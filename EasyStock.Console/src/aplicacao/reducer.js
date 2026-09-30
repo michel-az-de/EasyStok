@@ -191,6 +191,61 @@ function comMensagem(conversa, mensagem, { id, agora }) {
   }
 }
 
+// Modo API (F01). A conversa do servidor manda; do lado de cá só sobrevivem os
+// balões da dona ainda sem resposta da API (enviando) ou recusados (falhou), para
+// ela ver o que não saiu. O resto do estado local (rascunhos, filtros) fica.
+const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou'
+
+function mesclarDoServidor(local, doServidor) {
+  if (!local) return doServidor
+  const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
+  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
+  return { ...local, ...doServidor, mensagens: [...doServidor.mensagens, ...soLocais] }
+}
+
+const CASOS_API = {
+  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas }) => {
+    const locais = new Map(estado.conversas.map((c) => [c.id, c]))
+    const mescladas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c))
+    const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
+    return {
+      ...estado,
+      conversas: mescladas,
+      selecionadaId: aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null),
+      automaticoPausado: Object.fromEntries(
+        mescladas.map((c) => [c.id, c.situacaoApi === 'Assumida' ? PAUSA_POR_ASSUMIR : false]),
+      ),
+      sincronizacao: { estado: 'ok', mensagem: null, em: Date.now() },
+    }
+  },
+
+  [acao.SINCRONIZACAO_FALHOU]: (estado, { mensagem }) => ({
+    ...estado, sincronizacao: { ...estado.sincronizacao, estado: 'erro', mensagem },
+  }),
+
+  [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem }) =>
+    mapear(estado, id, (c) => ({
+      ...c, mensagens: c.mensagens.map((m) => (m.id === mensagemId ? mensagem : m)),
+    })),
+
+  [acao.FALHAR_ENVIO_API]: (estado, { id, mensagemId, erro }) =>
+    mapear(estado, id, (c) => ({
+      ...c, mensagens: c.mensagens.map((m) => (m.id === mensagemId ? { ...m, status: 'falhou', erro } : m)),
+    })),
+
+  [acao.AVISO_API]: (estado, { mensagem }) => ({
+    ...estado, sincronizacao: { ...estado.sincronizacao, aviso: mensagem },
+  }),
+
+  // A API é a verdade do expediente: horário e controle manual substituem o local.
+  [acao.SINCRONIZAR_EXPEDIENTE]: (estado, { funcionamento, lojaAberta, mensagemForaDoHorario, mensagemLojaFechada }) => ({
+    ...estado,
+    funcionamento,
+    lojaAberta,
+    expediente: { carregado: true, mensagemForaDoHorario, mensagemLojaFechada },
+  }),
+}
+
 const CASOS = {
   [acao.SELECIONAR_CONVERSA]: (estado, { id }) => ({
     ...estado,
@@ -946,6 +1001,7 @@ const CASOS = {
 // base que já existia antes desta rodada mais os dois casos de
 // `ui.encerrando`, que são do passo zero.
 const CASOS_COMPOSTOS = {
+  ...CASOS_API,
   ...CASOS,
   ...casosCardapio,
   ...casosCardapioLink,

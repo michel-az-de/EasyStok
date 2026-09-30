@@ -254,3 +254,13 @@ export const EDITAR_RECOMPENSA = 'editar-recompensa'
 export const ALTERNAR_RECOMPENSA_ATIVA = 'alternar-recompensa-ativa'
 export const CRIAR_SORTEIO = 'criar-sorteio'
 export const RESGATAR_RECOMPENSA = 'resgatar-recompensa'
+
+// Modo API (ADR-0054, F01): a lista vem do EasyStok por polling e o envio da dona
+// é confirmado ou recusado pela API depois do balão otimista.
+export const SINCRONIZAR_CONVERSAS = 'sincronizar-conversas'
+export const SINCRONIZACAO_FALHOU = 'sincronizacao-falhou'
+export const CONFIRMAR_ENVIO_API = 'confirmar-envio-api'
+export const FALHAR_ENVIO_API = 'falhar-envio-api'
+export const AVISO_API = 'aviso-api'
+// F02: horário, controle manual e mensagens do expediente (S40) como a API devolveu.
+export const SINCRONIZAR_EXPEDIENTE = 'sincronizar-expediente'

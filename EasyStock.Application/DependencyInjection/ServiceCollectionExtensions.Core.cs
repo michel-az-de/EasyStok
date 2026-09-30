@@ -71,6 +71,7 @@ public static partial class ServiceCollectionExtensions
         // S19: KDS do console sobre Pedido
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Esteira.LancarLotePapelUseCase>();
         // S21: início previsto do preparo e aviso de atraso (PedidoAtrasoJob)
         services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
@@ -167,6 +168,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Inventario.IniciarContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.RegistrarItemContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.FinalizarContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.Desacertos.ListarDesacertosEstoqueUseCase>(); // S22
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.Desacertos.AjustarSaldoRapidoUseCase>(); // S22
         services.AddScoped<EasyStock.Application.UseCases.Inventario.CancelarContagemUseCase>();
 
         // Modulo Financeiro AR/AP — Lancamentos

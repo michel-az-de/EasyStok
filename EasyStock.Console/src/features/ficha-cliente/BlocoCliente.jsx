@@ -25,6 +25,7 @@ import { TagsDoCliente } from './TagsDoCliente'
 import { ModalHistorico } from './ModalHistorico'
 import { ModalBloqueio, ModalDesbloqueio } from './ModalBloqueio'
 import { ModalFidelidade } from './ModalFidelidade'
+import { AvisosDoCliente } from './AvisosDoCliente'
 import css from './cliente.module.css'
 
 const dataCurta = (iso) =>
@@ -291,33 +292,12 @@ export function BlocoCliente({ conversa }) {
               {canal.nome}{cliente.usuario ? ` · @${cliente.usuario}` : ''}
             </span>
           </div>
-          {/* Canais de aviso (decisão 46, "Encerrar" v2, pedido do dono
-              24/09): e-mail e SMS, cada um ligado ou não. Ação genérica de
-              EDITAR_DADO_CLIENTE (já grava qualquer campo de `cliente`),
-              sem tocar em casos/cliente.js, que é arquivo da F2. */}
+          {/* Canais de aviso: e-mail e SMS (AvisosDoCliente.jsx, que no modo API
+              grava o consentimento do cadastro, F02). */}
           <div className={css.linhaDado}>
             <span className={css.rotuloDado}>Avisos</span>
             <span className={css.avisosCanais}>
-              <label className={css.avisoCanal}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(cliente.avisos?.email)}
-                  onChange={(e) => editarDadoCliente(
-                    conversa.id, 'avisos', { ...cliente.avisos, email: e.target.checked }, agora,
-                  )}
-                />
-                E-mail
-              </label>
-              <label className={css.avisoCanal}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(cliente.avisos?.sms)}
-                  onChange={(e) => editarDadoCliente(
-                    conversa.id, 'avisos', { ...cliente.avisos, sms: e.target.checked }, agora,
-                  )}
-                />
-                SMS
-              </label>
+              <AvisosDoCliente conversa={conversa} />
             </span>
           </div>
 

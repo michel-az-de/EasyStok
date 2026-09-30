@@ -398,6 +398,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
+        public async Task<IReadOnlyList<ItemEstoque>> GetLotesParaAjusteAsync(
+            Guid empresaId, Guid produtoId, Guid? lojaId, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId
+                    && i.ProdutoId == produtoId
+                    && i.Status != StatusItemEstoque.Descartado
+                    && (lojaId == null || i.LojaId == lojaId))
+                .OrderBy(i => i.EntradaEm)
+                .ThenBy(i => i.CriadoEm)
+                .ToListAsync(ct);
+
         public Task UpdateRangeAsync(IEnumerable<ItemEstoque> itensEstoque)
         {
             dbContext.ItensEstoque.UpdateRange(itensEstoque);

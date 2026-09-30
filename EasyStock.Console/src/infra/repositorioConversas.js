@@ -1,6 +1,7 @@
 import { CONVERSAS_SEMENTE } from './conversasSemente'
 import { carregarMassa } from './massaConversas'
 import { bloqueioDeSemente } from '../dominio/conversa'
+import { FONTE_API } from './fonteDados'
 
 // Porta de entrada das conversas. A aplicação depende desta função, nunca do
 // array. Trocar por uma chamada HTTP mais tarde não toca em componente nenhum.
@@ -16,6 +17,8 @@ const querSemente = () => {
 // antiga da massa) nasce bloqueada, o resto nasce livre. Assim nenhum
 // componente precisa adivinhar o que significa a ausência do campo.
 export function carregarConversas() {
+  // Modo API (F01): as conversas chegam pelo polling, nunca da massa.
+  if (FONTE_API) return []
   const origem = querSemente() ? CONVERSAS_SEMENTE : carregarMassa()
   iniciarContadorPedido(origem)
   return origem.map((conversa) => ({ ...conversa, bloqueio: bloqueioDeSemente(conversa) }))
