@@ -13,6 +13,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   Fora da janela o console responde com `HUMAN_AGENT` até 7 dias; depois, 409. A conversa entra na
   fila humana e o agente não responde fora do WhatsApp. Flags `atendimento.canal.instagram` e
   `atendimento.canal.messenger`. (#1103)
+- **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
+  criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
+  a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
+  da empresa do token e id de outra loja devolve 404. Canais por empresa ficam para a parte 2. (#1095)
 
 ### Security
 - CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
@@ -23,6 +27,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **WhatsApp por empresa** (#1102): a resposta sai pelo `phone_number_id` da empresa do tenant
+  (`IRemetenteWhatsApp`), com fallback para `Notifications:WhatsApp:Meta:PhoneNumberId` e erro
+  permanente, sem chamar a Meta, quando não há nenhum. Chave nova `Atendimento__WhatsApp__Cliente=meta`
+  liga o cliente real da Cloud API sem trocar o provider de notificações (que segue `stub`);
+  `Provider=meta` continua ligando o cliente real. O `StartupHardening` exige AccessToken, AppSecret
+  e VerifyToken com qualquer uma das duas em `meta`. `PUT api/admin/tenants/{id}/whatsapp`
+  (`{ phoneNumberId }`, `null` desvincula, 409 se outra empresa já usa) e card "WhatsApp" na aba
+  Features do detalhe do tenant no Admin.
+- **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
+  (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
+  só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
+  mensagem programada e as campanhas. "SAIR", "PARAR" ou "STOP" sozinhos no WhatsApp revogam o
+  marketing daquele canal, confirmam ao cliente e não acionam o agente.
+  `GET|PUT api/atendimento/clientes/{id}/consentimentos` (Admin). Tabela `consentimentos_contato`
+  com RLS e backfill de `ConsentiuMarketing=true` para WhatsApp e e-mail. (#1078)
 - **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
   da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
   horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`

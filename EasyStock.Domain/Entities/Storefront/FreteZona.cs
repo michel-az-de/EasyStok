@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -100,15 +100,7 @@ public class FreteZona
         ValidarTempo(tempoEstimadoMinutos);
         ValidarOrdem(ordem);
 
-        var inicioNorm = NormalizarCep(cepInicio);
-        var fimNorm = NormalizarCep(cepFim);
-        ValidarCep(inicioNorm, nome: "CEP inicial");
-        ValidarCep(fimNorm, nome: "CEP final");
-
-        // Comparação lexicográfica funciona para CEPs sempre com 8 dígitos.
-        if (string.CompareOrdinal(inicioNorm, fimNorm) > 0)
-            throw new RegraDeDominioVioladaException(
-                $"intervalo de CEP invertido: início '{inicioNorm}' > fim '{fimNorm}'.");
+        var (inicioNorm, fimNorm) = FaixaCepValidada(cepInicio, cepFim);
 
         var agora = DateTime.UtcNow;
         return new FreteZona
@@ -148,24 +140,7 @@ public class FreteZona
         ValidarTempo(tempoEstimadoMinutos);
         ValidarOrdem(ordem);
 
-        if (bairros is null || bairros.Length == 0)
-            throw new RegraDeDominioVioladaException(
-                "Lista de bairros é obrigatória — informe ao menos 1 bairro.");
-
-        var normalizados = new List<string>(bairros.Length);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var b in bairros)
-        {
-            if (string.IsNullOrWhiteSpace(b))
-                throw new RegraDeDominioVioladaException(
-                    "bairro em branco não é permitido na lista.");
-
-            var norm = NormalizarBairro(b);
-            if (seen.Add(norm))
-                normalizados.Add(norm);
-        }
-
-        var json = JsonSerializer.Serialize(normalizados);
+        var json = BairrosJsonValidado(bairros);
 
         var agora = DateTime.UtcNow;
         return new FreteZona
@@ -251,7 +226,79 @@ public class FreteZona
         AlteradoEm = DateTime.UtcNow;
     }
 
+    /// <summary>Edição dos dados da zona pelo cadastro da loja (S45). Inválido não muda nada.</summary>
+    public void AtualizarDados(string label, decimal valor, int tempoEstimadoMinutos, int ordem)
+    {
+        ValidarLabel(label);
+        ValidarValor(valor);
+        ValidarTempo(tempoEstimadoMinutos);
+        ValidarOrdem(ordem);
+        Label = label.Trim();
+        Valor = valor;
+        TempoEstimadoMinutos = tempoEstimadoMinutos;
+        Ordem = ordem;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>Passa a cobrir a faixa de CEP (S45). Some a lista de bairros, se havia.</summary>
+    public void DefinirCoberturaPorCep(string cepInicio, string cepFim)
+    {
+        var (inicioNorm, fimNorm) = FaixaCepValidada(cepInicio, cepFim);
+        TipoCobertura = TipoCepRange;
+        CepInicio = inicioNorm;
+        CepFim = fimNorm;
+        BairrosJson = null;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>Passa a cobrir a lista de bairros (S45). Some a faixa de CEP, se havia.</summary>
+    public void DefinirCoberturaPorBairros(string[] bairros)
+    {
+        var json = BairrosJsonValidado(bairros);
+        TipoCobertura = TipoBairrosLista;
+        CepInicio = null;
+        CepFim = null;
+        BairrosJson = json;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     // ── Validações privadas ────────────────────────────────────────────
+
+    private static (string Inicio, string Fim) FaixaCepValidada(string cepInicio, string cepFim)
+    {
+        var inicioNorm = NormalizarCep(cepInicio);
+        var fimNorm = NormalizarCep(cepFim);
+        ValidarCep(inicioNorm, nome: "CEP inicial");
+        ValidarCep(fimNorm, nome: "CEP final");
+
+        // Comparação lexicográfica funciona para CEPs sempre com 8 dígitos.
+        if (string.CompareOrdinal(inicioNorm, fimNorm) > 0)
+            throw new RegraDeDominioVioladaException(
+                $"intervalo de CEP invertido: início '{inicioNorm}' > fim '{fimNorm}'.");
+        return (inicioNorm, fimNorm);
+    }
+
+    private static string BairrosJsonValidado(string[] bairros)
+    {
+        if (bairros is null || bairros.Length == 0)
+            throw new RegraDeDominioVioladaException(
+                "Lista de bairros é obrigatória — informe ao menos 1 bairro.");
+
+        var normalizados = new List<string>(bairros.Length);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var b in bairros)
+        {
+            if (string.IsNullOrWhiteSpace(b))
+                throw new RegraDeDominioVioladaException(
+                    "bairro em branco não é permitido na lista.");
+
+            var norm = NormalizarBairro(b);
+            if (seen.Add(norm))
+                normalizados.Add(norm);
+        }
+
+        return JsonSerializer.Serialize(normalizados);
+    }
 
     private static void ValidarStorefrontId(Guid storefrontId)
     {

@@ -75,6 +75,13 @@ namespace EasyStock.Domain.Entities
             AlteradoEm = DateTime.UtcNow;
         }
 
+        /// <summary>Tira o número da Meta da empresa: o webhook deixa de rotear para ela e o envio cai no número global.</summary>
+        public void DesvincularWhatsApp()
+        {
+            WhatsAppPhoneNumberId = null;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public ICollection<Categoria> Categorias { get; set; } = new List<Categoria>();
         public ICollection<Produto> Produtos { get; set; } = new List<Produto>();
         public ICollection<ProdutoVariacao> VariacoesProduto { get; set; } = new List<ProdutoVariacao>();

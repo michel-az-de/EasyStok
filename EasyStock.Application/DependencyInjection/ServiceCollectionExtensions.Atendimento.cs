@@ -24,6 +24,12 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ProcessarMidiaWhatsAppJobUseCase>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
         services.AddScoped<ResolvedorCanal>();
+
+        // S38: consentimento do cliente final por canal e opt-out por palavra.
+        services.AddScoped<PoliticaEnvioCliente>();
+        services.AddScoped<OptOutPorPalavra>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.ListarConsentimentosClienteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.DefinirConsentimentosClienteUseCase>();
         services.AddScoped<IdentificarClientePorTelefoneUseCase>();
         services.AddScoped<SaudacaoAtendimento>();
 
@@ -50,6 +56,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarMensagensConversaUseCase>();
         services.AddScoped<EnviarMensagemConsoleUseCase>();
         services.AddScoped<GerenciarConversaAtendimentoUseCase>();
+
+        // S47: assistente da dona (somente leitura, sem ferramentas).
+        services.AddScoped<AssistenteDonaUseCase>();
 
         return services;
     }

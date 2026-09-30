@@ -80,6 +80,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ILojaRepository, LojaRepository>();
             services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
             services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IExpedienteLojaRepository, EasyStock.Infra.Postgre.Repositories.Storefront.ExpedienteLojaRepository>();
             services.AddScoped<IPreferenciaMenuRepository, PreferenciaMenuRepository>();
             services.AddScoped<IFornecedorRepository, FornecedorRepository>();
@@ -213,6 +214,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // Atendimento (S04, ADR-0050)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
                 Repositories.Atendimento.ConversaRepository>();
+            // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
+            services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
+                Services.Atendimento.RemetenteWhatsAppDoTenant>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)
