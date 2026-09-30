@@ -204,6 +204,7 @@ public class KdsControllerTests : IDisposable
         var estoque = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
             Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var criarContaReceber = new CriarContaReceberUseCase(
