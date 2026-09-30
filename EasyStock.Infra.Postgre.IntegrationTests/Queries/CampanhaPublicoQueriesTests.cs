@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Campanhas;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Campanhas;
@@ -5,6 +6,7 @@ using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Campanhas;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Queries;
+using EasyStock.Infra.Postgre.Repositories.Campanhas;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 
@@ -121,6 +123,77 @@ public class CampanhaPublicoQueriesTests(PostgreSqlDatabaseFixture fixture)
             (await queries.ListarDestinatariosAsync(empresa.Id, campanha.Id, StatusCampanhaDestinatario.Pendente, 100))
                 .Should().BeEmpty();
             (await queries.ListarDestinatariosAsync(outraEmpresa.Id, campanha.Id, null, 100)).Should().BeEmpty();
+        }
+    }
+
+    [SkippableFact]
+    public async Task RecalculoNoBancoPreservaEnviadosERefazOsDemais()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Casa da Baba Recalculo", "77777777000191");
+        var clientes = new[] { "Ana", "Bia", "Cris", "Duda" }.Select(nome =>
+        {
+            var cliente = Cliente.Criar(empresa.Id, nome);
+            cliente.Telefone = "5511999990000";
+            cliente.DefinirConsentimentoMarketing(true, agora);
+            return cliente;
+        }).ToArray();
+        var (ana, bia, cris, duda) = (clientes[0], clientes[1], clientes[2], clientes[3]);
+        var campanha = NovaCampanha(empresa.Id, "Recalculo");
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            await db.Database.MigrateAsync();
+            db.Empresas.Add(empresa);
+            db.Clientes.AddRange(ana, bia, cris);
+            db.Campanhas.Add(campanha);
+            await db.SaveChangesAsync();
+        }
+
+        async Task<PublicoCampanhaResult> RecalcularAsync()
+        {
+            await using var db = fixture.CreateDbContext();
+            db.SetMobileTenantContext(empresa.Id);
+            var useCase = new CalcularPublicoCampanhaUseCase(
+                new CampanhaRepository(db), new CampanhaPublicoQueries(db), db, TimeProvider.System);
+            return await useCase.ExecuteAsync(empresa.Id, campanha.Id);
+        }
+
+        (await RecalcularAsync()).Pendentes.Should().Be(3);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa.Id);
+            var enviado = await db.CampanhaDestinatarios.SingleAsync(d => d.CampanhaId == campanha.Id && d.ClienteId == ana.Id);
+            enviado.Enfileirar(1, Guid.NewGuid());
+            enviado.MarcarEnviado(agora);
+            (await db.Clientes.SingleAsync(c => c.Id == bia.Id)).Bloquear(null, agora);
+            (await db.Clientes.SingleAsync(c => c.Id == cris.Id)).Ativo = false;
+            db.Clientes.Add(duda);
+            await db.SaveChangesAsync();
+        }
+
+        var resumo = await RecalcularAsync();
+
+        resumo.Should().BeEquivalentTo(new
+        {
+            Total = 3,
+            Pendentes = 1,
+            Preservados = 1,
+            ExcluidosPorMotivo = new Dictionary<string, int> { [MotivoExclusaoCampanha.Bloqueado] = 1 },
+            Amostra = new[] { "Duda" },
+        });
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa.Id);
+            var destinatarios = await new CampanhaPublicoQueries(db).ListarDestinatariosAsync(empresa.Id, campanha.Id, null, 100);
+            destinatarios.Select(d => (d.Nome, d.Status, d.MotivoExclusao)).Should().Equal(
+                ("Ana", StatusCampanhaDestinatario.Enviado, null),
+                ("Bia", StatusCampanhaDestinatario.Excluido, MotivoExclusaoCampanha.Bloqueado),
+                ("Duda", StatusCampanhaDestinatario.Pendente, null));
         }
     }
 
