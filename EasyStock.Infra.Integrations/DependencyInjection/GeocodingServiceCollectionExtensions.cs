@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Infra.Integrations.Geocoding;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Integrations.DependencyInjection;
 
@@ -34,10 +35,23 @@ public static class GeocodingServiceCollectionExtensions
     /// <summary>Base URL default (Nominatim público). Override pra apontar pro self-host.</summary>
     public const string NominatimDefaultBaseUrl = "https://nominatim.openstreetmap.org/";
 
+    /// <summary>Provedor explícito (<c>google</c>). Ausente = comportamento Nominatim acima (issue #1217).</summary>
+    public const string ProviderKey = "Storefront:Frete:GeocodingProvider";
+
+    /// <summary>Chave da Google Maps Platform. Env var alternativa: <see cref="GoogleApiKeyEnvVar"/>.</summary>
+    public const string GoogleApiKeyKey = "Storefront:Frete:GoogleMapsApiKey";
+
+    public const string GoogleApiKeyEnvVar = "GOOGLE_MAPS_API_KEY";
+
+    public const string GoogleDefaultBaseUrl = "https://maps.googleapis.com/maps/api/";
+
     public static IServiceCollection AddEasyStockGeocoding(
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        if (string.Equals(configuration[ProviderKey], "google", StringComparison.OrdinalIgnoreCase))
+            return AddGoogle(services, configuration);
+
         var enabled = ResolveEnabled(configuration);
         if (!enabled)
         {
@@ -54,6 +68,34 @@ public static class GeocodingServiceCollectionExtensions
             // ToS do Nominatim exige User-Agent identificável.
             client.DefaultRequestHeaders.UserAgent.ParseAdd("EasyStok-Storefront/1.0 (+contato@casadababa.app)");
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Google sem chave cai em NoOp: o frete continua pela zona e nada bate na rede.
+    /// </summary>
+    private static IServiceCollection AddGoogle(IServiceCollection services, IConfiguration configuration)
+    {
+        var apiKey = configuration[GoogleApiKeyKey];
+        if (string.IsNullOrWhiteSpace(apiKey))
+            apiKey = Environment.GetEnvironmentVariable(GoogleApiKeyEnvVar);
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            services.AddScoped<IGeocodingClient, NoOpGeocodingClient>();
+            return services;
+        }
+
+        services.AddHttpClient(nameof(GoogleGeocodingClient), client =>
+        {
+            client.BaseAddress = new Uri(GoogleDefaultBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(2);
+        });
+        services.AddScoped<IGeocodingClient>(sp => new GoogleGeocodingClient(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GoogleGeocodingClient)),
+            apiKey,
+            sp.GetRequiredService<ILogger<GoogleGeocodingClient>>()));
 
         return services;
     }
