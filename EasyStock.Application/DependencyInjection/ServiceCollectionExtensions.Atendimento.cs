@@ -37,6 +37,7 @@ public static partial class ServiceCollectionExtensions
 
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
+        services.AddScoped<AvisoStatusPedidoCliente>();
         services.AddScoped<OptOutPorPalavra>();
 
         // S39: mensagem programada ao cliente (console + disparador no processo da API).
@@ -67,7 +68,7 @@ public static partial class ServiceCollectionExtensions
         // TODO(S26): acao:avaliacao.
 
         // Ferramentas do agente. As demais da tabela da S06 dependem da onda 2 e entram aqui quando
-        // existirem: TODO(S14) validar_endereco e confirmar_endereco; TODO(S31) registrar_interesse.
+        // existirem: TODO(S31) registrar_interesse.
         services.AddScoped<IFerramentaAgente, CriarPedidoFerramenta>(); // S10 + S11: pedido, total e link
         services.AddScoped<IFerramentaAgente, ListarJanelasFerramenta>(); // S16: janelas no prazo, com botões
         services.AddScoped<IFerramentaAgente, ConsultarCardapioFerramenta>();
@@ -77,6 +78,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IFerramentaAgente, EncerrarConversaFerramenta>();
         services.AddScoped<IFerramentaAgente, RegistrarRestricaoFerramenta>(); // S24: tag com origem agente
         services.AddScoped<IFerramentaAgente, RegistrarNotaFerramenta>(); // S24: nota interna
+
+        // S14: endereço em texto livre e área de entrega.
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Endereco.ValidarEnderecoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Endereco.ConfirmarEnderecoClienteUseCase>();
+        services.AddScoped<ConfirmarEnderecoPendente>();
+        services.AddScoped<IFerramentaAgente, ValidarEnderecoFerramenta>();
+        services.AddScoped<IFerramentaAgente, ConfirmarEnderecoFerramenta>();
+        services.AddScoped<IFerramentaAgente, ListarEnderecoSalvoFerramenta>();
 
         // S07: handoff pelo console (inbox, envio da dona, assumir, liberar, encerrar, marcar lida).
         services.AddScoped<ListarConversasAtendimentoUseCase>();

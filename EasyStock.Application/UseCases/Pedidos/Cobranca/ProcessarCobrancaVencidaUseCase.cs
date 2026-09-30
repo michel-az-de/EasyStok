@@ -1,4 +1,5 @@
 using EasyStock.Application.Events.Storefront.Handlers;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -22,6 +23,9 @@ public enum ResultadoExpiracaoCobranca
 
     /// <summary>Pedido cancelado com motivo <c>pagamento_expirado</c> e vaga liberada.</summary>
     PedidoCancelado = 4,
+
+    /// <summary>S32: o Mercado Pago tinha um pagamento aprovado (webhook perdido); o pedido foi confirmado.</summary>
+    ConfirmadaPelaConsulta = 5,
 }
 
 /// <summary>
@@ -37,8 +41,9 @@ public enum ResultadoExpiracaoCobranca
 /// </list>
 ///
 /// <para>
-/// Pendente para S32: antes de expirar, consultar <c>GET v1/payments/search?external_reference=</c> para
-/// pegar webhook perdido e confirmar pelo <see cref="ConfirmarPagamentoPedidoUseCase"/>.
+/// S32: antes de expirar, consulta <c>GET v1/payments/search?external_reference=</c> para pegar webhook
+/// perdido; pagamento aprovado confirma pelo <see cref="ConfirmarPagamentoPedidoUseCase"/> e nada expira.
+/// Falha nessa consulta propaga: sem saber se o cliente pagou, o job não cancela e tenta na próxima rodada.
 /// </para>
 /// </summary>
 public sealed class ProcessarCobrancaVencidaUseCase(
@@ -48,6 +53,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     CancelarPedidoUseCase cancelarPedido,
     LiberarVagaOnPedidoCanceladoHandler liberarVaga,
     AvisoCobrancaConversa aviso,
+    IMercadoPagoClient mercadoPagoClient,
+    ConfirmarPagamentoPedidoUseCase confirmarPagamento,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
@@ -59,6 +66,13 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     {
         ArgumentNullException.ThrowIfNull(item);
         tenantContext.SetCurrentTenant(item.EmpresaId);
+
+        if (await ConfirmarPagamentoPerdidoAsync(item, ct))
+        {
+            logger.LogInformation("Cobranca vencida confirmada pela consulta cobrancaId={CobrancaId} pedidoId={PedidoId}",
+                item.CobrancaId, item.PedidoId);
+            return ResultadoExpiracaoCobranca.ConfirmadaPelaConsulta;
+        }
 
         var (resultado, conversaId, link) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await ProcessarNoLockAsync(item, token), ct);
@@ -75,6 +89,20 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         logger.LogInformation("Cobranca vencida cobrancaId={CobrancaId} pedidoId={PedidoId} resultado={Resultado}",
             item.CobrancaId, item.PedidoId, resultado);
         return resultado;
+    }
+
+    /// <summary>Pagamento aprovado no Mercado Pago que o webhook não entregou, do mais novo para o mais antigo.</summary>
+    private async Task<bool> ConfirmarPagamentoPerdidoAsync(CobrancaPedidoVencida item, CancellationToken ct)
+    {
+        var pagamentos = await mercadoPagoClient.BuscarPagamentosPorReferenciaAsync(item.PedidoId.ToString(), ct);
+        foreach (var pagamento in pagamentos.Where(p => p.Aprovado))
+        {
+            var r = await confirmarPagamento.ExecuteAsync(new ConfirmarPagamentoPedidoInput(
+                item.PedidoId, pagamento.Id, pagamento.Status, pagamento.TransactionAmount,
+                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved), ct);
+            if (r.Confirmado) return true;
+        }
+        return false;
     }
 
     private async Task<(ResultadoExpiracaoCobranca, Guid?, string?)> ProcessarNoLockAsync(

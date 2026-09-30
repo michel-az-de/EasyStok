@@ -202,7 +202,7 @@ public static class StartupMigrationsAndSeed
                 app.Logger.LogWarning(ex, "[Migrations] Drift check falhou (nao-fatal).");
             }
 
-            // SuperAdmin global ANTES do seed de tenants — o painel /EasyStock.Admin
+            // SuperAdmin global ANTES do seed de tenants — as rotas api/admin/*
             // depende dele e nenhum dos seeds de tenant cria SuperAdmin (apenas Admin
             // de empresa). Idempotente: no-op se ja existe.
             // R6: em Production, exception aqui DERRUBA o startup. Painel admin inacessivel

@@ -5974,6 +5974,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("MaxTentativas")
                         .HasColumnType("integer");
 
+                    b.Property<string>("MetadadosJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("ProviderUsado")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -6197,6 +6200,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<string>("MetadadosJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -8568,6 +8574,10 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<int?>("FreteRaioMaxMetros")
                         .HasColumnType("integer");
+
+                    b.Property<string>("InstagramUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)

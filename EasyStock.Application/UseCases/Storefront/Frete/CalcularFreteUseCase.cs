@@ -103,7 +103,8 @@ public sealed class CalcularFreteUseCase(
             Valor: valorCentavos,
             ValorFormatado: FormatarValor(zona.Valor),
             EtaLabel: FormatarEta(zona.TempoEstimadoMinutos),
-            ZonaLabel: zona.Label);
+            ZonaLabel: zona.Label,
+            TempoEstimadoMinutos: zona.TempoEstimadoMinutos);
     }
 
     /// <summary>
@@ -160,7 +161,8 @@ public sealed class CalcularFreteUseCase(
             Valor: r.ValorCentavos,
             ValorFormatado: FormatarValor(r.ValorCentavos / 100m),
             EtaLabel: FormatarEta(minutos),
-            ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio");
+            ZonaLabel: r.Gratis ? "Frete grátis" : "Entrega por raio",
+            TempoEstimadoMinutos: minutos);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

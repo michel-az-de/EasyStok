@@ -7,26 +7,14 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Infra.Async.Pagamentos;
 
 /// <summary>
-/// Adapter stub para Mercado Pago (F12). Mesmo padrao do <see cref="StripeGatewayAdapter"/>:
-/// sem chamada a API real, retorna "nao configurado" ate que credenciais sejam
-/// adicionadas em <c>MercadoPago:AccessToken</c>.
-///
-/// <para>
-/// Integrar de verdade:
-/// </para>
-/// <list type="number">
-///   <item>Adicionar pacote <c>mercadopago-sdk-dotnet</c>.</item>
-///   <item>No DI: <c>MercadoPagoConfig.AccessToken = config["MercadoPago:AccessToken"]</c>.</item>
-///   <item><c>CriarAsync</c>: <c>PreferenceClient.CreateAsync</c> ou
-///   <c>PaymentClient.CreateAsync</c> (Pix nativo MP). Retornar <c>init_point</c>
-///   em <c>UrlCheckout</c> ou QR Code Pix.</item>
-///   <item><c>ConsultarAsync</c>: <c>PaymentClient.GetAsync(id)</c>; mapear
-///   status approved → Confirmado, pending → Pendente, rejected → Falhou.</item>
-///   <item><c>EstornarAsync</c>: <c>PaymentRefundClient.RefundAsync(...)</c>.</item>
-/// </list>
+/// Adapter do Mercado Pago no roteador de gateways (F12). <c>ConsultarAsync</c> e <c>EstornarAsync</c>
+/// delegam ao <see cref="IMercadoPagoClient"/> (S32: <c>GET v1/payments/{id}</c> e
+/// <c>POST v1/payments/{id}/refunds</c>). <c>CriarAsync</c> continua não implementado: é o caminho das
+/// faturas SaaS, que sai em P02; o pedido é cobrado pela preferência da S11.
 /// </summary>
 public sealed class MercadoPagoGatewayAdapter(
     IConfiguration configuration,
+    IMercadoPagoClient mercadoPagoClient,
     ILogger<MercadoPagoGatewayAdapter> logger) : IPagamentoGateway
 {
     public string Provedor => "MercadoPago";
@@ -60,9 +48,38 @@ public sealed class MercadoPagoGatewayAdapter(
             "MercadoPagoGatewayAdapter.CriarAsync: SDK MP nao adicionado. Veja XML doc do adapter.");
     }
 
-    public Task<StatusGateway> ConsultarAsync(string transactionId, CancellationToken ct = default) =>
-        Task.FromResult(StatusGateway.Desconhecido);
+    public async Task<StatusGateway> ConsultarAsync(string transactionId, CancellationToken ct = default)
+    {
+        try
+        {
+            var pagamento = await mercadoPagoClient.ConsultarPagamentoAsync(transactionId, ct);
+            return pagamento?.Status.ToLowerInvariant() switch
+            {
+                PagamentoMercadoPago.Approved => StatusGateway.Confirmado,
+                PagamentoMercadoPago.Pending or PagamentoMercadoPago.InProcess or "authorized" => StatusGateway.Pendente,
+                PagamentoMercadoPago.Rejected or PagamentoMercadoPago.Cancelled => StatusGateway.Falhou,
+                PagamentoMercadoPago.Refunded or PagamentoMercadoPago.ChargedBack => StatusGateway.Estornado,
+                _ => StatusGateway.Desconhecido,
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "MercadoPagoGatewayAdapter.ConsultarAsync falhou.");
+            return StatusGateway.Desconhecido;
+        }
+    }
 
-    public Task<EstornoResult> EstornarAsync(string transactionId, decimal valor, CancellationToken ct = default) =>
-        Task.FromResult(new EstornoResult(false, Mensagem: "MercadoPago estorno nao implementado (stub)."));
+    public async Task<EstornoResult> EstornarAsync(string transactionId, decimal valor, CancellationToken ct = default)
+    {
+        try
+        {
+            var estorno = await mercadoPagoClient.EstornarAsync(transactionId, valor, ct: ct);
+            return new EstornoResult(true, ProtocoloEstorno: estorno.EstornoId);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "MercadoPagoGatewayAdapter.EstornarAsync falhou.");
+            return new EstornoResult(false, Mensagem: "Falha ao estornar no Mercado Pago.");
+        }
+    }
 }

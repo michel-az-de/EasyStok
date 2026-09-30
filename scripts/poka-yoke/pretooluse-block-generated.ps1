@@ -24,8 +24,7 @@ try {
   # cada regra: substring que identifica a COPIA gerada + a FONTE a editar
   $rules = @(
     @{ match = 'EasyStock.Web/wwwroot/etiqueta/';               src = 'EasyStock.Api/wwwroot/pwa/etiqueta (copiado pelo target CopyEtiquetaAssets)' },
-    @{ match = 'EasyStock.Web/wwwroot/css/tailwind.dist.css';   src = 'tailwind.src.css + tailwind.config.js + .cshtml/.js (gerado por TailwindBuild)' },
-    @{ match = 'EasyStock.Admin/wwwroot/css/tailwind.dist.css'; src = 'tailwind.src.css + tailwind.config.js + .cshtml/.js (gerado por TailwindBuild)' }
+    @{ match = 'EasyStock.Web/wwwroot/css/tailwind.dist.css';   src = 'tailwind.src.css + tailwind.config.js + .cshtml/.js (gerado por TailwindBuild)' }
   )
 
   foreach ($r in $rules) {

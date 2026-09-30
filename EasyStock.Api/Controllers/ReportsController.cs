@@ -7,7 +7,6 @@ namespace EasyStock.Api.Controllers;
 
 /// <summary>
 /// Motor de relatórios assíncrono — Fase 1 (Tenant context).
-/// Endpoints Admin em <see cref="AdminReportsController"/> (rota /api/admin/reports).
 /// </summary>
 [ApiController]
 [Route("api/reports")]

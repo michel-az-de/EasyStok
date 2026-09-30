@@ -27,7 +27,7 @@ internal static class ArchTestPaths
         return current.FullName;
     }
 
-    /// <summary>Diretorio &lt;raiz&gt;/&lt;project&gt;/&lt;sub...&gt; (ex.: AppDirectory("EasyStock.Admin", "wwwroot", "css")).</summary>
+    /// <summary>Diretorio &lt;raiz&gt;/&lt;project&gt;/&lt;sub...&gt; (ex.: AppDirectory("EasyStock.Web", "wwwroot", "css")).</summary>
     public static DirectoryInfo AppDirectory(string project, params string[] sub)
     {
         var parts = new List<string> { SolutionRoot(), project };
