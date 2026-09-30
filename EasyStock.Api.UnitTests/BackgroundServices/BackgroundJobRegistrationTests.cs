@@ -65,6 +65,22 @@ public class BackgroundJobRegistrationTests
     }
 
     [Fact]
+    public void AddEasyStockBackgroundJobs_RegistraAvaliadorDeLembretes_EDesligaPorFlag()
+    {
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var desligado = new ServiceCollection().AddLogging();
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableAvaliadorLembretes"] = "false" })
+            .Build());
+
+        ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().Contain(typeof(AvaliadorLembretesBackgroundService));
+        desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().NotContain(typeof(AvaliadorLembretesBackgroundService), "desligar o avaliador é o rollback do S43");
+    }
+
+    [Fact]
     public void AddEasyStockBackgroundJobs_DeveRegistrarJobsLegados_QuandoFlagsEstiveremHabilitadas()
     {
         var services = new ServiceCollection();
