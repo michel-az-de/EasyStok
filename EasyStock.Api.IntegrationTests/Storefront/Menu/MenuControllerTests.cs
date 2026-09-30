@@ -520,6 +520,51 @@ public sealed class MenuControllerTests : IAsyncLifetime
         itens.Select(i => i.Id).Should().Contain(new[] { seed.Vinculado.Id, seed.Avulso.Id });
     }
 
+    // ── #1171: saldo produzido projetado no cardápio ───────────────────
+
+    [SkippableFact]
+    public async Task GetMenu_VinculadoComLoteProduzido_ProjetaSaldoSemMudarDisponivel()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+        var seed = await SeedCardapioAsync(factory, slug: "casa-da-baba-saldo");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var _ = db.UseRowLevelSecurityBypass();
+            foreach (var (qtd, validadeEmDias) in new[] { (3m, 2), (4m, -1) })
+            {
+                db.ItensEstoque.Add(new ItemEstoque
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = seed.EmpresaId,
+                    ProdutoId = seed.ItemVisivel.ProdutoId!.Value,
+                    QuantidadeInicial = Quantidade.From(qtd),
+                    QuantidadeAtual = Quantidade.From(qtd),
+                    CustoUnitario = Dinheiro.FromDecimal(10m),
+                    ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(validadeEmDias)),
+                    Status = StatusItemEstoque.Ok,
+                    EntradaEm = DateTime.UtcNow,
+                    CriadoEm = DateTime.UtcNow,
+                    AlteradoEm = DateTime.UtcNow,
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        // Request anônima: o saldo precisa aparecer mesmo sem tenant no contexto.
+        var resp = await client.GetAsync($"/api/storefront/{seed.Storefront.Slug}/menu");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = JsonSerializer.Deserialize<MenuEnvelope>(
+            await resp.Content.ReadAsStringAsync(), JsonOpts)!.Itens.Single();
+        dto.EstoqueAtual.Should().Be(3, "só o lote não vencido conta");
+        dto.Disponivel.Should().BeTrue("disponibilidade segue a flag manual (#1171)");
+    }
+
     // ── DTO espelho ────────────────────────────────────────────────────
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);

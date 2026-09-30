@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -34,6 +35,7 @@ namespace EasyStock.Application.UseCases.Storefront.Menu;
 public sealed class ListarCardapioPublicoUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioItemRepository,
+    IItemEstoqueRepository itemEstoqueRepository,
     ILogger<ListarCardapioPublicoUseCase> logger)
 {
     /// <summary>Sentinela para empurrar items sem categoria para o fim da ordenação.</summary>
@@ -56,6 +58,7 @@ public sealed class ListarCardapioPublicoUseCase(
         }
 
         var itens = await cardapioItemRepository.GetVisiveisDoStorefrontAsync(storefront.Id, ct);
+        var saldos = await ObterSaldosAsync(storefront.EmpresaId, itens, ct);
 
         var dtos = itens
             // CategoriaTexto ?? Produto.Categoria.Nome: avulsos usam CategoriaTexto;
@@ -79,10 +82,12 @@ public sealed class ListarCardapioPublicoUseCase(
                 PrecoCentavos: (long)Math.Round(i.PrecoEfetivo() * 100m, MidpointRounding.AwayFromZero),
                 ImagemUrl: i.FotoUrl,
                 // Avulso: null (frontend usa disponivel; estoqueAtual não se aplica).
-                // Vinculado: 0 por ora — snapshot eventual fora deste escopo (TASK-EZ-MENU-001).
-                EstoqueAtual: i.ProdutoId.HasValue ? 0 : null,
+                // Vinculado (#1171): saldo produzido, somado dos lotes com saldo e não vencidos.
+                EstoqueAtual: i.ProdutoId.HasValue ? SaldoInteiro(saldos, i.ProdutoId.Value) : null,
                 Categoria: FormatarExibicao(i.CategoriaEfetiva()),
                 Ordem: i.OrdemExibicao,
+                // #1171: segue flag manual. Saldo 0 NÃO esgota o item: o checkout recusa
+                // !Disponivel (#1158) e falta de estoque avisa, não trava o pedido (S17).
                 Disponivel: i.Disponivel,
                 Tag: i.Tag,
                 PesoExibicao: i.PesoExibicao,
@@ -92,6 +97,30 @@ public sealed class ListarCardapioPublicoUseCase(
 
         return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);
     }
+
+    /// <summary>
+    /// Uma consulta de saldos para todos os itens vinculados (sem N+1). Sem item vinculado,
+    /// não vai ao banco. <paramref name="empresaId"/> vem do storefront resolvido pelo slug.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<Guid, decimal>> ObterSaldosAsync(
+        Guid empresaId, IReadOnlyList<CardapioItem> itens, CancellationToken ct)
+    {
+        var produtoIds = itens
+            .Where(i => i.ProdutoId.HasValue)
+            .Select(i => i.ProdutoId!.Value)
+            .Distinct()
+            .ToList();
+        if (produtoIds.Count == 0)
+            return new Dictionary<Guid, decimal>();
+
+        return await itemEstoqueRepository.GetSaldoDisponivelPorProdutosAsync(empresaId, produtoIds, ct);
+    }
+
+    /// <summary>Contrato expõe inteiro: arredonda para baixo (não promete fração que não existe inteira).</summary>
+    private static int SaldoInteiro(IReadOnlyDictionary<Guid, decimal> saldos, Guid produtoId) =>
+        saldos.TryGetValue(produtoId, out var saldo) && saldo > 0
+            ? (int)Math.Floor(Math.Min(saldo, int.MaxValue))
+            : 0;
 
     /// <summary>Preposições/conjunções que ficam minúsculas no meio do título (pt-BR).</summary>
     private static readonly HashSet<string> PalavrasMinusculas = new(StringComparer.Ordinal)

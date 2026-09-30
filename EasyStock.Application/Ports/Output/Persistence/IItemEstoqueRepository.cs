@@ -35,6 +35,15 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// Retorna dicionario produtoId -> lotes; produto sem estoque nao aparece (consumer usa TryGetValue + default vazio).
         /// </summary>
         Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default);
+        /// <summary>
+        /// Batch (#1171): saldo disponível somado por produto numa única query
+        /// (<c>WHERE EmpresaId = @e AND ProdutoId IN (...)</c>). Conta só lote com
+        /// <c>QuantidadeAtual &gt; 0</c> e não vencido (mesmo critério de #983 para saída).
+        /// Produto sem saldo não aparece no dicionário (consumer trata ausência como 0).
+        /// Não aplica filtro global de tenant: o caller é o cardápio público anônimo, e o
+        /// isolamento vem do <paramref name="empresaId"/> explícito no WHERE.
+        /// </summary>
+        Task<IReadOnlyDictionary<Guid, decimal>> GetSaldoDisponivelPorProdutosAsync(Guid empresaId, IReadOnlyCollection<Guid> produtoIds, CancellationToken ct = default);
         /// <param name="fefo">true = FEFO (saída pelo lote com validade mais próxima); false = FIFO (saída pela entrada mais antiga).</param>
         /// <param name="incluirVencidos">
         /// false (padrão) = exclui lotes com <c>ValidadeEm</c> vencido (#983) — evita que uma

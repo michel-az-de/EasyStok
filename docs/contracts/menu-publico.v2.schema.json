@@ -40,7 +40,7 @@
         "imagemUrl": { "type": ["string", "null"] },
         "estoqueAtual": {
           "type": ["integer", "null"],
-          "description": "null para avulso e para item guarda-chuva (estoque e por opcao); snapshot eventual para vinculado simples. Nao usar para decisao de compra."
+          "description": "null para avulso e para item guarda-chuva (estoque e por opcao); vinculado simples: saldo do ItemEstoque do produto (soma dos lotes com saldo e nao vencidos, arredondada para baixo; 0 sem lote), snapshot eventual sob o cache de 5 min (#1171). Informativo: NAO governa disponivel, que segue a flag manual (saldo 0 nao esgota o item; falta de estoque avisa e nao trava, S17). Nao usar para decisao de compra."
         },
         "categoria": { "type": ["string", "null"] },
         "ordem": { "type": "number" },
