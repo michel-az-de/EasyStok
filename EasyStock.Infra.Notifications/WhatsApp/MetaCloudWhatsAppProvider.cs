@@ -17,7 +17,9 @@ namespace EasyStock.Infra.Notifications.WhatsApp;
 /// <list type="bullet">
 /// <item>conversa aberta dentro da janela: texto renderizado, ou mensagem interativa quando há
 /// <c>Metadados["botao1..3"]</c> no formato <c>id|título</c> (S26);</item>
-/// <item>sem conversa aberta ou fora da janela, com <c>Metadados["template"]</c>: template com <c>param1..N</c>;</item>
+/// <item>sem conversa aberta ou fora da janela, com <c>Metadados["template"]</c>: template com <c>param1..N</c>
+/// e, com <c>Metadados["imagem"]</c> (arte da campanha, #1226), a imagem no cabeçalho;</item>
+/// <item>dentro da janela com <c>Metadados["imagem"]</c>: imagem com o texto como legenda;</item>
 /// <item>conversa aberta fora da janela sem template: falha permanente, sem chamar a Meta;</item>
 /// <item>sem conversa e sem template: tenta o texto; se a Meta recusar com 131047, falha permanente.</item>
 /// </list>
@@ -32,6 +34,9 @@ public sealed class MetaCloudWhatsAppProvider(
 {
     public const string ErroForaDaJanelaSemTemplate = "fora_da_janela_24h_sem_template";
 
+    /// <summary>Limite da Meta para a legenda de uma imagem.</summary>
+    public const int LegendaImagemTamanhoMaximo = 1024;
+
     private const string IdiomaPadrao = "pt_BR";
 
     public string Nome => "meta";
@@ -41,6 +46,7 @@ public sealed class MetaCloudWhatsAppProvider(
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var template = LerTemplate(mensagem.Metadados);
         var botoes = LerBotoes(mensagem.Metadados);
+        var imagem = LerImagem(mensagem.Metadados);
 
         try
         {
@@ -57,11 +63,15 @@ public sealed class MetaCloudWhatsAppProvider(
             if (template is { } t && !dentroDaJanela)
                 wamid = botoes.Count > 0
                     ? await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, botoes, ct)
-                    : await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, ct);
+                    : imagem is not null
+                        ? await canal.EnviarModeloComImagemAsync(contato, t.Nome, t.Idioma, t.Parametros, imagem, ct)
+                        : await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, ct);
+            else if (botoes.Count > 0 && dentroDaJanela)
+                wamid = await canal.EnviarBotoesAsync(contato, mensagem.Corpo, botoes, ct);
+            else if (imagem is not null)
+                wamid = await EnviarImagemComTextoAsync(canal, contato, imagem, mensagem.Corpo, ct);
             else
-                wamid = botoes.Count > 0 && dentroDaJanela
-                    ? await canal.EnviarBotoesAsync(contato, mensagem.Corpo, botoes, ct)
-                    : await canal.EnviarTextoAsync(contato, mensagem.Corpo, ct);
+                wamid = await canal.EnviarTextoAsync(contato, mensagem.Corpo, ct);
 
             if (conversa is not null)
                 await RegistrarNoHistoricoAsync(conversa, mensagem.Corpo, wamid, agora, ct);
@@ -134,6 +144,26 @@ public sealed class MetaCloudWhatsAppProvider(
         await conversaRepository.AddMensagemAsync(copia, ct);
         await unitOfWork.CommitAsync();
     }
+
+    /// <summary>
+    /// Imagem com o texto como legenda (#1226: arte da campanha dentro da janela). Legenda acima do limite
+    /// da Meta sai em duas mensagens: a imagem sem legenda e depois o texto, cujo id fica no histórico.
+    /// </summary>
+    private static async Task<string> EnviarImagemComTextoAsync(
+        ICanalMensageria canal, string contato, string imagem, string texto, CancellationToken ct)
+    {
+        if (texto.Length <= LegendaImagemTamanhoMaximo)
+            return await canal.EnviarImagemAsync(contato, imagem, texto, ct);
+
+        await canal.EnviarImagemAsync(contato, imagem, null, ct);
+        return await canal.EnviarTextoAsync(contato, texto, ct);
+    }
+
+    /// <summary><c>imagem</c>: URL HTTPS pública (cabeçalho do template ou imagem com legenda na janela).</summary>
+    private static string? LerImagem(IReadOnlyDictionary<string, string>? metadados) =>
+        metadados is not null && metadados.TryGetValue("imagem", out var url) && !string.IsNullOrWhiteSpace(url)
+            ? url.Trim()
+            : null;
 
     private static (string Nome, string Idioma, IReadOnlyList<string> Parametros)? LerTemplate(
         IReadOnlyDictionary<string, string>? metadados)

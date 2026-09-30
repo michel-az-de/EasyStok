@@ -19,12 +19,17 @@ public interface IWhatsAppCloudClient
     Task<EnvioWhatsAppResult> EnviarBotoesAsync(
         string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default);
 
+    /// <summary>
+    /// <paramref name="imagemCabecalho"/>: URL HTTPS pública do cabeçalho <c>IMAGE</c> do template (#1226). Só
+    /// para template aprovado com esse cabeçalho: a Meta recusa o parâmetro sobrando e também a falta dele.
+    /// </summary>
     Task<EnvioWhatsAppResult> EnviarTemplateAsync(
         string waId,
         string nomeTemplate,
         string idioma,
         IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null,
+        string? imagemCabecalho = null,
         CancellationToken ct = default);
 
     Task MarcarComoLidaAsync(string wamid, CancellationToken ct = default);
