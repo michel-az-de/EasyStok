@@ -10,10 +10,14 @@ public sealed record RegistrarInteresseItemCommand(
     Guid EmpresaId, Guid ClienteId, Guid? CardapioItemId, string? Descricao, string Origem);
 
 public sealed record InteresseItemResult(
-    Guid Id, Guid ClienteId, Guid? CardapioItemId, string? Descricao, string Origem, DateTime RegistradoEm);
+    Guid Id, Guid ClienteId, Guid? CardapioItemId, string? Descricao, string Origem, DateTime RegistradoEm,
+    DateTime? AtendidoEm);
 
 public sealed class ClienteNaoEncontradoParaInteresseException(Guid clienteId)
     : Exception($"Cliente {clienteId} não encontrado nesta empresa.");
+
+public sealed class InteresseNaoEncontradoException(Guid interesseId)
+    : Exception($"Interesse {interesseId} não encontrado para este cliente.");
 
 /// <summary>
 /// S31: registra que o cliente quer um item indisponível. O item do cardápio é identificado pelo id
@@ -82,7 +86,7 @@ public sealed class RegistrarInteresseItemUseCase(
     }
 
     internal static InteresseItemResult Mapear(InteresseItem i) =>
-        new(i.Id, i.ClienteId, i.CardapioItemId, i.Descricao, i.Origem, i.RegistradoEm);
+        new(i.Id, i.ClienteId, i.CardapioItemId, i.Descricao, i.Origem, i.RegistradoEm, i.AtendidoEm);
 
     private static string Normalizar(string texto)
     {
@@ -103,4 +107,73 @@ public sealed class ListarSugestoesInteresseUseCase(IInteresseItemRepository int
 {
     public Task<IReadOnlyList<InteresseAbertoCliente>> ExecuteAsync(Guid empresaId, Guid cardapioItemId, CancellationToken ct = default) =>
         interesses.ListarAbertosDoItemAsync(empresaId, cardapioItemId, ct);
+}
+
+/// <summary>
+/// #1228: a dona fecha o interesse pelo console (avisou o cliente ou ele já foi atendido). Interesse de
+/// outra empresa ou de outro cliente é tratado como inexistente. Idempotente: vale o primeiro instante.
+/// </summary>
+public sealed class MarcarInteresseAtendidoUseCase(
+    IInteresseItemRepository interesses,
+    IUnitOfWork unitOfWork,
+    TimeProvider relogio)
+{
+    /// <exception cref="InteresseNaoEncontradoException">Outra empresa, outro cliente ou inexistente.</exception>
+    public async Task<InteresseItemResult> ExecuteAsync(Guid empresaId, Guid clienteId, Guid interesseId, CancellationToken ct = default)
+    {
+        var interesse = await interesses.GetByIdAsync(empresaId, interesseId, ct);
+        if (interesse is null || interesse.ClienteId != clienteId)
+            throw new InteresseNaoEncontradoException(interesseId);
+
+        if (interesse.Aberto)
+        {
+            interesse.MarcarAtendido(relogio.GetUtcNow().UtcDateTime);
+            await unitOfWork.CommitAsync();
+        }
+        return RegistrarInteresseItemUseCase.Mapear(interesse);
+    }
+}
+
+/// <summary>#1228: interesses do cliente (abertos e atendidos) para o dossiê do console.</summary>
+public sealed class ListarInteressesDoClienteUseCase(IInteresseItemRepository interesses)
+{
+    public async Task<IReadOnlyList<InteresseItemResult>> ExecuteAsync(Guid empresaId, Guid clienteId, CancellationToken ct = default) =>
+        (await interesses.ListarDoClienteAsync(empresaId, clienteId, ct))
+            .Select(RegistrarInteresseItemUseCase.Mapear)
+            .ToList();
+}
+
+/// <summary>
+/// #1228: o cliente comprou o item em que tinha interesse, então o interesse está atendido. Roda no
+/// <c>pedido.pago</c> (handler do outbox), que cobre o pagamento pela conversa e pelo site; o checkout
+/// não conhece interesses. Só casa pelo item do cardápio: interesse só com descrição fica com a dona.
+/// </summary>
+public sealed class FecharInteressesDoPedidoUseCase(
+    IPedidoRepository pedidos,
+    IInteresseItemRepository interesses,
+    IUnitOfWork unitOfWork,
+    TimeProvider relogio)
+{
+    /// <returns>Quantos interesses foram fechados.</returns>
+    public async Task<int> ExecuteAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
+    {
+        var pedido = await pedidos.GetByIdWithDetailsAsync(empresaId, pedidoId);
+        if (pedido?.ClienteId is not { } clienteId) return 0;
+
+        var itens = pedido.Itens
+            .Where(i => i.CardapioItemId is not null)
+            .Select(i => i.CardapioItemId!.Value)
+            .Distinct()
+            .ToList();
+        if (itens.Count == 0) return 0;
+
+        var abertos = await interesses.ListarAbertosDoClienteNosItensAsync(empresaId, clienteId, itens, ct);
+        if (abertos.Count == 0) return 0;
+
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        foreach (var interesse in abertos)
+            interesse.MarcarAtendido(agora);
+        await unitOfWork.CommitAsync();
+        return abertos.Count;
+    }
 }
