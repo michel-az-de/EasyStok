@@ -11,6 +11,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Entregadores, viagens e chamado** (S44): `Entregador`, `Viagem` com paradas ordenadas e
+  `ChamadoEntregador`, migration `AddEntregadoresViagens` com RLS. `api/atendimento/entregadores`
+  (CRUD) e `api/atendimento/viagens` (criar, entregador, incluir, retirar e reordenar parada, sair,
+  marcar parada entregue, desfazer), com link de rota no Google Maps sem chave. "Sair" leva todos os
+  pedidos para `saiu_para_entrega` num commit só e publica `pedido.mudou_status` de cada um; sem
+  entregador é recusado (RN-32) e cliente bloqueado não entra (RN-14). Cada parada guarda o retrato
+  do entregador na saída. `GET api/atendimento/relatorios/entregas-por-bairro` (policy `Admin`). (#1183)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
