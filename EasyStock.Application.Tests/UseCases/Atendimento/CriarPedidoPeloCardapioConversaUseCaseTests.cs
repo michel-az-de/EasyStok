@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -39,6 +40,11 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
         public List<Mensagem> Mensagens { get; } = new();
         public List<CobrancaPedido> Cobrancas { get; } = new();
         public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+        public IOperacaoEventPublisher Eventos { get; } = Substitute.For<IOperacaoEventPublisher>();
+
+        /// <summary>Ordem observada: "mensagem" (resumo gravado), "commit" e "evento:&lt;nome&gt;".</summary>
+        public List<string> Linha { get; } = new();
+        public List<(string Nome, object Payload)> Publicados { get; } = new();
         public CriarPedidoPeloCardapioConversaUseCase UseCase { get; }
         public Guid EmpresaId => Checkout.Storefront.EmpresaId;
 
@@ -53,7 +59,14 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
             Conversa = Conversa.Abrir(EmpresaId, "5511999998888", Agora, "Maria", Cliente.Id);
             ConversaRepo.ObterPorIdAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
             ConversaRepo.When(r => r.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>()))
-                .Do(ci => Mensagens.Add(ci.Arg<Mensagem>()));
+                .Do(ci => { Mensagens.Add(ci.Arg<Mensagem>()); Linha.Add("mensagem"); });
+            Uow.When(u => u.CommitAsync()).Do(_ => Linha.Add("commit"));
+            Eventos.When(e => e.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>()))
+                .Do(ci =>
+                {
+                    Linha.Add("evento:" + ci.ArgAt<string>(0));
+                    Publicados.Add((ci.ArgAt<string>(0), ci.ArgAt<object>(2)));
+                });
 
             var cobrancaRepo = Substitute.For<ICobrancaPedidoRepository>();
             cobrancaRepo.ListarDoPedidoAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -78,7 +91,7 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
             UseCase = new CriarPedidoPeloCardapioConversaUseCase(
                 LinkService, Tenant, ConversaRepo, clienteRepo,
                 new CriarPedidoAtendimentoUseCase(Checkout.Servico(), ConversaRepo, clienteRepo, Checkout.ConfiguracaoAtendimentoRepo, Uow, Checkout.Atribuicao()),
-                gerar, trocar, Uow, TimeProvider.System,
+                gerar, trocar, Eventos, Uow, TimeProvider.System,
                 NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance);
         }
 
@@ -167,5 +180,59 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
         c.Links.Links.Single().UsadoEm.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AvisaOConsoleDepoisDoCommit()
+    {
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+
+        var resultado = await c.UseCase.ExecuteAsync(c.Input(token));
+
+        var resumo = c.Mensagens.Single();
+        var pedido = c.Publicados.Should().ContainSingle(p => p.Nome == EventosOperacao.ConversaPedidoPelaPagina)
+            .Subject.Payload.Should().BeOfType<ConversaPedidoPelaPaginaOperacao>().Subject;
+        pedido.Should().Be(new ConversaPedidoPelaPaginaOperacao(c.Conversa.Id, resultado.PedidoId,
+            resultado.PedidoId.ToString("N")[..8].ToUpperInvariant(), 25m));
+        c.Publicados.Should().ContainSingle(p => p.Nome == EventosOperacao.ConversaMensagemRecebida)
+            .Which.Payload.Should().BeEquivalentTo(new { conversaId = c.Conversa.Id, mensagemId = resumo.Id });
+        await c.Eventos.Received().PublicarAsync(Arg.Any<string>(), c.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+
+        var gravouResumo = c.Linha.IndexOf("mensagem");
+        var commitDoResumo = c.Linha.IndexOf("commit", gravouResumo);
+        commitDoResumo.Should().BePositive("o resumo é gravado num commit");
+        c.Linha.FindIndex(l => l.StartsWith("evento:")).Should().BeGreaterThan(commitDoResumo,
+            "evento de UI só sai depois do commit");
+    }
+
+    [Fact]
+    public async Task CommitFalho_NaoAvisaOConsole()
+    {
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+        var commits = 0;
+        c.Uow.CommitAsync().Returns(_ => ++commits == 1
+            ? Task.FromResult(1)
+            : Task.FromException<int>(new InvalidOperationException("banco caiu")));
+
+        var act = () => c.UseCase.ExecuteAsync(c.Input(token));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        await c.Eventos.DidNotReceiveWithAnyArgs().PublicarAsync(default!, default, default!, default);
+    }
+
+    [Fact]
+    public async Task AvisoAoConsoleFalha_PedidoSegue()
+    {
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+        c.Eventos.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("broker fora")));
+
+        var resultado = await c.UseCase.ExecuteAsync(c.Input(token));
+
+        resultado.LinkPagamento.Should().Be("https://mp.test/pref-1");
+        c.Conversa.PedidoEmAndamentoId.Should().Be(resultado.PedidoId);
     }
 }
