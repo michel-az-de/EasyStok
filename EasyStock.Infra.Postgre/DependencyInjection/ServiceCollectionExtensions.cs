@@ -215,6 +215,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // Atendimento (S04, ADR-0050)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
                 Repositories.Atendimento.ConversaRepository>();
+            // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
+            services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
+                Services.Atendimento.RemetenteWhatsAppDoTenant>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
                 Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)
