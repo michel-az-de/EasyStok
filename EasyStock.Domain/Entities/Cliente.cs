@@ -89,6 +89,24 @@
         /// <summary>Carimbo do opt-in (LGPD: precisa registrar quando consentimento foi dado).</summary>
         public DateTime? ConsentimentoEm { get; set; }
 
+        // ── CRM leve (S24) ──────────────────────────────────────────────
+        public const int MotivoBloqueioTamanhoMaximo = 255;
+
+        /// <summary>
+        /// Bloqueio que vale em todos os canais: o agente não saúda nem cria pedido; a conversa vai
+        /// direto para a dona. Muda só por <see cref="Bloquear"/> e <see cref="Desbloquear"/>.
+        /// </summary>
+        public bool Bloqueado { get; private set; }
+
+        public DateTime? BloqueadoEm { get; private set; }
+        public string? MotivoBloqueio { get; private set; }
+
+        /// <summary>
+        /// Avisos de andamento do pedido (preparando, saiu para entrega). O agradecimento da entrega sai
+        /// sempre. Default true, também no banco.
+        /// </summary>
+        public bool AvisosStatusAtivos { get; private set; } = true;
+
         // ── Métricas operacionais (mantidas pelo sync) ──────────────────
         public int OrderCount { get; set; }
         public DateTime? LastOrderAt { get; set; }
@@ -104,6 +122,9 @@
         public ICollection<ClienteTelefone> Telefones { get; set; } = new List<ClienteTelefone>();
         public ICollection<ClienteDocumento> Documentos { get; set; } = new List<ClienteDocumento>();
         public ICollection<ClienteAlteracao> Alteracoes { get; set; } = new List<ClienteAlteracao>();
+
+        /// <summary>Tags do cliente (S24). Entram só por <see cref="AdicionarTag"/>.</summary>
+        public ICollection<ClienteTag> Tags { get; private set; } = new List<ClienteTag>();
 
         public static Cliente Criar(Guid empresaId, string nome)
         {
@@ -216,6 +237,67 @@
 
         public void Desativar() { Ativo = false; AlteradoEm = DateTime.UtcNow; }
         public void Reativar() { Ativo = true; AlteradoEm = DateTime.UtcNow; }
+
+        // ── CRM leve (S24). Métodos separados de AtualizarCadastro (R8). ──
+
+        /// <summary>
+        /// Marca a tag normalizada. Devolve a tag criada, ou <c>null</c> quando o cliente já a tinha
+        /// (no-op: a origem e a data da primeira marcação ficam).
+        /// </summary>
+        public ClienteTag? AdicionarTag(string tag, string origem, DateTime em)
+        {
+            var normalizada = ClienteTag.NormalizarValidando(tag);
+            if (Tags.Any(t => t.Tag == normalizada)) return null;
+
+            var nova = ClienteTag.Criar(EmpresaId, Id, normalizada, origem, em);
+            Tags.Add(nova);
+            return nova;
+        }
+
+        /// <summary>Tira a tag (comparada já normalizada). <c>false</c> quando o cliente não a tinha.</summary>
+        public bool RemoverTag(string tag)
+        {
+            var normalizada = ClienteTag.Normalizar(tag);
+            var existente = Tags.FirstOrDefault(t => t.Tag == normalizada);
+            return existente is not null && Tags.Remove(existente);
+        }
+
+        public void Bloquear(string? motivo, DateTime em)
+        {
+            var motivoLimpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+            if (motivoLimpo?.Length > MotivoBloqueioTamanhoMaximo)
+                throw new RegraDeDominioVioladaException($"Motivo do bloqueio passa de {MotivoBloqueioTamanhoMaximo} caracteres.");
+
+            Bloqueado = true;
+            BloqueadoEm = em;
+            MotivoBloqueio = motivoLimpo;
+            AlteradoEm = em;
+        }
+
+        public void Desbloquear(DateTime em)
+        {
+            Bloqueado = false;
+            BloqueadoEm = null;
+            MotivoBloqueio = null;
+            AlteradoEm = em;
+        }
+
+        public void DefinirAvisosStatus(bool ativos, DateTime em)
+        {
+            AvisosStatusAtivos = ativos;
+            AlteradoEm = em;
+        }
+
+        /// <summary>
+        /// Opt-in de marketing do cadastro, com carimbo (LGPD). O consentimento por canal é o de
+        /// <c>ConsentimentoContato</c> (S38); este booleano segue para compatibilidade.
+        /// </summary>
+        public void DefinirConsentimentoMarketing(bool consentiu, DateTime quando)
+        {
+            ConsentiuMarketing = consentiu;
+            ConsentimentoEm = quando;
+            AlteradoEm = quando;
+        }
     }
 
     /// <summary>

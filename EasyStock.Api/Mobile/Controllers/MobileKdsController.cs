@@ -16,17 +16,17 @@ namespace EasyStock.Api.Mobile.Controllers;
 /// que a PWA balcao ja opera.
 ///
 /// Endpoints:
-///   GET   /api/kds/pedidos?statuses=aguardando,preparando — snapshot atual
-///   PATCH /api/kds/pedidos/{id}/status                    — bumpa status
+///   GET   /api/mobile/kds/pedidos?statuses=aguardando,preparando — snapshot atual
+///   PATCH /api/mobile/kds/pedidos/{id}/status                    — bumpa status
 /// </summary>
 [ApiController]
-[Route("api/kds")]
+[Route("api/mobile/kds")]
 [MobileApiKey]
 [AllowAnonymous]
-public class KdsController(
+public class MobileKdsController(
     EasyStockDbContext db,
     OperacaoEventBroker eventBroker,
-    ILogger<KdsController> log) : ControllerBase
+    ILogger<MobileKdsController> log) : ControllerBase
 {
     private static readonly HashSet<string> StatusesPermitidos = new(StringComparer.OrdinalIgnoreCase)
     {

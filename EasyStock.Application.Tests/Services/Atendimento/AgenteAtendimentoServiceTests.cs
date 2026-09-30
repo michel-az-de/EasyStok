@@ -116,6 +116,24 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task ClienteBloqueadoNoMeioDaConversaEscalaSemChamarLlm()
+    {
+        var cliente = Cliente.Criar(_empresaId, "Maria");
+        cliente.Bloquear("golpe", Agora.AddHours(-1));
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _conversa.VincularCliente(cliente.Id);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+        resultado.Escalou.Should().BeTrue();
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, "cliente bloqueado: golpe", Agora, Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
     public async Task NaoChamaLlmQuandoDesligado()
     {
         _llm.Disponivel.Returns(false);
