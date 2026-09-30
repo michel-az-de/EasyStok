@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
@@ -32,7 +34,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     RoteadorAcoesBotao roteadorAcoes,
     OptOutPorPalavra optOut,
     IEscaladorConversa escalador,
-    ILogger<ProcessarEventoWhatsAppUseCase> logger)
+    ILogger<ProcessarEventoWhatsAppUseCase> logger,
+    IPublicadorEventoIntegracao? publicadorEventos = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -156,6 +159,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
             if (identificacao?.Cliente.Bloqueado == true)
                 await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
+
+            // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
+            // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24).
+            if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true && publicadorEventos is not null)
+                await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
+                    new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
 
             configuracao = await AtualizarUltimaMensagemRecebidaAsync(empresaId, enviadaEm);
 

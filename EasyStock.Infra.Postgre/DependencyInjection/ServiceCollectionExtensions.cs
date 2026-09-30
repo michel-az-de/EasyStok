@@ -76,6 +76,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
             services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRespostaProntaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RespostaProntaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRegraAutomaticaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RegraAutomaticaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IMensagemProgramadaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.MensagemProgramadaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.IInteresseItemRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.InteresseItemRepository>(); // S31
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILembreteRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.LembreteRepository>();
@@ -184,6 +186,20 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.NotificarClientePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+
+            // S42: mensagens automáticas por gatilho, ao lado dos handlers acima.
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler>(
+                EasyStock.Application.Events.Atendimento.AutomacaoPedidoEntregueHandler.Tipo);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoConversaAbertaHandler>(
+                EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.AutomacaoConversaEncerradaHandler>(
+                EasyStock.Application.Events.Atendimento.ConversaEncerradaEvent.TipoEvento);
 
             services.AddScoped<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass,
                 Security.RowLevelSecurityBypass>();
