@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Campanhas: cadastro e agendamento** (S28): entidades `Campanha` (rascunho, agendada, enviando,
+  enviada, encerrada, cancelada; mensagem Scriban, arte, template de marketing, filtro de público,
+  tags de restrição, ondas) e `CampanhaDestinatario` (único por campanha e cliente, motivo de
+  exclusão). `GET|POST api/campanhas`, `GET|PUT api/campanhas/{id}`, `POST api/campanhas/{id}/cancelar`
+  (policy `Gerente`; cancelar exclui só os pendentes) e `POST api/uploads/campanha/arte`. Migration
+  `AddCampanhas` com RLS e índices `(EmpresaId, Status)` e `(ClienteId, EnviadoEm)`. Público (S29) e
+  disparo (S30) ficam fora. (#1160)
 - **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
   api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
   api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST
