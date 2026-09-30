@@ -127,7 +127,7 @@ public static class MenuDefinition
         new MenuItem("usuarios", "Usuários", "user-cog", "/usuarios",
             new[] { "Usuarios" }),
         new MenuItem("configuracoes", "Configurações", "settings", "/configuracoes",
-            new[] { "Configuracoes", "Lojas", "Assinatura", "Notificacoes", "Preferencias" }),
+            new[] { "Configuracoes", "Lojas", "Notificacoes", "Preferencias" }),
     };
 
     /// <summary>Dashboard + itens de grupo + rodape, na ordem de declaracao (sem filtro de flag).</summary>

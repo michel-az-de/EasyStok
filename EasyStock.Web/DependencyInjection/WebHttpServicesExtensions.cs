@@ -86,7 +86,6 @@ public static class WebHttpServicesExtensions
         services.AddScoped<AutoPreenchimentoService>();
         services.AddScoped<NotificacoesService>();
         services.AddScoped<UsuariosService>();
-        services.AddScoped<AssinaturaService>();
         services.AddScoped<AuditService>();
         services.AddScoped<ConfiguracoesService>();
         services.AddScoped<CategoriasService>();

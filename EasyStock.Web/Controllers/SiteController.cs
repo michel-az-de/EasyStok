@@ -1,4 +1,3 @@
-using EasyStock.Web.Models.ViewModels.Site;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,9 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace EasyStock.Web.Controllers;
 
 /// <summary>
-/// Landing publica do EasyStok. Todas as actions sao anonimas, com layout
-/// proprio (_LayoutSite) — separado do app autenticado. Usuarios ja logados
-/// sao redirecionados pro portal (Launcher) pra nao verem pitch de venda novamente.
+/// Paginas publicas do EasyStok (app, contato, termos, privacidade). Todas as actions
+/// sao anonimas, com layout proprio (_LayoutSite) — separado do app autenticado.
 ///
 /// <para>
 /// Antiforgery: o EasyStock.Web ja registra <see cref="AutoValidateAntiforgeryTokenAttribute"/>
@@ -26,18 +24,14 @@ namespace EasyStock.Web.Controllers;
 public sealed class SiteController(
     SessionService session) : Controller
 {
+    /// <summary>
+    /// A landing de venda e a pagina de precos sairam na poda P02 (billing SaaS).
+    /// A raiz leva direto ao portal ou ao login.
+    /// </summary>
     [HttpGet("")]
-    public IActionResult Index()
-    {
-        // Usuario ja autenticado vai direto pro portal — landing e pitch de venda.
-        if (session.IsLoggedIn())
-            return RedirectToAction("Index", "Launcher");
-
-        return View(new LandingViewModel());
-    }
-
-    [HttpGet("precos")]
-    public IActionResult Precos() => View();
+    public IActionResult Index() => session.IsLoggedIn()
+        ? RedirectToAction("Index", "Launcher")
+        : RedirectToAction("Login", "Auth");
 
     [HttpGet("app")]
     public IActionResult App() => View();

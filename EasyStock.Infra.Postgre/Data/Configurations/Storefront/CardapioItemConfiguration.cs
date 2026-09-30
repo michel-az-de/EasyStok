@@ -1,3 +1,4 @@
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -37,6 +38,10 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.Alergenos).HasMaxLength(200);
         builder.Property(c => c.SugestaoMolho).HasMaxLength(200);
         builder.Property(c => c.TempoPreparo).HasMaxLength(50);
+        // S15: linha (enum int, default ParaServir=1), preparo numérico e instrução de finalização.
+        builder.Property(c => c.Linha).HasConversion<int>().IsRequired().HasDefaultValue(LinhaProduto.ParaServir).HasSentinel((LinhaProduto)0);
+        builder.Property(c => c.TempoPreparoMinutos);
+        builder.Property(c => c.InstrucaoFinalizacao).HasMaxLength(500);
         builder.Property(c => c.FotoUrl).HasMaxLength(500);
         builder.Property(c => c.PesoExibicao).HasMaxLength(50);
 

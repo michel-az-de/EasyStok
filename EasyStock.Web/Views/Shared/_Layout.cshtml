@@ -50,7 +50,7 @@
     <link rel="stylesheet" href="~/css/mobile.css" media="(max-width: 768px)" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/print.css" media="print" asp-append-version="true" />
     @* es-fetch.js carregado cedo (sincrono, no head) porque scripts inline do corpo
-       — _TrialBanner e varias views migradas de fetch->esFetch em ec0168ad — chamam
+       — varias views migradas de fetch->esFetch em ec0168ad — chamam
        esFetch() no load, ANTES do bundle de scripts no fim do <body>. Sem isto da
        ReferenceError: esFetch is not defined em toda pagina (BUG-03 do QA 2026-06-04). *@
     <script src="~/js/es-fetch.js" asp-append-version="true"></script>
@@ -124,7 +124,6 @@
             @await Html.PartialAsync("_Topbar")
             <main id="app-main" class="app-main flex-1 overflow-y-auto p-4 lg:p-6 pb-28 lg:pb-6" tabindex="-1">
                 @await Html.PartialAsync("_Toast")
-                @await Html.PartialAsync("_TrialBanner")
                 @RenderBody()
             </main>
         </div>

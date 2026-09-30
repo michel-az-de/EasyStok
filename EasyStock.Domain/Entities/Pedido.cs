@@ -142,6 +142,38 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public string? MensagemRecusaCliente { get; set; }
 
+        // ── Aprovação manual só na exceção (S12, #1119) ───────────────
+
+        /// <summary>Tamanho máximo persistido de <see cref="MotivoRequerAprovacao"/>.</summary>
+        public const int MotivoRequerAprovacaoMaxLength = 200;
+
+        /// <summary>
+        /// Pedido que precisa da aprovação da dona antes de entrar na fila (ex.: aceito fora
+        /// de área). Default false: pagamento confirmado vai direto para
+        /// <see cref="StatusPedido.Aguardando"/>.
+        /// </summary>
+        public bool RequerAprovacao { get; private set; }
+
+        /// <summary>Por que o pedido requer aprovação. Preenchido por <see cref="MarcarRequerAprovacao"/>.</summary>
+        public string? MotivoRequerAprovacao { get; private set; }
+
+        /// <summary>
+        /// Marca o pedido como exceção que exige aprovação manual. Motivo obrigatório,
+        /// cortado em <see cref="MotivoRequerAprovacaoMaxLength"/>.
+        /// </summary>
+        public void MarcarRequerAprovacao(string motivo)
+        {
+            if (string.IsNullOrWhiteSpace(motivo))
+                throw new ArgumentException("Motivo obrigatório para exigir aprovação.", nameof(motivo));
+
+            var limpo = motivo.Trim();
+            RequerAprovacao = true;
+            MotivoRequerAprovacao = limpo.Length > MotivoRequerAprovacaoMaxLength
+                ? limpo[..MotivoRequerAprovacaoMaxLength]
+                : limpo;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
@@ -279,6 +311,8 @@ namespace EasyStock.Domain.Entities
         public string? VariacaoRotuloSnapshot { get; set; }
         /// <summary>SKU da opção congelado no momento do pedido.</summary>
         public string? SkuSnapshot { get; set; }
+        /// <summary>Linha do item do cardápio congelada no pedido (S15): "paraServir" | "prepararEmCasa". Null = sem cardápio (frete, ad-hoc).</summary>
+        public string? LinhaSnapshot { get; set; }
 
         public Pedido? Pedido { get; set; }
         public Produto? Produto { get; set; }

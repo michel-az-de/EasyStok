@@ -22,6 +22,13 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 /// </list>
 ///
 /// <para>
+/// Resultado (P02): desfecho de negócio processado (confirmado, repetido, valor menor, recusa, estorno) volta
+/// <see cref="ResultadoWebhookGateway.Ok"/>; evento que não é de pedido do EasyStok volta
+/// <see cref="ResultadoWebhookGateway.Falha"/> com o motivo, que o controller grava no <c>WebhookRecebido</c>
+/// respondendo 200.
+/// </para>
+///
+/// <para>
 /// Idempotência em camadas: <c>WebhookRecebido</c> por id da notificação no controller; o mesmo pagamento
 /// confirmado de novo é no-op no use case (cobrança já paga com esse id). Falha na consulta propaga: o
 /// controller responde 500 e o Mercado Pago reenvia.
@@ -42,22 +49,22 @@ public sealed class MercadoPagoWebhookProcessor(
     /// <summary>Bate com <see cref="MercadoPagoSignatureValidator.Provedor"/>.</summary>
     public string Provedor => "MercadoPago";
 
-    public async Task ProcessarAsync(string rawBody, IDictionary<string, string?> headers, CancellationToken ct = default)
+    public async Task<ResultadoWebhookGateway> ProcessarAsync(string rawBody, IDictionary<string, string?> headers, CancellationToken ct = default)
     {
-        var pagamentoId = ExtrairPagamentoId(rawBody);
-        if (pagamentoId is null) return;
+        var (pagamentoId, motivo) = ExtrairPagamentoId(rawBody);
+        if (pagamentoId is null) return ResultadoWebhookGateway.Falha(motivo);
 
         var pagamento = await mercadoPagoClient.ConsultarPagamentoAsync(pagamentoId, ct);
         if (pagamento is null)
         {
             logger.LogWarning("Webhook MercadoPago: pagamento {PagamentoId} desconhecido na consulta. Ignorando.", pagamentoId);
-            return;
+            return ResultadoWebhookGateway.Falha("pagamento_desconhecido");
         }
 
         if (!Guid.TryParse(pagamento.ExternalReference, out var pedidoId))
         {
             logger.LogInformation("Webhook MercadoPago: pagamento {PagamentoId} sem pedido do EasyStok como referencia. Ignorando.", pagamentoId);
-            return;
+            return ResultadoWebhookGateway.Falha("referencia_externa_desconhecida");
         }
 
         if (pagamento.Aprovado)
@@ -67,22 +74,27 @@ public sealed class MercadoPagoWebhookProcessor(
                 pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved), ct);
             logger.LogInformation("Webhook MercadoPago: pagamento {PagamentoId} pedido {PedidoId} confirmacao={Situacao}",
                 pagamentoId, pedidoId, r.Situacao);
-            return;
+            return r.Situacao is SituacaoConfirmacaoPagamento.SemCobranca or SituacaoConfirmacaoPagamento.PedidoNaoEncontrado
+                ? ResultadoWebhookGateway.Falha("pedido_sem_cobranca")
+                : ResultadoWebhookGateway.Ok;
         }
 
         var situacao = await atualizarCobranca.ExecuteAsync(
             new AtualizarCobrancaPorPagamentoInput(pedidoId, pagamentoId, pagamento.Status), ct);
         logger.LogInformation("Webhook MercadoPago: pagamento {PagamentoId} pedido {PedidoId} nao aprovado atualizacao={Situacao}",
             pagamentoId, pedidoId, situacao);
+        return situacao is SituacaoAtualizacaoCobranca.SemCobranca or SituacaoAtualizacaoCobranca.PedidoNaoEncontrado
+            ? ResultadoWebhookGateway.Falha("pedido_sem_cobranca")
+            : ResultadoWebhookGateway.Ok;
     }
 
     /// <summary>
     /// <c>data.id</c> de uma notificação <c>payment</c>, normalizado a partir de um <see cref="long"/>: o texto que
     /// segue para a URL da consulta e para o log nunca é o do corpo (evita injeção de caminho e log forging).
     /// </summary>
-    private string? ExtrairPagamentoId(string rawBody)
+    private (string? Id, string Motivo) ExtrairPagamentoId(string rawBody)
     {
-        if (string.IsNullOrWhiteSpace(rawBody)) return null;
+        if (string.IsNullOrWhiteSpace(rawBody)) return (null, "corpo_vazio");
 
         JsonElement root;
         try
@@ -93,7 +105,7 @@ public sealed class MercadoPagoWebhookProcessor(
         catch (JsonException)
         {
             logger.LogWarning("Webhook MercadoPago: payload JSON invalido. Ignorando.");
-            return null;
+            return (null, "json_invalido");
         }
 
         if (root.ValueKind != JsonValueKind.Object
@@ -102,14 +114,14 @@ public sealed class MercadoPagoWebhookProcessor(
             || !string.Equals(tipo.GetString(), TopicoPagamento, StringComparison.Ordinal))
         {
             logger.LogInformation("Webhook MercadoPago: topico diferente de payment. Ignorando.");
-            return null;
+            return (null, "topico_ignorado");
         }
 
         if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object
             || !data.TryGetProperty("id", out var idEl))
         {
             logger.LogWarning("Webhook MercadoPago: notificacao payment sem data.id. Ignorando.");
-            return null;
+            return (null, "sem_data_id");
         }
 
         var bruto = idEl.ValueKind switch
@@ -121,9 +133,9 @@ public sealed class MercadoPagoWebhookProcessor(
         if (!long.TryParse(bruto, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0)
         {
             logger.LogWarning("Webhook MercadoPago: data.id fora do formato numerico. Ignorando.");
-            return null;
+            return (null, "data_id_invalido");
         }
 
-        return id.ToString(CultureInfo.InvariantCulture);
+        return (id.ToString(CultureInfo.InvariantCulture), string.Empty);
     }
 }

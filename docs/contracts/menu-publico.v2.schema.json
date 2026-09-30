@@ -63,6 +63,16 @@
           "type": ["array", "null"],
           "description": "Caminho de secao raiz->folha (ex: ['Massas'] ou ['Eletronicos','Celulares','Smartphones']). null = sem categoria. Permite agrupar/breadcrumb sem depender da string plana 'categoria'.",
           "items": { "type": "string" }
+        },
+        "linha": {
+          "type": ["string", "null"],
+          "enum": ["paraServir", "prepararEmCasa", null],
+          "description": "S15 (US-024): linha do item. Opcional (aditivo); ausente = paraServir."
+        },
+        "tempoPreparoMinutos": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "S15 (RN-06): preparo em minutos. null = a loja usa o preparo padrao."
         }
       }
     },

@@ -1,4 +1,4 @@
-using EasyStock.Domain.Exceptions;
+﻿using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.Sales;
 using FluentAssertions;
 
@@ -14,6 +14,9 @@ public class PedidoStateMachineTests
         new object[] { StatusPedido.Preparando, StatusPedido.Cancelado },
         new object[] { StatusPedido.Pronto, StatusPedido.Entregue },
         new object[] { StatusPedido.Pronto, StatusPedido.Cancelado },
+        new object[] { StatusPedido.Pronto, StatusPedido.SaiuParaEntrega },
+        new object[] { StatusPedido.SaiuParaEntrega, StatusPedido.Entregue },
+        new object[] { StatusPedido.SaiuParaEntrega, StatusPedido.Cancelado },
         new object[] { StatusPedido.Entregue, StatusPedido.Cancelado },
         // Storefront flow (ADR-0014)
         new object[] { StatusPedido.Rascunho, StatusPedido.AguardandoPagamento },
@@ -49,6 +52,17 @@ public class PedidoStateMachineTests
         new object[] { StatusPedido.Cancelado, StatusPedido.Preparando },
         new object[] { StatusPedido.Cancelado, StatusPedido.Pronto },
         new object[] { StatusPedido.Cancelado, StatusPedido.Entregue },
+
+        // Saiu para entrega (S12): só avança para Entregue/Cancelado, nunca volta nem pula
+        new object[] { StatusPedido.SaiuParaEntrega, StatusPedido.Pronto },
+        new object[] { StatusPedido.SaiuParaEntrega, StatusPedido.Preparando },
+        new object[] { StatusPedido.SaiuParaEntrega, StatusPedido.Aguardando },
+        new object[] { StatusPedido.SaiuParaEntrega, StatusPedido.SaiuParaEntrega },
+        new object[] { StatusPedido.Preparando, StatusPedido.SaiuParaEntrega },
+        new object[] { StatusPedido.Aguardando, StatusPedido.SaiuParaEntrega },
+        new object[] { StatusPedido.Entregue, StatusPedido.SaiuParaEntrega },
+        new object[] { StatusPedido.Cancelado, StatusPedido.SaiuParaEntrega },
+        new object[] { StatusPedido.AprovadoBaba, StatusPedido.SaiuParaEntrega },
     };
 
     [Theory]
@@ -108,10 +122,24 @@ public class PedidoStateMachineTests
         PedidoStateMachine.Transicoes[StatusPedido.Cancelado].Should().BeEmpty();
     }
 
+    [Fact]
+    public void ProntoParaSaiuParaEntrega()
+        => PedidoStateMachine.PodeTransicionar(StatusPedido.Pronto, StatusPedido.SaiuParaEntrega).Should().BeTrue();
+
+    [Fact]
+    public void SaiuParaEntregaParaEntregue()
+        => PedidoStateMachine.PodeTransicionar(StatusPedido.SaiuParaEntrega, StatusPedido.Entregue).Should().BeTrue();
+
+    [Fact]
+    public void SaiuParaEntrega_so_tem_Entregue_e_Cancelado_como_destino()
+        => PedidoStateMachine.Transicoes[StatusPedido.SaiuParaEntrega].Should()
+            .BeEquivalentTo(new[] { StatusPedido.Entregue, StatusPedido.Cancelado });
+
     [Theory]
     [InlineData(StatusPedido.Aguardando, true)]
     [InlineData(StatusPedido.Preparando, true)]
     [InlineData(StatusPedido.Pronto, true)]
+    [InlineData(StatusPedido.SaiuParaEntrega, true)]
     [InlineData(StatusPedido.Entregue, false)]
     [InlineData(StatusPedido.Cancelado, false)]
     public void EstaAberto_classifica_corretamente(StatusPedido status, bool esperado)
@@ -123,6 +151,7 @@ public class PedidoStateMachineTests
     [InlineData(StatusPedido.Aguardando, false)]
     [InlineData(StatusPedido.Preparando, false)]
     [InlineData(StatusPedido.Pronto, false)]
+    [InlineData(StatusPedido.SaiuParaEntrega, false)]
     [InlineData(StatusPedido.Entregue, true)]
     [InlineData(StatusPedido.Cancelado, true)]
     public void EstaFinalizado_classifica_corretamente(StatusPedido status, bool esperado)
@@ -134,6 +163,7 @@ public class PedidoStateMachineTests
     [InlineData(StatusPedido.Aguardando, false)]
     [InlineData(StatusPedido.Preparando, false)]
     [InlineData(StatusPedido.Pronto, true)]
+    [InlineData(StatusPedido.SaiuParaEntrega, true)]
     [InlineData(StatusPedido.Entregue, true)]
     [InlineData(StatusPedido.Cancelado, false)]
     public void DescontaEstoque_classifica_corretamente(StatusPedido status, bool esperado)

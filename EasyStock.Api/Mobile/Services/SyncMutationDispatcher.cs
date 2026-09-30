@@ -262,11 +262,14 @@ public class SyncMutationDispatcher(
     /// Onda 2 parte 2: quando ErpProductId preenchido, espelha em itens_estoque +
     /// movimentacoes_estoque. Falha NÃO interrompe sync.
     /// </summary>
+    /// <summary>Status do Order mobile em que o estoque já foi descontado (espelha StatusPedido.ComEstoqueDescontado).</summary>
+    public static bool StatusDescontaEstoque(string status)
+        => status is "pronto" or "saiu_para_entrega" or "entregue";
+
     private async Task ApplyStockRule(string oldStatus, string newStatus, List<OrderItemDto> items,
         Guid? empresaId, string? orderId = null)
     {
-        if (oldStatus != "pronto" && oldStatus != "entregue"
-            && (newStatus == "pronto" || newStatus == "entregue"))
+        if (!StatusDescontaEstoque(oldStatus) && StatusDescontaEstoque(newStatus))
         {
             foreach (var i in items)
             {
@@ -280,7 +283,7 @@ public class SyncMutationDispatcher(
                 if (!reconciliouNoErp) p.Stock -= i.Qty;
             }
         }
-        if ((oldStatus == "pronto" || oldStatus == "entregue") && newStatus == "cancelado")
+        if (StatusDescontaEstoque(oldStatus) && newStatus == "cancelado")
         {
             foreach (var i in items)
             {

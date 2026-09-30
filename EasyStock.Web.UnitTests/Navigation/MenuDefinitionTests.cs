@@ -22,7 +22,7 @@ public class MenuDefinitionTests
         "Kds", "Dispositivos", "Operacao",
         "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas",
         "Relatorios", "Usuarios", "Configuracoes", "Lojas",
-        "Assinatura", "Notificacoes", "Preferencias",
+        "Notificacoes", "Preferencias",
     };
 
     [Fact]

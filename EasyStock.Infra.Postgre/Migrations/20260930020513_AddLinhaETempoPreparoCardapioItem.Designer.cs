@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930020513_AddLinhaETempoPreparoCardapioItem")]
+    partial class AddLinhaETempoPreparoCardapioItem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -917,49 +920,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_mensagens_programadas_empresa_cliente");
 
                     b.ToTable("mensagens_programadas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ConversaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ExpiraEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("StorefrontId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("UltimoUsoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiraEm")
-                        .HasDatabaseName("ix_sessoes_chat_site_expira_em");
-
-                    b.HasIndex("StorefrontId");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_sessoes_chat_site_token_hash");
-
-                    b.ToTable("sessoes_chat_site", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AuditLog", b =>
@@ -6115,86 +6075,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("notif_web_push_subscriptions", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.CobrancaPedido", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("AtualizadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ConversaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ExpiraEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LinkPagamento")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("MetodoPagamento")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Motivo")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime?>("PagaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PagamentoExternoId")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<Guid>("PedidoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Provedor")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("ReferenciaExterna")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Tentativa")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("Valor")
-                        .HasColumnType("numeric(14,2)");
-
-                    b.Property<decimal?>("ValorPago")
-                        .HasColumnType("numeric(14,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiraEm")
-                        .HasDatabaseName("ix_cobrancas_pedido_pendentes_expira")
-                        .HasFilter("\"Status\" = 1");
-
-                    b.HasIndex("PedidoId", "Status")
-                        .HasDatabaseName("ix_cobrancas_pedido_pedido_status");
-
-                    b.HasIndex("Provedor", "ReferenciaExterna")
-                        .IsUnique()
-                        .HasDatabaseName("uq_cobrancas_pedido_provedor_referencia");
-
-                    b.ToTable("cobrancas_pedido", (string)null);
-                });
-
             modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.GatewayHealthSnapshot", b =>
                 {
                     b.Property<string>("Provedor")
@@ -6559,11 +6439,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("motivo_recusa");
 
-                    b.Property<string>("MotivoRequerAprovacao")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("motivo_requer_aprovacao");
-
                     b.Property<string>("Observacoes")
                         .HasColumnType("text");
 
@@ -6578,12 +6453,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("RecusadoPorUsuarioId")
                         .HasColumnType("uuid")
                         .HasColumnName("recusado_por_usuario_id");
-
-                    b.Property<bool>("RequerAprovacao")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("requer_aprovacao");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -10062,15 +9931,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Storefront.Storefront", null)
-                        .WithMany()
-                        .HasForeignKey("StorefrontId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("EasyStock.Domain.Entities.AuditLog", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Usuario", "Usuario")
@@ -11094,15 +10954,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Empresa");
 
                     b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.CobrancaPedido", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Pedido", null)
-                        .WithMany()
-                        .HasForeignKey("PedidoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.PaymentAttempt", b =>
