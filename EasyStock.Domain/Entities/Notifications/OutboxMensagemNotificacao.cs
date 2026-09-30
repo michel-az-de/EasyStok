@@ -1,6 +1,7 @@
 using EasyStock.Domain.Enums.Notifications;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace EasyStock.Domain.Entities.Notifications;
 
@@ -30,6 +31,13 @@ public class OutboxMensagemNotificacao
     public DateTime CriadoEm { get; set; }
     public int ShardKey { get; set; }
 
+    /// <summary>
+    /// Dados do envio já renderizados que o canal interpreta (S13, fecha a pendência da S09): no WhatsApp da
+    /// Meta, <c>template</c>, <c>idioma</c> e <c>param1..N</c> para o envio fora da janela de 24 h. Objeto JSON
+    /// de strings; nulo quando o template não declara metadados.
+    /// </summary>
+    public string? MetadadosJson { get; set; }
+
     public EventoNotificacao? Evento { get; set; }
     public RotinaNotificacao? Rotina { get; set; }
     public TemplateNotificacao? Template { get; set; }
@@ -49,10 +57,16 @@ public class OutboxMensagemNotificacao
         Guid? usuarioDestinoId = null,
         string canaisFallbackRestantesJson = "[]",
         string tenantTimezone = "America/Sao_Paulo",
-        int maxTentativas = 3)
+        int maxTentativas = 3,
+        string? metadadosJson = null,
+        string? chaveIdempotencia = null)
     {
         var agora = DateTime.UtcNow;
-        var idempotencyKey = ComputarIdempotencyKey(eventoId, usuarioDestinoId, canal);
+        // S13: com chave do negócio (ex.: pedido + status), reprocessar o fato gera a mesma chave mesmo vindo de
+        // outro EventoNotificacao; o índice único da coluna barra a segunda linha.
+        var idempotencyKey = string.IsNullOrWhiteSpace(chaveIdempotencia)
+            ? ComputarIdempotencyKey(eventoId, usuarioDestinoId, canal)
+            : ComputarIdempotencyKey(chaveIdempotencia.Trim(), canal);
         return new OutboxMensagemNotificacao
         {
             Id = Guid.NewGuid(),
@@ -74,7 +88,8 @@ public class OutboxMensagemNotificacao
             TenantTimezone = tenantTimezone,
             CanaisFallbackRestantesJson = canaisFallbackRestantesJson,
             CriadoEm = agora,
-            ShardKey = Convert.FromHexString(idempotencyKey)[0] % 4
+            ShardKey = Convert.FromHexString(idempotencyKey)[0] % 4,
+            MetadadosJson = string.IsNullOrWhiteSpace(metadadosJson) ? null : metadadosJson
         };
     }
 
@@ -115,6 +130,27 @@ public class OutboxMensagemNotificacao
     }
 
     public bool TentativasEsgotadas() => Tentativas >= MaxTentativas;
+
+    /// <summary>Chave de idempotência do outbox para uma chave de negócio no canal (S13).</summary>
+    public static string ComputarIdempotencyKey(string chaveIdempotencia, CanalNotificacao canal)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"negocio|{chaveIdempotencia}|{(int)canal}"));
+        return Convert.ToHexString(hash);
+    }
+
+    /// <summary><see cref="MetadadosJson"/> como dicionário; nulo quando ausente ou inválido.</summary>
+    public IReadOnlyDictionary<string, string>? LerMetadados()
+    {
+        if (string.IsNullOrWhiteSpace(MetadadosJson)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(MetadadosJson);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static string ComputarIdempotencyKey(Guid eventoId, Guid? usuarioId, CanalNotificacao canal)
     {
