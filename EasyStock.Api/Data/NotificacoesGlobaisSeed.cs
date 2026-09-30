@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
@@ -538,6 +538,17 @@ public static class NotificacoesGlobaisSeed
             corpoTemplate: """Pedido nº {{ numero }} entregue. Obrigada pela preferência, {{ nome }}!{{ if instagram != "" }} Siga a gente no Instagram: {{ instagram }}{{ end }}"""),
             """{"template":"pedido_entregue","idioma":"pt_BR","param1":"{{ nome }}"}""");
 
+        // S26: avaliação em dois botões 30 min após a entrega. Dentro da janela sai interativa com os botões;
+        // fora, o template "avaliacao" com os mesmos payloads como quick reply (voltam em button.payload).
+        yield return ComMetadados(TemplateNotificacao.Criar(
+            codigo: "avaliacao_whatsapp_v1",
+            nome: "Pedido de Avaliação — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.AvaliacaoSolicitada,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, o que achou do pedido nº {{ numero }}? É só tocar num botão."),
+            """{"template":"avaliacao","idioma":"pt_BR","param1":"{{ nome }}","botao1":"acao:avaliacao:positiva:{{ pedidoId }}|Gostei","botao2":"acao:avaliacao:negativa:{{ pedidoId }}|Não gostei"}""");
+
         // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
         // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
         // ativar o canal em ConfiguracaoCanal (AtivoNoTenant); o objetivo aqui e cobrir o filtro
@@ -777,6 +788,9 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
         yield return MakeRotina("pedido_entregue_global", "Pedido Entregue — Agradecimento ao Cliente",
             TipoEventoNotificacao.PedidoEntregue, "pedido_entregue_whatsapp_v1",
+            CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
+        yield return MakeRotina("avaliacao_solicitada_global", "Pedido de Avaliação — 30 min após a entrega",
+            TipoEventoNotificacao.AvaliacaoSolicitada, "avaliacao_whatsapp_v1",
             CategoriaConteudoNotificacao.Transacional, "[\"WhatsApp\"]");
     }
 

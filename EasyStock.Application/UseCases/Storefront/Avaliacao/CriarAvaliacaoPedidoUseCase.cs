@@ -83,7 +83,7 @@ public sealed class CriarAvaliacaoPedidoUseCase(
         return new AvaliacaoCriadaDto(
             Id: avaliacao.Id,
             CriadaEm: avaliacao.RespondidoEm ?? agora,
-            Nota: avaliacao.Estrelas,
+            Nota: input.Nota,
             Comentario: avaliacao.Comentario);
     }
 }
