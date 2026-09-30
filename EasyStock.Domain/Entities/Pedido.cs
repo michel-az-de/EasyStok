@@ -219,6 +219,21 @@ namespace EasyStock.Domain.Entities
 
         public void Cancelar() => MudarStatus(StatusPedido.Cancelado);
 
+        /// <summary>
+        /// Desfaz o "marcar como pago" por engano (S11): o pedido sem preparo iniciado volta a esperar o
+        /// pagamento online. Compensação fora da matriz de transições (<see cref="PedidoStateMachine.PodeDesfazerPagamento"/>).
+        /// </summary>
+        public void VoltarParaAguardandoPagamento()
+        {
+            var atual = StatusEnum;
+            if (atual == StatusPedido.AguardandoPagamento) return;
+            if (!PedidoStateMachine.PodeDesfazerPagamento(atual))
+                throw new TransicaoInvalidaException(atual, StatusPedido.AguardandoPagamento);
+
+            Status = StatusPedidoMapper.AguardandoPagamento;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public decimal TotalPago
         {
             get

@@ -107,6 +107,16 @@ public static class PedidoStateMachine
     /// </summary>
     public static bool AceitaPagamento(StatusPedido status) => !PreOperacionais.Contains(status);
 
+    /// <summary>
+    /// Status em que um pagamento registrado à mão ainda pode ser desfeito (S11): o pedido está na
+    /// fila e o preparo não começou. É uma compensação, fora de <see cref="Transicoes"/>: a troca de
+    /// status genérica nunca devolve um pedido para <see cref="StatusPedido.AguardandoPagamento"/>.
+    /// </summary>
+    public static IReadOnlySet<StatusPedido> SemPreparoIniciado { get; } =
+        new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.AprovadoBaba };
+
+    public static bool PodeDesfazerPagamento(StatusPedido status) => SemPreparoIniciado.Contains(status);
+
     public static bool PodeTransicionar(StatusPedido de, StatusPedido para)
         => Transicoes.TryGetValue(de, out var destinos) && destinos.Contains(para);
 
