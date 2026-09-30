@@ -77,6 +77,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IMensagemProgramadaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.MensagemProgramadaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.IInteresseItemRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.InteresseItemRepository>(); // S31
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILembreteRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.LembreteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICandidatosLembreteQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CandidatosLembreteQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IExpedienteLojaRepository, EasyStock.Infra.Postgre.Repositories.Storefront.ExpedienteLojaRepository>();
@@ -84,7 +85,10 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IFornecedorRepository, FornecedorRepository>();
             services.AddScoped<IClienteRepository, ClienteRepository>();
             services.AddScoped<IClienteCrmRepository, ClienteCrmRepository>(); // S24
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.CampanhaRepository>(); // S28
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaPublicoQueries, EasyStock.Infra.Postgre.Queries.CampanhaPublicoQueries>(); // S29
             services.AddScoped<IHistoricoPedidosClienteQueries, EasyStock.Infra.Postgre.Queries.HistoricoPedidosClienteQueries>(); // S25
+            services.AddScoped<IDesacertosEstoqueQueries, EasyStock.Infra.Postgre.Queries.DesacertosEstoqueQueries>(); // S22
             services.AddScoped<IDomicilioQueries, EasyStock.Infra.Postgre.Queries.DomicilioQueries>(); // S25
             services.AddScoped<IPedidoRepository, PedidoRepository>();
             services.AddScoped<ICaixaRepository, CaixaRepository>();

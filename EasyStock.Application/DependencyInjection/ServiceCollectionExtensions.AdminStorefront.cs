@@ -43,6 +43,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EditarCardapioItemAdminUseCase>();
         services.AddScoped<ToggleVisibilidadeCardapioItemAdminUseCase>();
         services.AddScoped<ToggleDisponibilidadeCardapioItemAdminUseCase>();
+        services.AddScoped<EasyStock.Application.Services.Campanhas.AvisoItemComInteresse>(); // S31: item voltou → SSE
         services.AddScoped<ReordenarCardapioItemAdminUseCase>();
         services.AddScoped<RemoverCardapioItemAdminUseCase>();
 

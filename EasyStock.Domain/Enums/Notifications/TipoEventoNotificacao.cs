@@ -59,6 +59,10 @@ public enum TipoEventoNotificacao
     PedidoSaiuParaEntrega = 40,
     PedidoEntregue = 41,
 
+    // Campanhas (S30): a mensagem da onda e o lembrete do encerramento ao cliente, pelo WhatsApp.
+    CampanhaMarketing = 44,
+    CampanhaLembreteEncerramento = 45,
+
     // Atendimento por WhatsApp (S07): o agente passou a conversa para a dona.
     ConversaEscalada = 46,
 

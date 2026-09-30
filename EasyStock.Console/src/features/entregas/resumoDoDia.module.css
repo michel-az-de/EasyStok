@@ -1,0 +1,10 @@
+/* Rodada 12 (issue #16): linha do resumo do dia no topo de Entregas. */
+.resumo {
+  display: flex; align-items: center; gap: var(--e-2) var(--e-3); flex-wrap: wrap;
+  padding: var(--e-2) var(--e-3); border-radius: var(--r-1);
+  background: var(--preenchimento); color: var(--tinta);
+}
+.texto { margin: 0; display: grid; gap: 2px; flex: 1 1 260px; min-width: 0; }
+.texto strong { font-weight: 700; }
+.texto span { font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { margin: 0; flex-basis: 100%; font-size: var(--t-apoio); color: var(--parado); }

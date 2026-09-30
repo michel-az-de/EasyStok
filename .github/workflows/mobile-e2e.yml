@@ -1,20 +1,20 @@
-name: Mobile E2E Tests
+name: PWA E2E Tests
 
-# Roda os 8 test suites do casa-da-baba-mobile (apk/tests/*.test.js)
-# em todo PR/push que toca o PWA ou os testes. Nao requer Android SDK
-# nem APK — usa o runner vanilla (node tests/run.js) que carrega o
-# index.html num sandbox vm com stubs de DOM/Storage/Navigator.
+# Roda as suites da PWA (tests/pwa/*.test.js) em todo PR/push que toca a
+# PWA ou os testes. Nao requer Android SDK: o runner vanilla (node
+# tests/pwa/run.js) carrega EasyStock.Api/wwwroot/pwa/index.html num sandbox
+# vm com stubs de DOM/Storage/Navigator.
 
 on:
   push:
     branches: [ master, main ]
     paths:
-      - 'casa-da-baba-mobile/**'
+      - 'tests/pwa/**'
       - 'EasyStock.Api/wwwroot/pwa/**'
       - '.github/workflows/mobile-e2e.yml'
   pull_request:
     paths:
-      - 'casa-da-baba-mobile/**'
+      - 'tests/pwa/**'
       - 'EasyStock.Api/wwwroot/pwa/**'
       - '.github/workflows/mobile-e2e.yml'
   workflow_dispatch:
@@ -31,17 +31,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Capacitor deps (necessario pro copy-web)
-        working-directory: casa-da-baba-mobile/apk
-        run: npm install --no-audit --no-fund --prefer-offline
-
-      - name: Copy PWA from EasyStock.Api/wwwroot/pwa to apk/web/
-        working-directory: casa-da-baba-mobile/apk
-        run: npm run copy-web
-
       - name: Run E2E tests
-        working-directory: casa-da-baba-mobile/apk
-        run: npm test
+        run: node tests/pwa/run.js
         env:
-          # Aponta o runner pro index.html copiado no passo anterior.
-          PWA_HTML: ${{ github.workspace }}/casa-da-baba-mobile/apk/web/index.html
+          PWA_HTML: ${{ github.workspace }}/EasyStock.Api/wwwroot/pwa/index.html

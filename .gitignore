@@ -27,6 +27,8 @@ EasyStock.Api/uploaded-files/
 node_modules/
 **/wwwroot/css/tailwind.dist.css
 package-lock.json
+# Console (ADR-0054) versiona o lock: o CI roda npm ci
+!EasyStock.Console/package-lock.json
 
 # User-specific files
 *.rsuser

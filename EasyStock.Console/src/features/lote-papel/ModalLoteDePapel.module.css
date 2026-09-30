@@ -1,0 +1,31 @@
+/* Lote de papel (US-042, D6, UC-04 E1): faixa de queda, faixa de pendência
+   e a lista da modal. Mesmos tokens de .gavetaCanhoto (comanda.module.css) e
+   .diferencaPaga (aviso de --atencao), nada novo inventado. */
+
+.bannerOffline, .faixaPendente {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-2) var(--e-4);
+  background: var(--atencao-pastel); color: var(--atencao);
+  border-bottom: var(--b-1) solid var(--linha-forte);
+  font-size: var(--t-apoio); font-weight: 600;
+}
+.bannerOffline span, .faixaPendente span { flex: 1; min-width: 220px; }
+/* Pendência depois de "Depois" (integração 72): a mesma faixa, em tom
+   neutro, no lugar da pílula que flutuava embaixo e cobria as abas do
+   celular e o fim da lista do Balcão no tablet. */
+.faixaPendente { background: var(--papel); color: var(--tinta); }
+/* Integração 72: a tela desce a altura da faixa enquanto ela existe (medida
+   em ModalLoteDePapel.jsx); sem faixa, a variável não existe e nada muda. */
+:global(#root) { padding-top: var(--faixa-offline, 0px); }
+
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-4); }
+.linha { padding-bottom: var(--e-3); border-bottom: var(--b-1) solid var(--linha); }
+.linha:last-child { border-bottom: 0; padding-bottom: 0; }
+.linhaTopo { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); margin-bottom: var(--e-2); }
+.numero { font-family: var(--f-dado); color: var(--tinta-2); font-size: var(--t-apoio); }
+/* Rótulo neutro do estado atual (achado 1, banca3/e4-e7): informa, nunca
+   parece chip escolhido. Mesmo tom apagado de .avisoCancelado. */
+.estadoAtual { margin: 0 0 var(--e-2); color: var(--tinta-2); font-size: var(--t-apoio); }
+.opcoes { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.avisoCancelado { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }

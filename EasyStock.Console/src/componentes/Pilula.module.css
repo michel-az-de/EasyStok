@@ -1,0 +1,40 @@
+/* Marca de estado: ponto de cor mais texto, no lugar da mancha pastel. O texto
+   vai sempre junto, então a cor nunca informa sozinha, e o ponto some para quem
+   não distingue cor sem levar informação embora.
+
+   Regra de uso: uma por linha, e só quando o estado pede ação. Contagem e
+   rótulo de catálogo não são pílula, são texto. */
+.pilula {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
+  color: var(--tinta); min-width: 0; overflow-wrap: anywhere;
+}
+.fina { font-weight: 400; color: var(--tinta-2); }
+
+/* Três estados e a marca. Nada mais ganha ponto. */
+.ok::before, .aviso::before, .perigo::before, .ragu::before {
+  content: ''; flex-shrink: 0;
+  width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula);
+}
+.ok::before { background: var(--ok); }
+.aviso::before { background: var(--atencao); }
+.perigo::before { background: var(--parado); }
+.ragu::before { background: var(--ragu); }
+
+/* Registro do sistema não é estado: fica em texto neutro, sem ponto. */
+.info, .neutro { color: var(--tinta-2); }
+
+/* Marca com fundo pastel e ícone (seção 1 da direção visual, rodada 5): troca
+   o ponto por um selo cheio, para o cartão de triagem do Balcão escanear numa
+   passada. Os pares de cor são os medidos na direção ("--parado sobre
+   --parado-pastel" etc): ícone e texto na cor forte, fundo na pastel. */
+.comIcone {
+  padding: 2px var(--e-3) 2px var(--e-2); border-radius: var(--r-pilula);
+  gap: 6px; white-space: nowrap; flex-shrink: 0; font-weight: 600;
+}
+.comIcone::before { content: none; }
+.comIcone.ok { background: var(--ok-fundo); color: var(--ok); }
+.comIcone.aviso { background: var(--aviso-fundo); color: var(--atencao); }
+.comIcone.perigo { background: var(--perigo-fundo); color: var(--parado); }
+.comIcone.ragu { background: var(--ragu-claro); color: var(--ragu); }
+.comIcone.neutro, .comIcone.info { background: var(--elevado); color: var(--tinta-3); }

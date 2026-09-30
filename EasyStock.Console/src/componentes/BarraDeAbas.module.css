@@ -1,0 +1,39 @@
+.barra {
+  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+  border-top: var(--b-1) solid var(--linha);
+  padding-bottom: env(safe-area-inset-bottom, 0px); flex-shrink: 0;
+}
+.trilho { display: flex; }
+.aba {
+  flex: 1; min-height: var(--toque); padding: var(--e-2) var(--e-1);
+  background: none; border: 0; border-top: var(--b-3) solid transparent; border-radius: 0;
+  font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2);
+  line-height: var(--lh-compacto);
+}
+.ativa { color: var(--ragu); border-top-color: var(--ragu); }
+.contador {
+  display: inline-block; min-width: 20px; margin-left: var(--e-1); padding: 0 var(--e-1);
+  border-radius: var(--r-pilula); background: var(--ragu-claro); color: var(--ragu);
+  font-family: var(--f-dado); font-size: var(--t-apoio); font-weight: 700;
+}
+
+.contador { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-11); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); margin-left: 0; }
+
+/* Rodada 6d (banca, item 6): ícone de 24 com rótulo embaixo, como a tab bar
+   do iOS; ativa em tinta cheia, as outras em cinza. Contador no canto do ícone. */
+.aba {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-top: 0; min-height: 54px; font-size: var(--t-11); font-weight: 600; color: var(--tinta-3);
+}
+.aba:active:not(:disabled) { background: var(--preenchimento); }
+.ativa { color: var(--tinta); }
+.icone { position: relative; display: grid; place-items: center; }
+.icone .contador { position: absolute; top: -4px; left: calc(100% - 6px); box-shadow: 0 0 0 2px var(--papel); }
+
+/* Correção da integração: o contador vem DEPOIS do rótulo no DOM, para o nome
+   da aba continuar começando pelo rótulo ("Atendimentos 0"); na aba com ícone
+   ele sobe para o canto do ícone por posição, sem mudar a ordem de leitura.
+   Aba sem ícone (Histórico) fica em linha, rótulo e contador lado a lado. */
+.aba { position: relative; }
+.aba:has(> svg) .contador { position: absolute; top: 5px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--papel); }
+.aba:not(:has(> svg)) { flex-direction: row; gap: 6px; font-size: var(--t-apoio); min-height: var(--toque); }

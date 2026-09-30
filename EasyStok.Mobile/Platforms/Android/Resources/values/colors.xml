@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Identidade EasyStok: navy 900 + orange 600 -->
-    <color name="colorPrimary">#06143A</color>
-    <color name="colorPrimaryDark">#06143A</color>
-    <color name="colorAccent">#E85814</color>
-    <color name="splash_background">#06143A</color>
-</resources>

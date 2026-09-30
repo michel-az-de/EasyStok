@@ -1,0 +1,15 @@
+/* Rodada 10 (registro 79) · bolha de avaliação de um toque, distinta da
+   bolha de texto comum (achado P2.7). Ícone em azulejo colorido, igual ao
+   resto da tela, nunca só texto solto. */
+.pedido, .resposta {
+  display: flex; align-items: center; gap: var(--e-2);
+  margin: 0; font-size: var(--t-corpo);
+}
+.icone {
+  display: grid; place-items: center; flex: none;
+  width: 32px; height: 32px; border-radius: var(--r-2);
+  background: var(--preenchimento-forte); color: var(--tinta-2);
+}
+.resposta.positiva .icone { background: var(--ok-fundo); color: var(--ok); }
+.resposta.negativa .icone { background: var(--perigo-fundo); color: var(--perigo); }
+.resposta strong { font-weight: 600; }
