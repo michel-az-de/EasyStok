@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Criar usuário em cliente pelo SuperAdmin (`POST api/admin/usuarios-tenant` e "Novo usuário" do
+  Admin) respondia 500: o RLS recusava o `Perfil` da empresa alvo porque o token do SuperAdmin não
+  tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
+
 ### Added
 - **Dossiê do cliente ao lado da conversa** (S25): `GET api/clientes/{id}/dossie` e `GET
   api/atendimento/conversas/{id}/dossie` devolvem a mesma projeção (cadastro, endereços, tags, notas
