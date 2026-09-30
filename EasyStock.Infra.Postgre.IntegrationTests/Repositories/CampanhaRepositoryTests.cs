@@ -64,7 +64,7 @@ public class CampanhaRepositoryTests(PostgreSqlDatabaseFixture fixture)
         // RLS: login sem superuser, sem o filtro do EF; o banco sozinho barra a outra empresa.
         await using var rlsDb = fixture.CreateRlsClientDbContext();
         await rlsDb.Database.OpenConnectionAsync();
-        await rlsDb.Database.ExecuteSqlRawAsync($"SET app.empresa_id = '{empresaA}'");
+        await rlsDb.Database.ExecuteSqlAsync($"SELECT set_config('app.empresa_id', {empresaA.ToString()}, false)");
         (await rlsDb.Campanhas.IgnoreQueryFilters().Select(c => c.Id).ToListAsync()).Should().Equal(campanhaA.Id);
         (await rlsDb.CampanhaDestinatarios.IgnoreQueryFilters().Select(d => d.CampanhaId).ToListAsync()).Should().Equal(campanhaA.Id);
 
