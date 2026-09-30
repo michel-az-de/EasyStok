@@ -56,6 +56,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EnviarMensagemConsoleUseCase>();
         services.AddScoped<GerenciarConversaAtendimentoUseCase>();
 
+        // S47: assistente da dona (somente leitura, sem ferramentas).
+        services.AddScoped<AssistenteDonaUseCase>();
+
         return services;
     }
 }
