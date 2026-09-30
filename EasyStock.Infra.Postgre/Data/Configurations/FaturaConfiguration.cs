@@ -76,11 +76,6 @@ public class FaturaConfiguration : IEntityTypeConfiguration<Fatura>
             .HasForeignKey(f => f.ClienteId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasOne(f => f.TicketRelacionado)
-            .WithMany()
-            .HasForeignKey(f => f.TicketRelacionadoId)
-            .OnDelete(DeleteBehavior.SetNull);
-
         builder.HasMany(f => f.Itens)
             .WithOne(i => i.Fatura)
             .HasForeignKey(i => i.FaturaId)
