@@ -1,3 +1,5 @@
+using EasyStock.Application.Events.Atendimento;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -9,8 +11,10 @@ public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid Co
 /// <summary>
 /// Ações da dona sobre a conversa (S07): assumir sem escrever, devolver ao agente (D4: a retomada é
 /// decisão dela, nunca por tempo), encerrar e marcar como lida. Cada ação confirma sozinha.
+/// Encerrar enfileira <see cref="ConversaEncerradaEvent"/> no outbox do mesmo commit (S42, ADR-0030).
 /// </summary>
-public sealed class GerenciarConversaAtendimentoUseCase(IConversaRepository conversaRepository, IUnitOfWork unitOfWork)
+public sealed class GerenciarConversaAtendimentoUseCase(
+    IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null)
 {
     public const string PrefixoLiberacao = "atendimento automático retomado pelo usuário ";
 
@@ -37,7 +41,10 @@ public sealed class GerenciarConversaAtendimentoUseCase(IConversaRepository conv
         ExecutarAsync(command, (conversa, agora) =>
         {
             conversa.Encerrar(agora);
-            return Task.CompletedTask;
+            return publicador is null
+                ? Task.CompletedTask
+                : publicador.PublicarAsync(command.EmpresaId, ConversaEncerradaEvent.TipoEvento, "Conversa", conversa.Id,
+                    new ConversaEncerradaEvent(conversa.Id, conversa.ClienteId), ct: ct);
         }, ct);
 
     public Task<ConversaSituacaoResult> MarcarLidaAsync(AcaoConversaCommand command, CancellationToken ct = default) =>

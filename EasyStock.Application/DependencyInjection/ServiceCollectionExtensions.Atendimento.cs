@@ -46,6 +46,12 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.ReservarMensagensProgramadasUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.DispararMensagemProgramadaUseCase>();
 
+        // S42: respostas prontas e mensagens automáticas por gatilho (disparadas pelos handlers do outbox).
+        services.AddScoped<VariaveisAtendimento>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.RespostasProntasUseCases>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.AutomacoesUseCases>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase>();
+
         // S43: lembretes da dona (console + avaliador no processo da API).
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.CriarLembreteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.ListarLembretesUseCase>();
