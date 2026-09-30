@@ -37,6 +37,22 @@ e `EmailTemplateRenderSmokeTests.Template_de_email_renderiza_sem_erro_de_sintaxe
 
 ---
 
+## ⚠️ AMBIENTE (#1110) — Smart App Control bloqueia a DLL dos arch-tests no gate
+
+Não é teste flaky, é bloqueio da máquina local. Fica aqui porque aparece como "gate estranho" no pre-commit.
+
+- **Sintoma:** em 2026-09-29 o Windows Smart App Control bloqueou
+  `.build\arch-gate\EasyStock.ArchitectureTests.dll` ("Uma política de Controle de Aplicativo bloqueou
+  este arquivo", `0x800711C7`). O vstest pulou o assembly, disse "Nenhum teste corresponde ao filtro
+  `Category=Architecture`" e **saiu 0**. O `gate.ps1` confiava só no exit code e dava VERDE falso.
+- **Fix (#1110):** o `gate.ps1` grava TRX em `.build\arch-gate-results\arch.trx` e exige
+  `Counters/@executed > 0`. Zero testes executados agora é VERMELHO com **exit 4**.
+- **Se o gate der exit 4:** confira a mensagem do vstest. Com `0x800711C7`, o bloqueio é do Smart App
+  Control (Segurança do Windows > Controle de aplicativos e navegador); rode de novo ou valide pelo CI.
+  **Não** contorne com `--no-verify` nem afrouxe a checagem do TRX.
+
+---
+
 ## Política geral
 
 - **Não marcar teste como flaky sem documentar aqui.** Sem entrada neste arquivo + comment no próprio teste, o "sabe-se que é flaky" não é compartilhável (e some quando a memória do dev some).
