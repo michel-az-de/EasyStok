@@ -33,7 +33,7 @@ public static class NotificacoesGlobaisSeed
             .Select(c => c.Canal)
             .ToListAsync();
 
-        // Push (S07): so a rotina de ConversaEscalada o usa; sem VAPID configurado o WebPushCanal falha limpo.
+        // Push (S07, S43): so as rotinas de ConversaEscalada e LembreteVencido o usam; sem VAPID configurado o WebPushCanal falha limpo.
         var canais = new[] { CanalNotificacao.Email, CanalNotificacao.Sms, CanalNotificacao.WhatsApp, CanalNotificacao.InApp, CanalNotificacao.Push };
         var adicionados = false;
 
@@ -471,6 +471,16 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "{{ cliente }} precisa de você",
             corpoTemplate: "{{ cliente }} precisa de você: {{ motivo }}");
 
+        // ===== Lembretes da dona (S43): Push para quem e o lembrete (payload com usuarioId) ou para a
+        // empresa toda (sem usuarioId). Interno: nada sai para o cliente. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "lembrete_vencido_push_v1",
+            nome: "Lembrete da Dona — Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.LembreteVencido,
+            assuntoTemplate: "Lembrete",
+            corpoTemplate: "{{ texto }}");
+
         // ===== ADM-09 (#744): templates minimos SMS/WhatsApp p/ eventos criticos de cobranca/SLA.
         // Sem assunto (SMS/WhatsApp nao tem). Ficam inertes ate configurar provider Twilio/Meta e
         // ativar o canal em ConfiguracaoCanal (AtivoNoTenant); o objetivo aqui e cobrir o filtro
@@ -690,6 +700,11 @@ public static class NotificacoesGlobaisSeed
         // ===== Atendimento por WhatsApp (S07) =====
         yield return MakeRotina("conversa_escalada_global", "Conversa Escalada para a Dona",
             TipoEventoNotificacao.ConversaEscalada, "conversa_escalada_push_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+
+        // ===== Lembretes da dona (S43) =====
+        yield return MakeRotina("lembrete_vencido_global", "Lembrete da Dona",
+            TipoEventoNotificacao.LembreteVencido, "lembrete_vencido_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
     }
 

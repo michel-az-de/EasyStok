@@ -75,7 +75,7 @@ internal sealed class MercadoPagoWebhookFixture
         MpClient.ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(ci => Pagamentos.GetValueOrDefault(ci.Arg<string>()));
 
-        Uow.SetupExecuteInTransactionSemRetry<ConfirmarPagamentoPedidoResult>();
+        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?)>();
         Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
     }
@@ -95,7 +95,8 @@ internal sealed class MercadoPagoWebhookFixture
         var relogio = new RelogioFixoMp(Agora);
         var confirmar = new ConfirmarPagamentoPedidoUseCase(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
-            Publicador, tenant, Uow, relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance);
+            Publicador, Substitute.For<IOperacaoEventPublisher>(), tenant, Uow, relogio,
+            NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance);
         var aviso = new AvisoCobrancaConversa(Substitute.For<IConversaRepository>(),
             new ResolvedorCanal(Array.Empty<ICanalMensageria>()), Uow, NullLogger<AvisoCobrancaConversa>.Instance);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,

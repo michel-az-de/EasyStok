@@ -1,4 +1,5 @@
 using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -77,12 +78,18 @@ public sealed record ConfirmarPagamentoPedidoResult(
 /// Pendente para S12: com <c>Pedido.RequerAprovacao</c> o destino passa a ser <c>AguardandoAprovacaoBaba</c>.
 /// A impressão (S20) consome o <see cref="PedidoPagoEvent"/>.
 /// </para>
+///
+/// <para>
+/// Depois que a transação fecha, publica <c>pedido.pago</c> no SSE de operação (S18) para o console tocar o
+/// som. Commit que falha não publica nada.
+/// </para>
 /// </summary>
 public sealed class ConfirmarPagamentoPedidoUseCase(
     ICobrancaPedidoRepository cobrancaRepository,
     IPedidoStorefrontRepository pedidoRepository,
     RegistrarPagamentoPedidoUseCase registrarPagamento,
     IPublicadorEventoIntegracao publicador,
+    IOperacaoEventPublisher operacaoEventos,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
@@ -114,38 +121,43 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         }
         tenantContext.SetCurrentTenant(empresaId.Value);
 
-        return await unitOfWork.ExecuteInTransactionSemRetryAsync(
+        var (resultado, pago) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             token => ConfirmarNoLockAsync(input, empresaId.Value, token), ct);
+
+        // Evento de UI: só depois do commit da transação, nunca para uma confirmação desfeita.
+        if (pago is not null)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId.Value, pago, ct);
+        return resultado;
     }
 
-    private async Task<ConfirmarPagamentoPedidoResult> ConfirmarNoLockAsync(
+    private async Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?)> ConfirmarNoLockAsync(
         ConfirmarPagamentoPedidoInput input, Guid empresaId, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != empresaId)
-            return new(SituacaoConfirmacaoPagamento.PedidoNaoEncontrado);
+            return (new(SituacaoConfirmacaoPagamento.PedidoNaoEncontrado), null);
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
         var jaPaga = cobrancas.FirstOrDefault(c => c.PagamentoExternoId == input.PagamentoExternoId);
         if (jaPaga is not null)
-            return new(SituacaoConfirmacaoPagamento.JaConfirmado, jaPaga.Id, pedido.Status);
+            return (new(SituacaoConfirmacaoPagamento.JaConfirmado, jaPaga.Id, pedido.Status), null);
 
         var alvo = EscolherCobranca(cobrancas, input);
         if (alvo is null)
-            return new(SituacaoConfirmacaoPagamento.SemCobranca, null, pedido.Status);
+            return (new(SituacaoConfirmacaoPagamento.SemCobranca, null, pedido.Status), null);
 
         if (input.ValorPago < alvo.Valor)
         {
             var motivo = $"valor_menor: pagamento {input.PagamentoExternoId} de {input.ValorPago.ToString("F2", Cultura.PtBr)} " +
                          $"para cobrança de {alvo.Valor.ToString("F2", Cultura.PtBr)}";
-            return await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct);
+            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct), null);
         }
 
         if (pedido.StatusEnum == StatusPedido.Cancelado)
         {
             var motivo = $"pedido_cancelado: pagamento {input.PagamentoExternoId} recebido depois do cancelamento; estornar (S27)";
-            return await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.PedidoCancelado, agora, ct);
+            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.PedidoCancelado, agora, ct), null);
         }
 
         var pagoEm = input.PagoEm ?? agora;
@@ -190,7 +202,9 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         logger.LogInformation(
             "Pagamento confirmado pedidoId={PedidoId} cobrancaId={CobrancaId} pagamento={Pagamento} status={Status}",
             pedido.Id, alvo.Id, input.PagamentoExternoId, pedido.Status);
-        return new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status);
+        var pago = new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm);
+        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), pago);
     }
 
     private static CobrancaPedido? EscolherCobranca(IReadOnlyList<CobrancaPedido> cobrancas, ConfirmarPagamentoPedidoInput input)

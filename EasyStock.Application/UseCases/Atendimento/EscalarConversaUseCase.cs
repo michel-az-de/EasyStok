@@ -34,6 +34,12 @@ public sealed class EscalarConversaUseCase(
     public const string PrefixoMotivo = "escalado para a dona: ";
     public const string EventoSse = "conversa.escalada";
 
+    /// <summary>S24: motivo interno da escalada de cliente bloqueado (nunca vai ao cliente).</summary>
+    public static string MotivoClienteBloqueado(EasyStock.Domain.Entities.Cliente cliente) =>
+        string.IsNullOrWhiteSpace(cliente.MotivoBloqueio)
+            ? "cliente bloqueado"
+            : $"cliente bloqueado: {cliente.MotivoBloqueio}";
+
     public async Task EscalarAsync(Guid empresaId, Conversa conversa, string motivo, DateTime agora, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(conversa);

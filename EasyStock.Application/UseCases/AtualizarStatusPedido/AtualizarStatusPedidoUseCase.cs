@@ -1,4 +1,5 @@
 using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
@@ -14,7 +15,8 @@ public sealed record AtualizarStatusPedidoCommand(
     [property: Required][property: MaxLength(20)] string Status,
     Guid? UsuarioId = null,
     [property: MaxLength(120)] string? UsuarioNome = null,
-    [property: MaxLength(20)] string? Origem = "web");
+    [property: MaxLength(20)] string? Origem = "web",
+    DateTime? OcorridoEm = null);
 
 /// <summary>
 /// Atualiza o status do pedido (aguardando → preparando → pronto → entregue).
@@ -40,6 +42,7 @@ public class AtualizarStatusPedidoUseCase(
     IConfiguracaoLojaRepository configLojaRepo,
     GerarContaReceberDePedidoUseCase gerarContaReceberUseCase,
     IPublicadorEventoIntegracao publicadorEventos,
+    IOperacaoEventPublisher operacaoEventos,
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger)
 {
@@ -107,7 +110,7 @@ public class AtualizarStatusPedidoUseCase(
             UsuarioId = cmd.UsuarioId,
             UsuarioNome = cmd.UsuarioNome,
             Origem = cmd.Origem,
-            OcorridoEm = DateTime.UtcNow
+            OcorridoEm = OcorridoEmAuditoria(cmd.OcorridoEm)
         });
 
         // Ponto de integracao unico da esteira (ADR-0042, Onda 4): publica a transicao no
@@ -135,6 +138,10 @@ public class AtualizarStatusPedidoUseCase(
 
         logger.LogInformation("Pedido {Id} status {Antigo} → {Novo}.", pedido.Id, statusAntigoStr, statusNovoStr);
 
+        // SSE de operação (S18): evento de UI, só depois do commit — commit que lança não publica.
+        await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, pedido.EmpresaId,
+            new PedidoMudouStatusOperacao(pedido.Id, statusAntigoStr, statusNovoStr));
+
         // Integracao automatica CAP/CAR (P1): se status novo coincide com configuracao,
         // gera ContaReceber. Best-effort: falha aqui nao reverte status do pedido
         // (idempotencia via OrigemRefId garante retry seguro depois).
@@ -161,5 +168,22 @@ public class AtualizarStatusPedidoUseCase(
         }
 
         return CriarPedidoUseCase.Map(pedido);
+    }
+
+    /// <summary>
+    /// Instante do toque informado pelo aparelho (fila offline do KDS, S19), em UTC e nunca no futuro;
+    /// sem ele, agora. Só alimenta o evento de auditoria.
+    /// </summary>
+    private static DateTime OcorridoEmAuditoria(DateTime? informado)
+    {
+        var agora = DateTime.UtcNow;
+        if (informado is not { } o) return agora;
+        var utc = o.Kind switch
+        {
+            DateTimeKind.Utc => o,
+            DateTimeKind.Local => o.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(o, DateTimeKind.Utc),
+        };
+        return utc > agora ? agora : utc;
     }
 }
