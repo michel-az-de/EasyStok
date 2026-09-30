@@ -87,9 +87,9 @@ avisos, assistente); no erro do controle manual o estado volta ao que a API tem.
 **Aceite.**
 - [x] `npm run qualidade` verde; fronteira de camadas ok.
 - [x] Sem `VITE_FONTE_DADOS`, o console abre como hoje, com a massa (sem a aba Atendimento).
-- [ ] Abrir e fechar a loja pelo topo reflete no expediente (validação do Felipe).
-- [ ] A configuração salva e recarrega (validação do Felipe).
-- [ ] O assistente responde (validação do Felipe).
-- [ ] E-mail e SMS da Ficha gravam e voltam após recarregar (validação do Felipe).
+- [x] Abrir e fechar a loja pelo topo reflete no expediente (validado pelo Felipe em 2026-09-30).
+- [x] A configuração salva e recarrega (validado pelo Felipe em 2026-09-30).
+- [x] O assistente responde (validado pelo Felipe em 2026-09-30).
+- [x] E-mail e SMS da Ficha gravam e voltam após recarregar (validado pelo Felipe em 2026-09-30).
 
 **Fora.** Mensagem programada (S39), finalidade Marketing na Ficha, SSE do expediente.
