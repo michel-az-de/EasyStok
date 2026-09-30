@@ -4,7 +4,7 @@
     Encerra o ambiente local do EasyStok subido pelo up.ps1.
 
 .DESCRIPTION
-    Mata os processos `dotnet watch` (API/Web/Admin) lendo os PIDs em
+    Mata os processos `dotnet watch` (API/Web) lendo os PIDs em
     .build/local-env/<svc>.pid e derrubando a arvore inteira (taskkill /T),
     ja que o watch gera processos filhos (dotnet run -> app).
 
@@ -32,7 +32,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $StateDir = Join-Path $RepoRoot '.build\local-env'
 
-foreach ($name in @('api', 'web', 'admin')) {
+foreach ($name in @('api', 'web')) {
     $pidFile = Join-Path $StateDir ("{0}.pid" -f $name)
     if (-not (Test-Path $pidFile)) {
         Write-Host "  $name : sem .pid (nao estava de pe?)" -ForegroundColor DarkGray
