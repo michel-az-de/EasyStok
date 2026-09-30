@@ -53,7 +53,8 @@ public sealed class CampanhaPublicoQueries(EasyStockDbContext db) : ICampanhaPub
                 l.ConsentimentoWhatsApp is { } situacao ? situacao == SituacaoConsentimento.Concedido : l.ConsentiuMarketing,
                 l.Tags,
                 l.UltimaCompraItemEm,
-                l.UltimaCampanhaRecebidaEm))
+                l.UltimaCampanhaRecebidaEm,
+                l.Telefone))
             .ToList();
     }
 
