@@ -74,20 +74,11 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<AdminAuditService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaResolver>();
-        services.AddScoped<EasyStock.Application.Ports.Output.Helpdesk.ISlaResolver>(sp =>
-            sp.GetRequiredService<EasyStock.Api.Services.Helpdesk.SlaResolver>());
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskTicketService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskAnexoService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskBugFixService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.SlaConfiguracaoService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskDashboardService>();
-        services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskRelatorioService>();
         services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
-        // F14 — auto-ticket categoria=Financeiro apos N falhas de pagamento.
+        // F14 — audita falha de pagamento em FaturaEvento.
         services.AddScoped<EasyStock.Application.Ports.Output.IFalhaPagamentoNotifier,
-            EasyStock.Api.Services.Faturacao.AutoTicketFalhaPagamento>();
+            EasyStock.Api.Services.Faturacao.AuditoriaFalhaPagamento>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
@@ -256,39 +247,6 @@ public static class ApiServiceCollectionExtensions
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 5
-                    });
-            });
-
-            // Rate limit para criação/resposta de tickets de suporte. Particionado
-            // por IP para impedir cliente abusivo abrir centenas de tickets.
-            // Limite generoso o suficiente pra suporte legítimo (10/min/IP).
-            options.AddPolicy("tickets-post", context =>
-            {
-                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 10,
-                        Window = TimeSpan.FromMinutes(1),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = 0
-                    });
-            });
-
-            // FAQ publico — leitura anonima (busca, listar categorias, obter item).
-            // Generoso para nao quebrar SEO/scrapers legitimos.
-            options.AddPolicy("public-read", context =>
-            {
-                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 60,
-                        Window = TimeSpan.FromMinutes(1),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = 10
                     });
             });
 

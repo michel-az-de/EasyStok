@@ -102,16 +102,9 @@ builder.Services
     .AddNotificationsHosting(builder.Configuration)
     .AddPostgresOutboxSignaler(builder.Configuration);
 
-// Jobs de Helpdesk (notificação tem manutenção própria via AddPostgresOutboxSignaler).
-// SlaMonitorService monitora tickets e gera EventoNotificacao — pertence ao Worker mesmo.
-builder.Services.AddHostedService<SlaMonitorService>();
-
 // Lembretes de pedidos agendados (mobile_orders.scheduled_delivery_at):
 // no dia, 1h antes, 10min antes. Idempotencia via colunas agendamento_notificado_*_em.
 builder.Services.AddHostedService<AgendamentoNotificacaoService>();
-
-// Fan-out da notificacao opcional de banners de plataforma (#869): guard atomico + BroadcastSuperAdmin por empresa.
-builder.Services.AddHostedService<BannerNotificacaoService>();
 
 // Monitor de saude de endpoints publicos. Abre ticket via /api/ci/tickets
 // quando >threshold falhas consecutivas. Idempotencia via tabela
