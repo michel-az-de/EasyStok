@@ -98,6 +98,8 @@ public static class FeatureCatalogo
     /// <summary>Instagram Direct e Messenger como canais (S35, ADR-0051). Exigem também <see cref="ModuloAtendimento"/>.</summary>
     public const string CanalInstagram = "atendimento.canal.instagram";
     public const string CanalMessenger = "atendimento.canal.messenger";
+    /// <summary>Chat do site como canal de atendimento (S36, ADR-0051). Exige também <see cref="ModuloAtendimento"/>.</summary>
+    public const string CanalChatSite = "atendimento.canal.chatsite";
 
     /// <summary>Features conhecidas, na ordem em que aparecem no back-office.</summary>
     public static IReadOnlyList<FeatureConhecida> Conhecidas { get; } =
@@ -107,6 +109,7 @@ public static class FeatureCatalogo
         new(ModuloAtendimento, "Atendimento por WhatsApp: agente, conversa e handoff pelo console."),
         new(CanalInstagram, "Instagram Direct: a loja atende as mensagens do perfil pelo console."),
         new(CanalMessenger, "Messenger: a loja atende as mensagens da página do Facebook pelo console."),
+        new(CanalChatSite, "Chat do site: o visitante conversa com a loja pela vitrine."),
     ];
 
     /// <summary>

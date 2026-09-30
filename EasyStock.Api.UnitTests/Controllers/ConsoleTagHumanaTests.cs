@@ -9,6 +9,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Integrations.Meta;
 using FluentAssertions;
@@ -37,6 +38,7 @@ public class ConsoleTagHumanaTests
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.EmpresaId.Returns(_empresaId);
         currentUser.UsuarioId.Returns(Guid.NewGuid());
+        currentUser.TemPermissao(Permissao.AtenderConversas).Returns(true);
         var uploads = new GerenciarUploadsUseCase(
             Substitute.For<IFileStorage>(), Substitute.For<IImageProcessor>(), Substitute.For<IProdutoRepository>(),
             Substitute.For<IUsuarioRepository>(), Substitute.For<ILojaRepository>(), Substitute.For<IStorefrontRepository>(),
