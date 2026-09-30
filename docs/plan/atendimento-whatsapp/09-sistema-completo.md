@@ -158,6 +158,10 @@ startup com a chave nomeada, igual ao S01.
 
 ### S38 · Consentimento do cliente final por canal
 
+> **Entregue na #1078.** O `ConsentiuMarketing` não recebeu `[Obsolete]` (o build trata aviso como
+> erro). Ele fica documentado como legado até a poda. Opt-out por palavra: SAIR, PARAR ou STOP,
+> sozinhas na mensagem. "quero sair do grupo" vai para o atendimento normal.
+
 **Problema.** `Cliente.ConsentiuMarketing` (`Cliente.cs:87`) é um booleano único. A LGPD e as
 políticas da Meta e da Twilio pedem opt-in por canal e por finalidade, além de opt-out simples.
 **Abordagem.** Nova entidade `ConsentimentoContato (EmpresaId, ClienteId, Canal, Finalidade
@@ -346,6 +350,9 @@ integração vai preencher.
 ---
 
 ### S45 · Cadastros operacionais completos
+
+> **Parte 1 entregue na #1095** (janelas, zonas e bloqueios; medido: não havia CRUD em controller
+> nenhum). A parte 2, `CanalEmpresa`, espera S37–S39 entrarem, porque mexe no `ResolvedorCanal`.
 
 **Problema.** No protótipo, canais, janelas com capacidade e zona por prefixo de CEP são só semente
 (`catalogo.js:15,82,267`). No EasyStok, `JanelaEntrega`, `BloqueioEntrega` e `FreteZona` existem, mas

@@ -45,6 +45,10 @@ public static partial class ServiceCollectionExtensions
 
         // S40: expediente da loja (abrir e fechar, horário por dia).
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.ObterExpedienteLojaUseCase>();
+        // S45: cadastro de janelas, zonas e bloqueios pela própria loja
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.CadastroJanelasEntregaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.CadastroZonasFreteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Entrega.CadastroBloqueiosEntregaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.AtualizarExpedienteLojaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.DefinirControleExpedienteUseCase>();
         services.AddScoped<LiberarVagaOnPedidoCanceladoHandler>();
