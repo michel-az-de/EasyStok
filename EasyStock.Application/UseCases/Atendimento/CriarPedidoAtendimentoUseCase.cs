@@ -48,6 +48,10 @@ public sealed class CriarPedidoAtendimentoUseCase(
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException($"Cliente {input.ClienteId} não encontrado.");
 
+        // S24: bloqueio vale em todos os canais; nada de vaga ocupada nem pedido.
+        if (cliente.Bloqueado)
+            throw new ClienteBloqueadoException(cliente.Id);
+
         var endereco = cliente.Enderecos.FirstOrDefault(e => e.Id == input.EnderecoId)
             ?? throw new RegraDeDominioVioladaException($"Endereço {input.EnderecoId} não pertence ao cliente.");
 
@@ -70,5 +74,14 @@ public sealed class CriarPedidoAtendimentoUseCase(
         await unitOfWork.CommitAsync();
 
         return reservado;
+    }
+
+    /// <summary>Endereço padrão do cliente ou, sem padrão, o único cadastrado; senão nulo (é preciso perguntar).</summary>
+    public static Guid? EnderecoPadrao(EasyStock.Domain.Entities.Cliente cliente)
+    {
+        ArgumentNullException.ThrowIfNull(cliente);
+        var padrao = cliente.Enderecos.FirstOrDefault(e => e.Padrao);
+        if (padrao is not null) return padrao.Id;
+        return cliente.Enderecos.Count == 1 ? cliente.Enderecos.First().Id : null;
     }
 }

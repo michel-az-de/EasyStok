@@ -98,4 +98,24 @@ public class CriarPedidoFerramentaTests
 
         resultado.Should().Contain("cliente_nao_identificado");
     }
+
+    [Fact]
+    public async Task ClienteBloqueado_RecusaComCodigoSemCriarPedido()
+    {
+        var c = new Cenario();
+        c.Cliente.Bloquear("golpe", Agora);
+
+        var resultado = await c.ExecutarAsync(new
+        {
+            itens = new[] { new { cardapio_item_id = c.Checkout.CardapioItemId, quantidade = 1 } },
+            data_entrega = c.Checkout.DataEntrega.ToString("yyyy-MM-dd"),
+            janela_id = c.Checkout.JanelaId,
+        });
+
+        using var json = JsonDocument.Parse(resultado);
+        json.RootElement.GetProperty("erro").GetString().Should().Be("cliente_bloqueado");
+        resultado.Should().NotContain("golpe", "o motivo do bloqueio é interno");
+        c.Conversa.PedidoEmAndamentoId.Should().BeNull();
+        c.Cobrancas.Should().BeEmpty();
+    }
 }

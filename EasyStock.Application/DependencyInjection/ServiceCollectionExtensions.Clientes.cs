@@ -15,6 +15,7 @@ using EasyStock.Application.UseCases.RemoverClienteTelefone;
 using EasyStock.Application.UseCases.AdicionarClienteDocumento;
 using EasyStock.Application.UseCases.RemoverClienteDocumento;
 using EasyStock.Application.UseCases.ObterClienteDetalhes;
+using EasyStock.Application.UseCases.ClienteCrm;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -49,6 +50,15 @@ public static partial class ServiceCollectionExtensions
         // Gerenciamento de documentos (CPF, CNPJ, RG, etc)
         services.AddScoped<AdicionarClienteDocumentoUseCase>();
         services.AddScoped<RemoverClienteDocumentoUseCase>();
+
+        // CRM leve (S24): tags, notas internas, bloqueio e preferências
+        services.AddScoped<ListarTagsClienteUseCase>();
+        services.AddScoped<AdicionarTagClienteUseCase>();
+        services.AddScoped<RemoverTagClienteUseCase>();
+        services.AddScoped<ListarNotasClienteUseCase>();
+        services.AddScoped<AdicionarNotaClienteUseCase>();
+        services.AddScoped<DefinirBloqueioClienteUseCase>();
+        services.AddScoped<DefinirPreferenciasClienteUseCase>();
 
         return services;
     }

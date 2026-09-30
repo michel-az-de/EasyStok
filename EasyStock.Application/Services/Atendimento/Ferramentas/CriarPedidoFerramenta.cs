@@ -65,10 +65,12 @@ public sealed class CriarPedidoFerramenta(
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(contexto.EmpresaId, clienteId);
         if (cliente is null)
             return Erro("cliente_nao_identificado");
+        if (cliente.Bloqueado)
+            return Erro(ClienteBloqueadoException.CodigoErro); // S24: o motivo é interno
 
         var enderecoId = Guid.TryParse(FerramentaJson.LerTexto(entrada, "endereco_id"), out var informado)
             ? informado
-            : EscolherEndereco(cliente);
+            : CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente);
         if (enderecoId is null)
         {
             return FerramentaJson.Serializar(new
@@ -95,6 +97,10 @@ public sealed class CriarPedidoFerramenta(
             reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
                 contexto.EmpresaId, conversa.Id, clienteId, itens, janelaId.Value, dataEntrega, enderecoId.Value,
                 FerramentaJson.LerTexto(entrada, "observacoes")), ct);
+        }
+        catch (ClienteBloqueadoException)
+        {
+            return Erro(ClienteBloqueadoException.CodigoErro);
         }
         catch (RegraDeDominioVioladaException ex)
         {
@@ -167,13 +173,6 @@ public sealed class CriarPedidoFerramenta(
             itens.Add(new ItemPedidoCheckout(cardapioItemId, quantidade, FerramentaJson.LerTexto(item, "observacao")));
         }
         return itens.Count == 0 ? null : itens;
-    }
-
-    private static Guid? EscolherEndereco(Cliente cliente)
-    {
-        var padrao = cliente.Enderecos.FirstOrDefault(e => e.Padrao);
-        if (padrao is not null) return padrao.Id;
-        return cliente.Enderecos.Count == 1 ? cliente.Enderecos.First().Id : null;
     }
 
     private async Task<IReadOnlyList<Domain.Entities.Storefront.JanelaEntrega>> JanelasDoDiaAsync(
