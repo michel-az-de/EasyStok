@@ -16,6 +16,12 @@ public sealed class BackgroundJobOptions
     /// <summary>S43: avaliador dos lembretes da dona. Desligar é o rollback.</summary>
     public bool EnableAvaliadorLembretes { get; set; } = true;
 
+    /// <summary>
+    /// S30: job das campanhas (primeira onda no horário, conciliação com o outbox, encerramento e
+    /// lembrete). Desligar é o rollback: as campanhas ficam <c>Agendada</c>.
+    /// </summary>
+    public bool EnableCampanhaJob { get; set; } = true;
+
     // Jobs opcionais (default false)
     public bool EnableAlertasEstoqueJob { get; set; }
     public bool EnableProcessarRecebimentoJob { get; set; }

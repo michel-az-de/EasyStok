@@ -1,0 +1,50 @@
+/* Controles da frente Anexos dentro do Composer (rodada 7). */
+
+.botaoAnexo {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--toque); min-height: var(--toque); border-radius: var(--r-1);
+  border: var(--b-1) solid var(--linha); background: var(--papel);
+  color: var(--tinta); cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+.botaoAnexo:hover { background: var(--semola-2); }
+.botaoAnexo.desabilitado { opacity: .5; cursor: not-allowed; }
+
+.previa {
+  display: flex; align-items: center; gap: var(--e-2);
+  padding: var(--e-2); margin-bottom: var(--e-2);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1); background: var(--elevado);
+}
+.previaMiniatura { width: 48px; height: 48px; object-fit: cover; border-radius: var(--r-ponta); flex-shrink: 0; }
+.previaIcone {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 48px; height: 48px; border-radius: var(--r-ponta); background: var(--papel); color: var(--tinta-2);
+}
+.previaTexto { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.previaTexto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.previaTexto span { font-size: var(--t-apoio); color: var(--tinta-3); }
+.previaRemover {
+  flex-shrink: 0; display: grid; place-items: center;
+  width: var(--toque); height: var(--toque); border-radius: 999px; border: 0; background: none;
+  color: var(--tinta-2); cursor: pointer; transition: background 180ms ease;
+}
+.previaRemover:hover { background: var(--linha); }
+
+.gravando {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  min-height: var(--toque);
+}
+.gravandoIcone { color: var(--perigo); flex-shrink: 0; }
+.onda { display: flex; align-items: flex-end; gap: 2px; height: 24px; flex: 1 1 80px; min-width: 60px; }
+.onda span { width: 3px; min-height: 3px; border-radius: 2px; background: var(--perigo); }
+.cronometro { font-family: var(--f-dado); font-size: var(--t-corpo); color: var(--tinta); min-width: 3.5ch; }
+.avisoLimite { font-size: var(--t-apoio); color: var(--aviso); }
+
+.aviso, .erro {
+  display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque);
+  font-size: var(--t-apoio); color: var(--tinta-2); margin: 0;
+}
+.erro { color: var(--perigo); }
+.erro button {
+  margin-left: auto; border: 0; background: none; color: inherit; text-decoration: underline; cursor: pointer;
+}

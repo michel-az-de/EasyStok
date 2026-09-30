@@ -55,4 +55,10 @@ public static class LockKeys
     /// avaliar e avisar em dobro. "Lembret" em hex ASCII.
     /// </summary>
     public const long AvaliadorLembretes = 0x4C65_6D62_7265_7400L;
+
+    /// <summary>
+    /// Job das campanhas (S30), a cada minuto. Serializa entre réplicas para não disparar onda nem
+    /// lembrete em dobro. "Campanh" em hex ASCII.
+    /// </summary>
+    public const long CampanhaJob = 0x4361_6D70_616E_6800L;
 }

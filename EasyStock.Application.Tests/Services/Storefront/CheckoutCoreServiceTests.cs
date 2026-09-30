@@ -47,6 +47,12 @@ public class CheckoutCoreServiceTests
         public List<Pedido> PedidosAdicionados { get; } = new();
         public List<PedidoItem> ItensAdicionados { get; } = new();
 
+        /// <summary>Campanhas do cliente (S30): sem envio recente, o pedido não é atribuído a nenhuma.</summary>
+        public EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaRepository CampanhaRepo { get; } =
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaRepository>();
+
+        public EasyStock.Application.Services.Campanhas.AtribuicaoPedidoCampanha Atribuicao() => new(CampanhaRepo, Relogio);
+
         public Cenario()
         {
             Storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);

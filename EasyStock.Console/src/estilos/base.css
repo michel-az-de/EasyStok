@@ -1,0 +1,123 @@
+@import './tokens.css';
+
+* { box-sizing: border-box; }
+
+/* A tela cabe na janela e ponto. A rolagem mora DENTRO das colunas, nunca no
+   documento: sem isto o corpo crescia para 1797 px num app de 1100 px, sobravam
+   697 px de branco rolável e o topo sumia quando ela rolava. */
+html, body { height: 100dvh; overflow: hidden; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--tinta);
+  font-family: var(--f-corpo);
+  font-size: var(--t-corpo);
+  line-height: var(--lh-corpo);
+  letter-spacing: var(--ls-corpo);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* `clip`, não `hidden` (registro 101): `hidden` ainda deixa o script rolar.
+   Rótulo `.sr` de balão, absoluto, escapa do recorte da coluna e dava ao
+   #root milhares de pixels de sobra; o `scrollIntoView` do fim da conversa
+   (Thread.jsx) rolava o #root e a tela inteira subia, o cabeçalho sumia e,
+   com a faixa de queda, os campos ficavam por baixo dela. */
+#root { height: 100dvh; overflow: clip; }
+
+/* Hora, valor e contagem em algarismo tabular: alinham na coluna sem fonte
+   mono. Só no número, porque no texto corrido o tabular espaça o hífen. */
+time, data, output { font-variant-numeric: tabular-nums; }
+
+button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+
+/* Toque que responde: todo botão afunda um pouco ao apertar e volta com mola.
+   O transform inline do arraste (dnd-kit) vence esta regra por ser inline. */
+button {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-curta) var(--ease-padrao),
+    border-color var(--dur-curta) var(--ease-padrao),
+    color var(--dur-curta) var(--ease-padrao),
+    box-shadow var(--dur-curta) var(--ease-padrao),
+    opacity var(--dur-curta) var(--ease-padrao),
+    transform var(--dur-media) var(--ease-mola);
+}
+button:active:not(:disabled) {
+  transform: scale(.975);
+  transition-duration: var(--dur-micro);
+  transition-timing-function: var(--ease-entrada);
+}
+
+/* Foco: anel de 3 px com folga de 2. */
+:focus-visible {
+  outline: var(--b-3) solid var(--ragu);
+  outline-offset: 2px;
+}
+
+h1, h2, h3 { text-wrap: balance; letter-spacing: var(--ls-titulo); }
+p { text-wrap: pretty; }
+
+::selection { background: var(--ragu-claro); color: var(--tinta); }
+
+/* Barra de rolagem fina e discreta. */
+* { scrollbar-width: thin; scrollbar-color: var(--linha-media) transparent; }
+
+.sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Troca de tema como dissolvência única da tela inteira (View Transitions),
+   em vez de cada componente trocar de cor no seu próprio ritmo. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-longa);
+  animation-timing-function: var(--ease-padrao);
+}
+
+/* Movimentos compartilhados. Quem usa só escolhe o nome. */
+@keyframes surgir {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes surgirDeLado {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes esmaecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes estalar {
+  0% { transform: scale(.4); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes pulsar {
+  0% { box-shadow: 0 0 0 0 var(--halo); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Impressão (seção 3.4 e 5 da direção visual, passo zero): FolhaImpressao.jsx
+   cria um portal direto no body, fora de #root. Em tela ele fica escondido
+   (a folha visível é a que mora dentro do Modal); só a impressão revela o
+   portal e esconde o app inteiro por baixo, forçando o tema claro no papel. */
+[data-imprimir] { display: none; }
+@media print {
+  :root { color-scheme: light; }
+  #root { display: none; }
+  [data-imprimir] { display: block; }
+}

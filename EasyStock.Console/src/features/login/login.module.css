@@ -1,0 +1,51 @@
+.tela {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--fundo);
+}
+
+.cartao {
+  width: min(100%, 400px);
+  display: grid;
+  gap: 20px;
+  padding: 32px 24px;
+  background: var(--papel);
+  border: 1px solid var(--linha);
+  border-radius: 16px;
+  box-shadow: var(--sombra);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--t-20);
+  color: var(--ragu);
+}
+
+.subtitulo {
+  margin: -12px 0 0;
+  color: var(--tinta-2);
+  font-size: var(--t-15);
+}
+
+.formulario,
+.empresas {
+  display: grid;
+  gap: 16px;
+}
+
+.pergunta {
+  margin: 0;
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.erro {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--perigo-fundo);
+  color: var(--perigo);
+  font-size: var(--t-15);
+}

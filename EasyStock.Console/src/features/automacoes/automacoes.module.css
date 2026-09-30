@@ -1,0 +1,124 @@
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
+.regra {
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  padding: var(--e-3); background: var(--semola);
+}
+.desligada { opacity: .68; }
+.topo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.topo strong { font-size: var(--t-corpo); }
+.espera {
+  margin-left: auto; display: flex; align-items: center; gap: var(--e-1);
+  font-size: var(--t-apoio); color: var(--tinta-3);
+}
+.descricao { margin: var(--e-1) 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.texto {
+  margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
+  background: var(--papel); border-radius: var(--r-1);
+  font-size: var(--t-corpo); color: var(--tinta); border-left: var(--trilho) solid var(--linha-forte);
+}
+
+/* Som da cozinha: chave única, antes das regras, porque vale para a tela toda. */
+.som {
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  padding: var(--e-3); margin-bottom: var(--e-4); background: var(--papel);
+}
+
+/* Horário de funcionamento e estado da loja: mesma casca do bloco de som,
+   uma lista de dias dentro. */
+.funcionamento {
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  padding: var(--e-3); margin-bottom: var(--e-4); background: var(--papel);
+}
+.diasFuncionamento {
+  list-style: none; margin: var(--e-3) 0 0; padding: 0; display: grid; gap: var(--e-2);
+}
+.diaFuncionamento {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha);
+}
+.horariosDoDia { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-left: auto; }
+.horariosDoDia input { min-height: var(--toque); }
+
+/* Achado 8 (banca capricho R10): as sete linhas liam igual, sem marca do dia
+   atual. Fundo e trilho sutis (mesmo tom de "selecionado" do resto do app,
+   nunca cor de estado ok/aviso/perigo, porque "hoje" não é um status). */
+.diaFuncionamentoHoje {
+  background: var(--preenchimento); border-radius: var(--r-1);
+  padding-left: var(--e-2); margin-left: calc(var(--e-2) * -1);
+  border-top-color: transparent;
+}
+.marcaHoje {
+  padding: 1px var(--e-2); border-radius: var(--r-pilula);
+  background: var(--preenchimento-forte); color: var(--tinta-2);
+  font-size: var(--t-11); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+}
+
+/* Chave com rótulo de estado. Ligado e desligado não podem ser parecidos. */
+.chave {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); font-size: var(--t-apoio); font-weight: 600;
+  color: var(--tinta-2);
+}
+.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+.topo .chave { margin-left: auto; }
+
+/* Aviso de uma linha enquanto o navegador não deu o gesto que destrava o
+   áudio. Some sozinho assim que ela toca em qualquer lugar da tela. */
+.avisoAudio {
+  margin: var(--e-2) 0 0; padding: var(--e-1) var(--e-2);
+  background: var(--aviso-fundo); color: var(--aviso);
+  border-radius: var(--r-1); font-size: var(--t-apoio); font-weight: 600;
+}
+
+/* Amostra dos três sons, para ela reconhecer de ouvido antes de confiar
+   na chave. */
+.amostras { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-top: var(--e-2); }
+.amostra { min-height: var(--toque); font-size: var(--t-apoio); }
+
+/* Chip por variável (achado 2, pendência 21 da banca 64): substitui o texto
+   corrido "Variáveis: {a}, {b}". Sem fonte mono: T5 do auditor visual só
+   libera mono na comanda e no canhoto. */
+.variaveis {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1);
+  margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3);
+}
+.tokenVariavel {
+  display: inline-flex; padding: 1px var(--e-2);
+  border-radius: var(--r-pilula); background: var(--elevado); color: var(--tinta-2);
+  font-size: var(--t-apoio); font-weight: 600;
+}
+
+/* Prévia em bolha, do jeito que o cliente recebe, com os dados da conversa. */
+.rotuloPrevia {
+  margin: var(--e-3) 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-3);
+}
+.bolha {
+  margin: 0; padding: var(--e-2) var(--e-3);
+  background: var(--ragu-claro); color: var(--tinta);
+  border-radius: var(--r-1); border-bottom-right-radius: var(--r-ponta);
+  font-size: var(--t-corpo); white-space: pre-wrap;
+}
+
+.horario {
+  display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
+  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-2);
+}
+.editando { margin: var(--e-2) 0 0; }
+.acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-3); }
+.toque { min-height: var(--toque); }
+
+/* Rodada 6d (banca estética, item 9): liga e desliga em cápsula, como os
+   Ajustes do iPhone. Continua sendo o mesmo checkbox, só com outro desenho. */
+.chave input[type='checkbox'] {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0; cursor: pointer; margin: 0;
+  position: relative; width: 44px; height: 26px; border-radius: var(--r-pilula);
+  background: var(--preenchimento-forte); transition: background-color var(--dur-curta) var(--ease-padrao);
+}
+.chave input[type='checkbox']::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #FFFFFF; box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform var(--dur-media) var(--ease-mola);
+}
+.chave input[type='checkbox']:checked { background: var(--ok); }
+.chave input[type='checkbox']:checked::after { transform: translateX(18px); }
+.chave input[type='checkbox']:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; }

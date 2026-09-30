@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.CriarPedido;
 
@@ -31,7 +32,8 @@ public sealed class CriarPedidoAtendimentoUseCase(
     IConversaRepository conversaRepository,
     IClienteRepository clienteRepository,
     IConfiguracaoAtendimentoRepository configuracaoRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    AtribuicaoPedidoCampanha atribuicaoCampanha)
 {
     /// <summary>Motivo gravado em <c>Pedido.MotivoRequerAprovacao</c> quando a dona liberou o lead fora de área (S14).</summary>
     public const string MotivoForaDeArea = "fora_de_area";
@@ -79,6 +81,8 @@ public sealed class CriarPedidoAtendimentoUseCase(
             reservado.Pedido.MarcarRequerAprovacao(MotivoForaDeArea);
 
         conversa.DefinirPedidoEmAndamento(reservado.Pedido.Id);
+        // S30: pedido de quem recebeu campanha na semana conta como conversão dela.
+        await atribuicaoCampanha.AtribuirAsync(input.EmpresaId, cliente.Id, reservado.Pedido.Id, ct);
         await unitOfWork.CommitAsync();
 
         return reservado;
