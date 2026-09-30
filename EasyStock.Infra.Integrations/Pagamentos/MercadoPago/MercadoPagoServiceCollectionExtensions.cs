@@ -33,6 +33,9 @@ public static class MercadoPagoServiceCollectionExtensions
             });
         }
 
+        // S27: estorno da ocorrência sobre o EstornarAsync (S32).
+        services.AddScoped<IEstornoPedidoGateway, MercadoPagoEstornoPedidoGateway>();
+
         return services;
     }
 }
