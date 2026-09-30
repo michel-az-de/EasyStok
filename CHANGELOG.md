@@ -5,6 +5,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- **Painel `EasyStock.Admin` e controllers `Admin*`** (poda P01): saem o projeto Admin e seus testes,
+  19 controllers `Api/Controllers/Admin*` e o `FaturasPdfController` (77 endpoints; 89 com os 12 que
+  saem do `AdminTenantsController`), com os use cases, portas, repositórios e relatórios que só eles usavam (faturas do admin, MRR/inadimplência,
+  dashboard, busca global, frota, status, configurações do sistema, cupons, planos, APK, seed de
+  cenários, helpdesk do cliente). Na Web sai o `POST /auth/impersonate` (handoff que só o Admin
+  chamava). Deploy: sem serviço `admin` no compose Azure, Caddy, Render, Fly e na matriz do
+  `build-images.yml`; `vm-deploy.sh` e scripts de verificação sem o container `easystok-admin`.
+  Ficam as rotas de plataforma sem substituto: `AdminTenantsController` enxuto (criar empresa,
+  consultar, módulos, vínculo do número da Meta), `AdminStorefrontController` e
+  `AdminNotificacoesController`. Tabelas ficam para a P06. (#1169)
+
 ### Fixed
 - Criar usuário em cliente pelo SuperAdmin (`POST api/admin/usuarios-tenant` e "Novo usuário" do
   Admin) respondia 500: o RLS recusava o `Perfil` da empresa alvo porque o token do SuperAdmin não
