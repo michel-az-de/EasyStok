@@ -1,9 +1,12 @@
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Domain.Entities.Operacao;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
@@ -67,6 +70,7 @@ public sealed record ConfirmarPagamentoPedidoResult(
 ///   <item><c>AguardandoPagamento → Aguardando</c> (pedido já na fila só recebe o pagamento), cobrança
 ///     <c>Paga</c>, demais pendentes canceladas, <c>PedidoPagoEvent</c> e <c>pedido.mudou_status</c> no
 ///     outbox e <c>PedidoPagamento</c> pelo <see cref="RegistrarPagamentoPedidoUseCase"/>.</item>
+///   <item><c>InicioPrevistoEm</c> pela <see cref="CalculadoraInicioPrevistoPedido"/> (S21).</item>
 /// </list>
 ///
 /// <para>
@@ -76,12 +80,16 @@ public sealed record ConfirmarPagamentoPedidoResult(
 ///
 /// <para>
 /// Pendente para S12: com <c>Pedido.RequerAprovacao</c> o destino passa a ser <c>AguardandoAprovacaoBaba</c>.
-/// A impressão (S20) consome o <see cref="PedidoPagoEvent"/>.
 /// </para>
 ///
 /// <para>
-/// Depois que a transação fecha, publica <c>pedido.pago</c> no SSE de operação (S18) para o console tocar o
-/// som. Commit que falha não publica nada.
+/// S20: o canhoto entra na fila de impressão (<see cref="ImpressaoPendente"/>) na mesma transação; rollback
+/// do pagamento não deixa impressão órfã.
+/// </para>
+///
+/// <para>
+/// Depois que a transação fecha, publica <c>pedido.pago</c> (o console toca o som) e <c>impressao.pendente</c>
+/// (a aba que imprime busca a fila) no SSE de operação (S18). Commit que falha não publica nada.
 /// </para>
 /// </summary>
 public sealed class ConfirmarPagamentoPedidoUseCase(
@@ -90,10 +98,12 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     RegistrarPagamentoPedidoUseCase registrarPagamento,
     IPublicadorEventoIntegracao publicador,
     IOperacaoEventPublisher operacaoEventos,
+    IImpressaoPendenteRepository impressoes,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<ConfirmarPagamentoPedidoUseCase> logger)
+    ILogger<ConfirmarPagamentoPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto)
 {
     public const string StatusAprovado = "approved";
     private const string Origem = "mercadopago";
@@ -121,43 +131,45 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         }
         tenantContext.SetCurrentTenant(empresaId.Value);
 
-        var (resultado, pago) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
+        var (resultado, pago, impressao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             token => ConfirmarNoLockAsync(input, empresaId.Value, token), ct);
 
         // Evento de UI: só depois do commit da transação, nunca para uma confirmação desfeita.
         if (pago is not null)
             await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId.Value, pago, ct);
+        if (impressao is not null)
+            await operacaoEventos.PublicarAsync(EventosOperacao.ImpressaoPendente, empresaId.Value, impressao, ct);
         return resultado;
     }
 
-    private async Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?)> ConfirmarNoLockAsync(
+    private async Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)> ConfirmarNoLockAsync(
         ConfirmarPagamentoPedidoInput input, Guid empresaId, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != empresaId)
-            return (new(SituacaoConfirmacaoPagamento.PedidoNaoEncontrado), null);
+            return (new(SituacaoConfirmacaoPagamento.PedidoNaoEncontrado), null, null);
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
         var jaPaga = cobrancas.FirstOrDefault(c => c.PagamentoExternoId == input.PagamentoExternoId);
         if (jaPaga is not null)
-            return (new(SituacaoConfirmacaoPagamento.JaConfirmado, jaPaga.Id, pedido.Status), null);
+            return (new(SituacaoConfirmacaoPagamento.JaConfirmado, jaPaga.Id, pedido.Status), null, null);
 
         var alvo = EscolherCobranca(cobrancas, input);
         if (alvo is null)
-            return (new(SituacaoConfirmacaoPagamento.SemCobranca, null, pedido.Status), null);
+            return (new(SituacaoConfirmacaoPagamento.SemCobranca, null, pedido.Status), null, null);
 
         if (input.ValorPago < alvo.Valor)
         {
             var motivo = $"valor_menor: pagamento {input.PagamentoExternoId} de {input.ValorPago.ToString("F2", Cultura.PtBr)} " +
                          $"para cobrança de {alvo.Valor.ToString("F2", Cultura.PtBr)}";
-            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct), null);
+            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct), null, null);
         }
 
         if (pedido.StatusEnum == StatusPedido.Cancelado)
         {
             var motivo = $"pedido_cancelado: pagamento {input.PagamentoExternoId} recebido depois do cancelamento; estornar (S27)";
-            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.PedidoCancelado, agora, ct), null);
+            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.PedidoCancelado, agora, ct), null, null);
         }
 
         var pagoEm = input.PagoEm ?? agora;
@@ -166,11 +178,16 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         foreach (var outra in cobrancas.Where(c => c.EstaPendente && c.Id != alvo.Id))
             outra.Cancelar($"pago_por_outra_cobranca: {alvo.Id}", agora);
 
+        // S21: com o pagamento, a janela vira compromisso; o card do KDS atrasa a partir daqui.
+        pedido.DefinirInicioPrevisto(await inicioPrevisto.CalcularAsync(pedido, ct));
+
         var statusAntigo = pedido.Status;
-        if (pedido.StatusEnum == StatusPedido.AguardandoPagamento)
-        {
+        var transitou = pedido.StatusEnum == StatusPedido.AguardandoPagamento;
+        if (transitou)
             pedido.MudarStatus(StatusPedido.Aguardando);
-            await pedidoRepository.UpdateAsync(pedido, ct);
+        await pedidoRepository.UpdateAsync(pedido, ct);
+        if (transitou)
+        {
             await publicador.PublicarAsync(
                 empresaId, "pedido.mudou_status", "pedido", pedido.Id,
                 new PedidoMudouStatusEvent(pedido.Id, empresaId, pedido.LojaId, statusAntigo, pedido.Status,
@@ -183,6 +200,9 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             new PedidoPagoEvent(pedido.Id, empresaId, pedido.LojaId, pedido.ClienteId, alvo.ConversaId, alvo.Id,
                 alvo.Provedor, input.PagamentoExternoId, metodo, input.ValorPago, pedido.Status, pagoEm),
             correlationId: pedido.Id.ToString(), ct: ct);
+
+        var canhoto = ImpressaoPendente.CriarCanhoto(empresaId, pedido.LojaId, pedido.Id, agora);
+        await impressoes.AddAsync(canhoto, ct);
 
         // Registra o PedidoPagamento na mesma transação (o use case reusa a transação aberta e faz o flush).
         // Excedente permitido: o valor veio do provedor, não de digitação.
@@ -204,7 +224,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             pedido.Id, alvo.Id, input.PagamentoExternoId, pedido.Status);
         var pago = new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm);
-        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), pago);
+        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), pago,
+            new ImpressaoPendenteOperacao(canhoto.Id, pedido.Id));
     }
 
     private static CobrancaPedido? EscolherCobranca(IReadOnlyList<CobrancaPedido> cobrancas, ConfirmarPagamentoPedidoInput input)

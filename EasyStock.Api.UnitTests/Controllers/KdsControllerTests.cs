@@ -139,6 +139,28 @@ public class KdsControllerTests : IDisposable
         cards.Should().ContainSingle().Which.Id.Should().Be(emCasa.Id);
     }
 
+    [Fact]
+    public async Task AtrasadoPeloInicioPrevisto()
+    {
+        // S21: atrasado = aguardando com o início previsto vencido; preparo começado não atrasa.
+        var agora = DateTime.UtcNow;
+        var vencido = PedidoPersistido(EmpresaA, StatusPedidoMapper.Aguardando, "paraServir");
+        vencido.DefinirInicioPrevisto(agora.AddMinutes(-10));
+        var noPrazo = PedidoPersistido(EmpresaA, StatusPedidoMapper.Aguardando, "paraServir");
+        noPrazo.DefinirInicioPrevisto(agora.AddMinutes(60));
+        var comecado = PedidoPersistido(EmpresaA, StatusPedidoMapper.Preparando, "paraServir");
+        comecado.DefinirInicioPrevisto(agora.AddMinutes(-10));
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetPedidos(status: null, linha: null, data: null, empresaId: null, CancellationToken.None);
+
+        var cards = OkData<IReadOnlyList<KdsPedidoDto>>(result).ToDictionary(c => c.Id);
+        cards[vencido.Id].Atrasado.Should().BeTrue();
+        cards[vencido.Id].InicioPrevistoEm.Should().Be(vencido.InicioPrevistoEm);
+        cards[noPrazo.Id].Atrasado.Should().BeFalse();
+        cards[comecado.Id].Atrasado.Should().BeFalse("o preparo já começou");
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static T OkData<T>(IActionResult result)

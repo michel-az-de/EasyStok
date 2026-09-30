@@ -125,6 +125,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // S11: cobrança do pedido
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository,
                 Repositories.Pagamentos.CobrancaPedidoRepository>();
+            // S20: fila de impressão do canhoto
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IImpressaoPendenteRepository,
+                Repositories.Operacao.ImpressaoPendenteRepository>();
 
             // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
             services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
@@ -133,6 +136,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
             services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
+            services.AddScoped<IPrazoPreparoPedidoQueries, PrazoPreparoPedidoQueries>(); // S21: início previsto
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();

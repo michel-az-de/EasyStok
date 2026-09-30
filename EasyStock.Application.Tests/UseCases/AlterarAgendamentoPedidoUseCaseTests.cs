@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using Microsoft.Extensions.Logging;
 
@@ -12,9 +13,31 @@ public class AlterarAgendamentoPedidoUseCaseTests
 {
     private readonly IPedidoRepository _pedidoRepo = Substitute.For<IPedidoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
     private AlterarAgendamentoPedidoUseCase Sut() => new(_pedidoRepo, _uow,
-        Substitute.For<ILogger<AlterarAgendamentoPedidoUseCase>>());
+        Substitute.For<ILogger<AlterarAgendamentoPedidoUseCase>>(),
+        new CalculadoraInicioPrevistoPedido(_prazoQueries));
+
+    [Fact]
+    public async Task RecalculaInicioPrevisto()
+    {
+        // S21: pedido sem vaga, reagendado → início previsto = novo horário − prazo (60 + 40), aviso zerado.
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        pedido.DefinirInicioPrevisto(DateTime.UtcNow.AddHours(-1));
+        pedido.MarcarAtrasoNotificado(DateTime.UtcNow).Should().BeTrue();
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        _prazoQueries.ObterAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+        var novaData = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(2).AddHours(15), DateTimeKind.Utc);
+
+        await Sut().ExecuteAsync(new AlterarAgendamentoPedidoCommand(empresaId, pedido.Id, novaData));
+
+        pedido.InicioPrevistoEm.Should().Be(novaData.AddMinutes(-100));
+        pedido.AtrasoNotificadoEm.Should().BeNull("prazo novo, aviso novo");
+        await _pedidoRepo.Received(1).UpdateAsync(pedido);
+    }
 
     [Fact]
     public async Task DeveReagendarPedido_QuandoDataFutura()
