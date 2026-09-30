@@ -101,6 +101,8 @@ public static class ApiServiceCollectionExtensions
                 };
             })
             .AddInternalCronJobScheme(configuration)
+            // S20: bridge de impressão (X-Impressao-Api-Key), só nas rotas da policy ImpressaoFila.
+            .AddImpressaoApiKeyScheme(configuration)
             // Sessões server-side do storefront (ADR-0012) — cookie __Host-cdb_session
             .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
                 EasyStock.Api.Authentication.ClienteSessionAuthenticationHandler>(
@@ -113,6 +115,7 @@ public static class ApiServiceCollectionExtensions
             opts.AddPolicy("Gerente",  p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente"));
             opts.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador"));
             opts.AddInternalCronJobPolicy();
+            opts.AddImpressaoFilaPolicy();
         });
 
         return services;

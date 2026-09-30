@@ -396,5 +396,7 @@ public static class PipelineExtensions
         // seguro (opt-in por header -- sem Idempotency-Key a rota segue como sempre).
         .Add("/api/pedidos")
         // S23 (#1137): producao em porcoes cria lote + entrada; retry nao pode duplicar.
-        .Add("/api/producao");
+        .Add("/api/producao")
+        // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
+        .Add("/api/impressao");
 }
