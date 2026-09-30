@@ -17,6 +17,8 @@ public static partial class ServiceCollectionExtensions
     public static IServiceCollection AddEasyStockAtendimentoUseCases(this IServiceCollection services)
     {
         services.AddScoped<ObterConfiguracaoAtendimentoUseCase>();
+        // S10: pedido fechado na conversa pelo núcleo do checkout (a cobrança é da S11).
+        services.AddScoped<CriarPedidoAtendimentoUseCase>();
         services.AddScoped<AtualizarConfiguracaoAtendimentoUseCase>();
         services.AddScoped<ObterStatusIntegracaoWhatsAppUseCase>();
         services.AddScoped<ProcessarEventoWhatsAppUseCase>();
