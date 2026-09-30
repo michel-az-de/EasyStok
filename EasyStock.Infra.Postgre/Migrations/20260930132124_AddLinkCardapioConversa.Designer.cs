@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930132124_AddLinkCardapioConversa")]
+    partial class AddLinkCardapioConversa
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1233,22 +1236,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("AvisosStatusAtivos")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
                     b.Property<string>("Bairro")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("Bloqueado")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<DateTime?>("BloqueadoEm")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Cep")
                         .HasMaxLength(8)
@@ -1298,10 +1288,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("LastOrderAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("MotivoBloqueio")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -1505,85 +1491,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("ClienteId");
 
                     b.ToTable("cliente_enderecos", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.ClienteNota", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Autor")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<Guid>("ClienteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MensagemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("PedidoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Texto")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClienteId");
-
-                    b.HasIndex("EmpresaId", "ClienteId", "CriadoEm");
-
-                    b.ToTable("cliente_notas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.ClienteTag", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClienteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Origem")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Tag")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClienteId", "Tag")
-                        .IsUnique()
-                        .HasDatabaseName("uq_cliente_tags_cliente_tag");
-
-                    b.HasIndex("EmpresaId", "Tag");
-
-                    b.ToTable("cliente_tags", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_cliente_tags_origem", "\"Origem\" IN ('dona','agente','sistema')");
-                        });
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.ClienteTelefone", b =>
@@ -10296,24 +10203,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Cliente");
                 });
 
-            modelBuilder.Entity("EasyStock.Domain.Entities.ClienteNota", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
-                        .WithMany()
-                        .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.ClienteTag", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
-                        .WithMany("Tags")
-                        .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("EasyStock.Domain.Entities.ClienteTelefone", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Cliente", "Cliente")
@@ -12133,8 +12022,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Documentos");
 
                     b.Navigation("Enderecos");
-
-                    b.Navigation("Tags");
 
                     b.Navigation("Telefones");
                 });

@@ -70,4 +70,13 @@ public sealed class CriarPedidoAtendimentoUseCase(
 
         return reservado;
     }
+
+    /// <summary>Endereço padrão do cliente ou, sem padrão, o único cadastrado; senão nulo (é preciso perguntar).</summary>
+    public static Guid? EnderecoPadrao(EasyStock.Domain.Entities.Cliente cliente)
+    {
+        ArgumentNullException.ThrowIfNull(cliente);
+        var padrao = cliente.Enderecos.FirstOrDefault(e => e.Padrao);
+        if (padrao is not null) return padrao.Id;
+        return cliente.Enderecos.Count == 1 ? cliente.Enderecos.First().Id : null;
+    }
 }

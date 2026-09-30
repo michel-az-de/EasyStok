@@ -1,4 +1,5 @@
 using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
@@ -101,5 +102,56 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PedidoCancelado);
         f.Pedido.Pagamentos.Should().BeEmpty();
         cobranca.Motivo.Should().Contain("pedido_cancelado");
+    }
+
+    [Fact]
+    public async Task PublicaPedidoPagoAposCommit()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.ClienteNome = "Ana";
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddHours(2);
+        f.AdicionarOnline();
+        var numero = f.Pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var ordem = new List<string>();
+        f.Uow.When(u => u.CommitAsync()).Do(_ => ordem.Add("commit"));
+        f.OperacaoEventos.When(p => p.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("publica"));
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        await f.OperacaoEventos.Received(1).PublicarAsync(
+            EventosOperacao.PedidoPago, f.EmpresaId,
+            Arg.Is<PedidoPagoOperacao>(e =>
+                e.PedidoId == f.Pedido.Id &&
+                e.Numero == numero &&
+                e.Cliente == "Ana" &&
+                e.Total == 25m &&
+                e.Janela == CobrancaPedidoFixture.Agora.AddHours(2)),
+            Arg.Any<CancellationToken>());
+        ordem.Should().Contain("commit").And.EndWith("publica", "o evento de UI sai depois do último commit");
+    }
+
+    [Fact]
+    public async Task CommitFalhaNaoPublicaPedidoPago()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        f.Uow.CommitAsync().Returns<int>(_ => throw new InvalidOperationException("commit falhou"));
+
+        var act = () => f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        f.OperacaoEventos.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SemConfirmacaoNaoPublicaPedidoPago()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 20m));
+
+        f.OperacaoEventos.ReceivedCalls().Should().BeEmpty();
     }
 }
