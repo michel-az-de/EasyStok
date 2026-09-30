@@ -27,6 +27,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **Núcleo do checkout compartilhado** (S10): `CheckoutCoreService` concentra as fases 1 e 2 do
+  checkout (validação de CEP, janela, bloqueio e cardápio, frete por zona, pedido em `Rascunho`,
+  vaga ocupada, `AguardandoPagamento`, rollback para `Cancelado` com janela lotada).
+  `IniciarCheckoutUseCase` e `IniciarCheckoutGuestUseCase` passam a delegar; o site não muda de
+  comportamento. Novo `CriarPedidoAtendimentoUseCase` cria o pedido da conversa pelo mesmo caminho
+  (`Origem = "whatsapp"`, observação por item, `Conversa.PedidoEmAndamentoId`); a cobrança é da S11. (#1101)
 - **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
   (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
   novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp
