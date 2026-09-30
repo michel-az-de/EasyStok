@@ -10,6 +10,7 @@ public static class EventosOperacao
     public const string PedidoMudouStatus = "pedido.mudou_status";
     public const string ImpressaoPendente = "impressao.pendente";
     public const string ImpressaoAtrasada = "impressao.atrasada";
+    public const string PedidoAtrasado = "pedido.atrasado";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -25,3 +26,8 @@ public sealed record ImpressaoPendenteOperacao(Guid ImpressaoId, Guid PedidoId);
 
 /// <summary>Payload de <see cref="EventosOperacao.ImpressaoAtrasada"/> (S20): canhoto parado na fila, o console avisa a dona.</summary>
 public sealed record ImpressaoAtrasadaOperacao(Guid ImpressaoId, Guid PedidoId, DateTime CriadaEm);
+
+/// <summary>Payload de <see cref="EventosOperacao.PedidoAtrasado"/> (S21): o card vira "Atrasado" (cor e rótulo, RN-30).</summary>
+/// <param name="Numero">Número curto do pedido, o mesmo de <see cref="PedidoPagoOperacao.Numero"/>.</param>
+/// <param name="InicioPrevistoEm">Instante (UTC) em que o preparo deveria ter começado.</param>
+public sealed record PedidoAtrasadoOperacao(Guid PedidoId, string Numero, string? Cliente, DateTime InicioPrevistoEm);

@@ -174,6 +174,45 @@ namespace EasyStock.Domain.Entities
             AlteradoEm = DateTime.UtcNow;
         }
 
+        // ── Início previsto e atraso (S21) ─────────────────────────────
+
+        /// <summary>
+        /// Instante (UTC) em que o preparo precisa começar para cumprir a janela prometida: início da
+        /// janela (ou <see cref="AgendadoParaEm"/>) menos o prazo mínimo dos itens. Nulo = sem janela.
+        /// </summary>
+        public DateTime? InicioPrevistoEm { get; private set; }
+
+        /// <summary>Quando o atraso foi publicado (<c>pedido.atrasado</c>). Nulo = ainda não. Trava de uma vez só.</summary>
+        public DateTime? AtrasoNotificadoEm { get; private set; }
+
+        /// <summary>
+        /// Grava o início previsto e zera a notificação de atraso: prazo novo, aviso novo. Mesmo valor é
+        /// no-op, para um segundo pagamento ou reagendamento para o mesmo horário não repetir o aviso.
+        /// </summary>
+        public void DefinirInicioPrevisto(DateTime? inicioPrevistoEm)
+        {
+            if (InicioPrevistoEm == inicioPrevistoEm) return;
+            InicioPrevistoEm = inicioPrevistoEm;
+            AtrasoNotificadoEm = null;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>Atrasado = ainda aguardando e o início previsto já passou (US-037, UC-04 E2).</summary>
+        public bool EstaAtrasado(DateTime agoraUtc) =>
+            StatusEnum == StatusPedido.Aguardando && InicioPrevistoEm is { } inicio && agoraUtc > inicio;
+
+        /// <summary>
+        /// Marca o atraso como notificado. Devolve <c>false</c> (sem mudar nada) se o pedido não está
+        /// atrasado ou já foi notificado desde o último início previsto.
+        /// </summary>
+        public bool MarcarAtrasoNotificado(DateTime agoraUtc)
+        {
+            if (AtrasoNotificadoEm is not null || !EstaAtrasado(agoraUtc)) return false;
+            AtrasoNotificadoEm = agoraUtc;
+            AlteradoEm = DateTime.UtcNow;
+            return true;
+        }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 

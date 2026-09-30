@@ -69,6 +69,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableImpressaoPendenteAlerta)
             services.AddHostedService<ImpressaoPendenteAlertaJob>();
 
+        // PedidoAtrasoJob (S21) — a cada 60 s, publica pedido.atrasado uma vez por pedido aguardando
+        // com o início previsto vencido (o KDS deriva o card atrasado sozinho; o job é o aviso no SSE).
+        if (options.EnablePedidoAtraso)
+            services.AddHostedService<PedidoAtrasoJob>();
+
         // CaixaEsquecidoJob (#641) — diario 10:00 UTC, detecta caixas abertos nao fechados de
         // dias anteriores e notifica in-app (so notifica, nao fecha).
         if (options.EnableCaixaEsquecidoJob)

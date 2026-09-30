@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Criar usuário em cliente pelo SuperAdmin (`POST api/admin/usuarios-tenant` e "Novo usuário" do
+  Admin) respondia 500: o RLS recusava o `Perfil` da empresa alvo porque o token do SuperAdmin não
+  tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
+
 ### Added
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
@@ -15,6 +20,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (`Impressao:ApiKey` + `Impressao:EmpresaId`). `POST api/pedidos/{id}/reimprimir` só para operador.
   `ImpressaoPendenteAlertaJob` publica `impressao.atrasada` para pendente há mais de 3 min
   (`BackgroundJobs:EnableImpressaoPendenteAlerta`). Migration `AddImpressaoPendente` com RLS. (#1156)
+- **Início previsto e atraso** (S21): `Pedido.InicioPrevistoEm` = início da janela da vaga ativa (hora
+  de Brasília) ou `AgendadoParaEm`, menos o prazo mínimo dos itens do cardápio (S15); gravado em
+  `ConfirmarPagamentoPedidoUseCase` e recalculado em `AlterarAgendamentoPedidoUseCase`, que também zera
+  `AtrasoNotificadoEm`. O KDS devolve `inicioPrevistoEm` e deriva `atrasado` (aguardando e início vencido;
+  sem início previsto, vale a regra da S19). `PedidoAtrasoJob` (60 s, `BackgroundJobs:EnablePedidoAtraso`)
+  publica `pedido.atrasado {pedidoId, numero, cliente, inicioPrevistoEm}` uma vez por pedido. Migration
+  `AddInicioPrevistoPedido`. (#1165)
 - **Dossiê do cliente ao lado da conversa** (S25): `GET api/clientes/{id}/dossie` e `GET
   api/atendimento/conversas/{id}/dossie` devolvem a mesma projeção (cadastro, endereços, tags, notas
   internas, 10 últimos pedidos com itens, item favorito, última compra, bloqueio, preferências,

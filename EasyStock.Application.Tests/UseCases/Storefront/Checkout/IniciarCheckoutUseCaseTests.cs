@@ -194,7 +194,8 @@ public class IniciarCheckoutUseCaseTests
             f.VagaRepo,
             f.PedidoRepo,
             f.ExpedienteRepo,
-            NullLogger<CheckoutCoreService>.Instance),
+            NullLogger<CheckoutCoreService>.Instance,
+            TimeProvider.System),
         f.IdempotencyService,
         new GerarCobrancaPedidoUseCase(
             Substitute.For<IPedidoRepository>(),
