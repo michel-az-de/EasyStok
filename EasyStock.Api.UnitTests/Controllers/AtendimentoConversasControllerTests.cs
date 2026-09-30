@@ -190,6 +190,20 @@ public class AtendimentoConversasControllerTests
     }
 
     [Fact]
+    public async Task LiberarForaDeAreaGravaNoContexto()
+    {
+        var conversa = ConversaComClienteAgora();
+
+        var result = await _controller.LiberarForaDeArea(conversa.Id, new LiberarForaDeAreaBody("cliente fiel"), default);
+
+        result.Should().BeOfType<OkObjectResult>();
+        ContextoConversaJson.Ler<bool>(conversa, ContextoConversaJson.ForaDeAreaLiberado).Should().BeTrue();
+        ContextoConversaJson.Ler<string>(conversa, ContextoConversaJson.ForaDeAreaMotivo).Should().Be("cliente fiel");
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema && m.Texto!.Contains("cliente fiel"));
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
     public async Task ConversaDeOutraEmpresaDevolve404()
     {
         var outra = Conversa.Abrir(Guid.NewGuid(), WaId, DateTime.UtcNow, "Zé");

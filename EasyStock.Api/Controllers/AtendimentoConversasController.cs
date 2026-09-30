@@ -125,6 +125,15 @@ public class AtendimentoConversasController(
     public Task<IActionResult> LiberarAutomatico(Guid id, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await gerenciarUseCase.LiberarAutomaticoAsync(Acao(id), ct)));
 
+    [SwaggerOperation(Summary = "Allow delivery outside the service area (S14)",
+        Description = "Grava foraDeAreaLiberado=true e o motivo no contexto da conversa; o próximo pedido criado nela vai para aprovação.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpPost("{id:guid}/liberar-fora-de-area")]
+    public Task<IActionResult> LiberarForaDeArea(Guid id, [FromBody] LiberarForaDeAreaBody? body, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await gerenciarUseCase.LiberarForaDeAreaAsync(Acao(id), body?.Motivo, ct)));
+
     [SwaggerOperation(Summary = "Close the conversation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -183,3 +192,5 @@ public class AtendimentoConversasController(
 public sealed record EnviarMensagemConsoleBody(string Texto);
 
 public sealed record TransferirConversaBody(Guid ParaUsuarioId);
+
+public sealed record LiberarForaDeAreaBody(string? Motivo);

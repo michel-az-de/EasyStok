@@ -51,7 +51,7 @@ public static partial class ServiceCollectionExtensions
         // TODO(S16): acao:escolher_janela; TODO(S26): acao:avaliacao.
 
         // Ferramentas do agente. As demais da tabela da S06 dependem da onda 2 e entram aqui quando
-        // existirem: TODO(S14) validar_endereco e confirmar_endereco; TODO(S16) listar_janelas;
+        // existirem: TODO(S16) listar_janelas;
         // TODO(S10, S11, S32) criar_pedido; TODO(S24, S31) registrar_restricao, registrar_interesse
         // e registrar_nota. Até lá o prompt manda fechar pedido pelo link do cardápio ou pela dona.
         services.AddScoped<IFerramentaAgente, ConsultarCardapioFerramenta>();
@@ -59,6 +59,14 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IFerramentaAgente, ConsultarPedidoFerramenta>();
         services.AddScoped<IFerramentaAgente, EscalarParaDonaFerramenta>();
         services.AddScoped<IFerramentaAgente, EncerrarConversaFerramenta>();
+
+        // S14: endereço em texto livre e área de entrega.
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Endereco.ValidarEnderecoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Endereco.ConfirmarEnderecoClienteUseCase>();
+        services.AddScoped<ConfirmarEnderecoPendente>();
+        services.AddScoped<IFerramentaAgente, ValidarEnderecoFerramenta>();
+        services.AddScoped<IFerramentaAgente, ConfirmarEnderecoFerramenta>();
+        services.AddScoped<IFerramentaAgente, ListarEnderecoSalvoFerramenta>();
 
         // S07: handoff pelo console (inbox, envio da dona, assumir, liberar, encerrar, marcar lida).
         services.AddScoped<ListarConversasAtendimentoUseCase>();
