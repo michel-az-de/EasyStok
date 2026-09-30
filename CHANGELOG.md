@@ -11,6 +11,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Alerta de desacerto e ajuste rápido de saldo** (S22): `GET api/estoque/desacertos` lista os
+  produtos com `QuantidadeDescoberta > 0` com texto legível citando os pedidos (sem tabela nova).
+  `POST api/estoque/desacertos/{produtoId}/ajustar` recebe a contagem e o motivo, reusa
+  `ItemEstoque.AplicarAjusteContagem` numa contagem de um produto já aplicada, grava `AjusteInventario`
+  e movimentação de ajuste por lote, zera o descoberto e publica `estoque.desacerto_resolvido`.
+  Exige `GerenciarEstoque`. (#1181)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
