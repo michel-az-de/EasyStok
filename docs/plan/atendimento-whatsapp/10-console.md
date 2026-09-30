@@ -19,7 +19,7 @@ backend já está no master. Quando o módulo fica em paridade, a tela legada da
 | Mensagem programada (dentro de `atendimento`) | S39 | Sim | `api/atendimento/mensagens-programadas` | Nenhuma |
 | `encerramento` (pedido e cobrança) | S10, S11 | Não (S10 na PR #1112, S11 na issue #1115) | `api/storefront/{slug}/checkout` e o do S11 | PWA do caixa (`Api/wwwroot/pwa`), a medir na F03 |
 | `entregas` | S12, S14, S44 | S45 parte 1 sim; o resto não | `api/minha-vitrine/entrega` | a medir na F04 |
-| `cozinha` | S19, S20, S21 | Não | SSE do S18 | KDS atual (`Api/Mobile/Controllers/KdsController.cs`) |
+| `cozinha` (ligado na F05) | S18, S19, S20, S21 | Sim | `api/kds/pedidos` (+ `/{id}/status`), `api/operacao/eventos` (SSE), `api/pedidos/{id}/canhoto`, `api/pedidos/{id}/reimprimir` | KDS atual (`Api/Mobile/Controllers/KdsController.cs`), sai na P05 |
 | `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/minha-vitrine/cardapio`, `api/minha-vitrine/configuracao`, `api/storefront/{slug}/menu` | a medir |
 | `ficha-cliente` (tags, notas, dossiê), `notas` | S24, S25 | Não | a definir na spec | a medir |
 | `respostas`, `automacoes` | S42 | Não | a definir na spec | Nenhuma |
@@ -93,3 +93,27 @@ avisos, assistente); no erro do controle manual o estado volta ao que a API tem.
 - [x] E-mail e SMS da Ficha gravam e voltam após recarregar (validado pelo Felipe em 2026-09-30).
 
 **Fora.** Mensagem programada (S39), finalidade Marketing na Ficha, SSE do expediente.
+
+## F05 · Cozinha na API real
+
+Issue #1218. Sem endpoint novo: os quatro já estavam no master (S18 a S21).
+
+**Abordagem.** No modo API, `#/cozinha` abre `TelaCozinhaApi` (pede login se a aba não tem sessão);
+sem `VITE_FONTE_DADOS` segue a cozinha espelhada do Balcão.
+- Fila: `GET api/kds/pedidos` (aguardando, em preparo, pronto e saiu para entrega), uma coluna por status.
+- Ao vivo: `GET api/operacao/eventos` lido por `fetch` em stream com o JWT no header (o EventSource
+  não manda header). Todo `ready` e `pedido.*` recarrega a fila. SSE caído: fila a cada 15 s e nova
+  conexão a cada 10 s.
+- S21: o cartão mostra "Começar em N min" ou "Atrasado N min" pelo `inicioPrevistoEm` e `atrasado`.
+- Um toque: `PATCH api/kds/pedidos/{id}/status`; a transição inválida volta a mensagem da API.
+- S20: "Canhoto" abre o HTML de 80 mm e chama a impressão do navegador; "Reimprimir na fila" põe o
+  canhoto de novo na fila do bridge.
+- Prova pura: `node ferramentas/prova-f05-cozinha-api.mjs` (próximo passo, aviso S21, leitor SSE).
+
+**Aceite.**
+- [x] `npm run qualidade` verde; fronteira de camadas ok.
+- [x] Sem `VITE_FONTE_DADOS`, o console e a cozinha abrem como hoje.
+- [ ] Pedido pago aparece na cozinha e muda de passo pela tela (validação do Felipe).
+
+**Fora.** Arrastar cartão, filtro por linha e escolha de entregador no modo API; consumo automático
+da fila de impressão pela aba (decisão da onda 0.6).

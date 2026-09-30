@@ -29,6 +29,7 @@ import { ModalBiblioteca } from '../features/respostas/ModalBiblioteca'
 import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
 import { TelaEntregas } from '../features/entregas/TelaEntregas'
 import { TelaCozinha } from '../features/cozinha/TelaCozinha'
+import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
 import { FilaCanhotos } from '../features/ficha-cliente/FilaCanhotos'
@@ -262,11 +263,19 @@ function AppPrincipal() {
   )
 }
 
+// Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
+// sessão nesta aba, pede o login como a janela principal.
+function CozinhaApi() {
+  const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
+  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  return <TelaCozinhaApi key={sessao.token} />
+}
+
 export function App() {
   const hash = useHash()
   const rota = rotaDaHash(hash)
   if (rota.tipo === ROTA_ENTREGAS) return <TelaEntregas />
-  if (rota.tipo === ROTA_COZINHA) return <TelaCozinha />
+  if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi /> : <TelaCozinha />
   if (rota.tipo === ROTA_CARDAPIO_LINK) return <TelaCardapioLink />
   return <AppPrincipal />
 }
