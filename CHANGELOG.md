@@ -6,6 +6,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
+  api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
+  api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST
+  bloquear|desbloquear`: sem saudação nem agente, conversa vai para a dona, `criar_pedido` recusa com
+  `cliente_bloqueado`) e preferências (`PUT preferencias`: `AvisosStatusAtivos`, `ConsentiuMarketing`).
+  Ferramentas do agente `registrar_restricao` e `registrar_nota`. Migration
+  `AddClienteTagNotaBloqueioPreferencias` com RLS. O filtro de avisos de status por
+  `AvisosStatusAtivos` fica para depois da S13. (#1148)
 - **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
   `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
   `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na
