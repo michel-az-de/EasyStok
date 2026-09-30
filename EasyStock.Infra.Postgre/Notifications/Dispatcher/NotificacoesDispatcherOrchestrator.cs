@@ -124,7 +124,11 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
         var mensagemPronta = new MensagemPronta(
             mensagem.Id, mensagem.EmpresaId, mensagem.Destinatario, mensagem.AssuntoRenderizado,
-            mensagem.CorpoRenderizado, mensagem.Canal, mensagem.Categoria);
+            mensagem.CorpoRenderizado, mensagem.Canal, mensagem.Categoria)
+        {
+            // S13: template da Meta e parâmetros para o envio fora da janela de 24 h (pendência da S09).
+            Metadados = mensagem.LerMetadados()
+        };
 
         var sw = Stopwatch.StartNew();
         var resultado = await canal.EnviarAsync(mensagemPronta, ct);

@@ -67,7 +67,8 @@ public sealed record ConfirmarPagamentoPedidoResult(
 ///   <item><c>SELECT FOR UPDATE</c> no pedido (padrão de <c>AprovarPedidoStorefrontUseCase</c>).</item>
 ///   <item>Mesmo <see cref="ConfirmarPagamentoPedidoInput.PagamentoExternoId"/> já pago → no-op.</item>
 ///   <item>Valor menor que o da cobrança → não confirma, grava o motivo na cobrança e na trilha.</item>
-///   <item><c>AguardandoPagamento → Aguardando</c> (pedido já na fila só recebe o pagamento), cobrança
+///   <item><c>AguardandoPagamento → Aguardando</c>, ou <c>AguardandoAprovacaoBaba</c> quando
+///     <c>Pedido.RequerAprovacao</c> (S12); pedido já na fila só recebe o pagamento. Cobrança
 ///     <c>Paga</c>, demais pendentes canceladas, <c>PedidoPagoEvent</c> e <c>pedido.mudou_status</c> no
 ///     outbox e <c>PedidoPagamento</c> pelo <see cref="RegistrarPagamentoPedidoUseCase"/>.</item>
 ///   <item><c>InicioPrevistoEm</c> pela <see cref="CalculadoraInicioPrevistoPedido"/> (S21).</item>
@@ -78,9 +79,7 @@ public sealed record ConfirmarPagamentoPedidoResult(
 /// cancelado não volta à fila; o motivo fica na cobrança para o estorno (S27).
 /// </para>
 ///
-/// <para>
-/// Pendente para S12: com <c>Pedido.RequerAprovacao</c> o destino passa a ser <c>AguardandoAprovacaoBaba</c>.
-/// </para>
+/// <para>A impressão (S20) consome o <see cref="PedidoPagoEvent"/>.</para>
 ///
 /// <para>
 /// S20: o canhoto entra na fila de impressão (<see cref="ImpressaoPendente"/>) na mesma transação; rollback
@@ -184,7 +183,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var statusAntigo = pedido.Status;
         var transitou = pedido.StatusEnum == StatusPedido.AguardandoPagamento;
         if (transitou)
-            pedido.MudarStatus(StatusPedido.Aguardando);
+            // S12: pedido de exceção (ex.: aceito fora de área) passa pela aprovação da dona.
+            pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
         await pedidoRepository.UpdateAsync(pedido, ct);
         if (transitou)
         {
@@ -215,7 +215,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             Observacao: $"Mercado Pago, cobrança {alvo.Id}",
             RegistradoPorNome: "Mercado Pago",
             Origem: Origem,
-            PermitirExcedente: true), ct);
+            PermitirExcedente: true,
+            ConfirmadoPeloProvedor: true), ct);
 
         await unitOfWork.CommitAsync();
 

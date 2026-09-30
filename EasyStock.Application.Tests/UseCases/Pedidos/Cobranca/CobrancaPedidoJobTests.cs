@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Enums.Pagamentos;
@@ -88,5 +89,57 @@ public class CobrancaPedidoJobTests
 
         r.Should().Be(ResultadoExpiracaoCobranca.Ignorada);
         pendente.Status.Should().Be(StatusCobrancaPedido.Pendente);
+    }
+
+    /// <summary>S32: webhook perdido. Antes de expirar, o job consulta <c>payments/search</c> e confirma.</summary>
+    [Fact]
+    public async Task VencidaComPagamentoAprovadoNoMercadoPago_ConfirmaEmVezDeExpirar()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var vencida = f.AdicionarOnline(tentativa: 2);
+        f.PagamentosNoMercadoPago.Add(new PagamentoMercadoPago(
+            "pay-perdido", "approved", "accredited", f.Pedido.Id.ToString(), 25m,
+            CobrancaPedidoFixture.Agora.AddMinutes(10), "pix", "bank_transfer"));
+
+        var r = await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
+
+        r.Should().Be(ResultadoExpiracaoCobranca.ConfirmadaPelaConsulta);
+        vencida.Status.Should().Be(StatusCobrancaPedido.Paga);
+        vencida.PagamentoExternoId.Should().Be("pay-perdido");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Pedido.Pagamentos.Should().ContainSingle(p => p.Referencia == "pay-perdido");
+        await f.MpClient.Received(1).BuscarPagamentosPorReferenciaAsync(f.Pedido.Id.ToString(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task VencidaSoComPagamentoRecusado_SegueExpirando()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var vencida = f.AdicionarOnline(tentativa: 2);
+        f.PagamentosNoMercadoPago.Add(new PagamentoMercadoPago(
+            "pay-x", "rejected", "cc_rejected_other_reason", f.Pedido.Id.ToString(), 25m, null, "visa", "credit_card"));
+
+        var r = await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
+
+        r.Should().Be(ResultadoExpiracaoCobranca.PedidoCancelado);
+        vencida.Status.Should().Be(StatusCobrancaPedido.Expirada);
+    }
+
+    [Fact]
+    public async Task ConsultaAoMercadoPagoFalha_NaoExpiraNemCancela()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var vencida = f.AdicionarOnline(tentativa: 2);
+        f.MpClient.BuscarPagamentosPorReferenciaAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<PagamentoMercadoPago>>>(_ => throw new HttpRequestException("mp fora"));
+
+        var act = () => f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
+
+        await act.Should().ThrowAsync<HttpRequestException>("sem saber se pagou, o job tenta de novo na próxima rodada");
+        vencida.Status.Should().Be(StatusCobrancaPedido.Pendente);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
     }
 }

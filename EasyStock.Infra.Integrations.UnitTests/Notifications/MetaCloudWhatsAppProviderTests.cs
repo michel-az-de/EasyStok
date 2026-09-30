@@ -80,6 +80,20 @@ public class MetaCloudWhatsAppProviderTests
     }
 
     [Fact]
+    public async Task ConversaAssumidaAindaRecebeAvisoDeStatus()
+    {
+        // S13 (RN-05): a dona assumir a conversa silencia o agente, não o aviso de status do pedido.
+        var conversa = ConversaComEntradaHa(TimeSpan.FromHours(1));
+        conversa.Assumir(DateTime.UtcNow);
+        _canal.EnviarTextoAsync(Telefone, "Seu pedido #123 foi pago.", Arg.Any<CancellationToken>()).Returns("wamid.assumida");
+
+        var resultado = await Provider().EnviarAsync(Mensagem(ComTemplate));
+
+        resultado.Sucesso.Should().BeTrue();
+        await _canal.Received(1).EnviarTextoAsync(Telefone, "Seu pedido #123 foi pago.", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ForaDaJanelaTemplate()
     {
         var conversa = ConversaComEntradaHa(TimeSpan.FromHours(25));

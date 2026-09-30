@@ -23,6 +23,23 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
+  `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
+  Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.
+  Saem com a conversa assumida; só a revogação do transacional no WhatsApp bloqueia. Idempotente por
+  pedido + status. O outbox passa a persistir os metadados do envio (template da Meta e parâmetros),
+  fechando a pendência da S09; `Storefront.InstagramUrl` novo. Pedido pago com `RequerAprovacao` (S12)
+  vai para `AguardandoAprovacaoBaba`. Migration `AddAvisosStatusPedido` (3 colunas nulas).
+- **Webhook do Mercado Pago de ponta a ponta** (S32): `POST /api/webhooks/mercadopago` ganha o
+  `MercadoPagoWebhookProcessor` (antes respondia 500). Só o tópico `payment`; o `data.id` do corpo
+  dispara `GET v1/payments/{id}` e só o que a fonte devolve vale. `approved` confirma o pedido pela S11
+  (`AguardandoPagamento → Aguardando`, `PedidoPagamento`, `pedido.pago`); valor menor e recusa só gravam
+  o motivo (recusa avisa a conversa uma vez); `refunded`/`charged_back` marcam a cobrança `Estornada`.
+  Idempotência pelo id da notificação (numérico) no `WebhookRecebido`. Client: preferência em
+  `POST checkout/preferences`, consulta, `payments/search` por `external_reference` (o job de cobrança
+  confirma webhook perdido antes de expirar), estorno com `X-Idempotency-Key` e `PUT checkout/preferences/{id}`
+  para expirar o link antigo na troca de forma. Corrige o DI que entregava a porta com `HttpClient` sem
+  `BaseAddress`. Sem credencial ainda (onda 0.9). (#1136)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
