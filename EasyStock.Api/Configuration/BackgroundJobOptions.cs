@@ -13,6 +13,9 @@ public sealed class BackgroundJobOptions
     /// <summary>S39: disparador das mensagens programadas ao cliente. Desligar é o rollback.</summary>
     public bool EnableMensagensProgramadas { get; set; } = true;
 
+    /// <summary>S43: avaliador dos lembretes da dona. Desligar é o rollback.</summary>
+    public bool EnableAvaliadorLembretes { get; set; } = true;
+
     // Jobs opcionais (default false)
     public bool EnableAlertasEstoqueJob { get; set; }
     public bool EnableProcessarRecebimentoJob { get; set; }

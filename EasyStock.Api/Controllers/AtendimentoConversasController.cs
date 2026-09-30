@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums.Atendimento;
 using Swashbuckle.AspNetCore.Annotations;
@@ -21,6 +22,7 @@ public class AtendimentoConversasController(
     EnviarMensagemConsoleUseCase enviarUseCase,
     GerenciarConversaAtendimentoUseCase gerenciarUseCase,
     TransferirConversaUseCase transferirUseCase,
+    ObterDossieClienteUseCase dossieUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     private const int TamanhoMaximoImagem = 6 * 1024 * 1024;
@@ -61,6 +63,17 @@ public class AtendimentoConversasController(
         [FromQuery] int limite = ListarMensagensConversaUseCase.LimitePadrao, CancellationToken ct = default)
         => Tratar(async () => DataOk(await listarMensagensUseCase.ExecuteAsync(
             new ListarMensagensConversaQuery(currentUser.EmpresaId, id, antesDe, limite), ct)));
+
+    [SwaggerOperation(Summary = "Customer dossier beside the conversation (S25)",
+        Description = "Mesma projeção de GET api/clientes/{id}/dossie. Conversa sem cliente vinculado devolve o dossiê mínimo (nome do perfil e telefone).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}/dossie")]
+    public async Task<IActionResult> Dossie(Guid id, CancellationToken ct = default)
+    {
+        var dossie = await dossieUseCase.ObterPorConversaAsync(currentUser.EmpresaId, id, ct);
+        return dossie is null ? DataNotFound("Conversa não encontrada.") : DataOk(dossie);
+    }
 
     [SwaggerOperation(Summary = "Send a text message as the owner (takes over the conversation)",
         Description = "Fora da janela de 24 h: 409 { erro: \"fora_da_janela_24h\", sugestao: \"template\" } e nada gravado.")]

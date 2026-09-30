@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.ClienteCrm;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -20,8 +21,22 @@ public class ClientesCrmController(
     AdicionarNotaClienteUseCase adicionarNota,
     DefinirBloqueioClienteUseCase bloqueio,
     DefinirPreferenciasClienteUseCase preferencias,
+    ObterDossieClienteUseCase dossie,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    // ── Dossiê (S25) ───────────────────────────────────────────────────
+
+    [SwaggerOperation(Summary = "Customer dossier (orders, favorite, notes, tags, same household)",
+        Description = "Painel lateral do console. Tem notas internas: nunca vai para o storefront.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("dossie")]
+    [Authorize(Policy = "Operador")]
+    public Task<IActionResult> Dossie(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
+        Executar(empresaId, async emp => await dossie.ExecuteAsync(new ObterDossieClienteQuery(emp, id), ct) is { } resultado
+            ? DataOk(resultado)
+            : DataNotFound("Cliente não encontrado."));
+
     // ── Tags ───────────────────────────────────────────────────────────
 
     [SwaggerOperation(Summary = "List client tags (with suggested tags)")]

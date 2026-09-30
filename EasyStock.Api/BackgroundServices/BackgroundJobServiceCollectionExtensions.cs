@@ -82,6 +82,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableMensagensProgramadas)
             services.AddHostedService<MensagensProgramadasBackgroundService>();
 
+        // S43: lembretes internos da dona (pagamento sem baixa, cliente sem resposta, manuais vencidos).
+        if (options.EnableAvaliadorLembretes)
+            services.AddHostedService<AvaliadorLembretesBackgroundService>();
+
         // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
         if (options.EnableAtendimentoTurnoAgente)
             services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
