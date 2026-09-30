@@ -17,7 +17,7 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 public class ImpressaoPendenteRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    private const string MigrationAnterior = "20260930021758_AddCobrancaPedido";
+    private const string MigrationAnterior = "20260930132753_AddClienteTagNotaBloqueioPreferencias";
     private static readonly DateTime Agora = new(2026, 9, 30, 15, 0, 0, DateTimeKind.Utc);
 
     private static async Task<Pedido> CriarPedidoAsync(EasyStockDbContext db, Guid empresaId)

@@ -31,6 +31,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     SaudacaoAtendimento saudacao,
     RoteadorAcoesBotao roteadorAcoes,
     OptOutPorPalavra optOut,
+    IEscaladorConversa escalador,
     ILogger<ProcessarEventoWhatsAppUseCase> logger)
 {
     private const string Provedor = "meta_whatsapp";
@@ -139,8 +140,6 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 identificacao = await identificarCliente.ExecuteAsync(
                     new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
                 conversa.VincularCliente(identificacao.Cliente.Id);
-                // TODO(S24) #1062: cliente bloqueado não recebe saudação automática; em vez dela,
-                // Conversa.Assumir() + Mensagem(Sistema, "cliente bloqueado: <motivo>") + notificação à dona (S07).
             }
 
             conversa.RegistrarEntrada(enviadaEm);
@@ -152,6 +151,11 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
             mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, MapearTipoConteudo(msg.Tipo), texto, msg.Wamid, botaoId);
             await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
+
+            // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
+            // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
+            if (identificacao?.Cliente.Bloqueado == true)
+                await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
 
             configuracao = await AtualizarUltimaMensagemRecebidaAsync(empresaId, enviadaEm);
 
@@ -193,6 +197,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 await queueService.EnqueueAsync(FilaAtendimentoNomes.MidiaWhatsApp,
                     new ArmazenarMidiaWhatsAppJob(empresaId, conversa.Id, msg.Wamid, msg.MidiaId));
+            }
+
+            // S24: conversa de cliente bloqueado já nasceu com a dona; nada automático responde.
+            if (identificacao?.Cliente.Bloqueado == true)
+            {
+                await eventPublisher.PublicarAsync("conversa.mensagem_recebida", empresaId,
+                    new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);
+                return;
             }
 
             // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s.

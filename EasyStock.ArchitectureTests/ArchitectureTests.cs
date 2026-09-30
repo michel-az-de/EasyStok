@@ -169,4 +169,55 @@ public class ArchitectureTests
         result.IsSuccessful.Should().BeTrue(
             "Use cases devem usar ICacheService — IMemoryCache (concreto) vive em Infra.Async.");
     }
+
+    /// <summary>
+    /// S24: <c>ClienteNota.Texto</c> é da equipe. Nenhum tipo do storefront nem das ferramentas do
+    /// agente lê a propriedade; a nota só chega ao agente pelo dossiê, marcada <c>[interno]</c> (S06, S25).
+    /// Varre o IL (Mono.Cecil) atrás de <c>get_Texto</c> da nota, inclusive em lambdas, state machines
+    /// de async e árvores de expressão do EF (<c>ldtoken</c>).
+    /// </summary>
+    [Fact]
+    public void NotaInternaNaoVazaParaStorefront()
+    {
+        string[] proibidos =
+        [
+            "EasyStock.Application.UseCases.Storefront",
+            "EasyStock.Application.Services.Atendimento.Ferramentas",
+        ];
+
+        var leitores = LeitoresDoTextoDaNota(typeof(EasyStock.Application.Ports.Output.Persistence.IClienteRepository).Assembly.Location);
+
+        // Sanidade do varredor: a listagem de notas do console lê o texto; se nada for achado,
+        // o teste abaixo passaria sem provar coisa alguma.
+        leitores.Should().NotBeEmpty("o varredor precisa enxergar ao menos a listagem de notas do console");
+
+        leitores
+            .Where(tipo => proibidos.Any(ns => tipo == ns || tipo.StartsWith(ns + ".", StringComparison.Ordinal)))
+            .Should().BeEmpty("nota interna não pode ser projetada para o cliente (storefront nem ferramenta do agente)");
+    }
+
+    private static List<string> LeitoresDoTextoDaNota(string caminhoAssembly)
+    {
+        const string tipoNota = "EasyStock.Domain.Entities.ClienteNota";
+        using var assembly = Mono.Cecil.AssemblyDefinition.ReadAssembly(caminhoAssembly);
+
+        var leitores = new List<string>();
+        foreach (var tipo in assembly.MainModule.GetTypes())
+        {
+            var leTexto = tipo.Methods
+                .Where(m => m.HasBody)
+                .SelectMany(m => m.Body.Instructions)
+                .Any(i => i.Operand is Mono.Cecil.MethodReference alvo
+                          && alvo.Name == "get_Texto"
+                          && alvo.DeclaringType.FullName == tipoNota);
+            if (!leTexto) continue;
+
+            // Tipo aninhado (closure, state machine) herda o namespace do tipo de topo.
+            var topo = tipo;
+            while (topo.DeclaringType is not null) topo = topo.DeclaringType;
+            leitores.Add($"{topo.Namespace}.{topo.Name}");
+        }
+
+        return leitores.Distinct().ToList();
+    }
 }

@@ -38,6 +38,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly IStorefrontRepository _storefrontRepository = Substitute.For<IStorefrontRepository>();
     private readonly IConsentimentoContatoRepository _consentimentoRepository = Substitute.For<IConsentimentoContatoRepository>();
     private readonly ICanalMensageria _canalWhatsApp = Substitute.For<ICanalMensageria>();
+    private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly ProcessarEventoWhatsAppUseCase _useCase;
 
@@ -59,6 +60,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
                 NullLogger<RoteadorAcoesBotao>.Instance),
             new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),
                 _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
+            new EscalarConversaUseCase(_conversaRepository, _notificador, _eventPublisher),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 
         _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -266,6 +268,32 @@ public class ProcessarEventoWhatsAppUseCaseTests
             Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Sistema
                                   && m.ExternoId == "wamid.saudacao" && m.Texto == textoSaudacao),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagemDeClienteBloqueadoEscalaSemSaudacaoNemAgente()
+    {
+        var bloqueado = ClienteEntity.Criar(_empresaId, "Maria Silva");
+        bloqueado.Bloquear("golpe do Pix", DateTime.UtcNow.AddDays(-1));
+        _clienteStorefrontRepository
+            .GetByTelefoneHashAsync(_empresaId, ClienteOtp.CalcularTelefoneHash("+" + ContatoWaId), Arg.Any<CancellationToken>())
+            .Returns(bloqueado);
+        Conversa? conversaAberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => conversaAberta = c), Arg.Any<CancellationToken>());
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.bloqueado", "Oi"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        conversaAberta!.Situacao.Should().Be(SituacaoConversa.Assumida);
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema && m.ExternoId == null
+                                  && m.Texto!.Contains("cliente bloqueado: golpe do Pix")),
+            Arg.Any<CancellationToken>());
+        await _notificador.Received(1).EnfileirarEventoAsync(
+            EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao.ConversaEscalada, _empresaId,
+            Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
     }
 
     [Fact]
