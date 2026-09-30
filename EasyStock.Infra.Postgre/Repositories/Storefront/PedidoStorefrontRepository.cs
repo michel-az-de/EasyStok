@@ -151,4 +151,24 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .AsSplitQuery()
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<IReadOnlyList<PedidoAtrasoCandidato>> ListarAtrasoNaoNotificadoAsync(
+        DateTime agoraUtc,
+        int maximo,
+        CancellationToken ct = default)
+    {
+        // Varredura do job (S21): cross-tenant por natureza, bypass de RLS em escopo curto, só ids.
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.Pedidos
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(p => p.Status == StatusPedidoMapper.Aguardando
+                     && p.AtrasoNotificadoEm == null
+                     && p.InicioPrevistoEm != null
+                     && p.InicioPrevistoEm < agoraUtc)
+            .OrderBy(p => p.InicioPrevistoEm)
+            .Take(Math.Clamp(maximo, 1, 500))
+            .Select(p => new PedidoAtrasoCandidato(p.Id, p.EmpresaId))
+            .ToListAsync(ct);
+    }
 }

@@ -9,6 +9,7 @@ public static class EventosOperacao
     public const string PedidoPago = "pedido.pago";
     public const string PedidoMudouStatus = "pedido.mudou_status";
     public const string CardapioItemComInteresse = "cardapio.item_com_interesse";
+    public const string PedidoAtrasado = "pedido.atrasado";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -24,3 +25,8 @@ public sealed record PedidoMudouStatusOperacao(Guid PedidoId, string StatusAntig
 /// <paramref name="Quantidade"/> clientes com interesse aberto; a dona decide se avisa.
 /// </summary>
 public sealed record CardapioItemComInteresseOperacao(Guid CardapioItemId, int Quantidade);
+
+/// <summary>Payload de <see cref="EventosOperacao.PedidoAtrasado"/> (S21): o card vira "Atrasado" (cor e rótulo, RN-30).</summary>
+/// <param name="Numero">Número curto do pedido, o mesmo de <see cref="PedidoPagoOperacao.Numero"/>.</param>
+/// <param name="InicioPrevistoEm">Instante (UTC) em que o preparo deveria ter começado.</param>
+public sealed record PedidoAtrasadoOperacao(Guid PedidoId, string Numero, string? Cliente, DateTime InicioPrevistoEm);

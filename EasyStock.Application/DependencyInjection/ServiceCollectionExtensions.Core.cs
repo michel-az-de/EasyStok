@@ -79,6 +79,9 @@ public static partial class ServiceCollectionExtensions
         // S19: KDS do console sobre Pedido
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>();
+        // S21: início previsto do preparo e aviso de atraso (PedidoAtrasoJob)
+        services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();
