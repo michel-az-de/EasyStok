@@ -1,6 +1,7 @@
 using EasyStock.Api.Middleware;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Api.UnitTests.Middleware;
@@ -137,6 +138,30 @@ public class ProtecaoCsrfCookieMiddlewareTests
 
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
         chamadas[0].Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Log_da_recusa_nao_leva_quebra_de_linha_vinda_do_cliente()
+    {
+        // #1098: Origin e Sec-Fetch-Site vem do cliente; com \r\n fabricariam linha no log.
+        var logger = new CapturingLogger<ProtecaoCsrfCookieMiddleware>();
+        var mw = new ProtecaoCsrfCookieMiddleware(_ => Task.CompletedTask, logger);
+        var ctx = Ctx(secFetchSite: "cross-site\r\nFAKE", origin: "https://x.example\r\nINFO forjado");
+
+        await mw.InvokeAsync(ctx);
+
+        logger.Entries.Should().ContainSingle()
+            .Which.Should().NotContainAny("\r", "\n");
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add(formatter(state, exception));
     }
 
     [Fact]

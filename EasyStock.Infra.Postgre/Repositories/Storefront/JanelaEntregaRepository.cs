@@ -17,6 +17,14 @@ public sealed class JanelaEntregaRepository(EasyStockDbContext db) : IJanelaEntr
             .ThenBy(j => j.HoraInicio)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<JanelaEntrega>> GetTodasDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default) =>
+        await db.JanelasEntrega
+            .AsNoTracking()
+            .Where(j => j.StorefrontId == storefrontId)
+            .OrderBy(j => j.DiaDaSemana)
+            .ThenBy(j => j.HoraInicio)
+            .ToListAsync(ct);
+
     public Task AddAsync(JanelaEntrega janela, CancellationToken ct = default)
     {
         db.JanelasEntrega.Add(janela);

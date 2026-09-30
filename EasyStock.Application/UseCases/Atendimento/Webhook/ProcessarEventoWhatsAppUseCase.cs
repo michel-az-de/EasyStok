@@ -30,6 +30,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IdentificarClientePorTelefoneUseCase identificarCliente,
     SaudacaoAtendimento saudacao,
     RoteadorAcoesBotao roteadorAcoes,
+    OptOutPorPalavra optOut,
     ILogger<ProcessarEventoWhatsAppUseCase> logger)
 {
     private const string Provedor = "meta_whatsapp";
@@ -202,6 +203,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 // S06: "acao:<nome>:<payload>" é resolvido sem LLM; o turno do agente não é enfileirado.
                 await ExecutarAcaoDeBotaoAsync(empresaId, conversa, botaoId!, ct);
+            }
+            else if (await optOut.TentarAsync(empresaId, conversa, mensagem.Texto, DateTime.UtcNow, ct))
+            {
+                // S38: "SAIR" revogou o marketing do canal e já confirmou; o agente não responde.
             }
             else
             {
