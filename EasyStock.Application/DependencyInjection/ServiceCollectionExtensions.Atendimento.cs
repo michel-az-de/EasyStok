@@ -29,6 +29,13 @@ public static partial class ServiceCollectionExtensions
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
         services.AddScoped<OptOutPorPalavra>();
+
+        // S39: mensagem programada ao cliente (console + disparador no processo da API).
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.AgendarMensagemProgramadaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.ListarMensagensProgramadasUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.CancelarMensagemProgramadaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.ReservarMensagensProgramadasUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.DispararMensagemProgramadaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.ListarConsentimentosClienteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.DefinirConsentimentosClienteUseCase>();
         services.AddScoped<IdentificarClientePorTelefoneUseCase>();
@@ -57,6 +64,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarMensagensConversaUseCase>();
         services.AddScoped<EnviarMensagemConsoleUseCase>();
         services.AddScoped<GerenciarConversaAtendimentoUseCase>();
+
+        // S47: assistente da dona (somente leitura, sem ferramentas).
+        services.AddScoped<AssistenteDonaUseCase>();
 
         return services;
     }
