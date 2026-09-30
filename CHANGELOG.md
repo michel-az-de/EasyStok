@@ -11,13 +11,6 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
-- **Campanhas: cadastro e agendamento** (S28): entidades `Campanha` (rascunho, agendada, enviando,
-  enviada, encerrada, cancelada; mensagem Scriban, arte, template de marketing, filtro de público,
-  tags de restrição, ondas) e `CampanhaDestinatario` (único por campanha e cliente, motivo de
-  exclusão). `GET|POST api/campanhas`, `GET|PUT api/campanhas/{id}`, `POST api/campanhas/{id}/cancelar`
-  (policy `Gerente`; cancelar exclui só os pendentes) e `POST api/uploads/campanha/arte`. Migration
-  `AddCampanhas` com RLS e índices `(EmpresaId, Status)` e `(ClienteId, EnviadoEm)`. Público (S29) e
-  disparo (S30) ficam fora. (#1160)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
