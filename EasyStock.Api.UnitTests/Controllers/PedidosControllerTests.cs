@@ -52,6 +52,7 @@ public class PedidosControllerTests
         var estoqueIntegration = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
             Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
 

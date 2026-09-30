@@ -23,13 +23,14 @@ public static class MercadoPagoServiceCollectionExtensions
         else
         {
             services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.Section));
-            services.AddHttpClient<MercadoPagoClient>(client =>
+            // S32: registra a PORTA como client tipado. O antigo AddHttpClient<MercadoPagoClient> +
+            // AddScoped<IMercadoPagoClient, MercadoPagoClient> resolvia a porta com um HttpClient sem BaseAddress.
+            services.AddHttpClient<IMercadoPagoClient, MercadoPagoClient>(client =>
             {
                 var baseUrl = configuration["MercadoPago:BaseUrl"] ?? "https://api.mercadopago.com/";
                 client.BaseAddress = new Uri(baseUrl);
                 client.Timeout = TimeSpan.FromSeconds(10); // timeout externo de segurança
             });
-            services.AddScoped<IMercadoPagoClient, MercadoPagoClient>();
         }
 
         return services;

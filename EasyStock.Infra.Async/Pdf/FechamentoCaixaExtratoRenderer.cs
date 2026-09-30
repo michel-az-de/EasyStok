@@ -7,8 +7,7 @@ namespace EasyStock.Infra.Async.Pdf;
 /// <summary>
 /// Implementação de <see cref="IFechamentoCaixaExtratoRenderer"/> com QuestPDF (issue #642).
 /// Stateless/threadsafe — o estado entra via <see cref="FechamentoCaixaExtratoTemplate"/>.
-/// Pode ser registrado como Singleton. QuestPDF Community MIT (faturamento &lt; US$1M),
-/// igual a <see cref="FaturaPdfRenderer"/>.
+/// Pode ser registrado como Singleton. QuestPDF Community MIT (faturamento &lt; US$1M).
 /// </summary>
 public sealed class FechamentoCaixaExtratoRenderer : IFechamentoCaixaExtratoRenderer
 {

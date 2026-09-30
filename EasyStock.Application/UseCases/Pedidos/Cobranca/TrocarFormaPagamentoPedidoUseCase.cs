@@ -1,5 +1,6 @@
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -29,9 +30,9 @@ public sealed record TrocarFormaPagamentoPedidoResult(CobrancaPedidoResult Cobra
 /// </list>
 ///
 /// <para>
-/// Pendente para S32: expirar a preferência anterior no Mercado Pago (<c>PUT checkout/preferences/{id}</c>).
-/// Até lá, um pagamento que ainda chegue pelo link antigo é confirmado mesmo assim
-/// (<see cref="ConfirmarPagamentoPedidoUseCase"/>: dinheiro recebido vence).
+/// S32: depois do commit, a preferência online substituída é expirada no Mercado Pago
+/// (<c>PUT checkout/preferences/{id}</c>), best-effort: falha só loga. Um pagamento que ainda chegue pelo
+/// link antigo é confirmado mesmo assim (<see cref="ConfirmarPagamentoPedidoUseCase"/>: dinheiro recebido vence).
 /// </para>
 /// </summary>
 public sealed class TrocarFormaPagamentoPedidoUseCase(
@@ -40,8 +41,10 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     GerarCobrancaPedidoUseCase gerarCobranca,
     AvisoCobrancaConversa aviso,
     IPublicadorEventoIntegracao publicador,
+    IMercadoPagoClient mercadoPagoClient,
     IUnitOfWork unitOfWork,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    ILogger<TrocarFormaPagamentoPedidoUseCase> logger)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
@@ -55,8 +58,11 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         if (forma is not (FormaOnline or FormaNaEntrega))
             throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
 
-        var (cobranca, conversaId) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
+        var (cobranca, conversaId, preferenciaSubstituida) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await TrocarNoLockAsync(input, forma, token), ct);
+
+        if (preferenciaSubstituida is not null)
+            await ExpirarPreferenciaAsync(preferenciaSubstituida, ct);
 
         var enviada = false;
         if (conversaId is { } conversa && cobranca.LinkPagamento is { } link)
@@ -66,7 +72,19 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         return new TrocarFormaPagamentoPedidoResult(cobranca, enviada);
     }
 
-    private async Task<(CobrancaPedidoResult, Guid?)> TrocarNoLockAsync(
+    private async Task ExpirarPreferenciaAsync(string preferenceId, CancellationToken ct)
+    {
+        try
+        {
+            await mercadoPagoClient.ExpirarPreferenciaAsync(preferenceId, relogio.GetUtcNow().UtcDateTime, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Troca de forma: falha ao expirar a preferencia anterior no Mercado Pago");
+        }
+    }
+
+    private async Task<(CobrancaPedidoResult, Guid?, string?)> TrocarNoLockAsync(
         TrocarFormaPagamentoPedidoInput input, string forma, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
@@ -84,11 +102,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;
         if (pendente is not null && pendente.Provedor == provedorPedido && !pendente.Venceu(agora))
-            return (CobrancaPedidoResult.De(pendente, reutilizada: true), pendente.ConversaId);
+            return (CobrancaPedidoResult.De(pendente, reutilizada: true), pendente.ConversaId, null);
 
         var conversaId = cobrancas.Where(c => c.ConversaId is not null).Select(c => c.ConversaId).LastOrDefault();
         var formaAnterior = pendente?.Provedor ?? "nenhuma";
         pendente?.Cancelar($"troca_forma: {forma}", agora);
+        var preferenciaSubstituida = pendente is { EhOnline: true } ? pendente.ReferenciaExterna : null;
 
         CobrancaPedidoResult nova;
         if (forma == FormaOnline)
@@ -118,7 +137,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }, ct);
         await unitOfWork.CommitAsync();
 
-        return (nova, conversaId);
+        return (nova, conversaId, preferenciaSubstituida);
     }
 
     private async Task ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)

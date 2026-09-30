@@ -21,6 +21,7 @@ public class RemoverItemPagamentoPedidoUseCaseTests
             new PedidoEstoqueIntegrationService(
                 Substitute.For<IItemEstoqueRepository>(),
                 Substitute.For<IMovimentacaoEstoqueRepository>(),
+                Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
                 Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
                 Substitute.For<ILogger<PedidoEstoqueIntegrationService>>()),
             _uow, Substitute.For<ILogger<RemoverItemPedidoUseCase>>());
