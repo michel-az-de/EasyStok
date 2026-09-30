@@ -19,6 +19,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterConfiguracaoAtendimentoUseCase>();
         // S10: pedido fechado na conversa pelo núcleo do checkout (a cobrança é da S11).
         services.AddScoped<CriarPedidoAtendimentoUseCase>();
+        // S48: link do cardápio com token da conversa e o pedido que volta do site por ele.
+        services.AddScoped<LinkCardapioConversaService>();
+        services.AddScoped<CriarPedidoPeloCardapioConversaUseCase>();
         services.AddScoped<AtualizarConfiguracaoAtendimentoUseCase>();
         services.AddScoped<ObterStatusIntegracaoWhatsAppUseCase>();
         services.AddScoped<ProcessarEventoWhatsAppUseCase>();

@@ -68,7 +68,7 @@ public sealed class CriarPedidoFerramenta(
 
         var enderecoId = Guid.TryParse(FerramentaJson.LerTexto(entrada, "endereco_id"), out var informado)
             ? informado
-            : EscolherEndereco(cliente);
+            : CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente);
         if (enderecoId is null)
         {
             return FerramentaJson.Serializar(new
@@ -167,13 +167,6 @@ public sealed class CriarPedidoFerramenta(
             itens.Add(new ItemPedidoCheckout(cardapioItemId, quantidade, FerramentaJson.LerTexto(item, "observacao")));
         }
         return itens.Count == 0 ? null : itens;
-    }
-
-    private static Guid? EscolherEndereco(Cliente cliente)
-    {
-        var padrao = cliente.Enderecos.FirstOrDefault(e => e.Padrao);
-        if (padrao is not null) return padrao.Id;
-        return cliente.Enderecos.Count == 1 ? cliente.Enderecos.First().Id : null;
     }
 
     private async Task<IReadOnlyList<Domain.Entities.Storefront.JanelaEntrega>> JanelasDoDiaAsync(
