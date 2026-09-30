@@ -11,6 +11,10 @@ import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
 import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL } from '../infra/catalogo'
+import { FONTE_API } from '../infra/fonteDados'
+import { useSessaoApi } from '../aplicacao/useSessaoApi'
+import { TelaLogin } from '../features/login/TelaLogin'
+import { FaixaApi } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { canalDaConversa } from '../dominio/canal'
@@ -36,7 +40,7 @@ import { BalaoAssistente } from '../features/assistente/BalaoAssistente'
 import { Moldura } from './Moldura'
 
 // Só o topo conhece todas as features. Feature nenhuma importa outra feature.
-function Composicao() {
+function Composicao({ aoSair }) {
   const {
     selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta,
     conversas, automaticoPausado,
@@ -58,10 +62,13 @@ function Composicao() {
   const [pratoArrastando, setPratoArrastando] = useState(null)
   // Rodada 10 (registro 79): o cliente simulado que reage às ações da
   // Thatiane, sempre ativo (não só quando a gaveta Simulações está aberta).
-  useReacaoClienteSimulado({ conversas, agora })
+  // Modo API (F01): nada de cliente simulado nem resposta automática inventada
+  // em conversa de verdade. O automático real é o agente do EasyStok (S06).
+  const conversasSimuladas = FONTE_API ? SEM_CONVERSAS : conversas
+  useReacaoClienteSimulado({ conversas: conversasSimuladas, agora })
   // Rodada 11 (issue #8, registro 92): a resposta automática "digitando" sai
   // por aqui, com a gaveta aberta ou fechada.
-  useDigitacaoAutomatica({ conversas, agora })
+  useDigitacaoAutomatica({ conversas: conversasSimuladas, agora })
   // Rodada 11 (registro 92): o roteiro do cenário mora aqui em cima, não
   // dentro da gaveta. Antes ele morria ao fechar a gaveta, e a gaveta aberta
   // cobria a conversa: a automação rodava sem ninguém ver. Agora a gaveta
@@ -216,6 +223,8 @@ function Composicao() {
 
       <BalaoAssistente sugestaoAgente={sugestaoAgente} />
 
+      <FaixaApi aoSair={aoSair} />
+
       <DragOverlay>
         {pratoArrastando && <CartaoArrasto item={pratoArrastando} />}
       </DragOverlay>
@@ -234,11 +243,21 @@ function Composicao() {
 // `if`, para não chamar hook condicionalmente) reage a `hashchange`, e
 // `rotaDaHash` (domínio puro) decide a tela a cada troca, sem recarregar.
 
+const SEM_CONVERSAS = []
+
+// Modo demonstração parte do instante fixo da massa; modo API usa o relógio real.
+const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
+
 function AppPrincipal() {
-  const agora = useRelogio(INSTANTE_INICIAL)
+  const agora = useRelogio(INICIO_DO_RELOGIO)
+  const { sessao, listarEmpresas, entrarNaEmpresa, encerrarSessao } = useSessaoApi()
+  if (FONTE_API && !sessao) {
+    return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  }
   return (
-    <AtendimentoProvider agora={agora}>
-      <Composicao />
+    // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
+    <AtendimentoProvider key={sessao?.token ?? 'demo'} agora={agora} sessao={sessao}>
+      <Composicao aoSair={encerrarSessao} />
     </AtendimentoProvider>
   )
 }

@@ -49,12 +49,12 @@ quando não está (o modo demonstração continua). Assumir, responder, liberar 
 marcar como lida chamam os endpoints do S07. Atualização por polling curto até o SSE do S18 existir.
 
 **Aceite.**
-- [ ] Com `VITE_API_URL` apontando para a API, a lista mostra as conversas do tenant logado e nenhuma
-  de outro tenant.
-- [ ] Mensagem enviada pelo console chega ao WhatsApp do cliente (teste manual com o número de teste
-  da Meta) e aparece na thread.
-- [ ] Sem `VITE_API_URL`, o console abre como hoje, com a massa.
-- [ ] `npm run qualidade` verde; a fronteira de camadas continua valendo (`features` não chama
+- [x] Com `VITE_FONTE_DADOS=api`, a lista mostra as conversas do tenant logado e nenhuma de outro
+  tenant (validado pelo Felipe em 2026-09-30, Demonstração EasyStok).
+- [x] Mensagem enviada pelo console chega ao WhatsApp do cliente e aparece na thread (validado pelo
+  Felipe em 2026-09-30, envio e recebimento).
+- [x] Sem `VITE_FONTE_DADOS`, o console abre como hoje, com a massa.
+- [x] `npm run qualidade` verde; a fronteira de camadas continua valendo (`features` não chama
   `fetch`).
 - [ ] Console publicado em `app.easystok.online` atrás do Caddy compartilhado (GO de deploy próprio).
 
