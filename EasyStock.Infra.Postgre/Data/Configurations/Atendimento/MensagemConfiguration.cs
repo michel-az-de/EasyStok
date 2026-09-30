@@ -17,6 +17,7 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.TipoConteudo).HasConversion<int>().IsRequired();
         builder.Property(m => m.Texto).HasMaxLength(Mensagem.TextoTamanhoMaximo);
         builder.Property(m => m.BotaoId).HasMaxLength(Mensagem.BotaoIdTamanhoMaximo);
+        builder.Property(m => m.Programada).HasDefaultValue(false);
         builder.Property(m => m.MidiaChave).HasMaxLength(Mensagem.MidiaChaveTamanhoMaximo);
         builder.Property(m => m.MidiaMime).HasMaxLength(Mensagem.MidiaMimeTamanhoMaximo);
         builder.Property(m => m.Status).HasConversion<int>().IsRequired();

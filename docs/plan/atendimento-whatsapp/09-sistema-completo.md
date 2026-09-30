@@ -190,6 +190,11 @@ antigo fica marcado `[Obsolete]` e só é removido na poda.
 
 ### S39 · Mensagem programada ao cliente (multicanal)
 
+> **Entregue na #1082, com duas decisões.**
+> 1. A tag `HUMAN_AGENT` não vale para envio agendado: fora da janela, Instagram e Messenger recusam.
+> 2. Uma mensagem presa em `Enviando` por queda do processo **não é reenviada sozinha**, para não
+>    sair duas vezes. Ela fica para revisão, e a reentrega automática entra junto com os lembretes (S43).
+
 **Problema.** Decisão 3 do ADR-0051. O protótipo teve "Programar envio" (`prototipo-casa-da-baba.html`,
 build de 22/09) e ficaram restos no código atual: `PROGRAMAR_ENVIO`, `CANCELAR_PROGRAMADO` e
 `DISPARAR_PROGRAMADO` em `aplicacao/acoesMidia.js:2-4`, e o selo "programada" em `Balao.jsx:61`.

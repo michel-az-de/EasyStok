@@ -20,6 +20,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
+  (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
+  novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp
+  exige modelo e Instagram e Messenger recusam; marketing sem consentimento no canal é recusado
+  (S38). O destino vem da conversa aberta ou do cadastro (telefone para WhatsApp e SMS, e-mail
+  para e-mail). Disparador no processo da API (`MensagensProgramadasBackgroundService`, desliga
+  com `BackgroundJobs:EnableMensagensProgramadas=false`), com reserva `FOR UPDATE SKIP LOCKED` que
+  não duplica entre processos. A saída entra no histórico com `Mensagem.Programada`.
+  `POST|GET|DELETE api/atendimento/mensagens-programadas` (Operador). (#1082)
 - **WhatsApp por empresa** (#1102): a resposta sai pelo `phone_number_id` da empresa do tenant
   (`IRemetenteWhatsApp`), com fallback para `Notifications:WhatsApp:Meta:PhoneNumberId` e erro
   permanente, sem chamar a Meta, quando não há nenhum. Chave nova `Atendimento__WhatsApp__Cliente=meta`
