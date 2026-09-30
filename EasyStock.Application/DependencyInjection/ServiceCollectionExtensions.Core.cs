@@ -47,8 +47,6 @@ using EasyStock.Application.UseCases.PreviewSugestaoCompra;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
 using EasyStock.Application.UseCases.GerenciarComposicao;
 using EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
-using EasyStock.Application.UseCases.AnuncioIa;
-using EasyStock.Application.UseCases.GerarSugestaoDescricaoAnuncio;
 using EasyStock.Application.UseCases.ListarPlanos;
 using EasyStock.Application.UseCases.ListarFaturas;
 using EasyStock.Application.UseCases.CancelarAssinatura;
@@ -175,13 +173,6 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Inventario.FinalizarContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.CancelarContagemUseCase>();
 
-        // IA para Anúncios
-        services.AddScoped<GerarSugestaoDescricaoAnuncioUseCase>();
-        services.AddScoped<GerarAnuncioStreamingUseCase>();
-        services.AddScoped<SalvarRascunhoAnuncioUseCase>();
-        services.AddScoped<ListarAnunciosUseCase>();
-        services.AddScoped<ExcluirAnuncioUseCase>();
-        services.AddScoped<ObterUsoIaUseCase>();
 
         // Planos e Assinaturas
         services.AddScoped<ListarPlanosUseCase>();
@@ -201,7 +192,6 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ExportarFaturasCsvUseCase>();
         services.AddScoped<MetricasFinanceirasUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Admin.ExportarTenantsCsv.ExportarTenantsCsvUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.Admin.ExportarTicketsCsv.ExportarTicketsCsvUseCase>();
 
         // Modulo Financeiro AR/AP — Lancamentos
         services.AddScoped<BaixarLancamentoUseCase>();

@@ -157,6 +157,20 @@ public class Conversa
         UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
     }
 
+    /// <summary>
+    /// Passa a conversa para outro atendente (S41). Fica assumida: o agente continua calado. Quem
+    /// pode receber (permissao de atender) e decidido fora do dominio.
+    /// </summary>
+    public void Transferir(Guid paraUsuarioId, DateTime agora)
+    {
+        GarantirAberta("transferir");
+        if (paraUsuarioId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Destino da transferencia e obrigatorio.");
+        Situacao = SituacaoConversa.Assumida;
+        AssumidaPorUsuarioId = paraUsuarioId;
+        UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
+    }
+
     /// <summary>Devolve ao agente por decisao da dona (D4). Nunca por tempo.</summary>
     public void LiberarAutomatico()
     {

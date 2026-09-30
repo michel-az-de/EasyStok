@@ -2118,25 +2118,15 @@ async _doDeletePhoto(fotoId) {
                     if (this.aiGenerating || !this.nome) return;
                     this.aiGenerating = true;
                     try {
-                        let res;
-                        if (this.productId) {
-                            // Produto já salvo: usa endpoint com contexto completo
-                            const params = new URLSearchParams({
-                                produtoId: this.productId, canal: 'descricao', tom: 'profissional',
-                                foco: 'beneficios',
-                                contexto: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases) para usar no cadastro do produto. Nao use listas. Nao use titulo.'
-                            });
-                            res = await esFetch('/anuncios/gerar?' + params.toString());
-                        } else {
-                            // Novo produto: usa endpoint de completar com dados do formulário
-                            const params = new URLSearchParams({
-                                nome: this.nome,
-                                categoria: this.categoriaNome ?? '',
-                                marca: this.marca ?? '',
-                                instrucoes: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases). Nao use listas. Nao use titulo.'
-                            });
-                            res = await esFetch('/anuncios/completar-produto?' + params.toString());
-                        }
+                        // Anuncios com IA sairam na poda P03 (#1116): produto novo ou salvo
+                        // usa o auto-preenchimento com os dados do formulario.
+                        const params = new URLSearchParams({
+                            nome: this.nome,
+                            categoria: this.categoriaNome ?? '',
+                            marca: this.marca ?? '',
+                            instrucoes: 'Gere apenas uma descricao comercial curta e objetiva (2-3 frases). Nao use listas. Nao use titulo.'
+                        });
+                        const res = await esFetch('/anuncios/completar-produto?' + params.toString());
                         if (!res || !res.ok || !res.body) throw new Error('Resposta inválida');
                         const reader = res.body.getReader();
                         const decoder = new TextDecoder();

@@ -1,18 +1,16 @@
 using EasyStock.Application.Ports.Output;
-using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using Microsoft.Extensions.Logging;
-using NSubstitute.ExceptionExtensions;
 
 namespace EasyStock.Application.Tests.UseCases;
 
 /// <summary>
 /// Cobre ramificacoes nao exercitadas pelo conjunto principal: propagacao de
 /// DocumentoReferencia ate MovimentacaoEstoque, validacoes de quantidade,
-/// caminhos defensivos de loja, contexto de auditoria e fallback do gerador
-/// de descricao por IA.
+/// caminhos defensivos de loja, contexto de auditoria e fallback da descricao
+/// sugerida do produto.
 /// </summary>
 public class RegistrarEntradaEstoqueDocumentoReferenciaTests
 {
@@ -22,8 +20,7 @@ public class RegistrarEntradaEstoqueDocumentoReferenciaTests
         IUnitOfWork uow,
         Produto produto,
         Guid empresaId) BuildHappyPath(
-            ICurrentUserAccessor? currentUser = null,
-            IGeradorDescricaoAnuncio? gerador = null)
+            ICurrentUserAccessor? currentUser = null)
     {
         var produtoRepository = Substitute.For<IProdutoRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
@@ -50,7 +47,6 @@ public class RegistrarEntradaEstoqueDocumentoReferenciaTests
             movimentacaoRepository,
             unitOfWork,
             logger,
-            gerador,
             Substitute.For<IPublicadorEventos>(), // #306: publicador obrigatorio no caminho de publicacao
             null,
             null,
@@ -307,14 +303,13 @@ public class RegistrarEntradaEstoqueDocumentoReferenciaTests
     }
 
     [Fact]
-    public async Task GeradorIA_que_falha_nao_aborta_entrada_e_retorna_sugestao_do_produto()
+    public async Task Sem_descricao_informada_usa_sugestao_do_produto()
     {
         var produtoRepository = Substitute.For<IProdutoRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
         var itemRepository = Substitute.For<IItemEstoqueRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var gerador = Substitute.For<IGeradorDescricaoAnuncio>();
         var logger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
         var empresaId = Guid.NewGuid();
 
@@ -327,12 +322,10 @@ public class RegistrarEntradaEstoqueDocumentoReferenciaTests
             SugestaoDescricaoAnuncio = "Sugestao fallback"
         };
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        gerador.GerarAsync(Arg.Any<Produto>(), Arg.Any<ProdutoVariacao?>(), Arg.Any<ItemEstoque?>(), Arg.Any<string?>())
-            .ThrowsAsyncForAnyArgs(new InvalidOperationException("OpenAI down"));
 
         var useCase = new RegistrarEntradaEstoqueUseCase(
             produtoRepository, variacaoRepository, itemRepository,
-            movimentacaoRepository, unitOfWork, logger, gerador,
+            movimentacaoRepository, unitOfWork, logger,
             publicadorEventos: Substitute.For<IPublicadorEventos>()); // #306
 
         var command = CommandPadrao(empresaId, produto.Id, descricaoAnuncio: null);

@@ -76,6 +76,11 @@ e o parser e o use case do webhook da PR #1053.
 
 ### S35 · Instagram Direct e Messenger
 
+> **Entregue na #1103.** Conferido na documentação da Meta em 29/09/2026: `HUMAN_AGENT` vale no
+> Messenger e no Instagram, 7 dias, só humano, e pede a permissão `Human Agent` no painel da app
+> (acrescentar à Onda 0.10). Assinatura inválida devolve 403, como no webhook do WhatsApp, e não 401. O
+> agente não responde nestes canais (envia pelo WhatsApp). A mídia recebida entra só com o tipo e um aviso.
+
 **Problema.** O protótipo atende o Instagram (`catalogo.js:15-61`: janela de 24 h, sem modelo, foto e
 áudio). O Felipe incluiu Facebook, ou seja, Messenger (ADR-0051, item 2).
 **Abordagem.** O webhook da Meta já assina com o `AppSecret`. O parser passa a aceitar
@@ -254,6 +259,10 @@ evento `expediente.alterado` no SSE (S18) e a leitura de `EstaAberta` no `Inicia
 ---
 
 ### S41 · Atendentes e atribuição de conversa
+
+> **Entregue na #1085.** Sem perfil padrão `Atendente` semeado: nenhum perfil tem permissões
+> explícitas hoje e a criação de usuário escolhe o perfil padrão pelo nível, então um segundo padrão
+> Operador a tornaria ambígua. A permissão vem pelo nível (Operador para cima).
 
 **Problema.** O protótipo fixa uma atendente (`reducer.js:48`) e muda o responsável ao escrever ou
 assumir (RN-04). No EasyStok existe `Conversa.AssumidaPorUsuarioId` (`Conversa.cs:55`), mas falta

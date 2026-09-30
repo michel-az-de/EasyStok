@@ -11,6 +11,8 @@ public sealed record EmpresaPreviewResultado(
     bool Mascarado,
     string? MotivoRevelacao);
 
+public sealed record RevelarClienteCommand(Guid EmpresaId, string Motivo, Guid? TicketIdContexto);
+
 /// <summary>
 /// Retorna dados resumidos da empresa para o card de cliente em tickets.
 /// Por default tudo mascarado via PiiMaskingHelper. Revelar exige permissao

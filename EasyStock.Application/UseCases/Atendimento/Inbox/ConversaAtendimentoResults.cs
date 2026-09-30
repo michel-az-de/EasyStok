@@ -36,11 +36,12 @@ public sealed record MensagemAtendimentoResult(
     StatusMensagem Status,
     string? Erro,
     string? ExternoId,
-    DateTime EnviadaEm)
+    DateTime EnviadaEm,
+    Guid? EnviadaPorUsuarioId)
 {
     internal static MensagemAtendimentoResult De(Mensagem m) => new(
         m.Id, m.Direcao, m.Autor, m.TipoConteudo, m.Texto, m.BotaoId, m.MidiaChave, m.MidiaMime,
-        m.Status, m.Erro, m.ExternoId, m.EnviadaEm);
+        m.Status, m.Erro, m.ExternoId, m.EnviadaEm, m.EnviadaPorUsuarioId);
 }
 
 /// <summary>Estado da conversa depois de uma ação do console.</summary>

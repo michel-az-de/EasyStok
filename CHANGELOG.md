@@ -10,6 +10,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (React 19 + Vite, commit de origem a9831ab) passa a viver em `EasyStock.Console/`, ainda com dados
   simulados. CI própria (`console.yml`: lint, fronteira de camadas e build) só quando a pasta muda.
   Matriz de paridade e ordem de ligação à API em `docs/plan/atendimento-whatsapp/10-console.md`. (#1120)
+- **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
+  `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
+  `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na
+  porta de canal (Send API v25.0, page token em `Atendimento:MetaMensageria`, stub sem provider `meta`).
+  Fora da janela o console responde com `HUMAN_AGENT` até 7 dias; depois, 409. A conversa entra na
+  fila humana e o agente não responde fora do WhatsApp. Flags `atendimento.canal.instagram` e
+  `atendimento.canal.messenger`. (#1103)
 - **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
   criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
   a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
@@ -24,6 +31,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **Núcleo do checkout compartilhado** (S10): `CheckoutCoreService` concentra as fases 1 e 2 do
+  checkout (validação de CEP, janela, bloqueio e cardápio, frete por zona, pedido em `Rascunho`,
+  vaga ocupada, `AguardandoPagamento`, rollback para `Cancelado` com janela lotada).
+  `IniciarCheckoutUseCase` e `IniciarCheckoutGuestUseCase` passam a delegar; o site não muda de
+  comportamento. Novo `CriarPedidoAtendimentoUseCase` cria o pedido da conversa pelo mesmo caminho
+  (`Origem = "whatsapp"`, observação por item, `Conversa.PedidoEmAndamentoId`); a cobrança é da S11. (#1101)
 - **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
   (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
   novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp
@@ -53,6 +66,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   link em HTML escapado, pelo `IEmailService`). O `ResolvedorCanal` passa a achar `Sms` e `Email`.
   Falha do provedor vira `EnvioCanalFalhouException`; operação que o canal não suporta lança
   `NotSupportedException`. (#1080)
+- **Atendentes e atribuição de conversa** (S41, ADR-0051): permissão `AtenderConversas` (Operador,
+  Gerente e Admin pelo nível; perfil com permissões explícitas só se a tiver). Assumir, responder,
+  transferir, liberar e encerrar devolvem 403 sem ela. `POST api/atendimento/conversas/{id}/transferir`
+  (422 se o destino não atende na empresa), `GET api/atendimento/atendentes` e filtro
+  `?responsavel=eu|ninguem|{id}` na inbox. Mensagem do console grava `EnviadaPorUsuarioId`. A regra
+  de permissão efetiva foi para o domínio (`PoliticaPermissao`). (#1085)
 - **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
   da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
   horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`

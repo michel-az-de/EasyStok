@@ -105,7 +105,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
             services.AddScoped<IEmailConfirmationTokenRepository, EmailConfirmationTokenRepository>();
             services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
-            services.AddScoped<IAnuncioIaRepository, AnuncioIaRepository>();
             services.AddScoped<IUsoIaRepository, UsoIaRepository>();
             services.AddScoped<IProdutoAlteracaoRepository, ProdutoAlteracaoRepository>();
             services.AddScoped<IProdutoComposicaoRepository, ProdutoComposicaoRepository>();
@@ -131,14 +130,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
 
-            services.AddScoped<IClienteTicketRepository, ClienteTicketRepository>();
-            services.AddScoped<IAdminTicketRepository, AdminTicketRepository>();
-            services.AddScoped<IFaqRepository, FaqRepository>();
-            services.AddScoped<IFaqAdminRepository, FaqAdminRepository>();
-            services.AddScoped<IBannerRepository, BannerRepository>();
-            services.AddScoped<IBannerConfirmacaoRepository, BannerConfirmacaoRepository>();
-            services.AddScoped<IBannerRecebimentoQuery, BannerRecebimentoQuery>();
-            services.AddScoped<ILeadPublicoRepository, LeadPublicoRepository>();
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
             services.AddScoped<IAdminStatusQueries, AdminStatusQueries>();
@@ -153,7 +144,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IRevenueMetricsQueries, RevenueMetricsQueries>(); // ADR-0037 adendo / #754
             services.AddScoped<IMetricasFinanceirasQueries, MetricasFinanceirasQueries>(); // #762 — bypass condicional a SuperAdmin
             services.AddScoped<IEntityAuditQueries, EntityAuditQueries>();
-            services.AddScoped<ICiAutoTicketRepository, CiAutoTicketRepository>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
             // Modulo Integration (F3) — credenciais cifradas por tenant + resolver AES-256-GCM
@@ -203,6 +193,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // Atendimento (S04, ADR-0050)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
                 Repositories.Atendimento.ConversaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAtendenteRepository,
+                Repositories.Atendimento.AtendenteRepository>();
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.
             services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.IRemetenteWhatsApp,
                 Services.Atendimento.RemetenteWhatsAppDoTenant>();
@@ -225,21 +217,15 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             if (openAiEnabled)
             {
                 services.AddHttpClient("OpenAI");
-                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioOpenAI>();
-                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioOpenAIStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoOpenAI>();
             }
             else if (anthropicEnabled)
             {
                 services.AddHttpClient("Anthropic");
-                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioClaude>();
-                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioClaudeStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoClaude>();
             }
             else
             {
-                services.AddScoped<IGeradorDescricaoAnuncio, GeradorDescricaoAnuncioStub>();
-                services.AddScoped<IGeradorDescricaoAnuncioStreaming, GeradorDescricaoAnuncioStubStreaming>();
                 services.AddScoped<IGeradorAutoPreenchimento, GeradorAutoPreenchimentoStub>();
             }
 

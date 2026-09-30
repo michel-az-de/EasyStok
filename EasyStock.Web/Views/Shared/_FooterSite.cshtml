@@ -26,7 +26,6 @@
 
         <nav class="site-foot-col" aria-label="Suporte">
             <h4>Suporte</h4>
-            <a href="/faq">Central de Ajuda</a>
             <a href="/contato">Fale com a gente</a>
             <a href="@Model.LinkWhatsApp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
             <a href="mailto:@Model.EmailContato">@Model.EmailContato</a>
@@ -46,17 +45,6 @@
             }
         </nav>
 
-        <div class="site-foot-newsletter">
-            <h4>Newsletter</h4>
-            <p>Novidades sobre o produto, sem spam. Você sai quando quiser.</p>
-            <form id="site-newsletter" method="post" action="/newsletter" class="site-newsletter-form" novalidate>
-                @Html.AntiForgeryToken()
-                <input type="email" name="Email" required maxlength="255" placeholder="seu@@email.com.br" autocomplete="email" />
-                <input type="text" name="Website" tabindex="-1" autocomplete="off" class="site-honeypot" aria-hidden="true" />
-                <button type="submit" class="btn btn-primary btn-sm">Quero receber</button>
-            </form>
-            <p class="site-newsletter-status" role="status" aria-live="polite"></p>
-        </div>
     </div>
 
     <div class="site-container site-foot-bottom">

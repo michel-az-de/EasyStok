@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Definitions.Admin.Faturamento;
 using EasyStock.Application.Reporting.Definitions.Admin.Tenants;
-using EasyStock.Application.Reporting.Definitions.Admin.Tickets;
 using EasyStock.Application.Reporting.Definitions.EstoquePosicaoAtual;
 using EasyStock.Application.Reporting.Definitions.Fiscal.CancelamentosInutilizacoes;
 using EasyStock.Application.Reporting.Definitions.Fiscal.LivroSaidas;
@@ -49,8 +48,6 @@ public static class ReportingApiExtensions
         // Definições Admin SaaS — Fase 1b (ADR-R12: contexto AdminSaaS, cross-tenant)
         services.AddSingleton<IReportDefinition, MrrArrChurnDefinition>();
         services.AddSingleton<IReportDefinition, InadimplenciaDefinition>();
-        services.AddSingleton<IReportDefinition, SlaVioladoDefinition>();
-        services.AddSingleton<IReportDefinition, CsatMensalDefinition>();
         services.AddSingleton<IReportDefinition, TenantsUsoDefinition>();
 
         // ── Handlers de relatório (Scoped — cada request tem seu EF context) ─────
@@ -67,8 +64,6 @@ public static class ReportingApiExtensions
         // Handlers Admin SaaS (Scoped — usam IgnoreQueryFilters() diretamente, ADR-R07 satisfeito por bypass intencional)
         services.AddScoped<IReportHandler<MrrArrChurnParams,  MrrArrChurnRow>,  MrrArrChurnHandler>();
         services.AddScoped<IReportHandler<InadimplenciaParams, InadimplenciaRow>, InadimplenciaHandler>();
-        services.AddScoped<IReportHandler<SlaVioladoParams,   SlaVioladoRow>,   SlaVioladoHandler>();
-        services.AddScoped<IReportHandler<CsatMensalParams,   CsatMensalRow>,   CsatMensalHandler>();
         services.AddScoped<IReportHandler<TenantsUsoParams,   TenantsUsoRow>,   TenantsUsoHandler>();
 
         // ── Contexto de execução (AsyncLocal + defesa multi-tenant) ──────────────

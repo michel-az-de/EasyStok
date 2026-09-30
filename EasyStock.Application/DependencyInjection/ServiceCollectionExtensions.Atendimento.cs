@@ -17,9 +17,12 @@ public static partial class ServiceCollectionExtensions
     public static IServiceCollection AddEasyStockAtendimentoUseCases(this IServiceCollection services)
     {
         services.AddScoped<ObterConfiguracaoAtendimentoUseCase>();
+        // S10: pedido fechado na conversa pelo núcleo do checkout (a cobrança é da S11).
+        services.AddScoped<CriarPedidoAtendimentoUseCase>();
         services.AddScoped<AtualizarConfiguracaoAtendimentoUseCase>();
         services.AddScoped<ObterStatusIntegracaoWhatsAppUseCase>();
         services.AddScoped<ProcessarEventoWhatsAppUseCase>();
+        services.AddScoped<ProcessarEventoMensageriaMetaUseCase>(); // S35: Instagram e Messenger
         services.AddScoped<ProcessarMidiaWhatsAppJobUseCase>();
         services.AddScoped<ArmazenadorMidiaWhatsApp>();
         services.AddScoped<ResolvedorCanal>();
@@ -62,6 +65,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarMensagensConversaUseCase>();
         services.AddScoped<EnviarMensagemConsoleUseCase>();
         services.AddScoped<GerenciarConversaAtendimentoUseCase>();
+        services.AddScoped<TransferirConversaUseCase>();
+        services.AddScoped<ListarAtendentesUseCase>();
 
         // S47: assistente da dona (somente leitura, sem ferramentas).
         services.AddScoped<AssistenteDonaUseCase>();
