@@ -1,6 +1,6 @@
 # Motor de integrações: requisitos (pagamento + logística)
 
-Issue: #1203 · Levantamento: 2026-09-30 · Status: RASCUNHO, aguardando decisões do Felipe (seção 6)
+Issue: #1203 · Levantamento: 2026-09-30 · Status: DECIDIDO em 2026-09-30 (seção 6)
 
 Provedores: Mercado Pago, PayPal, Pix direto (PSP), 99 Entrega, Lalamove.
 
@@ -117,23 +117,23 @@ Princípios:
 | F5 | Pagamento confirmado avança o pedido (outbox) | ALTO | F4 |
 | F6 | Porta `ILogisticaGateway` + adapter Interno | ALTO | nenhuma |
 | F7 | Lalamove adapter | ALTO | F1, F6 |
-| F8 | PayPal adapter | ALTO | D1, aprovação Multiparty |
+| F8 | ~~PayPal adapter~~ fora (D1) | n/a | n/a |
 | F9 | 99 Entrega adapter | ALTO | contato comercial |
 | F10 | Pix Automático para assinaturas | ALTO | F1 |
 
-## 6. Decisões pendentes (Felipe)
+## 6. Decisões (Felipe, 2026-09-30)
 
-| # | Decisão | Opções |
-|---|---|---|
-| D1 | PayPal entra, apesar da decisão de 22/09 (MP gateway único de pedidos)? | Sim, como meio adicional · Não por ora |
-| D2 | Quem é dono da conta que recebe? | Conta do tenant (recomendado) · Conta FMA com repasse (subcredenciamento) |
-| D3 | Pix direto por PSP do tenant, ou Pix sempre via Mercado Pago? | PSP próprio · Via MP |
-| D4 | Ordem de ataque | Pagamento primeiro (F1→F5) · Logística primeiro (F6→F7) |
+| # | Decisão | Escolha | Efeito |
+|---|---|---|---|
+| D1 | PayPal | **Não por ora** | F8 fora do escopo; reabrir só com demanda |
+| D2 | Quem recebe | **Conta do tenant** | OAuth MP por tenant + `marketplace_fee`; sem subcredenciamento |
+| D3 | Pix de pedido | **PSP próprio do tenant** | Pix sai do MP e vai para o PSP do tenant (Efí primeiro). Revisa em parte a decisão A de 22/09: MP fica para cartão/boleto. F1 precisa guardar certificado `.p12` com validade e rotação |
+| D4 | Ordem | **Pagamento primeiro** | F1 → F2 → F3 → F4 → F5; logística (F6, F7) depois |
 
 ## 7. Ações comerciais (dependem do Felipe, não do agente)
 
 1. Mercado Pago: criar app marketplace no painel Developers (conta FMA).
-2. PayPal: solicitar parceria Multiparty (só se D1 = sim).
+2. ~~PayPal~~: fora do escopo (D1).
 3. Lalamove: cadastro no Partner Portal, chave de sandbox.
 4. 99: contato com gerente 99 Empresas perguntando por API de despacho de entregas.
 5. Efí: nada novo (já contratado).
