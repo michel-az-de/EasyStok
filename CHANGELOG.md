@@ -7,8 +7,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Removed
 - **Painel `EasyStock.Admin` e controllers `Admin*`** (poda P01): saem o projeto Admin e seus testes,
-  19 controllers `Api/Controllers/Admin*` e o `FaturasPdfController` (91 endpoints), com os use
-  cases, portas, repositórios e relatórios que só eles usavam (faturas do admin, MRR/inadimplência,
+  19 controllers `Api/Controllers/Admin*` e o `FaturasPdfController` (77 endpoints; 89 com os 12 que
+  saem do `AdminTenantsController`), com os use cases, portas, repositórios e relatórios que só eles usavam (faturas do admin, MRR/inadimplência,
   dashboard, busca global, frota, status, configurações do sistema, cupons, planos, APK, seed de
   cenários, helpdesk do cliente). Na Web sai o `POST /auth/impersonate` (handoff que só o Admin
   chamava). Deploy: sem serviço `admin` no compose Azure, Caddy, Render, Fly e na matriz do
