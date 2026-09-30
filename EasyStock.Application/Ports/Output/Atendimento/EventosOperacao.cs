@@ -8,6 +8,7 @@ public static class EventosOperacao
 {
     public const string PedidoPago = "pedido.pago";
     public const string PedidoMudouStatus = "pedido.mudou_status";
+    public const string CardapioItemComInteresse = "cardapio.item_com_interesse";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -17,3 +18,9 @@ public sealed record PedidoPagoOperacao(Guid PedidoId, string Numero, string? Cl
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoMudouStatus"/>: a cozinha move o card sem recarregar.</summary>
 public sealed record PedidoMudouStatusOperacao(Guid PedidoId, string StatusAntigo, string StatusNovo);
+
+/// <summary>
+/// Payload de <see cref="EventosOperacao.CardapioItemComInteresse"/> (S31): o item voltou e há
+/// <paramref name="Quantidade"/> clientes com interesse aberto; a dona decide se avisa.
+/// </summary>
+public sealed record CardapioItemComInteresseOperacao(Guid CardapioItemId, int Quantidade);

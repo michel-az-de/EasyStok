@@ -57,8 +57,11 @@ public static partial class ServiceCollectionExtensions
 
         // Ferramentas do agente. As demais da tabela da S06 dependem da onda 2 e entram aqui quando
         // existirem: TODO(S14) validar_endereco e confirmar_endereco; TODO(S16) listar_janelas;
-        // TODO(S24, S31) registrar_restricao, registrar_interesse e registrar_nota.
+        // TODO(S24) registrar_restricao e registrar_nota.
         services.AddScoped<IFerramentaAgente, CriarPedidoFerramenta>(); // S10 + S11: pedido, total e link
+        services.AddScoped<IFerramentaAgente, RegistrarInteresseFerramenta>(); // S31
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.RegistrarInteresseItemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.ListarSugestoesInteresseUseCase>();
         services.AddScoped<IFerramentaAgente, ConsultarCardapioFerramenta>();
         services.AddScoped<IFerramentaAgente, EnviarCardapioImagemFerramenta>();
         services.AddScoped<IFerramentaAgente, ConsultarPedidoFerramenta>();
