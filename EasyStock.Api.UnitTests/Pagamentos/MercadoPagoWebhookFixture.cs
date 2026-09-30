@@ -96,7 +96,8 @@ internal sealed class MercadoPagoWebhookFixture
         var tenant = Substitute.For<ITenantContextAccessor>();
         var relogio = new RelogioFixoMp(Agora);
         var confirmar = new ConfirmarPagamentoPedidoUseCase(CobrancaRepo, PedidoStorefrontRepo,
-            new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
+            new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+                new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>())),
             Publicador, Substitute.For<IOperacaoEventPublisher>(), Substitute.For<IImpressaoPendenteRepository>(), tenant, Uow, relogio,
             NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()));

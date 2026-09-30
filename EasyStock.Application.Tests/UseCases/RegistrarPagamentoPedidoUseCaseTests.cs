@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging;
@@ -24,9 +25,11 @@ public class RegistrarPagamentoPedidoUseCaseTests
     private readonly IPedidoRepository _repo = Substitute.For<IPedidoRepository>();
     private readonly ICaixaRepository _caixaRepo = Substitute.For<ICaixaRepository>();
     private readonly FakeUnitOfWork _uow = new();
+    private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
     private RegistrarPagamentoPedidoUseCase UC(bool comCaixa = true) =>
         new(_repo, _uow, Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(),
+            new CalculadoraInicioPrevistoPedido(_prazoQueries),
             comCaixa ? _caixaRepo : null);
 
     private Pedido NovoPedidoOperacional(Guid empresaId, Guid? lojaId = null)
@@ -53,6 +56,36 @@ public class RegistrarPagamentoPedidoUseCaseTests
              .Do(ci => pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
 
         return pedido;
+    }
+
+    [Fact]
+    public async Task PagamentoManual_EmPedidoNaFila_GravaInicioPrevisto()
+    {
+        // #1230: a dona registra o Pix na mão num pedido da fila que ainda não tinha início previsto;
+        // o pagamento vira compromisso como no Mercado Pago e o aviso de atraso passa a valer.
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        var entrega = new DateTime(2026, 10, 2, 15, 0, 0, DateTimeKind.Utc);
+        pedido.AgendadoParaEm = entrega;
+        _prazoQueries.ObterAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+
+        await UC(comCaixa: false).ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 100m));
+
+        pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+    }
+
+    [Fact]
+    public async Task PagamentoConfirmadoPeloProvedor_NaoRecalcula()
+    {
+        // #1230: o ConfirmarPagamentoPedidoUseCase já gravou o início previsto antes de chamar este use case.
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+
+        await UC(comCaixa: false).ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 100m,
+            ConfirmadoPeloProvedor: true));
+
+        await _prazoQueries.DidNotReceiveWithAnyArgs().ObterAsync(default, default, default);
     }
 
     [Fact]

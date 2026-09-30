@@ -70,7 +70,7 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar,
                 new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([]), Uow, NullLogger<AvisoCobrancaConversa>.Instance),
                 Substitute.For<IPublicadorEventoIntegracao>(), mp, Uow, TimeProvider.System,
-                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance);
+                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
             LinkService = new LinkCardapioConversaService(Links,
                 new SaudacaoAtendimento(Checkout.StorefrontRepo, new ConfigurationBuilder().Build()));

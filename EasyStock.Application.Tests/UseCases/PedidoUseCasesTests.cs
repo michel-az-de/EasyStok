@@ -45,12 +45,12 @@ public class PedidoUseCasesTests
         Substitute.For<ILogger<PedidoEstoqueIntegrationService>>());
 
     private CriarPedidoUseCase CriarPedidoUC() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>());
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
     private CancelarPedidoUseCase CancelarUC() => new(_pedidoRepo, EstoqueSvc(),
         Substitute.For<IContaReceberRepository>(),
         _uow, Substitute.For<ILogger<CancelarPedidoUseCase>>());
     private RegistrarPagamentoPedidoUseCase PagamentoUC() => new(_pedidoRepo, _uow,
-        Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>());
+        Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(), new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
     private AdicionarItemPedidoUseCase AdicionarItemUC() => new(_pedidoRepo, _produtoRepo, EstoqueSvc(), _uow,
         Substitute.For<ILogger<AdicionarItemPedidoUseCase>>());
     private RemoverItemPedidoUseCase RemoverItemUC() => new(_pedidoRepo, EstoqueSvc(), _uow,
