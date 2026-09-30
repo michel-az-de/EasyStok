@@ -35,7 +35,8 @@ public sealed class PedidoAvaliacaoRepository(EasyStockDbContext db) : IPedidoAv
         CancellationToken ct = default) =>
         await db.PedidoAvaliacoes
             .AsNoTracking()
-            .Where(a => a.EmpresaId == empresaId && a.OcultadoEm == null)
+            // Só as de estrelas: a avaliação de um toque (S26) não entra na vitrine pública.
+            .Where(a => a.EmpresaId == empresaId && a.OcultadoEm == null && a.Estrelas != null)
             .OrderByDescending(a => a.RespondidoEm)
             .Take(max)
             .ToListAsync(ct);

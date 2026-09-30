@@ -35,6 +35,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<RoteadorAcoesBotao>();
         services.AddScoped<ConfirmarEnderecoPendente>(); // S14
 
+        // S26: avaliação de um toque (use case em UseCases.Storefront, fora da convenção do atendimento).
+        services.AddScoped<EasyStock.Application.UseCases.Storefront.Avaliacao.RegistrarAvaliacaoSimplesUseCase>();
+
         // S31: interesse em item (use cases em UseCases.Campanhas, fora da convenção do atendimento).
         services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.RegistrarInteresseItemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.ListarSugestoesInteresseUseCase>();

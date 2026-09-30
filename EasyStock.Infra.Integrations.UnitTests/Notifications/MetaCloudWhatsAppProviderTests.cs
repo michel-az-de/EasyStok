@@ -163,4 +163,45 @@ public class MetaCloudWhatsAppProviderTests
         resultado.Sucesso.Should().BeFalse();
         resultado.FalhaPermanente.Should().BeFalse();
     }
+
+    private static readonly Dictionary<string, string> ComBotoes = new()
+    {
+        ["template"] = "avaliacao",
+        ["idioma"] = "pt_BR",
+        ["param1"] = "Maria",
+        ["botao1"] = "acao:avaliacao:positiva:abc|Gostei",
+        ["botao2"] = "acao:avaliacao:negativa:abc|Não gostei",
+    };
+
+    [Fact]
+    public async Task BotoesDentroTemplateFora()
+    {
+        // Dentro da janela: mensagem interativa com os dois botões de resposta (S26).
+        ConversaComEntradaHa(TimeSpan.FromHours(1));
+        _canal.EnviarBotoesAsync(Telefone, "Seu pedido #123 foi pago.", Arg.Any<IReadOnlyList<(string Id, string Titulo)>>(), Arg.Any<CancellationToken>())
+            .Returns("wamid.botoes");
+
+        (await Provider().EnviarAsync(Mensagem(ComBotoes))).Sucesso.Should().BeTrue();
+
+        await _canal.Received(1).EnviarBotoesAsync(Telefone, "Seu pedido #123 foi pago.",
+            Arg.Is<IReadOnlyList<(string Id, string Titulo)>>(b => b.Count == 2
+                && b[0].Id == "acao:avaliacao:positiva:abc" && b[0].Titulo == "Gostei"
+                && b[1].Id == "acao:avaliacao:negativa:abc" && b[1].Titulo == "Não gostei"),
+            Arg.Any<CancellationToken>());
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+
+        // Fora da janela (pedido pago no site, sem conversa aberta): template com quick replies.
+        _canal.ClearReceivedCalls();
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((Conversa?)null);
+        _canal.EnviarModeloAsync(Telefone, "avaliacao", "pt_BR", Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<IReadOnlyList<(string Id, string Titulo)>?>(), Arg.Any<CancellationToken>()).Returns("wamid.modelo");
+
+        (await Provider().EnviarAsync(Mensagem(ComBotoes))).Sucesso.Should().BeTrue();
+
+        await _canal.Received(1).EnviarModeloAsync(Telefone, "avaliacao", "pt_BR",
+            Arg.Is<IReadOnlyList<string>>(p => p.Count == 1 && p[0] == "Maria"),
+            Arg.Is<IReadOnlyList<(string Id, string Titulo)>?>(b => b != null && b.Count == 2 && b[1].Id == "acao:avaliacao:negativa:abc"),
+            Arg.Any<CancellationToken>());
+    }
 }
