@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.UseCases.Admin.Storefront.Cardapio;
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.EditarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ListarCardapioAdmin;
@@ -68,7 +69,11 @@ public class AdminStorefrontCardapioController(
         string? FiltrosJson,
         List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652): opções do item guarda-chuva
         Guid? SecaoId,                              // ADR-0035: seção (null até existir CRUD de seções)
-        string? Motivo);
+        string? Motivo,
+        // S15: linha e preparo numérico (opcionais; null = não mexe).
+        LinhaProduto? Linha = null,
+        int? TempoPreparoMinutos = null,
+        string? InstrucaoFinalizacao = null);
 
     public sealed record EditarItemRequest(
         string? NomePublico,    // override de nome para avulso ou vinculado
@@ -85,7 +90,11 @@ public class AdminStorefrontCardapioController(
         string? FiltrosJson,
         List<CardapioItemVariacaoInput>? Opcoes,   // ADR-0035 (#652): reconciliação keyed-by-Id
         Guid? SecaoId,
-        string? Motivo);
+        string? Motivo,
+        // S15: linha e preparo numérico (opcionais; null = não mexe).
+        LinhaProduto? Linha = null,
+        int? TempoPreparoMinutos = null,
+        string? InstrucaoFinalizacao = null);
 
     public sealed record ReordenarRequest(double NovaOrdem);
 
@@ -124,7 +133,10 @@ public class AdminStorefrontCardapioController(
                 req.FiltrosJson,
                 EscopoEmpresa(),
                 req.Opcoes,
-                req.SecaoId));
+                req.SecaoId,
+                Linha: req.Linha,
+                TempoPreparoMinutos: req.TempoPreparoMinutos,
+                InstrucaoFinalizacao: req.InstrucaoFinalizacao));
 
             await audit.LogAsync(
                 "AdminAdicionouCardapioItem",
@@ -171,7 +183,10 @@ public class AdminStorefrontCardapioController(
                 req.FiltrosJson,
                 EscopoEmpresa(),
                 req.Opcoes,
-                req.SecaoId));
+                req.SecaoId,
+                Linha: req.Linha,
+                TempoPreparoMinutos: req.TempoPreparoMinutos,
+                InstrucaoFinalizacao: req.InstrucaoFinalizacao));
 
             await audit.LogAsync(
                 "AdminEditouCardapioItem",

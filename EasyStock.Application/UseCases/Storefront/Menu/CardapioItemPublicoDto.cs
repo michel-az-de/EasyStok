@@ -29,4 +29,6 @@ public sealed record CardapioItemPublicoDto(
     double Ordem,
     bool Disponivel,
     string? Tag,
-    string? PesoExibicao);   // unidade/porção exibida junto ao preço (ex: "por kg", "300g / 800g")
+    string? PesoExibicao,    // unidade/porção exibida junto ao preço (ex: "por kg", "300g / 800g")
+    string Linha,            // S15: "paraServir" | "prepararEmCasa"
+    int? TempoPreparoMinutos); // S15: null = usa o preparo padrão da loja

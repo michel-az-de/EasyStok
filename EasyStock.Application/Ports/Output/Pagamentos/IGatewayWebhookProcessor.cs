@@ -20,11 +20,20 @@ public interface IGatewayWebhookProcessor
 
     /// <summary>
     /// Processa o payload bruto (JSON). Implementacao parseia conforme o
-    /// formato do provedor e atualiza Faturas/Cobrancas. Excecoes nao-fatal
+    /// formato do provedor e da baixa no que reconhece. Excecoes nao-fatal
     /// devem ser logadas internamente; excecoes propagadas viram 500 no
-    /// controller (e o gateway vai tentar reentregar).
+    /// controller (e o gateway vai tentar reentregar). Evento que o sistema
+    /// nao reconhece volta como <see cref="ResultadoWebhookGateway.Sucesso"/>
+    /// <c>false</c>: o controller registra o erro e responde 200.
     /// </summary>
-    Task ProcessarAsync(string rawBody, IDictionary<string, string?> headers, CancellationToken ct = default);
+    Task<ResultadoWebhookGateway> ProcessarAsync(string rawBody, IDictionary<string, string?> headers, CancellationToken ct = default);
+}
+
+/// <summary>Resultado do processamento de um webhook de gateway.</summary>
+public sealed record ResultadoWebhookGateway(bool Sucesso, string? Erro = null)
+{
+    public static ResultadoWebhookGateway Ok { get; } = new(true);
+    public static ResultadoWebhookGateway Falha(string erro) => new(false, erro);
 }
 
 /// <summary>

@@ -33,8 +33,8 @@ public static class StatusPedidoVocabulario
     /// <param name="RotuloLojista">Rótulo exibido ao lojista (Web/cockpit/Detail).</param>
     /// <param name="ContratoCliente">Token PascalCase do contrato storefront consumido pelo
     /// app do cliente (casa-da-baba). Colapsa <c>aguardando</c>+<c>preparando</c> em
-    /// <c>EmPreparo</c> e <c>pronto</c> em <c>SaiuParaEntrega</c> de propósito — o cliente
-    /// não vê a granularidade interna da cozinha.</param>
+    /// <c>EmPreparo</c> de propósito — o cliente não vê a granularidade interna da cozinha.
+    /// Desde a S12 <c>pronto</c> é "Pronto" e <c>saiu_para_entrega</c> é "SaiuParaEntrega".</param>
     /// <param name="Bucket">Classificação operacional.</param>
     public sealed record Projecao(string RotuloLojista, string ContratoCliente, BucketStatusPedido Bucket);
 
@@ -49,7 +49,8 @@ public static class StatusPedidoVocabulario
             [StatusPedido.AprovadoBaba]            = new("Aprovado",              "AprovadoBaba",           BucketStatusPedido.Operacional),
             [StatusPedido.Aguardando]              = new("Aguardando",            "EmPreparo",              BucketStatusPedido.Operacional),
             [StatusPedido.Preparando]              = new("Em preparo",            "EmPreparo",              BucketStatusPedido.Operacional),
-            [StatusPedido.Pronto]                  = new("Pronto",                "SaiuParaEntrega",        BucketStatusPedido.Operacional),
+            [StatusPedido.Pronto]                  = new("Pronto",                "Pronto",                 BucketStatusPedido.Operacional),
+            [StatusPedido.SaiuParaEntrega]         = new("Saiu para entrega",     "SaiuParaEntrega",        BucketStatusPedido.Operacional),
             // Terminais
             [StatusPedido.Entregue]                = new("Entregue",              "Entregue",               BucketStatusPedido.Terminal),
             [StatusPedido.Cancelado]               = new("Cancelado",             "Cancelado",              BucketStatusPedido.Terminal),

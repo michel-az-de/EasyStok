@@ -39,6 +39,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   `IniciarCheckoutUseCase` e `IniciarCheckoutGuestUseCase` passam a delegar; o site não muda de
   comportamento. Novo `CriarPedidoAtendimentoUseCase` cria o pedido da conversa pelo mesmo caminho
   (`Origem = "whatsapp"`, observação por item, `Conversa.PedidoEmAndamentoId`); a cobrança é da S11. (#1101)
+- **Cobrança do pedido pelo Mercado Pago** (S11): `CobrancaPedido` (migration `AddCobrancaPedido`,
+  RLS) guarda a preferência com `external_reference = PedidoId`, link e expiração de 30 min; site e
+  conversa passam pelo mesmo `GerarCobrancaPedidoUseCase`. `ConfirmarPagamentoPedidoUseCase` (ponto de
+  entrada do webhook da S32) leva o pedido de `AguardandoPagamento` a `Aguardando`, registra o
+  pagamento e publica `pedido.pago`; repetido é no-op e valor menor não confirma. `CobrancaPedidoJob`
+  (60 s, `BackgroundJobs:EnableCobrancaPedido`) reemite uma vez para pedido da conversa e cancela o
+  resto liberando a vaga. Operadora: `POST api/pedidos/{id}/cobranca`, `.../cobranca/forma`
+  (`online` ou `na_entrega`) e `.../pagamento-manual/desfazer`. A ferramenta `criar_pedido` do agente
+  fecha o pedido e devolve resumo, total e link. (#1115)
 - **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
   (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
   novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp
