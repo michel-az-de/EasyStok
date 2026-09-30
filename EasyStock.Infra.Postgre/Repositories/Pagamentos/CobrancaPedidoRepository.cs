@@ -20,6 +20,7 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
         await db.CobrancasPedido
             .Where(c => c.EmpresaId == empresaId && c.PedidoId == pedidoId)
             .OrderBy(c => c.CriadaEm)
+            .ThenBy(c => c.Id)
             .ToListAsync(ct);
 
     public async Task<Guid?> ObterEmpresaIdDoPedidoAsync(Guid pedidoId, CancellationToken ct = default)

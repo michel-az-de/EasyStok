@@ -44,8 +44,8 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
         var repo = new CobrancaPedidoRepository(db);
 
         await repo.AddAsync(CobrancaPedido.CriarOnline(empresa, pedido.Id, 25m, "pref-x", "https://mp/x", Agora.AddMinutes(30), 1, Agora));
-        await repo.AddAsync(CobrancaPedido.CriarNaEntrega(empresa, pedido.Id, 25m, Agora));
         await repo.AddAsync(CobrancaPedido.CriarNaEntrega(empresa, pedido.Id, 25m, Agora.AddMinutes(1)));
+        await repo.AddAsync(CobrancaPedido.CriarNaEntrega(empresa, pedido.Id, 25m, Agora.AddMinutes(2)));
         await db.SaveChangesAsync();
 
         var duplicada = CobrancaPedido.CriarOnline(empresa, pedido.Id, 25m, "pref-x", "https://mp/x", Agora.AddMinutes(30), 2, Agora);
