@@ -53,6 +53,7 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo ap
 7. **Não faça:** refatorar fora do Escopo; ler além da Leitura mínima; abrir o `graphify`; tocar `EasyStok.Mobile`, `EasyStock.Admin` ou `EasyStock.Web` salvo quando a spec mandar (R8: assinatura pública estendida = todos os call-sites no mesmo commit).
 8. **Stack real:** .NET 10 (`global.json` 10.0.201), EF Core, Postgres. O `CLAUDE.md` diz .NET 8 e o `README.md` diz 9: estão errados, corrigidos em P06.
 9. **Segredos:** nunca em código, issue, log ou teste. Nomes de configuração, sim.
+10. **Registro de serviços (#1178):** use case (`*UseCase` em `UseCases/Atendimento`), ferramenta do agente (`IFerramentaAgente`) e tratador de botão (`IAcaoBotaoHandler`) entram sozinhos por convenção. **Não edite** `ServiceCollectionExtensions.Atendimento.cs` para eles; só para interface própria ou outro ciclo de vida.
 
 ## Prompt de execução (copiar para a sessão do modelo executor)
 
