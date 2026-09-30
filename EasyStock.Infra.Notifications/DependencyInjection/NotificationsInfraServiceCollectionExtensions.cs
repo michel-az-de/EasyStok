@@ -46,6 +46,10 @@ public static class NotificationsInfraServiceCollectionExtensions
             "sms:active",
             (sp, _) => sp.GetRequiredKeyedService<IProvedorSms>($"sms:{smsProvider}"));
 
+        // S37 (ADR-0051): SMS e e-mail na porta de canal do atendimento, escolhidos pelo ResolvedorCanal.
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, EasyStock.Infra.Notifications.Atendimento.CanalSms>();
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, EasyStock.Infra.Notifications.Atendimento.CanalEmail>();
+
         // WhatsApp providers
         services.Configure<TwilioWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Twilio"));
         services.Configure<MetaCloudWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Meta"));

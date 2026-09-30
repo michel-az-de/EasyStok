@@ -16,6 +16,7 @@ namespace EasyStock.Infra.Integrations.WhatsApp;
 public sealed class WhatsAppCloudClient(
     HttpClient httpClient,
     IOptions<WhatsAppCloudOptions> options,
+    IRemetenteWhatsApp remetente,
     ResiliencePipelineProvider<string> pipelineProvider,
     ILogger<WhatsAppCloudClient> logger) : IWhatsAppCloudClient
 {
@@ -173,11 +174,32 @@ public sealed class WhatsAppCloudClient(
         return new EnvioWhatsAppResult(wamid);
     }
 
-    private Task<HttpResponseMessage> PostMessagesAsync(object payload, CancellationToken ct)
+    private async Task<HttpResponseMessage> PostMessagesAsync(object payload, CancellationToken ct)
     {
+        var phoneNumberId = await ResolverPhoneNumberIdAsync(ct);
         var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsApp);
-        var url = $"{_options.PhoneNumberId}/messages";
-        return pipeline.ExecuteAsync(async pollyCt => await httpClient.PostAsJsonAsync(url, payload, pollyCt), ct).AsTask();
+        var url = $"{phoneNumberId}/messages";
+        return await pipeline.ExecuteAsync(async pollyCt => await httpClient.PostAsJsonAsync(url, payload, pollyCt), ct);
+    }
+
+    /// <summary>
+    /// Número da empresa do tenant corrente (#1102); sem ele, o global de
+    /// <c>Notifications:WhatsApp:Meta:PhoneNumberId</c>. Sem nenhum dos dois a chamada é recusada
+    /// aqui, antes da rede: um POST em "/messages" só devolveria um erro opaco da Meta.
+    /// </summary>
+    private async Task<string> ResolverPhoneNumberIdAsync(CancellationToken ct)
+    {
+        var doTenant = await remetente.ObterPhoneNumberIdAsync(ct);
+        if (!string.IsNullOrWhiteSpace(doTenant))
+            return doTenant.Trim();
+
+        if (!string.IsNullOrWhiteSpace(_options.PhoneNumberId))
+            return _options.PhoneNumberId.Trim();
+
+        throw new WhatsAppCloudException(0,
+            "Nenhum phone_number_id do WhatsApp configurado: vincule o número à empresa (Admin > Tenants > WhatsApp) " +
+            "ou defina Notifications:WhatsApp:Meta:PhoneNumberId.",
+            ehPermanente: true);
     }
 
     private async Task LancarErroAsync(HttpResponseMessage response, CancellationToken ct)

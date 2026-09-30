@@ -20,6 +20,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **WhatsApp por empresa** (#1102): a resposta sai pelo `phone_number_id` da empresa do tenant
+  (`IRemetenteWhatsApp`), com fallback para `Notifications:WhatsApp:Meta:PhoneNumberId` e erro
+  permanente, sem chamar a Meta, quando não há nenhum. Chave nova `Atendimento__WhatsApp__Cliente=meta`
+  liga o cliente real da Cloud API sem trocar o provider de notificações (que segue `stub`);
+  `Provider=meta` continua ligando o cliente real. O `StartupHardening` exige AccessToken, AppSecret
+  e VerifyToken com qualquer uma das duas em `meta`. `PUT api/admin/tenants/{id}/whatsapp`
+  (`{ phoneNumberId }`, `null` desvincula, 409 se outra empresa já usa) e card "WhatsApp" na aba
+  Features do detalhe do tenant no Admin.
 - **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
   (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
   só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
@@ -27,6 +35,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   marketing daquele canal, confirmam ao cliente e não acionam o agente.
   `GET|PUT api/atendimento/clientes/{id}/consentimentos` (Admin). Tabela `consentimentos_contato`
   com RLS e backfill de `ConsentiuMarketing=true` para WhatsApp e e-mail. (#1078)
+- **E-mail e SMS na porta de canal do atendimento** (S37, ADR-0051): `CanalSms` (texto pelo
+  `IProvedorSms` ativo, Twilio em produção, com `+` no número) e `CanalEmail` (texto, ou imagem por
+  link em HTML escapado, pelo `IEmailService`). O `ResolvedorCanal` passa a achar `Sms` e `Email`.
+  Falha do provedor vira `EnvioCanalFalhouException`; operação que o canal não suporta lança
+  `NotSupportedException`. (#1080)
 - **Expediente da loja** (S40, ADR-0051): `ExpedienteLoja` por empresa com horário por dia (virada
   da meia-noite), controle manual que vence o relógio e não volta sozinho, e mensagens de "fora do
   horário" (`{abre}` vira "amanhã às 08:00") e "loja fechada". `GET|PUT api/atendimento/expediente`
@@ -160,6 +173,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tracing, sink Serilog OTLP e sampler ParentBased (preserva trace distribuido). (#1002)
 
 ### Fixed
+- `SeedSchemaBootstrap` rodava `ALTER TABLE "Empresas"` (a tabela e `empresas`) e falhava com 42P01
+  a cada startup, quebrando todo seed pelo painel admin no passo 1. O `ALTER` sai: `IsSeedData` foi
+  dropada pela migration `20260507011959` e e `[NotMapped]` no dominio. (#1092)
 - `ToString` de `Quantidade`, `Dinheiro` e `Dimensoes` dependia da cultura do host (`1,5` no
   Windows pt-BR, `1.5` no CI Linux) e passa a ser invariante, como a Api ja produzia no container.
   O teste de wiring de metricas coleta so o proprio reader InMemory: o `ForceFlush` do provider

@@ -24,9 +24,13 @@ namespace EasyStock.Api.Data;
 public static class SeedSchemaBootstrap
 {
     /// <summary>
-    /// Garante que <c>Empresas.IsSeedData</c> e a tabela <c>SeedRunLogs</c>
-    /// existem. Idempotente — pode ser chamado múltiplas vezes sem efeito.
-    /// Usa Npgsql diretamente (não passa pelo EF) para máxima confiabilidade.
+    /// Garante que a tabela <c>SeedRunLogs</c> existe. Idempotente — pode ser
+    /// chamado múltiplas vezes sem efeito. Usa Npgsql diretamente (não passa pelo
+    /// EF) para máxima confiabilidade.
+    /// <para>
+    /// Não mexe em <c>empresas.IsSeedData</c>: a coluna foi dropada pela migration
+    /// 20260507011959 e a entidade a marca [NotMapped] (#1092).
+    /// </para>
     /// </summary>
     public static async Task EnsureAsync(
         EasyStockDbContext ctx,
@@ -46,9 +50,6 @@ public static class SeedSchemaBootstrap
             // Cada statement roda isolada em autocommit — DDL é transacional no Postgres
             // mas sem tx explícita cada statement commita imediatamente e é visível
             // a todas as conexões (sem risco de rollback acidental).
-
-            await ExecAsync(conn, ct,
-                @"ALTER TABLE ""Empresas"" ADD COLUMN IF NOT EXISTS ""IsSeedData"" boolean NOT NULL DEFAULT false");
 
             await ExecAsync(conn, ct, @"
                 CREATE TABLE IF NOT EXISTS ""SeedRunLogs"" (
@@ -71,7 +72,7 @@ public static class SeedSchemaBootstrap
                 VALUES ('20260506233022_AddSeedRunLogAndIsSeedData', '9.0.0')
                 ON CONFLICT DO NOTHING");
 
-            logger.LogInformation("[SeedSchema] Schema OK — Empresas.IsSeedData + SeedRunLogs verificados via Npgsql direto.");
+            logger.LogInformation("[SeedSchema] Schema OK — SeedRunLogs verificado via Npgsql direto.");
         }
         catch (Exception ex)
         {

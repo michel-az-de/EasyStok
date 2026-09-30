@@ -98,8 +98,6 @@ public static class WebHttpServicesExtensions
         services.AddScoped<MobileProductsService>();
         services.AddScoped<OperacaoMobileService>();
         services.AddScoped<RelatoriosService>();
-        services.AddScoped<NotasFiscaisService>();
-        services.AddScoped<ConfiguracaoFiscalService>();
 
         // 6d. Menu lateral (ADR-0032, fatia 2): badges agregados com cache curto (60s)
         // por empresa+loja. AddMemoryCache registra IMemoryCache (distinto do distributed
@@ -115,10 +113,8 @@ public static class WebHttpServicesExtensions
         services.AddScoped<ITenantFeaturesFonte, TenantFeaturesFonte>();
         services.AddScoped<TenantFeaturesService>();
 
-        // 6b. Marketing options + Leads API service (landing publica)
+        // 6b. Marketing options (landing publica)
         services.Configure<MarketingOptions>(config.GetSection("Marketing"));
-        // Feature flags (issue #770): modulo fiscal default-off ate homologacao FocusNFe.
-        services.Configure<FeaturesOptions>(config.GetSection("Features"));
 
         // 6c. Response compression — Brotli/Gzip pra Razor HTML, JSON do AJAX e estaticos.
         // CPU overhead marginal vs ganho de bandwidth (Render cobra acima do free tier).

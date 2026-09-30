@@ -64,7 +64,7 @@ public sealed record TenantDetail(
     IReadOnlyList<TenantUsuarioInfo> Usuarios,
     IReadOnlyList<TenantAuditLogInfo> AuditLogRecentes);
 
-public sealed record TenantEmpresaInfo(Guid Id, string Nome, string? Documento, DateTime CriadoEm);
+public sealed record TenantEmpresaInfo(Guid Id, string Nome, string? Documento, DateTime CriadoEm, string? WhatsAppPhoneNumberId = null);
 
 public sealed record TenantAssinaturaInfo(
     Guid Id,

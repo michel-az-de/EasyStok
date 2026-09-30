@@ -19,7 +19,7 @@ public class MenuDefinitionTests
         "Clientes", "ClientesMobile", "Pedidos", "PedidosMobile", "Caixa",
         "CaixaMobile", "Financeiro", "ContasAReceber", "ContasAPagar", "Lotes",
         "LotesMobile", "ListasCompras", "Categorias", "Entradas", "Saidas",
-        "NotasFiscais", "ConfiguracaoFiscal", "Kds", "Dispositivos", "Operacao",
+        "Kds", "Dispositivos", "Operacao",
         "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas",
         "Relatorios", "Usuarios", "Configuracoes", "Lojas",
         "Assinatura", "Notificacoes", "Preferencias",

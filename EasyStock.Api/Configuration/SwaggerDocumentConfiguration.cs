@@ -543,7 +543,6 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["DiagnosticoInfra"]    = "Diagnóstico de infraestrutura (PostgreSQL, Redis, S3, SMTP) com self-test.",
         ["DiagnosticoLogs"]     = "Live tail de logs estruturados (SSE) para diagnóstico em produção.",
         ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
-        ["WebhookFocusNFe"]     = "Webhook público da Focus NFe (HMAC) para retorno de emissão fiscal.",
         ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
         ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",
     };

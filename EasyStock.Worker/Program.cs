@@ -11,8 +11,6 @@ using EasyStock.Worker;
 using EasyStock.Worker.BackgroundServices;
 using EasyStock.Worker.DependencyInjection;
 using EasyStock.Infra.Integrations.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal.FocusNFe.DependencyInjection;
-using EasyStock.Infra.Integrations.Fiscal.Mock.DependencyInjection;
 using Serilog;
 
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -128,11 +126,8 @@ builder.Services.AddEasyStockFileStorageCore(builder.Configuration);
 // WorkerCurrentUserAccessor (override ADR-R06) + ReportExecutionContext (AsyncLocal).
 builder.Services.AddReportingWorker();
 
-// IMemoryCache: o ConfigFiscalResolver (registrado em AddEasyStockPostgreInfrastructure)
-// faz cache de 60s da config fiscal por tenant. Sem este registro o
-// ReprocessarContingenciaBackgroundService quebrava em runtime ao resolver
-// ReprocessarContingenciaUseCase → IConfigFiscalResolver → IMemoryCache (só a API
-// registrava o cache, via AddEasyStockCache). Singleton consumido por Scoped: OK.
+// IMemoryCache: a API registra via AddEasyStockCache; o Worker registra aqui para os
+// servicos compartilhados que dependem dele. Singleton consumido por Scoped: OK.
 builder.Services.AddMemoryCache();
 
 // #877: registra ICacheService — sem isso o EstoqueSaldoCacheInvalidationInterceptor
@@ -146,26 +141,15 @@ builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSingleton<EasyStock.Application.Ports.Output.ICacheService, EasyStock.Infra.Async.RedisCacheService>();
 
-// Modulo Fiscal NFC-e (F4) — Polly pipelines + adapters Focus NFe + Mock + jobs background
+// Polly pipelines compartilhados pelas integracoes HTTP
 builder.Services.AddEasyStockIntegrationResilience();
-builder.Services.AddFocusNFeAdapter(builder.Configuration);
-builder.Services.AddMockFiscalGateway();
 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
 builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
 // Atendimento WhatsApp (S06) — o Worker reusa AddEasyStockApplication(), que registra o agente.
 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
-// Scoped (não Singleton): a factory consome IGatewayFiscal Scoped — como Singleton
-// capturava gateways scoped (captive dependency / lifetime mismatch). Mesmo fix da
-// API (#193). Os jobs (hosted services) já resolvem os use cases fiscais via
-// IServiceScope (ex.: ReprocessarContingenciaBackgroundService.CreateScope()), então
-// a factory scoped resolve corretamente dentro do scope.
-builder.Services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGatewayFiscalFactory,
-    EasyStock.Infra.Integrations.Fiscal.GatewayFiscalFactory>();
 // Key ring compartilhado com a Api via Postgres (#1035) — sem isso o Worker nao
 // decifra o certificado A1 que a Api gravou em credencial_integracao.
 builder.Services.AddEasyStockDataProtection();
-builder.Services.AddHostedService<ReprocessarContingenciaBackgroundService>();
-builder.Services.AddHostedService<RenovacaoCertificadoA1BackgroundService>();
 
 // Health checks
 builder.Services.AddHealthChecks();
@@ -177,7 +161,7 @@ builder.Services.AddHealthChecks();
 //
 // Esta ferramenta encontrou e fechamos 2 crashes latentes que dariam "erro genérico":
 //   • IFileStorage  — motor de relatórios (ReportRunner/Watchdog). Realocado p/ Infra.Async.
-//   • IMemoryCache  — cadeia fiscal (ReprocessarContingenciaUseCase → IConfigFiscalResolver).
+//   • IMemoryCache  — cadeia fiscal (removida na poda P04, #1106).
 //
 // Mantido CONDICIONAL (não roda no startup normal): o grafo ainda não é 100% resolvível
 // porque o Worker reusa AddEasyStockApplication() — que registra TODOS os use cases da

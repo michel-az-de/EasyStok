@@ -1,5 +1,6 @@
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Common;
+using EasyStock.Infra.Integrations.DependencyInjection;
 
 namespace EasyStock.Api.Startup;
 
@@ -70,35 +71,44 @@ public static class StartupHardening
     }
 
     /// <summary>
-    /// Com o provider WhatsApp "meta" ligado, AccessToken/AppSecret/VerifyToken sao obrigatorios:
-    /// sem AppSecret nao ha como validar a assinatura do webhook (S03); sem VerifyToken a Meta
-    /// nunca completa a verificacao do endpoint.
+    /// Com o cliente da Cloud API real ligado (<c>Atendimento:WhatsApp:Cliente=meta</c> ou
+    /// <c>Notifications:WhatsApp:Provider=meta</c>, #1102), AccessToken/AppSecret/VerifyToken sao
+    /// obrigatorios: sem AppSecret nao ha como validar a assinatura do webhook (S03); sem
+    /// VerifyToken a Meta nunca completa a verificacao do endpoint. O PhoneNumberId global NAO e
+    /// obrigatorio: o numero de envio vem da empresa do tenant, e o global e so fallback.
     /// </summary>
     public static void ValidateWhatsAppMeta(WebApplicationBuilder builder)
         => ValidateWhatsAppMeta(
-            builder.Configuration["Notifications:WhatsApp:Provider"],
+            builder.Configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveClienteAtendimento],
+            builder.Configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveProviderNotificacoes],
             builder.Configuration["Notifications:WhatsApp:Meta:AccessToken"],
             builder.Configuration["Notifications:WhatsApp:Meta:AppSecret"],
             builder.Configuration["Notifications:WhatsApp:Meta:VerifyToken"]);
 
-    /// <summary>Nucleo puro/testavel de <see cref="ValidateWhatsAppMeta(WebApplicationBuilder)"/>.</summary>
-    public static void ValidateWhatsAppMeta(string? provider, string? accessToken, string? appSecret, string? verifyToken)
+    /// <summary>
+    /// Nucleo puro/testavel de <see cref="ValidateWhatsAppMeta(WebApplicationBuilder)"/>: mesma regra
+    /// real/stub do registro do cliente (<see cref="WhatsAppCloudClientServiceCollectionExtensions.UsaClienteMeta"/>).
+    /// </summary>
+    public static void ValidateWhatsAppMeta(
+        string? clienteAtendimento, string? provider, string? accessToken, string? appSecret, string? verifyToken)
     {
-        if (!string.Equals(provider, "meta", StringComparison.OrdinalIgnoreCase)) return;
+        if (!WhatsAppCloudClientServiceCollectionExtensions.UsaClienteMeta(clienteAtendimento, provider)) return;
         ValidateWhatsAppMetaCore(accessToken, appSecret, verifyToken);
     }
 
-    /// <summary>Nucleo puro/testavel que assume o provider "meta" ja ligado.</summary>
+    /// <summary>Atalho sem a chave do atendimento (so o provider de notificacoes).</summary>
+    public static void ValidateWhatsAppMeta(string? provider, string? accessToken, string? appSecret, string? verifyToken)
+        => ValidateWhatsAppMeta(clienteAtendimento: null, provider, accessToken, appSecret, verifyToken);
+
+    /// <summary>Nucleo puro/testavel que assume o cliente "meta" ja ligado.</summary>
     public static void ValidateWhatsAppMetaCore(string? accessToken, string? appSecret, string? verifyToken)
     {
+        const string quando = "when Notifications:WhatsApp:Provider=meta or Atendimento:WhatsApp:Cliente=meta.";
         if (string.IsNullOrWhiteSpace(accessToken))
-            throw new InvalidOperationException(
-                "Notifications:WhatsApp:Meta:AccessToken is required when Notifications:WhatsApp:Provider=meta.");
+            throw new InvalidOperationException($"Notifications:WhatsApp:Meta:AccessToken is required {quando}");
         if (string.IsNullOrWhiteSpace(appSecret))
-            throw new InvalidOperationException(
-                "Notifications:WhatsApp:Meta:AppSecret is required when Notifications:WhatsApp:Provider=meta.");
+            throw new InvalidOperationException($"Notifications:WhatsApp:Meta:AppSecret is required {quando}");
         if (string.IsNullOrWhiteSpace(verifyToken))
-            throw new InvalidOperationException(
-                "Notifications:WhatsApp:Meta:VerifyToken is required when Notifications:WhatsApp:Provider=meta.");
+            throw new InvalidOperationException($"Notifications:WhatsApp:Meta:VerifyToken is required {quando}");
     }
 }
