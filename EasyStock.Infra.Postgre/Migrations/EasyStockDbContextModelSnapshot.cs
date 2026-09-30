@@ -790,6 +790,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("EnviadaEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("EnviadaPorUsuarioId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Erro")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -1831,8 +1834,16 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("FacebookPageId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<bool>("FinanceiroHabilitado")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("InstagramAccountId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -1867,6 +1878,14 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("Documento")
                         .IsUnique();
+
+                    b.HasIndex("FacebookPageId")
+                        .IsUnique()
+                        .HasFilter("\"FacebookPageId\" IS NOT NULL");
+
+                    b.HasIndex("InstagramAccountId")
+                        .IsUnique()
+                        .HasFilter("\"InstagramAccountId\" IS NOT NULL");
 
                     b.HasIndex("WhatsAppPhoneNumberId")
                         .IsUnique()

@@ -34,6 +34,12 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public string? WhatsAppPhoneNumberId { get; set; }
 
+        /// <summary>Id da página do Facebook: roteia o webhook do Messenger pelo <c>recipient.id</c> (S35).</summary>
+        public string? FacebookPageId { get; set; }
+
+        /// <summary>Id da conta profissional do Instagram: roteia o webhook do Instagram pelo <c>recipient.id</c> (S35).</summary>
+        public string? InstagramAccountId { get; set; }
+
         public static Empresa Criar(string nome, string? documento)
         {
             var agora = DateTime.UtcNow;
@@ -58,6 +64,14 @@ namespace EasyStock.Domain.Entities
         public void VincularWhatsApp(string phoneNumberId)
         {
             WhatsAppPhoneNumberId = phoneNumberId;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>Página do Facebook e conta do Instagram desta empresa (S35). Vazio desvincula.</summary>
+        public void VincularMensageriaMeta(string? facebookPageId, string? instagramAccountId)
+        {
+            FacebookPageId = string.IsNullOrWhiteSpace(facebookPageId) ? null : facebookPageId.Trim();
+            InstagramAccountId = string.IsNullOrWhiteSpace(instagramAccountId) ? null : instagramAccountId.Trim();
             AlteradoEm = DateTime.UtcNow;
         }
 

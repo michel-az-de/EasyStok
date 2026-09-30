@@ -21,7 +21,7 @@ public class MenuDefinitionTests
         "LotesMobile", "ListasCompras", "Categorias", "Entradas", "Saidas",
         "Kds", "Dispositivos", "Operacao",
         "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas",
-        "Relatorios", "Anuncios", "Usuarios", "Configuracoes", "Lojas",
+        "Relatorios", "Usuarios", "Configuracoes", "Lojas",
         "Assinatura", "Notificacoes", "Preferencias",
     };
 

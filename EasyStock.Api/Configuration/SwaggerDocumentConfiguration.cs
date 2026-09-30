@@ -487,7 +487,7 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Loja"]           = "Configurações e dados da loja vinculada à empresa.",
         ["Plano"]          = "Gerenciamento de planos e assinaturas.",
         ["Uploads"]        = "Upload e gerenciamento de arquivos (fotos de produtos, documentos).",
-        ["IaAnuncio"]      = "Geração de anúncios e descrições de produtos via Inteligência Artificial (Anthropic Claude).",
+        ["IaAutoPreenchimento"] = "Auto-preenchimento de produto novo via Inteligência Artificial (SSE).",
         ["Venda"]          = "Registro e consulta de vendas realizadas.",
         ["Diagnostico"]    = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
 
@@ -507,12 +507,10 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["AdminPlanos"]         = "CRUD dos planos da plataforma SaaS (preço, limites, features incluídas).",
         ["AdminReports"]        = "Relatórios consolidados cross-tenant para tomada de decisão.",
         ["AdminSeed"]           = "Disparo manual de seed/reset de dados de demo (apenas Development/Staging).",
-        ["AdminSla"]            = "Configuração e acompanhamento de SLAs de helpdesk por plano.",
         ["AdminStatus"]         = "Página de status pública da plataforma (incidentes, manutenções).",
         ["AdminStorefront"]     = "Gestão dos sites storefront por tenant (slug, domínio, branding).",
         ["AdminStorefrontCardapio"] = "Curadoria do cardápio público (storefront) por tenant.",
         ["AdminTenants"]        = "Operações administrativas em tenants individuais (admin global).",
-        ["AdminTickets"]        = "Visão consolidada dos tickets de helpdesk de todos os tenants.",
         ["AdminUsuariosTenant"] = "Gestão dos usuários de um tenant específico (admin global).",
         ["AdminFaturas"]        = "Gestão de faturas SaaS por tenant (admin global).",
 
@@ -539,14 +537,11 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Public"]              = "Endpoints públicos sem autenticação (captura de leads, formulários landing).",
 
         // ── Outros ───────────────────────────────────────────────────────────
-        ["Tickets"]             = "Helpdesk: abertura, resposta e acompanhamento de tickets de suporte por clientes.",
         ["Reports"]             = "Relatórios gerenciais (estoque, vendas, financeiro).",
         ["Consentimentos"]      = "Registro de consentimentos LGPD por usuário/cliente.",
         ["EntityAudit"]         = "Consulta da trilha de auditoria de entidades específicas (quem alterou o quê).",
         ["DiagnosticoInfra"]    = "Diagnóstico de infraestrutura (PostgreSQL, Redis, S3, SMTP) com self-test.",
         ["DiagnosticoLogs"]     = "Live tail de logs estruturados (SSE) para diagnóstico em produção.",
-        ["Faq"]                 = "FAQ público (artigos de ajuda, busca por categoria).",
-        ["FaqAdmin"]            = "Curadoria do FAQ (admin global): criação e edição de artigos.",
         ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
         ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
         ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",

@@ -29,6 +29,7 @@ namespace EasyStock.Domain.Enums
         VisualizarContasAReceber,
         GerenciarContasAReceber,
         GerenciarCategoriasFinanceiras,
-        GerenciarCentrosCusto
+        GerenciarCentrosCusto,
+        AtenderConversas
     }
 }

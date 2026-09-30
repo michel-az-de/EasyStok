@@ -198,14 +198,36 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         await db.SaveChangesAsync();
 
         var repo = new ConversaRepository(db);
-        var todas = await repo.ListarInboxAsync(empresa, situacao: null, busca: null, pagina: 1, tamanhoPagina: 10);
+        var todas = await repo.ListarInboxAsync(empresa, situacao: null, busca: null, responsavel: null, pagina: 1, tamanhoPagina: 10);
         todas.Select(i => i.Conversa.Id).Should().ContainInOrder(maria.Id, joao.Id);
         todas[0].UltimaMensagemTexto.Should().Be("ultima");
         todas[1].UltimaMensagemTexto.Should().BeNull();
 
-        var busca = await repo.ListarInboxAsync(empresa, null, "souza", 1, 10);
+        var busca = await repo.ListarInboxAsync(empresa, null, "souza", null, 1, 10);
         busca.Should().ContainSingle(i => i.Conversa.Id == maria.Id);
-        (await repo.ListarInboxAsync(empresa, null, "990012", 1, 10)).Should().ContainSingle(i => i.Conversa.Id == joao.Id);
+        (await repo.ListarInboxAsync(empresa, null, "990012", null, 1, 10)).Should().ContainSingle(i => i.Conversa.Id == joao.Id);
+    }
+
+    [SkippableFact]
+    public async Task Inbox_FiltraPorResponsavel()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var ana = Guid.NewGuid();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var daAna = Conversa.Abrir(empresa, "5511999990021", Agora, "Rita");
+        daAna.Assumir(Agora, ana);
+        var livre = Conversa.Abrir(empresa, "5511999990022", Agora, "Joana");
+        db.AtendimentoConversas.AddRange(daAna, livre);
+        await db.SaveChangesAsync();
+
+        var repo = new ConversaRepository(db);
+        (await repo.ListarInboxAsync(empresa, null, null, new(ana), 1, 10))
+            .Should().ContainSingle(i => i.Conversa.Id == daAna.Id);
+        (await repo.ListarInboxAsync(empresa, null, null, Application.Ports.Output.Persistence.Atendimento.FiltroResponsavel.Ninguem, 1, 10))
+            .Should().ContainSingle(i => i.Conversa.Id == livre.Id);
     }
 
     [SkippableFact]

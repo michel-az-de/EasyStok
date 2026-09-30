@@ -58,6 +58,14 @@ public sealed class AgenteAtendimentoService(
         if (conversa.Situacao != SituacaoConversa.Automatica || !conversa.DentroDaJanela(agora))
             return ResultadoTurnoAgente.Ignorado;
 
+        // O agente envia pelo cliente do WhatsApp: em outro canal a resposta sairia pelo canal errado.
+        // Instagram, Messenger e chat do site ficam com o humano até o agente enviar pela porta de canal.
+        if (conversa.Canal != CanalConversa.WhatsApp)
+        {
+            logger.LogInformation("Agente: conversa {ConversaId} é do canal {Canal}; fica para a dona.", conversaId, conversa.Canal);
+            return ResultadoTurnoAgente.Ignorado;
+        }
+
         var mensagens = MontarConversacao(dados.Mensagens);
         if (mensagens.Count == 0 || mensagens[^1].Papel != MensagemLlm.Usuario)
             return ResultadoTurnoAgente.Ignorado;

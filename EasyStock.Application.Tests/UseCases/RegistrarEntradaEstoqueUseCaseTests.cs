@@ -1,4 +1,3 @@
-using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
@@ -11,14 +10,13 @@ namespace EasyStock.Application.Tests.UseCases;
 public class RegistrarEntradaEstoqueUseCaseTests
 {
     [Fact]
-    public async Task Deve_registrar_entrada_com_descricao_gerada_e_movimentacao()
+    public async Task Deve_registrar_entrada_com_descricao_sugerida_do_produto_e_movimentacao()
     {
         var produtoRepository = Substitute.For<IProdutoRepository>();
         var variacaoRepository = Substitute.For<IProdutoVariacaoRepository>();
         var itemRepository = Substitute.For<IItemEstoqueRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var gerador = Substitute.For<IGeradorDescricaoAnuncio>();
         var logger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
         var empresaId = Guid.NewGuid();
 
@@ -29,11 +27,11 @@ public class RegistrarEntradaEstoqueUseCaseTests
             Nome = "Galaxy Buds FE",
             Status = StatusProduto.Ativo,
             PrecoReferencia = Dinheiro.FromDecimal(399.90m),
-            SkuBase = CodigoSku.From("BUDS-FE")
+            SkuBase = CodigoSku.From("BUDS-FE"),
+            SugestaoDescricaoAnuncio = "Descricao pronta"
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        gerador.GerarAsync(produto, null, null, "Mercado Livre").Returns("Descricao pronta");
 
         var useCase = new RegistrarEntradaEstoqueUseCase(
             produtoRepository,
@@ -42,7 +40,6 @@ public class RegistrarEntradaEstoqueUseCaseTests
             movimentacaoRepository,
             unitOfWork,
             logger,
-            gerador,
             publicadorEventos: Substitute.For<IPublicadorEventos>()); // #306
 
         var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
@@ -348,7 +345,6 @@ public class RegistrarEntradaEstoqueUseCaseTests
         var itemRepository = Substitute.For<IItemEstoqueRepository>();
         var movimentacaoRepository = Substitute.For<IMovimentacaoEstoqueRepository>();
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var gerador = Substitute.For<IGeradorDescricaoAnuncio>();
         var publicadorEventos = Substitute.For<IPublicadorEventos>();
         var logger = Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>();
         var empresaId = Guid.NewGuid();
@@ -363,7 +359,6 @@ public class RegistrarEntradaEstoqueUseCaseTests
         };
 
         produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
-        gerador.GerarAsync(produto, null, null, "Mercado Livre").Returns("Descricao pronta");
 
         var useCase = new RegistrarEntradaEstoqueUseCase(
             produtoRepository,
@@ -372,7 +367,6 @@ public class RegistrarEntradaEstoqueUseCaseTests
             movimentacaoRepository,
             unitOfWork,
             logger,
-            gerador,
             publicadorEventos);
 
         var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
@@ -445,7 +439,6 @@ public class RegistrarEntradaEstoqueUseCaseTests
             movimentacaoRepository,
             unitOfWork,
             logger,
-            null,
             Substitute.For<IPublicadorEventos>(), // #306
             lojaRepository,
             configuracaoLojaRepository);
