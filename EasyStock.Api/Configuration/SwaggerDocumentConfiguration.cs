@@ -514,11 +514,9 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["AdminFaturas"]        = "Gestão de faturas SaaS por tenant (admin global).",
 
         // ── Mobile (Casa da Babá PWA — sync delta offline-first) ─────────────
-        ["ApkDistribution"]     = "Distribuição de APKs assinados para tablets Casa da Babá.",
         ["DeviceBackup"]        = "Backup e restore do estado local do device (PWA).",
         ["DevicePairing"]       = "Pareamento de tablets via código (provisioning + emissão de API key).",
         ["Kds"]                 = "Kitchen Display System — fila de pedidos em produção.",
-        ["MobileAdmin"]         = "Endpoints admin do módulo mobile (estado dos devices, comandos remotos).",
         ["MobileBatches"]       = "Lotes de produção sincronizados do mobile (vinculo opcional com Lote ERP).",
         ["MobileCalculadora"]   = "Calculadora de compras Casa da Babá (precificação + receita).",
         ["MobileCash"]          = "Caixa do tablet: entradas, saídas, fechamento diário.",
@@ -528,7 +526,6 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["MobileEstoque"]       = "Visão de estoque do tablet (read-mostly, sync com ERP).",
         ["MobileOrders"]        = "Pedidos do tablet (Casa da Babá): rascunho, pago, entregue.",
         ["MobileProducts"]      = "Catálogo de produtos do tablet (cardápio + variações).",
-        ["MobilePush"]          = "Notificações push para tablets/PWA (FCM/WebPush).",
         ["MobileQuickReports"]  = "Relatórios resumo offline para o tablet (vendas, fechamento).",
         ["Operation"]           = "Operações cross-device do módulo mobile (comandos remotos, broadcast).",
 
