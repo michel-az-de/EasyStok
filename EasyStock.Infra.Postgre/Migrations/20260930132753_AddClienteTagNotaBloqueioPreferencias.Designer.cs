@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930132753_AddClienteTagNotaBloqueioPreferencias")]
+    partial class AddClienteTagNotaBloqueioPreferencias
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -763,43 +766,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasFilter("\"Situacao\" <> 3");
 
                     b.ToTable("atendimento_conversas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.LinkCardapioConversa", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConversaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ExpiraEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime?>("UsadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversaId");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_links_cardapio_conversa_token_hash");
-
-                    b.ToTable("links_cardapio_conversa", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Mensagem", b =>
@@ -10175,15 +10141,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .WithMany()
                         .HasForeignKey("ClienteId")
                         .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.LinkCardapioConversa", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Conversa", null)
-                        .WithMany()
-                        .HasForeignKey("ConversaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Mensagem", b =>

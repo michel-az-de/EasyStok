@@ -60,13 +60,15 @@ public static partial class ServiceCollectionExtensions
 
         // Ferramentas do agente. As demais da tabela da S06 dependem da onda 2 e entram aqui quando
         // existirem: TODO(S14) validar_endereco e confirmar_endereco; TODO(S16) listar_janelas;
-        // TODO(S24, S31) registrar_restricao, registrar_interesse e registrar_nota.
+        // TODO(S31) registrar_interesse.
         services.AddScoped<IFerramentaAgente, CriarPedidoFerramenta>(); // S10 + S11: pedido, total e link
         services.AddScoped<IFerramentaAgente, ConsultarCardapioFerramenta>();
         services.AddScoped<IFerramentaAgente, EnviarCardapioImagemFerramenta>();
         services.AddScoped<IFerramentaAgente, ConsultarPedidoFerramenta>();
         services.AddScoped<IFerramentaAgente, EscalarParaDonaFerramenta>();
         services.AddScoped<IFerramentaAgente, EncerrarConversaFerramenta>();
+        services.AddScoped<IFerramentaAgente, RegistrarRestricaoFerramenta>(); // S24: tag com origem agente
+        services.AddScoped<IFerramentaAgente, RegistrarNotaFerramenta>(); // S24: nota interna
 
         // S07: handoff pelo console (inbox, envio da dona, assumir, liberar, encerrar, marcar lida).
         services.AddScoped<ListarConversasAtendimentoUseCase>();

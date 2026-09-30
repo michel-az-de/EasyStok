@@ -65,6 +65,8 @@ public sealed class CriarPedidoFerramenta(
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(contexto.EmpresaId, clienteId);
         if (cliente is null)
             return Erro("cliente_nao_identificado");
+        if (cliente.Bloqueado)
+            return Erro(ClienteBloqueadoException.CodigoErro); // S24: o motivo é interno
 
         var enderecoId = Guid.TryParse(FerramentaJson.LerTexto(entrada, "endereco_id"), out var informado)
             ? informado
@@ -95,6 +97,10 @@ public sealed class CriarPedidoFerramenta(
             reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
                 contexto.EmpresaId, conversa.Id, clienteId, itens, janelaId.Value, dataEntrega, enderecoId.Value,
                 FerramentaJson.LerTexto(entrada, "observacoes")), ct);
+        }
+        catch (ClienteBloqueadoException)
+        {
+            return Erro(ClienteBloqueadoException.CodigoErro);
         }
         catch (RegraDeDominioVioladaException ex)
         {

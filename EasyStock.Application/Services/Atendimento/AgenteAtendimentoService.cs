@@ -76,6 +76,14 @@ public sealed class AgenteAtendimentoService(
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
             : null;
 
+        // S24: bloqueado no meio da conversa → a dona assume; o agente não responde.
+        if (cliente?.Bloqueado == true)
+        {
+            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(cliente), agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
         var system = PromptAtendimento.Montar(configuracao) + "\n\n" + MontarDossie(conversa, cliente, dados.Mensagens, agora);
         var definicoes = _ferramentas.Values
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))

@@ -46,6 +46,10 @@ public sealed class CriarPedidoAtendimentoUseCase(
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException($"Cliente {input.ClienteId} não encontrado.");
 
+        // S24: bloqueio vale em todos os canais; nada de vaga ocupada nem pedido.
+        if (cliente.Bloqueado)
+            throw new ClienteBloqueadoException(cliente.Id);
+
         var endereco = cliente.Enderecos.FirstOrDefault(e => e.Id == input.EnderecoId)
             ?? throw new RegraDeDominioVioladaException($"Endereço {input.EnderecoId} não pertence ao cliente.");
 
