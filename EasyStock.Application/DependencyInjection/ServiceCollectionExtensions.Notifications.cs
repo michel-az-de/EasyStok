@@ -23,7 +23,6 @@ public static partial class ServiceCollectionExtensions
 
         // Use cases — eventos
         services.AddScoped<PublicarEventoNotificacaoUseCase>();
-        services.AddScoped<EnviarNotificacaoManualUseCase>();
 
         // Use cases — consentimento
         services.AddScoped<RegistrarOptInUseCase>();

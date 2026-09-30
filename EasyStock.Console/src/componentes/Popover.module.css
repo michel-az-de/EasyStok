@@ -1,0 +1,55 @@
+/* Popover (rodada 6): material de vidro sobre o que está atrás, raio de
+   cartão, sombra alta e entrada curta a partir do gatilho. */
+.popover {
+  position: absolute; bottom: calc(100% + var(--e-2)); left: var(--e-3); right: var(--e-3);
+  max-height: min(340px, 50dvh); overflow-y: auto;
+  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  box-shadow: var(--sombra-alta), var(--brilho); padding: var(--e-2); z-index: 20;
+  transform-origin: bottom center;
+  animation: abrir var(--dur-media) var(--ease-mola) both;
+}
+@keyframes abrir {
+  from { opacity: 0; transform: translateY(6px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+.grupo { margin-bottom: var(--e-1); }
+.titulo {
+  margin: var(--e-3) var(--e-2) var(--e-1); font-size: var(--t-apoio);
+  font-weight: 600; color: var(--tinta-3); line-height: var(--lh-compacto);
+}
+.grupo:first-child .titulo { margin-top: var(--e-0); }
+.item {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  border-radius: var(--r-1); padding: var(--e-2) var(--e-3); min-height: var(--toque);
+}
+.item:hover { background: var(--preenchimento-forte); }
+.item strong { display: block; font-size: var(--t-corpo); font-weight: 600; }
+.item span { display: block; font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-0); }
+/* Popover que abre para baixo, para gatilho que mora no topo da tela. Largura
+   própria porque o gatilho é um botão estreito, não a barra inteira.
+   `max-height` mais folgada que a do `.popover` base (340px/50dvh): este é o
+   Mais do cabeçalho, que cresce de item em item (rodada 13, achado da
+   validação independente: "Gestão" entrou no grupo "Ver" e foi de 4 para 5
+   itens), e o resto da tela abaixo do gatilho quase sempre sobra. */
+.abaixo {
+  bottom: auto; top: calc(100% + var(--e-2)); left: auto; right: 0;
+  width: min(360px, calc(100vw - var(--e-6)));
+  max-height: min(70dvh, 560px);
+  transform-origin: top right;
+}
+/* Na tela estreita o gatilho pode estar em qualquer canto da barra, então a
+   camada vira folha presa embaixo, sempre inteira e sempre no alcance do dedo. */
+@media (max-width: 759px) {
+  .abaixo {
+    position: fixed; top: auto; left: var(--e-4); right: var(--e-4); width: auto;
+    bottom: calc(var(--e-4) + env(safe-area-inset-bottom, 0px));
+    /* Regressão da rodada 13: com 5 itens (420px/60dvh) o último ("Hoje")
+       nascia fora da tela a 390x844 (e pior a 390x667). Reserva ~96px pro
+       cabeçalho (64px de altura + respiro) e usa o resto da altura
+       disponível, até um teto de 640px; `overflow-y: auto` (herdado de
+       `.popover`) segue como rede de segurança para o dia em que a lista
+       crescer mais do que isso couber. */
+    max-height: min(calc(100dvh - 96px), 640px);
+  }
+}

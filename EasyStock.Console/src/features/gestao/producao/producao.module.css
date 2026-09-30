@@ -1,0 +1,95 @@
+/* Aba Produção e cardápio (rodada 13, issue #43). Tokens do tema, mesmo
+   vocabulário visual da casca de Gestão (gestao.module.css). */
+
+.aba { display: grid; gap: var(--e-5); }
+
+.intro {
+  margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo);
+}
+
+.secao { display: grid; gap: var(--e-3); }
+
+.tituloSecao {
+  margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta);
+}
+
+.legenda { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.legendaFina { color: var(--tinta-3); font-size: var(--t-apoio); }
+
+/* Cartão de formulário (registrar produção / ajustar contagem): mesma moldura
+   da direção visual, papel elevado com borda fina. */
+.cartao {
+  display: grid; gap: var(--e-3); padding: var(--e-4);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+}
+.tituloCartao { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+
+.grade {
+  display: grid; gap: var(--e-3);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.opcao {
+  display: flex; align-items: center; gap: var(--e-2);
+  font-size: var(--t-apoio); color: var(--tinta-2); min-height: var(--toque);
+}
+
+.porcoes { display: grid; gap: var(--e-2); }
+
+.linhaPorcao {
+  display: grid; gap: var(--e-2); align-items: end;
+  grid-template-columns: minmax(140px, 1fr) 90px 90px minmax(120px, 1fr) auto auto;
+  padding: var(--e-2); border: var(--b-1) dashed var(--linha-media); border-radius: var(--r-1);
+}
+@media (max-width: 640px) {
+  .linhaPorcao { grid-template-columns: 1fr 1fr; }
+}
+
+.erro { margin: 0; color: var(--parado); font-size: var(--t-apoio); font-weight: 600; }
+
+.acoesForm { display: flex; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; }
+
+/* Tabela de saldo por item: `<table>` de verdade (semântica real para leitor
+   de tela), mas o layout de colunas continua em grid, como antes. `thead` e
+   `tbody` viram `display: contents` (não geram caixa própria) para que cada
+   `tr` siga como item direto do grid do `<table>`; cada `tr` é, por sua vez,
+   grid container das próprias células, igual à divisão de colunas antiga. */
+.tabela {
+  display: grid; gap: 0; width: 100%; border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-2); overflow: hidden; border-collapse: collapse;
+}
+.tabela thead, .tabela tbody { display: contents; }
+.tabela th, .tabela td { padding: 0; margin: 0; font: inherit; text-align: left; }
+.linhaCabecalho, .linha {
+  display: grid; align-items: center; gap: var(--e-2); padding: var(--e-2) var(--e-3);
+  grid-template-columns: minmax(140px, 1.6fr) minmax(80px, .8fr) minmax(90px, .8fr) minmax(120px, 1fr) minmax(200px, 1.4fr);
+}
+.linhaCabecalho {
+  background: var(--preenchimento); font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2);
+}
+.linha { border-top: var(--b-1) solid var(--linha); font-size: var(--t-apoio); }
+.acoesLinha { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+@media (max-width: 640px) {
+  .linhaCabecalho { display: none; }
+  .linha {
+    grid-template-columns: 1fr; gap: var(--e-1); padding: var(--e-3);
+  }
+}
+
+.listaAlertas, .listaLotes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+
+.linhaAlerta {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--perigo-fundo);
+}
+
+.linhaLote {
+  display: grid; gap: var(--e-1); padding: var(--e-3);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+.cabecalhoLote { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.porcoesLote { margin: var(--e-1) 0 0; padding-left: var(--e-4); font-size: var(--t-apoio); color: var(--tinta-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .linha, .cartao { transition: none; }
+}

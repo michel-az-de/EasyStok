@@ -1,0 +1,37 @@
+/* Chip (seções 1, 2 e 4 da direção visual): três papéis do mesmo desenho.
+   44 px de altura, raio pílula, a forma informa além da cor (WCAG 1.4.1).
+   Rodada 6: parado é preenchimento translúcido sem contorno; ligado ganha
+   fundo da marca, texto da marca e um anel fino, e entra com mola. */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); padding: 0 var(--e-16);
+  border-radius: var(--r-pilula); border: var(--b-1) solid transparent;
+  background: var(--preenchimento); color: var(--tinta);
+  font-size: var(--t-corpo); font-weight: 600; line-height: var(--lh-compacto);
+  letter-spacing: -.01em;
+}
+button.chip { cursor: pointer; }
+button.chip:hover:not(.ativo):not(.emBreve) { background: var(--preenchimento-forte); }
+/* Ligado/marcado: fundo e borda mudam, não só a cor do texto. */
+.ativo {
+  background: var(--ragu-claro); color: var(--ragu);
+  border-color: color-mix(in srgb, var(--ragu) 45%, transparent);
+}
+/* "Em breve" (seção 4): não é clicável, rótulo inteiro escreve o motivo. */
+.emBreve {
+  background: transparent; color: var(--tinta-3); border-style: dashed;
+  border-color: var(--linha-media); cursor: default;
+}
+/* "+ Tag" (seção 2): convite a criar, nunca confundido com um chip ligado. */
+.tracejado {
+  background: transparent; border-style: dashed; border-color: var(--linha-forte);
+  color: var(--tinta-2);
+}
+.tracejado:hover { color: var(--tinta); }
+.textoTag { white-space: nowrap; }
+.remover {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin: 0 calc(var(--e-3) * -1) 0 0;
+  background: none; border: 0; border-radius: var(--r-pilula); color: inherit; opacity: .7;
+}
+.remover:hover { opacity: 1; background: var(--preenchimento-forte); }

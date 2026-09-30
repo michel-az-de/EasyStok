@@ -1,0 +1,451 @@
+.itens { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
+.item { display: flex; gap: var(--e-2); align-items: baseline; font-size: var(--t-corpo); flex-wrap: wrap; }
+.item .qtd { font-family: var(--f-dado); color: var(--tinta-3); }
+.item .corpo { flex: 1; min-width: 140px; }
+.item .porcao { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
+.item .obs { display: block; font-size: var(--t-apoio); color: var(--tinta-2); font-style: italic; }
+/* Campo curto por item (QA2-01): mesma largura da linha, altura de um toque,
+   nunca os 96 px do CampoArea de bloqueio, que é texto longo. */
+.item .obsCampo { min-height: var(--toque); margin-top: var(--e-1); resize: none; }
+.remover {
+  background: none; border: 0; color: var(--tinta-3); padding: 0 var(--e-1);
+  min-width: var(--toque); min-height: var(--toque);
+  font-size: var(--t-apoio); line-height: 1;
+}
+.remover:hover { color: var(--perigo); }
+
+/* Total da comanda: a segunda voz da serifa, ao lado do número em 26 px na
+   fonte de dado. Nada mais na tela mistura as duas. */
+.total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: var(--e-4) 0 var(--e-3); padding-top: var(--e-3);
+  border-top: var(--b-1) solid var(--linha);
+}
+.total span {
+  font-family: var(--f-display); font-size: var(--t-forte); font-weight: 600;
+  letter-spacing: -.01em;
+}
+.total b {
+  font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700;
+  line-height: var(--lh-compacto);
+}
+
+.acoesPedido { display: grid; gap: var(--e-2); }
+
+/* Área de entrega (UC-02): as três ações de exceção, mesmo molde de
+   .acoesPedido, um botão embaixo do outro em vez de lado a lado. */
+.acoesArea { display: grid; gap: var(--e-2); }
+
+/* Trilha do bloco Pedido (secao 5 da direção visual): seis círculos de 40 px
+   ligados por linha de 2 px, cada um com o ícone do passo. Substitui a lista
+   de seis linhas do antigo BlocoEsteira. */
+/* Rodada 6d (banca estética, item 3): trilho CONTÍNUO de 2 px atrás dos
+   círculos, preenchido em verde até a etapa atual (--progresso vem do JSX,
+   de 0 a 1) e animado quando a etapa muda. Rótulo curto sob cada ícone. */
+.trilha {
+  --trilho-ponta: calc(100% / 12);
+  position: relative; list-style: none; margin: 0 0 var(--e-3); padding: 0;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+}
+.trilha::before, .trilha::after {
+  content: ''; position: absolute; top: 17px; height: 2px; border-radius: 2px;
+  left: var(--trilho-ponta);
+}
+.trilha::before { right: var(--trilho-ponta); background: var(--linha-media); }
+.trilha::after {
+  width: calc((100% - 2 * var(--trilho-ponta)) * var(--progresso, 0));
+  background: var(--ok);
+  transition: width var(--dur-longa) var(--ease-mola);
+}
+.trilhaItem { position: relative; z-index: 1; display: grid; justify-items: center; gap: 6px; }
+.rotuloPasso { font-size: var(--t-11); font-weight: 600; color: var(--tinta-3); line-height: 1.1; white-space: nowrap; }
+.trilhaItem.feito .rotuloPasso, .trilhaItem.atual .rotuloPasso { color: var(--tinta); }
+.circuloPasso {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: var(--r-pilula);
+  border: var(--b-1) solid var(--linha-media); color: var(--tinta-3); background: var(--papel);
+  display: grid; place-items: center;
+  transition: background-color var(--dur-media) var(--ease-padrao), border-color var(--dur-media) var(--ease-padrao), color var(--dur-media) var(--ease-padrao), transform var(--dur-longa) var(--ease-mola);
+}
+.trilhaItem.feito .circuloPasso {
+  border-color: transparent; color: #FFFFFF;
+  background: linear-gradient(145deg, light-dark(#3E9A63, #3E9A63), light-dark(#2B6A45, #2B7A4E));
+  box-shadow: 0 3px 8px -3px rgba(43, 106, 69, .55);
+}
+.trilhaItem.atual .circuloPasso {
+  --halo: light-dark(rgba(29, 29, 31, .16), rgba(244, 239, 233, .18));
+  transform: scale(1.11); border: 2px solid var(--tinta); background: var(--papel); color: var(--tinta);
+  box-shadow: 0 0 0 0 var(--halo); animation: pulsoAtualizacao 2.4s var(--ease-padrao) infinite;
+}
+.trilhaItem.futuro .circuloPasso { color: var(--tinta-3); border-color: var(--linha-media); background: var(--papel); }
+
+@keyframes pulsoAtualizacao {
+  0% { box-shadow: 0 0 0 0 var(--halo); }
+  60% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Onde está: ícone do passo atual, rótulo e "Próximo: X" (secao 5, item 2). */
+.ondeEsta { display: flex; align-items: flex-start; gap: var(--e-3); }
+.ondeEsta > svg { flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; }
+.ondeEsta > div { display: flex; flex-direction: column; gap: var(--e-1); }
+.rotuloEstado { display: block; font-size: var(--t-titulo); font-weight: 700; }
+.depoisTexto { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
+.marcaEstorno { color: var(--parado); font-weight: 600; }
+.motivoDesabilitado { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+/* Ação: botão primário largo e o gatilho do menu ⋯ ao lado (secao 5, item 3). */
+.linhaAcao { display: flex; gap: var(--e-2); align-items: flex-end; }
+.botoesPrimarios { flex: 1; display: grid; gap: var(--e-2); }
+.comMenu { position: relative; display: inline-flex; flex-shrink: 0; }
+.gatilhoMenu { width: var(--toque); height: var(--toque); padding: 0; flex-shrink: 0; }
+.menuAcoes { display: grid; }
+.itemMenu {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; text-align: left;
+  background: none; border: 0; border-radius: var(--r-1); min-height: var(--toque);
+  padding: var(--e-2); font-size: var(--t-apoio); color: var(--tinta);
+}
+.itemMenu:hover { background: var(--semola-2); }
+
+/* Confirmação em linha, no lugar do botão, nunca em modal (secao 4). Mesmo
+   par pergunta/ação em toda ação destrutiva: voltar etapa, cancelar pedido,
+   marcar estorno, encerrar atendimento. */
+.confirmarCorrecao { display: grid; gap: var(--e-2); margin-top: var(--e-2); }
+.confirmarAcoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin: 0; }
+
+.notas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.nota {
+  background: var(--elevado); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--atencao);
+  padding: var(--e-2) var(--e-3); font-size: var(--t-apoio);
+}
+/* Autoria da nota é rótulo, não carimbo de hora: 15 px. */
+.nota .quem {
+  display: block; font-family: var(--f-dado); font-size: var(--t-apoio);
+  color: var(--atencao); margin-bottom: var(--e-1);
+}
+
+.historico { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.pedidoAntigo {
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); background: var(--semola);
+}
+.pedidoAntigo header { display: flex; gap: var(--e-2); align-items: baseline; }
+.pedidoAntigo header b { font-family: var(--f-dado); font-weight: 600; }
+.pedidoAntigo header time { margin-left: auto; color: var(--tinta-3); font-size: var(--t-micro); }
+.pedidoAntigo ul { list-style: none; margin: var(--e-1) 0 0; padding: 0; color: var(--tinta-2); }
+.pedidoAntigo .obsAntiga { display: block; margin-top: var(--e-1); color: var(--tinta-3); font-style: italic; }
+
+.tags { display: flex; gap: var(--e-3); flex-wrap: wrap; margin-top: var(--e-3); }
+.rodapeBloco { margin: var(--e-3) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+.corpoBloco { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
+.enderecoCapturado { margin: 0 0 var(--e-1); font-size: var(--t-apoio); }
+
+.painel { display: flex; flex-direction: column; flex: 1; height: 100%; min-height: 0; }
+/* Espaço entre blocos, 20 px, e nenhuma linha: a linha ficou para a borda
+   entre regiões. É a regra que tira a ficha da pilha de faixas cinza. */
+.conteudo {
+  overflow-y: auto; flex: 1; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-4); align-content: start;
+  padding: var(--e-4) 0;
+}
+
+.alerta {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); background: var(--papel); color: var(--atencao);
+  border-left: var(--trilho) solid var(--atencao);
+  border-bottom: var(--b-1) solid var(--linha); font-size: var(--t-apoio);
+}
+.alerta p { margin: 0; flex: 1; min-width: 160px; color: var(--tinta); }
+
+/* Barra do próximo passo: alvo fixo, sempre no mesmo lugar, sempre visível. */
+.barraPasso {
+  flex-shrink: 0; display: grid; gap: var(--e-2);
+  padding: var(--e-3) var(--e-4);
+  padding-bottom: calc(var(--e-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--papel); border-top: var(--b-1) solid var(--linha-forte);
+}
+.barraDesfazer {
+  grid-auto-flow: column; align-items: center; justify-content: start;
+  border-left: var(--trilho) solid var(--ok); color: var(--ok);
+}
+.barraTexto { font-size: var(--t-apoio); font-weight: 600; }
+
+.identidade { display: flex; gap: var(--e-3); align-items: center; margin-bottom: var(--e-3); }
+.situacao { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
+.enderecoLiteral {
+  margin: 0 0 var(--e-2); padding: var(--e-2) var(--e-3);
+  background: var(--papel); border-radius: var(--r-1);
+  font-size: var(--t-corpo); font-family: var(--f-dado);
+}
+
+.contador {
+  display: inline-flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-pilula); padding: 2px;
+}
+.contador button {
+  background: none; border: 0; padding: var(--e-1); line-height: 0;
+  min-width: var(--toque); min-height: var(--toque);
+  display: grid; place-items: center;
+  color: var(--tinta-2); border-radius: var(--r-pilula);
+}
+.contador button:hover { background: var(--elevado); color: var(--tinta); }
+.contador b { font-family: var(--f-dado); min-width: 16px; text-align: center; }
+
+/* ---------------------------------------------------------------------------
+   Rodada 2 · cobrança por Pix. Regras acrescentadas no fim do arquivo.
+   --------------------------------------------------------------------------- */
+
+.cabecaCobranca {
+  display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
+  margin-bottom: var(--e-3);
+}
+.valorForte {
+  margin-left: auto; font-family: var(--f-dado); font-size: var(--t-forte); font-weight: 700;
+}
+.valorCobranca {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 0 0 var(--e-3); padding-top: var(--e-2);
+  border-top: var(--b-1) solid var(--linha); font-size: var(--t-apoio);
+}
+.valorCobranca b { font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; }
+.rotuloTotal { font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.carregando {
+  display: flex; gap: var(--e-2); align-items: center; margin: 0;
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+
+.copiaECola { display: grid; gap: var(--e-2); margin: var(--e-3) 0; }
+.codigoPix {
+  display: block; padding: var(--e-2) var(--e-3);
+  background: var(--semola); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta-2);
+  overflow-wrap: anywhere; max-height: 72px; overflow-y: auto;
+}
+
+.acoesCobranca { display: grid; gap: var(--e-2); }
+
+
+.baixaDivergente {
+  display: grid; gap: var(--e-3); margin-top: var(--e-3);
+  padding: var(--e-3); background: var(--semola); border-radius: var(--r-1);
+}
+
+/* ---------------------------------------------------------------------------
+   Rodada 5 · seção 4 (escolha de meio). Chips de meio quebram em duas linhas
+   na largura da coluna (420 px), como o resto do app já faz nos filtros da
+   caixa de entrada.
+   --------------------------------------------------------------------------- */
+
+.chipsMeio { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-3); }
+.perguntaMeio { margin: var(--e-3) 0 var(--e-2); font-size: var(--t-corpo); font-weight: 600; }
+
+/* Rodada 12 (issue #13): Pix e cartão em destaque; pagar na entrega em
+   segundo plano, menor e sem preenchimento, mas ainda com 40 px de toque. */
+.escolhaMeio { display: grid; gap: 0; }
+.chipDestaque { font-size: var(--t-17); min-height: 48px; }
+.chipsNaEntrega { align-items: center; }
+.rotuloNaEntrega { font-size: var(--t-13); color: var(--tinta-2); font-weight: 600; }
+.chipSecundario:not([aria-checked="true"]) {
+  background: transparent; border-color: var(--linha-media); color: var(--tinta-2);
+  font-size: var(--t-15); font-weight: 500;
+}
+
+/* "Alterar forma de pagamento" e "Desfazer pagamento": confirmação em linha. */
+.confirmarTroca {
+  display: grid; gap: var(--e-2); margin-top: var(--e-3); padding: var(--e-3);
+  border-radius: var(--r-1); background: var(--aviso-fundo); color: var(--tinta);
+}
+.confirmarTroca p { margin: 0; font-size: var(--t-corpo); }
+.alterarForma { margin-top: var(--e-3); }
+
+/* Maquininha e vale: sem anel, sem prazo. Uma linha só, valor no fim. */
+.linhaNaEntrega {
+  display: flex; align-items: center; gap: var(--e-2);
+  margin: 0 0 var(--e-3); font-size: var(--t-corpo);
+}
+.linhaNaEntrega b { margin-left: auto; font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; }
+
+.trocarMeio { margin-top: var(--e-2); }
+
+/* ---------------------------------------------------------------------------
+   Rodada 2 · seletor de janela. Lista sempre visível no lugar do select: a
+   janela cheia FICA na tela, desabilitada, com a contagem e a próxima livre.
+   --------------------------------------------------------------------------- */
+
+.janelas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+/* Mesmo trilho de 3 px da esteira e das notas, no lugar da caixa colorida. */
+.janela {
+  border: 0; border-left: var(--trilho) solid var(--linha);
+  border-radius: var(--r-1);
+  background: var(--semola); overflow: hidden;
+}
+.janela.confirmada { border-left-color: var(--ragu); background: var(--ragu-claro); }
+.janela.estourada { border-left-color: var(--perigo); }
+
+.escolhaJanela {
+  display: grid; gap: var(--e-1); width: 100%; text-align: left;
+  min-height: var(--toque); padding: var(--e-2) var(--e-3);
+  background: none; border: 0; color: inherit;
+}
+.escolhaJanela:hover:not(:disabled) { background: var(--semola-2); }
+.escolhaJanela:disabled { opacity: .65; cursor: not-allowed; }
+
+.faixaJanela {
+  display: flex; align-items: center; gap: var(--e-2);
+  font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto);
+}
+.vagas { font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.trilho {
+  display: block; height: 6px; background: var(--semola-2);
+  border-radius: var(--r-pilula); overflow: hidden;
+}
+.preenchimento {
+  display: block; height: 100%; background: var(--linha-forte); border-radius: var(--r-pilula);
+}
+.preenchimentoEstourado { background: var(--perigo); }
+
+/* Motivo por escrito. Sem isto sobra botão morto, e botão morto faz a pessoa
+   clicar de novo achando que a tela travou. */
+.motivoJanela {
+  display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
+  margin: 0; padding: var(--e-2) var(--e-3);
+  background: var(--elevado); border-left: var(--trilho) solid var(--atencao);
+  font-size: var(--t-apoio); color: var(--tinta);
+}
+.motivoJanela b { font-weight: 700; }
+/* Bloqueio na ficha: bloco próprio, com ícone e palavra. O vermelho é apoio
+   do texto, nunca a única informação. */
+.avisoBloqueio {
+  margin: var(--e-3) 0; padding: var(--e-3);
+  background: var(--elevado); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--parado);
+}
+.tituloBloqueio {
+  display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
+  margin: 0; color: var(--parado); font-size: var(--t-corpo);
+}
+.motivoBloqueio { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); }
+.avisoBloqueio .rodapeBloco { margin-top: var(--e-1); }
+
+.acoesCliente { margin-top: var(--e-3); }
+
+/* Defeito b: item novo em pedido pago, mesmo desenho de destaque do bloqueio
+   mas em âmbar, porque aqui ainda dá para resolver com um toque. */
+.avisoDiferenca {
+  margin: 0 0 var(--e-3); padding: var(--e-3); display: grid; gap: var(--e-2);
+  background: var(--atencao-pastel); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--atencao);
+}
+.avisoDiferenca .corpoBloco { margin: 0; color: var(--atencao); display: flex; gap: var(--e-2); align-items: baseline; }
+.avisoDiferenca .corpoBloco b { color: var(--atencao); }
+
+.formBloqueio { display: grid; gap: var(--e-4); }
+.motivoEscolhido {
+  margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
+  background: var(--semola-2); border-radius: var(--r-1); font-size: var(--t-apoio);
+}
+.consequencias {
+  margin: 0; padding-left: var(--e-5); display: grid; gap: var(--e-1);
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+
+/* Texto que era pílula. Etiqueta, alcance do bloqueio e número da tentativa
+   são dado de catálogo, não estado que pede ação. */
+.tag { font-size: var(--t-apoio); color: var(--ragu); font-weight: 600; }
+.alcanceBloqueio { font-size: var(--t-apoio); color: var(--tinta-2); }
+.tentativa { margin-left: auto; font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta-3); }
+
+/* Canhoto (QA2-19): mesmo conteúdo que a impressora térmica vai receber
+   depois. Em tela é uma folha cheia por cima do resto; na impressão do
+   navegador é a única coisa que sai, o resto da ficha some. */
+.canhotoOverlay {
+  position: fixed; inset: 0; z-index: 60; overflow-y: auto;
+  background: var(--papel); padding: var(--e-5);
+}
+.canhotoFolha { max-width: 480px; margin: 0 auto; color: var(--tinta); }
+.canhotoAcoes { display: flex; gap: var(--e-2); justify-content: flex-end; margin-bottom: var(--e-4); }
+.canhotoTitulo { margin: 0 0 var(--e-1); font-size: var(--t-titulo); }
+.canhotoCliente { margin: 0 0 var(--e-3); font-weight: 600; }
+.canhotoDado { margin: 0 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
+.canhotoGrupo { margin-top: var(--e-4); }
+.canhotoGrupo h3 {
+  margin: 0 0 var(--e-2); font-size: var(--t-apoio); text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--tinta-3);
+}
+.canhotoItens { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.canhotoPorcao, .canhotoObs { display: block; font-size: var(--t-apoio); color: var(--tinta-2); }
+.canhotoObs { font-style: italic; }
+
+/* Sem `@media print` aqui (rodada 11, registro 93): o antigo escondia
+   `body *` inteiro e só reabria `.canhotoOverlay`, que ninguém mais usa desde
+   a decisão 29. Como `body *` é seletor global mesmo em CSS module, toda
+   impressão do app saía em branco, canhoto e resumo do Encerrar. Quem manda
+   na impressão é `estilos/base.css` com a FolhaImpressao. */
+
+/* O botão principal do passo mede o próprio texto, não a coluna inteira: uma
+   faixa cheia de cor forte do tamanho da ficha pesava mais que a conversa. */
+.botoesPrimarios { justify-items: start; }
+.botoesPrimarios > button { width: auto; padding: 0 var(--e-4); }
+
+/* Rodada 11 (issue #8, registro 92): faixa "Atendimento automático" no topo
+   da ficha. Trilho do automático (ragu, mesma cor da bolha automática) em vez
+   de fundo pastel, como o resto da ficha; os cinco passos numa linha que
+   quebra em 390 px sem rolar de lado. O passo que o automático está pedindo
+   pulsa de leve; movimento reduzido (base.css) corta o pulso e o contorno
+   continua marcando. */
+.capturaAuto {
+  margin: 0 var(--e-4); padding: var(--e-3) var(--e-3) var(--e-3) calc(var(--e-3) - var(--trilho));
+  border-left: var(--trilho) solid var(--ragu); border-radius: var(--r-2);
+  background: var(--elevado); display: grid; gap: var(--e-2);
+}
+.capturaTitulo {
+  margin: 0; display: flex; align-items: center; gap: var(--e-2);
+  font-size: var(--t-apoio); font-weight: 600; color: var(--tinta);
+}
+.capturaTitulo svg { color: var(--ragu); }
+.capturaAtivo, .capturaParado {
+  margin-left: auto; padding: 1px 8px; border-radius: 999px;
+  font-size: var(--t-micro); font-weight: 600;
+}
+.capturaAtivo { color: var(--ok); background: var(--ok-pastel); }
+.capturaParado { color: var(--atencao); background: var(--atencao-pastel); }
+.capturaPassos {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2);
+}
+.capturaPassos li {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px 3px 5px; border-radius: 999px;
+  font-size: var(--t-micro); color: var(--tinta-3);
+  border: var(--b-1) solid var(--linha-media);
+}
+.passoMarca {
+  width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
+  border: var(--b-1) solid var(--linha-forte);
+}
+.capturaPassos .passoFeito { color: var(--ok); border-color: transparent; background: var(--ok-pastel); }
+.passoFeito .passoMarca { border-color: transparent; background: var(--ok); color: var(--papel); }
+.capturaPassos .passoAgora {
+  color: var(--ragu); border-color: var(--ragu); font-weight: 600;
+  animation: passoAgoraPulso 1.4s ease-in-out infinite;
+}
+.passoAgora .passoMarca { border-color: var(--ragu); }
+@keyframes passoAgoraPulso {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px var(--halo); }
+}
+
+/* Rodada 13 · campo "Cupom" da Cobrança (Fidelidade e cupons, issue #45,
+   registro 107). */
+.linhaCupom { display: flex; gap: var(--e-2); align-items: flex-start; margin-bottom: var(--e-3); }
+.linhaCupom > :first-child { flex: 1; }
+.cupomAplicado {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
+  background: var(--ragu-claro); color: var(--ragu); border-radius: var(--r-2);
+  font-size: var(--t-apoio);
+}
+.cupomAplicado b { color: var(--tinta); }
+.capturaStatus { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }

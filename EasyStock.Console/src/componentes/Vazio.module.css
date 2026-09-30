@@ -1,0 +1,20 @@
+.vazio {
+  padding: var(--e-6) var(--e-4); margin: 0; text-align: center;
+  display: grid; justify-items: center; gap: var(--e-3);
+  animation: surgirVazio var(--dur-longa) var(--ease-saida) both;
+}
+/* Título em 21 px, não em cinza pequeno: o estado vazio é a primeira coisa que
+   ela lê quando a tela está parada. */
+.titulo {
+  color: var(--tinta); font-size: var(--t-forte);
+  font-weight: 600; line-height: var(--lh-compacto);
+}
+.frase {
+  margin: 0; max-width: 38ch;
+  color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo);
+}
+.acao { display: grid; justify-content: center; }
+@keyframes surgirVazio {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}

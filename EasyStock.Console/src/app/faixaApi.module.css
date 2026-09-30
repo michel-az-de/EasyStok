@@ -1,0 +1,34 @@
+.faixa {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 16px;
+  font-size: var(--t-13);
+  color: var(--tinta-2);
+  background: var(--elevado);
+  border-top: 1px solid var(--linha);
+}
+
+.alerta {
+  color: var(--perigo);
+  background: var(--perigo-fundo);
+}
+
+.quem {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.sair {
+  border: 0;
+  background: none;
+  color: var(--ragu);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}

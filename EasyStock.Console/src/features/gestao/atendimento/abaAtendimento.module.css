@@ -1,0 +1,29 @@
+/* Aba Atendimento da Gestão (F02): três blocos na mesma casca de papel que
+   Mensagens automáticas usa para o horário e o som. */
+.aba { display: grid; gap: var(--e-4); }
+
+.secao {
+  display: grid; gap: var(--e-3);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  padding: var(--e-3); background: var(--papel);
+}
+.secao h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+
+.topo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.topo .chave { margin-left: auto; }
+
+.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.toque { min-height: var(--toque); }
+
+.numeros { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+.chave {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
+}
+.chave input { width: 20px; height: 20px; accent-color: var(--ragu); }
+
+.retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { color: var(--perigo); font-size: var(--t-apoio); margin: 0; }

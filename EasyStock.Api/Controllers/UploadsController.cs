@@ -99,6 +99,26 @@ public class UploadsController(
         }
     }
 
+    [SwaggerOperation(Summary = "Upload campaign art (S28)", Description = "Devolve a URL pública; ela vai em imagemUrl da campanha.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "Gerente")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 6 * 1024 * 1024)]
+    [HttpPost("campanha/arte")]
+    public async Task<IActionResult> UploadArteCampanha(IFormFile file, CancellationToken cancellationToken)
+    {
+        var payload = await LerArquivoAsync(file, cancellationToken);
+        var result = await gerenciarUploadsUseCase.UploadArteCampanhaAsync(
+            currentUserAccessor.EmpresaId,
+            payload.FileName,
+            payload.ContentType,
+            payload.Content,
+            cancellationToken);
+
+        return DataOk(result);
+    }
+
     internal async Task<UploadedFileResult> UploadProdutoAsync(Guid empresaId, Guid produtoId, IFormFile file, CancellationToken cancellationToken)
     {
         var payload = await LerArquivoAsync(file, cancellationToken);

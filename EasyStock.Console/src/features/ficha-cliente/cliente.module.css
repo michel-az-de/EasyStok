@@ -1,0 +1,258 @@
+/* F2 · Ficha do lead e do cliente (rodada 5, seção 2). Arquivo próprio: a F2
+   não abre `ficha.module.css` (é da F4 a partir desta rodada). Classe morta
+   que sobrar em `ficha.module.css` por causa desta troca fica para a faxina
+   do passe de integração. */
+
+.identidade { display: flex; gap: var(--e-3); align-items: center; margin-bottom: var(--e-3); }
+.identidadeTextos { flex: 1; min-width: 0; }
+.situacao { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
+
+.menuCliente { position: relative; display: inline-flex; flex-shrink: 0; }
+.gatilhoMenu { width: var(--toque); height: var(--toque); padding: 0; flex-shrink: 0; }
+.menuAcoes { display: grid; }
+.itemMenu {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; text-align: left;
+  background: none; border: 0; border-radius: var(--r-1); min-height: var(--toque);
+  padding: var(--e-2); font-size: var(--t-apoio); color: var(--tinta);
+}
+.itemMenu:hover { background: var(--elevado); }
+
+.avisoBloqueio {
+  margin: var(--e-3) 0; padding: var(--e-3);
+  background: var(--elevado); border-radius: var(--r-1);
+  border-left: var(--trilho) solid var(--parado);
+}
+.tituloBloqueio {
+  display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
+  margin: 0; color: var(--parado); font-size: var(--t-corpo);
+}
+.motivoBloqueio { margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); }
+.alcanceBloqueio { font-size: var(--t-apoio); color: var(--tinta-2); }
+.rodapeBloco { margin: var(--e-3) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+.avisoBloqueio .rodapeBloco { margin-top: var(--e-1); }
+.corpoBloco { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.numerosCliente { margin: 0 0 var(--e-3); display: grid; grid-auto-flow: column; auto-columns: 1fr; gap: 0; background: var(--elevado); border-radius: 14px; overflow: hidden; }
+.numerosCliente > span { display: flex; flex-direction: column; gap: var(--e-1); align-items: center; padding: var(--e-3); border-right: var(--b-1) solid var(--linha); text-align: center; }
+.numerosCliente > span:last-child { border-right: 0; }
+.numerosCliente b { font-family: var(--f-dado); font-size: var(--t-titulo); font-weight: 700; font-variant-numeric: tabular-nums; }
+.numerosCliente i { font-size: var(--t-apoio); color: var(--tinta-3); font-style: normal; font-weight: 400; }
+
+/* --- Cadastro rápido do lead (sem modal) ---------------------------------- */
+.cadastroRapido { display: grid; gap: var(--e-3); margin-bottom: var(--e-3); }
+
+/* --- Dados editáveis do cliente -------------------------------------------- */
+.dadosCliente { display: grid; gap: 0; margin-bottom: var(--e-3); background: var(--elevado); border-radius: var(--r-2); overflow: hidden; }
+.linhaDado { display: flex; align-items: flex-start; gap: var(--e-3); min-height: var(--toque); padding: var(--e-3); border-bottom: var(--b-1) solid var(--linha); }
+.linhaDado:last-child { border-bottom: 0; }
+.rotuloDado { flex: 0 0 88px; font-size: var(--t-apoio); color: var(--tinta-3); font-weight: 400; }
+.linhaDado > .campoEmLinha { flex: 1; min-width: 0; overflow-wrap: normal; }
+.linhaDado > .campoEmLinha button { word-break: break-word; overflow-wrap: normal; }
+.valorCanal { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-corpo); color: var(--tinta); }
+
+/* Canais de aviso (decisão 46, "Encerrar" v2): e-mail e SMS, cada um ligado
+   ou não. Mesma linha do resto do cadastro, dois toques lado a lado. */
+.avisosCanais { display: flex; gap: var(--e-4); flex-wrap: wrap; }
+.avisoCanal { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
+.avisoErro { flex-basis: 100%; font-size: var(--t-apoio); color: var(--perigo); }
+
+.avisoEmLinha {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  margin: 0; padding: var(--e-2) 0; font-size: var(--t-apoio); color: var(--atencao);
+}
+
+.mesmoDomicilio { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
+.linkDomicilio {
+  background: none; border: 0; padding: 0; color: var(--ragu); font-weight: 600;
+  font-size: inherit; text-decoration: underline; min-height: var(--toque);
+}
+
+.ultimaNota {
+  margin: 0 0 var(--e-3); padding: var(--e-3) var(--e-4);
+  background: var(--atencao-pastel); border-radius: var(--r-2);
+  font-size: var(--t-apoio); color: var(--tinta);
+}
+/* O corte em duas linhas mora no texto, não no bloco: com o corte no bloco, o
+   rótulo contava como linha e a terceira linha vazava pela margem de baixo. */
+.textoNota { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rotuloNota { display: block; color: var(--atencao); font-weight: 600; margin-bottom: var(--e-2); }
+
+/* --- Edição em linha (CampoEmLinha.jsx) ------------------------------------ */
+.campoEmLinha { position: relative; }
+.valorBotao {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: var(--toque);
+  background: none; border: 0; padding: 0; text-align: left;
+  font-size: var(--t-corpo); color: var(--tinta); font-family: inherit;
+}
+.valorBotao svg { color: var(--tinta-2); flex-shrink: 0; }
+.valorVazio { color: var(--tinta-3); font-style: italic; }
+.salvo { display: flex; align-items: center; gap: var(--e-1); margin: 0; color: var(--ok); font-size: var(--t-apoio); }
+
+.edicaoEmLinha { display: flex; align-items: center; gap: var(--e-1); }
+.controleEmLinha {
+  flex: 1; min-height: var(--toque); padding: 0 var(--e-2);
+  border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
+  background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
+}
+.controleComErro { border-width: var(--b-2); border-color: var(--parado); }
+.botaoIconeEdicao {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--toque); height: var(--toque); flex-shrink: 0;
+  background: none; border: 0; color: var(--tinta-2);
+}
+.erroEmLinha { margin: var(--e-1) 0 0; color: var(--parado); font-size: var(--t-apoio); }
+
+/* --- Tags (TagsDoCliente.jsx) ---------------------------------------------- */
+.blocoTags { margin-bottom: var(--e-3); }
+.tagsLinha { display: flex; gap: var(--e-2); flex-wrap: wrap; list-style: none; margin: 0; padding: 0; align-items: center; }
+.tagsLinha li { display: inline-flex; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: var(--e-1);
+  min-height: var(--toque); padding: 0 var(--e-1) 0 var(--e-3);
+  border-radius: var(--r-pilula); border: var(--b-1) solid transparent;
+  background: var(--preenchimento); color: var(--tinta);
+  font-size: var(--t-apoio); font-weight: 600; line-height: 1; white-space: nowrap;
+}
+.chipRestricao { border-color: var(--atencao); color: var(--tinta); background: var(--atencao-pastel); }
+.chipTexto { background: none; border: 0; padding: 0; font: inherit; color: inherit; min-height: auto; }
+.chipRemover {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin: 0; border-radius: var(--r-pilula);
+  background: none; border: 0; color: var(--tinta-3);
+}
+.chipRemover:hover { background: var(--preenchimento-forte); color: var(--tinta); }
+.chipEdicao {
+  min-height: var(--toque); min-width: 96px; padding: 0 var(--e-3);
+  border-radius: var(--r-pilula); border: var(--b-2) solid var(--ragu);
+  background: var(--papel); color: var(--tinta); font-size: var(--t-apoio); font-weight: 600;
+}
+.chipTracejado {
+  display: inline-flex; align-items: center; gap: var(--e-1);
+  min-height: var(--toque); padding: var(--e-1) var(--e-3);
+  border-radius: var(--r-pilula); border: var(--b-1) dashed var(--linha-forte);
+  background: transparent; color: var(--tinta-3); font-size: var(--t-apoio); font-weight: 600; white-space: nowrap;
+}
+.sugestoesTag { margin-top: var(--e-2); display: grid; gap: var(--e-2); }
+.grupoSugestao { margin: 0 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-3); }
+.chipSugestao {
+  min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-pilula);
+  border: var(--b-1) solid var(--linha); background: var(--papel); color: var(--tinta-2);
+  font-size: var(--t-apoio);
+}
+.avisoDesfazer {
+  display: flex; align-items: center; gap: var(--e-1); margin: var(--e-2) 0 0;
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+.avisoDesfazer button { background: none; border: 0; color: var(--ragu); font-weight: 600; padding: 0 var(--e-1); }
+
+/* --- Modal Histórico -------------------------------------------------------- */
+.faixaLead { margin: 0 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
+.faixaNumeros {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e-3);
+  margin-bottom: var(--e-4);
+}
+.faixaNumeros div { display: flex; flex-direction: column; gap: var(--e-1); }
+.faixaNumeros b { font-family: var(--f-dado); font-size: var(--t-valor); }
+.faixaNumeros span { font-size: var(--t-apoio); color: var(--tinta-2); }
+@media (max-width: 480px) {
+  .faixaNumeros { grid-template-columns: repeat(2, 1fr); }
+}
+
+.painelAba { margin-top: var(--e-4); }
+
+.listaPedidos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
+.linhaPedido { padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); }
+.linhaPedido header { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.itensPedido { flex: 1; min-width: 120px; color: var(--tinta-2); font-size: var(--t-apoio); }
+.totalPedido { font-family: var(--f-dado); }
+.notaPedido { margin: var(--e-2) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+
+/* Log de auditoria do atendimento (decisão 46, "Encerrar" v2): quem
+   encerrou, com que desfecho, e o que foi avisado. Uma linha discreta entre
+   o cabeçalho e a anotação. */
+.logEncerramento { margin: var(--e-1) 0 0; color: var(--tinta-3); font-size: var(--t-micro); }
+.avaliacao { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--ok); font-size: var(--t-apoio); }
+.avaliacaoVazia { color: var(--tinta-3); font-size: var(--t-apoio); }
+
+.abaNotas { display: grid; gap: var(--e-4); }
+.novaNota { display: grid; gap: var(--e-2); justify-items: start; }
+.listaNotas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
+.linhaNota { padding: var(--e-3); background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio); }
+.quemNota { display: block; color: var(--tinta-2); margin-bottom: var(--e-1); }
+
+/* Rodada 6c: dados do cliente como no Contatos do iPhone. Azulejo colorido
+   com o ícone à esquerda, rótulo pequeno em cima e o valor embaixo. */
+.linhaDado {
+  display: grid; grid-template-columns: 30px 1fr; column-gap: var(--e-3); row-gap: 1px;
+  align-items: center; padding: 10px var(--e-3);
+}
+.linhaDado > :not(.azulejo) { grid-column: 2; }
+.azulejo {
+  grid-row: 1 / span 2; align-self: center;
+  width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  color: #FFFFFF; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .12);
+}
+.azVerde, .az_conversa { background: linear-gradient(160deg, #3FC77A, #1E9E57); }
+.azAzul, .az_globo { background: linear-gradient(160deg, #5B9BFF, #2D6BE0); }
+/* Achado 5 (banca capricho R10): mesma cor do banner "Endereço capturado"
+   (Bloco.module.css .destaque), para o campo vazio abaixo ler como parte da
+   mesma pendência, não como um segundo dado desencontrado. */
+.linhaDadoPendente {
+  border-left: var(--trilho) solid var(--atencao); background: var(--atencao-pastel);
+  padding-left: calc(var(--e-3) - var(--trilho));
+}
+.linhaDadoPendente .valorVazio { color: var(--atencao); font-style: normal; }
+.az_camera { background: linear-gradient(160deg, #FF6A9A, #C2185B 55%, #F58529); }
+.azCinza { background: linear-gradient(160deg, #A8A29E, #78716C); }
+.rotuloDado { flex: none; font-size: var(--t-micro); color: var(--tinta-3); font-weight: 400; line-height: 1.2; }
+.linhaDado > .campoEmLinha, .linhaDado .valorCanal { font-size: var(--t-corpo); }
+
+.az_whatsapp { background: linear-gradient(160deg, #3FC77A, #1E9E57); }
+.az_instagram { background: linear-gradient(160deg, #FF6A9A, #C2185B 55%, #F58529); }
+
+/* Rodada 11 (issue #8, registro 92): campo que o automático captou da
+   conversa. Selo pequeno ao lado do rótulo, no verde de "feito", e um realce
+   curto na linha no instante em que o dado chega (a linha remonta pela
+   `key`, então o realce toca uma vez por dado novo). Movimento reduzido
+   (base.css) corta o realce; o selo continua. */
+.seloCaptado {
+  display: inline-flex; align-items: center; gap: 3px; margin-left: var(--e-1);
+  padding: 1px 7px; border-radius: 999px; vertical-align: middle;
+  font-size: var(--t-micro); font-weight: 600; line-height: 1.5; white-space: nowrap;
+  color: var(--ok); background: var(--ok-pastel);
+}
+.captadoAgora { animation: realceCaptado 1.6s var(--ease-saida, ease-out); }
+@keyframes realceCaptado {
+  0% { background-color: var(--ok-pastel); box-shadow: inset 3px 0 0 var(--ok); }
+  100% { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
+}
+
+/* Rodada 13 · Fidelidade e cupons (issue #45, registro 107): selo discreto de
+   saldo de pontos na ficha, ao lado dos números do cliente, e a lista de
+   recompensas da modal de resgate. Discreto de propósito (pedido do Felipe:
+   "sem sujar a UX atual"), mesmo tom pastel do selo captado acima. */
+.seloPontos {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
+  border-radius: 999px; font-size: var(--t-micro); font-weight: 600;
+  color: var(--ragu); background: var(--ragu-claro);
+}
+.linhaFidelidade {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  margin: var(--e-2) 0;
+}
+
+.listaRecompensas { display: grid; gap: var(--e-2); list-style: none; margin: 0; padding: 0; }
+/* `flex-wrap` (mesmo achado de AbaFidelidade.module.css, registro 107): sem
+   quebra, ícone + texto + selo + botão em uma linha só transbordava a modal
+   em 390 px. */
+.linhaRecompensa {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding: var(--e-2);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+.iconeRecompensa {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--ragu); background: var(--ragu-claro);
+}
+.textoRecompensa { flex: 1 1 140px; min-width: 0; display: grid; }
+.subRecompensa { font-size: var(--t-micro); color: var(--tinta-3); }
