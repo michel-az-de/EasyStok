@@ -13,9 +13,11 @@ import { AbaCaixa } from './caixa/AbaCaixa'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
+import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
-const ABAS = [
+const ABAS_DEMONSTRACAO = [
   { id: 'producao', rotulo: 'Produção e cardápio' },
   { id: 'caixa', rotulo: 'Caixa' },
   { id: 'janelas', rotulo: 'Janelas de entrega' },
@@ -23,19 +25,23 @@ const ABAS = [
   { id: 'integracoes', rotulo: 'Entregas e integrações' },
 ]
 
+// Modo API (F02): a aba Atendimento é a única que já grava no EasyStok, por isso vem
+// primeiro. No modo demonstração ela não aparece (não há expediente nem configuração).
+const ABAS_API = [{ id: 'atendimento', rotulo: 'Atendimento' }, ...ABAS_DEMONSTRACAO]
+
 // "A aba ativa é lembrada durante a sessão": sessionStorage (não
 // localStorage, que sobrevive à sessão) no mesmo molde de `app/Moldura.jsx`
 // (CHAVE_TEMA, CHAVE_SIMULAR_ESCONDIDO).
 const CHAVE_ABA = 'casa-da-baba:gestao-aba'
 
-function lerAbaSalva() {
+function lerAbaSalva(abas) {
   try {
     const salva = window.sessionStorage.getItem(CHAVE_ABA)
-    if (ABAS.some((aba) => aba.id === salva)) return salva
+    if (abas.some((aba) => aba.id === salva)) return salva
   } catch {
     // sem sessionStorage, a gaveta sempre abre na primeira aba
   }
-  return ABAS[0].id
+  return abas[0].id
 }
 
 function gravarAba(id) {
@@ -47,7 +53,9 @@ function gravarAba(id) {
 }
 
 export function ModalGestao({ aoFechar }) {
-  const [ativa, setAtiva] = useState(lerAbaSalva)
+  const { fonteApi } = useAtendimento()
+  const ABAS = fonteApi ? ABAS_API : ABAS_DEMONSTRACAO
+  const [ativa, setAtiva] = useState(() => lerAbaSalva(ABAS))
   const referenciasDasAbas = useRef([])
 
   const escolher = useCallback((id) => {
@@ -69,11 +77,12 @@ export function ModalGestao({ aoFechar }) {
     evento.preventDefault()
     escolher(ABAS[proximo].id)
     referenciasDasAbas.current[proximo]?.focus()
-  }, [ativa, escolher])
+  }, [ativa, escolher, ABAS])
 
   // Um por frente, arquivo próprio (US da issue): o objeto só decide qual
   // elemento entra na árvore, os outros quatro nunca chegam a renderizar.
   const painelDaAba = useMemo(() => ({
+    atendimento: <AbaAtendimento />,
     producao: <AbaProducao />,
     caixa: <AbaCaixa />,
     janelas: <AbaJanelas />,
