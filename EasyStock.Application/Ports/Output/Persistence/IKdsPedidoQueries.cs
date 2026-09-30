@@ -20,6 +20,7 @@ public interface IKdsPedidoQueries
 }
 
 /// <param name="DataProducao">Dia de produção (data civil de Brasília), conforme <see cref="IKdsPedidoQueries.ListarAsync"/>.</param>
+/// <param name="InicioPrevistoEm"><c>Pedido.InicioPrevistoEm</c> (S21).</param>
 public sealed record KdsPedidoLeitura(
     Guid Id,
     string Status,
@@ -30,6 +31,7 @@ public sealed record KdsPedidoLeitura(
     DateTime CriadoEm,
     DateTime? PagoEm,
     DateOnly DataProducao,
+    DateTime? InicioPrevistoEm,
     KdsJanelaLeitura? Janela,
     IReadOnlyList<KdsItemLeitura> Itens);
 

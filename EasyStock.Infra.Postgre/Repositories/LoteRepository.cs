@@ -57,8 +57,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<int> GetNextSequencialDoDiaAsync(Guid empresaId, DateOnly data)
         {
-            var inicio = data.ToDateTime(TimeOnly.MinValue);
-            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            // S23 (#1137): Npgsql so aceita Kind=Utc em timestamptz; Unspecified lancava ArgumentException.
+            var inicio = data.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var fim    = data.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
             return await db.Lotes.AsNoTracking()
                 .Where(l => l.EmpresaId == empresaId
                          && l.DataProducao >= inicio && l.DataProducao < fim)

@@ -78,6 +78,7 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 CriadoEm: p.CriadoEm,
                 PagoEm: p.Pagamentos.Count == 0 ? null : p.Pagamentos.Max(g => g.PagoEm),
                 DataProducao: janela?.DataEntrega ?? HorarioBrasil.DataOperacional(p.AgendadoParaEm ?? p.CriadoEm),
+                InicioPrevistoEm: p.InicioPrevistoEm,
                 Janela: janela is null ? null : new KdsJanelaLeitura(janela.Label, janela.DataEntrega, janela.HoraInicio, janela.HoraFim),
                 Itens: p.Itens
                     .OrderBy(i => i.CriadoEm)

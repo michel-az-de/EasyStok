@@ -21,4 +21,15 @@ public static class CalculadoraPrazoPedido
 
         return maiorPreparo + respiroMinutos;
     }
+
+    /// <summary>
+    /// Corte da S16 (RN-21): a janela que começa em <paramref name="data"/> às <paramref name="horaInicio"/>
+    /// (fuso da loja, <see cref="HorarioBrasil"/>) só serve se não for antes de agora + prazo. Usado na
+    /// listagem de janelas e na revalidação do checkout, para os dois cortarem igual.
+    /// </summary>
+    public static bool AtendePrazo(DateOnly data, TimeOnly horaInicio, DateTime agoraUtc, int prazoMinimoMinutos)
+    {
+        var limite = HorarioBrasil.ConverterParaBrasilia(agoraUtc).AddMinutes(prazoMinimoMinutos);
+        return data.ToDateTime(horaInicio) >= limite;
+    }
 }
