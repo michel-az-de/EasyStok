@@ -66,7 +66,8 @@ const carregar = () => ({
   // Thatiane, no modo manual, coerente com os pedidos em preparo do dia. Sem
   // isso, relógio do Simular fora das 8h-22h fechava a loja sozinho e as
   // conversas saíam de "Precisa de você". Fechar é um toque no topo.
-  lojaAberta: true,
+  // No modo API (F02) quem manda é o expediente da API; até ele chegar, segue o horário.
+  lojaAberta: FONTE_API ? null : true,
   modoAgente: 'simulado',
   // Chave "Som da cozinha" (US-010): lembra a escolha entre uma visita e
   // outra, guardada em infra/preferenciaSom.js.
@@ -78,6 +79,9 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
     ...estadoInicial(carregar()),
     // Modo API (F01): a lista nasce vazia e chega pelo polling.
     sincronizacao: { estado: FONTE_API ? 'carregando' : 'desligada', mensagem: null, aviso: null },
+    // Modo API (F02): mensagens do expediente (S40); horário e controle vivem em
+    // `funcionamento` e `lojaAberta`, os mesmos do modo demonstração.
+    expediente: { carregado: false, mensagemForaDoHorario: '', mensagemLojaFechada: '' },
   }))
   useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar })
 
@@ -577,9 +581,14 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   }, [conversasAgora, agoraEfetivo, estado.catalogo.janelas])
 
   const acoesAtivas = useMemo(
-    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef }) : acoes),
+    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef }) : acoes),
     [acoes],
   )
+
+  // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
+  useEffect(() => {
+    if (FONTE_API) acoesAtivas.recarregarExpediente()
+  }, [acoesAtivas])
 
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
@@ -655,6 +664,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       // Modo API (F01): estado do polling e quem está logado.
       fonteApi: FONTE_API,
       sincronizacao: estado.sincronizacao,
+      expediente: estado.expediente,
       sessao,
     }
   }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])
