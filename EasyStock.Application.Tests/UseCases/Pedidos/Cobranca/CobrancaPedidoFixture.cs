@@ -62,6 +62,9 @@ internal sealed class CobrancaPedidoFixture
     public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
 
+    /// <summary>O que <c>payments/search?external_reference=</c> devolve (S32).</summary>
+    public List<PagamentoMercadoPago> PagamentosNoMercadoPago { get; } = new();
+
     public CobrancaPedidoFixture(string status = StatusPedidoMapper.AguardandoPagamento)
     {
         Pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
@@ -97,9 +100,13 @@ internal sealed class CobrancaPedidoFixture
                 return new PreferenceCriadaResult($"pref-{sequencia}", $"https://mp.test/pref-{sequencia}");
             });
 
+        MpClient.BuscarPagamentosPorReferenciaAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_ => PagamentosNoMercadoPago.ToList());
+
         Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<CobrancaPedidoResult>();
-        Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<DesfazerPagamentoManualResult>();
         Uow.SetupExecuteInTransactionSemRetry<(ResultadoExpiracaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
@@ -153,7 +160,12 @@ internal sealed class CobrancaPedidoFixture
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
-        new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, Uow, Relogio);
+        new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
+            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance);
+
+    public AtualizarCobrancaPorPagamentoUseCase AtualizarPorPagamento() =>
+        new(CobrancaRepo, PedidoStorefrontRepo, Aviso(), Tenant, Uow, Relogio,
+            NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
 
     public DesfazerPagamentoManualUseCase Desfazer() =>
         new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio);
@@ -163,13 +175,14 @@ internal sealed class CobrancaPedidoFixture
         var estoque = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
             Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque, Substitute.For<IContaReceberRepository>(), Uow,
             NullLogger<CancelarPedidoUseCase>.Instance);
         var liberarVaga = new LiberarVagaOnPedidoCanceladoHandler(VagaRepo, NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance);
         return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar, liberarVaga,
-            Aviso(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance);
+            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance);
     }
 
     public void AdicionarPagamento(string? referencia, decimal valor = 25m)

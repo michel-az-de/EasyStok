@@ -19,4 +19,4 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
 
-# Sem health check HTTP (mesmo motivo do admin: redirect pra login).
+# Sem health check HTTP (a raiz redireciona pra login).

@@ -63,7 +63,6 @@ public class RlsBypassAllowlistTests
         "EasyStock.Api",
         "EasyStock.Worker",
         "EasyStock.Web",
-        "EasyStock.Admin",
     };
 
     /// <summary>

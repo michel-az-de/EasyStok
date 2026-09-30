@@ -25,6 +25,7 @@ public class TemplateNotificacaoConfiguration : IEntityTypeConfiguration<Templat
         b.ConfigureCriadoEm(x => x.CriadoEm)
          .ConfigureAtualizadoEm(x => x.AtualizadoEm);
         b.Property(x => x.AtualizadoPor).HasMaxLength(256).IsRequired();
+        b.Property(x => x.MetadadosJson).HasColumnType("jsonb");
 
         b.HasIndex(x => new { x.Codigo, x.EmpresaId, x.Versao }).IsUnique();
         b.HasIndex(x => new { x.TipoEvento, x.Canal, x.Ativo });

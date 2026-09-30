@@ -19,6 +19,12 @@ public sealed class NotificadorService(
     IUnitOfWork unitOfWork,
     ILogger<NotificadorService> logger) : INotificadorService
 {
+    /// <summary>
+    /// Chave do payload com a identidade de negócio do aviso (S13: <c>pedidoId|status</c>). Presente, vira a
+    /// <c>IdempotencyKey</c> do outbox no lugar do id do evento.
+    /// </summary>
+    public const string ChaveIdempotenciaPayload = "chaveIdempotencia";
+
     private static readonly JsonSerializerOptions EnumOptions = new()
     {
         Converters = { new JsonStringEnumConverter() }
@@ -219,6 +225,37 @@ public sealed class NotificadorService(
             return;
         }
 
+        // S13: chave de negócio no payload (ex.: pedido + status) torna o enfileiramento idempotente entre
+        // eventos distintos do mesmo fato; o índice único do outbox é a defesa final.
+        var chaveIdempotencia = vars.TryGetValue(ChaveIdempotenciaPayload, out var chave) && chave is string c && !string.IsNullOrWhiteSpace(c)
+            ? c
+            : null;
+        if (chaveIdempotencia is not null
+            && await outboxRepository.ExisteAsync(OutboxMensagemNotificacao.ComputarIdempotencyKey(chaveIdempotencia, canalPrimario), ct))
+        {
+            logger.LogInformation(
+                "Evento {EventoId} repete um fato já enfileirado (Tipo={Tipo} canal {Canal}) — sem nova mensagem",
+                evento.Id, evento.Tipo, canalPrimario);
+            evento.MarcarComoProcessado();
+            await eventoRepository.UpdateAsync(evento, ct);
+            return;
+        }
+
+        string? metadadosJson;
+        try
+        {
+            metadadosJson = await RenderizarMetadadosAsync(template.MetadadosJson, vars, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Erro ao renderizar metadados do template {TemplateId} para evento {EventoId}",
+                template.Id, evento.Id);
+            evento.MarcarComoFalhado($"Erro de renderização dos metadados: {ex.Message}");
+            await eventoRepository.UpdateAsync(evento, ct);
+            return;
+        }
+
         var canaisFallbackJson = canaisFallback.Count > 0
             ? JsonSerializer.Serialize(canaisFallback, EnumOptions)
             : "[]";
@@ -233,12 +270,34 @@ public sealed class NotificadorService(
             corpoRenderizado: corpo,
             categoria: rotina.Categoria,
             usuarioDestinoId: usuarioDestinoId,
-            canaisFallbackRestantesJson: canaisFallbackJson);
+            canaisFallbackRestantesJson: canaisFallbackJson,
+            metadadosJson: metadadosJson,
+            chaveIdempotencia: chaveIdempotencia);
 
         await outboxRepository.AddAsync(outbox, ct);
 
         evento.MarcarComoProcessado();
         await eventoRepository.UpdateAsync(evento, ct);
+    }
+
+    /// <summary>
+    /// Renderiza cada valor dos metadados do template com as variáveis do evento (texto puro: vão para a API
+    /// do provider, não para HTML). Nulo quando o template não declara metadados.
+    /// </summary>
+    private async Task<string?> RenderizarMetadadosAsync(
+        string? metadadosTemplateJson,
+        IDictionary<string, object?> vars,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(metadadosTemplateJson)) return null;
+
+        var modelos = JsonSerializer.Deserialize<Dictionary<string, string>>(metadadosTemplateJson)
+            ?? new Dictionary<string, string>();
+        var renderizados = new Dictionary<string, string>(modelos.Count);
+        foreach (var (chave, modelo) in modelos)
+            renderizados[chave] = await renderer.RenderizarAsync(modelo, vars, ct);
+
+        return JsonSerializer.Serialize(renderizados);
     }
 
     private async Task<TemplateNotificacao?> ResolverTemplateAsync(

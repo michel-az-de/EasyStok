@@ -71,7 +71,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IStorageService, S3StorageService>();
 
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
-        services.AddSingleton<IFaturaPdfRenderer, FaturaPdfRenderer>();
         // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
         // PDF do extrato de fechamento de caixa (#642) — QuestPDF stateless/threadsafe
@@ -97,7 +96,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGatewayErrorClassifier, GatewayErrorClassifier>();
         services.AddScoped<IPagamentoOrchestrator, PagamentoOrchestrator>();
 
-        // Webhook processors (scoped — consomem RegistrarPagamentoFaturaUseCase + repos)
+        // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
 
         // Signature validators (singleton — stateless, leem IConfiguration uma vez por call)
@@ -178,6 +177,8 @@ public static class ServiceCollectionExtensions
             services.AddScoped<MercadoPagoGatewayAdapter>();
             services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
             services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
+            // S32: sem processor o /api/webhooks/mercadopago respondia 500. Rollback: remover esta linha.
+            services.AddScoped<IGatewayWebhookProcessor, MercadoPagoWebhookProcessor>();
         }
 
         return services;
