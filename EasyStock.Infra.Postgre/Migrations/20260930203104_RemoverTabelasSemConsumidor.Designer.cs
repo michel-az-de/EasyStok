@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20260930192953_RemoverTabelasSemConsumidor")]
+    [Migration("20260930203104_RemoverTabelasSemConsumidor")]
     partial class RemoverTabelasSemConsumidor
     {
         /// <inheritdoc />
@@ -200,6 +200,45 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("assinaturas_empresa", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ChamadoEntregador", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AbertoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("AtendidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CanceladoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Situacao")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ViagemId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ViagemId");
+
+                    b.HasIndex("EmpresaId", "Situacao", "AbertoEm")
+                        .HasDatabaseName("ix_chamados_entregador_empresa_situacao_aberto_em");
+
+                    b.ToTable("chamados_entregador", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento", b =>
                 {
                     b.Property<Guid>("EmpresaId")
@@ -374,6 +413,55 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasFilter("\"Situacao\" <> 3");
 
                     b.ToTable("atendimento_conversas", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Entregador", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Empresa")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Placa")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Telefone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Veiculo")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Ativo", "Nome")
+                        .HasDatabaseName("ix_entregadores_empresa_ativo_nome");
+
+                    b.ToTable("entregadores", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Lembrete", b =>
@@ -638,6 +726,51 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("mensagens_programadas", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ParadaViagem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("EmpresaEntregador")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EntregadorNome")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime?>("EntregueEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PedidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Placa")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Veiculo")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<Guid>("ViagemId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PedidoId")
+                        .HasDatabaseName("ix_viagem_paradas_pedido");
+
+                    b.HasIndex("ViagemId", "PedidoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_viagem_paradas_viagem_pedido");
+
+                    b.ToTable("viagem_paradas", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -679,6 +812,40 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("uq_sessoes_chat_site_token_hash");
 
                     b.ToTable("sessoes_chat_site", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Viagem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConcluidaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("EntregadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("SaiuEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Situacao")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntregadorId");
+
+                    b.HasIndex("EmpresaId", "Situacao", "CriadaEm")
+                        .HasDatabaseName("ix_viagens_empresa_situacao_criada_em");
+
+                    b.ToTable("viagens", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AuditLog", b =>
@@ -7723,7 +7890,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Estrelas")
+                    b.Property<int?>("Estrelas")
                         .HasColumnType("integer");
 
                     b.Property<string>("FotoUrl")
@@ -7748,6 +7915,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("RespostaDaBaba")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("Resultado")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("SolicitadoEm")
                         .HasColumnType("timestamp with time zone");
@@ -9232,6 +9402,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Plano");
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ChamadoEntregador", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Viagem", null)
+                        .WithMany()
+                        .HasForeignKey("ViagemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Empresa", null)
@@ -9298,6 +9476,21 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ParadaViagem", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Pedido", null)
+                        .WithMany()
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Viagem", null)
+                        .WithMany("Paradas")
+                        .HasForeignKey("ViagemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Storefront.Storefront", null)
@@ -9305,6 +9498,14 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasForeignKey("StorefrontId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Viagem", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Entregador", null)
+                        .WithMany()
+                        .HasForeignKey("EntregadorId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AuditLog", b =>
@@ -11119,6 +11320,11 @@ namespace EasyStock.Infra.Postgre.Migrations
             modelBuilder.Entity("EasyStock.Domain.Entities.AjusteInventario", b =>
                 {
                     b.Navigation("Linhas");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.Viagem", b =>
+                {
+                    b.Navigation("Paradas");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>
