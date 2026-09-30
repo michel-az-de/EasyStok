@@ -5,12 +5,28 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
+  criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
+  a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
+  da empresa do token e id de outra loja devolve 404. Canais por empresa ficam para a parte 2. (#1095)
+
 ### Security
+- CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
+  (`Sec-Fetch-Site` `same-origin`/`none`, ou `Origin` igual ao `Host`); outro site recebe 403.
+  O front é same-origin e não muda; chamadas bearer do Web e do Admin seguem livres (ADR-0053). (#1088)
 - CodeQL: `cs/web/missing-token-validation` filtrada na Api bearer (CSRF não se aplica a JWT) e
   mantida nos 4 controllers do storefront que usam cookie; `CodeQlCsrfFilterTests` amarra a lista
   do `codeql.yml` ao código. Web e Admin seguem com a regra inteira (ADR-0052). (#1089)
 
 ### Added
+- **Consentimento do cliente final por canal e finalidade** (S38, ADR-0051): `ConsentimentoContato`
+  (transacional ou marketing, concedido ou revogado, com origem), `PoliticaConsentimento` (marketing
+  só com opt-in no canal; transacional passa salvo revogação) e `PoliticaEnvioCliente` para a
+  mensagem programada e as campanhas. "SAIR", "PARAR" ou "STOP" sozinhos no WhatsApp revogam o
+  marketing daquele canal, confirmam ao cliente e não acionam o agente.
+  `GET|PUT api/atendimento/clientes/{id}/consentimentos` (Admin). Tabela `consentimentos_contato`
+  com RLS e backfill de `ConsentiuMarketing=true` para WhatsApp e e-mail. (#1078)
 - **Atendentes e atribuição de conversa** (S41, ADR-0051): permissão `AtenderConversas` (Operador,
   Gerente e Admin pelo nível; perfil com permissões explícitas só se a tiver). Assumir, responder,
   transferir, liberar e encerrar devolvem 403 sem ela. `POST api/atendimento/conversas/{id}/transferir`

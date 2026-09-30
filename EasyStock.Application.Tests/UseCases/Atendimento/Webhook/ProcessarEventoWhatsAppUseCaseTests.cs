@@ -36,11 +36,16 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly IClienteRepository _clienteRepository = Substitute.For<IClienteRepository>();
     private readonly IClienteStorefrontRepository _clienteStorefrontRepository = Substitute.For<IClienteStorefrontRepository>();
     private readonly IStorefrontRepository _storefrontRepository = Substitute.For<IStorefrontRepository>();
+    private readonly IConsentimentoContatoRepository _consentimentoRepository = Substitute.For<IConsentimentoContatoRepository>();
+    private readonly ICanalMensageria _canalWhatsApp = Substitute.For<ICanalMensageria>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly ProcessarEventoWhatsAppUseCase _useCase;
 
     public ProcessarEventoWhatsAppUseCaseTests()
     {
+        // Antes de construir: o ResolvedorCanal indexa os adaptadores pelo Canal no construtor.
+        _canalWhatsApp.Canal.Returns(CanalConversa.WhatsApp);
+
         _useCase = new ProcessarEventoWhatsAppUseCase(
             _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
             _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext,
@@ -52,6 +57,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             new RoteadorAcoesBotao(
                 [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()))],
                 NullLogger<RoteadorAcoesBotao>.Instance),
+            new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),
+                _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 
         _cloudClient.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -397,5 +404,27 @@ public class ProcessarEventoWhatsAppUseCaseTests
         completo.Should().BeTrue();
         await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
             Arg.Any<Guid>(), sucesso: false, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SairDeClienteIdentificadoRevogaMarketingENaoAcionaAgente()
+    {
+        // S38: "sair" revoga o marketing do WhatsApp, confirma pelo canal e o agente não responde.
+        var clienteId = Guid.NewGuid();
+        var aberta = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddMinutes(-5), "Fulano");
+        aberta.VincularCliente(clienteId);
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(aberta);
+        _consentimentoRepository.ListarDoClienteAsync(_empresaId, clienteId, Arg.Any<CancellationToken>())
+            .Returns(new List<ConsentimentoContato>());
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.sair", "Sair"));
+
+        await _consentimentoRepository.Received(1).AddAsync(
+            Arg.Is<ConsentimentoContato>(c => c.Canal == CanalConversa.WhatsApp
+                && c.Finalidade == FinalidadeContato.Marketing && c.Situacao == SituacaoConsentimento.Revogado),
+            Arg.Any<CancellationToken>());
+        await _canalWhatsApp.Received(1).EnviarTextoAsync(ContatoWaId, OptOutPorPalavra.Confirmacao, Arg.Any<CancellationToken>());
+        await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, default(ProcessarTurnoAgenteJob)!);
     }
 }

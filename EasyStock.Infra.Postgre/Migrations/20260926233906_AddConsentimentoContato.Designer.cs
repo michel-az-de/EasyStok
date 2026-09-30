@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926233906_AddConsentimentoContato")]
+    partial class AddConsentimentoContato
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -789,9 +792,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime>("EnviadaEm")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("EnviadaPorUsuarioId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("Erro")
                         .HasMaxLength(500)
@@ -7799,45 +7799,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("cliente_session", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStock.Domain.Entities.Storefront.ExpedienteLoja", b =>
-                {
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ControleAlteradoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ControleAlteradoPorUsuarioId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ControleManual")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("HorariosJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("MensagemForaDoHorario")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("MensagemLojaFechada")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.HasKey("EmpresaId");
-
-                    b.ToTable("expedientes_loja", (string)null);
-                });
-
             modelBuilder.Entity("EasyStock.Domain.Entities.Storefront.FreteZona", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11383,15 +11344,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EasyStock.Domain.Entities.Empresa", null)
-                        .WithMany()
-                        .HasForeignKey("EmpresaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Storefront.ExpedienteLoja", b =>
-                {
                     b.HasOne("EasyStock.Domain.Entities.Empresa", null)
                         .WithMany()
                         .HasForeignKey("EmpresaId")
