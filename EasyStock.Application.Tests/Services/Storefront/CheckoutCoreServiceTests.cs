@@ -40,6 +40,7 @@ public class CheckoutCoreServiceTests
         /// <summary>Véspera da entrega, 12:00 em Brasília: qualquer janela do dia seguinte atende o prazo.</summary>
         public FakeTimeProvider Relogio { get; } = new(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero));
         public StorefrontEntity Storefront { get; }
+        public CardapioItem CardapioItem { get; }
         public Guid JanelaId => CheckoutCoreServiceTests.JanelaId;
         public Guid CardapioItemId => CheckoutCoreServiceTests.CardapioItemId;
         public DateOnly DataEntrega => CheckoutCoreServiceTests.DataEntrega;
@@ -64,6 +65,7 @@ public class CheckoutCoreServiceTests
             var cardapioItem = CardapioItem.CriarAPartirDeProduto(Storefront.Id, produto);
             cardapioItem.TornarVisivel();
             cardapioItem.Produto = produto;
+            CardapioItem = cardapioItem;
             typeof(CardapioItem).GetProperty("Id")!.SetValue(cardapioItem, CheckoutCoreServiceTests.CardapioItemId);
             CardapioRepo.GetByIdAsync(Storefront.Id, CheckoutCoreServiceTests.CardapioItemId, Arg.Any<CancellationToken>())
                 .Returns(cardapioItem);
@@ -196,5 +198,20 @@ public class CheckoutCoreServiceTests
             Input(c) with { Prazo = new PrazoPreparoCheckout(TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40) });
 
         reservado.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Fact]
+    public async Task ItemEsgotadoRecusaOCheckout()
+    {
+        var c = new Cenario();
+        c.CardapioItem.MarcarEsgotado();
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>()
+            .WithMessage($"*{CardapioItemId}*indisponível*");
+        c.PedidosAdicionados.Should().BeEmpty("item esgotado não pode virar pedido");
+        await c.VagaRepo.DidNotReceive().OcuparAsync(
+            Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

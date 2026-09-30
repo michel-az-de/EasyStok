@@ -257,7 +257,7 @@ public sealed class CheckoutCoreService(
     }
 
     /// <summary>
-    /// Carrega os itens do cardápio pedidos. Item inexistente ou invisível recusa o checkout.
+    /// Carrega os itens do cardápio pedidos. Item inexistente, invisível ou esgotado recusa o checkout.
     /// </summary>
     public async Task<IReadOnlyDictionary<Guid, CardapioItem>> CarregarItensCardapioAsync(
         Guid storefrontId,
@@ -269,7 +269,7 @@ public sealed class CheckoutCoreService(
         foreach (var itemId in cardapioItemIds.Distinct())
         {
             var ci = await cardapioItemRepository.GetByIdAsync(storefrontId, itemId, ct);
-            if (ci is null || !ci.Visivel)
+            if (ci is null || !ci.Visivel || !ci.Disponivel)
                 throw new RegraDeDominioVioladaException(
                     $"Item de cardápio {itemId} não encontrado ou indisponível.");
             cardapioItens[itemId] = ci;
