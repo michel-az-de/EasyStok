@@ -68,7 +68,7 @@ snapshot_predeploy() {
     echo "[vm-deploy] ERRO: pg_dump falhou — abortando deploy (banco sem snapshot)."
     exit 3
   fi
-  for v in easystok_uploads-data easystok_dataprotection-admin-keys easystok_dataprotection-web-keys; do
+  for v in easystok_uploads-data easystok_dataprotection-web-keys; do
     docker run --rm -v "$v":/data alpine tar -C /data -cf - . > "$dest/$v.tar"
     zstd -19 --rm "$dest/$v.tar"
   done
@@ -121,7 +121,7 @@ main() {
   if [ "$DEPLOY_MODE" = "pull" ]; then
     ghcr_login
     echo "[vm-deploy] pull das imagens :${remote_sha:0:8} do GHCR ..."
-    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" ${COMPOSE_EXTRA:+-f "$COMPOSE_EXTRA"} pull --quiet api web admin worker; then
+    if ! EASYSTOK_IMAGE_TAG="$remote_sha" docker compose -f "$COMPOSE" -f "$COMPOSE_IMAGES" ${COMPOSE_EXTRA:+-f "$COMPOSE_EXTRA"} pull --quiet api web worker; then
       echo "[vm-deploy] imagens de ${remote_sha:0:8} ainda nao disponiveis no GHCR. Abortando SEM avancar HEAD; proximo cron tenta de novo."
       exit 4
     fi

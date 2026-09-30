@@ -23,6 +23,13 @@ public class TemplateNotificacao
     public DateTime AtualizadoEm { get; set; }
     public string AtualizadoPor { get; set; } = "system";
 
+    /// <summary>
+    /// Metadados do envio, objeto JSON de strings com expressões Scriban renderizadas com as mesmas variáveis
+    /// do corpo (S13). No WhatsApp da Meta: <c>template</c> (nome aprovado no WhatsApp Manager), <c>idioma</c>
+    /// e <c>param1..N</c>, usados fora da janela de 24 h. Nulo: o canal usa só o corpo.
+    /// </summary>
+    public string? MetadadosJson { get; set; }
+
     public Empresa? Empresa { get; set; }
 
     public static TemplateNotificacao Criar(
@@ -68,6 +75,12 @@ public class TemplateNotificacao
         Aprovado = false;
         Ativo = false;
         RecomputarChecksum();
+    }
+
+    public void DefinirMetadados(string? metadadosJson)
+    {
+        MetadadosJson = string.IsNullOrWhiteSpace(metadadosJson) ? null : metadadosJson.Trim();
+        AtualizadoEm = DateTime.UtcNow;
     }
 
     public void Aprovar(string adminEmail)

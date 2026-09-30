@@ -64,7 +64,6 @@ jobs:
           PR=${{ github.event.pull_request.number }}
           echo "api=https://easystok-api-pr-$PR.onrender.com"   >> "$GITHUB_OUTPUT"
           echo "web=https://easystok-web-pr-$PR.onrender.com"   >> "$GITHUB_OUTPUT"
-          echo "admin=https://easystok-admin-pr-$PR.onrender.com" >> "$GITHUB_OUTPUT"
 
       - name: Smoke API
         run: |
@@ -92,7 +91,6 @@ jobs:
             |---|---|---|
             | API | ${{ steps.urls.outputs.api }} | [/health](${{ steps.urls.outputs.api }}/health) |
             | Web (PWA) | ${{ steps.urls.outputs.web }} | [/health](${{ steps.urls.outputs.web }}/health) |
-            | Admin | ${{ steps.urls.outputs.admin }} | [/health](${{ steps.urls.outputs.admin }}/health) |
 
             PWA version endpoint: [`/api/mobile/version`](${{ steps.urls.outputs.api }}/api/mobile/version)
             Downloads APK: ${{ steps.urls.outputs.web }}/downloads

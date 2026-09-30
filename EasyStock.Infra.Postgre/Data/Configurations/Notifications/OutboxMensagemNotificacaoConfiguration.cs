@@ -31,6 +31,7 @@ public class OutboxMensagemNotificacaoConfiguration : IEntityTypeConfiguration<O
         b.Property(x => x.Categoria).HasConversion<string>().HasMaxLength(20).IsRequired();
         b.Property(x => x.CriadoEm).IsRequired();
         b.Property(x => x.ShardKey).IsRequired();
+        b.Property(x => x.MetadadosJson).HasColumnType("jsonb");
 
         b.HasIndex(x => x.IdempotencyKey).IsUnique();
         b.HasIndex(x => new { x.Status, x.ProximaTentativaEm });
