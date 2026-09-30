@@ -48,14 +48,6 @@ using EasyStock.Application.UseCases.PreviewSugestaoCompra;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
 using EasyStock.Application.UseCases.GerenciarComposicao;
 using EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
-using EasyStock.Application.UseCases.Faturas.EmitirFatura;
-using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
-using EasyStock.Application.UseCases.Faturas.CancelarFatura;
-using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
-using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
-using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
-using EasyStock.Application.UseCases.Faturas.ExportarFaturasCsv;
-using EasyStock.Application.UseCases.Faturas.MetricasFinanceiras;
 using EasyStock.Application.UseCases.Financeiro.BaixarLancamento;
 
 namespace EasyStock.Application.DependencyInjection;
@@ -172,20 +164,6 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Inventario.RegistrarItemContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.FinalizarContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.CancelarContagemUseCase>();
-
-
-        // Planos e Assinaturas
-
-        // Modulo Financeiro (F1+) — Faturas
-        services.AddScoped<EmitirFaturaUseCase>();
-        services.AddScoped<RegistrarPagamentoFaturaUseCase>();
-        services.AddScoped<CancelarFaturaUseCase>();
-        services.AddScoped<ListarFaturasAdminUseCase>();
-        services.AddScoped<ObterFaturaDetalheUseCase>();
-        services.AddScoped<GerarPdfFaturaUseCase>();
-        services.AddScoped<ExportarFaturasCsvUseCase>();
-        services.AddScoped<MetricasFinanceirasUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.Admin.ExportarTenantsCsv.ExportarTenantsCsvUseCase>();
 
         // Modulo Financeiro AR/AP — Lancamentos
         services.AddScoped<BaixarLancamentoUseCase>();

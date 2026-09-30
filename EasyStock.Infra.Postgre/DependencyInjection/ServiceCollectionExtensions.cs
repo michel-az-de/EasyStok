@@ -97,7 +97,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IPerfilRepository, PerfilRepository>();
             services.AddScoped<IPlanoRepository, PlanoRepository>();
             services.AddScoped<IAssinaturaEmpresaRepository, AssinaturaEmpresaRepository>();
-            services.AddScoped<ICupomRepository, CupomRepository>();
             services.AddScoped<IUsuarioEmpresaRepository, UsuarioEmpresaRepository>();
             services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -134,17 +133,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
-            services.AddScoped<IAdminAuditLogQueries, AdminAuditLogQueries>();
-            services.AddScoped<IAdminStatusQueries, AdminStatusQueries>();
-            services.AddScoped<IAdminBuscaGlobalQueries, AdminBuscaGlobalQueries>();
-            services.AddScoped<IApkReleaseRepository, ApkReleaseRepository>();
-            services.AddScoped<IConfiguracaoSistemaRepository, ConfiguracaoSistemaRepository>();
             services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
-            services.AddScoped<IPlanoAdminRepository, PlanoAdminRepository>();
-            services.AddScoped<ICupomAdminRepository, CupomAdminRepository>();
-            services.AddScoped<IAdminDashboardQueries, AdminDashboardQueries>();
-            services.AddScoped<IFleetOperationQueries, FleetOperationQueries>();
-            services.AddScoped<IMetricasFinanceirasQueries, MetricasFinanceirasQueries>(); // #762 — bypass condicional a SuperAdmin
             services.AddScoped<IEntityAuditQueries, EntityAuditQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();
 
