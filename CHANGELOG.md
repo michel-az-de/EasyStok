@@ -6,6 +6,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
+  transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
+  `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
+  colunas sem acentos para ESC/POS), agrupado por linha com porção, molho e observação por item.
+  Consumidor agnóstico por polling: `GET api/impressao/pendentes`, `POST api/impressao/{id}/impressa`
+  (idempotente) e `POST .../falhou`, com JWT de operador ou header `X-Impressao-Api-Key`
+  (`Impressao:ApiKey` + `Impressao:EmpresaId`). `POST api/pedidos/{id}/reimprimir` só para operador.
+  `ImpressaoPendenteAlertaJob` publica `impressao.atrasada` para pendente há mais de 3 min
+  (`BackgroundJobs:EnableImpressaoPendenteAlerta`). Migration `AddImpressaoPendente` com RLS. (#1156)
 - **SSE de operação do console** (S18): `GET api/operacao/eventos` com JWT no header `Authorization`
   (sem token, 401; token sem empresa, 403), eventos nomeados só da empresa da claim e heartbeat a cada
   25 s. `ConfirmarPagamentoPedidoUseCase` publica `pedido.pago {pedidoId, numero, cliente, total, janela}`

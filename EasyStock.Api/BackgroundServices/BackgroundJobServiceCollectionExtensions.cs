@@ -64,6 +64,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableCobrancaPedido)
             services.AddHostedService<CobrancaPedidoJob>();
 
+        // ImpressaoPendenteAlertaJob (S20) — a cada 2 min, canhoto pendente há mais de 3 min vira
+        // impressao.atrasada no SSE de operação (o console avisa a dona).
+        if (options.EnableImpressaoPendenteAlerta)
+            services.AddHostedService<ImpressaoPendenteAlertaJob>();
+
         // CaixaEsquecidoJob (#641) — diario 10:00 UTC, detecta caixas abertos nao fechados de
         // dias anteriores e notifica in-app (so notifica, nao fecha).
         if (options.EnableCaixaEsquecidoJob)

@@ -250,7 +250,9 @@ public static class PipelineExtensions
             // porque o id do pedido fica NO MEIO do path e o matcher e' so-prefixo; cobre de
             // quebra outras mutacoes de pedido contra double-submit, o que e' estritamente
             // seguro (opt-in por header -- sem Idempotency-Key a rota segue como sempre).
-            .Add("/api/pedidos"));
+            .Add("/api/pedidos")
+            // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
+            .Add("/api/impressao"));
         app.MapControllers();
 
         app.MapGet("/", () => Results.Redirect("/swagger", permanent: false))
