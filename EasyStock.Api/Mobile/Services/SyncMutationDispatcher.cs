@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Api.Services.Operacao;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -14,14 +15,14 @@ public class SyncMutationDispatcher(
     EasyStockDbContext db,
     MobileStockReconciler stockReconciler,
     MobileSaleSyncService saleSync,
-    MobileEventBroker eventBroker,
+    OperacaoEventBroker eventBroker,
     IProdutoRepository produtoRepo,
     ILogger<SyncMutationDispatcher> log)
 {
     private readonly EasyStockDbContext _db = db;
     private readonly MobileStockReconciler _stockReconciler = stockReconciler;
     private readonly MobileSaleSyncService _saleSync = saleSync;
-    private readonly MobileEventBroker _eventBroker = eventBroker;
+    private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
     private readonly ILogger<SyncMutationDispatcher> _log = log;
 

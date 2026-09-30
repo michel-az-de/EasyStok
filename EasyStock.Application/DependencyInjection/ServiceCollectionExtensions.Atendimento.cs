@@ -1,13 +1,16 @@
 // Atendimento por WhatsApp (ADR-0050) — configuração por tenant (S08), status da integração
 // (S01) e agente/conversa (S02, S06, S07 adicionam mais).
 
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.AcoesBotao;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Services.Operacao;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -16,6 +19,8 @@ public static partial class ServiceCollectionExtensions
     /// <summary>Registra os UseCases do módulo de atendimento por WhatsApp.</summary>
     public static IServiceCollection AddEasyStockAtendimentoUseCases(this IServiceCollection services)
     {
+        // SSE de operação (S18): no-op por padrão; a Api substitui pelo publisher sobre o broker.
+        services.TryAddSingleton<IOperacaoEventPublisher, NoOpOperacaoEventPublisher>();
         services.AddScoped<ObterConfiguracaoAtendimentoUseCase>();
         // S10: pedido fechado na conversa pelo núcleo do checkout (a cobrança é da S11).
         services.AddScoped<CriarPedidoAtendimentoUseCase>();
