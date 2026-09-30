@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930021758_AddCobrancaPedido")]
+    partial class AddCobrancaPedido
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -6559,11 +6562,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("motivo_recusa");
 
-                    b.Property<string>("MotivoRequerAprovacao")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("motivo_requer_aprovacao");
-
                     b.Property<string>("Observacoes")
                         .HasColumnType("text");
 
@@ -6578,12 +6576,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("RecusadoPorUsuarioId")
                         .HasColumnType("uuid")
                         .HasColumnName("recusado_por_usuario_id");
-
-                    b.Property<bool>("RequerAprovacao")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("requer_aprovacao");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -6786,10 +6778,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Emoji")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
-
-                    b.Property<string>("LinhaSnapshot")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -7725,15 +7713,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("InstrucaoFinalizacao")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int>("Linha")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1);
-
                     b.Property<string>("NomePublico")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -7770,9 +7749,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("TempoPreparo")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<int?>("TempoPreparoMinutos")
-                        .HasColumnType("integer");
 
                     b.Property<bool>("Visivel")
                         .ValueGeneratedOnAdd()

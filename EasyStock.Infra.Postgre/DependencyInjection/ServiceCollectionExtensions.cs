@@ -122,6 +122,9 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Pagamentos.PaymentAttemptRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
                 Repositories.Pagamentos.GatewayRoutingRuleRepository>();
+            // S11: cobrança do pedido
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository,
+                Repositories.Pagamentos.CobrancaPedidoRepository>();
 
             // Modulo Contas a Pagar / Contas a Receber (CAP/CAR)
             services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
@@ -163,6 +166,10 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // "sem handler"; a Onda 5 (#867) pluga Hiram/marketplace ao lado deste.
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.PedidoMudouStatusLogHandler>("pedido.mudou_status");
+            // S11: pedido.pago (S13, S18 e S20 entram ao lado deste).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Pedidos.Handlers.PedidoPagoLogHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
 
             services.AddScoped<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass,
                 Security.RowLevelSecurityBypass>();

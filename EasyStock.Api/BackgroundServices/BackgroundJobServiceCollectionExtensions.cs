@@ -78,6 +78,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableContaReceberPixReconciliacaoJob)
             services.AddHostedService<ContaReceberPixReconciliacaoJob>();
 
+        // CobrancaPedidoJob (S11) — a cada 60 s, expira links do Mercado Pago vencidos, reemite uma vez
+        // para pedido da conversa e cancela os demais (libera a vaga).
+        if (options.EnableCobrancaPedido)
+            services.AddHostedService<CobrancaPedidoJob>();
+
         // CaixaEsquecidoJob (#641) — diario 10:00 UTC, detecta caixas abertos nao fechados de
         // dias anteriores e notifica in-app (so notifica, nao fecha).
         if (options.EnableCaixaEsquecidoJob)

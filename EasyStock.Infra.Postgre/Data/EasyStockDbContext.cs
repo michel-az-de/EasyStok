@@ -277,6 +277,9 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Payment Orchestration (Onda P0)
         public DbSet<PaymentAttempt> PaymentAttempts { get; set; } = null!;
+
+        // S11: cobrança do pedido (Mercado Pago ou na entrega)
+        public DbSet<CobrancaPedido> CobrancasPedido { get; set; } = null!;
         public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;
         public DbSet<GatewayRoutingRule> GatewayRoutingRules { get; set; } = null!;
         public DbSet<GatewayHealthSnapshot> GatewayHealthSnapshots { get; set; } = null!;
