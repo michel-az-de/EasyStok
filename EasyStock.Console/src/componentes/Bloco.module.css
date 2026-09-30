@@ -1,0 +1,16 @@
+/* Bloco de painel separado por ESPAÇO, nunca por linha. A linha de 1 px ficou
+   reservada à borda entre regiões: topo, coluna e rodapé. Quem empilha os
+   blocos dá o respiro de 20 px, aqui dentro o respiro é de 8. */
+.bloco { padding: 0 var(--e-4); }
+.bloco > h3 {
+  margin: 0 0 var(--e-3); font-size: var(--t-apoio); font-weight: 600;
+  color: var(--tinta-3); line-height: var(--lh-compacto); letter-spacing: -.005em;
+}
+
+/* Bloco que espera ação dela: trilho de 3 px mais o título em âmbar. Sem fundo
+   pastel, que vale um lugar por tela e não é aqui. */
+.destaque {
+  border-left: var(--trilho) solid var(--atencao);
+  padding-left: calc(var(--e-4) - var(--trilho));
+}
+.destaque > h3 { color: var(--atencao); }

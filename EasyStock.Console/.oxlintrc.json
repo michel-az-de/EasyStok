@@ -1,0 +1,51 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "react-perf",
+    "jsx-a11y",
+    "import",
+    "unicorn",
+    "oxc"
+  ],
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "react/jsx-key": "error",
+    "react/no-danger": "error",
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ],
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-is-valid": "error",
+    "jsx-a11y/aria-props": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/label-has-associated-control": "error",
+    "jsx-a11y/no-autofocus": "warn",
+    "jsx-a11y/role-has-required-aria-props": "error",
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error",
+    "eqeqeq": [
+      "error",
+      "smart"
+    ],
+    "no-var": "error",
+    "no-console": "warn",
+    "no-debugger": "error",
+    "unicorn/no-useless-undefined": "off"
+  },
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "ferramentas",
+    ".vite-r*"
+  ]
+}

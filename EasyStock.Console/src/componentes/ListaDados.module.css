@@ -1,0 +1,7 @@
+.lista { margin: 0; }
+.fileira {
+  display: flex; gap: var(--e-3); align-items: baseline;
+  padding: 6px 0; font-size: var(--t-apoio);
+}
+.fileira dt { color: var(--tinta-3); min-width: 80px; flex-shrink: 0; }
+.fileira dd { margin: 0; overflow-wrap: anywhere; color: var(--tinta); }

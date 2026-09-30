@@ -1,0 +1,34 @@
+name: console
+
+# Console do operador (ADR-0054): lint (oxlint), fronteira de camadas e build.
+# Roda só quando a pasta do console muda; o gate .NET fica no ci.yml.
+on:
+  pull_request:
+    paths:
+      - 'EasyStock.Console/**'
+      - '.github/workflows/console.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'EasyStock.Console/**'
+      - '.github/workflows/console.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualidade:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: EasyStock.Console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: EasyStock.Console/package-lock.json
+      - run: npm ci
+      - run: npm run qualidade

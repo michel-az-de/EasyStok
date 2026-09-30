@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Console do operador no repositório** (ADR-0054): o protótipo `prototipo-omni` da Casa da Baba
+  (React 19 + Vite, commit de origem a9831ab) passa a viver em `EasyStock.Console/`, ainda com dados
+  simulados. CI própria (`console.yml`: lint, fronteira de camadas e build) só quando a pasta muda.
+  Matriz de paridade e ordem de ligação à API em `docs/plan/atendimento-whatsapp/10-console.md`. (#1120)
 - **Cadastro de entrega pela loja** (S45, parte 1): `api/minha-vitrine/entrega` com janelas (listar,
   criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
   a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
