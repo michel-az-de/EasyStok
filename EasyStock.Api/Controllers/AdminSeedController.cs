@@ -380,7 +380,7 @@ public class AdminSeedController(
 
             // ── Schema bootstrap defensivo ───────────────────────────────────────
             // Não depende de migrations EF terem rodado certinho — garante
-            // IsSeedData + SeedRunLogs via SQL idempotente. Se ambiente já tem,
+            // SeedRunLogs via SQL idempotente. Se ambiente já tem,
             // é no-op. Se faltava algo (deploy parcial, migration vazia, etc),
             // agora está lá. Sem isso, seed quebra com "column does not exist".
             seedProgress.Report(runId, 1, "Verificando schema do banco…");
