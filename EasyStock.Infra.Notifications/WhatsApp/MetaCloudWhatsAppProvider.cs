@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output;
+﻿using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -15,7 +15,8 @@ namespace EasyStock.Infra.Notifications.WhatsApp;
 /// <see cref="ResolvedorCanal"/> com <see cref="CanalConversa.WhatsApp"/>) e decide o formato pela
 /// janela de 24 h da conversa aberta do destinatário:
 /// <list type="bullet">
-/// <item>conversa aberta dentro da janela: texto renderizado;</item>
+/// <item>conversa aberta dentro da janela: texto renderizado, ou mensagem interativa quando há
+/// <c>Metadados["botao1..3"]</c> no formato <c>id|título</c> (S26);</item>
 /// <item>sem conversa aberta ou fora da janela, com <c>Metadados["template"]</c>: template com <c>param1..N</c>;</item>
 /// <item>conversa aberta fora da janela sem template: falha permanente, sem chamar a Meta;</item>
 /// <item>sem conversa e sem template: tenta o texto; se a Meta recusar com 131047, falha permanente.</item>
@@ -39,6 +40,7 @@ public sealed class MetaCloudWhatsAppProvider(
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var template = LerTemplate(mensagem.Metadados);
+        var botoes = LerBotoes(mensagem.Metadados);
 
         try
         {
@@ -51,9 +53,15 @@ public sealed class MetaCloudWhatsAppProvider(
                 return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
 
             var canal = resolvedorCanal.Obter(CanalConversa.WhatsApp);
-            var wamid = template is { } t && !dentroDaJanela
-                ? await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, ct)
-                : await canal.EnviarTextoAsync(contato, mensagem.Corpo, ct);
+            string wamid;
+            if (template is { } t && !dentroDaJanela)
+                wamid = botoes.Count > 0
+                    ? await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, botoes, ct)
+                    : await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, ct);
+            else
+                wamid = botoes.Count > 0 && dentroDaJanela
+                    ? await canal.EnviarBotoesAsync(contato, mensagem.Corpo, botoes, ct)
+                    : await canal.EnviarTextoAsync(contato, mensagem.Corpo, ct);
 
             if (conversa is not null)
                 await RegistrarNoHistoricoAsync(conversa, mensagem.Corpo, wamid, agora, ct);
@@ -139,6 +147,23 @@ public sealed class MetaCloudWhatsAppProvider(
             parametros.Add(valor);
 
         return (nome.Trim(), idioma, parametros);
+    }
+
+    /// <summary><c>botao1..3</c> no formato <c>id|título</c>; entradas vazias ou sem título são ignoradas.</summary>
+    private static IReadOnlyList<(string Id, string Titulo)> LerBotoes(IReadOnlyDictionary<string, string>? metadados)
+    {
+        var botoes = new List<(string Id, string Titulo)>();
+        if (metadados is null) return botoes;
+
+        for (var n = 1; n <= 3; n++)
+        {
+            if (!metadados.TryGetValue($"botao{n}", out var valor) || string.IsNullOrWhiteSpace(valor)) continue;
+            var separador = valor.LastIndexOf('|');
+            if (separador <= 0 || separador == valor.Length - 1) continue;
+            botoes.Add((valor[..separador].Trim(), valor[(separador + 1)..].Trim()));
+        }
+
+        return botoes;
     }
 
     private static string Truncar(string texto) =>

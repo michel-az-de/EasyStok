@@ -1,0 +1,544 @@
+/* Cardápio por link (rodada 7, US-021; rodada 12, #19: vitrine estilo iFood).
+   Site do cliente, fora do chat. Só tokens existentes (src/estilos/tokens.css);
+   nada de cor, raio ou fonte literal aqui. Um componente para desktop e
+   celular: abaixo de 900 px a sacola vira passo próprio (barra de baixo);
+   acima, vitrine e sacola ficam lado a lado. */
+
+/* html, body e #root não rolam (base.css, feito para o Balcão): a página do
+   cliente rola por dentro, e o cabeçalho e a busca grudam nela. */
+.pagina {
+  height: 100dvh;
+  overflow-y: auto;
+  background: var(--fundo);
+  color: var(--tinta);
+  font-family: var(--f-corpo);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  background: var(--papel);
+  border-bottom: var(--b-1) solid var(--linha);
+}
+
+.cabecalhoMiolo {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-width: 0;
+}
+
+.marcaIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-2);
+  background: var(--ragu-claro);
+  color: var(--ragu);
+  flex-shrink: 0;
+}
+
+.marca strong {
+  display: block;
+  font-family: var(--f-display);
+  font-size: var(--t-forte);
+}
+
+.marca strong,
+.marcaSub { white-space: nowrap; }
+
+.marcaSub {
+  display: block;
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+/* --- Loja: vitrine + sacola ------------------------------------------------ */
+
+.loja {
+  width: 100%;
+  max-width: 1120px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--e-4);
+  padding: var(--e-4) var(--e-3) calc(var(--e-5) + 72px);
+  animation: entrar 220ms ease;
+}
+
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vitrine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-4);
+  min-width: 0;
+}
+
+/* Celular: a sacola só aparece quando aberta pela barra de baixo, e aí
+   esconde a vitrine (passo próprio, como o carrinho do iFood). */
+.sacola { display: none; }
+.comSacolaAberta .sacola { display: block; }
+.comSacolaAberta .vitrine { display: none; }
+
+@media (min-width: 900px) {
+  .loja {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: start;
+    padding-bottom: var(--e-5);
+  }
+  .sacola,
+  .comSacolaAberta .sacola {
+    display: block;
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+  }
+  .comSacolaAberta .vitrine { display: flex; }
+  .voltar,
+  .barraCarrinho { display: none !important; }
+}
+
+.introducao {
+  margin: 0;
+  color: var(--tinta-2);
+  font-size: var(--t-apoio);
+}
+
+.ferramentas {
+  position: sticky;
+  top: 65px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  padding: var(--e-2) 0;
+  background: var(--fundo);
+}
+
+.busca {
+  position: relative;
+  color: var(--tinta-3);
+}
+
+.busca > svg {
+  position: absolute;
+  left: var(--e-3);
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.busca input {
+  padding-left: calc(var(--e-3) + 28px);
+}
+
+.categorias {
+  display: flex;
+  gap: var(--e-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.categorias > * { flex-shrink: 0; }
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+}
+
+.rotuloGrupo {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-titulo);
+}
+
+.dicaGrupo {
+  margin: calc(-1 * var(--e-1)) 0 0;
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+/* --- Cartão do prato -------------------------------------------------------
+   Celular: texto à esquerda, foto quadrada à direita (padrão iFood).
+   Tela maior: grade de cartões com a foto em cima. */
+
+.grade {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--e-3);
+}
+
+.cartao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-areas:
+    "texto foto"
+    "acao acao"
+    "obs obs"
+    "extra extra";
+  gap: var(--e-2) var(--e-3);
+  background: var(--papel);
+  border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-2);
+  padding: var(--e-3);
+  box-shadow: var(--sombra);
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.cartao:has(button:focus-visible) { border-color: var(--linha-forte); }
+.cartaoMarcado { border-color: var(--ragu); }
+
+.foto {
+  grid-area: foto;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--r-2);
+  background: var(--elevado);
+}
+
+.cartaoTexto {
+  grid-area: texto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--e-1);
+  min-width: 0;
+}
+
+.cartaoNome { font-size: var(--t-forte); }
+
+.cartaoPorcao {
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+.cartaoPreco {
+  font-family: var(--f-dado);
+  font-size: var(--t-forte);
+  white-space: nowrap;
+}
+
+.cartaoAcao {
+  grid-area: acao;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cartaoObs { grid-area: obs; }
+
+.cartaoIndisponivel .foto { filter: grayscale(1); opacity: .55; }
+.cartaoIndisponivel .cartaoNome,
+.cartaoIndisponivel .cartaoPreco { color: var(--tinta-3); }
+
+@media (min-width: 640px) {
+  .grade { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .cartao {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "foto" "texto" "acao" "obs" "extra";
+    align-content: start;
+  }
+  .foto { aspect-ratio: 16 / 11; }
+}
+
+.contador {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+}
+
+.contador button {
+  width: var(--toque);
+  height: var(--toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-pilula);
+  background: var(--elevado);
+  color: var(--tinta);
+  cursor: pointer;
+}
+
+.contador button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.contador b {
+  min-width: 1.5ch;
+  text-align: center;
+  font-family: var(--f-dado);
+}
+
+.adicionaisLista {
+  grid-area: extra;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+}
+
+/* --- Barra do celular ------------------------------------------------------- */
+
+.barraCarrinho {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+  background: var(--papel);
+  border-top: var(--b-1) solid var(--linha);
+  box-shadow: var(--sombra-alta);
+  z-index: 20;
+}
+
+.barraResumo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-family: var(--f-dado);
+  font-size: var(--t-apoio);
+}
+
+/* --- Sacola ------------------------------------------------------------------ */
+
+.sacolaCorpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-3);
+}
+
+.voltar { align-self: flex-start; }
+
+.sacolaVazia {
+  margin: 0;
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+.corpo {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-4);
+  padding: var(--e-4) var(--e-3) var(--e-5);
+  animation: entrar 220ms ease;
+}
+
+.blocoCheckout {
+  background: var(--papel);
+  border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-2);
+  box-shadow: var(--sombra);
+  padding: var(--e-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-3);
+}
+
+.blocoCentro {
+  align-items: center;
+  text-align: center;
+}
+
+.blocoCentro h2,
+.blocoCentro p {
+  margin: 0;
+  color: var(--tinta);
+}
+
+.seloEnviado { color: var(--ok); }
+.seloAguardando { color: var(--atencao); }
+
+.grupoMeios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+}
+
+.rotuloMeios,
+.rotuloMeiosDiscreto {
+  margin: 0;
+  font-size: var(--t-apoio);
+  font-weight: 600;
+}
+
+.rotuloMeiosDiscreto { color: var(--tinta-3); font-weight: 400; }
+.meioDestaque { font-weight: 600; }
+.meioDiscreto { font-size: var(--t-apoio); }
+
+.pagamentoMock {
+  width: 100%;
+  background: var(--elevado);
+  border-radius: var(--r-1);
+  padding: var(--e-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-1);
+  text-align: left;
+}
+
+.legendaMock {
+  margin: 0;
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+.codigoMock {
+  font-family: var(--f-dado);
+  font-size: var(--t-apoio);
+  color: var(--tinta-2);
+  word-break: break-all;
+}
+
+.blocoCheckout h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-size: var(--t-forte);
+}
+
+.listaResumo {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+}
+
+.linhaResumo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-2);
+}
+
+.linhaResumoNome {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.linhaResumoObs {
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+.linhaResumoPreco {
+  font-family: var(--f-dado);
+  white-space: nowrap;
+}
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  padding-top: var(--e-2);
+  border-top: var(--b-1) solid var(--linha);
+}
+
+.total b {
+  font-family: var(--f-dado);
+  font-size: var(--t-valor);
+}
+
+.avisoCampo {
+  margin: 0;
+  color: var(--parado);
+  font-size: var(--t-apoio);
+}
+
+.opcoesPagamento {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+}
+
+.faltas,
+.notaFechar {
+  margin: 0;
+  color: var(--tinta-3);
+  font-size: var(--t-apoio);
+}
+
+.faltas { text-align: center; }
+
+.detalhes {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--e-1) var(--e-3);
+  font-size: var(--t-apoio);
+}
+
+.detalhes dt { color: var(--tinta-3); }
+.detalhes dd { margin: 0; }
+
+/* --- Aviso (link inválido, Balcão fora) -------------------------------------- */
+
+.avisoCartao {
+  max-width: 400px;
+  margin: var(--e-5) auto;
+  padding: var(--e-5);
+  background: var(--papel);
+  border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-2);
+  box-shadow: var(--sombra);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-2);
+  color: var(--ragu);
+}
+
+.avisoCartao h1 {
+  margin: 0;
+  color: var(--tinta);
+  font-family: var(--f-display);
+  font-size: var(--t-titulo);
+}
+
+.avisoCartao p {
+  margin: 0;
+  color: var(--tinta-2);
+  font-size: var(--t-apoio);
+}

@@ -1,0 +1,87 @@
+/* Aba Caixa (rodada 13, issue #44). Arquivo próprio desta frente, ninguém mais
+   mexe aqui: `gestao.module.css` continua só com a casca (tablist, painel). */
+
+.painel { display: grid; gap: var(--e-4); }
+
+.cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); }
+
+.tituloSecao { margin: 0 0 var(--e-1); font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+
+.corpoBloco { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.dicaItem { display: block; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.avisoFechado {
+  margin: 0; padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
+  background: var(--perigo-fundo); border-radius: var(--r-1);
+}
+
+.resumoLista {
+  margin: 0; display: grid; gap: var(--e-2);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.resumoLista div {
+  display: flex; flex-direction: column; gap: var(--e-1);
+  padding: var(--e-2) var(--e-3); background: var(--elevado); border-radius: var(--r-1);
+}
+.resumoLista dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.resumoLista dd { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+.resumoForte dd { color: var(--ragu); }
+.resumoForte { background: var(--ragu-claro) !important; }
+
+.porMetodo {
+  margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4);
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+
+.acoesTopo { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+
+.formLancamento {
+  display: grid; gap: var(--e-3); padding: var(--e-3);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+
+.tiposLancamento { display: flex; gap: var(--e-2); }
+
+.categoriasSugeridas { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+
+.formGrade { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+.lista { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--e-2); }
+
+.linha {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3);
+  padding: var(--e-2) var(--e-3); background: var(--elevado); border-radius: var(--r-1);
+  font-size: var(--t-apoio);
+}
+.linhaEstornada { opacity: .6; }
+.linhaEstornada .linhaInfo strong { text-decoration: line-through; }
+
+.linhaInfo { display: flex; flex-direction: column; gap: 2px; }
+
+.linhaValor { display: flex; align-items: center; gap: var(--e-2); font-weight: 700; color: var(--tinta); white-space: nowrap; }
+
+.acaoEstorno { color: var(--perigo); min-height: auto; padding: 0 var(--e-2); }
+.acaoEstorno:hover:not(:disabled) { background: var(--perigo-fundo); }
+
+.promptEstorno {
+  display: grid; gap: var(--e-2); padding: var(--e-3);
+  background: var(--perigo-fundo); border-radius: var(--r-1); width: 100%;
+}
+
+.confirmarAcoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin: 0; justify-content: flex-end; }
+
+.listaItens { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--e-2); }
+
+.itemVenda {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
+  padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+}
+
+.infoItem { display: flex; flex-direction: column; gap: 2px; }
+
+.qtdControle { display: flex; align-items: center; gap: var(--e-2); }
+.qtdControle button { min-height: var(--toque); min-width: var(--toque); padding: 0; }
+.qtdValor { min-width: 1.5em; text-align: center; font-weight: 700; }
+
+.corpoDiferenca { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); }

@@ -1,0 +1,31 @@
+/* Aba Entregas e integrações (rodada 13, issue #46, registro 108). Mesmos
+   tokens de espaço/cor do resto do app (nenhum valor novo inventado). */
+.aba { display: flex; flex-direction: column; gap: var(--e-4); }
+
+.intro { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+
+.lista {
+  display: grid; gap: var(--e-3);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 0; padding: 0; list-style: none;
+}
+
+.cartao {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+
+.cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.nomeProvedor { min-width: 0; font-size: var(--t-corpo); overflow-wrap: anywhere; }
+.chipLigar { flex-shrink: 0; }
+
+.credencial { display: flex; flex-direction: column; gap: var(--e-2); }
+.formularioCredencial { display: flex; flex-direction: column; gap: var(--e-2); }
+.formularioCredencial :global(input) { width: 100%; }
+.botoesCredencial { display: flex; gap: var(--e-2); }
+
+.rodapeCartao { display: flex; flex-direction: column; gap: var(--e-1); align-items: flex-start; }
+.motivo { margin: 0; color: var(--tinta-2); font-size: var(--t-15); }
+
+.rodape { margin: 0; color: var(--tinta-3); font-size: var(--t-15); }
+.rodape code { font-size: inherit; }

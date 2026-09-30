@@ -12,6 +12,7 @@ public static class EventosOperacao
     public const string ImpressaoPendente = "impressao.pendente";
     public const string ImpressaoAtrasada = "impressao.atrasada";
     public const string PedidoAtrasado = "pedido.atrasado";
+    public const string EstoqueDesacertoResolvido = "estoque.desacerto_resolvido";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -38,3 +39,6 @@ public sealed record ImpressaoAtrasadaOperacao(Guid ImpressaoId, Guid PedidoId, 
 /// <param name="Numero">Número curto do pedido, o mesmo de <see cref="PedidoPagoOperacao.Numero"/>.</param>
 /// <param name="InicioPrevistoEm">Instante (UTC) em que o preparo deveria ter começado.</param>
 public sealed record PedidoAtrasadoOperacao(Guid PedidoId, string Numero, string? Cliente, DateTime InicioPrevistoEm);
+
+/// <summary>Payload de <see cref="EventosOperacao.EstoqueDesacertoResolvido"/> (S22): o alerta do produto some do console.</summary>
+public sealed record EstoqueDesacertoResolvidoOperacao(Guid ProdutoId, decimal QuantidadeAtual);

@@ -1,0 +1,171 @@
+/* Folha A4 do resumo de encerramento (rodada 5, seção 5). 794 px = 210 mm a
+   96 dpi, como a direção pede. Tokens só, nada de cor literal: o papel claro
+   e escuro dos dois temas já vem do --papel/--tinta de tokens.css. */
+
+.folha {
+  width: 794px;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: var(--e-5);
+  background: var(--papel);
+  box-shadow: var(--sombra);
+  color: var(--tinta);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-4);
+}
+
+.faixaAtencao {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  padding: var(--e-3);
+  border-left: var(--trilho) solid var(--atencao);
+  background: var(--atencao-pastel);
+  color: var(--atencao);
+  font-size: var(--t-apoio);
+  border-radius: var(--r-1);
+}
+
+/* Confirmação de encerrar (decisão 46, "Encerrar" v2): a escolha de mandar a
+   mensagem de despedida, com o texto editável na hora, mais o que os canais
+   de aviso do cadastro já vão fazer sozinhos. Fica FORA da folha (não é dado
+   do trecho, é decisão de agora), acima do botão Encerrar. */
+.confirmacaoEncerrar {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+  background: var(--elevado);
+}
+.confirmacaoEncerrar label {
+  display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-corpo); font-weight: 600;
+}
+.avisosConfigurados { font-size: var(--t-apoio); color: var(--tinta-3); margin: 0; }
+
+.cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: var(--b-1) solid var(--linha-forte);
+  padding-bottom: var(--e-3);
+}
+
+.marca { font-family: var(--f-marca); font-size: var(--t-24); margin: 0; }
+.submarca { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.tituloResumo { margin: 0; font-size: var(--t-forte); text-align: right; }
+.numeroResumo { margin: 0; font-family: var(--f-dado); color: var(--tinta-2); font-size: var(--t-apoio); text-align: right; }
+
+.linhaCliente {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-1);
+  padding-bottom: var(--e-3);
+  border-bottom: var(--b-1) solid var(--linha);
+}
+.nomeCliente { margin: 0; font-size: var(--t-forte); }
+.subCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.conversao { margin: 0; color: var(--ok); font-size: var(--t-apoio); font-weight: 700; }
+
+/* As 3 primeiras colunas nunca quebram (rótulo maiúsculo e valor em mono são
+   uma palavra só, sem espaço pra quebrar: "MENSAGENS", "R$ 113,00"), então
+   `minmax(max-content, 1fr)` dá a cada uma exatamente a largura que precisa.
+   "Converteu" é o oposto: "Não, segue lead"/"Lead que virou cliente" TEM
+   espaço pra quebrar, e são as frases mais longas da folha, então fica de
+   fora do `max-content` (senão puxava a coluna inteira) e recebe o resto. */
+.grade4 {
+  display: grid;
+  /* Integração: quatro colunas na folha de 430 px vazavam "CONVERTEU" para
+     fora do papel; duas por linha cabem sem quebrar rótulo nem valor. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--e-3);
+  padding-bottom: var(--e-3);
+  border-bottom: var(--b-1) solid var(--linha);
+}
+/* `min-width: 0` desarma o mínimo automático de item de grid (senão "Já era
+   cliente"/"Não, segue lead" empurra a coluna e vaza da folha em vez de
+   quebrar linha). */
+.estatistica { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.rotuloEstatistica {
+  margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+/* --t-valor (26px) só cabe numa coluna larga; nas quatro colunas apertadas da
+   folha, --t-forte (21px) é o maior tamanho que ainda sobra espaço para
+   quebrar só no espaço ("R$" / "113,00"), nunca no meio do número. */
+.valorEstatistica { margin: 0; font-family: var(--f-dado); font-size: var(--t-forte); }
+/* Converteu é texto, não número: --t-valor (26px mono) é feito para "1 h 12"
+   e "R$ 113,00", não para "Não, segue lead". */
+.valorTexto { font-family: var(--f-corpo); font-size: var(--t-forte); white-space: normal; }
+.apoioEstatistica { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.secao { display: flex; flex-direction: column; gap: var(--e-2); }
+.tituloSecao {
+  margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.barraMensagens {
+  display: flex; width: 100%; height: 40px; border-radius: var(--r-1);
+  overflow: hidden; border: var(--b-1) solid var(--linha-forte);
+}
+.parteMensagem {
+  display: flex; align-items: center; justify-content: center; gap: var(--e-1);
+  font-size: var(--t-apoio); font-weight: 700; white-space: nowrap;
+  border-right: var(--b-1) solid var(--linha-forte);
+}
+.parteMensagem:last-child { border-right: 0; }
+.parteCliente { background: var(--ragu-claro); flex-grow: var(--peso, 1); }
+.parteVoce { background: var(--elevado); flex-grow: var(--peso, 1); }
+.parteAutomatico { background: var(--ok-pastel); flex-grow: var(--peso, 1); }
+.semMensagem { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+
+.tabelaVendas { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); }
+/* Achado 4 (pendência 22 da banca 64): cabeçalho em caixa alta pequena, igual
+   a `.tituloSecao`, e a coluna Valor alinhada à direita (número, não texto). */
+.tabelaVendas th {
+  text-align: left; color: var(--tinta-2); font-weight: 600; padding: var(--e-1) var(--e-2);
+  text-transform: uppercase; letter-spacing: 0.04em; font-size: var(--t-micro);
+}
+.tabelaVendas td { padding: var(--e-1) var(--e-2); border-top: var(--b-1) solid var(--linha); }
+.tabelaVendas tfoot td { font-weight: 700; border-top: var(--b-2) solid var(--linha-forte); }
+/* thead/tbody têm 5 células por linha (nth-child bate com a coluna Valor);
+   o tfoot funde as 3 primeiras num colSpan, por isso o Total ganha classe
+   própria em vez de nth-child. */
+.tabelaVendas th:nth-child(4), .tabelaVendas td:nth-child(4) { text-align: right; }
+.totalVendas { text-align: right; }
+
+.marcos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-1); }
+.marco { display: flex; gap: var(--e-2); font-size: var(--t-apoio); }
+.horaMarco { font-family: var(--f-dado); color: var(--tinta-2); min-width: 3.5em; }
+
+.avaliacoes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-4);
+  padding-bottom: var(--e-3); border-bottom: var(--b-1) solid var(--linha);
+}
+.grupoAvaliacao { display: flex; flex-direction: column; gap: var(--e-2); }
+.opcoesAvaliacao { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.botaoAvaliacao { min-height: var(--toque); }
+.semAvaliacao { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.avaliacaoImpressa { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); }
+
+.checkboxNota { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); }
+.anotacaoImpressa { margin: 0; font-size: var(--t-apoio); white-space: pre-wrap; }
+
+.rodape {
+  display: flex; justify-content: space-between; color: var(--tinta-2);
+  font-size: var(--t-apoio); padding-top: var(--e-2);
+}
+
+.canhotoTela { display: flex; justify-content: center; padding: var(--e-4) 0; overflow: auto; }
+.corpoModal { width: 100%; display: flex; flex-direction: column; gap: var(--e-3); }
+
+/* Impressão: página A4 nomeada, para não mudar o `@page` do canhoto térmico
+   (comanda.module.css deixa o dele sem `@page` de propósito). Só o elemento
+   marcado com `page: folha-resumo` usa este tamanho de papel. */
+@page folha-resumo {
+  size: A4;
+  margin: 18mm;
+}
+
+@media print {
+  .folha { page: folha-resumo; width: auto; box-shadow: none; margin: 0; }
+}

@@ -1413,6 +1413,121 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("banner_confirmacoes", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.Campanha", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CriadaPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DisparoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EncerramentoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EnviarLembreteEncerramento")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FiltroJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ImagemUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Mensagem")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("OndaAtual")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TagsRestricaoExcluidas")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("TamanhoOnda")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TemplateMeta")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Status");
+
+                    b.ToTable("campanhas", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.CampanhaDestinatario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CampanhaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClienteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EnviadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MotivoExclusao")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Onda")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("OutboxMensagemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PedidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampanhaId", "ClienteId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_campanha_destinatarios_campanha_cliente");
+
+                    b.HasIndex("ClienteId", "EnviadoEm");
+
+                    b.ToTable("campanha_destinatarios", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_campanha_destinatarios_motivo_exclusao", "\"MotivoExclusao\" IS NULL OR \"MotivoExclusao\" IN ('restricao','limite_semanal','sem_consentimento','bloqueado','sem_telefone','cancelada')");
+                        });
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.InteresseItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8689,7 +8804,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Estrelas")
+                    b.Property<int?>("Estrelas")
                         .HasColumnType("integer");
 
                     b.Property<string>("FotoUrl")
@@ -8714,6 +8829,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("RespostaDaBaba")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("Resultado")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("SolicitadoEm")
                         .HasColumnType("timestamp with time zone");
@@ -10624,6 +10742,21 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
 
                     b.Navigation("Banner");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.CampanhaDestinatario", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Campanhas.Campanha", null)
+                        .WithMany()
+                        .HasForeignKey("CampanhaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.InteresseItem", b =>

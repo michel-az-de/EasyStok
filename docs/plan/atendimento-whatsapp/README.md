@@ -2,7 +2,8 @@
 
 Issues: #1040 (plano original) e #1042 (revisão para Meta direto) · Decisão: ADR-0050 (supersede ADR-0049) · Origem: docs 01-04 em `C:\Users\felip\Downloads\`
 Escopo: **somente backend** (`EasyStock.Api`, `Application`, `Domain`, `Infra.*`, `Worker`). O front do
-operador é outra tecnologia e outro repositório. O site casadababa.com continua consumindo a API.
+operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API módulo a módulo pela
+[matriz de paridade](10-console.md); as specs S não tocam essa pasta. O site casadababa.com continua consumindo a API.
 
 > Este plano foi escrito para ser executado **uma spec por sessão** por um modelo mais barato.
 > Cada spec traz tudo o que a sessão precisa: arquivos a ler, arquivos a criar, testes a escrever
@@ -21,6 +22,7 @@ operador é outra tecnologia e outro repositório. O site casadababa.com continu
 | 7 | [07-poda.md](07-poda.md) | P01–P06 | Remoção do que é SaaS, fiscal, MAUI e alvos de deploy extras |
 | MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno; opção A adotada: gateway único |
 | 8 | [09-sistema-completo.md](09-sistema-completo.md) | S34–S47 | ADR-0051: canal como porta, Instagram, Messenger, chat do site, e-mail e SMS, consentimento por canal, mensagem programada, expediente da loja, atendentes, respostas prontas e automações, lembretes, entregadores e viagens, cadastros, lote de papel, assistente |
+| Console | [10-console.md](10-console.md) | F01–F05 | ADR-0054: o protótipo vira o console do operador neste repositório; matriz de paridade e ordem de ligação à API |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).
@@ -53,6 +55,7 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo ap
 7. **Não faça:** refatorar fora do Escopo; ler além da Leitura mínima; abrir o `graphify`; tocar `EasyStok.Mobile`, `EasyStock.Admin` ou `EasyStock.Web` salvo quando a spec mandar (R8: assinatura pública estendida = todos os call-sites no mesmo commit).
 8. **Stack real:** .NET 10 (`global.json` 10.0.201), EF Core, Postgres. O `CLAUDE.md` diz .NET 8 e o `README.md` diz 9: estão errados, corrigidos em P06.
 9. **Segredos:** nunca em código, issue, log ou teste. Nomes de configuração, sim.
+10. **Registro de serviços (#1178):** use case (`*UseCase` em `UseCases/Atendimento`), ferramenta do agente (`IFerramentaAgente`) e tratador de botão (`IAcaoBotaoHandler`) entram sozinhos por convenção. **Não edite** `ServiceCollectionExtensions.Atendimento.cs` para eles; só para interface própria ou outro ciclo de vida.
 
 ## Prompt de execução (copiar para a sessão do modelo executor)
 

@@ -41,7 +41,7 @@ internal sealed class CobrancaPedidoFixture
 {
     public static readonly DateTime Agora = new(2026, 9, 29, 15, 0, 0, DateTimeKind.Utc);
 
-    public Guid EmpresaId { get; } = Guid.NewGuid();
+    public Guid EmpresaId { get; }
     public Pedido Pedido { get; }
     public List<CobrancaPedido> Cobrancas { get; } = new();
     public List<PedidoEvento> Eventos { get; } = new();
@@ -65,13 +65,23 @@ internal sealed class CobrancaPedidoFixture
     /// <summary>O que <c>payments/search?external_reference=</c> devolve (S32).</summary>
     public List<PagamentoMercadoPago> PagamentosNoMercadoPago { get; } = new();
 
-    public CobrancaPedidoFixture(string status = StatusPedidoMapper.AguardandoPagamento)
+    /// <param name="pedido">Pedido já criado por outro use case (caminho completo); sem ele, um pedido de R$ 25.</param>
+    public CobrancaPedidoFixture(string status = StatusPedidoMapper.AguardandoPagamento, Pedido? pedido = null)
     {
-        Pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
-        Pedido.Status = status;
-        Pedido.Itens.Add(Item("Brigadeiro", 2, 10m));
-        Pedido.Itens.Add(Item("Frete SP Centro", 1, 5m));
-        Pedido.RecalcularTotal();
+        if (pedido is not null)
+        {
+            EmpresaId = pedido.EmpresaId;
+            Pedido = pedido;
+        }
+        else
+        {
+            EmpresaId = Guid.NewGuid();
+            Pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
+            Pedido.Status = status;
+            Pedido.Itens.Add(Item("Brigadeiro", 2, 10m));
+            Pedido.Itens.Add(Item("Frete SP Centro", 1, 5m));
+            Pedido.RecalcularTotal();
+        }
 
         PedidoRepo.GetByIdWithDetailsAsync(EmpresaId, Pedido.Id).Returns(Pedido);
         PedidoRepo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))

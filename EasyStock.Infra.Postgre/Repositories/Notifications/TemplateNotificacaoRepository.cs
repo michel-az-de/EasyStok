@@ -13,10 +13,31 @@ public sealed class TemplateNotificacaoRepository(EasyStockDbContext db) : ITemp
     public async Task<TemplateNotificacao?> GetAtivoAsync(
         string codigo, CanalNotificacao canal, Guid? empresaId, CancellationToken ct = default)
     {
+        if (empresaId is null)
+            return await GetGlobalAtivoAsync(codigo, canal, ct);
+
         return await db.NotifTemplates
             .AsNoTracking()
             .Where(t => t.Codigo == codigo && t.Canal == canal && t.Ativo && t.Aprovado
                         && t.EmpresaId == empresaId)
+            .OrderByDescending(t => t.Versao)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    /// <summary>
+    /// Template global (<c>EmpresaId</c> nulo). No escopo de uma empresa, o filtro do EF e a policy
+    /// <c>tenant_isolation</c> (<c>EmpresaId = app.empresa_id</c>) o escondem, e o fallback para o
+    /// global nunca o achava (S30, provado em <c>DisparoCampanhaIntegrationTests</c>). A leitura
+    /// abre conexão própria com o bypass de RLS e o WHERE só alcança linhas globais. Com a conexão
+    /// já aberta por quem chama, o bypass não se aplica e vale o comportamento anterior.
+    /// </summary>
+    private async Task<TemplateNotificacao?> GetGlobalAtivoAsync(string codigo, CanalNotificacao canal, CancellationToken ct)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.NotifTemplates
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(t => t.Codigo == codigo && t.Canal == canal && t.Ativo && t.Aprovado && t.EmpresaId == null)
             .OrderByDescending(t => t.Versao)
             .FirstOrDefaultAsync(ct);
     }

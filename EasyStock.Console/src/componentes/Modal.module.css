@@ -1,0 +1,88 @@
+/* Modal (rodada 6): folha com raio de painel, sombra em camadas e entrada com
+   mola, subindo 12 px e crescendo de 96%. A cortina escurece e desfoca o que
+   ficou atrás, como a folha do iOS. O React desmonta a caixa ao fechar, então
+   só a entrada tem movimento. */
+.caixa {
+  margin: auto; padding: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-3);
+  background: var(--papel); color: var(--tinta);
+  width: min(560px, calc(100vw - var(--e-6))); max-height: 86dvh; overflow: hidden;
+  box-shadow: var(--sombra-alta), var(--brilho);
+  /* `.caixa` em coluna e `.conteudo` como item flexível de `min-height: 0`
+     (em vez de duas `max-height` iguais soltas, ancestral e filho): garante
+     que o filho é sempre quem rola, nunca depende do conteúdo "adivinhar"
+     que precisa parar antes do rodapé. */
+  display: flex; flex-direction: column;
+}
+.caixa[open] { animation: entrar var(--dur-longa) var(--ease-mola) both; }
+.caixa::backdrop {
+  background: var(--cortina);
+  backdrop-filter: blur(6px) saturate(120%);
+  animation: cortina var(--dur-media) var(--ease-padrao) both;
+}
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(12px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cortina { from { opacity: 0; } to { opacity: 1; } }
+
+.conteudo {
+  padding: var(--e-2) var(--e-5) var(--e-5); overflow-y: auto; flex: 1; min-height: 0;
+  /* Achado do gerente (24/09, canhoto de comanda comprida "aparece cortado
+     dentro da modal"): a rolagem já funcionava, mas sem barra visível (padrão
+     overlay do Chromium) o corte parecia definitivo, sem pista nenhuma de que
+     o resto da folha continua embaixo. Duas correções, as duas sem JS:
+     barra sempre desenhada (linhas abaixo), e a "sombra de rolagem" clássica
+     (dois graus de sombra grudados no scroll, dois graus de tampa do papel
+     grudados no conteúdo): ela só aparece no lado que ainda tem conteúdo para
+     rolar, e some sozinha quando a folha inteira já coube.
+     Achado 2 (banca capricho R10): a sombra em rgba(0,0,0,.18) sumia no tema
+     escuro (--papel já é quase preto, sombra preta em cima não aparece). Cor
+     trocada para --linha-forte, que já é o tom de linha visível dos dois
+     temas (a mesma variável do scrollbar logo abaixo). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--linha-forte) transparent;
+  background-color: var(--papel);
+  background-repeat: no-repeat;
+  background-image:
+    linear-gradient(var(--papel) 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(rgba(255, 255, 255, 0), var(--papel) 70%),
+    radial-gradient(farthest-side at 50% 0, var(--linha-forte), transparent),
+    radial-gradient(farthest-side at 50% 100%, var(--linha-forte), transparent);
+  background-position: top, bottom, top, bottom;
+  background-size: 100% var(--e-5), 100% var(--e-5), 100% 12px, 100% 12px;
+  background-attachment: local, local, scroll, scroll;
+}
+.conteudo::-webkit-scrollbar { width: 10px; }
+.conteudo::-webkit-scrollbar-track { background: transparent; }
+.conteudo::-webkit-scrollbar-thumb {
+  background: var(--linha-forte); border-radius: var(--r-pilula); border: 2px solid var(--papel);
+}
+.caixa h2.titulo {
+  margin: 0; padding: var(--e-5) 56px var(--e-2) var(--e-5); font-size: var(--t-titulo);
+  font-weight: 700; line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); flex: none;
+}
+.sub { margin: 0 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
+.rodape {
+  display: flex; gap: var(--e-2); justify-content: flex-end; flex-wrap: wrap; flex: none;
+  padding: var(--e-3) var(--e-5); border-top: var(--b-1) solid var(--linha);
+}
+@media (max-width: 759px) {
+  .caixa {
+    margin: auto auto 0; width: 100vw; max-height: 92dvh;
+    border-radius: var(--r-3) var(--r-3) 0 0;
+  }
+  .rodape { padding-bottom: calc(var(--e-3) + env(safe-area-inset-bottom, 0px)); }
+  .caixa[open] { animation-name: subirFolha; }
+}
+@keyframes subirFolha {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+.caixa { position: relative; }
+.fecharCanto {
+  position: absolute; top: 14px; right: 14px; z-index: 2;
+  width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--r-pilula);
+  display: grid; place-items: center; background: var(--preenchimento); color: var(--tinta-2);
+}
+.fecharCanto:hover { background: var(--preenchimento-forte); color: var(--tinta); }

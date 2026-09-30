@@ -35,6 +35,15 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// Retorna dicionario produtoId -> lotes; produto sem estoque nao aparece (consumer usa TryGetValue + default vazio).
         /// </summary>
         Task<IReadOnlyDictionary<Guid, IReadOnlyCollection<ItemEstoque>>> GetByProdutosAsync(Guid empresaId, IEnumerable<Guid> produtoIds, Guid? lojaId, CancellationToken ct = default);
+        /// <summary>
+        /// Batch (#1171): saldo disponível somado por produto numa única query
+        /// (<c>WHERE EmpresaId = @e AND ProdutoId IN (...)</c>). Conta só lote com
+        /// <c>QuantidadeAtual &gt; 0</c> e não vencido (mesmo critério de #983 para saída).
+        /// Produto sem saldo não aparece no dicionário (consumer trata ausência como 0).
+        /// Não aplica filtro global de tenant: o caller é o cardápio público anônimo, e o
+        /// isolamento vem do <paramref name="empresaId"/> explícito no WHERE.
+        /// </summary>
+        Task<IReadOnlyDictionary<Guid, decimal>> GetSaldoDisponivelPorProdutosAsync(Guid empresaId, IReadOnlyCollection<Guid> produtoIds, CancellationToken ct = default);
         /// <param name="fefo">true = FEFO (saída pelo lote com validade mais próxima); false = FIFO (saída pela entrada mais antiga).</param>
         /// <param name="incluirVencidos">
         /// false (padrão) = exclui lotes com <c>ValidadeEm</c> vencido (#983) — evita que uma
@@ -43,6 +52,11 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// satisfaz <see cref="Domain.Enums.NaturezaMovimentacaoEstoqueExtensions.PermiteBaixaDeLoteVencido"/>).
         /// </param>
         Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false);
+        /// <summary>
+        /// Lotes do produto (opcionalmente da loja) para o ajuste rápido de saldo (S22): RASTREADOS,
+        /// inclui saldo 0 e descoberto, exclui Descartado. Ordenados do mais antigo para o mais novo.
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetLotesParaAjusteAsync(Guid empresaId, Guid produtoId, Guid? lojaId, CancellationToken ct = default);
         Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId);
         Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId);
         Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id);

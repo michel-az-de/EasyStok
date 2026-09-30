@@ -1,4 +1,4 @@
-namespace EasyStock.Domain.Enums.Notifications;
+﻿namespace EasyStock.Domain.Enums.Notifications;
 
 public enum TipoEventoNotificacao
 {
@@ -59,8 +59,15 @@ public enum TipoEventoNotificacao
     PedidoSaiuParaEntrega = 40,
     PedidoEntregue = 41,
 
+    // Campanhas (S30): a mensagem da onda e o lembrete do encerramento ao cliente, pelo WhatsApp.
+    CampanhaMarketing = 44,
+    CampanhaLembreteEncerramento = 45,
+
     // Atendimento por WhatsApp (S07): o agente passou a conversa para a dona.
     ConversaEscalada = 46,
+
+    // Avaliacao de um toque (S26): pedido de avaliacao ao cliente 30 min apos a entrega.
+    AvaliacaoSolicitada = 42,
 
     // Lembretes da dona (S43): lembrete venceu (manual) ou nasceu do avaliador (pagamento sem baixa,
     // cliente sem resposta). Push para quem e o lembrete, ou para a empresa toda.

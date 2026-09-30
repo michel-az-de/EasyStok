@@ -91,6 +91,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableAvaliadorLembretes)
             services.AddHostedService<AvaliadorLembretesBackgroundService>();
 
+        // S30: campanhas — primeira onda no horário agendado, conciliação com o outbox, encerramento e lembrete.
+        if (options.EnableCampanhaJob)
+            services.AddHostedService<CampanhaJob>();
+
         // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
         if (options.EnableAtendimentoTurnoAgente)
             services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
