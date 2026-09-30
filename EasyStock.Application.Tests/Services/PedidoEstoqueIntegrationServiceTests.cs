@@ -1,3 +1,5 @@
+using EasyStock.Application.Events.Estoque;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Domain.ValueObjects;
@@ -13,15 +15,26 @@ public class PedidoEstoqueIntegrationServiceTests
         IMovimentacaoEstoqueRepository movRepo) Build(
         bool permiteNegativo = false, bool requerEstoque = false)
     {
+        var (svc, itemRepo, movRepo, _) = BuildComPublicador(permiteNegativo, requerEstoque);
+        return (svc, itemRepo, movRepo);
+    }
+
+    private static (PedidoEstoqueIntegrationService svc,
+        IItemEstoqueRepository itemRepo,
+        IMovimentacaoEstoqueRepository movRepo,
+        IPublicadorEventoIntegracao publicador) BuildComPublicador(
+        bool permiteNegativo = true, bool requerEstoque = false)
+    {
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
         var movRepo = Substitute.For<IMovimentacaoEstoqueRepository>();
+        var publicador = Substitute.For<IPublicadorEventoIntegracao>();
         var opts = Options.Create(new PedidoEstoqueOptions
         {
             PermiteEstoqueNegativo = permiteNegativo,
             RequerEstoqueExistente = requerEstoque
         });
-        var svc = new PedidoEstoqueIntegrationService(itemRepo, movRepo, opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
-        return (svc, itemRepo, movRepo);
+        var svc = new PedidoEstoqueIntegrationService(itemRepo, movRepo, publicador, opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
+        return (svc, itemRepo, movRepo, publicador);
     }
 
     private static Pedido PedidoComItem(Guid empresaId, Guid lojaId, Guid produtoId, decimal qty)
@@ -64,9 +77,15 @@ public class PedidoEstoqueIntegrationServiceTests
     }
 
     [Fact]
-    public async Task DescontarAsync_clampa_quando_PermiteNegativo_true()
+    public void PermiteEstoqueNegativo_default_true()
     {
-        var (svc, itemRepo, movRepo) = Build(permiteNegativo: true);
+        new PedidoEstoqueOptions().PermiteEstoqueNegativo.Should().BeTrue();
+    }
+
+    [Fact] // S17 / RN-48: falta de saldo vira descoberto auditável, não bloqueio.
+    public async Task SemSaldoRegistraDescobertoENaoLanca()
+    {
+        var (svc, itemRepo, movRepo, _) = BuildComPublicador(permiteNegativo: true);
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
         var produtoId = Guid.NewGuid();
@@ -85,7 +104,64 @@ public class PedidoEstoqueIntegrationServiceTests
         await svc.DescontarAsync(pedido);
 
         alvo.QuantidadeAtual!.Value.Should().Be(0);
-        await movRepo.Received(1).InsertAsync(Arg.Any<MovimentacaoEstoque>());
+        alvo.QuantidadeDescoberta.Value.Should().Be(3);
+        var item = pedido.Itens.Single();
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m =>
+            m.Quantidade.Value == 5
+            && m.DocumentoReferencia == $"{pedido.Id}:{item.Id}"
+            && m.Descricao == $"pedido {pedido.Id}: 3 un a descoberto"));
+    }
+
+    [Fact] // S17: o desacerto vira evento para S18 (SSE estoque.desacerto) e S22 (ajuste).
+    public async Task SemSaldoPublicaEstoqueDesacertadoEvent()
+    {
+        var (svc, itemRepo, _, publicador) = BuildComPublicador(permiteNegativo: true);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(2)
+            }
+        });
+
+        await svc.DescontarAsync(pedido);
+
+        await publicador.Received(1).PublicarAsync(
+            empresaId,
+            EstoqueDesacertadoEvent.TipoEventoOutbox,
+            "Pedido",
+            pedido.Id,
+            Arg.Is<EstoqueDesacertadoEvent>(e =>
+                e.ProdutoId == produtoId && e.PedidoId == pedido.Id && e.Falta == 3m),
+            Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ComSaldoNaoPublicaEstoqueDesacertadoEvent()
+    {
+        var (svc, itemRepo, _, publicador) = BuildComPublicador(permiteNegativo: true);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(5)
+            }
+        });
+
+        await svc.DescontarAsync(pedido);
+
+        await publicador.DidNotReceiveWithAnyArgs().PublicarAsync<EstoqueDesacertadoEvent>(
+            default, default!, default!, default, default!);
     }
 
     [Fact]

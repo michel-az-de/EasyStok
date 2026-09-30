@@ -1323,6 +1323,49 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("banner_confirmacoes", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.InteresseItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AtendidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CardapioItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClienteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Origem")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardapioItemId");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("EmpresaId", "CardapioItemId")
+                        .HasDatabaseName("ix_interesses_item_abertos_por_item")
+                        .HasFilter("\"AtendidoEm\" IS NULL");
+
+                    b.ToTable("interesses_item", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6051,6 +6094,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("MaxTentativas")
                         .HasColumnType("integer");
 
+                    b.Property<string>("MetadadosJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("ProviderUsado")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -6274,6 +6320,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<string>("MetadadosJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -8646,6 +8695,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int?>("FreteRaioMaxMetros")
                         .HasColumnType("integer");
 
+                    b.Property<string>("InstagramUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -10450,6 +10503,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
 
                     b.Navigation("Banner");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.InteresseItem", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Storefront.CardapioItem", null)
+                        .WithMany()
+                        .HasForeignKey("CardapioItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>

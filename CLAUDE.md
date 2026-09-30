@@ -19,7 +19,7 @@ Decisao fundadora desta versao: ADR-0043 (adocao policy v4.0), que supersede ADR
 - TEST_ARCH:        incluido no gate.ps1
 - GIT_EMAIL:        michel.az.de@gmail.com   (email vinculado a conta -> atribui os commits)
 - GH_ACCOUNT:       michel-az-de
-- AUTO_MERGE_TIER:  baixo = chore/docs/test/fix-trivial (auto no verde); alto = feat/refactor/migracao/auth/RLS/policy (aguarda label `aprovado`)
+- AUTO_MERGE_TIER:  baixo = chore/docs/test/fix-trivial + spec (S/P-numero) de plano aprovado em docs/plan/** (auto no verde, ADR-0055); alto = migracao/auth/RLS/policy (mesmo dentro de spec) e feat/refactor sem spec (aguarda label `aprovado`)
 - HAS_CI:           sim (.github/workflows/ci.yml e outros)
 - LABELS_MODULO:    caixa, nfe, rotulagem, mobile, storefront, pwa, infra, web-api, domain, migrations, admin, web
 - LABELS_PRIO:      priority:p0..p3
@@ -125,7 +125,8 @@ porque ele testa a branch e nao a integracao dela com o trunk de agora.
   8. GATE do PR: detectar checks (`gh pr view --json statusCheckRollup`); ha CI (ci.yml) -> `gh pr checks --watch`.
      Review automatizado: `/code-review` + `pr-review-toolkit:review-pr`. Aceite da issue todo marcado.
   9. MERGE por tier: baixo + verde -> `git switch master && git pull --ff-only`, tree limpo, `gh pr merge --squash --delete-branch`.
-     Alto (feat/refactor/migracao/auth/RLS/policy) -> PR aberto ate label `aprovado`.
+     Spec de plano aprovado (S/P-numero, ADR-0055) sem migracao/auth/RLS/policy = baixo.
+     Alto (migracao/auth/RLS/policy, ou feat/refactor sem spec) -> PR aberto ate label `aprovado`.
  10. CLEANUP: worktree remove+prune; branch local `-d`; `commit-commands:clean_gone`. Depois DoD "zero resquicios".
 
 Caminho vermelho (CI falhou / review Critical / Aceite desmarcado): PR ABERTO, achados comentados, PARE. Nunca mergeia.
@@ -139,7 +140,7 @@ vigia o CI do master (escape `git revert`). Sem GO, hotfix vira tarefa normal. V
 ## §DEFINITION OF DONE — "zero resquicios"
 
 Asseverar por exit code/JSON (nao por texto): Aceite todo marcado; issue CLOSED (`closes #N`); PR MERGED (squash);
-branch remota e local removidas; worktree removido + prune; CI verde no master pos-merge; CHANGELOG atualizado;
+branch remota e local removidas; worktree removido + prune; CI verde no master pos-merge; fragmento `changelog.d/<issue>.md` criado (ADR-0055; nao editar o topo do CHANGELOG.md);
 ADR criado se houve decisao; working tree limpo sem artefatos (R11).
 
 ## 3. PROTOCOLO DE INICIO DE SESSAO

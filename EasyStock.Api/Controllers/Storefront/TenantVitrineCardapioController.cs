@@ -52,7 +52,7 @@ public class TenantVitrineCardapioController(
         if (currentUser.EmpresaId == Guid.Empty)
             context.Result = DataBadRequest(
                 "Sua sessão não está vinculada a uma empresa. Selecione uma empresa para gerenciar a vitrine " +
-                "(SuperAdmin: use o painel admin em /api/admin/storefronts).");
+                "(SuperAdmin: selecione a empresa antes; o cardápio só é editado no contexto dela).");
     }
 
     void IActionFilter.OnActionExecuted(ActionExecutedContext context) { }

@@ -60,7 +60,7 @@ jobs:
       # O CodeQL nao reconhece [IgnoreAntiforgeryToken], entao a regra sai da Api
       # aqui e volta nos controllers que usam cookie (storefront, issue #1088).
       # A lista "+" e conferida pelo CodeQlCsrfFilterTests: usar cookie na Api
-      # sem reincluir o arquivo quebra o gate. Web e Admin nao sao filtrados.
+      # sem reincluir o arquivo quebra o gate. A Web nao e filtrada.
       - name: Filter SARIF (CSRF falso positivo na Api bearer)
         uses: advanced-security/filter-sarif@2da736ff05ef065cb2894ac6892e47b5eac2c3c0 # v1.1
         with:

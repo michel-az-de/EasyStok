@@ -5,6 +5,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- **Painel `EasyStock.Admin` e controllers `Admin*`** (poda P01): saem o projeto Admin e seus testes,
+  19 controllers `Api/Controllers/Admin*` e o `FaturasPdfController` (77 endpoints; 89 com os 12 que
+  saem do `AdminTenantsController`), com os use cases, portas, repositórios e relatórios que só eles usavam (faturas do admin, MRR/inadimplência,
+  dashboard, busca global, frota, status, configurações do sistema, cupons, planos, APK, seed de
+  cenários, helpdesk do cliente). Na Web sai o `POST /auth/impersonate` (handoff que só o Admin
+  chamava). Deploy: sem serviço `admin` no compose Azure, Caddy, Render, Fly e na matriz do
+  `build-images.yml`; `vm-deploy.sh` e scripts de verificação sem o container `easystok-admin`.
+  Ficam as rotas de plataforma sem substituto: `AdminTenantsController` enxuto (criar empresa,
+  consultar, módulos, vínculo do número da Meta), `AdminStorefrontController` e
+  `AdminNotificacoesController`. Tabelas ficam para a P06. (#1169)
+
 ### Fixed
 - Criar usuário em cliente pelo SuperAdmin (`POST api/admin/usuarios-tenant` e "Novo usuário" do
   Admin) respondia 500: o RLS recusava o `Perfil` da empresa alvo porque o token do SuperAdmin não
@@ -19,6 +31,23 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   `pedido.mudou_status` entregue), só dentro da janela do canal e com consentimento transacional; na
   entrada sai uma só (loja fechada > fora do horário > primeiro contato). Migration
   `AddRespostasProntasEAutomacoes` com RLS. (#1182)
+- **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
+  `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
+  Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.
+  Saem com a conversa assumida; só a revogação do transacional no WhatsApp bloqueia. Idempotente por
+  pedido + status. O outbox passa a persistir os metadados do envio (template da Meta e parâmetros),
+  fechando a pendência da S09; `Storefront.InstagramUrl` novo. Pedido pago com `RequerAprovacao` (S12)
+  vai para `AguardandoAprovacaoBaba`. Migration `AddAvisosStatusPedido` (3 colunas nulas).
+- **Webhook do Mercado Pago de ponta a ponta** (S32): `POST /api/webhooks/mercadopago` ganha o
+  `MercadoPagoWebhookProcessor` (antes respondia 500). Só o tópico `payment`; o `data.id` do corpo
+  dispara `GET v1/payments/{id}` e só o que a fonte devolve vale. `approved` confirma o pedido pela S11
+  (`AguardandoPagamento → Aguardando`, `PedidoPagamento`, `pedido.pago`); valor menor e recusa só gravam
+  o motivo (recusa avisa a conversa uma vez); `refunded`/`charged_back` marcam a cobrança `Estornada`.
+  Idempotência pelo id da notificação (numérico) no `WebhookRecebido`. Client: preferência em
+  `POST checkout/preferences`, consulta, `payments/search` por `external_reference` (o job de cobrança
+  confirma webhook perdido antes de expirar), estorno com `X-Idempotency-Key` e `PUT checkout/preferences/{id}`
+  para expirar o link antigo na troca de forma. Corrige o DI que entregava a porta com `HttpClient` sem
+  `BaseAddress`. Sem credencial ainda (onda 0.9). (#1136)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
