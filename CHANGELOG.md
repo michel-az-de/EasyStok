@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Dossiê do cliente ao lado da conversa** (S25): `GET api/clientes/{id}/dossie` e `GET
+  api/atendimento/conversas/{id}/dossie` devolvem a mesma projeção (cadastro, endereços, tags, notas
+  internas, 10 últimos pedidos com itens, item favorito, última compra, bloqueio, preferências,
+  conversas recentes e pedido em andamento). Conversa de lead devolve o dossiê mínimo (nome do perfil e
+  telefone). Sinal de mesmo domicílio por `cep+numero+complemento` normalizado, só com id e nome do
+  outro cadastro (D10). O agente recebe um resumo com as notas marcadas `[interno]`. (#1161)
 - **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
   api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
   api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST
