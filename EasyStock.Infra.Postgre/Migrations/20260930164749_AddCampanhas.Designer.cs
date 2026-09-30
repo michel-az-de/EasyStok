@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930164749_AddCampanhas")]
+    partial class AddCampanhas
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1027,83 +1030,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("mensagens_programadas", (string)null);
                 });
 
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.RegraAutomatica", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AlteradaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CriadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Gatilho")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Ligada")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Texto")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "Gatilho")
-                        .IsUnique()
-                        .HasDatabaseName("ux_regras_automaticas_empresa_gatilho");
-
-                    b.ToTable("regras_automaticas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.RespostaPronta", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AlteradaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("Arquivada")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Atalho")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateTime>("CriadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Texto")
-                        .IsRequired()
-                        .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
-
-                    b.Property<string>("Titulo")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "Atalho")
-                        .IsUnique()
-                        .HasDatabaseName("ux_respostas_prontas_empresa_atalho");
-
-                    b.ToTable("respostas_prontas", (string)null);
-                });
-
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1436,49 +1362,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         {
                             t.HasCheckConstraint("ck_campanha_destinatarios_motivo_exclusao", "\"MotivoExclusao\" IS NULL OR \"MotivoExclusao\" IN ('restricao','limite_semanal','sem_consentimento','bloqueado','sem_telefone','cancelada')");
                         });
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.InteresseItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("AtendidoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CardapioItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClienteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Descricao")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Origem")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime>("RegistradoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CardapioItemId");
-
-                    b.HasIndex("ClienteId");
-
-                    b.HasIndex("EmpresaId", "CardapioItemId")
-                        .HasDatabaseName("ix_interesses_item_abertos_por_item")
-                        .HasFilter("\"AtendidoEm\" IS NULL");
-
-                    b.ToTable("interesses_item", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Categoria", b =>
@@ -6209,9 +6092,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("MaxTentativas")
                         .HasColumnType("integer");
 
-                    b.Property<string>("MetadadosJson")
-                        .HasColumnType("jsonb");
-
                     b.Property<string>("ProviderUsado")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -6435,9 +6315,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
-
-                    b.Property<string>("MetadadosJson")
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -8810,10 +8687,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int?>("FreteRaioMaxMetros")
                         .HasColumnType("integer");
 
-                    b.Property<string>("InstagramUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -10627,20 +10500,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasForeignKey("CampanhaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
-                        .WithMany()
-                        .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Campanhas.InteresseItem", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Storefront.CardapioItem", null)
-                        .WithMany()
-                        .HasForeignKey("CardapioItemId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("EasyStock.Domain.Entities.Cliente", null)
                         .WithMany()

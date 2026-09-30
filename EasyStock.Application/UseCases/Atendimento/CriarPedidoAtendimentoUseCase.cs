@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.CriarPedido;
 
@@ -32,6 +33,9 @@ public sealed class CriarPedidoAtendimentoUseCase(
     IConfiguracaoAtendimentoRepository configuracaoRepository,
     IUnitOfWork unitOfWork)
 {
+    /// <summary>Motivo gravado em <c>Pedido.MotivoRequerAprovacao</c> quando a dona liberou o lead fora de área (S14).</summary>
+    public const string MotivoForaDeArea = "fora_de_area";
+
     public async Task<PedidoReservado> ExecuteAsync(
         CriarPedidoAtendimentoInput input,
         CancellationToken ct = default)
@@ -69,6 +73,10 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 Observacoes: input.Observacoes,
                 Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos)),
             ct);
+
+        // S14: a dona liberou o lead fora de área; pago, o pedido espera por ela (S12/S13), não vai para a cozinha.
+        if (ContextoConversaJson.Ler<bool>(conversa, ContextoConversaJson.ForaDeAreaLiberado))
+            reservado.Pedido.MarcarRequerAprovacao(MotivoForaDeArea);
 
         conversa.DefinirPedidoEmAndamento(reservado.Pedido.Id);
         await unitOfWork.CommitAsync();
