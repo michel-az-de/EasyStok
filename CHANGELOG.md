@@ -6,6 +6,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Dossiê do cliente ao lado da conversa** (S25): `GET api/clientes/{id}/dossie` e `GET
+  api/atendimento/conversas/{id}/dossie` devolvem a mesma projeção (cadastro, endereços, tags, notas
+  internas, 10 últimos pedidos com itens, item favorito, última compra, bloqueio, preferências,
+  conversas recentes e pedido em andamento). Conversa de lead devolve o dossiê mínimo (nome do perfil e
+  telefone). Sinal de mesmo domicílio por `cep+numero+complemento` normalizado, só com id e nome do
+  outro cadastro (D10). O agente recebe um resumo com as notas marcadas `[interno]`. (#1161)
+- **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
+  api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
+  api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST
+  bloquear|desbloquear`: sem saudação nem agente, conversa vai para a dona, `criar_pedido` recusa com
+  `cliente_bloqueado`) e preferências (`PUT preferencias`: `AvisosStatusAtivos`, `ConsentiuMarketing`).
+  Ferramentas do agente `registrar_restricao` e `registrar_nota`. Migration
+  `AddClienteTagNotaBloqueioPreferencias` com RLS. O filtro de avisos de status por
+  `AvisosStatusAtivos` fica para depois da S13. (#1148)
+- **SSE de operação do console** (S18): `GET api/operacao/eventos` com JWT no header `Authorization`
+  (sem token, 401; token sem empresa, 403), eventos nomeados só da empresa da claim e heartbeat a cada
+  25 s. `ConfirmarPagamentoPedidoUseCase` publica `pedido.pago {pedidoId, numero, cliente, total, janela}`
+  e `AtualizarStatusPedidoUseCase` publica `pedido.mudou_status`, sempre depois do commit. O broker
+  in-memory do mobile virou `Api/Services/Operacao/OperacaoEventBroker` e atende os dois canais; o SSE
+  mobile não muda. `IOperacaoEventPublisher` deixa de ser no-op na Api (Worker segue no-op). (#1146)
 - **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
   `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
   `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na

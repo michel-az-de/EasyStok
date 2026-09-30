@@ -55,6 +55,7 @@ public class WebhookWhatsAppControllerTests
             new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
             new OptOutPorPalavra(Substitute.For<IConsentimentoContatoRepository>(), Substitute.For<IConversaRepository>(),
                 new ResolvedorCanal([]), _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
+            Substitute.For<IEscaladorConversa>(),
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance);
 
         var metaOptions = Options.Create(new MetaCloudWhatsAppOptions { VerifyToken = VerifyToken, AppSecret = AppSecret });

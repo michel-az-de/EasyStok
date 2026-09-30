@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
@@ -12,7 +13,7 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class AtualizarStatusPedidoUseCaseTests
 {
-    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true)
+    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null)
     {
         var pedidoRepo = Substitute.For<IPedidoRepository>();
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
@@ -28,7 +29,8 @@ public class AtualizarStatusPedidoUseCaseTests
             criarContaReceber, NullLogger<GerarContaReceberDePedidoUseCase>.Instance);
         var opts = Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = permiteNegativo });
         var integ = new PedidoEstoqueIntegrationService(itemRepo, movRepo, Substitute.For<IPublicadorEventoIntegracao>(), opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
-        var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, publicador, uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
+        var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, publicador,
+            operacaoEventos ?? Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
         return (uc, pedidoRepo, itemRepo, movRepo, uow, publicador);
     }
 
@@ -168,5 +170,42 @@ public class AtualizarStatusPedidoUseCaseTests
 
         item.QuantidadeAtual!.Value.Should().Be(10); // devolvidos 2 unidades
         pedido.Status.Should().Be("cancelado");
+    }
+
+    [Fact]
+    public async Task PublicaMudouStatusNaOperacaoAposCommit()
+    {
+        var operacao = Substitute.For<IOperacaoEventPublisher>();
+        var (uc, repo, _, _, uow, _) = Build(operacaoEventos: operacao);
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1);
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "preparando"));
+
+        Received.InOrder(() =>
+        {
+            uow.CommitAsync();
+            operacao.PublicarAsync(EventosOperacao.PedidoMudouStatus, empresaId,
+                Arg.Is<PedidoMudouStatusOperacao>(e =>
+                    e.PedidoId == pedido.Id && e.StatusAntigo == "aguardando" && e.StatusNovo == "preparando"),
+                Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task CommitFalhaNaoPublicaNaOperacao()
+    {
+        var operacao = Substitute.For<IOperacaoEventPublisher>();
+        var (uc, repo, _, _, uow, _) = Build(operacaoEventos: operacao);
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1);
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        uow.CommitAsync().Returns<int>(_ => throw new InvalidOperationException("commit falhou"));
+
+        var act = () => uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "preparando"));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        operacao.ReceivedCalls().Should().BeEmpty();
     }
 }

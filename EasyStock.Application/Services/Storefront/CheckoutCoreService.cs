@@ -2,6 +2,7 @@ using EasyStock.Domain.Enums.Storefront;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -28,7 +29,14 @@ public sealed record CheckoutCoreInput(
     string Origem,
     string? Slug = null,
     Guid? EmpresaId = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    PrazoPreparoCheckout? Prazo = null);
+
+/// <summary>
+/// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
+/// agora + <c>CalculadoraPrazoPedido.PrazoMinimo</c> dos itens. Nulo (site) não corta.
+/// </summary>
+public sealed record PrazoPreparoCheckout(int TempoPreparoPadraoMinutos, int RespiroMinutos);
 
 /// <summary>
 /// Pedido em <c>AguardandoPagamento</c> com a vaga ocupada. <see cref="Itens"/> são os itens do
@@ -71,9 +79,13 @@ public sealed class CheckoutCoreService(
     IVagaOcupadaRepository vagaOcupadaRepository,
     IPedidoStorefrontRepository pedidoRepository,
     IExpedienteLojaRepository expedienteLojaRepository,
-    ILogger<CheckoutCoreService> logger)
+    ILogger<CheckoutCoreService> logger,
+    TimeProvider timeProvider)
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
+
+    /// <summary>Motivo da recusa quando a janela começa antes de agora + prazo mínimo (S16).</summary>
+    public const string JanelaAbaixoDoPrazo = "janela_abaixo_do_prazo";
 
     /// <summary>
     /// Valida CEP e carrinho antes de qualquer consulta. Devolve o CEP só com dígitos.
@@ -146,6 +158,19 @@ public sealed class CheckoutCoreService(
         // ── Validar e carregar itens do cardápio ──────────────────────────
         var cardapioItens = await CarregarItensCardapioAsync(
             storefront.Id, input.Itens!.Select(i => i.CardapioItemId), ct);
+
+        // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
+        // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar.
+        if (input.Prazo is { } prazo)
+        {
+            var prazoMinimo = CalculadoraPrazoPedido.PrazoMinimo(
+                cardapioItens.Values.Select(ci => ci.TempoPreparoMinutos),
+                prazo.TempoPreparoPadraoMinutos,
+                prazo.RespiroMinutos);
+            if (!CalculadoraPrazoPedido.AtendePrazo(
+                    input.DataEntrega, janela.HoraInicio, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
+                throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
+        }
 
         logger.LogInformation(
             "Checkout fase-validacao ok storefrontId={StorefrontId} clienteId={ClienteId} elapsed={Ms}ms",
@@ -232,7 +257,7 @@ public sealed class CheckoutCoreService(
     }
 
     /// <summary>
-    /// Carrega os itens do cardápio pedidos. Item inexistente ou invisível recusa o checkout.
+    /// Carrega os itens do cardápio pedidos. Item inexistente, invisível ou esgotado recusa o checkout.
     /// </summary>
     public async Task<IReadOnlyDictionary<Guid, CardapioItem>> CarregarItensCardapioAsync(
         Guid storefrontId,
@@ -244,7 +269,7 @@ public sealed class CheckoutCoreService(
         foreach (var itemId in cardapioItemIds.Distinct())
         {
             var ci = await cardapioItemRepository.GetByIdAsync(storefrontId, itemId, ct);
-            if (ci is null || !ci.Visivel)
+            if (ci is null || !ci.Visivel || !ci.Disponivel)
                 throw new RegraDeDominioVioladaException(
                     $"Item de cardápio {itemId} não encontrado ou indisponível.");
             cardapioItens[itemId] = ci;

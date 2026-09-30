@@ -50,6 +50,7 @@ internal sealed class CobrancaPedidoFixture
     public IStorefrontRepository StorefrontRepo { get; } = Substitute.For<IStorefrontRepository>();
     public IMercadoPagoClient MpClient { get; } = Substitute.For<IMercadoPagoClient>();
     public IPublicadorEventoIntegracao Publicador { get; } = Substitute.For<IPublicadorEventoIntegracao>();
+    public IOperacaoEventPublisher OperacaoEventos { get; } = Substitute.For<IOperacaoEventPublisher>();
     public ITenantContextAccessor Tenant { get; } = Substitute.For<ITenantContextAccessor>();
     public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
     public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
@@ -91,7 +92,7 @@ internal sealed class CobrancaPedidoFixture
                 return new PreferenceCriadaResult($"pref-{sequencia}", $"https://mp.test/pref-{sequencia}");
             });
 
-        Uow.SetupExecuteInTransactionSemRetry<ConfirmarPagamentoPedidoResult>();
+        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?)>();
         Uow.SetupExecuteInTransactionSemRetry<CobrancaPedidoResult>();
         Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?)>();
         Uow.SetupExecuteInTransactionSemRetry<DesfazerPagamentoManualResult>();
@@ -139,7 +140,7 @@ internal sealed class CobrancaPedidoFixture
     public ConfirmarPagamentoPedidoUseCase Confirmar() =>
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
-            Publicador, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance);
+            Publicador, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance);
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, Uow, Relogio);
