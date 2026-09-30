@@ -70,6 +70,12 @@ public static partial class ServiceCollectionExtensions
 
         // S47: assistente da dona (somente leitura, sem ferramentas).
         services.AddScoped<AssistenteDonaUseCase>();
+        // S36: chat do site (canal próprio, sem provedor externo)
+        services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, CanalChatSite>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.AcessoChatSite>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.AbrirSessaoChatSiteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.EnviarMensagemVisitanteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.ChatSite.ListarMensagensChatSiteUseCase>();
 
         return services;
     }
