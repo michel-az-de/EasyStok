@@ -11,6 +11,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Respostas prontas e mensagens automáticas** (S42): `RespostaPronta` (atalho único por empresa, 409
+  no duplicado) e `RegraAutomatica` (uma por gatilho: primeiro contato, fora do horário, loja fechada,
+  pagamento confirmado, pós-entrega e encerramento). CRUD em `api/atendimento/respostas-prontas` (com
+  `GET {id}/render?conversaId=` que recusa variável sem valor) e `api/atendimento/automacoes`. O
+  disparo roda nos handlers do outbox (`conversa.aberta`, `conversa.encerrada`, `pedido.pago`,
+  `pedido.mudou_status` entregue), só dentro da janela do canal e com consentimento transacional; na
+  entrada sai uma só (loja fechada > fora do horário > primeiro contato). Migration
+  `AddRespostasProntasEAutomacoes` com RLS. (#1182)
 - **Canhoto e fila de impressão** (S20): o pedido pago entra em `impressoes_pendentes` na mesma
   transação do `ConfirmarPagamentoPedidoUseCase` e sai `impressao.pendente` no SSE depois do commit.
   `GET api/pedidos/{id}/canhoto?formato=html|texto` (html de 80 mm com o CSS do recibo; texto de 42
