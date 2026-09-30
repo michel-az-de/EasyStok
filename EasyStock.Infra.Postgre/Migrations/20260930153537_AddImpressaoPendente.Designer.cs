@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930153537_AddImpressaoPendente")]
+    partial class AddImpressaoPendente
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -6759,10 +6762,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("aprovado_por_usuario_id");
 
-                    b.Property<DateTime?>("AtrasoNotificadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("atraso_notificado_em");
-
                     b.Property<DateTime?>("AvaliacaoSolicitadaEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("avaliacao_solicitada_em");
@@ -6793,10 +6792,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("EntreguEm")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("InicioPrevistoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("inicio_previsto_em");
 
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid");
@@ -6863,10 +6858,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("ClienteId");
 
                     b.HasIndex("EmpresaId");
-
-                    b.HasIndex("InicioPrevistoEm")
-                        .HasDatabaseName("ix_pedidos_atraso_pendente")
-                        .HasFilter("\"Status\" = 'aguardando' AND atraso_notificado_em IS NULL AND inicio_previsto_em IS NOT NULL");
 
                     b.HasIndex("LojaId");
 
