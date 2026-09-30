@@ -49,7 +49,8 @@ public sealed record AtualizarRotinaCommand(
     Guid RotinaId,
     string? CronExpression,
     string? ParametrosJson,
-    string AtualizadoPor) : ICommand;
+    string AtualizadoPor,
+    Guid EmpresaId) : ICommand;
 
 public sealed class AtualizarRotinaUseCase(
     IRotinaRepository rotinaRepository,
@@ -58,8 +59,7 @@ public sealed class AtualizarRotinaUseCase(
 {
     public async Task<RotinaResult> ExecuteAsync(AtualizarRotinaCommand command)
     {
-        var rotina = await rotinaRepository.GetByIdAsync(command.RotinaId)
-            ?? throw new InvalidOperationException($"Rotina {command.RotinaId} não encontrada.");
+        var rotina = await rotinaRepository.ObterDaEmpresaAsync(command.RotinaId, command.EmpresaId);
 
         if (command.CronExpression is not null)
             rotina.DefinirCronExpression(command.CronExpression, command.AtualizadoPor);
@@ -75,8 +75,8 @@ public sealed class AtualizarRotinaUseCase(
 
 // ── Ativar / Desativar ────────────────────────────────────────────────────────
 
-public sealed record AtivarRotinaCommand(Guid RotinaId, string AtualizadoPor) : ICommand;
-public sealed record DesativarRotinaCommand(Guid RotinaId, string AtualizadoPor) : ICommand;
+public sealed record AtivarRotinaCommand(Guid RotinaId, string AtualizadoPor, Guid EmpresaId) : ICommand;
+public sealed record DesativarRotinaCommand(Guid RotinaId, string AtualizadoPor, Guid EmpresaId) : ICommand;
 public sealed record AtivarRotinaResult(bool Ativa);
 
 public sealed class AtivarRotinaUseCase(
@@ -86,8 +86,7 @@ public sealed class AtivarRotinaUseCase(
 {
     public async Task<AtivarRotinaResult> ExecuteAsync(AtivarRotinaCommand command)
     {
-        var rotina = await rotinaRepository.GetByIdAsync(command.RotinaId)
-            ?? throw new InvalidOperationException($"Rotina {command.RotinaId} não encontrada.");
+        var rotina = await rotinaRepository.ObterDaEmpresaAsync(command.RotinaId, command.EmpresaId);
 
         rotina.Ativar(command.AtualizadoPor);
         await rotinaRepository.UpdateAsync(rotina);
@@ -103,8 +102,7 @@ public sealed class DesativarRotinaUseCase(
 {
     public async Task<AtivarRotinaResult> ExecuteAsync(DesativarRotinaCommand command)
     {
-        var rotina = await rotinaRepository.GetByIdAsync(command.RotinaId)
-            ?? throw new InvalidOperationException($"Rotina {command.RotinaId} não encontrada.");
+        var rotina = await rotinaRepository.ObterDaEmpresaAsync(command.RotinaId, command.EmpresaId);
 
         rotina.Desativar(command.AtualizadoPor);
         await rotinaRepository.UpdateAsync(rotina);

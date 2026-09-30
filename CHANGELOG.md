@@ -23,6 +23,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Alerta de desacerto e ajuste rápido de saldo** (S22): `GET api/estoque/desacertos` lista os
+  produtos com `QuantidadeDescoberta > 0` com texto legível citando os pedidos (sem tabela nova).
+  `POST api/estoque/desacertos/{produtoId}/ajustar` recebe a contagem e o motivo, reusa
+  `ItemEstoque.AplicarAjusteContagem` numa contagem de um produto já aplicada, grava `AjusteInventario`
+  e movimentação de ajuste por lote, zera o descoberto e publica `estoque.desacerto_resolvido`.
+  Exige `GerenciarEstoque`. (#1181)
 - **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
   `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
   Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.

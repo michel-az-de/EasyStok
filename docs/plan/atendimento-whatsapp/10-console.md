@@ -13,14 +13,14 @@ backend já está no master. Quando o módulo fica em paridade, a tela legada da
 | `caixa-de-entrada`, `atendimento` (lista, thread, assumir, responder, encerrar) | S04, S07, S34 | Sim | `api/atendimento/conversas` (+ `/mensagens`, `/assumir`, `/liberar-automatico`, `/encerrar`, `/marcar-lida`) | Nenhuma |
 | `anexos` | S02 | Sim | `api/atendimento/conversas/{id}/mensagens/imagem` | Nenhuma |
 | `agente` (painel do automático) | S06 | Sim | o agente roda na API; o console só mostra estado e sugestão | `servidor/agente.mjs` do próprio console |
-| `assistente` | S47 | Sim | `api/atendimento/assistente` | Nenhuma |
-| `gestao` (expediente, configuração) | S08, S40 | Sim | `api/atendimento/configuracao`, `api/atendimento/expediente` | Nenhuma |
-| `ficha-cliente` (consentimento) | S38 | Sim | `api/atendimento/clientes/{id}/consentimentos` | Nenhuma |
+| `assistente` (ligado na F02) | S47 | Sim | `api/atendimento/assistente` | Nenhuma |
+| `gestao` (expediente, configuração; ligado na F02) | S08, S40 | Sim | `api/atendimento/configuracao`, `api/atendimento/expediente` | Nenhuma |
+| `ficha-cliente` (consentimento; ligado na F02) | S38 | Sim | `api/atendimento/clientes/{id}/consentimentos` | Nenhuma |
 | Mensagem programada (dentro de `atendimento`) | S39 | Sim | `api/atendimento/mensagens-programadas` | Nenhuma |
 | `encerramento` (pedido e cobrança) | S10, S11 | Não (S10 na PR #1112, S11 na issue #1115) | `api/storefront/{slug}/checkout` e o do S11 | PWA do caixa (`Api/wwwroot/pwa`), a medir na F03 |
 | `entregas` | S12, S14, S44 | S45 parte 1 sim; o resto não | `api/minha-vitrine/entrega` | a medir na F04 |
 | `cozinha` | S19, S20, S21 | Não | SSE do S18 | KDS atual (`Api/Mobile/Controllers/KdsController.cs`) |
-| `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/admin/storefronts/{id}/cardapio`, `api/storefront/{slug}/menu` | a medir |
+| `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/minha-vitrine/cardapio`, `api/minha-vitrine/configuracao`, `api/storefront/{slug}/menu` | a medir |
 | `ficha-cliente` (tags, notas, dossiê), `notas` | S24, S25 | Não | a definir na spec | a medir |
 | `respostas`, `automacoes` | S42 | Não | a definir na spec | Nenhuma |
 | `lembretes` | S43 | Não | a definir na spec | Nenhuma |
@@ -59,3 +59,37 @@ marcar como lida chamam os endpoints do S07. Atualização por polling curto at�
 - [ ] Console publicado em `app.easystok.online` atrás do Caddy compartilhado (GO de deploy próprio).
 
 **Fora.** SSE, cobrança, cozinha, agente no navegador.
+
+## F02 · Gestão, assistente e consentimento na API real
+
+Issue #1201. Base: a F01 (`feat/console-caixa-real-f01-1132`).
+
+**Problema.** No modo API, abrir e fechar a loja, editar o horário, configurar o atendimento, perguntar
+ao assistente e marcar os avisos da Ficha mudavam só a memória do navegador; recarregar perdia tudo.
+
+**Abordagem.** Um módulo por endpoint em `src/infra/api/` (`expedienteApi`, `configuracaoApi`,
+`assistenteApi`, `consentimentosApi`) e as ações em `src/aplicacao/api/`, compostas em `comApi`:
+- Expediente (S40): carrega ao entrar e ao abrir a aba; o botão do topo grava `ForcarAberta` ou
+  `ForcarFechada`; editar o horário em Mensagens automáticas grava a semana (espera de 800 ms);
+  a aba **Atendimento** da Gestão (só no modo API) tem "Voltar a seguir o horário" e as mensagens de
+  fora do horário e loja fechada. Dia sem turno na API é dia fechado no console.
+- Configuração (S08): mesma aba, formulário com tom, sugestões, saudações, frases, respiro, preparo e
+  a chave do automático; o que a API devolve no PUT volta para o formulário.
+- Assistente (S47): o balão pergunta à API com o `conversaId`; o 503 sem chave da Anthropic aparece
+  como erro no próprio balão.
+- Consentimento (S38): os checkboxes E-mail e SMS da Ficha leem e gravam a finalidade Transacional
+  daquele canal e mostram `podeEnviar` (transacional sai por padrão; desmarcar revoga). Só com
+  `clienteId`; lead sem cadastro vê o aviso para cadastrar.
+
+Erro de carga ou gravação aparece na FaixaApi (expediente) ou ao lado do controle (configuração,
+avisos, assistente); no erro do controle manual o estado volta ao que a API tem.
+
+**Aceite.**
+- [x] `npm run qualidade` verde; fronteira de camadas ok.
+- [x] Sem `VITE_FONTE_DADOS`, o console abre como hoje, com a massa (sem a aba Atendimento).
+- [x] Abrir e fechar a loja pelo topo reflete no expediente (validado pelo Felipe em 2026-09-30).
+- [x] A configuração salva e recarrega (validado pelo Felipe em 2026-09-30).
+- [x] O assistente responde (validado pelo Felipe em 2026-09-30).
+- [x] E-mail e SMS da Ficha gravam e voltam após recarregar (validado pelo Felipe em 2026-09-30).
+
+**Fora.** Mensagem programada (S39), finalidade Marketing na Ficha, SSE do expediente.

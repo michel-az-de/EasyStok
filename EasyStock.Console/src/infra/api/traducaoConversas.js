@@ -58,6 +58,8 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
   return {
     id: resumo.id,
     conta: resumo.clienteId ? 'cliente' : 'lead',
+    // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
+    clienteId: resumo.clienteId ?? null,
     nome: resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,

@@ -27,6 +27,9 @@ namespace EasyStock.Infra.Postgre.Repositories
             return Task.CompletedTask;
         }
 
+        public Task AddAjusteAsync(AjusteInventario ajuste, CancellationToken ct = default) =>
+            dbContext.AjustesInventario.AddAsync(ajuste, ct).AsTask();
+
         public async Task<IReadOnlyList<ItemEstoque>> GetLotesDoEscopoAsync(
             Guid empresaId, EscopoContagem escopo, Guid? escopoRefId)
         {

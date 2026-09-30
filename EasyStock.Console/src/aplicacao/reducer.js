@@ -236,6 +236,14 @@ const CASOS_API = {
   [acao.AVISO_API]: (estado, { mensagem }) => ({
     ...estado, sincronizacao: { ...estado.sincronizacao, aviso: mensagem },
   }),
+
+  // A API é a verdade do expediente: horário e controle manual substituem o local.
+  [acao.SINCRONIZAR_EXPEDIENTE]: (estado, { funcionamento, lojaAberta, mensagemForaDoHorario, mensagemLojaFechada }) => ({
+    ...estado,
+    funcionamento,
+    lojaAberta,
+    expediente: { carregado: true, mensagemForaDoHorario, mensagemLojaFechada },
+  }),
 }
 
 const CASOS = {

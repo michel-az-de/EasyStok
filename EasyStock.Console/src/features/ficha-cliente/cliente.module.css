@@ -54,6 +54,7 @@
    ou não. Mesma linha do resto do cadastro, dois toques lado a lado. */
 .avisosCanais { display: flex; gap: var(--e-4); flex-wrap: wrap; }
 .avisoCanal { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
+.avisoErro { flex-basis: 100%; font-size: var(--t-apoio); color: var(--perigo); }
 
 .avisoEmLinha {
   display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
