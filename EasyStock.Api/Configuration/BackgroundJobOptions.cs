@@ -44,6 +44,13 @@ public sealed class BackgroundJobOptions
     public bool EnableCobrancaPedido { get; set; } = true;
 
     /// <summary>
+    /// Quando <c>true</c>, registra o <c>ImpressaoPendenteAlertaJob</c> (S20): a cada 2 min publica
+    /// <c>impressao.atrasada</c> para canhoto pendente há mais de 3 min
+    /// (<c>BackgroundJobs:EnableImpressaoPendenteAlerta</c>). Default true; <c>false</c> desliga o alerta.
+    /// </summary>
+    public bool EnableImpressaoPendenteAlerta { get; set; } = true;
+
+    /// <summary>
     /// Quando <c>true</c>, registra o <c>PedidoAtrasoJob</c> (S21) que roda a cada 60 s publicando
     /// <c>pedido.atrasado</c> uma vez por pedido aguardando com o início previsto vencido
     /// (<c>BackgroundJobs:EnablePedidoAtraso</c>). Default true; <c>false</c> é o rollback do job.

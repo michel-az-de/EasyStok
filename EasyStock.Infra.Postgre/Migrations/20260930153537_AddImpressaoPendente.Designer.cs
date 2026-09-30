@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20260930163257_AddAvisosStatusPedido")]
-    partial class AddAvisosStatusPedido
+    [Migration("20260930153537_AddImpressaoPendente")]
+    partial class AddImpressaoPendente
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -5977,9 +5977,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("MaxTentativas")
                         .HasColumnType("integer");
 
-                    b.Property<string>("MetadadosJson")
-                        .HasColumnType("jsonb");
-
                     b.Property<string>("ProviderUsado")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -6204,9 +6201,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<string>("MetadadosJson")
-                        .HasColumnType("jsonb");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -6326,6 +6320,50 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_web_push_usuario_ativo");
 
                     b.ToTable("notif_web_push_subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Operacao.ImpressaoPendente", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Erro")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ImpressaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LojaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PedidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tentativas")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PedidoId");
+
+                    b.HasIndex("EmpresaId", "Status", "CriadaEm")
+                        .HasDatabaseName("ix_impressoes_pendentes_empresa_status_criada");
+
+                    b.ToTable("impressoes_pendentes", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.CobrancaPedido", b =>
@@ -6724,10 +6762,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("aprovado_por_usuario_id");
 
-                    b.Property<DateTime?>("AtrasoNotificadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("atraso_notificado_em");
-
                     b.Property<DateTime?>("AvaliacaoSolicitadaEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("avaliacao_solicitada_em");
@@ -6758,10 +6792,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("EntreguEm")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("InicioPrevistoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("inicio_previsto_em");
 
                     b.Property<Guid?>("LojaId")
                         .HasColumnType("uuid");
@@ -6828,10 +6858,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("ClienteId");
 
                     b.HasIndex("EmpresaId");
-
-                    b.HasIndex("InicioPrevistoEm")
-                        .HasDatabaseName("ix_pedidos_atraso_pendente")
-                        .HasFilter("\"Status\" = 'aguardando' AND atraso_notificado_em IS NULL AND inicio_previsto_em IS NOT NULL");
 
                     b.HasIndex("LojaId");
 
@@ -8533,10 +8559,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<int?>("FreteRaioMaxMetros")
                         .HasColumnType("integer");
-
-                    b.Property<string>("InstagramUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
@@ -11363,6 +11385,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Empresa");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Operacao.ImpressaoPendente", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Pedido", null)
+                        .WithMany()
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Pagamentos.CobrancaPedido", b =>

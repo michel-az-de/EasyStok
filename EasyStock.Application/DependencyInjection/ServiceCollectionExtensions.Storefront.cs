@@ -53,6 +53,13 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();
         services.AddScoped<EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa>();
 
+        // S20: canhoto e fila de impressão (o pedido pago entra na fila dentro do ConfirmarPagamento).
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.MontarCanhotoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ListarImpressoesPendentesUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.RegistrarRetornoImpressaoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.ReimprimirCanhotoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.AlertarImpressoesAtrasadasUseCase>();
+
         // S40: expediente da loja (abrir e fechar, horário por dia).
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.ObterExpedienteLojaUseCase>();
         // S45: cadastro de janelas, zonas e bloqueios pela própria loja

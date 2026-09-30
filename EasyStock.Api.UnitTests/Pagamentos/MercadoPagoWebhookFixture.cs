@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -76,7 +77,7 @@ internal sealed class MercadoPagoWebhookFixture
         MpClient.ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(ci => Pagamentos.GetValueOrDefault(ci.Arg<string>()));
 
-        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>();
         Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
     }
@@ -96,7 +97,7 @@ internal sealed class MercadoPagoWebhookFixture
         var relogio = new RelogioFixoMp(Agora);
         var confirmar = new ConfirmarPagamentoPedidoUseCase(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
-            Publicador, Substitute.For<IOperacaoEventPublisher>(), tenant, Uow, relogio,
+            Publicador, Substitute.For<IOperacaoEventPublisher>(), Substitute.For<IImpressaoPendenteRepository>(), tenant, Uow, relogio,
             NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()));
         var aviso = new AvisoCobrancaConversa(Substitute.For<IConversaRepository>(),
