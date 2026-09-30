@@ -1,5 +1,5 @@
 using EasyStock.Api.Mobile.Security;
-using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Services.Operacao;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -7,7 +7,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 
 /// <summary>
 /// KDS (Kitchen Display System) — versao alpha. Display dedicado pra cozinha
-/// que escuta o stream SSE existente (mutations-applied via MobileEventBroker)
+/// que escuta o stream SSE existente (mutations-applied via OperacaoEventBroker)
 /// e mostra pedidos abertos com botao "Pronto" pra bumpar.
 ///
 /// Reusa toda a infra mobile existente: pareamento via X-Mobile-Api-Key,
@@ -25,7 +25,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 [AllowAnonymous]
 public class KdsController(
     EasyStockDbContext db,
-    MobileEventBroker eventBroker,
+    OperacaoEventBroker eventBroker,
     ILogger<KdsController> log) : ControllerBase
 {
     private static readonly HashSet<string> StatusesPermitidos = new(StringComparer.OrdinalIgnoreCase)
