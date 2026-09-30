@@ -17,6 +17,7 @@ using EasyStock.Application.UseCases.RemoverClienteDocumento;
 using EasyStock.Application.UseCases.ObterClienteDetalhes;
 using EasyStock.Application.UseCases.ClienteCrm;
 using EasyStock.Application.UseCases.Campanhas;
+using EasyStock.Application.UseCases.Cliente.Dossie;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -67,6 +68,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterCampanhaUseCase>();
         services.AddScoped<ListarCampanhasUseCase>();
         services.AddScoped<CancelarCampanhaUseCase>();
+        // Dossiê do cliente ao lado da conversa (S25)
+        services.AddScoped<ObterDossieClienteUseCase>();
 
         return services;
     }

@@ -340,6 +340,22 @@
         public DateTime AlteradoEm { get; set; }
 
         public Cliente? Cliente { get; set; }
+
+        /// <summary>
+        /// Chave do sinal "mesmo domicílio" (S25, RN-13): <c>cep|numero|complemento</c> com a
+        /// normalização de <see cref="Storefront.FreteZona"/> (CEP só dígitos; texto sem acento e
+        /// minúsculo). Sem CEP de 8 dígitos ou sem número não há chave: endereço incompleto não
+        /// aproxima cadastros.
+        /// </summary>
+        public static string? ChaveDomicilio(string? cep, string? numero, string? complemento)
+        {
+            var cepNorm = Storefront.FreteZona.NormalizarCep(cep);
+            if (cepNorm.Length != 8) return null;
+            var numeroNorm = Storefront.FreteZona.NormalizarBairro(numero ?? string.Empty);
+            if (numeroNorm.Length == 0) return null;
+            var complementoNorm = Storefront.FreteZona.NormalizarBairro(complemento ?? string.Empty);
+            return $"{cepNorm}|{numeroNorm}|{complementoNorm}";
+        }
     }
 
     /// <summary>Telefone extra. Cliente pode ter vários. Um Principal.</summary>
