@@ -23,11 +23,6 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
-- **Ocorrência e reembolso** (S27): tabela `ocorrencias` (RLS) e `api/ocorrencias` (listar, obter, abrir,
-  resolver). Abrir com conversa escala para a dona e publica `ocorrencia.aberta`. Resolver com reembolso
-  estorna a cobrança paga (idempotência pelo id da ocorrência), grava `ClienteNota` e enfileira
-  `ReembolsoEfetuado`; valor acima do pago dá 400; pago fora do gateway responde
-  `reembolso_manual_necessario`; estorno recusado pelo Mercado Pago dá 502 e a ocorrência segue aberta. (#1186)
 - **Avisos de status do pedido ao cliente pelo WhatsApp** (S13, #1142): pagamento confirmado,
   `preparando` (com a previsão da janela), `saiu_para_entrega` e `entregue` (agradecimento com o
   Instagram da loja) viram mensagem no outbox de notificações, canal WhatsApp, categoria transacional.

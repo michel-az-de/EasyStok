@@ -1,0 +1,188 @@
+/* Comanda com cara de comanda (seção 7 da direção visual). Papel de cozinha:
+   fundo creme/escuro próprio, borda e serrilhado na base. Sem textura, sem
+   fonte manuscrita, sem papel torto: o gesto é só a base dentada. */
+
+.comanda {
+  position: relative;
+  background: var(--comanda);
+  border: var(--b-1) solid var(--linha-forte);
+  border-bottom: 0;
+  border-radius: var(--r-2) var(--r-2) 0 0;
+  box-shadow: var(--sombra-media);
+  padding: var(--e-4);
+  margin-bottom: 8px;
+  color: var(--tinta);
+  font-family: var(--f-papel);
+}
+
+/* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
+   pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,
+   então a faixa "recorta" a borda de baixo em vez de desenhar uma linha reta. */
+.comanda::after {
+  content: '';
+  position: absolute; left: -1px; right: -1px; bottom: -5px; height: 5px;
+  background-image:
+    linear-gradient(135deg, var(--comanda) 50%, transparent 50.5%),
+    linear-gradient(45deg, transparent 49.5%, var(--comanda) 50%);
+  background-size: 8px 5px;
+  background-position: 0 0, 4px 0;
+  background-repeat: repeat-x;
+}
+
+/* Soltar aqui (seção 9): borda tracejada --ragu quando um prato arrastado do
+   cardápio está sobre a comanda. */
+.alvoArrasto { border-style: dashed; border-width: var(--b-2); border-color: var(--ragu); }
+.soltarAqui {
+  margin: 0 0 var(--e-3); padding: var(--e-2); text-align: center;
+  border: var(--b-1) dashed var(--ragu); border-radius: var(--r-1);
+  background: var(--ragu-claro); color: var(--ragu); font-weight: 700;
+}
+
+.cabecalho { margin: 0 0 var(--e-3); text-align: center; }
+.linhaCabecalho { display: flex; align-items: baseline; justify-content: center; gap: var(--e-2); }
+.linhaCabecalho h2 {
+  margin: 0; font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto);
+}
+.numero { font-family: var(--f-papel); font-size: var(--t-titulo); }
+.subCabecalho { margin: var(--e-1) 0 0; font-size: var(--t-corpo); color: var(--tinta-2); border-top: repeating-linear-gradient(to right, var(--linha-forte) 0 6px, transparent 6px 10px); padding-top: var(--e-2); }
+
+/* Tracejado de 2 px, traço de 6 px e vão de 4 px, entre cabeçalho, grupos e
+   total (a régua exata da direção, não uma borda tracejada genérica). */
+.separador {
+  height: 2px; margin: var(--e-3) 0; border: 0;
+  background-image: repeating-linear-gradient(to right, var(--linha-forte) 0 6px, transparent 6px 10px);
+}
+
+.grupo + .grupo { margin-top: var(--e-3); }
+.rotuloGrupo {
+  display: block; margin: 0 0 var(--e-2);
+  font-size: var(--t-corpo); font-weight: 700; color: var(--tinta-2);
+}
+
+.itens { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
+.item { display: flex; flex-direction: column; gap: var(--e-1); }
+.linhaItem { display: flex; gap: var(--e-2); align-items: baseline; }
+
+/* "2×" fixo em 3ch para o nome do prato começar sempre na mesma coluna,
+   dígito com dígito (RN de leitura de relance da cozinha). */
+.qtd { flex-shrink: 0; width: 3ch; font-family: var(--f-dado); font-weight: 700; }
+.corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nomeItem { font-weight: 600; display: inline-flex; align-items: center; gap: var(--e-1); }
+.porcao { font-size: var(--t-apoio); color: var(--tinta-2); }
+.preco { flex-shrink: 0; font-family: var(--f-dado); }
+
+/* Seção 3.3: toque em qualquer lugar do nome abre a anotação — alvo do
+   tamanho da linha, não de um ícone de 48 px isolado. `.corpo` some da
+   aparência de botão (sem fundo, sem borda, texto herdado) e ganha só um
+   sublinhado tracejado sutil no nome, para continuar lendo como texto até
+   que o dedo passe perto. */
+.corpoAnotar {
+  background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit;
+  text-align: left; cursor: pointer; border-radius: var(--r-1);
+}
+.corpoAnotar .nomeItem { text-decoration: underline dashed var(--tinta-3) 1px; text-underline-offset: 3px; }
+.corpoAnotar:hover, .corpoAnotar[aria-pressed='true'] { background: var(--papel); }
+.corpoAnotar svg { color: var(--tinta-3); }
+
+/* Observação: trilho de --atencao à esquerda, texto reto (não itálico). É o
+   que o cozinheiro não pode perder, então não compete com o resto em ênfase. */
+.obs {
+  display: block; margin-top: var(--e-1);
+  border-left: var(--trilho) solid var(--atencao); padding-left: var(--e-2);
+  font-size: var(--t-apoio); color: var(--tinta);
+}
+.obsCampo { min-height: var(--toque); margin-top: var(--e-1); resize: none; }
+
+/* Edição por item: −/+ e o lápis de anotar, só com a comanda aberta. */
+.controlesItem { display: flex; align-items: center; gap: var(--e-2); }
+.contador {
+  display: inline-flex; align-items: center; gap: var(--e-1);
+  border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-pilula); padding: 2px;
+  background: var(--papel);
+}
+.contador button {
+  background: none; border: 0; color: var(--tinta-2); border-radius: var(--r-pilula);
+  min-width: var(--toque); min-height: var(--toque); display: grid; place-items: center;
+}
+.contador button:hover { background: var(--elevado); color: var(--tinta); }
+.contador b { font-family: var(--f-dado); min-width: 16px; text-align: center; }
+
+.vazio { margin: 0; font-size: var(--t-corpo); color: var(--tinta-2); }
+
+.total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0; font-size: var(--t-corpo); font-weight: 700;
+  padding-top: var(--e-3); border-top: 2px double var(--linha-forte);
+}
+.total b { font-family: var(--f-papel); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
+
+/* Defeito b: pedido pago que ganhou item novo não pode ficar calado sobre o
+   quanto falta cobrar. Mesmo desenho de alerta do composer bloqueado. */
+.diferencaPaga {
+  display: flex; gap: var(--e-2); align-items: baseline; flex-wrap: wrap;
+  margin: var(--e-2) 0 0; padding: var(--e-2) var(--e-3);
+  background: var(--atencao-pastel); color: var(--atencao);
+  border-left: var(--trilho) solid var(--atencao);
+  border-radius: var(--r-1); font-size: var(--t-apoio);
+}
+
+/* Botões fora do papel (secao 7): "Enviar comanda" ou "Imprimir", conforme
+   o estado. */
+.acoesPedido { display: grid; gap: var(--e-2); margin-top: var(--e-3); }
+
+/* Rodada 12 (issue #14): no lugar do botão desabilitado sem motivo, a linha
+   diz o que já aconteceu ou por que não sai. */
+.situacaoEnvio {
+  display: flex; gap: var(--e-2); align-items: center; margin: 0;
+  padding: var(--e-2) var(--e-3); border-radius: var(--r-1);
+  background: var(--info-fundo); color: var(--tinta-2); font-size: var(--t-apoio);
+}
+.envioFeito { background: var(--ok-fundo); color: var(--ok); }
+
+/* Aviso passageiro do envio: some sozinho em 6 s, fala pelo leitor de tela. */
+.avisoEnvio {
+  position: fixed; left: 50%; bottom: var(--e-5); transform: translateX(-50%);
+  z-index: 60; display: flex; gap: var(--e-2); align-items: center;
+  max-width: min(560px, calc(100vw - 32px)); padding: var(--e-3) var(--e-4);
+  border-radius: var(--r-2); background: var(--tinta); color: var(--papel);
+  box-shadow: var(--sombra-alta); font-size: var(--t-15); font-weight: 600;
+}
+
+/* Canhoto (RN-27, RN-28, RN-29, RN-33): mesma folha da comanda, sem os
+   controles de edição, agora dentro da Modal reusável (direção 19, seção
+   3.4) em vez de cobrir a tela inteira. window.print() continua o plano B
+   contra queda de luz ou internet até existir impressora de verdade (D6). */
+.canhotoTela { width: 360px; max-width: 100%; margin: 0 auto; }
+.canhotoAviso {
+  margin: 0 0 var(--e-2); font-size: var(--t-apoio); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--tinta-2);
+}
+
+/* Só a impressão fixa a largura de bobina térmica de 80 mm; sem `@page`,
+   quem decide o papel de verdade é o driver da impressora (direção 19). */
+@media print {
+  [data-imprimir] .papelCanhoto { width: 80mm; }
+}
+
+/* Gaveta da fila automática do pagamento (RN-27, FilaCanhotos.jsx, decisão 31
+   item 4): NÃO é modal, nunca trava a tela. Painel fixo com o contador e um
+   "Imprimir" que dispara na hora — dez pagamentos seguidos empilham no
+   contador, nunca em dez modais. */
+.gavetaCanhoto {
+  position: fixed; right: var(--e-4); bottom: var(--e-4); z-index: 55;
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-2) var(--e-2) var(--e-2) var(--e-3); border-radius: var(--r-pilula);
+  background: var(--tinta); color: var(--papel); box-shadow: var(--sombra-alta);
+}
+.gavetaNoTitulo {
+  margin-left: auto; min-width: 0; display: flex; align-items: center; gap: var(--e-3);
+  padding: 2px 2px 2px var(--e-3); border-radius: var(--r-pilula);
+  background: var(--tinta); color: var(--papel);
+}
+.gavetaTexto { display: flex; align-items: center; gap: var(--e-2); min-width: 0; font-weight: 700; white-space: nowrap; }
+/* Achado 3 (banca capricho R10): coluna Ficha estreitando cortava a última
+   letra de "Imprimir" sem aviso, porque a pílula de aviso disputava o mesmo
+   espaço. O botão é a ação, nunca encolhe nem quebra; quem cede é o texto da
+   pílula, com reticência. */
+.gavetaLabel { overflow: hidden; text-overflow: ellipsis; }
+.botaoImprimir { flex-shrink: 0; white-space: nowrap; }

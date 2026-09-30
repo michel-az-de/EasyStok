@@ -1,0 +1,214 @@
+/* Tela de cozinha (US-037, US-038, o tablet da parede, D6). Só a janela
+   própria usa isto — mesmo espírito de dashboard.module.css (Entregas), sem
+   gaveta: D6 é som, toque e papel, não um painel que divide espaço com o
+   Balcão. */
+
+.pagina {
+  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  background: var(--fundo); color: var(--tinta); font-family: var(--f-corpo);
+}
+.topoPagina {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  flex-shrink: 0;
+}
+.topoPagina h1 { margin: 0; font-size: var(--t-forte); font-weight: 700; flex: 1; }
+.horaTopo { font-family: var(--f-dado); color: var(--tinta-2); font-size: var(--t-apoio); }
+
+.aviso {
+  margin: var(--e-4); padding: var(--e-4); text-align: center;
+  background: var(--elevado); border: var(--b-1) dashed var(--linha-forte);
+  border-radius: var(--r-2); color: var(--tinta-2);
+}
+
+.conteudo { display: flex; flex-direction: column; gap: var(--e-3); min-height: 0; flex: 1; overflow-y: auto; }
+
+.filtros {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+}
+
+/* Cinco colunas, uma por passo da esteira que a cozinha vê (Pago até
+   Entregue). As cinco cabem inteiras na janela que o topo abre (1280 px):
+   com 280 px de mínimo a coluna Entregue saía cortada pela borda. Abaixo de
+   220 px por coluna, rola na horizontal. */
+.colunas { display: flex; gap: var(--e-3); padding: 0 var(--e-4) var(--e-4); overflow-x: auto; flex: 1; min-height: 0; }
+.coluna {
+  display: flex; flex-direction: column; gap: var(--e-2); min-width: 220px; flex: 1 1 0;
+  /* Moldura invisível que o arrasto acende (issue #7): 2 px já reservados,
+     então destacar a coluna não empurra cartão nenhum. */
+  padding: var(--e-1); border: var(--b-2) dashed transparent; border-radius: var(--r-2); position: relative;
+  transition: background-color var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao),
+    opacity var(--dur-curta) var(--ease-padrao);
+}
+.coluna h2 {
+  margin: 0; font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--tinta-3); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
+}
+.contagem { font-family: var(--f-dado); }
+
+/* Entregue recolhido (RN-30/UC-04): mesmo desenho tipográfico de "coluna h2",
+   só que em botão, porque a coluna vira contagem que abre com um toque. */
+.tituloRecolhivel {
+  margin: 0; padding: 0; width: 100%; min-height: var(--toque);
+  font: inherit; font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--tinta-3); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
+  background: none; border: 0; text-align: left; cursor: pointer;
+}
+.chevronAberto { transform: rotate(90deg); }
+.listaColuna { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); min-height: 60px; overflow-y: auto; }
+
+/* --- Cartão de pedido ------------------------------------------------------
+   Cor + rótulo escrito, nunca cor sozinha (RN-30). O trilho de 4px carrega a
+   cor, o texto do rótulo carrega o significado: quem não distingue cor lê o
+   rótulo, quem bate o olho lê a cor. */
+.cartao {
+  display: grid; gap: var(--e-2); padding: var(--e-3);
+  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  border-left-width: 4px;
+}
+.cor-esperando { border-left-color: var(--info); }
+.cor-atraso { border-left-color: var(--parado); }
+.cor-preparo { border-left-color: var(--ok); }
+.cor-entregue { border-left-color: var(--entregue); }
+
+/* Achado 1 (rodada 10): cartão que muda sozinho (pagamento, novo pedido)
+   pisca por ~1,5 s, mesmo tempo do destaque sonoro (aplicacao/useAvisoSonoro.js). */
+.cartaoNovo { animation: cartaoRealce 1.5s var(--ease-pulo); }
+@keyframes cartaoRealce {
+  0% { background: var(--ok-pastel); }
+  100% { background: var(--papel); }
+}
+
+.cabecaCartao { display: flex; align-items: center; gap: var(--e-2); }
+.numeroCartao { font-family: var(--f-display); font-size: var(--t-corpo); font-weight: 600; }
+
+.rotuloSituacao { margin: 0; font-size: var(--t-apoio); font-weight: 700; }
+.cor-esperando .rotuloSituacao { color: var(--info); }
+.cor-atraso .rotuloSituacao { color: var(--parado); }
+.cor-preparo .rotuloSituacao { color: var(--ok); }
+.cor-entregue .rotuloSituacao { color: var(--entregue); }
+
+.horaJanela {
+  margin: 0; display: flex; align-items: center; gap: var(--e-1);
+  font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta-2);
+}
+
+.grupo { display: grid; gap: var(--e-1); }
+.rotuloGrupo { font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); }
+.itens { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.item { display: grid; grid-template-columns: auto 1fr auto; gap: var(--e-2); align-items: baseline; font-size: var(--t-apoio); }
+.qtd { font-family: var(--f-dado); color: var(--tinta-2); }
+.nomeItem { font-weight: 600; }
+.porcao { font-family: var(--f-dado); color: var(--tinta-3); white-space: nowrap; }
+.obs { grid-column: 2 / -1; color: var(--tinta-2); font-style: italic; }
+
+/* Botão largo, alvo de 48px já garantido por `--toque` em Botao.module.css
+   (RN-31). */
+.botaoAvancar { margin-top: var(--e-1); }
+/* Motivo do botão desabilitado (RN-14), mesmo tom de `ficha.module.css`. */
+.motivoDesabilitado { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+/* --- Arrastar e soltar (issue #7, rodada 11) -------------------------------
+   "Cozinha deveria ter drag and drop com efeitos visuais" (dono, 26/09/2026).
+   Quatro momentos, cada um com um sinal: o cartão LEVANTA (escala, leve giro e
+   --sombra-alta, o buraco fica tracejado no lugar), a coluna que aceita
+   DESTACA antes de a mão chegar, o cartão ASSENTA com mola na coluna nova, e
+   a recusa TREME e escreve o motivo. Com movimento reduzido o global de
+   base.css esmaga as animações; o giro some aqui embaixo e o texto fica. */
+.cartaoArrastavel {
+  cursor: grab;
+  /* Toque longo arrasta (250 ms): sem isto o celular abre a seleção de texto
+     ou o menu da imagem por cima do gesto. */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.alca {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: var(--toque); height: var(--toque); margin: calc(var(--toque) * -0.25) calc(var(--toque) * -0.25) calc(var(--toque) * -0.25) auto;
+  background: none; border: 0; border-radius: var(--r-1); color: var(--tinta-3); cursor: grab;
+}
+.alca:hover { color: var(--tinta); background: var(--elevado); }
+.alca:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 0; color: var(--ragu); }
+.cabecaCartao .numeroCartao { flex: 1; min-width: 0; }
+
+/* O buraco que fica na coluna de origem: mesma altura, sem conteúdo à vista,
+   para a coluna não pular enquanto o cartão está na mão. */
+.cartaoOrigem {
+  background: transparent; border-style: dashed; border-color: var(--linha-forte);
+  box-shadow: none; animation: none;
+}
+.cartaoOrigem > * { visibility: hidden; }
+
+/* O cartão na mão (DragOverlay). */
+.cartaoErguido {
+  cursor: grabbing; box-shadow: var(--sombra-alta);
+  transform: rotate(-1.5deg) scale(1.03);
+  animation: cartaoErguer var(--dur-curta) var(--ease-saida);
+}
+@keyframes cartaoErguer {
+  from { transform: rotate(0) scale(1); box-shadow: var(--sombra); }
+  to { transform: rotate(-1.5deg) scale(1.03); box-shadow: var(--sombra-alta); }
+}
+
+/* Solto e aceito, esperando o Balcão devolver o estado: continua no lugar,
+   apagado, para a mão não achar que o soltar falhou. */
+.cartaoACaminho { opacity: .45; border-style: dashed; }
+
+.cartaoAssenta { animation: cartaoAssentar var(--dur-longa) var(--ease-mola); }
+@keyframes cartaoAssentar {
+  0% { transform: scale(1.03); box-shadow: var(--sombra-alta); background: var(--ok-pastel); }
+  100% { transform: scale(1); box-shadow: none; background: var(--papel); }
+}
+
+.cartaoRecusado { border-color: var(--perigo); animation: cartaoRecusar var(--dur-longa) var(--ease-padrao); }
+@keyframes cartaoRecusar {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(3px); }
+}
+.motivoRecusa {
+  margin: 0; display: flex; align-items: flex-start; gap: var(--e-1);
+  padding: var(--e-2); border-radius: var(--r-1);
+  background: var(--perigo-fundo); color: var(--perigo); font-size: var(--t-apoio); font-weight: 600;
+}
+.motivoRecusa svg { flex-shrink: 0; margin-top: 2px; }
+
+/* Colunas durante o arrasto: a do próximo passo convida, a que está sob a
+   mão e aceita acende inteira, a que está sob a mão e recusa fica no tom de
+   perigo com o motivo escrito, as demais recuam um pouco. */
+.colunaAlvo { border-color: var(--ragu); background: color-mix(in srgb, var(--ragu-claro) 50%, transparent); }
+.colunaSobre { border-style: solid; background: var(--ragu-claro); }
+.colunaRecusa { border-color: var(--perigo); background: var(--perigo-fundo); cursor: not-allowed; }
+.colunaQuieta { opacity: .6; }
+
+.dicaColuna {
+  /* Pílula que flutua no pé da coluna: fica à vista com a lista rolada e
+     não cobre o nome do primeiro cartão. */
+  position: absolute; z-index: 2; bottom: var(--e-3); left: 50%; translate: -50% 0; max-width: calc(100% - 16px);
+  margin: 0; display: flex; align-items: center; gap: var(--e-1); pointer-events: none;
+  padding: var(--e-1) var(--e-3); border-radius: var(--r-pilula); white-space: nowrap;
+  background: var(--papel); color: var(--ragu); font-size: var(--t-apoio); font-weight: 700;
+  border: var(--b-1) solid currentColor; box-shadow: var(--sombra-media); animation: dicaEntrar var(--dur-curta) var(--ease-saida);
+}
+.dicaRecusa { color: var(--perigo); border-radius: var(--r-1); white-space: normal; width: calc(100% - 16px); }
+@keyframes dicaEntrar {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartaoErguido { transform: none; }
+}
+
+/* Issue #17: número do pedido para o entregador, quem leva, veículo e placa. */
+.despacho {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: var(--e-1) var(--e-2); border-radius: var(--r-1);
+  background: var(--preenchimento); font-size: var(--t-apoio);
+}
+.numeroEntrega { font-family: var(--f-dado); font-weight: 700; }
+.quemLeva { display: flex; align-items: flex-start; gap: var(--e-1); color: var(--tinta-2); }
+.quemLeva > :first-child { flex-shrink: 0; margin-top: 2px; }
+.quemLeva b { color: var(--tinta); }

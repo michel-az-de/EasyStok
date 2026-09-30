@@ -1,0 +1,101 @@
+/* Balão flutuante do assistente (rodada 7, seção D da pesquisa). Só tokens
+   que já existem em src/estilos/tokens.css: nenhuma cor, raio ou sombra nova
+   aqui, e claro/escuro vem de graça porque os tokens já resolvem os dois
+   (light-dark) por conta própria. */
+
+.gatilho {
+  position: fixed; right: var(--e-4); bottom: var(--e-4); z-index: 30;
+  width: 56px; height: 56px; padding: 0; border-radius: var(--r-pilula);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--sombra-alta);
+  transition: transform 180ms ease;
+}
+.gatilho:hover { transform: scale(1.05); }
+.gatilhoNoCabecalho {
+  position: relative; width: 48px; height: 48px; padding: 0; border-radius: var(--r-pilula);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+
+.pontoAtencao {
+  position: absolute; top: 4px; right: 4px;
+  width: calc(var(--ponto) + 2px); height: calc(var(--ponto) + 2px);
+  border-radius: var(--r-pilula); background: var(--parado);
+  border: var(--b-2) solid var(--papel);
+}
+
+.painel {
+  position: fixed; right: var(--e-4); z-index: 32;
+  bottom: calc(56px + var(--e-4) + var(--e-2));
+  width: min(384px, calc(100vw - 2 * var(--e-4)));
+  max-height: min(640px, calc(100vh - 140px));
+  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  box-shadow: var(--sombra-alta);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: assistenteSubir 180ms ease;
+}
+@keyframes assistenteSubir {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cabecalho {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-3) var(--e-2) var(--e-3) var(--e-3);
+  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+}
+.cabecalho h2 {
+  display: flex; align-items: center; gap: var(--e-1);
+  font-size: var(--t-apoio); font-weight: 700; margin: 0; color: var(--tinta);
+}
+
+.corpo { overflow-y: auto; padding: var(--e-3); display: flex; flex-direction: column; gap: var(--e-3); flex: 1; min-height: 0; }
+
+.cartoes { display: flex; flex-direction: column; gap: var(--e-2); }
+
+.cartao {
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  background: var(--elevado); padding: var(--e-2) var(--e-3);
+}
+.cartao.perigo { border-color: var(--parado); }
+.cartao.ok { border-color: var(--ok); }
+
+.cartaoTopo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2); }
+.cartaoTopo h3 {
+  display: flex; align-items: center; gap: var(--e-1); flex-wrap: wrap;
+  font-size: var(--t-apoio); font-weight: 700; margin: 0; color: var(--tinta);
+}
+.dispensar { padding: var(--e-1); min-width: 0; flex-shrink: 0; }
+.cartaoCorpo { font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-1); line-height: var(--lh-corpo); }
+.cartaoCorpo p { margin: 0 0 var(--e-1); }
+.cartaoCorpo ul { margin: var(--e-1) 0; padding-left: var(--e-3); }
+
+.tagsCliente { display: flex; flex-wrap: wrap; gap: var(--e-1); margin: var(--e-1) 0; }
+.numeros { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); font-family: var(--f-dado); font-size: var(--t-apoio); color: var(--tinta); margin-top: var(--e-1); }
+.numeros b { font-weight: 700; }
+
+.acaoCartao { margin-top: var(--e-2); }
+
+.vazio { padding: var(--e-2) 0; }
+
+.perguntas { border-top: var(--b-1) solid var(--linha); padding-top: var(--e-2); display: flex; flex-direction: column; gap: var(--e-2); }
+.tituloPerguntas { font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); margin: 0; }
+.trocas { display: flex; flex-direction: column; gap: var(--e-2); }
+.troca { display: flex; flex-direction: column; gap: var(--e-1); }
+.perguntaDaThatiane, .respostaDoAssistente {
+  font-size: var(--t-apoio); border-radius: var(--r-2); padding: var(--e-1) var(--e-2);
+  max-width: 92%; overflow-wrap: anywhere; line-height: var(--lh-corpo);
+}
+.perguntaDaThatiane { align-self: flex-end; background: var(--ragu-claro); color: var(--ragu-forte); }
+.respostaDoAssistente { align-self: flex-start; background: var(--elevado); color: var(--tinta); }
+.respostaErro { align-self: flex-start; background: var(--perigo-fundo); color: var(--perigo); }
+.respostaPensando { align-self: flex-start; color: var(--tinta-3); font-style: italic; }
+
+.formPergunta { display: flex; align-items: flex-end; gap: var(--e-1); }
+.campoPergunta { flex: 1; }
+.botaoEnviar { flex-shrink: 0; }
+
+/* Integração do visual: no celular o gatilho de canto sobe para cima da barra
+   de abas (54 px), em vez de cobrir a aba Ficha. */
+@media (max-width: 759px) {
+  .gatilho { bottom: calc(54px + var(--e-3) + env(safe-area-inset-bottom, 0px)); right: var(--e-3); width: 52px; height: 52px; }
+}

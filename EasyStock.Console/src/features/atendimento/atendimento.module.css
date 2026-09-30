@@ -1,0 +1,397 @@
+.cabecalho {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); background: var(--papel);
+  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+}
+.identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
+.cabecalho h2 {
+  margin: 0; font-family: var(--f-display); font-size: var(--t-titulo); font-weight: 700;
+  font-weight: 600; line-height: var(--lh-compacto); letter-spacing: -.01em;
+}
+/* A linha de apoio corre como texto: o ícone do canal é bloco (Icone.jsx) e
+   quebrava a linha sozinho. Ícone em linha, alinhado à base do texto. */
+.cabecalho h2 { min-width: 0; }
+.cabecalho h2 small svg { display: inline-block; vertical-align: -3px; margin-right: 5px; }
+.cabecalho h2 small {
+  display: block; margin-top: 2px; margin-left: 0;
+  font-family: var(--f-corpo); font-size: var(--t-apoio); font-weight: 400;
+  color: var(--tinta-3); line-height: var(--lh-compacto);
+}
+.direita {
+  margin-left: auto; display: flex; gap: var(--e-2); align-items: center;
+  flex-wrap: wrap; flex-shrink: 0;
+}
+
+/* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
+   agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
+   cinco blocos disputavam altura fixa numa coluna com `overflow: hidden`, a
+   soma dava 1244 px em 447 px de coluna e o composer saía da tela. */
+.rolagemCentro {
+  /* Base zero: a área rolável toma o que SOBRA da coluna, em vez de disputar
+     altura com o composer na proporção do tamanho da conversa. Com base auto,
+     mil pixels de histórico faziam o composer encolher até 80 px. */
+  flex: 1 1 0; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column;
+  background: var(--chao-conversa);
+}
+
+/* A thread cresce com o conteúdo e empurra o resto: quem rola é a área acima. */
+.thread {
+  flex: 1 0 auto; padding: var(--e-4);
+  display: flex; flex-direction: column; background: transparent;
+}
+
+.balao {
+  max-width: min(76%, 62ch); padding: var(--e-2) var(--e-3);
+  border-radius: 18px; box-shadow: var(--sombra);
+  margin-top: 4px; animation: entradaBalao var(--dur-media) var(--ease-saida);
+}
+@keyframes entradaBalao {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* Troca de remetente respira mais. */
+.trocaDeVoz { margin-top: 12px; }
+.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-corpo); }
+.meta {
+  display: flex; gap: var(--e-2); align-items: center; justify-content: flex-end;
+  margin-top: 6px; font-size: var(--t-micro); color: var(--tinta-3);
+}
+.meta time { font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums; }
+.falhou { color: var(--perigo); font-weight: 600; white-space: normal; text-align: right; }
+.entrada {
+  align-self: flex-start; background: var(--papel); border: 0;
+  border-radius: 20px 20px 20px 6px;
+  box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4)), 0 0 0 1px var(--linha);
+}
+.saida {
+  align-self: flex-end; background: var(--ragu-claro); color: var(--tinta);
+  border-radius: 20px 20px 6px 20px;
+  box-shadow: 0 1px 2px light-dark(rgba(120, 40, 10, .08), rgba(0, 0, 0, .35));
+}
+.saida .meta, .saida .meta * { color: var(--tinta-3); }
+.sistema {
+  align-self: center; max-width: 94%; background: var(--elevado); color: var(--tinta-2);
+  font-size: var(--t-apoio); box-shadow: none; text-align: center; padding: var(--e-2) var(--e-3);
+  border-radius: 18px;
+}
+.resumo { font-family: var(--f-dado); font-size: var(--t-apoio); }
+/* Rodada 12 (#19): link do convite do cardápio, clicável na bolha. */
+.linkCardapio { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+
+/* Divisória entre atendimentos (decisão 46, "Encerrar" v2): encerrado nunca
+   reabre o mesmo atendimento, o fio precisa mostrar onde um terminou e o
+   próximo começou. Linha fina com rótulo, sem virar balão de mensagem. */
+.divisoriaAtendimento {
+  display: flex; align-items: center; gap: var(--e-2); margin: var(--e-4) 0;
+  color: var(--tinta-3); font-size: var(--t-micro); text-transform: uppercase; letter-spacing: .04em;
+}
+.divisoriaAtendimento::before, .divisoriaAtendimento::after {
+  content: ''; flex: 1 1 auto; height: var(--b-1); background: var(--linha);
+}
+
+/* Separador de dia (achado 8, pendência 18 da banca 64): pílula centralizada
+   antes da primeira mensagem de cada dia no fio. */
+.separadorDia { display: flex; justify-content: center; margin: var(--e-3) 0; }
+
+/* Composer tipo iMessage: caixa única com raio 16, --papel, --linha-media,
+   sombra, focus-within com halo. */
+.composer {
+  background: transparent; border: 0; padding: var(--e-3) var(--e-4);
+  position: sticky; bottom: 0; z-index: 10;
+  flex: 0 0 auto; min-height: 0;
+  /* Sem overflow próprio: ele recortava todo Popover ancorado no composer
+     (achado da rodada 7). O campo já tem teto de altura e rola por dentro. */
+  overflow: visible;
+  /* Container query (rodada 9, achado 2 da r7): a coluna do meio em notebook
+     (1280, ~420 px) espremia o campo a 118 px mesmo com a janela larga. A
+     quebra em duas linhas precisa reagir à largura desta caixa, não à da
+     janela (@media via viewport nunca disparava com o palco de três colunas
+     aberto). */
+  container: composer / inline-size;
+  display: flex; flex-direction: column; gap: var(--e-3);
+}
+.caixa {
+  background: var(--papel); border: var(--b-1) solid var(--linha-media);
+  border-radius: 16px; box-shadow: var(--sombra); padding: var(--e-3);
+  display: flex; flex-direction: column; gap: 0;
+}
+/* O campo some dentro da caixa: sem borda, sem fundo, sem alça de redimensionar.
+   Cresce com o texto (field-sizing) até um terço da tela e então rola. */
+.caixa textarea,
+.caixa textarea:hover,
+.caixa textarea:focus,
+.caixa textarea:disabled {
+  border: 0; box-shadow: none; background: transparent; outline: none;
+  resize: none; padding: var(--e-1) var(--e-1); min-height: 56px; max-height: 32dvh;
+  field-sizing: content;
+}
+.caixa:has(textarea:disabled) { background: var(--preenchimento); box-shadow: none; }
+.caixa:focus-within {
+  border-color: var(--ragu); box-shadow: var(--sombra), 0 0 0 4px var(--halo);
+}
+.acoes {
+  display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
+  padding: var(--e-2) 0 0 0; border-top: 0; margin: 0;
+  justify-content: flex-start;
+}
+.acoes .enviar { margin-left: auto; }
+
+/* Aviso janela fechada: raio 12, padding vertical curto, ícone ao topo. */
+.bloqueio {
+  display: flex; gap: var(--e-2); align-items: flex-start; flex-wrap: wrap;
+  padding: 10px 16px; margin: 0 0 var(--e-3);
+  background: var(--atencao-pastel); color: var(--atencao);
+  border: 0; border-radius: 12px; font-size: var(--t-apoio);
+}
+.bloqueio strong { color: var(--tinta); font-weight: 600; }
+
+@media (max-width: 759px) {
+  .balao { max-width: 90%; }
+  .acoes .enviar { margin-left: 0; width: 100%; }
+}
+
+.selo { display: inline-flex; align-items: center; gap: 3px; }
+/* Item D (banca 10): a etiqueta "automática" virou botão (abre a definição),
+   sem parecer um botão de verdade — mesma cor e tamanho de antes, só com
+   sublinhado sutil para dizer que é clicável. */
+.seloBotao {
+  border: 0; background: transparent; padding: 0; margin: 0; font: inherit; color: inherit;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.seloBotao:hover, .seloBotao:focus-visible { color: var(--tinta); }
+.figurinha { width: 128px; height: 128px; display: block; }
+.figura { margin: 0; display: grid; gap: var(--e-1); }
+.figura img { width: 100%; max-width: 280px; border-radius: var(--r-1); display: block; }
+.figura figcaption { font-size: var(--t-apoio); color: var(--tinta-3); }
+
+/* Quem responde esta conversa. Fica entre o cabeçalho e a thread, que é onde
+   a dona olha antes de escrever. Estado por trilho esquerdo mais texto, não
+   por fundo pastel, para não competir com os balões. */
+.modo {
+  flex-shrink: 0; background: var(--papel);
+  border-bottom: var(--b-1) solid var(--linha);
+  border-left: var(--trilho) solid var(--linha-forte);
+  padding: var(--e-3) var(--e-4);
+}
+.modo_ligado { border-left-color: var(--ok); }
+.modo_pausado { border-left-color: var(--linha-forte); }
+.modo_com-voce { border-left-color: var(--atencao); }
+.modo_encerrado { border-left-color: var(--linha-forte); }
+.modo_bloqueado { border-left-color: var(--parado); }
+
+.modoLinha { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.modoDetalhe {
+  margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2);
+}
+/* Rodada 12 (issue #16): próximo passo sugerido depois de ela responder.
+   Mesma letra do detalhe, com peso, porque é o que ela faz a seguir. */
+.modoProximo {
+  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta); font-weight: 600;
+}
+.listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
+
+/* Alvo de toque de 44 px em qualquer ponteiro, não só no grosso. */
+.acaoToque { min-height: var(--toque); }
+
+/* Trava por bloqueio de cadastro. Vermelho aqui é o único caso no composer:
+   os outros avisos são âmbar porque voltam sozinhos, este só sai pela mão. */
+.bloqueioGrave {
+  background: var(--parado-pastel); color: var(--parado); border-left-color: var(--parado);
+}
+.bloqueioGrave span { color: var(--tinta); }
+
+/* Restrição do canal em uma linha, no pé do composer. Fica perto do botão que
+   ela explica, não num tooltip que a mão suja nunca vai abrir. */
+.restricao {
+  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-3);
+}
+
+/* Cor por canal, pelo nome do ícone do catálogo (conversa, camera, globo). */
+.canal_conversa { color: var(--c-whatsapp); }
+.canal_camera { color: var(--c-instagram); }
+.canal_globo { color: var(--c-site); }
+
+/* O que o automático mandou fica em tom de marca claro, com texto escuro; o
+   laranja cheio é só o que ela escreveu. A conversa ganha ritmo em vez de
+   virar um bloco laranja só. */
+.saida.doAutomatico {
+  background: light-dark(#E9E9EB, #2C2927); color: var(--tinta);
+  box-shadow: none;
+}
+.saida.doAutomatico .meta, .saida.doAutomatico .meta * { color: var(--tinta-3); }
+.saida.doAutomatico .selo { color: var(--tinta-3); }
+
+/* Rodada 6c: barra do composer com ícone em cada ação, botões fantasma que
+   ganham fundo no hover, e o enviar redondo com seta, como no Mensagens. */
+.acoes > button:not(.enviar) {
+  background: transparent; border-color: transparent; box-shadow: none;
+  color: var(--tinta-2); padding: 0 var(--e-3); min-height: 36px; gap: 6px;
+}
+.acoes > button:not(.enviar):hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); border-color: transparent; }
+.acoes > button:not(.enviar):disabled { background: transparent; color: var(--tinta-3); opacity: .6; }
+.acoes > button svg { width: 20px; height: 20px; }
+.acoes .enviar {
+  width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0;
+  border-radius: var(--r-pilula);
+}
+.acoes .enviar:disabled { background: var(--preenchimento-forte); color: var(--tinta-3); }
+.acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
+@keyframes enviarPronto { from { transform: scale(.8); } to { transform: none; } }
+@media (max-width: 759px) {
+  .acoes .enviar { width: 40px; margin-left: auto; }
+}
+
+/* Subtítulo da conversa numa linha só, com reticência, em vez de quebrar em
+   pedaços ao lado do Encerrar. O texto inteiro fica no title do navegador. */
+.cabecalho h2 small {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cabecalho .identidade { min-width: 0; }
+
+/* Rodada 6d (banca estética, itens 2 e 16): composer em UMA linha, como no
+   Mensagens. Ícones de ação à esquerda, o campo numa pílula que cresce com o
+   texto, o enviar redondo à direita. A div .acoes some do layout (contents):
+   todo botão novo que entrar nela cai no grupo da esquerda sozinho, e quem
+   levar a classe .enviar ocupa o lugar do enviar (o microfone, por exemplo). */
+.caixa {
+  flex-direction: row; align-items: flex-end; gap: 4px;
+  padding: 6px 6px 6px 8px; border-radius: 24px;
+}
+.acoes { display: contents; }
+.acoes > button:not(.enviar) { order: 1; width: 36px; min-width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-pilula); }
+.caixa > :not(.acoes) { order: 2; flex: 1; min-width: 0; }
+.acoes > .enviar { order: 3; margin-left: 0; }
+.caixa textarea,
+.caixa textarea:hover,
+.caixa textarea:focus,
+.caixa textarea:disabled { min-height: 36px; padding: 7px 8px; line-height: 1.4; }
+/* Enviar: a única mancha de cor da barra quando há texto; sem texto, tinta
+   clara da marca, visível no claro e no escuro. */
+.acoes .enviar:disabled { background: var(--ragu-claro); color: var(--ragu); opacity: .55; }
+@media (max-width: 759px) {
+  .acoes .enviar { width: 40px; margin-left: 0; }
+}
+
+/* Rodada 10, pedido do dono (25/09 23h42, "não vi pra enviar uma lista de
+   mensagens do sistema"): só o botão Respostas ganha rótulo visível junto do
+   ícone (especificidade de classe vence a regra redonda de cima, sem mexer
+   nos vizinhos ícone-só). Mesma pílula arredondada dos outros controles do
+   app (Automáticas do trilho, ControleLoja), não uma forma nova. */
+.acoes > button.botaoRespostas {
+  width: auto; min-width: auto; padding: 0 var(--e-3) 0 10px; gap: 5px;
+  font-size: var(--t-apoio); font-weight: 600;
+}
+
+/* Glifo real do canal (banca, item 24). */
+.canal_whatsapp { color: var(--c-whatsapp); }
+.canal_instagram { color: var(--c-instagram); }
+
+/* Rodada 6d (banca estética, item 1): dois tons só. Recebida em papel, a
+   dela e a do automático na tinta clara da marca (o selo "automática" é que
+   diz quem mandou). Cauda, o canto de 6 px, só na bolha que troca de quem
+   fala; as seguintes do mesmo lado ficam redondas. Aviso do sistema vira
+   texto centralizado, sem caixa. */
+.entrada { border-radius: 18px; }
+.saida { border-radius: 18px; }
+.entrada.trocaDeVoz { border-top-left-radius: 6px; }
+.saida.trocaDeVoz { border-top-right-radius: 6px; }
+.saida.doAutomatico { background: var(--ragu-claro); }
+.sistema {
+  background: transparent; box-shadow: none; color: var(--tinta-3);
+  font-size: var(--t-micro); padding: 2px var(--e-3); max-width: 80%;
+}
+
+/* Banca, item 13: o cabeçalho da conversa na mesma altura das colunas. */
+.cabecalho { min-height: 64px; padding-top: var(--e-2); padding-bottom: var(--e-2); }
+
+/* Anexar é um label sobre o input de arquivo (rodada 7), não um Botao: mesmo
+   desenho dos outros ícones da barra, no grupo da esquerda. */
+.acoes > label {
+  order: 1; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0;
+  display: inline-grid; place-items: center; border: 0; border-radius: var(--r-pilula);
+  background: transparent; color: var(--tinta-2); cursor: pointer;
+}
+.acoes > label:hover { background: var(--preenchimento); color: var(--tinta); }
+.acoes > label svg { width: 20px; height: 20px; }
+
+/* Integração: no celular (e em qualquer coluna estreita, rodada 9) o campo
+   ocupa a linha de cima inteira e os ícones descem para a de baixo; em
+   390 px de janela ou 420 px de coluna os ícones espremiam o campo e o
+   texto de apoio quebrava em seis linhas. Container query em vez de
+   @media: o celular sempre teve `.composer` estreito, mas o notebook de
+   1280 px com Balcão e Ficha abertos também tem, e a janela ali é larga. */
+/* Rodada 12 (issue #16): o teto subiu de 480 para 760 px porque os botões
+   ganharam nome visível; numa linha só, os nomes espremiam o campo. */
+@container composer (max-width: 760px) {
+  .caixa { flex-wrap: wrap; row-gap: 2px; }
+  .caixa > :not(.acoes) { order: 0; flex-basis: 100%; }
+  .acoes > .enviar { margin-left: auto; }
+}
+
+/* Integração: no celular o Encerrar fica só com o ícone (o nome continua
+   "Encerrar" para leitor de tela e para as provas), para o nome do cliente
+   caber na linha. */
+@media (max-width: 759px) {
+  .direita > button { font-size: 0; gap: 0; padding: 0 10px; }
+  .direita > button svg { width: 20px; height: 20px; }
+}
+
+/* Rodada 9 (achado 5 da banca estética): no celular, canal + pedidos + janela
+   quase sempre passam de 2 linhas ("23 h 5 min na janela" sozinho já usa
+   quase 1 linha inteira) e o corte de -webkit-line-clamp cai no meio de uma
+   palavra. Sem teto de linha aqui: o cabeçalho cresce o quanto precisar, o
+   texto inteiro fica visível e o title continua servindo o leitor de tela. */
+@media (max-width: 759px) {
+  .cabecalho h2 small { display: block; overflow: visible; }
+}
+
+/* Rodada 11 (issue #8, registro 92): a casa digitando a resposta automática.
+   Mesma bolha de saída do automático, com três pontos que sobem e descem em
+   sequência. O global de prefers-reduced-motion (base.css) para os pontos e
+   o texto "automática digitando" segue dizendo o que acontece. */
+.digitando { min-width: 132px; }
+.pontos { display: inline-flex; gap: 5px; align-items: center; height: 18px; padding: 0 2px; }
+.pontos i {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--tinta-3);
+  animation: pontoDigitando 1.1s ease-in-out infinite;
+}
+.pontos i:nth-child(2) { animation-delay: .15s; }
+.pontos i:nth-child(3) { animation-delay: .3s; }
+@keyframes pontoDigitando {
+  0%, 60%, 100% { transform: translateY(0); opacity: .45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Rodada 12 (issue #16): prévia do envio do cardápio, com a origem do link. */
+.cardapioEnvio { display: grid; gap: var(--e-2); }
+.cardapioEnvio p { margin: 0; }
+.cardapioRotulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-3); margin-top: var(--e-2) !important; }
+.cardapioMensagem {
+  padding: var(--e-3); border-radius: 12px; background: var(--ragu-claro); color: var(--tinta);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.cardapioLink { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.cardapioLink code { overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+/* Rodada 12 (issue #16, dúvidas da Thatiane): Anexar, Fotos, Cardápio e Nota
+   ganham nome visível embaixo do ícone, no desenho do trilho lateral (ícone
+   em cima, nome pequeno embaixo). Ao lado do ícone, como no Respostas, os
+   quatro somavam 530 px numa barra de 444 e quebravam linha. Em coluna
+   estreita (celular) o nome vira texto só para leitor de tela e fica o title
+   com a explicação inteira. */
+.acoes > button.acaoComRotulo,
+.acoes > label {
+  width: auto; min-width: 44px; min-height: 44px; height: auto; padding: 2px 6px; gap: 1px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: var(--t-11); font-weight: 600; line-height: 1.1; border-radius: var(--r-1);
+}
+@container composer (max-width: 439px) {
+  .acoes > button.acaoComRotulo,
+  .acoes > label { width: 36px; min-width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-pilula); }
+  .rotuloAcao {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}

@@ -481,6 +481,25 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Lembrete",
             corpoTemplate: "{{ texto }}");
 
+        // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
+        // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
+        // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "campanha_marketing_whatsapp_v1",
+            nome: "Campanha — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.CampanhaMarketing,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ mensagem }}\n\nPara não receber mais, responda SAIR.");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "campanha_lembrete_whatsapp_v1",
+            nome: "Campanha Lembrete de Encerramento — WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: TipoEventoNotificacao.CampanhaLembreteEncerramento,
+            assuntoTemplate: "",
+            corpoTemplate: "{{ nome }}, a campanha {{ campanha }} está terminando. Ainda dá tempo de pedir!\n\nPara não receber mais, responda SAIR.");
+
         // ===== Avisos de status do pedido ao cliente pelo WhatsApp (S13). Corpo = texto dentro da janela de
         // 24 h; MetadadosJson = template aprovado na Meta (onda 0.3) e parametros, usados fora da janela. =====
         yield return ComMetadados(TemplateNotificacao.Criar(
