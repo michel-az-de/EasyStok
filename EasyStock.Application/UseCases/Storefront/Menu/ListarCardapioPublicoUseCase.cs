@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Storefront.Menu;
@@ -84,7 +85,9 @@ public sealed class ListarCardapioPublicoUseCase(
                 Ordem: i.OrdemExibicao,
                 Disponivel: i.Disponivel,
                 Tag: i.Tag,
-                PesoExibicao: i.PesoExibicao))
+                PesoExibicao: i.PesoExibicao,
+                Linha: i.Linha.ParaContrato(),
+                TempoPreparoMinutos: i.TempoPreparoMinutos))
             .ToList();
 
         return new ListarCardapioPublicoResult(dtos, storefront.TituloPublico, storefront.Slug);

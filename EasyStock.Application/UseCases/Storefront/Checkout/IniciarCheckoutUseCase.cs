@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -26,18 +26,18 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 ///
 /// <para>
 /// <strong>Fase 3 (fora de transação):</strong>
-/// <see cref="IMercadoPagoClient.CriarPreferenceAsync"/> timeout 5 s.
-/// Falha → Pedido fica AguardandoPagamento; background service cancela em 30 min.
+/// <see cref="GerarCobrancaPedidoUseCase"/> (S11): preferência MP com expiração de 30 min (timeout 5 s)
+/// e <c>CobrancaPedido</c> gravada. Falha → Pedido fica AguardandoPagamento; o <c>CobrancaPedidoJob</c>
+/// expira a cobrança e cancela o pedido.
 /// Sucesso → retorna <c>{pedidoId, initPointUrl, expiresIn}</c>.
 /// </para>
 /// </summary>
 public sealed class IniciarCheckoutUseCase(
     CheckoutCoreService checkoutCore,
     CheckoutIdempotencyService idempotencyService,
-    IMercadoPagoClient mercadoPagoClient,
+    GerarCobrancaPedidoUseCase gerarCobranca,
     ILogger<IniciarCheckoutUseCase> logger)
 {
-    private static readonly TimeSpan MpTimeout = TimeSpan.FromSeconds(5);
     private const int ExpiresInSeconds = 1800;
 
     public async Task<CheckoutCriadoDto> ExecuteAsync(
@@ -83,59 +83,23 @@ public sealed class IniciarCheckoutUseCase(
         // FASE 3 — Criar Preference MP (fora de transação, timeout 5 s)
         // ═══════════════════════════════════════════════════════════════════
 
-        var swFase3 = Stopwatch.StartNew();
-
-        var preferenceItems = reservado.Itens
-            .Select(i => new PreferenceItemCommand(i.Nome, (int)i.Quantidade, i.PrecoUnitario))
-            .ToList();
-
-        if (reservado.ItemFrete.PrecoUnitario > 0m)
-            preferenceItems.Add(new PreferenceItemCommand(reservado.ItemFrete.Nome, 1, reservado.ItemFrete.PrecoUnitario));
-
-        var command = new CriarPreferenceCommand(
-            PedidoId: pedido.Id,
-            StorefrontId: storefront.Id,
-            StorefrontNome: storefront.TituloPublico,
-            ValorTotal: reservado.Total,
-            Items: preferenceItems);
-
-        PreferenceCriadaResult preferenceResult;
-        try
-        {
-            using var mpCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            mpCts.CancelAfter(MpTimeout);
-            preferenceResult = await mercadoPagoClient.CriarPreferenceAsync(command, mpCts.Token);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            logger.LogError(
-                "Checkout fase-3 timeout-mp pedidoId={PedidoId} timeout={Timeout}s",
-                pedido.Id, MpTimeout.TotalSeconds);
-            // Pedido fica AguardandoPagamento — background service limpa em 30 min
-            throw new MercadoPagoIndisponivelException(
-                "MercadoPago não respondeu no tempo limite. Tente novamente em instantes.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "Checkout fase-3 erro-mp pedidoId={PedidoId}", pedido.Id);
-            // Idem: pedido fica AguardandoPagamento
-            throw new MercadoPagoIndisponivelException(
-                "MercadoPago indisponível. Tente novamente em instantes.", ex);
-        }
+        // S11: a cobrança passa pelo mesmo use case da conversa e grava a CobrancaPedido. Falha ou timeout
+        // do MP → MercadoPagoIndisponivelException e o pedido fica AguardandoPagamento (o job expira).
+        var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: null, ct);
+        var initPointUrl = cobranca.LinkPagamento!;
 
         // Registrar resposta de idempotência
         if (input.IdempotencyKey.HasValue && input.ContentHash is not null)
         {
             await idempotencyService.RegistrarRespostaAsync(
                 input.IdempotencyKey.Value, input.ContentHash,
-                pedido.Id, preferenceResult.InitPointUrl, ct);
+                pedido.Id, initPointUrl, ct);
         }
 
         logger.LogInformation(
             "Checkout fase-3 ok pedidoId={PedidoId} storefrontId={StorefrontId} totalMs={Ms}ms",
             pedido.Id, storefront.Id, sw.ElapsedMilliseconds);
 
-        return new CheckoutCriadoDto(pedido.Id, preferenceResult.InitPointUrl, ExpiresInSeconds);
+        return new CheckoutCriadoDto(pedido.Id, initPointUrl, ExpiresInSeconds);
     }
 }

@@ -43,6 +43,15 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.Services.Storefront.CheckoutCoreService>(); // S10: fases 1-2
         services.AddScoped<IniciarCheckoutUseCase>();
 
+        // S11: cobrança do pedido pelo Mercado Pago (site e conversa), confirmação, expiração, troca de
+        // forma e desfazer pagamento manual. ConfirmarPagamentoPedidoUseCase é o ponto de entrada da S32.
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.GerarCobrancaPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ConfirmarPagamentoPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.TrocarFormaPagamentoPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.DesfazerPagamentoManualUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();
+        services.AddScoped<EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa>();
+
         // S40: expediente da loja (abrir e fechar, horário por dia).
         services.AddScoped<EasyStock.Application.UseCases.Storefront.Expediente.ObterExpedienteLojaUseCase>();
         // S45: cadastro de janelas, zonas e bloqueios pela própria loja

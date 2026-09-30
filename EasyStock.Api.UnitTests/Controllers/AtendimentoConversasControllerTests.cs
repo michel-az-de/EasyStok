@@ -9,6 +9,7 @@ using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums;
@@ -58,6 +59,9 @@ public class AtendimentoConversasControllerTests
             new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
             new GerenciarConversaAtendimentoUseCase(_repositorio, _unitOfWork),
             new TransferirConversaUseCase(_repositorio, _atendentes, _unitOfWork),
+            new ObterDossieClienteUseCase(
+                Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
+                Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
             _currentUser);
     }
 
@@ -95,7 +99,11 @@ public class AtendimentoConversasControllerTests
         var agente = new AgenteAtendimentoService(
             llm, _repositorio, Substitute.For<IConfiguracaoAtendimentoRepository>(), Substitute.For<IClienteRepository>(),
             Array.Empty<IFerramentaAgente>(), Substitute.For<IEscaladorConversa>(), Substitute.For<IWhatsAppCloudClient>(),
-            Substitute.For<IUsoIaRepository>(), _unitOfWork, NullLogger<AgenteAtendimentoService>.Instance);
+            Substitute.For<IUsoIaRepository>(), _unitOfWork,
+            new ObterDossieClienteUseCase(
+                Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
+                Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
+            NullLogger<AgenteAtendimentoService>.Instance);
 
         var turno = await agente.ProcessarTurnoAsync(_empresaId, conversa.Id, agora);
 
@@ -226,6 +234,27 @@ public class AtendimentoConversasControllerTests
     }
 
     // ── S41: atendentes e atribuição ──────────────────────────────────
+
+    [Fact]
+    public async Task DossieSemClienteNaoFalha()
+    {
+        var conversa = ConversaComClienteAgora();
+        conversa.ClienteId.Should().BeNull("é um lead: a conversa não tem cliente vinculado");
+
+        var dossie = Dados<DossieClienteDto>(await _controller.Dossie(conversa.Id, default));
+
+        dossie.Cliente.Should().Be(new DossieClienteDados(null, "Maria", WaId, null, null, null));
+        dossie.UltimosPedidos.Should().BeEmpty();
+        dossie.Notas.Should().BeEmpty();
+        dossie.Domicilio.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DossieDeConversaInexistenteDevolve404()
+    {
+        var result = await _controller.Dossie(Guid.NewGuid(), default);
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
 
     private static T Dados<T>(IActionResult result)
     {
@@ -382,6 +411,12 @@ public class AtendimentoConversasControllerTests
             Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens
                 .Where(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && (antesDe is null || m.EnviadaEm < antesDe))
                 .OrderBy(m => m.EnviadaEm).TakeLast(limite).ToList());
+
+        public Task<IReadOnlyList<Mensagem>> ListarMensagensDepoisAsync(
+            Guid empresaId, Guid conversaId, DateTime? depoisDe, int limite, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Mensagem>>(Mensagens
+                .Where(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && (depoisDe is null || m.EnviadaEm > depoisDe))
+                .OrderBy(m => m.EnviadaEm).Take(limite).ToList());
 
         public Task<IReadOnlyList<Conversa>> ListarPorClienteAsync(Guid empresaId, Guid clienteId, int max = 5, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<Conversa>>(Conversas.Where(c => c.EmpresaId == empresaId && c.ClienteId == clienteId).ToList());

@@ -93,4 +93,40 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversa.PedidoEmAndamentoId.Should().BeNull();
         await unitOfWork.DidNotReceive().CommitAsync();
     }
+
+    [Fact]
+    public async Task RecusaBloqueado()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        cliente.Bloquear("não pagou", Agora);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, unitOfWork);
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        (await act.Should().ThrowAsync<ClienteBloqueadoException>())
+            .Which.Codigo.Should().Be("cliente_bloqueado");
+        await c.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        conversa.PedidoEmAndamentoId.Should().BeNull();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
 }

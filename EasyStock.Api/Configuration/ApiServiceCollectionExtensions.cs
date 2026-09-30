@@ -75,10 +75,6 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
-        services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
-        // F14 — audita falha de pagamento em FaturaEvento.
-        services.AddScoped<EasyStock.Application.Ports.Output.IFalhaPagamentoNotifier,
-            EasyStock.Api.Services.Faturacao.AuditoriaFalhaPagamento>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
@@ -296,8 +292,24 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.OnRejected = async (context, cancellationToken) =>
+            // Chat do site (S36), público e anônimo. Abrir sessão: por IP, apertado (cada sessão é
+            // uma linha no banco). Mandar mensagem: por sessão (hash do token), para um visitante não
+            // gastar a cota do outro atrás do mesmo NAT; sem token, cai no IP. Ler: por IP, folgado
+            // (o widget lê ao reconectar o stream).
+            options.AddPolicy(ChatSiteRateLimit.AbrirSessao, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ChatSiteRateLimit.Mensagem, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    ChatSiteRateLimit.ChaveMensagem(context),
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = ChatSiteRateLimit.MensagensPorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ChatSiteRateLimit.Leitura, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;            options.OnRejected = async (context, cancellationToken) =>
             {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
 

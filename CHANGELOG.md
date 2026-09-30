@@ -10,6 +10,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (React 19 + Vite, commit de origem a9831ab) passa a viver em `EasyStock.Console/`, ainda com dados
   simulados. CI própria (`console.yml`: lint, fronteira de camadas e build) só quando a pasta muda.
   Matriz de paridade e ordem de ligação à API em `docs/plan/atendimento-whatsapp/10-console.md`. (#1120)
+- **Dossiê do cliente ao lado da conversa** (S25): `GET api/clientes/{id}/dossie` e `GET
+  api/atendimento/conversas/{id}/dossie` devolvem a mesma projeção (cadastro, endereços, tags, notas
+  internas, 10 últimos pedidos com itens, item favorito, última compra, bloqueio, preferências,
+  conversas recentes e pedido em andamento). Conversa de lead devolve o dossiê mínimo (nome do perfil e
+  telefone). Sinal de mesmo domicílio por `cep+numero+complemento` normalizado, só com id e nome do
+  outro cadastro (D10). O agente recebe um resumo com as notas marcadas `[interno]`. (#1161)
+- **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
+  api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
+  api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST
+  bloquear|desbloquear`: sem saudação nem agente, conversa vai para a dona, `criar_pedido` recusa com
+  `cliente_bloqueado`) e preferências (`PUT preferencias`: `AvisosStatusAtivos`, `ConsentiuMarketing`).
+  Ferramentas do agente `registrar_restricao` e `registrar_nota`. Migration
+  `AddClienteTagNotaBloqueioPreferencias` com RLS. O filtro de avisos de status por
+  `AvisosStatusAtivos` fica para depois da S13. (#1148)
+- **SSE de operação do console** (S18): `GET api/operacao/eventos` com JWT no header `Authorization`
+  (sem token, 401; token sem empresa, 403), eventos nomeados só da empresa da claim e heartbeat a cada
+  25 s. `ConfirmarPagamentoPedidoUseCase` publica `pedido.pago {pedidoId, numero, cliente, total, janela}`
+  e `AtualizarStatusPedidoUseCase` publica `pedido.mudou_status`, sempre depois do commit. O broker
+  in-memory do mobile virou `Api/Services/Operacao/OperacaoEventBroker` e atende os dois canais; o SSE
+  mobile não muda. `IOperacaoEventPublisher` deixa de ser no-op na Api (Worker segue no-op). (#1146)
 - **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
   `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
   `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na
@@ -21,6 +41,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   criar, editar, ativar e desativar), zonas de frete por faixa de CEP ou por bairros (inclusive trocar
   a cobertura) e bloqueios de dia ou de janela (listar por período, criar, remover). A loja é sempre a
   da empresa do token e id de outra loja devolve 404. Canais por empresa ficam para a parte 2. (#1095)
+- **Chat do site** (S36, ADR-0051): canal `ChatSite` público por loja em `api/public/chat/{slug}`.
+  `POST sessoes` devolve um token (só o hash fica no banco, vale 24 h renovadas no uso), `POST|GET
+  mensagens` com header `X-Chat-Token` e `GET stream` (SSE que lê do banco a cada 1 s, funciona
+  com várias instâncias). A conversa entra na fila humana sem responsável; o agente ainda não responde
+  no site. Flag `atendimento.canal.chatsite`, rate limit por IP e por sessão, tabela
+  `sessoes_chat_site` com RLS e limpeza das vencidas de hora em hora. (#1097)
 
 ### Security
 - CSRF do storefront: POST/PUT/PATCH/DELETE com cookie `__Host-cdb_*` só da mesma origem
@@ -37,6 +63,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   `IniciarCheckoutUseCase` e `IniciarCheckoutGuestUseCase` passam a delegar; o site não muda de
   comportamento. Novo `CriarPedidoAtendimentoUseCase` cria o pedido da conversa pelo mesmo caminho
   (`Origem = "whatsapp"`, observação por item, `Conversa.PedidoEmAndamentoId`); a cobrança é da S11. (#1101)
+- **Cobrança do pedido pelo Mercado Pago** (S11): `CobrancaPedido` (migration `AddCobrancaPedido`,
+  RLS) guarda a preferência com `external_reference = PedidoId`, link e expiração de 30 min; site e
+  conversa passam pelo mesmo `GerarCobrancaPedidoUseCase`. `ConfirmarPagamentoPedidoUseCase` (ponto de
+  entrada do webhook da S32) leva o pedido de `AguardandoPagamento` a `Aguardando`, registra o
+  pagamento e publica `pedido.pago`; repetido é no-op e valor menor não confirma. `CobrancaPedidoJob`
+  (60 s, `BackgroundJobs:EnableCobrancaPedido`) reemite uma vez para pedido da conversa e cancela o
+  resto liberando a vaga. Operadora: `POST api/pedidos/{id}/cobranca`, `.../cobranca/forma`
+  (`online` ou `na_entrega`) e `.../pagamento-manual/desfazer`. A ferramenta `criar_pedido` do agente
+  fecha o pedido e devolve resumo, total e link. (#1115)
 - **Mensagem programada ao cliente em todos os canais** (S39, ADR-0051): `MensagemProgramada`
   (texto ou modelo aprovado, agendada, enviando, enviada, cancelada ou falhou). Ao agendar e de
   novo no disparo: horário no passado é recusado; fora da janela no horário do envio, o WhatsApp

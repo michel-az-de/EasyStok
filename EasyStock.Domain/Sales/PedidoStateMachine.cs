@@ -25,7 +25,8 @@ public static class PedidoStateMachine
     /// <list type="bullet">
     ///   <item>Aguardando → {Preparando, Cancelado}</item>
     ///   <item>Preparando → {Pronto, Cancelado}</item>
-    ///   <item>Pronto → {Entregue, Cancelado}</item>
+    ///   <item>Pronto → {SaiuParaEntrega, Entregue, Cancelado}</item>
+    ///   <item>SaiuParaEntrega → {Entregue, Cancelado}  (S12)</item>
     ///   <item>Entregue → {Cancelado}  (cancela pós-entrega devolve estoque)</item>
     ///   <item>Cancelado → ∅</item>
     ///   <item>Rascunho → {AguardandoPagamento, Cancelado}  (Storefront ADR-0014)</item>
@@ -39,7 +40,11 @@ public static class PedidoStateMachine
         {
             [StatusPedido.Aguardando] = new HashSet<StatusPedido> { StatusPedido.Preparando, StatusPedido.Cancelado },
             [StatusPedido.Preparando] = new HashSet<StatusPedido> { StatusPedido.Pronto, StatusPedido.Cancelado },
-            [StatusPedido.Pronto] = new HashSet<StatusPedido> { StatusPedido.Entregue, StatusPedido.Cancelado },
+            [StatusPedido.Pronto] = new HashSet<StatusPedido>
+            {
+                StatusPedido.SaiuParaEntrega, StatusPedido.Entregue, StatusPedido.Cancelado,
+            },
+            [StatusPedido.SaiuParaEntrega] = new HashSet<StatusPedido> { StatusPedido.Entregue, StatusPedido.Cancelado },
             [StatusPedido.Entregue] = new HashSet<StatusPedido> { StatusPedido.Cancelado },
             [StatusPedido.Cancelado] = new HashSet<StatusPedido>(),
             // Storefront checkout flow (ADR-0014)
@@ -69,7 +74,7 @@ public static class PedidoStateMachine
         new HashSet<StatusPedido>
         {
             StatusPedido.Aguardando, StatusPedido.Preparando, StatusPedido.Pronto,
-            StatusPedido.Rascunho, StatusPedido.AguardandoPagamento,
+            StatusPedido.SaiuParaEntrega, StatusPedido.Rascunho, StatusPedido.AguardandoPagamento,
             StatusPedido.AguardandoAprovacaoBaba, StatusPedido.AprovadoBaba,
         };
 
@@ -83,7 +88,7 @@ public static class PedidoStateMachine
     /// ou devolução na transição.
     /// </summary>
     public static IReadOnlySet<StatusPedido> ComEstoqueDescontado { get; } =
-        new HashSet<StatusPedido> { StatusPedido.Pronto, StatusPedido.Entregue };
+        new HashSet<StatusPedido> { StatusPedido.Pronto, StatusPedido.SaiuParaEntrega, StatusPedido.Entregue };
 
     /// <summary>
     /// Status "pré-operacionais": o pedido ainda não entrou na fila de trabalho — está
@@ -106,6 +111,16 @@ public static class PedidoStateMachine
     /// pendente / aprovação do cardápio). Guarda de causa-raiz contra pagamento-fantasma.
     /// </summary>
     public static bool AceitaPagamento(StatusPedido status) => !PreOperacionais.Contains(status);
+
+    /// <summary>
+    /// Status em que um pagamento registrado à mão ainda pode ser desfeito (S11): o pedido está na
+    /// fila e o preparo não começou. É uma compensação, fora de <see cref="Transicoes"/>: a troca de
+    /// status genérica nunca devolve um pedido para <see cref="StatusPedido.AguardandoPagamento"/>.
+    /// </summary>
+    public static IReadOnlySet<StatusPedido> SemPreparoIniciado { get; } =
+        new HashSet<StatusPedido> { StatusPedido.Aguardando, StatusPedido.AprovadoBaba };
+
+    public static bool PodeDesfazerPagamento(StatusPedido status) => SemPreparoIniciado.Contains(status);
 
     public static bool PodeTransicionar(StatusPedido de, StatusPedido para)
         => Transicoes.TryGetValue(de, out var destinos) && destinos.Contains(para);

@@ -11,8 +11,8 @@ namespace EasyStock.Api.BackgroundServices;
 /// Job diario de vencimento de parcelas de Contas a Pagar/Receber (CAP/CAR).
 ///
 /// <para>
-/// Roda 1x/dia (proxima execucao 09:30 UTC apos boot — 30min depois do
-/// <see cref="FaturaVencimentoJob"/>) e processa parcelas atrasadas.
+/// Roda 1x/dia (proxima execucao 09:30 UTC apos boot)
+/// e processa parcelas atrasadas.
 /// </para>
 ///
 /// <para>Idempotente:</para>

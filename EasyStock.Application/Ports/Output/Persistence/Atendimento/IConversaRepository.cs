@@ -62,6 +62,14 @@ public interface IConversaRepository
         int limite,
         CancellationToken ct = default);
 
+    /// <summary>Mensagens depois de <paramref name="depoisDe"/> (ou as primeiras, sem cursor), em ordem cronologica (S36).</summary>
+    Task<IReadOnlyList<Mensagem>> ListarMensagensDepoisAsync(
+        Guid empresaId,
+        Guid conversaId,
+        DateTime? depoisDe,
+        int limite,
+        CancellationToken ct = default);
+
     Task<IReadOnlyList<Conversa>> ListarPorClienteAsync(Guid empresaId, Guid clienteId, int max = 5, CancellationToken ct = default);
 
     /// <summary>Lookup pelo <c>wamid</c> (idempotencia do webhook e callbacks de status).</summary>

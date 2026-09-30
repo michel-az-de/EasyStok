@@ -179,6 +179,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Loja> Lojas { get; set; } = null!;
         public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
         public DbSet<Cliente> Clientes { get; set; } = null!;
+        public DbSet<ClienteTag> ClienteTags { get; set; } = null!;
+        public DbSet<ClienteNota> ClienteNotas { get; set; } = null!;
         public DbSet<Pedido> Pedidos { get; set; } = null!;
         public DbSet<MovimentoCaixa> MovimentosCaixa { get; set; } = null!;
         public DbSet<FechamentoCaixa> FechamentosCaixa { get; set; } = null!;
@@ -194,6 +196,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento> ConfiguracoesAtendimento { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.ConsentimentoContato> ConsentimentosContato { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.MensagemProgramada> MensagensProgramadas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.Lembrete> Lembretes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ExpedienteLoja> ExpedientesLoja { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
         public DbSet<AnuncioIa> AnunciosIa { get; set; } = null!;
@@ -209,6 +212,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Storefront.PedidoAvaliacao> PedidoAvaliacoes { get; set; } = null!;
 
         // Atendimento (S04, ADR-0050): conversa por contato de WhatsApp e suas mensagens.
+        public DbSet<EasyStock.Domain.Entities.Atendimento.SessaoChatSite> SessoesChatSite { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.LinkCardapioConversa> LinksCardapioConversa { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Conversa> AtendimentoConversas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Mensagem> AtendimentoMensagens { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.StorefrontFaleConosco> StorefrontFaleConoscos { get; set; } = null!;
@@ -276,6 +281,9 @@ namespace EasyStock.Infra.Postgre.Data
 
         // Payment Orchestration (Onda P0)
         public DbSet<PaymentAttempt> PaymentAttempts { get; set; } = null!;
+
+        // S11: cobrança do pedido (Mercado Pago ou na entrega)
+        public DbSet<CobrancaPedido> CobrancasPedido { get; set; } = null!;
         public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;
         public DbSet<GatewayRoutingRule> GatewayRoutingRules { get; set; } = null!;
         public DbSet<GatewayHealthSnapshot> GatewayHealthSnapshots { get; set; } = null!;
