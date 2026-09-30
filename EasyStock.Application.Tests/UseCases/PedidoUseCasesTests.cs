@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Persistence;
+﻿using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
@@ -440,6 +440,35 @@ public class PedidoUseCasesTests
         await _pedidoRepo.DidNotReceive().AddEventoAsync(Arg.Any<PedidoEvento>());
         await _pedidoRepo.DidNotReceive().UpdateAsync(Arg.Any<Pedido>());
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact] // S12: SaiuParaEntrega esta em ComEstoqueDescontado, cancelar devolve o estoque.
+    public async Task CancelarPedido_EmSaiuParaEntrega_DevolveEstoque()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+
+        var pedido = Pedido.Criar(empresaId, cliente: null, lojaId, "web");
+        pedido.Status = "saiu_para_entrega";
+        var item = new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId,
+            Nome = "X", Quantidade = 2, PrecoUnitario = 10m };
+        pedido.Itens.Add(item);
+        _pedidoRepo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        _movRepo.ExisteReferenciaAsync(empresaId, produtoId, $"{pedido.Id}:{item.Id}",
+            NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        _itemEstoqueRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId,
+                ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) }
+        });
+
+        await CancelarUC().ExecuteAsync(new CancelarPedidoCommand(empresaId, pedido.Id));
+
+        await _movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
+            m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno && m.ProdutoId == produtoId));
+        pedido.Status.Should().Be("cancelado");
     }
 
     [Fact]

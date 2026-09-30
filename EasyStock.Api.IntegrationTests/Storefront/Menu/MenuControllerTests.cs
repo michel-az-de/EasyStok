@@ -259,8 +259,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
         chaves.Should().BeEquivalentTo(new[]
         {
             "categoria", "descricao", "disponivel", "estoqueAtual", "id",
-            "imagemUrl", "nome", "ordem", "pesoExibicao", "precoCentavos", "tag",
-        }, "exatamente as 11 chaves camelCase do contrato, inclusive as null");
+            "imagemUrl", "linha", "nome", "ordem", "pesoExibicao", "precoCentavos", "tag",
+            "tempoPreparoMinutos",
+        }, "as 11 chaves camelCase da v1 mais linha e tempoPreparoMinutos (S15, v2), inclusive as null");
+        avulso.GetProperty("linha").GetString().Should().Be("paraServir");
 
         avulso.GetProperty("descricao").ValueKind.Should().Be(JsonValueKind.Null);
         avulso.GetProperty("imagemUrl").ValueKind.Should().Be(JsonValueKind.Null);

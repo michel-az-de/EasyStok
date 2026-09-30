@@ -33,6 +33,7 @@ public sealed class ConsultarCardapioFerramenta(
             .Where(i => i.Disponivel)
             .Select(i => new
             {
+                id = i.Id, // S11: criar_pedido recebe o id do item do cardápio
                 nome = i.Nome,
                 descricao = i.Descricao,
                 preco = FerramentaJson.FormatarReais(i.PrecoCentavos / 100m),

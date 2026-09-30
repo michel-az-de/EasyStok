@@ -13,8 +13,11 @@ public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger)
         CriarPreferenceCommand command,
         CancellationToken ct = default)
     {
-        var preferenceId = $"stub-{command.PedidoId}";
-        var initPoint = $"https://stub.mp/{command.PedidoId}";
+        // S11: um pedido pode ter mais de uma cobrança (reemissão, troca de forma); a chave de
+        // idempotência distingue cada uma e mantém o índice único (Provedor, ReferenciaExterna).
+        var chave = command.IdempotencyKey ?? command.PedidoId.ToString();
+        var preferenceId = $"stub-{chave}";
+        var initPoint = $"https://stub.mp/{chave}";
 
         logger.LogInformation(
             "StubMercadoPago preference criada pedidoId={PedidoId} initPoint={InitPoint}",

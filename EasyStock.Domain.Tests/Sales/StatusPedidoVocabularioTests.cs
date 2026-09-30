@@ -24,7 +24,8 @@ public class StatusPedidoVocabularioTests
     }
 
     // De-para do contrato do cliente — congela o comportamento do antigo StatusToContract
-    // (aguardando+preparando colapsam em EmPreparo; pronto vira SaiuParaEntrega).
+    // (aguardando+preparando colapsam em EmPreparo). Desde a S12 pronto volta a ser "Pronto"
+    // para o cliente e SaiuParaEntrega passa a ser um estado real (token aditivo no contrato).
     [Theory]
     [InlineData(StatusPedido.Rascunho, "Rascunho")]
     [InlineData(StatusPedido.AguardandoPagamento, "AguardandoPagamento")]
@@ -32,11 +33,21 @@ public class StatusPedidoVocabularioTests
     [InlineData(StatusPedido.AprovadoBaba, "AprovadoBaba")]
     [InlineData(StatusPedido.Aguardando, "EmPreparo")]
     [InlineData(StatusPedido.Preparando, "EmPreparo")]
-    [InlineData(StatusPedido.Pronto, "SaiuParaEntrega")]
+    [InlineData(StatusPedido.Pronto, "Pronto")]
+    [InlineData(StatusPedido.SaiuParaEntrega, "SaiuParaEntrega")]
     [InlineData(StatusPedido.Entregue, "Entregue")]
     [InlineData(StatusPedido.Cancelado, "Cancelado")]
     public void ContratoCliente_preserva_o_de_para_do_storefront(StatusPedido status, string esperado)
         => StatusPedidoVocabulario.ContratoCliente(status).Should().Be(esperado);
+
+    [Fact]
+    public void CobreSaiuParaEntrega()
+    {
+        var p = StatusPedidoVocabulario.De(StatusPedido.SaiuParaEntrega);
+        p.RotuloLojista.Should().Be("Saiu para entrega");
+        p.ContratoCliente.Should().Be("SaiuParaEntrega");
+        p.Bucket.Should().Be(BucketStatusPedido.Operacional);
+    }
 
     // Unificacao do unico rotulo divergente entre superficies: cockpit/SSR usavam
     // "Em preparo", o StatusHelper do Web usava "Preparando". Canonico = "Em preparo".
