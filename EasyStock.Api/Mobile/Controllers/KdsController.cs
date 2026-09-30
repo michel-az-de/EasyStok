@@ -30,7 +30,7 @@ public class KdsController(
 {
     private static readonly HashSet<string> StatusesPermitidos = new(StringComparer.OrdinalIgnoreCase)
     {
-        "aguardando", "preparando", "pronto", "entregue", "cancelado"
+        "aguardando", "preparando", "pronto", "saiu_para_entrega", "entregue", "cancelado"
     };
 
     private static readonly HashSet<string> StatusesAtivosDefault = new(StringComparer.OrdinalIgnoreCase)

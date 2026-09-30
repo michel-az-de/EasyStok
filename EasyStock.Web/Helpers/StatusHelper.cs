@@ -20,6 +20,7 @@ public static class StatusHelper
         ["aguardando"] = new("Aguardando", "badge-warn",    "warn"),
         ["preparando"] = new("Em preparo", "badge-info",    "info"),  // canônico (issue 863): StatusPedidoVocabulario.RotuloLojista
         ["pronto"]     = new("Pronto",     "badge-ok",      "ok"),
+        ["saiu_para_entrega"] = new("Saiu para entrega", "badge-ok", "ok"),  // S12 (#1119)
         ["entregue"]   = new("Entregue",   "badge-neutral", "neutral"),
         ["cancelado"]  = new("Cancelado",  "badge-neutral badge-struck", "neutral"),
         ["em_producao"] = new("Em produção", "badge-info",  "info"),

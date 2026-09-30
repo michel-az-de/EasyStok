@@ -59,6 +59,15 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasColumnName("mensagem_recusa_cliente")
                 .HasMaxLength(280)
                 .IsRequired(false);
+            // S12 (#1119): aprovação manual só na exceção (ex.: fora de área).
+            b.Property(p => p.RequerAprovacao)
+                .HasColumnName("requer_aprovacao")
+                .HasDefaultValue(false)
+                .IsRequired();
+            b.Property(p => p.MotivoRequerAprovacao)
+                .HasColumnName("motivo_requer_aprovacao")
+                .HasMaxLength(Pedido.MotivoRequerAprovacaoMaxLength)
+                .IsRequired(false);
 
             b.HasOne(p => p.Empresa)
                 .WithMany()

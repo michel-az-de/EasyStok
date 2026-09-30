@@ -3,6 +3,7 @@ using System;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    partial class EasyStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930013036_AddRequerAprovacaoPedido")]
+    partial class AddRequerAprovacaoPedido
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -790,9 +793,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("EnviadaEm")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("EnviadaPorUsuarioId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Erro")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -917,49 +917,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_mensagens_programadas_empresa_cliente");
 
                     b.ToTable("mensagens_programadas", (string)null);
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ConversaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CriadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EmpresaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ExpiraEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("StorefrontId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTime>("UltimoUsoEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiraEm")
-                        .HasDatabaseName("ix_sessoes_chat_site_expira_em");
-
-                    b.HasIndex("StorefrontId");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("uq_sessoes_chat_site_token_hash");
-
-                    b.ToTable("sessoes_chat_site", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.AuditLog", b =>
@@ -1877,16 +1834,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("FacebookPageId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
                     b.Property<bool>("FinanceiroHabilitado")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("InstagramAccountId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -1921,14 +1870,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("Documento")
                         .IsUnique();
-
-                    b.HasIndex("FacebookPageId")
-                        .IsUnique()
-                        .HasFilter("\"FacebookPageId\" IS NOT NULL");
-
-                    b.HasIndex("InstagramAccountId")
-                        .IsUnique()
-                        .HasFilter("\"InstagramAccountId\" IS NOT NULL");
 
                     b.HasIndex("WhatsAppPhoneNumberId")
                         .IsUnique()
@@ -6707,10 +6648,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<string>("LinhaSnapshot")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -7645,15 +7582,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("InstrucaoFinalizacao")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int>("Linha")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1);
-
                     b.Property<string>("NomePublico")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -7690,9 +7618,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("TempoPreparo")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<int?>("TempoPreparoMinutos")
-                        .HasColumnType("integer");
 
                     b.Property<bool>("Visivel")
                         .ValueGeneratedOnAdd()
@@ -9978,15 +9903,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasOne("EasyStock.Domain.Entities.Cliente", null)
                         .WithMany()
                         .HasForeignKey("ClienteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
-                {
-                    b.HasOne("EasyStock.Domain.Entities.Storefront.Storefront", null)
-                        .WithMany()
-                        .HasForeignKey("StorefrontId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
