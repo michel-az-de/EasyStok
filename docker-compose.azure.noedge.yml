@@ -6,7 +6,7 @@
 # este override o poe atras de um profile para o `up -d` nao subi-lo.
 #
 # Uso (cron da VM): EASYSTOK_COMPOSE_EXTRA=/home/azureuser/easystok/docker-compose.azure.noedge.yml
-# O Caddy central alcanca web/admin/api/storefront conectando-se a rede externa
+# O Caddy central alcanca web/api/storefront conectando-se a rede externa
 # easystok_easystock-net (so o caddy entra na rede da stack, nao o contrario).
 services:
   caddy:

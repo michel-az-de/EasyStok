@@ -25,8 +25,7 @@ try {
   $rules = @(
     @{ match = 'EasyStock.Web/wwwroot/etiqueta/';               src = 'EasyStock.Api/wwwroot/pwa/etiqueta (copiado pelo target CopyEtiquetaAssets)' },
     @{ match = 'EasyStok.Mobile/Resources/Raw/pwa/';            src = 'EasyStock.Api/wwwroot/pwa (mirror manual; sincronize de la)' },
-    @{ match = 'EasyStock.Web/wwwroot/css/tailwind.dist.css';   src = 'tailwind.src.css + tailwind.config.js + .cshtml/.js (gerado por TailwindBuild)' },
-    @{ match = 'EasyStock.Admin/wwwroot/css/tailwind.dist.css'; src = 'tailwind.src.css + tailwind.config.js + .cshtml/.js (gerado por TailwindBuild)' }
+    @{ match = 'EasyStock.Web/wwwroot/css/tailwind.dist.css';   src = 'tailwind.src.css + tailwind.config.js + .cshtml/.js (gerado por TailwindBuild)' }
   )
 
   foreach ($r in $rules) {

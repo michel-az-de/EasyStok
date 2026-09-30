@@ -11,7 +11,7 @@ namespace EasyStock.Api.DependencyInjection;
 /// <summary>
 /// Agrupa registros que viviam soltos no Program.cs entre "Build" e "DiagnosticoMode":
 /// Background Jobs da Application, HttpClient genérico, validators do FluentValidation,
-/// Mobile module services (Onda 2-9), SeedProgressService e ExpirarClienteSessions
+/// Mobile module services (Onda 2-9), ExpirarClienteSessions
 /// (Storefront sliding window).
 ///
 /// DiagnosticoModeService NÃO entra aqui porque depende de <c>diagLevelSwitch</c>
@@ -57,10 +57,6 @@ public static class ApiServicesExtensions
         // Onda 9: OTA do PWA — lê CACHE_VERSION do sw.js em runtime pra /version reportar
         // a versão real do bundle (sem depender de config drift-prone).
         services.AddSingleton<IPwaVersionProvider, PwaVersionProvider>();
-
-        // SeedProgressService: Singleton pra compartilhar estado de runs entre requests.
-        // O background job e o polling endpoint falam com a mesma instância.
-        services.AddSingleton<SeedProgressService>();
 
         // Storefront — expirar sessões de clientes (ADR-0012: sliding window 30d).
         services.AddHostedService<ExpirarClienteSessionsBackgroundService>();

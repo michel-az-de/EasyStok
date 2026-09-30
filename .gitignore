@@ -411,9 +411,5 @@ EasyStock.Api/easystock.db*
 # Ver: docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
 /admin/
 
-# Previews locais do design system Deck do Admin (server.js + *.html de showcase).
-# Ferramenta de verificacao no browser (issue 730); nao faz parte do deploy nem do build.
-EasyStock.Admin/wwwroot/dev/
-
 # Cache NuGet local acidental (nunca deve existir no repo)
 .nuget/

@@ -141,8 +141,8 @@ public class WebhookGatewayController(
 
     /// <summary>
     /// Tenta extrair um event ID estavel do payload conforme o provedor.
-    /// Stripe e Mercado Pago tem <c>id</c> no root; Efi nao envia, fica null
-    /// e o caller usa hash do body como fallback.
+    /// Stripe e Mercado Pago tem <c>id</c> no root (no Mercado Pago o id da notificacao e numerico, S32);
+    /// Efi nao envia, fica null e o caller usa hash do body como fallback.
     /// </summary>
     private static string? ExtrairEventIdExterno(string rawBody, string provedor)
     {
@@ -152,12 +152,16 @@ public class WebhookGatewayController(
             using var doc = System.Text.Json.JsonDocument.Parse(rawBody);
             var root = doc.RootElement;
 
-            // Padrao 1: {"id": "evt_..."} no root (Stripe, Mercado Pago)
+            // Padrao 1: {"id": "evt_..."} (Stripe) ou {"id": 123456789} (Mercado Pago) no root
             if (root.ValueKind == System.Text.Json.JsonValueKind.Object
-                && root.TryGetProperty("id", out var idEl)
-                && idEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                && root.TryGetProperty("id", out var idEl))
             {
-                var id = idEl.GetString();
+                var id = idEl.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.String => idEl.GetString(),
+                    System.Text.Json.JsonValueKind.Number => idEl.GetRawText(),
+                    _ => null,
+                };
                 if (!string.IsNullOrWhiteSpace(id)) return $"{provedor}:{id}";
             }
         }
