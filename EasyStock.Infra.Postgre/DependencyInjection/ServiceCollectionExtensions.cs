@@ -203,6 +203,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // Atendimento (S04, ADR-0050)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
                 Repositories.Atendimento.ConversaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAtendenteRepository,
+                Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
                 Repositories.Atendimento.SessaoChatSiteRepository>();
             // #1102: número da Meta pelo qual a resposta sai = o da empresa do tenant corrente.

@@ -11,6 +11,7 @@ using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Atendimento;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
@@ -34,12 +35,14 @@ public class AtendimentoConversasControllerTests
     private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
+    private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
     private readonly AtendimentoConversasController _controller;
 
     public AtendimentoConversasControllerTests()
     {
         _currentUser.EmpresaId.Returns(_empresaId);
         _currentUser.UsuarioId.Returns(_usuarioId);
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(true);
         _canal.Canal.Returns(CanalConversa.WhatsApp);
         _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.dona1");
 
@@ -54,6 +57,7 @@ public class AtendimentoConversasControllerTests
             new ListarMensagensConversaUseCase(_repositorio),
             new EnviarMensagemConsoleUseCase(_repositorio, resolvedor, uploads, _unitOfWork),
             new GerenciarConversaAtendimentoUseCase(_repositorio, _unitOfWork),
+            new TransferirConversaUseCase(_repositorio, _atendentes, _unitOfWork),
             _currentUser);
     }
 
@@ -214,11 +218,127 @@ public class AtendimentoConversasControllerTests
     {
         var conversa = ConversaComClienteAgora();
 
-        var result = await _controller.Listar(null, "mar", 1, 20, default);
+        var result = await _controller.Listar(null, "mar", null, 1, 20, default);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var data = (IReadOnlyList<ConversaResumoResult>)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
         data.Should().ContainSingle(c => c.Id == conversa.Id && c.UltimaMensagemTexto == "oi" && c.NaoLidas == 1);
+    }
+
+    // ── S41: atendentes e atribuição ──────────────────────────────────
+
+    private static T Dados<T>(IActionResult result)
+    {
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        return (T)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+    }
+
+    private void Atendente(Guid usuarioId, NivelAcesso nivel = NivelAcesso.Operador, params Permissao[] explicitas) =>
+        _atendentes.ObterUsuarioAtivoAsync(_empresaId, usuarioId, Arg.Any<CancellationToken>())
+            .Returns(new UsuarioDaEmpresa(usuarioId, "Bia", "bia@x.com", [new PerfilNaEmpresa(nivel, explicitas)]));
+
+    [Fact]
+    public async Task SemPermissaoDeAtender403()
+    {
+        var conversa = ConversaComClienteAgora();
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+
+        (await _controller.Assumir(conversa.Id, default)).Should().BeOfType<ForbidResult>();
+        (await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("oi"), default)).Should().BeOfType<ForbidResult>();
+        (await _controller.Transferir(conversa.Id, new TransferirConversaBody(Guid.NewGuid()), default)).Should().BeOfType<ForbidResult>();
+        (await _controller.LiberarAutomatico(conversa.Id, default)).Should().BeOfType<ForbidResult>();
+        (await _controller.Encerrar(conversa.Id, default)).Should().BeOfType<ForbidResult>();
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task EnviarGravaQuemEnviou()
+    {
+        var conversa = ConversaComClienteAgora();
+
+        var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Oi"), default);
+
+        Dados<MensagemAtendimentoResult>(result).EnviadaPorUsuarioId.Should().Be(_usuarioId);
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Dona && m.EnviadaPorUsuarioId == _usuarioId);
+    }
+
+    [Fact]
+    public async Task TransferirParaAtendenteTrocaResponsavel()
+    {
+        var conversa = ConversaComClienteAgora();
+        conversa.Assumir(DateTime.UtcNow, _usuarioId);
+        var bia = Guid.NewGuid();
+        Atendente(bia);
+
+        var result = await _controller.Transferir(conversa.Id, new TransferirConversaBody(bia), default);
+
+        Dados<ConversaSituacaoResult>(result).AssumidaPorUsuarioId.Should().Be(bia);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema
+            && m.Texto!.Contains(_usuarioId.ToString()) && m.Texto.Contains(bia.ToString()));
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task TransferirParaQuemNaoAtende422()
+    {
+        var conversa = ConversaComClienteAgora();
+        conversa.Assumir(DateTime.UtcNow, _usuarioId);
+        var visualizador = Guid.NewGuid();
+        Atendente(visualizador, NivelAcesso.Visualizador);
+        var restrito = Guid.NewGuid();
+        Atendente(restrito, NivelAcesso.Admin, Permissao.GerenciarProdutos);
+        var desconhecido = Guid.NewGuid();
+
+        foreach (var destino in new[] { visualizador, restrito, desconhecido })
+        {
+            var result = await _controller.Transferir(conversa.Id, new TransferirConversaBody(destino), default);
+            result.Should().BeOfType<UnprocessableEntityObjectResult>();
+        }
+
+        conversa.AssumidaPorUsuarioId.Should().Be(_usuarioId);
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task ListarFiltraPorResponsavel()
+    {
+        var minha = ConversaComClienteAgora();
+        minha.Assumir(DateTime.UtcNow, _usuarioId);
+        var livre = Conversa.Abrir(_empresaId, "5511999997777", DateTime.UtcNow, "Joana");
+        _repositorio.Conversas.Add(livre);
+        var daBia = Conversa.Abrir(_empresaId, "5511999996666", DateTime.UtcNow, "Rita");
+        var bia = Guid.NewGuid();
+        daBia.Transferir(bia, DateTime.UtcNow);
+        _repositorio.Conversas.Add(daBia);
+
+        Dados<IReadOnlyList<ConversaResumoResult>>(await _controller.Listar(null, null, "eu", 1, 20, default))
+            .Should().ContainSingle(c => c.Id == minha.Id);
+        Dados<IReadOnlyList<ConversaResumoResult>>(await _controller.Listar(null, null, "ninguem", 1, 20, default))
+            .Should().ContainSingle(c => c.Id == livre.Id);
+        Dados<IReadOnlyList<ConversaResumoResult>>(await _controller.Listar(null, null, bia.ToString(), 1, 20, default))
+            .Should().ContainSingle(c => c.Id == daBia.Id);
+        (await _controller.Listar(null, null, "fulano", 1, 20, default)).Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task ListarAtendentesSoQuemTemPermissao()
+    {
+        var ana = new UsuarioDaEmpresa(Guid.NewGuid(), "Ana", "ana@x.com", [new PerfilNaEmpresa(NivelAcesso.Operador, [])]);
+        var leitor = new UsuarioDaEmpresa(Guid.NewGuid(), "Leo", "leo@x.com", [new PerfilNaEmpresa(NivelAcesso.Visualizador, [])]);
+        var semPerfil = new UsuarioDaEmpresa(Guid.NewGuid(), "Sem", "sem@x.com", []);
+        // Com dois perfis vale o de maior nível (menor valor), como no login.
+        var dupla = new UsuarioDaEmpresa(Guid.NewGuid(), "Duda", "duda@x.com",
+            [new PerfilNaEmpresa(NivelAcesso.Visualizador, []), new PerfilNaEmpresa(NivelAcesso.Gerente, [])]);
+        _atendentes.ListarUsuariosAtivosAsync(_empresaId, Arg.Any<CancellationToken>()).Returns([ana, leitor, semPerfil, dupla]);
+        var controller = new AtendimentoAtendentesController(new ListarAtendentesUseCase(_atendentes), _currentUser);
+
+        var lista = Dados<IReadOnlyList<AtendenteResult>>(await controller.Listar(default));
+
+        lista.Select(a => a.Nome).Should().BeEquivalentTo(["Ana", "Duda"]);
     }
 
     /// <summary>Repositório em memória: basta para os use cases e para o turno do agente.</summary>
@@ -249,9 +369,10 @@ public class AtendimentoConversasControllerTests
             Task.FromResult<IReadOnlyList<Conversa>>(Conversas.Where(c => c.EmpresaId == empresaId).ToList());
 
         public Task<IReadOnlyList<ConversaInboxItem>> ListarInboxAsync(
-            Guid empresaId, SituacaoConversa? situacao, string? busca, int pagina, int tamanhoPagina, CancellationToken ct = default) =>
+            Guid empresaId, SituacaoConversa? situacao, string? busca, FiltroResponsavel? responsavel, int pagina, int tamanhoPagina, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<ConversaInboxItem>>(Conversas
                 .Where(c => c.EmpresaId == empresaId && (situacao is null || c.Situacao == situacao))
+                .Where(c => responsavel is null || c.AssumidaPorUsuarioId == responsavel.UsuarioId)
                 .Where(c => busca is null || (c.ContatoNome ?? "").Contains(busca, StringComparison.OrdinalIgnoreCase) || c.ContatoIdExterno.Contains(busca))
                 .Select(c => new ConversaInboxItem(c, Mensagens.Where(m => m.ConversaId == c.Id).OrderBy(m => m.EnviadaEm).LastOrDefault()?.Texto))
                 .ToList());

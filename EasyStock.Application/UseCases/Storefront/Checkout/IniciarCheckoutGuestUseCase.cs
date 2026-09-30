@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using DomainCliente = EasyStock.Domain.Entities.Cliente;
 using DomainPedido = EasyStock.Domain.Entities.Pedido;
-using DomainPedidoItem = EasyStock.Domain.Entities.PedidoItem;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
@@ -25,15 +25,13 @@ namespace EasyStock.Application.UseCases.Storefront.Checkout;
 /// </para>
 ///
 /// <para>
-/// <strong>Codigo duplicado de Fase 1 (~80 LoC do IniciarCheckoutUseCase):</strong>
-/// deliberado pra isolar o caminho guest do caminho logado em arquivos
-/// distintos, evitando colisao com sessao paralela. Refatoracao
-/// extract-method fica pra commit futuro.
+/// Validacao do carrinho, carga do cardapio e gravacao dos itens vem do
+/// <see cref="CheckoutCoreService"/> (S10), o mesmo nucleo do checkout logado.
 /// </para>
 /// </summary>
 public sealed class IniciarCheckoutGuestUseCase(
     IStorefrontRepository storefrontRepository,
-    ICardapioItemRepository cardapioItemRepository,
+    CheckoutCoreService checkoutCore,
     IFreteZonaRepository freteZonaRepository,
     IClienteStorefrontRepository clienteRepository,
     IPedidoStorefrontRepository pedidoRepository,
@@ -42,8 +40,6 @@ public sealed class IniciarCheckoutGuestUseCase(
     TimeProvider timeProvider,
     ILogger<IniciarCheckoutGuestUseCase> logger)
 {
-    private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
-
     /// <summary>E.164 BR: <c>+55</c> + DDD (2) + numero (8 ou 9 digitos).</summary>
     private static readonly Regex TelefoneE164BrRegex =
         new(@"^\+55[1-9][0-9]\d{8,9}$", RegexOptions.Compiled);
@@ -63,19 +59,8 @@ public sealed class IniciarCheckoutGuestUseCase(
 
         var telefoneE164 = NormalizarTelefone(input.Telefone);
 
-        var cep = NormalizarCep(input.Cep);
-        if (!CepDigitosRegex.IsMatch(cep))
-            throw new CepInvalidoException();
-
-        if (input.Items is null || input.Items.Count == 0)
-            throw new RegraDeDominioVioladaException("Carrinho vazio — informe ao menos 1 item.");
-
-        foreach (var item in input.Items)
-        {
-            if (item.Qtd <= 0)
-                throw new RegraDeDominioVioladaException(
-                    $"Quantidade invalida para item {item.CardapioItemId}: deve ser > 0.");
-        }
+        var cep = CheckoutCoreService.ValidarEntrada(
+            input.Cep, input.Items?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
 
         // ── Resolver storefront ──────────────────────────────────────────
         var storefront = await storefrontRepository.GetBySlugAsync(input.Slug, ct);
@@ -107,16 +92,8 @@ public sealed class IniciarCheckoutGuestUseCase(
         }
 
         // ── Validar items do cardapio ────────────────────────────────────
-        var cardapioItemIds = input.Items.Select(i => i.CardapioItemId).Distinct().ToList();
-        var cardapioItens = new Dictionary<Guid, CardapioItem>();
-        foreach (var itemId in cardapioItemIds)
-        {
-            var ci = await cardapioItemRepository.GetByIdAsync(storefront.Id, itemId, ct);
-            if (ci is null || !ci.Visivel)
-                throw new RegraDeDominioVioladaException(
-                    $"Item de cardapio {itemId} nao encontrado ou indisponivel.");
-            cardapioItens[itemId] = ci;
-        }
+        var cardapioItens = await checkoutCore.CarregarItensCardapioAsync(
+            storefront.Id, input.Items!.Select(i => i.CardapioItemId), ct);
 
         // ── Frete best-effort (zonas, sem bloqueio) ──────────────────────
         decimal? freteEstimado = null;
@@ -145,42 +122,13 @@ public sealed class IniciarCheckoutGuestUseCase(
         pedido.Observacoes = MontarObservacoes(input.Observacoes, cep, input.Numero);
         await pedidoRepository.AddAsync(pedido, ct);
 
-        foreach (var inputItem in input.Items)
-        {
-            var ci = cardapioItens[inputItem.CardapioItemId];
-            var precoUnit = ci.PrecoEfetivo();
-            var item = new DomainPedidoItem
-            {
-                Id = Guid.NewGuid(),
-                PedidoId = pedido.Id,
-                ProdutoId = ci.ProdutoId,
-                CardapioItemId = ci.Id,
-                Nome = ci.Produto?.Nome ?? $"Item {ci.ProdutoId}",
-                Quantidade = inputItem.Qtd,
-                PrecoUnitario = precoUnit,
-                Subtotal = inputItem.Qtd * precoUnit,
-                CriadoEm = DateTime.UtcNow,
-            };
-            await pedidoRepository.AddItemAsync(item, ct);
+        var itens = await checkoutCore.AdicionarItensAsync(
+            pedido, input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)), cardapioItens, ct);
+        foreach (var item in itens)
             pedido.Itens.Add(item);
-        }
 
         if (zonaMatch is not null && zonaMatch.Valor > 0m)
-        {
-            var itemFrete = new DomainPedidoItem
-            {
-                Id = Guid.NewGuid(),
-                PedidoId = pedido.Id,
-                ProdutoId = null,
-                Nome = $"Entrega — {zonaMatch.Label}",
-                Quantidade = 1,
-                PrecoUnitario = zonaMatch.Valor,
-                Subtotal = zonaMatch.Valor,
-                CriadoEm = DateTime.UtcNow,
-            };
-            await pedidoRepository.AddItemAsync(itemFrete, ct);
-            pedido.Itens.Add(itemFrete);
-        }
+            pedido.Itens.Add(await checkoutCore.AdicionarItemFreteAsync(pedido, zonaMatch, ct));
 
         pedido.RecalcularTotal();
         pedido.AlteradoEm = DateTime.UtcNow;
@@ -199,14 +147,6 @@ public sealed class IniciarCheckoutGuestUseCase(
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
-
-    private static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new System.Text.StringBuilder(cep.Length);
-        foreach (var c in cep) if (char.IsDigit(c)) sb.Append(c);
-        return sb.ToString();
-    }
 
     private static string NormalizarTelefone(string telefone)
     {

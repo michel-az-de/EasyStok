@@ -74,6 +74,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         Guid empresaId,
         SituacaoConversa? situacao,
         string? busca,
+        FiltroResponsavel? responsavel,
         int pagina,
         int tamanhoPagina,
         CancellationToken ct = default)
@@ -87,6 +88,9 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
         if (situacao is { } s)
             query = query.Where(c => c.Situacao == s);
+
+        if (responsavel is not null)
+            query = query.Where(c => c.AssumidaPorUsuarioId == responsavel.UsuarioId);
 
         if (!string.IsNullOrWhiteSpace(busca))
         {

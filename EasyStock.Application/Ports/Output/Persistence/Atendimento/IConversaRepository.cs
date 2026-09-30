@@ -9,6 +9,12 @@ public sealed record ConversaComMensagens(Conversa Conversa, IReadOnlyList<Mensa
 /// <summary>Linha da inbox do console (S07): a conversa e o texto da ultima mensagem, quando houver.</summary>
 public sealed record ConversaInboxItem(Conversa Conversa, string? UltimaMensagemTexto);
 
+/// <summary>Filtro por responsavel da inbox (S41): <c>UsuarioId</c> nulo = conversas sem ninguem.</summary>
+public sealed record FiltroResponsavel(Guid? UsuarioId)
+{
+    public static readonly FiltroResponsavel Ninguem = new((Guid?)null);
+}
+
 /// <summary>
 /// Persistencia do agregado Conversa/Mensagem (S04, ADR-0050). Toda consulta recebe o
 /// <c>empresaId</c> e o poe no WHERE alem do filtro global e do RLS (ADR-0010, defesa em
@@ -34,11 +40,13 @@ public interface IConversaRepository
     /// <summary>
     /// Inbox do console (S07): mais recentes primeiro, com o texto da ultima mensagem.
     /// <paramref name="busca"/> filtra por nome ou identificador do contato (sem diferenciar caixa).
+    /// <paramref name="responsavel"/> nulo nao filtra (S41).
     /// </summary>
     Task<IReadOnlyList<ConversaInboxItem>> ListarInboxAsync(
         Guid empresaId,
         SituacaoConversa? situacao,
         string? busca,
+        FiltroResponsavel? responsavel,
         int pagina,
         int tamanhoPagina,
         CancellationToken ct = default);
