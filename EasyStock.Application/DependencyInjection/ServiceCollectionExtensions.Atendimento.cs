@@ -37,6 +37,7 @@ public static partial class ServiceCollectionExtensions
 
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
+        services.AddScoped<AvisoStatusPedidoCliente>();
         services.AddScoped<OptOutPorPalavra>();
 
         // S39: mensagem programada ao cliente (console + disparador no processo da API).
@@ -67,9 +68,12 @@ public static partial class ServiceCollectionExtensions
         // TODO(S26): acao:avaliacao.
 
         // Ferramentas do agente. As demais da tabela da S06 dependem da onda 2 e entram aqui quando
-        // existirem: TODO(S31) registrar_interesse.
+        // existirem.
         services.AddScoped<IFerramentaAgente, CriarPedidoFerramenta>(); // S10 + S11: pedido, total e link
         services.AddScoped<IFerramentaAgente, ListarJanelasFerramenta>(); // S16: janelas no prazo, com botões
+        services.AddScoped<IFerramentaAgente, RegistrarInteresseFerramenta>(); // S31
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.RegistrarInteresseItemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.ListarSugestoesInteresseUseCase>();
         services.AddScoped<IFerramentaAgente, ConsultarCardapioFerramenta>();
         services.AddScoped<IFerramentaAgente, EnviarCardapioImagemFerramenta>();
         services.AddScoped<IFerramentaAgente, ConsultarPedidoFerramenta>();

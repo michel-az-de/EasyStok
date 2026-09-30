@@ -8,12 +8,12 @@ name: Deploy to Render (master)
 #   3. gera APK release assinado e copia para EasyStock.Web/wwwroot/downloads/
 #   4. commita o APK no master (permite que o service Web sirva o binário)
 #   5. exige aprovação manual no GitHub Environment "production"
-#   6. dispara deploy hooks dos 4 services Render (api / web / admin / worker)
+#   6. dispara deploy hooks dos 3 services Render (api / web / worker)
 #   7. health-check final
 #
 # Render também tem auto-deploy ligado em master (render.yaml), então os
 # deploy hooks aqui servem como "trigger explícito + ordem garantida":
-# API primeiro, depois Web/Admin/Worker.
+# API primeiro, depois Web/Worker.
 
 on:
   # Desabilitado do gatilho por push: Render suspenso + build quebra por maui ausente (ADR-0029).
@@ -190,10 +190,9 @@ jobs:
           echo "::error::API health não atingiu 200 em 5min"
           exit 1
 
-      - name: Trigger Render Web/Admin/Worker
+      - name: Trigger Render Web/Worker
         run: |
           curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_WEB }}"
-          curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_ADMIN }}"
           curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}"
 
       - name: Smoke test Web (PWA + /downloads)

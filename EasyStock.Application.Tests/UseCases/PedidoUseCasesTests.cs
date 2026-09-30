@@ -40,6 +40,7 @@ public class PedidoUseCasesTests
     // permite asserir movimentações de estoque emitidas pelos use cases (#939).
     private PedidoEstoqueIntegrationService EstoqueSvc() => new(
         _itemEstoqueRepo, _movRepo,
+        Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
         Microsoft.Extensions.Options.Options.Create(new PedidoEstoqueOptions()),
         Substitute.For<ILogger<PedidoEstoqueIntegrationService>>());
 
