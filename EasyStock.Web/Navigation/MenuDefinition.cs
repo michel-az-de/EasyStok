@@ -119,8 +119,6 @@ public static class MenuDefinition
                 new[] { "Analytics", "Movimentacoes", "Inteligencia", "InteligenciaLojas" }),
             new MenuItem("relatorios", "Relatórios", "file-text", "/relatorios",
                 new[] { "Relatorios" }),
-            new MenuItem("anuncios", "Anúncios", "megaphone", "/anuncios",
-                new[] { "Anuncios" }),
         }),
     };
 
