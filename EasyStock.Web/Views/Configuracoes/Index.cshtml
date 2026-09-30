@@ -2,10 +2,6 @@
 @{
     ViewBag.Title = "Configurações";
     Layout = "_Layout";
-    // ADR-0032 fatia 8: ?tab=fiscal abre a aba fiscal (vindo do redirect da rota antiga
-    // ou do POST fiscal). Default = geral.
-    var activeTab = string.Equals(Context.Request.Query["tab"], "fiscal", StringComparison.OrdinalIgnoreCase)
-        ? "fiscal" : "geral";
 }
 
 <div class="flex items-center gap-4 mb-6">
@@ -14,28 +10,20 @@
     </span>
     <div class="pg-hd">
         <h1>Configurações</h1>
-        <p>Alertas, notificações, regras operacionais e emissão fiscal</p>
+        <p>Alertas, notificações e regras operacionais</p>
     </div>
 </div>
 
-<div x-data='{ active: "@activeTab" }'>
+<div x-data='{ active: "geral" }'>
     <div class="tabs" role="tablist" aria-label="Seções de configuração">
         <button type="button" role="tab" id="tab-geral" aria-controls="panel-geral"
                 :aria-selected="active === 'geral'" :tabindex="active === 'geral' ? 0 : -1"
                 @@click="active = 'geral'" style="display:inline-flex;align-items:center;gap:7px;">
             <es-icon name="sliders-horizontal" class="es-icon--sm"></es-icon> Geral</button>
-        <button type="button" role="tab" id="tab-fiscal" aria-controls="panel-fiscal"
-                :aria-selected="active === 'fiscal'" :tabindex="active === 'fiscal' ? 0 : -1"
-                @@click="active = 'fiscal'" style="display:inline-flex;align-items:center;gap:7px;">
-            <es-icon name="file-text" class="es-icon--sm"></es-icon> Fiscal (NFC-e)</button>
     </div>
 
     <div id="panel-geral" role="tabpanel" aria-labelledby="tab-geral"
          x-show="active === 'geral'" class="anim-fadeInUp">
         <partial name="_ConfiguracoesGeralTab" model="Model.Geral" />
-    </div>
-    <div id="panel-fiscal" role="tabpanel" aria-labelledby="tab-fiscal"
-         x-show="active === 'fiscal'" x-cloak class="anim-fadeInUp">
-        <partial name="_ConfiguracoesFiscalTab" model="Model.Fiscal" />
     </div>
 </div>

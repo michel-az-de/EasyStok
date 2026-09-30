@@ -173,20 +173,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.PedidoMudouStatusLogHandler>("pedido.mudou_status");
 
-            // Modulo Fiscal NFC-e (F1) — repositorios + servicos sobre Nfe*
-            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.INfeRepository,
-                Repositories.Fiscal.NfeRepository>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.INumeracaoNfeService,
-                Repositories.Fiscal.NumeracaoNfeService>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.IGeradorChaveAcesso,
-                Repositories.Fiscal.GeradorChaveAcesso>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Fiscal.ICertificadoA1Repository,
-                Repositories.Fiscal.NfeCertificadoA1Repository>();
-            services.AddScoped<EasyStock.Application.Services.Fiscal.IConfigFiscalResolver,
-                Services.ConfigFiscalResolver>();
             services.AddScoped<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass,
                 Security.RowLevelSecurityBypass>();
-            // TODO F2: registrar IGatewayFiscal (FocusNFeAdapter) e INfeCertificadoA1Service em EasyStock.Infra.Integrations.Fiscal
 
             // Storefront — 12 repos para entities novas (ADR-0011, 0012, 0014, 0006)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontRepository,

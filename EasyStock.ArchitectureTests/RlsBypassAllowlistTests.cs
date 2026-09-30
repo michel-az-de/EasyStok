@@ -33,7 +33,7 @@ public class RlsBypassAllowlistTests
     /// <summary>
     /// Casa o port em CODIGO, ignorando linhas de comentario. Um <c>&lt;see cref&gt;</c> apontando
     /// para o port nao concede capacidade nenhuma — e so documentacao cruzada, e ha varias delas
-    /// (INfeRepository, ReprocessarContingenciaCommand). Contar essas como violacao produziria
+    /// (ex.: ports que documentam o bypass). Contar essas como violacao produziria
     /// falso positivo, e falso positivo em guarda de seguranca e pior que guarda nenhuma: treina
     /// quem mantem o codigo a engordar a allowlist ate calar o teste, e ai a lista para de
     /// significar "quem pode burlar RLS".
@@ -76,13 +76,6 @@ public class RlsBypassAllowlistTests
         "EasyStock.Application/Ports/Output/Security/IRowLevelSecurityBypass.cs",
         "EasyStock.Infra.Postgre/Security/RowLevelSecurityBypass.cs",
         "EasyStock.Infra.Postgre/DependencyInjection/ServiceCollectionExtensions.cs",
-
-        // Webhook fiscal: chega sem JWT e o tenant e descoberto pelo payload, entao nao ha
-        // app.empresa_id no momento em que a query precisa rodar.
-        "EasyStock.Application/UseCases/Fiscal/ProcessarWebhookFocusNFe/ProcessarWebhookFocusNFeUseCase.cs",
-
-        // Reprocessamento de contingencia (fix B-053): itera sobre multiplos tenants por design.
-        "EasyStock.Application/UseCases/Fiscal/ReprocessarContingencia/ReprocessarContingenciaUseCase.cs",
 
         // issue #1024: registrar empresa e cross-tenant por definicao, porque cria o tenant. A
         // requisicao e anonima e nao existe app.empresa_id no contexto, entao a policy
