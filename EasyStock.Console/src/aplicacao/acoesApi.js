@@ -8,6 +8,7 @@ import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
+import { criarAcoesComandaApi } from './api/comanda'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -15,8 +16,9 @@ const motivoDaRecusa = (erro) => (erro.codigo === FORA_DA_JANELA
   ? 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
   : `Não enviada: ${erro.message}`)
 
-// Modo API (F01, F02): as ações que a caixa de entrada, o expediente, a configuração,
-// o assistente e os avisos da Ficha já ligam passam a valer no EasyStok.
+// Modo API (F01, F02, F03): as ações que a caixa de entrada, o expediente, a configuração,
+// o assistente, os avisos da Ficha e a comanda (pedido e cobrança) já ligam passam a valer
+// no EasyStok.
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. Todo o resto das ações continua local (módulos ainda
 // não ligados, matriz 10-console.md).
@@ -29,6 +31,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
     ...criarAcoesConsentimentosApi(),
+    ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
     enviar: (id, texto) => {
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })

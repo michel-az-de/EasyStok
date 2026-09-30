@@ -2,9 +2,8 @@ using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento.AcoesBotao;
-using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -13,7 +12,7 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
 /// <summary>
 /// <c>listar_janelas</c> (S16, RN-21): janelas com vaga cujo início não é antes de agora + prazo mínimo
-/// do pedido (<see cref="CalculadoraPrazoPedido"/>: maior preparo dos itens + respiro da configuração).
+/// do pedido (<see cref="EasyStock.Application.Services.Pedidos.CalculadoraPrazoPedido"/>: maior preparo dos itens + respiro da configuração).
 /// As primeiras vão ao cliente como botões <c>acao:escolher_janela:&lt;id&gt;:&lt;data&gt;</c> (até
 /// <see cref="MaximoBotoes"/>, limite do WhatsApp); a lista inteira volta para o agente.
 ///
@@ -23,16 +22,13 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 /// </para>
 /// </summary>
 public sealed class ListarJanelasFerramenta(
-    IStorefrontRepository storefrontRepository,
-    ICardapioItemRepository cardapioItemRepository,
-    IConfiguracaoAtendimentoRepository configuracaoRepository,
-    ListarJanelasDisponiveisUseCase listarJanelas,
+    ListarJanelasAtendimentoUseCase listarJanelas,
     IWhatsAppCloudClient cloudClient,
     IConversaRepository conversaRepository,
     ILogger<ListarJanelasFerramenta> logger) : IFerramentaAgente
 {
     public const int MaximoBotoes = 3;
-    public const int MaximoJanelas = 10;
+    public const int MaximoJanelas = ListarJanelasAtendimentoUseCase.MaximoPadrao;
     public const string CorpoBotoes = "Escolha a janela de entrega:";
 
     public string Nome => "listar_janelas";
@@ -55,10 +51,6 @@ public sealed class ListarJanelasFerramenta(
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
-        var storefront = await storefrontRepository.GetByEmpresaAsync(contexto.EmpresaId, ct);
-        if (storefront is null || !storefront.Ativo)
-            return FerramentaJson.Serializar(new { erro = "janelas_indisponiveis" });
-
         DateOnly? data = null;
         if (FerramentaJson.LerTexto(entrada, "data") is { } textoData)
         {
@@ -67,12 +59,12 @@ public sealed class ListarJanelasFerramenta(
             data = informada;
         }
 
-        var prazo = await PrazoMinimoAsync(contexto.EmpresaId, storefront.Id, LerItens(entrada), ct);
-        var janelas = (await listarJanelas.ExecuteAsync(
-                new ListarJanelasDisponiveisInput(storefront.Slug, data, data, null, prazo), ct))
-            .Where(j => !j.Esgotado)
-            .Take(MaximoJanelas)
-            .ToList();
+        var resultado = await listarJanelas.ExecuteAsync(
+            new ListarJanelasAtendimentoInput(contexto.EmpresaId, data, data, LerItens(entrada)), ct);
+        if (!resultado.LojaDisponivel)
+            return FerramentaJson.Serializar(new { erro = "janelas_indisponiveis" });
+        var prazo = resultado.PrazoMinimoMinutos;
+        var janelas = resultado.Janelas;
 
         if (janelas.Count == 0)
         {
@@ -98,21 +90,6 @@ public sealed class ListarJanelasFerramenta(
                 vagas = j.VagasRestantes
             })
         });
-    }
-
-    private async Task<int> PrazoMinimoAsync(Guid empresaId, Guid storefrontId, IReadOnlyCollection<Guid> itens, CancellationToken ct)
-    {
-        var configuracao = await configuracaoRepository.GetOrDefaultAsync(empresaId);
-
-        var tempos = new List<int?>();
-        foreach (var id in itens)
-        {
-            var item = await cardapioItemRepository.GetByIdAsync(storefrontId, id, ct);
-            if (item is not null) tempos.Add(item.TempoPreparoMinutos);
-        }
-        if (tempos.Count == 0) tempos.Add(null); // sem itens: vale o preparo padrão
-
-        return CalculadoraPrazoPedido.PrazoMinimo(tempos, configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos);
     }
 
     private async Task<int> EnviarBotoesAsync(ContextoTurnoAgente contexto, IReadOnlyList<JanelaDisponivelDto> janelas, CancellationToken ct)

@@ -2,8 +2,12 @@
 
 export const itemPorSku = (cardapio, sku) => cardapio.find((i) => i.sku === sku) ?? null
 
+// Item sem controle de saldo (cardápio da API sem estoque ligado, F03): nulo, nunca zero.
+export const semControleDeSaldo = (item) => item?.estoque == null
+
 // Saldo zero não impede a venda. Ele muda o tom e abre alerta.
 export function situacaoDeEstoque(item) {
+  if (semControleDeSaldo(item)) return { tom: 'ok', rotulo: 'sem controle de saldo', alerta: false }
   if (item.estoque === 0) return { tom: 'perigo', rotulo: 'sem saldo', alerta: true }
   if (item.estoque <= 2) return { tom: 'aviso', rotulo: item.estoque + ' em estoque', alerta: false }
   return { tom: 'ok', rotulo: item.estoque + ' em estoque', alerta: false }
@@ -16,13 +20,13 @@ export const textoDoAlerta = (item) =>
 // Saldo que não desce é pior que saldo nenhum, porque ela confia nele.
 export function baixarSaldo(cardapio, sku, quantidade = 1) {
   return cardapio.map((item) => (item.sku === sku
-    ? { ...item, estoque: Math.max(item.estoque - quantidade, 0) }
+    ? { ...item, estoque: semControleDeSaldo(item) ? null : Math.max(item.estoque - quantidade, 0) }
     : item))
 }
 
 export function devolverSaldo(cardapio, sku, quantidade = 1) {
   return cardapio.map((item) => (item.sku === sku
-    ? { ...item, estoque: item.estoque + quantidade }
+    ? { ...item, estoque: semControleDeSaldo(item) ? null : item.estoque + quantidade }
     : item))
 }
 
@@ -49,6 +53,12 @@ export function situacaoDoItem(item) {
     return {
       chave: 'fora-do-dia', tom: 'neutro', rotulo: 'Fora do cardápio de hoje',
       vendavel: false, alerta: false,
+    }
+  }
+  if (semControleDeSaldo(item)) {
+    return {
+      chave: 'disponivel', tom: 'ok', rotulo: 'Disponível',
+      vendavel: true, alerta: false,
     }
   }
   if (item.estoque === 0) {
