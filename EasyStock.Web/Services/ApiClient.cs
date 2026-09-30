@@ -368,25 +368,8 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
     private static string ResolveMessage(string code, string? message, int status) =>
         UserFacingErrors.Sanitize(code, message, status);
 
-    // Codigos de bloqueio de assinatura emitidos pelo SubscriptionGateMiddleware da Api
-    // (todos via 402). Distintos do 402 de limite de recurso (body {error:{recurso}}).
-    private static readonly HashSet<string> SubscriptionBlockCodes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "TRIAL_EXPIRED",
-        "NO_SUBSCRIPTION",
-        "SUBSCRIPTION_SUSPENDED",
-        "SUBSCRIPTION_CANCELLED",
-        "SUBSCRIPTION_EXPIRED",
-    };
-
-    // O 402 tem DUAS origens distintas e o destino do usuario depende de qual e:
-    //   - Limite de recurso do plano (PlanoLimiteAtingidoException): body {error:{recurso}}
-    //     -> code LIMITE_PLANO[:recurso] -> upgrade-wall em /assinatura (RedirectIfLimitReached).
-    //   - Bloqueio de assinatura (SubscriptionGate: trial vencido/suspenso/cancelado): body
-    //     {error:{code, message, upgradeUrl}} -> code ASSINATURA_BLOQUEADA:{sub-code} -> landing
-    //     de trial-vencido (RedirectIfAssinaturaBloqueada). Sem essa distincao o tenant com trial
-    //     vencido caia em loop de "criar loja" (#619/#620). O prefixo NAO pode comecar com
-    //     LIMITE_PLANO, senao RedirectIfLimitReached o intercepta antes.
+    // 402 = limite de recurso do plano (PlanoLimiteAtingidoException): body {error:{recurso}}
+    //   -> code LIMITE_PLANO[:recurso]. O 402 de bloqueio de assinatura saiu na poda P02.
     private async Task<ApiResult<T>> ParsePaymentRequired<T>(HttpResponseMessage response, int status, string? cid = null)
     {
         cid ??= ExtractCorrelationId(response);
@@ -398,17 +381,9 @@ public class ApiClient(HttpClient http, ILogger<ApiClient> log)
 
             if (root.TryGetProperty("error", out var errEl))
             {
-                // Limite de recurso tem prioridade: o gate de assinatura nunca emite "recurso".
                 var recurso = TryString(errEl, "recurso");
                 if (!string.IsNullOrEmpty(recurso))
                     return ApiResult<T>.Fail($"LIMITE_PLANO:{recurso}", "Limite do plano atingido.", status, cid);
-
-                var code = TryString(errEl, "code");
-                if (code is not null && SubscriptionBlockCodes.Contains(code))
-                    return ApiResult<T>.Fail(
-                        $"ASSINATURA_BLOQUEADA:{code}",
-                        UserFacingErrors.Sanitize(code, TryString(errEl, "message"), status),
-                        status, cid);
             }
 
             // 402 sem corpo reconhecivel: mantem comportamento historico (limite de plano).

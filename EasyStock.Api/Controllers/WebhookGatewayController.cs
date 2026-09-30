@@ -118,8 +118,10 @@ public class WebhookGatewayController(
         // 5) Processa
         try
         {
-            await processor.ProcessarAsync(rawBody, headers, ct);
-            await webhookRepo.MarcarProcessadoAsync(registro.Id, sucesso: true, ct: ct);
+            var resultado = await processor.ProcessarAsync(rawBody, headers, ct);
+            if (!resultado.Sucesso)
+                logger.LogWarning("Webhook {Provedor}: evento nao reconhecido ({Erro}).", validator.Provedor, resultado.Erro);
+            await webhookRepo.MarcarProcessadoAsync(registro.Id, resultado.Sucesso, resultado.Erro, ct);
             return Ok();
         }
         catch (Exception ex)

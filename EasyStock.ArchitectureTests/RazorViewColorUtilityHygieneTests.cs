@@ -45,7 +45,6 @@ public class RazorViewColorUtilityHygieneTests
     {
         "Analytics/Index.cshtml",
         "Analytics/Movimentacoes.cshtml",
-        "Assinatura/Index.cshtml",
         "Auth/SelecionarLoja.cshtml",
         "Caixa/Historico.cshtml",
         "Caixa/Index.cshtml",
@@ -79,7 +78,6 @@ public class RazorViewColorUtilityHygieneTests
         "MobileDevices/Index.cshtml",
         "MobileProducts/Divergencias.cshtml",
         "MobileProducts/Index.cshtml",
-        "Onboarding/Index.cshtml",
         "OperacaoMobile/Index.cshtml",
         "Pedidos/Detail.cshtml",
         "Pedidos/Index.cshtml",

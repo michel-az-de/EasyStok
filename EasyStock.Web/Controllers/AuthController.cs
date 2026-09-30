@@ -222,7 +222,6 @@ public class AuthController(
         }
 
         var lojasResult = await api.GetAsync<List<Loja>>("lojas");
-        if (RedirectSeAssinaturaBloqueada(lojasResult) is { } bloqueado) return bloqueado;
         if (lojasResult.Success && lojasResult.Data is { Count: > 0 } lojas)
         {
             if (lojas.Count == 1)
@@ -259,8 +258,7 @@ public class AuthController(
         else
         {
             var lojasResult = await api.GetAsync<List<Loja>>("lojas");
-            if (RedirectSeAssinaturaBloqueada(lojasResult) is { } bloqueado) return bloqueado;
-            lojas = lojasResult.Success ? lojasResult.Data ?? [] : [];
+                lojas = lojasResult.Success ? lojasResult.Data ?? [] : [];
         }
 
         // SuperAdmin precisa enxergar o caminho para criar/vincular loja — não basta
@@ -373,129 +371,6 @@ public class AuthController(
     }
 
     [AllowAnonymous]
-    [HttpGet("/auth/registrar")]
-    public IActionResult Registrar()
-    {
-        if (session.IsLoggedIn())
-            return RedirectToAction("Index", "Launcher");
-        return View(new RegisterViewModel());
-    }
-
-    // Proxies da validacao de disponibilidade do signup (issue 800): o fetch do Registrar
-    // apontava para /api/empresas/* que so existe no host da Api — no host do Web caia no
-    // BFF (404 HTML) e a validacao degradava em silencio. O rate-limit fica na Api
-    // (politica "disponibilidade", por IP real via X-Forwarded-For do TokenRefreshHandler).
-    [AllowAnonymous]
-    [HttpGet("/auth/registrar/email-disponivel.json")]
-    public async Task<IActionResult> EmailDisponivelJson(string? email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-            return Json(new { data = new { disponivel = false } });
-        var r = await api.GetAsync<DisponibilidadeApi>(
-            $"empresas/email-disponivel?email={Uri.EscapeDataString(email.Trim())}");
-        if (!r.Success || r.Data is null)
-            return StatusCode(r.HttpStatus is >= 400 and < 600 ? r.HttpStatus : 502);
-        return Json(new { data = new { disponivel = r.Data.Disponivel } });
-    }
-
-    [AllowAnonymous]
-    [HttpGet("/auth/registrar/cnpj-disponivel.json")]
-    public async Task<IActionResult> CnpjDisponivelJson(string? doc)
-    {
-        if (string.IsNullOrWhiteSpace(doc))
-            return Json(new { data = new { disponivel = false } });
-        var r = await api.GetAsync<DisponibilidadeApi>(
-            $"empresas/cnpj-disponivel?doc={Uri.EscapeDataString(doc.Trim())}");
-        if (!r.Success || r.Data is null)
-            return StatusCode(r.HttpStatus is >= 400 and < 600 ? r.HttpStatus : 502);
-        return Json(new { data = new { disponivel = r.Data.Disponivel } });
-    }
-
-    [AllowAnonymous]
-    [HttpPost("/auth/registrar")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Registrar(RegisterViewModel vm)
-    {
-        if (!ModelState.IsValid) return View(vm);
-
-        var result = await api.PostAsync<JsonElement>("empresas/registrar", new
-        {
-            nomeEmpresa = vm.NomeEmpresa,
-            documento = vm.Documento,
-            nomeAdmin = vm.NomeAdmin,
-            emailAdmin = vm.Email,
-            senhaAdmin = vm.Senha
-        });
-
-        if (!result.Success)
-        {
-            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Não foi possível criar a conta.");
-            return View(vm);
-        }
-
-        var data = result.Data;
-        var token = GetString(data, "token");
-        var refreshToken = GetString(data, "refreshToken");
-
-        if (string.IsNullOrEmpty(token))
-        {
-            TempData["Toast"] = "success|Conta criada! Faça login para continuar.";
-            return RedirectToAction(nameof(Login));
-        }
-
-        session.SetTokens(token, refreshToken ?? string.Empty);
-
-        var empresaId = jwt.TryReadClaim(token, "empresaId");
-        if (!string.IsNullOrEmpty(empresaId))
-            session.SetEmpresaId(empresaId);
-
-        session.SetUsuario(
-            GetString(data.TryGetProperty("usuario", out var u) ? u : data, "id") ?? string.Empty,
-            vm.NomeAdmin,
-            "Admin");
-
-        session.SetTemaPreferido("light");
-
-        // Após signup: se a empresa já tiver lojas (ex: signup repetido pelo mesmo
-        // admin), usa a primeira. Senão, NÃO cria loja silenciosamente — o usuário
-        // passa pelo wizard de onboarding obrigatório em /auth/selecionar-loja para
-        // configurar nome/cidade/contato da primeira loja.
-        var lojasResult = await api.GetAsync<List<Loja>>("lojas");
-        var jaTemLoja = lojasResult.Success && lojasResult.Data is { Count: > 0 };
-        if (jaTemLoja)
-        {
-            var lojas = lojasResult.Data!;
-            session.SetLoja(lojas[0].Id, lojas[0].Nome, lojas[0].Emoji, lojas[0].EmpresaId);
-        }
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.Name, vm.NomeAdmin),
-            new(ClaimTypes.Email, vm.Email),
-            new(ClaimTypes.Role, "Admin")
-        };
-        if (!string.IsNullOrEmpty(empresaId))
-            claims.Add(new Claim("empresaId", empresaId));
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var authProps = new AuthenticationProperties
-        {
-            IsPersistent = false,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(480)
-        };
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProps);
-
-        if (!jaTemLoja)
-        {
-            TempData["Toast"] = "success|Conta criada! Vamos configurar sua loja em poucos passos.";
-            return Redirect("/onboarding");
-        }
-
-        TempData["Toast"] = "success|Bem-vindo! Seu trial de 14 dias esta ativo.";
-        return RedirectToAction("Index", "Launcher");
-    }
-
-    [AllowAnonymous]
     [HttpGet("/auth/esqueci-senha")]
     public IActionResult EsqueciSenha()
     {
@@ -585,18 +460,6 @@ public class AuthController(
         !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? Redirect(returnUrl)
             : RedirectToAction("Index", "Launcher");
-
-    // AuthController não herda BaseController; replica a regra anti-loop (#619): se o gate
-    // barrou por assinatura bloqueada (ASSINATURA_BLOQUEADA:{sub-code}), manda para a landing
-    // em vez de tratar o 402 como "0 lojas" e cair no wizard de criar loja.
-    private IActionResult? RedirectSeAssinaturaBloqueada<T>(ApiResult<T> r)
-    {
-        if (r.Success || !(r.ErrorCode?.StartsWith("ASSINATURA_BLOQUEADA", StringComparison.Ordinal) ?? false))
-            return null;
-        var code = r.ErrorCode!;
-        TempData["AssinaturaBloqueioCode"] = code.Contains(':') ? code[(code.IndexOf(':') + 1)..] : "TRIAL_EXPIRED";
-        return Redirect("/assinatura/bloqueado");
-    }
 
     private static string ClassifyLoginError(string? errorMessage)
     {

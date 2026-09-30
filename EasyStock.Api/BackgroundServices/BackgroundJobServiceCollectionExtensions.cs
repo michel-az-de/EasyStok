@@ -49,25 +49,6 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableDiagnosticoEmailReport)
             services.AddHostedService<DiagnosticoEmailReportJob>();
 
-        if (options.EnableCobrancaAssinaturaJob)
-            services.AddHostedService<CobrancaAssinaturaJob>();
-
-        // FaturaBackfillJob (F5) — rodada unica para gerar Fatura para
-        // CobrancaAssinatura historicas. Habilitar via env var apenas durante
-        // migracao controlada; uma vez concluida a migracao, desabilitar.
-        if (options.EnableFaturaBackfillJob)
-            services.AddHostedService<FaturaBackfillJob>();
-
-        // FaturaReconciliacaoJob (F6/F11) — consulta gateway hora em hora para
-        // fechar gaps de webhooks perdidos. Pix funciona ponta-a-ponta desde F11
-        // (IEfiPixService.ConsultarCobrancaAsync via GET /v2/cob/{txid}).
-        if (options.EnableFaturaReconciliacaoJob)
-            services.AddHostedService<FaturaReconciliacaoJob>();
-
-        // FaturaVencimentoJob (F6) — diario, processa D-3, D-1 e marca Vencidas.
-        if (options.EnableFaturaVencimentoJob)
-            services.AddHostedService<FaturaVencimentoJob>();
-
         // ContaFinanceiraVencimentoJob (CAP/CAR) — diario 09:30 UTC, marca
         // parcelas vencidas e atualiza status agregado das contas.
         if (options.EnableContaFinanceiraVencimentoJob)

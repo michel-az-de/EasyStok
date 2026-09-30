@@ -22,8 +22,9 @@ public class MercadoPagoWebhookProcessorTests
         var f = new MercadoPagoWebhookFixture();
         f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m);
 
-        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
 
+        r.Sucesso.Should().BeTrue();
         f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
         f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Paga);
         f.Cobranca.PagamentoExternoId.Should().Be(MercadoPagoWebhookFixture.PagamentoId);
@@ -58,8 +59,9 @@ public class MercadoPagoWebhookProcessorTests
         var f = new MercadoPagoWebhookFixture();
         f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 20m);
 
-        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
 
+        r.Sucesso.Should().BeTrue("o motivo fica na cobrança; o webhook foi processado");
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         f.Pedido.Pagamentos.Should().BeEmpty();
         f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
@@ -118,8 +120,9 @@ public class MercadoPagoWebhookProcessorTests
     {
         var f = new MercadoPagoWebhookFixture();
 
-        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(tipo: tipo), SemHeaders);
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(tipo: tipo), SemHeaders);
 
+        r.Should().Be(ResultadoWebhookGateway.Falha("topico_ignorado"));
         await f.MpClient.DidNotReceiveWithAnyArgs().ConsultarPagamentoAsync(default!, default);
     }
 
@@ -142,8 +145,9 @@ public class MercadoPagoWebhookProcessorTests
         var f = new MercadoPagoWebhookFixture();
         f.PagamentoNaFonte(PagamentoMercadoPago.Approved, 25m, externalReference: "fatura-saas-123");
 
-        await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
+        var r = await f.Processor().ProcessarAsync(MercadoPagoWebhookFixture.Notificacao(), SemHeaders);
 
+        r.Should().Be(ResultadoWebhookGateway.Falha("referencia_externa_desconhecida"));
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         await f.CobrancaRepo.DidNotReceiveWithAnyArgs().ObterEmpresaIdDoPedidoAsync(default, default);
     }

@@ -145,4 +145,15 @@ public class CheckoutCoreServiceTests
         pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
         pedido.CanceladoEm.Should().NotBeNull();
     }
+
+    [Fact]
+    public async Task CopiaLinhaDoCardapioParaOItem()
+    {
+        var c = new Cenario();
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        reservado.Itens[0].LinhaSnapshot.Should().Be("paraServir");
+        reservado.ItemFrete.LinhaSnapshot.Should().BeNull("frete não é produto");
+    }
 }

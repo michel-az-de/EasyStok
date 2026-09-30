@@ -311,6 +311,8 @@ namespace EasyStock.Domain.Entities
         public string? VariacaoRotuloSnapshot { get; set; }
         /// <summary>SKU da opção congelado no momento do pedido.</summary>
         public string? SkuSnapshot { get; set; }
+        /// <summary>Linha do item do cardápio congelada no pedido (S15): "paraServir" | "prepararEmCasa". Null = sem cardápio (frete, ad-hoc).</summary>
+        public string? LinhaSnapshot { get; set; }
 
         public Pedido? Pedido { get; set; }
         public Produto? Produto { get; set; }

@@ -1,3 +1,4 @@
+using EasyStock.Domain.Enums.Storefront;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -273,6 +274,7 @@ public sealed class CheckoutCoreService(
                 PedidoId = pedido.Id,
                 ProdutoId = ci.ProdutoId,
                 CardapioItemId = ci.Id,
+                LinhaSnapshot = ci.Linha.ParaContrato(),
                 Nome = ci.Produto?.Nome ?? $"Item {ci.ProdutoId}",
                 Quantidade = inputItem.Qtd,
                 PrecoUnitario = precoUnit,

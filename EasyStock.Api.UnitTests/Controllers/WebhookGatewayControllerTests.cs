@@ -35,6 +35,8 @@ public class WebhookGatewayControllerTests
         _validator.Provedor.Returns(Provedor);
         _validator.Validar(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>()).Returns(true);
         _processor.Provedor.Returns(Provedor);
+        _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+            .Returns(ResultadoWebhookGateway.Ok);
 
         var controller = new WebhookGatewayController(
             new[] { _processor }, new[] { _validator }, _repo,
@@ -145,5 +147,23 @@ public class WebhookGatewayControllerTests
         await repo.DidNotReceiveWithAnyArgs().TryRegistrarAsync(default!, default!, default!, default);
         await f.MpClient.DidNotReceiveWithAnyArgs().ConsultarPagamentoAsync(default!, default);
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Fact]
+    public async Task Evento_nao_reconhecido_responde_200_e_registra_sem_sucesso()
+    {
+        // Poda P02: txid de cobranca de assinatura antiga nao tem mais dono. O gateway
+        // recebe 200 (para de retentar) e o WebhookRecebido guarda o motivo.
+        var registro = WebhookRecebido.Criar(Provedor, "evt-2", "hash");
+        _repo.TryRegistrarAsync(Provedor, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(registro);
+        var controller = CriarController();
+        _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+            .Returns(ResultadoWebhookGateway.Falha("txid_desconhecido"));
+
+        var result = await controller.Receber(Provedor);
+
+        result.Should().BeOfType<OkResult>();
+        await _repo.Received(1).MarcarProcessadoAsync(registro.Id, false, "txid_desconhecido", Arg.Any<CancellationToken>());
     }
 }

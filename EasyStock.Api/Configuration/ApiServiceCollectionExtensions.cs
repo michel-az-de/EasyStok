@@ -75,10 +75,6 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
         services.AddScoped<AdminAuditService>();
         services.AddScoped<EasyStock.Api.Services.Helpdesk.HelpdeskClienteService>();
-        services.AddScoped<EasyStock.Api.Services.Faturacao.FaturaSaasFactory>();
-        // F14 — audita falha de pagamento em FaturaEvento.
-        services.AddScoped<EasyStock.Application.Ports.Output.IFalhaPagamentoNotifier,
-            EasyStock.Api.Services.Faturacao.AuditoriaFalhaPagamento>();
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>

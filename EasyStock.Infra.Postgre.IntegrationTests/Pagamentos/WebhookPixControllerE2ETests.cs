@@ -3,11 +3,9 @@ using System.Text;
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
-using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -32,8 +30,10 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
     private const string WebhookSecret = "segredo-super-secreto-teste-42";
 
     [SkippableFact]
-    public async Task Assinatura_valida_valor_exato_marca_cobranca_paga_e_renova_assinatura()
+    public async Task Txid_de_cobranca_de_assinatura_antiga_responde_200_sem_alterar_nada()
     {
+        // Poda P02: a cobranca de assinatura SaaS saiu. Txid antigo (sem prefixo "cr")
+        // responde 200 para o Efi parar de retentar, sem excecao e sem renovar nada.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
 
@@ -56,9 +56,8 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
         var assinatura = await assert.AssinaturasEmpresa.AsNoTracking()
             .IgnoreQueryFilters().FirstAsync(a => a.EmpresaId == empresaId);
 
-        cobranca.Status.Should().Be(StatusCobranca.Paga);
-        cobranca.PagoEm.Should().NotBeNull();
-        assinatura.DataFim.Should().BeCloseTo(dataFimInicial.AddDays(30), TimeSpan.FromSeconds(2));
+        cobranca.Status.Should().Be(StatusCobranca.Pendente);
+        assinatura.DataFim.Should().BeCloseTo(dataFimInicial, TimeSpan.FromSeconds(2));
     }
 
     [SkippableFact]
@@ -106,101 +105,6 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
 
         var result = await controller.Pix();
         result.Should().BeOfType<UnauthorizedResult>();
-    }
-
-    [SkippableFact]
-    public async Task Sobrepagamento_aceito_renova_assinatura_e_loga_warning()
-    {
-        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
-        await fixture.ResetDatabaseAsync();
-
-        var txid = $"E2E-{Guid.NewGuid():N}";
-        var dataFimInicial = DateTime.UtcNow.AddDays(5);
-        var (empresaId, _) = await SeedAsync(txid, valor: 100m, dataFimAssinatura: dataFimInicial);
-
-        // Paga 150 em vez de 100
-        var payload = BuildPayloadJson([(txid, "150.00")]);
-        var (timestamp, signature) = GerarAssinaturaEfi(payload, WebhookSecret);
-
-        var controller = CriarController();
-        ConfigurarRequest(controller, payload, timestamp, signature);
-
-        var result = await controller.Pix();
-        result.Should().BeOfType<OkResult>();
-
-        await using var assert = fixture.CreateDbContext();
-        var cobranca = await assert.CobrancasAssinatura.AsNoTracking()
-            .IgnoreQueryFilters().FirstAsync(c => c.Txid == txid);
-        var assinatura = await assert.AssinaturasEmpresa.AsNoTracking()
-            .IgnoreQueryFilters().FirstAsync(a => a.EmpresaId == empresaId);
-
-        cobranca.Status.Should().Be(StatusCobranca.Paga, "sobrepagamento deve ser aceito");
-        assinatura.DataFim.Should().BeCloseTo(dataFimInicial.AddDays(30), TimeSpan.FromSeconds(2));
-    }
-
-    [SkippableFact]
-    public async Task Subpagamento_rejeitado_cobranca_permance_pendente()
-    {
-        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
-        await fixture.ResetDatabaseAsync();
-
-        var txid = $"E2E-{Guid.NewGuid():N}";
-        var (empresaId, _) = await SeedAsync(txid, valor: 100m, dataFimAssinatura: DateTime.UtcNow.AddDays(5));
-
-        // Paga 95 em vez de 100 (abaixo da tolerancia de 1 centavo)
-        var payload = BuildPayloadJson([(txid, "95.00")]);
-        var (timestamp, signature) = GerarAssinaturaEfi(payload, WebhookSecret);
-
-        var controller = CriarController();
-        ConfigurarRequest(controller, payload, timestamp, signature);
-
-        var result = await controller.Pix();
-        result.Should().BeOfType<OkResult>();
-
-        await using var assert = fixture.CreateDbContext();
-        var cobranca = await assert.CobrancasAssinatura.AsNoTracking()
-            .IgnoreQueryFilters().FirstAsync(c => c.Txid == txid);
-
-        cobranca.Status.Should().Be(StatusCobranca.Pendente, "subpagamento deve ser rejeitado");
-        cobranca.PagoEm.Should().BeNull();
-    }
-
-    [SkippableFact]
-    public async Task Duplo_fire_mesmo_txid_e_idempotente_assinatura_valida()
-    {
-        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
-        await fixture.ResetDatabaseAsync();
-
-        var txid = $"E2E-{Guid.NewGuid():N}";
-        var dataFimInicial = DateTime.UtcNow.AddDays(5);
-        var (empresaId, _) = await SeedAsync(txid, valor: 100m, dataFimAssinatura: dataFimInicial);
-
-        var payload = BuildPayloadJson([(txid, "100.00")]);
-        var (timestamp, signature) = GerarAssinaturaEfi(payload, WebhookSecret);
-
-        // 1o webhook
-        var controller1 = CriarController();
-        ConfigurarRequest(controller1, payload, timestamp, signature);
-        var result1 = await controller1.Pix();
-        result1.Should().BeOfType<OkResult>();
-
-        // 2o webhook (mesmo payload, mesma assinatura — simula retentativa do Efi)
-        var controller2 = CriarController();
-        ConfigurarRequest(controller2, payload, timestamp, signature);
-        var result2 = await controller2.Pix();
-        result2.Should().BeOfType<OkResult>();
-
-        await using var assert = fixture.CreateDbContext();
-        var cobranca = await assert.CobrancasAssinatura.AsNoTracking()
-            .IgnoreQueryFilters().FirstAsync(c => c.Txid == txid);
-        var assinatura = await assert.AssinaturasEmpresa.AsNoTracking()
-            .IgnoreQueryFilters().FirstAsync(a => a.EmpresaId == empresaId);
-
-        cobranca.Status.Should().Be(StatusCobranca.Paga);
-        // Renovação deve ter sido aplicada UMA vez (não +60d)
-        var diasAdicionados = (assinatura.DataFim!.Value - dataFimInicial).TotalDays;
-        diasAdicionados.Should().BeApproximately(30, 0.01,
-            "duplo-fire idempotente nao deve somar 60 dias");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -282,9 +186,6 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
 
         var ctx = fixture.CreateDbContext();
 
-        var registrarPagamentoUc = new RegistrarPagamentoFaturaUseCase(
-            Substitute.For<IFaturaRepository>(), ctx, NullLogger<RegistrarPagamentoFaturaUseCase>.Instance);
-
         var reconciliarPixUc = new ReconciliarPixParcelaReceberUseCase(
             Substitute.For<IContaReceberRepository>(),
             Substitute.For<ICaixaRepository>(),
@@ -293,11 +194,7 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
             NullLogger<ReconciliarPixParcelaReceberUseCase>.Instance);
 
         return new WebhookPixController(
-            new CobrancaAssinaturaRepository(ctx),
-            new AssinaturaEmpresaRepository(ctx),
-            ctx,
             config,
-            registrarPagamentoUc,
             reconciliarPixUc,
             NullLogger<WebhookPixController>.Instance,
             env);

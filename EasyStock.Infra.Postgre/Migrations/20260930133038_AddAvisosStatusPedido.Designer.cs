@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20260930030833_AddAvisosStatusPedido")]
+    [Migration("20260930133038_AddAvisosStatusPedido")]
     partial class AddAvisosStatusPedido
     {
         /// <inheritdoc />
@@ -6796,6 +6796,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<string>("LinhaSnapshot")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -7730,6 +7734,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("InstrucaoFinalizacao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Linha")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("NomePublico")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -7766,6 +7779,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("TempoPreparo")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("TempoPreparoMinutos")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("Visivel")
                         .ValueGeneratedOnAdd()
