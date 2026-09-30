@@ -1,4 +1,5 @@
 using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
@@ -40,6 +41,7 @@ public class AtualizarStatusPedidoUseCase(
     IConfiguracaoLojaRepository configLojaRepo,
     GerarContaReceberDePedidoUseCase gerarContaReceberUseCase,
     IPublicadorEventoIntegracao publicadorEventos,
+    IOperacaoEventPublisher operacaoEventos,
     IUnitOfWork uow,
     ILogger<AtualizarStatusPedidoUseCase> logger)
 {
@@ -134,6 +136,10 @@ public class AtualizarStatusPedidoUseCase(
         await uow.CommitAsync();
 
         logger.LogInformation("Pedido {Id} status {Antigo} → {Novo}.", pedido.Id, statusAntigoStr, statusNovoStr);
+
+        // SSE de operação (S18): evento de UI, só depois do commit — commit que lança não publica.
+        await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, pedido.EmpresaId,
+            new PedidoMudouStatusOperacao(pedido.Id, statusAntigoStr, statusNovoStr));
 
         // Integracao automatica CAP/CAR (P1): se status novo coincide com configuracao,
         // gera ContaReceber. Best-effort: falha aqui nao reverte status do pedido

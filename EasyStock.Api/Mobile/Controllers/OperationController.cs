@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using EasyStock.Api.Mobile.Security;
-using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
@@ -26,13 +26,13 @@ namespace EasyStock.Api.Mobile.Controllers;
 [Route("api/mobile/operation")]
 public class OperationController(
     EasyStockDbContext db,
-    MobileEventBroker eventBroker,
+    OperacaoEventBroker eventBroker,
     ICurrentUserAccessor currentUser,
     IConfiguration configuration,
     ILogger<OperationController> log) : ControllerBase
 {
     private readonly EasyStockDbContext _db = db;
-    private readonly MobileEventBroker _eventBroker = eventBroker;
+    private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly ICurrentUserAccessor _currentUser = currentUser;
     private readonly IConfiguration _configuration = configuration;
     private readonly ILogger<OperationController> _log = log;
@@ -425,9 +425,10 @@ public class OperationController(
             while (!ct.IsCancellationRequested && !subscription.Slot.Cancelled)
             {
                 await subscription.Slot.Signal.WaitAsync(ct);
-                while (subscription.Slot.Queue.TryDequeue(out var data))
+                while (subscription.Slot.Queue.TryDequeue(out var mensagem))
                 {
-                    await Response.WriteAsync($"data: {data}\n\n", ct);
+                    // Canal mobile: frame só com data: (o PWA escuta onmessage).
+                    await Response.WriteAsync(mensagem.ParaFrame(), ct);
                     await Response.Body.FlushAsync(ct);
                 }
             }
