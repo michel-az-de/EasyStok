@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,6 +23,9 @@ public class AgenteAtendimentoServiceTests
     private readonly IConversaRepository _conversaRepository = Substitute.For<IConversaRepository>();
     private readonly IConfiguracaoAtendimentoRepository _configuracaoRepository = Substitute.For<IConfiguracaoAtendimentoRepository>();
     private readonly IClienteRepository _clienteRepository = Substitute.For<IClienteRepository>();
+    private readonly IClienteCrmRepository _crm = Substitute.For<IClienteCrmRepository>();
+    private readonly IHistoricoPedidosClienteQueries _historicoPedidos = Substitute.For<IHistoricoPedidosClienteQueries>();
+    private readonly IDomicilioQueries _domicilio = Substitute.For<IDomicilioQueries>();
     private readonly IEscaladorConversa _escalador = Substitute.For<IEscaladorConversa>();
     private readonly IWhatsAppCloudClient _cloudClient = Substitute.For<IWhatsAppCloudClient>();
     private readonly IUsoIaRepository _usoIaRepository = Substitute.For<IUsoIaRepository>();
@@ -59,6 +63,7 @@ public class AgenteAtendimentoServiceTests
     private AgenteAtendimentoService CriarServico() => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+        new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         NullLogger<AgenteAtendimentoService>.Instance);
 
     private static RespostaLlm Texto(string texto) =>
@@ -201,6 +206,27 @@ public class AgenteAtendimentoServiceTests
         requisicao.System.Should().Contain("[interno] cliente pediu desconto na última compra");
         requisicao.Mensagens.SelectMany(m => m.Conteudo).OfType<BlocoTextoLlm>()
             .Should().NotContain(b => b.Texto.Contains("desconto"));
+    }
+
+    [Fact]
+    public async Task DossieDoClienteEntraNoSystemComNotasInterno()
+    {
+        var cliente = Cliente.Criar(_empresaId, "Maria");
+        cliente.AdicionarTag("vegano", OrigemClienteTag.Dona, Agora);
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _clienteRepository.GetByIdWithDetailsAsync(_empresaId, cliente.Id).Returns(cliente);
+        _crm.ObterComTagsAsync(_empresaId, cliente.Id, Arg.Any<CancellationToken>()).Returns(cliente);
+        _crm.ListarNotasAsync(_empresaId, cliente.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([ClienteNota.Criar(_empresaId, cliente.Id, "não gosta de coco", "Baba", Agora)]);
+        _conversa.VincularCliente(cliente.Id);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        var requisicao = _requisicoes.Should().ContainSingle().Subject;
+        requisicao.System.Should().Contain("vegano");
+        requisicao.System.Should().Contain("[interno] ").And.Contain("não gosta de coco");
+        requisicao.System.Split('\n').Where(l => l.Contains("coco"))
+            .Should().OnlyContain(l => l.StartsWith("- [interno]"));
     }
 
     [Fact]
