@@ -69,6 +69,18 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasMaxLength(Pedido.MotivoRequerAprovacaoMaxLength)
                 .IsRequired(false);
 
+            // S21: início previsto do preparo e trava do aviso de atraso.
+            b.Property(p => p.InicioPrevistoEm)
+                .HasColumnName("inicio_previsto_em")
+                .IsRequired(false);
+            b.Property(p => p.AtrasoNotificadoEm)
+                .HasColumnName("atraso_notificado_em")
+                .IsRequired(false);
+            // Varredura do PedidoAtrasoJob a cada 60 s: só os aguardando ainda não avisados.
+            b.HasIndex(p => p.InicioPrevistoEm)
+                .HasDatabaseName("ix_pedidos_atraso_pendente")
+                .HasFilter("\"Status\" = 'aguardando' AND atraso_notificado_em IS NULL AND inicio_previsto_em IS NOT NULL");
+
             b.HasOne(p => p.Empresa)
                 .WithMany()
                 .HasForeignKey(p => p.EmpresaId)

@@ -79,6 +79,9 @@ public static partial class ServiceCollectionExtensions
         // S19: KDS do console sobre Pedido
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>();
+        // S21: início previsto do preparo e aviso de atraso (PedidoAtrasoJob)
+        services.AddScoped<EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Atraso.NotificarAtrasoPedidoUseCase>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();
@@ -107,6 +110,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AdicionarItemLoteUseCase>();
         services.AddScoped<RemoverItemLoteUseCase>();
         services.AddScoped<FinalizarLoteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Producao.RegistrarProducaoUseCase>(); // S23 (#1137)
         services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
