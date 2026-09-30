@@ -548,7 +548,6 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Faq"]                 = "FAQ público (artigos de ajuda, busca por categoria).",
         ["FaqAdmin"]            = "Curadoria do FAQ (admin global): criação e edição de artigos.",
         ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
-        ["WebhookFocusNFe"]     = "Webhook público da Focus NFe (HMAC) para retorno de emissão fiscal.",
         ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
         ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",
     };

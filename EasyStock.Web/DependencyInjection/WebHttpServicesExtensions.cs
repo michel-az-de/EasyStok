@@ -98,8 +98,6 @@ public static class WebHttpServicesExtensions
         services.AddScoped<MobileProductsService>();
         services.AddScoped<OperacaoMobileService>();
         services.AddScoped<RelatoriosService>();
-        services.AddScoped<NotasFiscaisService>();
-        services.AddScoped<ConfiguracaoFiscalService>();
 
         // 6d. Menu lateral (ADR-0032, fatia 2): badges agregados com cache curto (60s)
         // por empresa+loja. AddMemoryCache registra IMemoryCache (distinto do distributed
@@ -117,8 +115,6 @@ public static class WebHttpServicesExtensions
 
         // 6b. Marketing options + Leads API service (landing publica)
         services.Configure<MarketingOptions>(config.GetSection("Marketing"));
-        // Feature flags (issue #770): modulo fiscal default-off ate homologacao FocusNFe.
-        services.Configure<FeaturesOptions>(config.GetSection("Features"));
         services.AddScoped<LeadsApiService>();
         services.AddScoped<FaqApiService>();
         services.AddScoped<TicketsApiService>();
