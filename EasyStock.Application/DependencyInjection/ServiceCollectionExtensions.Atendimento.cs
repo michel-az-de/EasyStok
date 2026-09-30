@@ -47,6 +47,9 @@ public static partial class ServiceCollectionExtensions
         // S31: interesse em item (use cases em UseCases.Campanhas, fora da convenção do atendimento).
         services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.RegistrarInteresseItemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.ListarSugestoesInteresseUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.MarcarInteresseAtendidoUseCase>(); // #1228
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.ListarInteressesDoClienteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.FecharInteressesDoPedidoUseCase>();
 
         // S36: chat do site (canal próprio, sem provedor externo)
         services.AddScoped<ICanalMensageria, CanalChatSite>();
