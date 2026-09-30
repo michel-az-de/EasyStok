@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Início previsto e atraso** (S21): `Pedido.InicioPrevistoEm` = início da janela da vaga ativa (hora
+  de Brasília) ou `AgendadoParaEm`, menos o prazo mínimo dos itens do cardápio (S15); gravado em
+  `ConfirmarPagamentoPedidoUseCase` e recalculado em `AlterarAgendamentoPedidoUseCase`, que também zera
+  `AtrasoNotificadoEm`. O KDS devolve `inicioPrevistoEm` e deriva `atrasado` (aguardando e início vencido;
+  sem início previsto, vale a regra da S19). `PedidoAtrasoJob` (60 s, `BackgroundJobs:EnablePedidoAtraso`)
+  publica `pedido.atrasado {pedidoId, numero, cliente, inicioPrevistoEm}` uma vez por pedido. Migration
+  `AddInicioPrevistoPedido`. (#1165)
 - **CRM leve do cliente** (S24): tags normalizadas e únicas por cliente (`GET|POST|DELETE
   api/clientes/{id}/tags`, repetida → 409, com sugeridas), notas internas datadas (`GET|POST
   api/clientes/{id}/notas`, pedido de outro cliente → 400), bloqueio em todos os canais (`POST

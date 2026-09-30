@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.CriarPedido;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos;
 
 namespace EasyStock.Application.UseCases.AlterarAgendamentoPedido;
@@ -14,7 +15,8 @@ public sealed record AlterarAgendamentoPedidoCommand(
 public class AlterarAgendamentoPedidoUseCase(
     IPedidoRepository pedidoRepo,
     IUnitOfWork uow,
-    ILogger<AlterarAgendamentoPedidoUseCase> logger)
+    ILogger<AlterarAgendamentoPedidoUseCase> logger,
+    CalculadoraInicioPrevistoPedido inicioPrevisto)
 {
     public async Task<PedidoResult?> ExecuteAsync(AlterarAgendamentoPedidoCommand cmd)
     {
@@ -39,6 +41,8 @@ public class AlterarAgendamentoPedidoUseCase(
         var anterior = pedido.AgendadoParaEm;
         pedido.AgendadoParaEm = agendado;
         pedido.AlteradoEm = DateTime.UtcNow;
+        // S21: janela nova, início previsto novo (e o aviso de atraso volta a valer).
+        pedido.DefinirInicioPrevisto(await inicioPrevisto.CalcularAsync(pedido));
 
         var descricao = cmd.AgendadoParaEm.HasValue
             ? $"Agendado para {cmd.AgendadoParaEm.Value:dd/MM/yyyy HH:mm}"
