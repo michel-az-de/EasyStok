@@ -13,7 +13,7 @@
 #   4. verifica /health.commit == HEAD -> falha ruidosamente se nao refletiu
 #
 # Uso (na VM):
-#   ./scripts/deploy/azure-deploy.sh            # api web admin (default)
+#   ./scripts/deploy/azure-deploy.sh            # api web (default)
 #   ./scripts/deploy/azure-deploy.sh web        # so o web
 #   ./scripts/deploy/azure-deploy.sh api web    # subconjunto
 #
@@ -24,7 +24,7 @@ set -euo pipefail
 
 REPO_DIR="${REPO_DIR:-/home/azureuser/easystok}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.azure.yml}"
-SERVICES="${*:-api web admin}"
+SERVICES="${*:-api web}"
 
 cd "$REPO_DIR"
 
@@ -57,7 +57,7 @@ dc up -d --force-recreate $SERVICES
 echo "==> [4/5] Estado dos containers"
 dc ps
 
-# Verificacao pos-deploy. Apos #572 os 3 containers (web/api/admin) carimbam GIT_SHA
+# Verificacao pos-deploy. Apos #572 os containers (web/api) carimbam GIT_SHA
 # no env; o deploy so e "sucesso" se o commit no ar == HEAD. Dois sinais:
 #   (a) env GIT_SHA de cada container == HEAD (uniforme, todos os servicos);
 #   (b) prova end-to-end de que o app SERVE o commit (web /health.commit, api
@@ -69,7 +69,6 @@ for svc in $SERVICES; do
   case "$svc" in
     api)   cname=easystok-api ;;
     web)   cname=easystok-web ;;
-    admin) cname=easystok-admin ;;
     *)     continue ;;
   esac
   CSHA="$("${DOCKER[@]}" inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cname" 2>/dev/null | sed -n 's/^GIT_SHA=//p' | head -1)"

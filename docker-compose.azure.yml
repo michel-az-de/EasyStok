@@ -1,5 +1,5 @@
 # docker-compose.azure.yml — stack completa do EasyStok numa VM unica (Azure).
-# Sobe Web + Admin + API + Postgres + Caddy (HTTPS automatico) num so host.
+# Sobe Web + API + Worker + Postgres + Caddy (HTTPS automatico) num so host.
 # Postgres roda em container (volume persistente) => zero custo de banco gerenciado.
 #
 # Uso na VM:
@@ -23,7 +23,6 @@ volumes:
   caddy-config:
   caddy-logs:          # issue #809: access log persistente do Caddy (sobrevive a recriacao)
   dataprotection-web-keys:
-  dataprotection-admin-keys:
 
 services:
 
@@ -97,7 +96,7 @@ services:
       Anthropic__Enabled: "false"
       FileStorage__Provider: Local
       # URL publica absoluta da API para compor os links dos arquivos. Sem isso a URL
-      # salva e relativa (/files/...) e a imagem quebra na Web/Admin (outra origem, que
+      # salva e relativa (/files/...) e a imagem quebra na Web (outra origem, que
       # nao serve /files). ${API_HOST} vem do .env (api.<ip>.sslip.io), igual ao web.
       FileStorage__PublicBaseUrl: "https://${API_HOST}/files"
       # SuperAdmin do painel /admin — obrigatorio em Production (fail-fast se ausente).
@@ -166,41 +165,6 @@ services:
       retries: 5
       start_period: 40s
 
-  # ── Admin (Razor Pages) — consome a API pela rede interna ────────────────────
-  admin:
-    build:
-      context: .
-      dockerfile: Dockerfile.cloudrun.admin
-      args:
-        GIT_SHA: ${GIT_SHA:-unknown}
-    image: easystok-admin:latest
-    container_name: easystok-admin
-    restart: unless-stopped
-    mem_limit: 192m
-    depends_on: [api]
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      # Onda 3 (#853): Workstation GC — VM de 1 CPU (ver api).
-      DOTNET_gcServer: "0"
-      ApiBaseUrl: "http://api:8080"
-      EasyStockWebUrl: "https://${APP_HOST}"
-      # Telemetria OTLP (issue 1002): vazio = desligado.
-      OpenTelemetry__OtlpEndpoint: ${OTEL_COLLECTOR_ENDPOINT:-}
-      # Persistencia das chaves de DataProtection num volume (mesma motivacao do web).
-      # O AdminSessionRestoreMiddleware restaura a sessao via cookie _rt_admin; o DP
-      # persistido evita churn de antiforgery/cookie de sessao a cada deploy. O Admin
-      # roda como root no Dockerfile.cloudrun.admin, entao o volume e gravavel sem chown.
-      DataProtection__KeysPath: /app/dataprotection-keys
-    volumes:
-      - dataprotection-admin-keys:/app/dataprotection-keys
-    networks: [easystock-net]
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
-
   # ── Worker (.NET) — jobs de background: outbox de integracao, notificacoes,
   # SLA de tickets, agendamento de pedidos, fan-out de banners, saude de endpoints,
   # contingencia fiscal e motor de relatorios assincrono. #878: antes NAO era
@@ -259,13 +223,12 @@ services:
     container_name: easystok-caddy
     restart: unless-stopped
     mem_limit: 80m
-    depends_on: [web, admin, api]
+    depends_on: [web, api]
     ports:
       - "80:80"
       - "443:443"
     environment:
       APP_HOST: ${APP_HOST}
-      ADMIN_HOST: ${ADMIN_HOST}
       API_HOST: ${API_HOST}
       CASA_HOST: ${CASA_HOST}
       CASADABABA_HOST: ${CASADABABA_HOST}

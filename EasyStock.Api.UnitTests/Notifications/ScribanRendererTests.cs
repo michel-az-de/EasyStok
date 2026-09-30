@@ -261,4 +261,20 @@ public class ScribanRendererTests
         r1.Should().Be("A:um");
         r2.Should().Be("B:dois");
     }
+
+    // S13: o agradecimento de pedido entregue (NotificacoesGlobaisSeed) só convida para o Instagram quando a
+    // loja tem o perfil cadastrado.
+    [Theory]
+    [InlineData("https://instagram.com/casadababa", "Pedido nº AB12 entregue. Obrigada pela preferência, Maria! Siga a gente no Instagram: https://instagram.com/casadababa")]
+    [InlineData("", "Pedido nº AB12 entregue. Obrigada pela preferência, Maria!")]
+    public async Task Agradecimento_de_pedido_entregue_so_convida_para_o_instagram_quando_ha_perfil(string instagram, string esperado)
+    {
+        var renderer = CriarRenderer();
+
+        var resultado = await renderer.RenderizarAsync(
+            """Pedido nº {{ numero }} entregue. Obrigada pela preferência, {{ nome }}!{{ if instagram != "" }} Siga a gente no Instagram: {{ instagram }}{{ end }}""",
+            new Dictionary<string, object?> { ["numero"] = "AB12", ["nome"] = "Maria", ["instagram"] = instagram });
+
+        resultado.Should().Be(esperado);
+    }
 }
