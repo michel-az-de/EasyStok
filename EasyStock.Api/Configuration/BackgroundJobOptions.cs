@@ -62,6 +62,13 @@ public sealed class BackgroundJobOptions
     public bool EnableContaReceberPixReconciliacaoJob { get; set; } = true;
 
     /// <summary>
+    /// Quando <c>true</c>, registra o <c>CobrancaPedidoJob</c> (S11) que roda a cada 60 s expirando
+    /// links do Mercado Pago vencidos: reemite uma vez para pedido da conversa e cancela o resto
+    /// (<c>BackgroundJobs:EnableCobrancaPedido</c>). Default true; <c>false</c> é o rollback do job.
+    /// </summary>
+    public bool EnableCobrancaPedido { get; set; } = true;
+
+    /// <summary>
     /// Quando <c>true</c>, registra o <c>CaixaEsquecidoJob</c> que roda 1x/dia (10:00 UTC ≈
     /// 07:00 BRT) detectando caixas abertos não fechados de dias anteriores e notificando in-app
     /// (só notifica, não fecha — ADR-0034 / issue #641). Default true em producao.
