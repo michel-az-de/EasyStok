@@ -83,4 +83,7 @@ public sealed class BackgroundJobOptions
     /// que enfileira está aqui e <c>BackgroundQueueService</c> não atravessa processos.
     /// </summary>
     public bool EnableAtendimentoTurnoAgente { get; set; } = true;
+
+    /// <summary>Apaga, de hora em hora, as sessões do chat do site vencidas há mais de um dia (S36).</summary>
+    public bool EnableLimpezaSessoesChatSite { get; set; } = true;
 }

@@ -209,6 +209,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Storefront.PedidoAvaliacao> PedidoAvaliacoes { get; set; } = null!;
 
         // Atendimento (S04, ADR-0050): conversa por contato de WhatsApp e suas mensagens.
+        public DbSet<EasyStock.Domain.Entities.Atendimento.SessaoChatSite> SessoesChatSite { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Conversa> AtendimentoConversas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Mensagem> AtendimentoMensagens { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.StorefrontFaleConosco> StorefrontFaleConoscos { get; set; } = null!;
