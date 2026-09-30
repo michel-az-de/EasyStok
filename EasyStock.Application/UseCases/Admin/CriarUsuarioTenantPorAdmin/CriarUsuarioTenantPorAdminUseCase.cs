@@ -33,6 +33,7 @@ public sealed class CriarUsuarioTenantPorAdminUseCase(
     IUsuarioPerfilRepository usuarioPerfilRepository,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
+    ITenantContextAccessor tenantContext,
     IEmailService? emailService,
     ILogger<CriarUsuarioTenantPorAdminUseCase> logger)
 {
@@ -53,6 +54,10 @@ public sealed class CriarUsuarioTenantPorAdminUseCase(
 
         var empresa = await empresaRepository.GetByIdAsync(command.TenantId)
             ?? throw new UseCaseValidationException("Cliente não encontrado.");
+
+        // SuperAdmin não tem empresa no token: sem isto o RLS recusa o INSERT de Perfil e
+        // UsuarioEmpresa da empresa alvo (42501, #1159). Escopo só dessa empresa, sem bypass.
+        tenantContext.SetCurrentTenant(empresa.Id);
 
         var emailExistente = await usuarioRepository.GetByEmailAsync(emailNorm);
         if (emailExistente is not null)
