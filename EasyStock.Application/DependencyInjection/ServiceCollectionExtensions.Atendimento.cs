@@ -45,6 +45,13 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.CancelarMensagemProgramadaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.ReservarMensagensProgramadasUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Programadas.DispararMensagemProgramadaUseCase>();
+
+        // S43: lembretes da dona (console + avaliador no processo da API).
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.CriarLembreteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.ListarLembretesUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.ConcluirLembreteUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.MarcarLembretesVistosUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Lembretes.AvaliarLembretesUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.ListarConsentimentosClienteUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Consentimento.DefinirConsentimentosClienteUseCase>();
         services.AddScoped<IdentificarClientePorTelefoneUseCase>();
