@@ -809,6 +809,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime?>("ProcessadaEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("Programada")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -830,6 +835,85 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasFilter("\"ExternoId\" IS NOT NULL");
 
                     b.ToTable("atendimento_mensagens", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.MensagemProgramada", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AgendadaPara")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("AlteradaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Canal")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ClienteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConversaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CriadaPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EnviadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Erro")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Finalidade")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdExterno")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ModeloIdioma")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModeloNome")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ModeloParametrosJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Situacao")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tentativas")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Texto")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("Situacao", "AgendadaPara")
+                        .HasDatabaseName("ix_mensagens_programadas_situacao_agendada_para");
+
+                    b.HasIndex("EmpresaId", "ClienteId", "AgendadaPara")
+                        .HasDatabaseName("ix_mensagens_programadas_empresa_cliente");
+
+                    b.ToTable("mensagens_programadas", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.SessaoChatSite", b =>
@@ -9840,6 +9924,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .WithMany()
                         .HasForeignKey("ConversaId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.MensagemProgramada", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Cliente", null)
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

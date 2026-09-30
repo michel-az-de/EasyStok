@@ -141,6 +141,10 @@ casadababa.com fica em outro repositório, e aqui entra só o contrato documenta
 
 ### S37 · E-mail e SMS como canais de saída
 
+> **Entregue na #1080, com escopo reduzido.** Os adaptadores ficam em `Infra.Notifications/Atendimento/`,
+> ao lado dos provedores. O remetente por empresa e a validação no startup ficaram fora: os provedores
+> já leem `Notifications:Sms:*` e `Email:*`, e com uma empresa só o remetente global basta.
+
 **Problema.** A mensagem programada e as campanhas precisam de e-mail e SMS (ADR-0051, item 4). Hoje
 `SmtpEmailCanal` e `TwilioSmsProvider` existem, mas estão inertes: o Stub é o único usado em
 produção (#783).
@@ -190,6 +194,11 @@ antigo fica marcado `[Obsolete]` e só é removido na poda.
 ---
 
 ### S39 · Mensagem programada ao cliente (multicanal)
+
+> **Entregue na #1082, com duas decisões.**
+> 1. A tag `HUMAN_AGENT` não vale para envio agendado: fora da janela, Instagram e Messenger recusam.
+> 2. Uma mensagem presa em `Enviando` por queda do processo **não é reenviada sozinha**, para não
+>    sair duas vezes. Ela fica para revisão, e a reentrega automática entra junto com os lembretes (S43).
 
 **Problema.** Decisão 3 do ADR-0051. O protótipo teve "Programar envio" (`prototipo-casa-da-baba.html`,
 build de 22/09) e ficaram restos no código atual: `PROGRAMAR_ENVIO`, `CANCELAR_PROGRAMADO` e

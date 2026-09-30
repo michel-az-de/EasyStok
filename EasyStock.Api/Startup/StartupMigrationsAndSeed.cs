@@ -158,7 +158,7 @@ public static class StartupMigrationsAndSeed
             }
 
             // Schema bootstrap defensivo: roda DEPOIS de migrations e antes de qualquer
-            // seed pra garantir que IsSeedData + SeedRunLogs existam, mesmo se uma
+            // seed pra garantir que SeedRunLogs exista, mesmo se uma
             // migration foi aplicada vazia ou deploy parcial deixou o banco inconsistente.
             // SQL idempotente — no-op se schema já está correto.
             try

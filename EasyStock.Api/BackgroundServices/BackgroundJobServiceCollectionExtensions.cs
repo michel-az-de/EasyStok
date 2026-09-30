@@ -87,6 +87,10 @@ public static class BackgroundJobServiceCollectionExtensions
         // neste processo porque a fila e em memoria (BackgroundQueueService).
         services.AddHostedService<AtendimentoFilaMidiaBackgroundService>();
 
+        // S39: mensagens programadas ao cliente, disparadas pelo banco (não é fila em memória).
+        if (options.EnableMensagensProgramadas)
+            services.AddHostedService<MensagensProgramadasBackgroundService>();
+
         // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
         if (options.EnableAtendimentoTurnoAgente)
             services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();

@@ -50,7 +50,7 @@ canonical_commands:
     status: active
   build-check:
     cmd: 'powershell -File scripts/poka-yoke/build-check.ps1'
-    raw: 'dotnet build EasyStok.CI.slnf --nologo -p:UseAppHost=false -o $TEMP/easystok-build-check'
+    raw: 'dotnet build EasyStok.CI.slnf --nologo -p:UseAppHost=false -o $TEMP/easystok-build-check-<hash8 do caminho do repo>'  # hash via build-out-dir.ps1 (issue 1117)
     why: "slnf pula Mobile (sem maui); -o (dir temporario) + UseAppHost=false evitam o lock de bin do ambiente local (#448). Substitui o build da sln cheia do passo 0 do CLAUDE.md. Provado verde com Admin/Web ativos (1m01s, 0 erros). E o passo 1 do gate; avulso serve p/ check de sessao (par.0) sem rodar testes."
     status: active
   arch-gate:
