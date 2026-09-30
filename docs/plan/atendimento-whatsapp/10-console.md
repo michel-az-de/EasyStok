@@ -20,7 +20,7 @@ backend já está no master. Quando o módulo fica em paridade, a tela legada da
 | `encerramento` (pedido e cobrança) | S10, S11 | Não (S10 na PR #1112, S11 na issue #1115) | `api/storefront/{slug}/checkout` e o do S11 | PWA do caixa (`Api/wwwroot/pwa`), a medir na F03 |
 | `entregas` | S12, S14, S44 | S45 parte 1 sim; o resto não | `api/minha-vitrine/entrega` | a medir na F04 |
 | `cozinha` | S19, S20, S21 | Não | SSE do S18 | KDS atual (`Api/Mobile/Controllers/KdsController.cs`) |
-| `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/admin/storefronts/{id}/cardapio`, `api/storefront/{slug}/menu` | a medir |
+| `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/minha-vitrine/cardapio`, `api/minha-vitrine/configuracao`, `api/storefront/{slug}/menu` | a medir |
 | `ficha-cliente` (tags, notas, dossiê), `notas` | S24, S25 | Não | a definir na spec | a medir |
 | `respostas`, `automacoes` | S42 | Não | a definir na spec | Nenhuma |
 | `lembretes` | S43 | Não | a definir na spec | Nenhuma |
