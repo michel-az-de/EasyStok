@@ -2,13 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace EasyStock.Domain.Entities.Atendimento;
 
-/// <summary>Variável usada no texto sem valor na conversa (S42): nunca sai <c>{nome}</c> literal.</summary>
-public sealed class VariavelSemValorException(string variavel)
-    : RegraDeDominioVioladaException($"A variável {{{variavel}}} não tem valor nesta conversa.")
-{
-    public string Variavel { get; } = variavel;
-}
-
 /// <summary>
 /// Renderização das variáveis das respostas prontas e automáticas (S42): <c>{nome}</c>, <c>{pedido}</c> e
 /// <c>{faixa}</c>. Chave fora dessa lista fica como está (pode ser texto da dona entre chaves).
