@@ -175,6 +175,7 @@ internal sealed class CobrancaPedidoFixture
         var estoque = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
             Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque, Substitute.For<IContaReceberRepository>(), Uow,
