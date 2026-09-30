@@ -4,8 +4,9 @@ namespace EasyStock.Application.UseCases.Operacao.Kds;
 /// <param name="NumeroCurto">8 primeiros caracteres do id em maiúsculas: o número que o cliente vê no checkout.</param>
 /// <param name="StatusRotulo">Rótulo escrito do status (RN-30), de <c>StatusPedidoVocabulario</c>.</param>
 /// <param name="Linhas">Linhas distintas dos itens (<c>paraServir</c>, <c>prepararEmCasa</c>).</param>
-/// <param name="InicioPrevistoEm">Preenchido pela S21; nulo até lá.</param>
-/// <param name="Atrasado">Até a S21: pedido aberto de dia de produção anterior a hoje.</param>
+/// <param name="InicioPrevistoEm">Quando o preparo precisa começar (S21); nulo sem janela (pedido para já).</param>
+/// <param name="Atrasado">Com início previsto: aguardando e o início já passou (S21). Sem ele: pedido aberto de
+/// dia de produção anterior a hoje.</param>
 public sealed record KdsPedidoDto(
     Guid Id,
     string NumeroCurto,
