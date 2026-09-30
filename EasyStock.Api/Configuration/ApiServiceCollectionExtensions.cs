@@ -287,6 +287,24 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
+            // Webhooks da Meta (WhatsApp, Instagram, Messenger). A Meta entrega em rajada a
+            // partir de poucos IPs; 429 faz ela reenviar e, insistindo, desativar a assinatura.
+            // O endpoint ja exige HMAC (X-Hub-Signature-256), entao aqui e so teto contra flood
+            // nao autenticado. Particionado por IP, generoso (issue 1105).
+            options.AddPolicy("webhook-meta", context =>
+            {
+                var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 600,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    });
+            });
+
             // Rate limit pro signup de empresa nova. Particionado por IP pra
             // travar criacao em massa de tenants falsos. 5/IP/hora chega pra
             // demos pessoais e onboarding de cliente novo, com folga.
