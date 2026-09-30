@@ -54,6 +54,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin.CriarTenantPorAdminUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Admin.CriarUsuarioTenantPorAdmin.CriarUsuarioTenantPorAdminUseCase>();
 
+        // Vinculo do numero da Meta a empresa (#1102)
+        services.AddScoped<EasyStock.Application.UseCases.Admin.VincularWhatsAppTenant.VincularWhatsAppDoTenantUseCase>();
+
         return services;
     }
 }
