@@ -47,14 +47,9 @@ using EasyStock.Application.UseCases.PreviewSugestaoCompra;
 using EasyStock.Application.UseCases.CriarSugestaoCompra;
 using EasyStock.Application.UseCases.GerenciarComposicao;
 using EasyStock.Application.UseCases.AdicionarItemPedidoFornecedor;
-using EasyStock.Application.UseCases.ListarPlanos;
-using EasyStock.Application.UseCases.ListarFaturas;
-using EasyStock.Application.UseCases.CancelarAssinatura;
-using EasyStock.Application.UseCases.AlterarPlano;
 using EasyStock.Application.UseCases.Faturas.EmitirFatura;
 using EasyStock.Application.UseCases.Faturas.RegistrarPagamentoFatura;
 using EasyStock.Application.UseCases.Faturas.CancelarFatura;
-using EasyStock.Application.UseCases.Faturas.ListarFaturasCliente;
 using EasyStock.Application.UseCases.Faturas.ListarFaturasAdmin;
 using EasyStock.Application.UseCases.Faturas.ObterFaturaDetalhe;
 using EasyStock.Application.UseCases.Faturas.GerarPdfFatura;
@@ -175,17 +170,11 @@ public static partial class ServiceCollectionExtensions
 
 
         // Planos e Assinaturas
-        services.AddScoped<ListarPlanosUseCase>();
-        services.AddScoped<ListarFaturasUseCase>();
-        services.AddScoped<CancelarAssinaturaUseCase>();
-        services.AddScoped<AlterarPlanoUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.PagarAgora.PagarAgoraUseCase>();
 
         // Modulo Financeiro (F1+) — Faturas
         services.AddScoped<EmitirFaturaUseCase>();
         services.AddScoped<RegistrarPagamentoFaturaUseCase>();
         services.AddScoped<CancelarFaturaUseCase>();
-        services.AddScoped<ListarFaturasClienteUseCase>();
         services.AddScoped<ListarFaturasAdminUseCase>();
         services.AddScoped<ObterFaturaDetalheUseCase>();
         services.AddScoped<GerarPdfFaturaUseCase>();

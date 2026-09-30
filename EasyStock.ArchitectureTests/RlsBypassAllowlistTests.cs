@@ -80,7 +80,6 @@ public class RlsBypassAllowlistTests
         // issue #1024: registrar empresa e cross-tenant por definicao, porque cria o tenant. A
         // requisicao e anonima e nao existe app.empresa_id no contexto, entao a policy
         // tenant_isolation recusa os INSERTs (42501) e as leituras de perfis voltam vazias.
-        "EasyStock.Application/UseCases/RegistrarEmpresa/RegistrarEmpresaUseCase.cs",
     };
 
     [Fact]

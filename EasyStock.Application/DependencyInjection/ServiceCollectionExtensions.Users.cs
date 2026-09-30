@@ -2,8 +2,6 @@
 // Registra UseCases relacionados a: CRUD de usuários, lojas, empresas, perfis
 
 using Microsoft.Extensions.DependencyInjection;
-using EasyStock.Application.UseCases.RegistrarEmpresa;
-using EasyStock.Application.UseCases.CompletarOnboarding;
 using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Application.UseCases.AlterarSenhaUsuario;
@@ -32,8 +30,6 @@ public static partial class ServiceCollectionExtensions
     public static IServiceCollection AddEasyStockUserManagementUseCases(this IServiceCollection services)
     {
         // Registro e gerenciamento de empresas
-        services.AddScoped<RegistrarEmpresaUseCase>();
-        services.AddScoped<CompletarOnboardingUseCase>();
 
         // CRUD de usuários
         services.AddScoped<CriarUsuarioUseCase>();

@@ -37,7 +37,6 @@ public static partial class ServiceCollectionExtensionsNotifications
         // Coletores de eventos de estado — vivem em Infra.Postgre porque dependem de
         // EasyStockDbContext. Worker e API ambos consomem via INotificacoesColetorOrchestrator.
         services.AddScoped<IColetorEventoNotificacao, ColetorProdutosVencendo>();
-        services.AddScoped<IColetorEventoNotificacao, ColetorAssinaturasExpirando>();
 
         return services;
     }
