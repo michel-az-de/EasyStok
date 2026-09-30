@@ -167,6 +167,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Inventario.IniciarContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.RegistrarItemContagemUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Inventario.FinalizarContagemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.Desacertos.ListarDesacertosEstoqueUseCase>(); // S22
+        services.AddScoped<EasyStock.Application.UseCases.Inventario.Desacertos.AjustarSaldoRapidoUseCase>(); // S22
         services.AddScoped<EasyStock.Application.UseCases.Inventario.CancelarContagemUseCase>();
 
         // Modulo Financeiro AR/AP — Lancamentos

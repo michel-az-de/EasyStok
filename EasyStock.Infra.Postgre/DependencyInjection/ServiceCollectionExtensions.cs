@@ -88,6 +88,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.CampanhaRepository>(); // S28
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.ICampanhaPublicoQueries, EasyStock.Infra.Postgre.Queries.CampanhaPublicoQueries>(); // S29
             services.AddScoped<IHistoricoPedidosClienteQueries, EasyStock.Infra.Postgre.Queries.HistoricoPedidosClienteQueries>(); // S25
+            services.AddScoped<IDesacertosEstoqueQueries, EasyStock.Infra.Postgre.Queries.DesacertosEstoqueQueries>(); // S22
             services.AddScoped<IDomicilioQueries, EasyStock.Infra.Postgre.Queries.DomicilioQueries>(); // S25
             services.AddScoped<IPedidoRepository, PedidoRepository>();
             services.AddScoped<ICaixaRepository, CaixaRepository>();
