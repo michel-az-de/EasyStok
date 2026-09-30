@@ -28,7 +28,8 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
     {
         UseCaseGuards.EnsureEmpresaId(query.EmpresaId);
 
-        var hoje = HorarioBrasil.DataOperacional(relogio.GetUtcNow().UtcDateTime);
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var hoje = HorarioBrasil.DataOperacional(agora);
         // Padrão: hoje e os que ficaram abertos de ontem (os status padrão não são terminais).
         var (dataInicial, dataFinal) = query.Data is { } d ? (d, d) : (hoje.AddDays(-1), hoje);
 
@@ -37,7 +38,7 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
         var linha = NormalizarLinha(query.Linha);
         return pedidos
             .Where(p => linha is null || p.Itens.Any(i => NormalizarLinha(i.Linha) == linha))
-            .Select(p => Mapear(p, hoje))
+            .Select(p => Mapear(p, hoje, agora))
             .ToList();
     }
 
@@ -52,13 +53,23 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
         return lista.Count == 0 ? StatusPadrao : lista;
     }
 
+    /// <summary>
+    /// S21: com início previsto, atrasado = ainda aguardando e o início já passou (mesma regra de
+    /// <see cref="Pedido.EstaAtrasado"/>). Sem ele (pedido para já ou anterior à S21), vale a regra da S19:
+    /// aberto de dia de produção anterior a hoje.
+    /// </summary>
+    private static bool Atrasado(KdsPedidoLeitura p, StatusPedido status, DateOnly hoje, DateTime agora) =>
+        p.InicioPrevistoEm is { } inicio
+            ? status == StatusPedido.Aguardando && agora > inicio
+            : p.DataProducao < hoje && !StatusPedidoVocabulario.EhTerminal(status);
+
     /// <summary>"preparar_em_casa", "prepararEmCasa" e "PREPARAR-EM-CASA" viram a mesma chave.</summary>
     private static string? NormalizarLinha(string? linha) =>
         string.IsNullOrWhiteSpace(linha)
             ? null
             : new string(linha.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
-    private static KdsPedidoDto Mapear(KdsPedidoLeitura p, DateOnly hoje)
+    private static KdsPedidoDto Mapear(KdsPedidoLeitura p, DateOnly hoje, DateTime agora)
     {
         var status = StatusPedidoMapper.Parse(p.Status);
         return new KdsPedidoDto(
@@ -72,8 +83,8 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
             StatusRotulo: StatusPedidoVocabulario.RotuloLojista(status),
             Linhas: p.Itens.Select(i => i.Linha).OfType<string>().Distinct().ToList(),
             Itens: p.Itens.Select(i => new KdsItemDto(i.Nome, i.Variacao, i.Quantidade, i.Observacao, i.Linha, i.Molho)).ToList(),
-            InicioPrevistoEm: null,
-            Atrasado: p.DataProducao < hoje && !StatusPedidoVocabulario.EhTerminal(status),
+            InicioPrevistoEm: p.InicioPrevistoEm,
+            Atrasado: Atrasado(p, status, hoje, agora),
             PagoEm: p.PagoEm,
             CriadoEm: p.CriadoEm,
             Observacoes: p.Observacoes);

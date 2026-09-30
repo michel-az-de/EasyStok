@@ -104,4 +104,17 @@ public interface IPedidoStorefrontRepository
         Guid clienteId,
         Guid pedidoId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Varredura do <c>PedidoAtrasoJob</c> (S21), cross-tenant: pedidos <c>aguardando</c> com
+    /// <c>InicioPrevistoEm &lt; agora</c> e atraso ainda não notificado, mais antigos primeiro. Devolve só
+    /// ids para o chamador ligar o tenant antes de tocar no pedido.
+    /// </summary>
+    Task<IReadOnlyList<PedidoAtrasoCandidato>> ListarAtrasoNaoNotificadoAsync(
+        DateTime agoraUtc,
+        int maximo,
+        CancellationToken ct = default);
 }
+
+/// <summary>Pedido que passou do início previsto sem notificação de atraso (S21).</summary>
+public sealed record PedidoAtrasoCandidato(Guid PedidoId, Guid EmpresaId);
