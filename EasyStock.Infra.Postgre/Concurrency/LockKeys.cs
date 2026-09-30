@@ -49,4 +49,10 @@ public static class LockKeys
     /// Serializa entre réplicas pra não notificar 2x. "CaixEsq" em hex ASCII.
     /// </summary>
     public const long CaixaEsquecidoMonitor = 0x4361_6978_4573_7100L;
+
+    /// <summary>
+    /// Avaliador dos lembretes da dona (S43), a cada minuto. Serializa entre réplicas para não
+    /// avaliar e avisar em dobro. "Lembret" em hex ASCII.
+    /// </summary>
+    public const long AvaliadorLembretes = 0x4C65_6D62_7265_7400L;
 }

@@ -10,6 +10,7 @@
         "aguardando"    => "preparando",
         "preparando"    => "pronto",
         "pronto"        => "entregue",
+        "saiu_para_entrega" => "entregue",
         "aprovado_baba" => "preparando",   // pós-aprovação do cardápio entra na fila (issue 862)
         _               => null!
     } ?? "";
@@ -18,6 +19,7 @@
         "aguardando"    => "Iniciar preparo",
         "preparando"    => "Marcar como pronto",
         "pronto"        => "Confirmar entrega",
+        "saiu_para_entrega" => "Confirmar entrega",
         "aprovado_baba" => "Iniciar preparo",
         _               => ""
     };
@@ -40,11 +42,12 @@
     }
 
     // Timeline de status
-    var statusOrder = new[] { "aguardando", "preparando", "pronto", "entregue" };
+    var statusOrder = new[] { "aguardando", "preparando", "pronto", "saiu_para_entrega", "entregue" };
     var statusLabels = new Dictionary<string, string> {
         { "aguardando", "Recebido" },
         { "preparando", "Em preparo" },
         { "pronto",     "Pronto" },
+        { "saiu_para_entrega", "Saiu para entrega" },
         { "entregue",   "Entregue" }
     };
     var currentIdx = Array.IndexOf(statusOrder, p.Status);

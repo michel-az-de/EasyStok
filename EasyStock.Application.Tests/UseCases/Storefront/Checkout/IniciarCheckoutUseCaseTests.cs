@@ -1,9 +1,14 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,7 +62,20 @@ public class IniciarCheckoutUseCaseTests
         StorefrontEntity Storefront,
         CardapioItem CardapioItem1,
         JanelaEntrega Janela,
-        FreteZona FreteZona);
+        FreteZona FreteZona)
+    {
+        // S11: a fase 3 grava a CobrancaPedido pelo GerarCobrancaPedidoUseCase.
+        public ICobrancaPedidoRepository CobrancaRepo { get; init; } = CobrancaRepoVazio();
+        public IUnitOfWork Uow { get; init; } = Substitute.For<IUnitOfWork>();
+    }
+
+    private static ICobrancaPedidoRepository CobrancaRepoVazio()
+    {
+        var repo = Substitute.For<ICobrancaPedidoRepository>();
+        repo.ListarDoPedidoAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<CobrancaPedido>());
+        return repo;
+    }
 
     private static Fakes BuildFakes(bool storefrontAtivo = true)
     {
@@ -176,9 +194,17 @@ public class IniciarCheckoutUseCaseTests
             f.VagaRepo,
             f.PedidoRepo,
             f.ExpedienteRepo,
-            NullLogger<CheckoutCoreService>.Instance),
+            NullLogger<CheckoutCoreService>.Instance,
+            TimeProvider.System),
         f.IdempotencyService,
-        f.MpClient,
+        new GerarCobrancaPedidoUseCase(
+            Substitute.For<IPedidoRepository>(),
+            f.StorefrontRepo,
+            f.CobrancaRepo,
+            f.MpClient,
+            f.Uow,
+            TimeProvider.System,
+            NullLogger<GerarCobrancaPedidoUseCase>.Instance),
         NullLogger<IniciarCheckoutUseCase>.Instance);
 
     private static IniciarCheckoutInput InputValido() => new(
@@ -232,6 +258,30 @@ public class IniciarCheckoutUseCaseTests
         result.ExpiresIn.Should().Be(1800);
 
         await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, result.PedidoId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegistraCobrancaPedido()
+    {
+        // S11: o site passa pelo mesmo use case de cobrança da conversa e grava a CobrancaPedido.
+        var f = BuildFakes();
+        var gravadas = new List<CobrancaPedido>();
+        f.CobrancaRepo.When(r => r.AddAsync(Arg.Any<CobrancaPedido>(), Arg.Any<CancellationToken>()))
+            .Do(ci => gravadas.Add(ci.Arg<CobrancaPedido>()));
+
+        var result = await BuildUseCase(f).ExecuteAsync(InputValido());
+
+        var cobranca = gravadas.Should().ContainSingle().Subject;
+        cobranca.PedidoId.Should().Be(result.PedidoId);
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
+        cobranca.ReferenciaExterna.Should().Be("pref-123");
+        cobranca.LinkPagamento.Should().Be(result.InitPointUrl);
+        cobranca.Valor.Should().Be(25m);
+        cobranca.ConversaId.Should().BeNull();
+        await f.MpClient.Received(1).CriarPreferenceAsync(
+            Arg.Is<CriarPreferenceCommand>(c => c.PedidoId == result.PedidoId && c.ExpiraEm != null),
+            Arg.Any<CancellationToken>());
+        await f.Uow.Received().CommitAsync();
     }
 
     [Fact]

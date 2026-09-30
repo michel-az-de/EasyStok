@@ -496,4 +496,39 @@ public class CardapioItemTests
         item.PrecoEfetivo().Should().Be(35.00m,
             "domínio armazena e retorna em R$; centavos são responsabilidade do DTO");
     }
+
+    // ── S15: linha de produto e tempo de preparo numérico ─────────────
+
+    [Fact]
+    public void LinhaPadraoParaServir()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Lasanha", 35m);
+
+        item.Linha.Should().Be(EasyStock.Domain.Enums.Storefront.LinhaProduto.ParaServir);
+        item.TempoPreparoMinutos.Should().BeNull("null = usa o TempoPreparoPadraoMinutos da configuração");
+        item.InstrucaoFinalizacao.Should().BeNull();
+    }
+
+    [Fact]
+    public void DefinirPreparo_AplicaCamposENullNaoMexe()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Nhoque congelado", 30m);
+
+        item.DefinirPreparo(EasyStock.Domain.Enums.Storefront.LinhaProduto.PrepararEmCasa, 45, "Forno 200 graus por 25 min");
+        item.DefinirPreparo(null, null, null);
+
+        item.Linha.Should().Be(EasyStock.Domain.Enums.Storefront.LinhaProduto.PrepararEmCasa);
+        item.TempoPreparoMinutos.Should().Be(45);
+        item.InstrucaoFinalizacao.Should().Be("Forno 200 graus por 25 min");
+    }
+
+    [Fact]
+    public void DefinirPreparo_TempoNaoPositivo_Lanca()
+    {
+        var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Lasanha", 35m);
+
+        var act = () => item.DefinirPreparo(null, 0, null);
+
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
 }

@@ -1,6 +1,7 @@
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Services.Operacao;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -29,7 +30,7 @@ public class SyncController(
     SyncMutationDispatcher dispatcher,
     SyncAutoLinker autoLinker,
     SyncReversePullService reversePull,
-    MobileEventBroker eventBroker,
+    OperacaoEventBroker eventBroker,
     IProdutoRepository produtoRepo,
     IConfiguration appConfig,
     ILogger<SyncController> log) : ControllerBase
@@ -38,7 +39,7 @@ public class SyncController(
     private readonly SyncMutationDispatcher _dispatcher = dispatcher;
     private readonly SyncAutoLinker _autoLinker = autoLinker;
     private readonly SyncReversePullService _reversePull = reversePull;
-    private readonly MobileEventBroker _eventBroker = eventBroker;
+    private readonly OperacaoEventBroker _eventBroker = eventBroker;
     private readonly IProdutoRepository _produtoRepo = produtoRepo;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<SyncController> _log = log;
