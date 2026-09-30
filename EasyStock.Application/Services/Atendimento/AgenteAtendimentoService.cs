@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -35,6 +36,7 @@ public sealed class AgenteAtendimentoService(
     IWhatsAppCloudClient cloudClient,
     IUsoIaRepository usoIaRepository,
     IUnitOfWork unitOfWork,
+    ObterDossieClienteUseCase dossieUseCase,
     ILogger<AgenteAtendimentoService> logger)
 {
     public const int MaximoIteracoes = 6;
@@ -85,6 +87,11 @@ public sealed class AgenteAtendimentoService(
         }
 
         var system = PromptAtendimento.Montar(configuracao) + "\n\n" + MontarDossie(conversa, cliente, dados.Mensagens, agora);
+
+        // S25: histórico do cadastro (tags, pedidos, favorito, notas [interno]) quando há cliente vinculado.
+        if (cliente is not null
+            && await dossieUseCase.ExecuteAsync(new ObterDossieClienteQuery(empresaId, cliente.Id), ct) is { } dossie)
+            system += "\n\n" + ResumoDossieParaAgente.Montar(dossie);
         var definicoes = _ferramentas.Values
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
             .ToList();

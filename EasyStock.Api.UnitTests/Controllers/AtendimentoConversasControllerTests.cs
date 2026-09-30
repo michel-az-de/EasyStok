@@ -99,7 +99,11 @@ public class AtendimentoConversasControllerTests
         var agente = new AgenteAtendimentoService(
             llm, _repositorio, Substitute.For<IConfiguracaoAtendimentoRepository>(), Substitute.For<IClienteRepository>(),
             Array.Empty<IFerramentaAgente>(), Substitute.For<IEscaladorConversa>(), Substitute.For<IWhatsAppCloudClient>(),
-            Substitute.For<IUsoIaRepository>(), _unitOfWork, NullLogger<AgenteAtendimentoService>.Instance);
+            Substitute.For<IUsoIaRepository>(), _unitOfWork,
+            new ObterDossieClienteUseCase(
+                Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
+                Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _repositorio),
+            NullLogger<AgenteAtendimentoService>.Instance);
 
         var turno = await agente.ProcessarTurnoAsync(_empresaId, conversa.Id, agora);
 
