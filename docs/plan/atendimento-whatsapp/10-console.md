@@ -18,7 +18,7 @@ backend já está no master. Quando o módulo fica em paridade, a tela legada da
 | `ficha-cliente` (consentimento; ligado na F02) | S38 | Sim | `api/atendimento/clientes/{id}/consentimentos` | Nenhuma |
 | Mensagem programada (dentro de `atendimento`) | S39 | Sim | `api/atendimento/mensagens-programadas` | Nenhuma |
 | `encerramento` (pedido e cobrança) | S10, S11 | Não (S10 na PR #1112, S11 na issue #1115) | `api/storefront/{slug}/checkout` e o do S11 | PWA do caixa (`Api/wwwroot/pwa`), a medir na F03 |
-| `entregas` | S12, S14, S44 | S45 parte 1 sim; o resto não | `api/minha-vitrine/entrega` | a medir na F04 |
+| `entregas` (ligado na F04) | S12, S14, S44, S45 | Sim | `api/kds/pedidos` (+ endereço e aprovação), `api/atendimento/entregadores`, `api/atendimento/viagens`, `api/atendimento/chamados-entregador`, `api/storefront/pedidos/{id}/aprovar` e `/recusar`, `api/minha-vitrine/entrega`, `api/operacao/eventos` (SSE) | Nenhuma |
 | `cozinha` (ligado na F05) | S18, S19, S20, S21 | Sim | `api/kds/pedidos` (+ `/{id}/status`), `api/operacao/eventos` (SSE), `api/pedidos/{id}/canhoto`, `api/pedidos/{id}/reimprimir` | KDS atual (`Api/Mobile/Controllers/KdsController.cs`), sai na P05 |
 | `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/minha-vitrine/cardapio`, `api/minha-vitrine/configuracao`, `api/storefront/{slug}/menu` | a medir |
 | `ficha-cliente` (tags, notas, dossiê), `notas` | S24, S25 | Não | a definir na spec | a medir |
@@ -117,3 +117,29 @@ sem `VITE_FONTE_DADOS` segue a cozinha espelhada do Balcão.
 
 **Fora.** Arrastar cartão, filtro por linha e escolha de entregador no modo API; consumo automático
 da fila de impressão pela aba (decisão da onda 0.6).
+
+## F04 · Entregas na API real
+
+Issue #1221. Sem endpoint novo. Medido: S44 e S45 já tinham todos os endpoints; faltava ao KDS o
+endereço do cliente (S14) e o `RequerAprovacao` com o motivo (S12). Os três campos entraram de forma
+aditiva em `KdsPedidoDto`, com `EmpresaId` no WHERE da leitura do cliente e teste de isolamento.
+
+**Abordagem.** No modo API, a gaveta abre `GavetaEntregasApi` e `#/entregas` abre `TelaEntregasApi`
+(pede login se a aba não tem sessão). Sem `VITE_FONTE_DADOS`, nada muda.
+- Hoje: `GET api/kds/pedidos?status=aguardando_aprovacao_baba,pronto,saiu_para_entrega` e as viagens
+  da S44. Recarrega a cada `ready` e `pedido.*` do SSE da F05; SSE caído, a cada 15 s.
+- S12/S14: aprovação da exceção (motivo legível, "Entrega fora da área") com aprovar e recusar.
+- S44: nova viagem, pôr pedido, subir, descer, tirar, escolher entregador, "Saiu para entrega"
+  (bloqueado na tela sem entregador, RN-32), marcar entregue, desfazer, link de rota; entregadores
+  (cadastrar e desativar) e chamados (abrir, atendido, cancelar).
+- S45: janelas, zonas (CEP ou bairros) e bloqueios dos próximos 60 dias. Policy `Admin`: operador
+  comum vê o 403 na faixa.
+- Prova pura: `node ferramentas/prova-f04-entregas-api.mjs`.
+
+**Aceite.**
+- [x] `npm run qualidade` verde; fronteira de camadas ok.
+- [x] Sem `VITE_FONTE_DADOS`, a gaveta e a janela de Entregas abrem como hoje.
+- [ ] Viagem com entregador sai e os pedidos vão para "saiu para entrega" (validação do Felipe).
+
+**Fora.** Arrastar parada, editar entregador, editar janela e zona já criadas (só ativar e desativar),
+relatório por bairro e o endereço de `ClienteEndereco` (a leitura usa os campos primários do cliente).
