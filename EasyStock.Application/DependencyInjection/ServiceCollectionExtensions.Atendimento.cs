@@ -29,6 +29,7 @@ public static partial class ServiceCollectionExtensions
 
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
+        services.AddScoped<AvisoStatusPedidoCliente>();
         services.AddScoped<OptOutPorPalavra>();
 
         // S39: mensagem programada ao cliente (console + disparador no processo da API).
