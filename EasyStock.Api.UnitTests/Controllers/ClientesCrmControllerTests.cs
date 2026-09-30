@@ -1,7 +1,9 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.ClienteCrm;
+using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -29,6 +31,7 @@ public class ClientesCrmControllerTests
         _currentUser.UsuarioId.Returns(Guid.NewGuid());
         _cliente = Cliente.Criar(_empresaId, "Maria");
         _clientes.GetByIdAsync(_empresaId, _cliente.Id).Returns(_cliente);
+        _clientes.GetByIdWithDetailsAsync(_empresaId, _cliente.Id).Returns(_cliente);
         _crm.ObterComTagsAsync(_empresaId, _cliente.Id, Arg.Any<CancellationToken>()).Returns(_cliente);
 
         var relogio = TimeProvider.System;
@@ -40,6 +43,9 @@ public class ClientesCrmControllerTests
             new AdicionarNotaClienteUseCase(_clientes, _crm, _uow, relogio),
             new DefinirBloqueioClienteUseCase(_clientes, _uow, relogio),
             new DefinirPreferenciasClienteUseCase(_clientes, _uow, relogio),
+            new ObterDossieClienteUseCase(
+                _clientes, _crm, Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(),
+                Substitute.For<IConversaRepository>()),
             _currentUser)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
@@ -96,4 +102,20 @@ public class ClientesCrmControllerTests
         _cliente.Bloqueado.Should().BeTrue();
         _cliente.MotivoBloqueio.Should().Be("golpe");
     }
+
+    [Fact]
+    public async Task DossieDoClienteDevolveProjecao()
+    {
+        var resultado = await _controller.Dossie(_cliente.Id, null, CancellationToken.None);
+
+        var ok = resultado.Should().BeOfType<OkObjectResult>().Subject;
+        var dossie = (DossieClienteDto)ok.Value!.GetType().GetProperty("Data")!.GetValue(ok.Value)!;
+        dossie.Cliente.Id.Should().Be(_cliente.Id);
+        dossie.Cliente.Nome.Should().Be("Maria");
+    }
+
+    [Fact]
+    public async Task DossieDeClienteDeOutraEmpresaDevolve404() =>
+        (await _controller.Dossie(Guid.NewGuid(), null, CancellationToken.None))
+            .Should().BeOfType<NotFoundObjectResult>();
 }

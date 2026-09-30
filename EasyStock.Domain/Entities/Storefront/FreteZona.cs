@@ -346,7 +346,7 @@ public class FreteZona
     }
 
     /// <summary>Remove tudo que não for dígito — aceita "05500-000", " 05500000 ", "05500000".</summary>
-    private static string NormalizarCep(string? cep)
+    internal static string NormalizarCep(string? cep)
     {
         if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
         var sb = new StringBuilder(cep.Length);
@@ -358,7 +358,7 @@ public class FreteZona
     }
 
     /// <summary>Lowercase + remove acentos + trim. "Butantã" → "butanta".</summary>
-    private static string NormalizarBairro(string bairro)
+    internal static string NormalizarBairro(string bairro)
     {
         var trimmed = bairro.Trim();
         var formD = trimmed.Normalize(NormalizationForm.FormD);
