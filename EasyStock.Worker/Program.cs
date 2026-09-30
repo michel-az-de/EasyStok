@@ -152,6 +152,7 @@ builder.Services.AddSingleton<EasyStock.Application.Ports.Output.ICacheService, 
 builder.Services.AddEasyStockIntegrationResilience();
 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
 builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
+builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
 // Atendimento WhatsApp (S06) — o Worker reusa AddEasyStockApplication(), que registra o agente.
 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
 // Key ring compartilhado com a Api via Postgres (#1035) — sem isso o Worker nao

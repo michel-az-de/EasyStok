@@ -19,6 +19,16 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.HasIndex(e => e.WhatsAppPhoneNumberId)
                 .IsUnique()
                 .HasFilter("\"WhatsAppPhoneNumberId\" IS NOT NULL");
+
+            // S35: Messenger e Instagram roteiam pelo recipient.id; uma empresa por página e por conta.
+            builder.Property(e => e.FacebookPageId).HasMaxLength(64);
+            builder.HasIndex(e => e.FacebookPageId)
+                .IsUnique()
+                .HasFilter("\"FacebookPageId\" IS NOT NULL");
+            builder.Property(e => e.InstagramAccountId).HasMaxLength(64);
+            builder.HasIndex(e => e.InstagramAccountId)
+                .IsUnique()
+                .HasFilter("\"InstagramAccountId\" IS NOT NULL");
         }
     }
 }

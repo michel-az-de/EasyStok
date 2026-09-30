@@ -66,6 +66,7 @@ public static class DatabaseModule
                 builder.Services.AddEasyStockIntegrationResilience();
                 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
                 builder.Services.AddEasyStockWhatsAppCloudClient(builder.Configuration);
+                builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
                 // Atendimento WhatsApp (S06) — LLM do agente (Anthropic:*; desligado sem chave).
                 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
                 // Key ring compartilhado com o Worker via Postgres (#1035). O certificado A1

@@ -33,10 +33,14 @@ public class ConsentimentoContatoIntegrationTests(PostgreSqlDatabaseFixture fixt
         using var _ = db.UseRowLevelSecurityBypass(); // igual ao boot: migration roda com bypass
         var migrator = db.GetService<IMigrator>();
 
-        await migrator.MigrateAsync(MigrationAntesDaS38);
+        // Grava com o schema atual e só depois desce para antes da S38: o modelo EF sempre reflete o
+        // schema mais novo, então inserir depois do downgrade quebra quando uma migration posterior
+        // acrescenta coluna em empresas ou clientes. As linhas sobrevivem ao Down.
+        await migrator.MigrateAsync();
         db.Empresas.Add(empresa);
         db.Clientes.AddRange(comTudo, soEmail, semConsentir);
         await db.SaveChangesAsync();
+        await migrator.MigrateAsync(MigrationAntesDaS38);
 
         await migrator.MigrateAsync();
         db.SetMobileTenantContext(empresa.Id); // o repositório passa pelo filtro global de tenant

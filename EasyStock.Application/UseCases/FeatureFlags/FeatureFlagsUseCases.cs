@@ -95,12 +95,18 @@ public static class FeatureCatalogo
     /// <summary>Atendimento por WhatsApp (ADR-0050): agente, conversa e handoff pelo console.</summary>
     public const string ModuloAtendimento = "modulo.atendimento";
 
+    /// <summary>Instagram Direct e Messenger como canais (S35, ADR-0051). Exigem também <see cref="ModuloAtendimento"/>.</summary>
+    public const string CanalInstagram = "atendimento.canal.instagram";
+    public const string CanalMessenger = "atendimento.canal.messenger";
+
     /// <summary>Features conhecidas, na ordem em que aparecem no back-office.</summary>
     public static IReadOnlyList<FeatureConhecida> Conhecidas { get; } =
     [
         new(ModuloComercial, "Propostas, contratos e catálogo de serviços (B2B)."),
         new(ModuloCrm, "Clientes PJ, pipeline e oportunidades (B2B)."),
         new(ModuloAtendimento, "Atendimento por WhatsApp: agente, conversa e handoff pelo console."),
+        new(CanalInstagram, "Instagram Direct: a loja atende as mensagens do perfil pelo console."),
+        new(CanalMessenger, "Messenger: a loja atende as mensagens da página do Facebook pelo console."),
     ];
 
     /// <summary>

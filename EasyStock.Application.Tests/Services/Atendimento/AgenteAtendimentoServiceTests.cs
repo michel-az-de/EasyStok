@@ -127,6 +127,26 @@ public class AgenteAtendimentoServiceTests
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
 
+    [Theory]
+    [InlineData(CanalConversa.Instagram, "IGSID-9")]
+    [InlineData(CanalConversa.Messenger, "PSID-3")]
+    [InlineData(CanalConversa.ChatSite, "sessao-1")]
+    public async Task AgenteNaoRespondeForaDoWhatsApp(CanalConversa canal, string contato)
+    {
+        // S35: o agente envia pelo cliente do WhatsApp; em outro canal sairia pelo canal errado.
+        var conversa = Conversa.Abrir(_empresaId, contato, Agora.AddMinutes(-1), canal: canal);
+        conversa.RegistrarEntrada(Agora.AddMinutes(-1));
+        _conversaRepository.ObterComMensagensAsync(_empresaId, conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ConversaComMensagens(conversa, [Mensagem.Entrada(_empresaId, conversa.Id, Agora.AddMinutes(-1),
+                TipoConteudoMensagem.Texto, "oi", "mid-1")]));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
     [Fact]
     public async Task NaoRespondeForaDaJanela24h()
     {

@@ -76,6 +76,11 @@ e o parser e o use case do webhook da PR #1053.
 
 ### S35 · Instagram Direct e Messenger
 
+> **Entregue na #1103.** Conferido na documentação da Meta em 29/09/2026: `HUMAN_AGENT` vale no
+> Messenger e no Instagram, 7 dias, só humano, e pede a permissão `Human Agent` no painel da app
+> (acrescentar à Onda 0.10). Assinatura inválida devolve 403, como no webhook do WhatsApp, e não 401. O
+> agente não responde nestes canais (envia pelo WhatsApp). A mídia recebida entra só com o tipo e um aviso.
+
 **Problema.** O protótipo atende o Instagram (`catalogo.js:15-61`: janela de 24 h, sem modelo, foto e
 áudio). O Felipe incluiu Facebook, ou seja, Messenger (ADR-0051, item 2).
 **Abordagem.** O webhook da Meta já assina com o `AppSecret`. O parser passa a aceitar
