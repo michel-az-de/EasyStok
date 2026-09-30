@@ -31,7 +31,7 @@ public class CriarPedidoAtendimentoUseCaseTests
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, unitOfWork);
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
 
         var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -77,7 +77,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, unitOfWork);
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
 
         var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
             EmpresaId: empresaId,
@@ -90,6 +90,40 @@ public class CriarPedidoAtendimentoUseCaseTests
 
         await act.Should().ThrowAsync<RegraDeDominioVioladaException>();
         await c.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        conversa.PedidoEmAndamentoId.Should().BeNull();
+        await unitOfWork.DidNotReceive().CommitAsync();
+    }
+    [Fact]
+    public async Task JanelaAbaixoDoPrazoDaConfiguracao_Recusa()
+    {
+        // S16: janela 9-12h no dia da entrega; agora 08:00 em Brasília; padrão 60 + respiro 40 → 09:40.
+        var c = new CheckoutCoreServiceTests.Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 11, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var useCase = new CriarPedidoAtendimentoUseCase(c.Servico(), conversaRepo, clienteRepo, c.ConfiguracaoAtendimentoRepo, unitOfWork);
+
+        var act = () => useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 1) },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id));
+
+        (await act.Should().ThrowAsync<RegraDeDominioVioladaException>()).WithMessage(CheckoutCoreService.JanelaAbaixoDoPrazo);
         conversa.PedidoEmAndamentoId.Should().BeNull();
         await unitOfWork.DidNotReceive().CommitAsync();
     }
