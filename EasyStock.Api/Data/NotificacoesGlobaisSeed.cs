@@ -744,6 +744,7 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("lembrete_vencido_global", "Lembrete da Dona",
             TipoEventoNotificacao.LembreteVencido, "lembrete_vencido_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
         // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====
         yield return MakeRotina("pedido_pago_confirmado_global", "Pedido Pago — Aviso ao Cliente",

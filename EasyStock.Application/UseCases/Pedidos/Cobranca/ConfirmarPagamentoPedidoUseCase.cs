@@ -172,8 +172,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var statusAntigo = pedido.Status;
         var transitou = pedido.StatusEnum == StatusPedido.AguardandoPagamento;
-        // S12: pedido de exceção (ex.: aceito fora de área) passa pela aprovação da dona.
         if (transitou)
+            // S12: pedido de exceção (ex.: aceito fora de área) passa pela aprovação da dona.
             pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
         await pedidoRepository.UpdateAsync(pedido, ct);
         if (transitou)
