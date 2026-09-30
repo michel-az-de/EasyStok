@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
@@ -92,8 +93,8 @@ public class ListarJanelasFerramentaTests
                 StorefrontRepo, JanelaRepo, Substitute.For<IBloqueioEntregaRepository>(), VagaRepo,
                 Substitute.For<IFreteZonaRepository>(), new FakeTimeProvider(AgoraOffset));
             var ferramenta = new ListarJanelasFerramenta(
-                StorefrontRepo, CardapioRepo, ConfiguracaoRepo, listar, Cloud, ConversaRepo,
-                NullLogger<ListarJanelasFerramenta>.Instance);
+                new ListarJanelasAtendimentoUseCase(StorefrontRepo, CardapioRepo, ConfiguracaoRepo, listar),
+                Cloud, ConversaRepo, NullLogger<ListarJanelasFerramenta>.Instance);
             return ferramenta.ExecutarAsync(
                 new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora), JsonSerializer.SerializeToElement(entrada));
         }

@@ -449,3 +449,6 @@
 }
 .cupomAplicado b { color: var(--tinta); }
 .capturaStatus { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+/* F03: erro de carga das janelas da API, ao lado da lista. */
+.avisoErro { display: block; font-size: var(--t-apoio); color: var(--perigo); }

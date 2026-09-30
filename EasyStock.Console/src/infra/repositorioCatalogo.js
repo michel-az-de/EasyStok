@@ -9,6 +9,7 @@ import { cartaDoItem } from './imagensCardapio'
 import { ENTREGADORES_CADASTRADOS } from './entregadoresSemente'
 import { tituloDaCarta } from '../dominio/arteCardapio'
 import { configuracaoPadraoIntegracoes } from '../dominio/integracoes'
+import { FONTE_API } from './fonteDados'
 
 // Carta genérica para peça sem foto de prato (hoje só "Horário de
 // funcionamento"): mesmo espírito honesto de `imagensCardapio.js` ("parece
@@ -45,8 +46,10 @@ export function carregarCatalogo() {
     canais: CANAIS,
     estadosConversa: ESTADOS_CONVERSA,
     // Adicional entra no mesmo cardápio: um lugar só tem preço e saldo.
-    cardapio: [...CARDAPIO, ...ADICIONAIS],
-    adicionais: ADICIONAIS_POR_SKU,
+    // Modo API (F03): nasce vazio; o da vitrine chega na primeira sincronização, para
+    // nenhum prato da massa entrar numa comanda que vira pedido de verdade.
+    cardapio: FONTE_API ? [] : [...CARDAPIO, ...ADICIONAIS],
+    adicionais: FONTE_API ? {} : ADICIONAIS_POR_SKU,
     linhas: LINHAS_PRODUTO,
     janelas: JANELAS_ENTREGA,
     // Rodada 13 (issue #42, RN-22): respiro mínimo de entrega, ajustável na

@@ -29,6 +29,11 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<OptOutPorPalavra>();
         services.AddScoped<SaudacaoAtendimento>();
 
+        // S42: variáveis e CRUDs agrupados (*UseCases, fora do sufixo da convenção).
+        services.AddScoped<VariaveisAtendimento>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.RespostasProntasUseCases>();
+        services.AddScoped<EasyStock.Application.UseCases.Atendimento.Automacoes.AutomacoesUseCases>();
+
         // S06: agente de atendimento (LLM com ferramentas) e roteador de botões sem LLM.
         services.AddScoped<AgenteAtendimentoService>();
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE

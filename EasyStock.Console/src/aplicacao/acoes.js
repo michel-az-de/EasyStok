@@ -264,3 +264,6 @@ export const FALHAR_ENVIO_API = 'falhar-envio-api'
 export const AVISO_API = 'aviso-api'
 // F02: horário, controle manual e mensagens do expediente (S40) como a API devolveu.
 export const SINCRONIZAR_EXPEDIENTE = 'sincronizar-expediente'
+// F03: cardápio da vitrine da empresa e o pedido da conversa (S10/S11) como a API devolveu.
+export const SINCRONIZAR_CARDAPIO = 'sincronizar-cardapio'
+export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'

@@ -17,7 +17,7 @@ backend já está no master. Quando o módulo fica em paridade, a tela legada da
 | `gestao` (expediente, configuração; ligado na F02) | S08, S40 | Sim | `api/atendimento/configuracao`, `api/atendimento/expediente` | Nenhuma |
 | `ficha-cliente` (consentimento; ligado na F02) | S38 | Sim | `api/atendimento/clientes/{id}/consentimentos` | Nenhuma |
 | Mensagem programada (dentro de `atendimento`) | S39 | Sim | `api/atendimento/mensagens-programadas` | Nenhuma |
-| `encerramento` (pedido e cobrança) | S10, S11 | Não (S10 na PR #1112, S11 na issue #1115) | `api/storefront/{slug}/checkout` e o do S11 | PWA do caixa (`Api/wwwroot/pwa`), a medir na F03 |
+| Comanda da `ficha-cliente` (pedido e cobrança; ligada na F03) | S10, S11, S16 | Sim | `api/atendimento/comanda/cardapio`, `api/atendimento/comanda/janelas`, `api/atendimento/conversas/{id}/pedido` (GET e POST), `api/pedidos/{id}/cobranca/forma` | Nenhuma: medido em 2026-09-30, o PWA `Api/wwwroot/pwa` (Easy Stock Mobile) não cria pedido de conversa |
 | `entregas` (ligado na F04) | S12, S14, S44, S45 | Sim | `api/kds/pedidos` (+ endereço e aprovação), `api/atendimento/entregadores`, `api/atendimento/viagens`, `api/atendimento/chamados-entregador`, `api/storefront/pedidos/{id}/aprovar` e `/recusar`, `api/minha-vitrine/entrega`, `api/operacao/eventos` (SSE) | Nenhuma |
 | `cozinha` (ligado na F05) | S18, S19, S20, S21 | Sim | `api/kds/pedidos` (+ `/{id}/status`), `api/operacao/eventos` (SSE), `api/pedidos/{id}/canhoto`, `api/pedidos/{id}/reimprimir` | KDS atual (`Api/Mobile/Controllers/KdsController.cs`), sai na P05 |
 | `cardapio`, `cardapio-link` | S45, S48 | Parcial | `api/minha-vitrine/cardapio`, `api/minha-vitrine/configuracao`, `api/storefront/{slug}/menu` | a medir |
@@ -33,7 +33,7 @@ existir decisão própria, depois das ondas acima.
 ## Ordem
 
 ```
-F01 caixa de entrada real ──► F02 gestão + assistente + consentimento ──► F03 pedido e cobrança (após S10/S11)
+F01 caixa de entrada real ──► F02 gestão + assistente + consentimento ──► F03 pedido e cobrança (ligada)
         │                                                                        │
         └── login JWT + tenant, deploy em app.easystok.online                     └──► F04 entregas ─► F05 cozinha (após S18–S21)
 ```
@@ -93,6 +93,41 @@ avisos, assistente); no erro do controle manual o estado volta ao que a API tem.
 - [x] E-mail e SMS da Ficha gravam e voltam após recarregar (validado pelo Felipe em 2026-09-30).
 
 **Fora.** Mensagem programada (S39), finalidade Marketing na Ficha, SSE do expediente.
+
+## F03 · Pedido e cobrança da conversa na API real
+
+Issue #1210. Medido em 2026-09-30: não havia endpoint autenticado para criar o pedido da conversa
+(o S48 é anônimo, pelo token do link; `POST api/pedidos` é outro núcleo, sem vaga nem conversa).
+
+**Problema.** No modo API a comanda da conversa era só memória do navegador: não virava pedido nem
+cobrança, e a polling apagava a comanda a cada 5 s (`pedido: null` no merge).
+
+**Abordagem.** Endpoint e tela na mesma PR (ADR-0054 item 5), sem regra de negócio no navegador:
+- API (`AtendimentoComandaController`, policy `Operador`, empresa do token):
+  - `GET comanda/cardapio`: o menu público da vitrine da empresa (o mesmo do agente e do site).
+  - `GET comanda/janelas?itens=`: janelas com vaga no prazo dos itens (S16), pelo mesmo use case
+    que a ferramenta `listar_janelas` passou a usar.
+  - `POST conversas/{id}/pedido`: `GerarPedidoConversaUseCase` cria o pedido pelo S10, cobra pelo
+    S11 (`online` ou `na_entrega`) e manda o resumo com o link ao cliente pela conversa. Exige
+    `AtenderConversas`; recusa com pedido em andamento não finalizado na conversa.
+  - `GET conversas/{id}/pedido`: pedido em andamento com a cobrança vigente (paga vence; senão a
+    mais recente).
+- Console: cardápio da vitrine no lugar da massa; seletor de janelas da API na comanda; "Enviar ao
+  cliente" chama o POST; a polling relê o pedido aberto a cada ciclo e mostra pendente, pago e
+  expirado pela mesma `situacaoDaCobranca` da demonstração. Trocar o meio com o pedido criado usa a
+  troca de forma do S11. Confirmar à mão, estorno, cancelar e esteira ficam para a F04 e, com o
+  pedido criado, avisam em vez de mudar só o navegador.
+
+**Aceite.**
+- [x] `npm run qualidade` verde; `ferramentas/prova-f03-pedido-api.mjs` com 12 verificações.
+- [x] Testes .NET: `GerarPedidoConversaUseCaseTests`, `ObterPedidoConversaUseCaseTests`,
+  `AtendimentoComandaControllerTests` (isolamento por empresa e permissão).
+- [x] Sem `VITE_FONTE_DADOS`, o console abre como hoje, com a massa.
+- [ ] Com a API publicada: pedido criado pela conversa aparece no EasyStok, o link chega ao
+  cliente e o estado vira pago quando o Mercado Pago confirma (validação do Felipe, sandbox).
+
+**Fora.** Esteira, cancelamento e estorno pela API (F04); reenvio avulso do link (o job da S11
+reemite e envia sozinho); cupom.
 
 ## F05 · Cozinha na API real
 
