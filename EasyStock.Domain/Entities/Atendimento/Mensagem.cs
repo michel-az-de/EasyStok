@@ -44,6 +44,9 @@ public class Mensagem
     public StatusMensagem Status { get; private set; }
     public string? Erro { get; private set; }
     public DateTime EnviadaEm { get; private set; }
+
+    /// <summary>Saiu de uma mensagem programada (S39): o console mostra o selo "programada".</summary>
+    public bool Programada { get; private set; }
     public DateTime? ProcessadaEm { get; private set; }
 
     /// <summary>Usuario do console que enviou a mensagem (S41). So em saida humana (<see cref="AutorMensagem.Dona"/>).</summary>
@@ -111,6 +114,13 @@ public class Mensagem
 
         if (Status == StatusMensagem.Falhou) return;
         if (novo > Status) Status = novo;
+    }
+
+    public void MarcarComoProgramada()
+    {
+        if (Direcao != DirecaoMensagem.Saida)
+            throw new RegraDeDominioVioladaException("So mensagem de saida pode ser programada.");
+        Programada = true;
     }
 
     public void AnexarMidia(string chave, string mime)
