@@ -22,7 +22,7 @@ const HORAS_DA_JANELA = 24
 const MS_POR_HORA = 3600000
 
 // DateTime sem fuso vem da API em UTC; sem o Z o navegador leria como hora local.
-const instante = (valor) => {
+export const instante = (valor) => {
   if (!valor) return null
   return /[zZ]|[+-]\d{2}:\d{2}$/.test(valor) ? valor : `${valor}Z`
 }

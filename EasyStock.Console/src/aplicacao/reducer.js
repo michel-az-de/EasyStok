@@ -196,11 +196,31 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 // ela ver o que não saiu. O resto do estado local (rascunhos, filtros) fica.
 const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou'
 
+// F03: sem pedido no servidor, a comanda que a dona monta (rascunho) fica. Com pedido, o do
+// servidor manda; a janela e o meio escolhidos na tela vêm junto (a API não os devolve).
+// Pedido anterior já entregue ou cancelado não apaga a comanda nova que ela está montando.
+function pedidoMesclado(local, doServidor) {
+  if (!doServidor) return local ?? null
+  const rascunho = Boolean(local) && !local.pedidoId
+  if (rascunho && pedidoEncerrado(doServidor)) return local
+  if (!local || (!rascunho && local.pedidoId !== doServidor.pedidoId)) return doServidor
+  return {
+    ...doServidor,
+    janela: local.janela ?? doServidor.janela,
+    meio: doServidor.cobranca?.meio ?? local.meio ?? doServidor.meio,
+  }
+}
+
 function mesclarDoServidor(local, doServidor) {
   if (!local) return doServidor
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
   const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
-  return { ...local, ...doServidor, mensagens: [...doServidor.mensagens, ...soLocais] }
+  return {
+    ...local,
+    ...doServidor,
+    pedido: pedidoMesclado(local.pedido, doServidor.pedido),
+    mensagens: [...doServidor.mensagens, ...soLocais],
+  }
 }
 
 const CASOS_API = {
@@ -236,6 +256,16 @@ const CASOS_API = {
   [acao.AVISO_API]: (estado, { mensagem }) => ({
     ...estado, sincronizacao: { ...estado.sincronizacao, aviso: mensagem },
   }),
+
+  // F03: o cardápio da vitrine substitui o da massa. Adicional da massa não existe na API.
+  [acao.SINCRONIZAR_CARDAPIO]: (estado, { cardapio }) => ({
+    ...estado,
+    catalogo: { ...estado.catalogo, cardapio, adicionais: {} },
+  }),
+
+  // F03: pedido que a API acabou de criar ou trocar de forma, sem esperar o próximo ciclo.
+  [acao.SINCRONIZAR_PEDIDO]: (estado, { id, pedido }) =>
+    mapear(estado, id, (c) => ({ ...c, pedido: pedidoMesclado(c.pedido, pedido) })),
 
   // A API é a verdade do expediente: horário e controle manual substituem o local.
   [acao.SINCRONIZAR_EXPEDIENTE]: (estado, { funcionamento, lojaAberta, mensagemForaDoHorario, mensagemLojaFechada }) => ({

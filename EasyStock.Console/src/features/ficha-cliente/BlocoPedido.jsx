@@ -4,7 +4,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
-import { useAcoes, useCatalogo } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { moeda } from '../../dominio/formato'
 import {
   agruparPorLinha, itensDetalhados, numeroCurto, pedidoEncerrado, totalDoPedido,
@@ -15,6 +15,7 @@ import { ROTULO_ENVIAR, avisoDoEnvio, situacaoDoEnvio } from '../../dominio/resu
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
 import { SeletorJanela } from './SeletorJanela'
+import { SeletorJanelaApi } from './SeletorJanelaApi'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import css from './comanda.module.css'
 
@@ -105,6 +106,7 @@ export function BlocoPedido({
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
+  const { fonteApi } = useAtendimento()
   const [canhotoAberto, setCanhotoAberto] = useState(false)
   // Ponta (a): "Enviar comanda" sem meio marcado pergunta o meio antes de
   // mandar, em vez de mandar Pix por baixo.
@@ -203,9 +205,13 @@ export function BlocoPedido({
         ))}
 
         <hr className={css.separador} />
+        {/* F03: pedido criado no EasyStok traz o frete da zona; o total é o que foi cobrado. */}
+        {pedido.frete > 0 && (
+          <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>
+        )}
         <p className={css.total}>
           <span>Total</span>
-          <b>{moeda(total)}</b>
+          <b>{moeda(pedido.totalApi ?? total)}</b>
         </p>
         {diferencaPosPagamento > 0 && (
           <p className={css.diferencaPaga} role="alert">
@@ -269,7 +275,11 @@ export function BlocoPedido({
         />
       )}
 
-      {!fechado && (
+      {/* F03: no modo API a janela é da vitrine, com data, e só se escolhe antes do envio. */}
+      {!fechado && fonteApi && !pedido.pedidoId && (
+        <SeletorJanelaApi pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
+      )}
+      {!fechado && !fonteApi && (
         <SeletorJanela
           pedido={pedido}
           editavel={editavel}
