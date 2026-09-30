@@ -4,9 +4,9 @@ namespace EasyStock.Api.Data;
 
 /// <summary>
 /// Garante que existe ao menos um SuperAdmin global (Perfil.EmpresaId=null) no
-/// banco para acesso ao painel /EasyStock.Admin. Nenhum dos seeds de tenant
+/// banco para as rotas de plataforma (api/admin/*). Nenhum dos seeds de tenant
 /// (PastaBella, CasaDaBaba, etc.) cria SuperAdmin — eles seedam apenas Admin
-/// de empresa. Sem este bootstrap, o painel admin fica inacessivel apos um
+/// de empresa. Sem este bootstrap, as rotas de plataforma ficam inacessiveis apos um
 /// reset de banco em ambientes onde o usuario foi criado manualmente.
 ///
 /// Idempotente: roda sempre no startup, no-op se ja existe.
@@ -59,7 +59,7 @@ public static class SuperAdminSeed
                 throw new InvalidOperationException(
                     "[SuperAdminSeed][PROD] SEED_SUPERADMIN_PASSWORD e obrigatoria em Production. " +
                     "Defina como env var no Azure App Service Settings (>= 12 chars, sem palavras conhecidas). " +
-                    "Sem isso, o bootstrap de SuperAdmin nao roda e o painel /EasyStock.Admin fica inacessivel.");
+                    "Sem isso, o bootstrap de SuperAdmin nao roda e as rotas de plataforma (api/admin/*) ficam inacessiveis.");
             }
             if (Environment.GetEnvironmentVariable("SEED_SUPERADMIN_EMAIL") is null or "")
             {

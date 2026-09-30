@@ -2,7 +2,8 @@
 
 Issues: #1040 (plano original) e #1042 (revisão para Meta direto) · Decisão: ADR-0050 (supersede ADR-0049) · Origem: docs 01-04 em `C:\Users\felip\Downloads\`
 Escopo: **somente backend** (`EasyStock.Api`, `Application`, `Domain`, `Infra.*`, `Worker`). O front do
-operador é outra tecnologia e outro repositório. O site casadababa.com continua consumindo a API.
+operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API módulo a módulo pela
+[matriz de paridade](10-console.md); as specs S não tocam essa pasta. O site casadababa.com continua consumindo a API.
 
 > Este plano foi escrito para ser executado **uma spec por sessão** por um modelo mais barato.
 > Cada spec traz tudo o que a sessão precisa: arquivos a ler, arquivos a criar, testes a escrever
@@ -21,6 +22,7 @@ operador é outra tecnologia e outro repositório. O site casadababa.com continu
 | 7 | [07-poda.md](07-poda.md) | P01–P06 | Remoção do que é SaaS, fiscal, MAUI e alvos de deploy extras |
 | MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno; opção A adotada: gateway único |
 | 8 | [09-sistema-completo.md](09-sistema-completo.md) | S34–S47 | ADR-0051: canal como porta, Instagram, Messenger, chat do site, e-mail e SMS, consentimento por canal, mensagem programada, expediente da loja, atendentes, respostas prontas e automações, lembretes, entregadores e viagens, cadastros, lote de papel, assistente |
+| Console | [10-console.md](10-console.md) | F01–F05 | ADR-0054: o protótipo vira o console do operador neste repositório; matriz de paridade e ordem de ligação à API |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).
@@ -47,7 +49,7 @@ Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo ap
 1. **Fluxo por spec:** `gh issue create` (título = título da spec; body = Problema, Abordagem, Escopo, Aceite, Rollback copiados da spec; labels da spec) → worktree `C:\rep\.worktrees\EasyStok\<slug>` com branch `feat/<slug>-<N>` a partir de `origin/master` → Red → Green → gate → commit → push → PR `closes #N`.
 2. **Gate:** `powershell -File scripts/poka-yoke/gate.ps1` verde antes de cada commit (é o mesmo do pre-commit).
 3. **Commits:** `tipo(escopo): descrição imperativa` + corpo `refs #N`. Stage arquivo por arquivo. Nunca `git add .`.
-4. **Tier:** `feat`, `refactor`, migration, auth = **alto** (PR fica aberta até a label `aprovado`). `docs`, `test`, `chore`, `fix` trivial = baixo (auto-merge no verde).
+4. **Tier (ADR-0055):** spec deste plano = **baixo** (merge no verde), exceto se tocar migration, RLS, auth ou policy, que continua **alto** (PR aberta até a label `aprovado`). CHANGELOG: crie `changelog.d/<issue>.md`, nunca edite o topo do `CHANGELOG.md`.
 5. **Código:** nomes de negócio em PT-BR com sufixos técnicos em inglês (ADR-0011); use case implementa `IUseCase<TIn,TOut>` com `CancellationToken` (ADR-0013); controller devolve `ActionResult<T>` (ADR-0019); evento vai para o outbox **antes** do único `CommitAsync` (ADR-0030); `EmpresaId` no `WHERE` de toda query nova além do RLS (ADR-0010); migration gerada com `dotnet ef migrations add` e `.Designer.cs` (ADR-0024); migration aplicada em produção **antes** de ligar configuração que dependa dela.
 6. **Testes:** Red primeiro, com o nome listado na spec. Projetos: `EasyStock.Domain.Tests`, `EasyStock.Application.Tests`, `EasyStock.Api.UnitTests`, `EasyStock.Api.IntegrationTests` (Postgres via Testcontainers, fora do `CI.slnf`: rodar local), `EasyStock.ArchitectureTests` (roda no gate).
 7. **Não faça:** refatorar fora do Escopo; ler além da Leitura mínima; abrir o `graphify`; tocar `EasyStok.Mobile`, `EasyStock.Admin` ou `EasyStock.Web` salvo quando a spec mandar (R8: assinatura pública estendida = todos os call-sites no mesmo commit).

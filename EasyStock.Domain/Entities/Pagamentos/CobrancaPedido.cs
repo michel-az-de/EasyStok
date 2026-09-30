@@ -176,6 +176,19 @@ public class CobrancaPedido
         RegistrarMotivo(motivo, agora);
     }
 
+    /// <summary>
+    /// O Mercado Pago informou o estorno (<c>refunded</c>) ou a contestação (<c>charged_back</c>) do pagamento
+    /// que pagou esta cobrança (S32). Só cobrança paga é estornada; repetir é no-op (o webhook reenvia).
+    /// </summary>
+    public void MarcarEstornada(string motivo, DateTime agora)
+    {
+        if (Status == StatusCobrancaPedido.Estornada) return;
+        if (Status != StatusCobrancaPedido.Paga)
+            throw new RegraDeDominioVioladaException($"Só cobrança paga é estornada (atual: {Status}).");
+        Status = StatusCobrancaPedido.Estornada;
+        RegistrarMotivo(motivo, agora);
+    }
+
     /// <summary>Grava por que um pagamento não confirmou a cobrança (valor menor, pedido cancelado).</summary>
     public void RegistrarMotivo(string motivo, DateTime agora)
     {

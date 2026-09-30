@@ -1,0 +1,268 @@
+/* Balcão refeito (seção 1 da direção visual, rodada 5). Cartão de três linhas,
+   flush, sem sombra nem espaço entre eles: hierarquia por peso e tamanho, uma
+   divisória de 1 px separa um do outro. Caberem seis numa tela de 1440 × 900
+   é o alvo (achado #1 de 31-gp-onda-seguinte.md: dez chips empilhados e
+   cartão de 200+ px cabiam só 2,3). */
+.rolagem {
+  overflow-y: auto; flex: 1; min-height: 0;
+  background: var(--papel);
+  display: flex; flex-direction: column;
+  /* Integração: o botão flutuante "Simular" fica sobre o fim da coluna; a
+     folga deixa o último cartão rolar para fora dele. */
+  padding-bottom: 88px;
+}
+
+/* Altura perto de 100 px (seção 1): seis cartões por tela a 1440 × 900 é o
+   alvo, contra os 2,3 de hoje (achado #1 de 31-gp-onda-seguinte.md). Padding
+   vertical mais justo que o resto da tela porque o cartão é triagem, não
+   leitura. */
+.cartao {
+  display: flex; align-items: center; gap: var(--e-3); width: 100%; text-align: left;
+  background: transparent; border: 0; padding: var(--e-3) var(--e-3);
+  border-radius: var(--r-1); margin: 0 var(--e-2);
+  transition: background var(--dur-curta) var(--ease-padrao);
+  animation: entradaCartao var(--dur-media) var(--ease-saida);
+}
+@keyframes entradaCartao {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cartao:hover { background: var(--preenchimento); }
+/* Selecionado: fundo tinto com borda interna sutil. Pastilha suave. */
+.cartao[aria-current='true'] {
+  background: var(--preenchimento-forte);
+  box-shadow: none;
+}
+.cartao.precisa[aria-current='true'] { background: var(--atencao-pastel); }
+.cartao.atrasada[aria-current='true'] { background: var(--parado-pastel); }
+
+.iconeCanal {
+  margin-top: 0; color: var(--tinta-3); flex-shrink: 0; width: 24px; height: 24px;
+}
+
+.corpo {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--e-1);
+}
+
+/* Linha 1: nome à esquerda, hora à direita. */
+.topo { display: flex; align-items: center; gap: var(--e-2); min-width: 0; width: 100%; }
+.topo strong {
+  font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-apoio);
+  line-height: var(--lh-compacto); min-width: 0; color: var(--tinta);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+}
+.topo strong.semResposta { font-weight: 700; }
+.topo time {
+  margin-left: auto; flex-shrink: 0;
+  font-family: var(--f-dado); font-size: var(--t-apoio); font-weight: 400;
+  color: var(--tinta-3); font-variant-numeric: tabular-nums;
+}
+
+/* Linha 1.5: apoio com ícone inline, canal, pedidos, janela. Compacta. */
+.apoio {
+  display: flex; align-items: center; gap: 4px;
+  font-size: var(--t-apoio); color: var(--tinta-3); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; width: 100%;
+}
+.iconeCanalPequeno { flex-shrink: 0; width: 16px; height: 16px; }
+.separador { color: var(--tinta-3); }
+.soModelo { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Linha 2: prévia, uma linha só (corte de #8 da direção: prévia de mais de uma
+   linha vira leitura, não triagem). */
+.previa {
+  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  color: var(--tinta-2); font-size: var(--t-apoio); margin: 2px 0;
+}
+.previa strong { font-weight: 600; color: var(--tinta); }
+
+/* Linha 3: marca única à esquerda, um contexto à direita. */
+/* Pílula larga ("Aguardando pagamento") com a hora da entrega ao lado passava
+   da borda e cortava a hora ("19h3"): sem espaço, a hora desce de linha. */
+.marcas { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--e-2); min-width: 0; margin-top: 2px; }
+
+/* Rodada 10, item 2: selo "novo, não visto" do pagamento, independente do
+   sinal verde (RN-25) já ter expirado. Some assim que ela abre a conversa. */
+.pontoNaoVisto {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex-shrink: 0;
+  animation: estalarPonto var(--dur-longa) var(--ease-pulo) both;
+}
+.contexto {
+  display: inline-flex; align-items: center; gap: var(--e-1);
+  color: var(--tinta-3); font-size: var(--t-apoio); flex-shrink: 0;
+}
+.horaContexto { font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+/* Faixa de controles do topo (linhas A, B, C da seção 1): substitui Filtros,
+   os dois selects e as duas chaves de uma tecla do Balcão antigo. Alvo de
+   160 px contra os cerca de 250 de hoje (seção 1): padding e entrelinha mais
+   justos do que o resto da tela, porque são três linhas de controle, não de
+   leitura. */
+.barra {
+  padding: var(--e-1) var(--e-3); display: grid; gap: var(--e-1);
+  background: var(--elevado); flex-shrink: 0;
+}
+
+/* Linha A: busca com lupa e × dentro do campo, botão de ordenar do lado. */
+.linhaA { display: flex; gap: var(--e-2); align-items: center; }
+.campoBusca {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--e-2);
+  height: var(--toque); padding: 0 var(--e-3);
+  background: var(--papel); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
+  color: var(--tinta-3);
+}
+.entradaBusca {
+  flex: 1; min-width: 0; border: 0; background: none; color: var(--tinta);
+  font-family: var(--f-corpo); font-size: var(--t-apoio); height: 100%;
+}
+.entradaBusca:focus { outline: none; }
+.entradaBusca::-webkit-search-cancel-button { display: none; }
+.limparBusca {
+  flex-shrink: 0; width: var(--toque); height: var(--toque); margin: 0 calc(-1 * var(--e-3));
+  display: grid; place-items: center; background: none; border: 0; color: var(--tinta-2);
+}
+.comOrdenar { position: relative; flex-shrink: 0; }
+.botaoOrdenar { position: relative; width: var(--toque); height: var(--toque); padding: 0; }
+.pontoOrdem {
+  position: absolute; top: 6px; right: 6px; width: 10px; height: 10px;
+  border-radius: var(--r-pilula); background: var(--ragu); border: var(--b-1) solid var(--papel);
+}
+.menuOrdem { display: grid; min-width: 260px; }
+.itemOrdem {
+  display: flex; align-items: start; gap: var(--e-2); padding: var(--e-2); text-align: left;
+  background: none; border: 0; border-radius: var(--r-1); color: var(--tinta);
+}
+.itemOrdem:hover { background: var(--elevado); }
+.itemOrdem strong { display: block; font-size: var(--t-apoio); font-weight: 600; }
+.detalheOrdem { display: block; font-size: var(--t-apoio); color: var(--tinta-2); }
+.semMarca { visibility: hidden; }
+
+/* Linha B: controle segmentado tipo Apple/Linear. Trilho com --preenchimento,
+   aba ativa em pastilha --papel com sombra, inativa text-only. */
+.abas {
+  display: flex; gap: var(--e-1); align-items: stretch;
+  background: var(--preenchimento); border-radius: var(--r-pilula);
+  padding: var(--e-1); position: relative;
+}
+.aba {
+  flex: 1; min-height: var(--toque); display: flex; align-items: center; justify-content: center;
+  gap: var(--e-1); background: none; border: 0; color: var(--tinta-2);
+  font-size: var(--t-apoio); font-weight: 600; border-radius: var(--r-pilula);
+  transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao), box-shadow var(--dur-curta) var(--ease-padrao);
+}
+.abaAtiva {
+  background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media);
+}
+.contadorAba {
+  font-family: var(--f-dado); font-weight: 400; font-variant-numeric: tabular-nums;
+}
+
+/* Linha C: um contador por canal (issue #2), três colunas iguais do celular
+   de 390 px ao computador. `fieldset` por semântica de grupo (a11y); zera o
+   estilo nativo do navegador. */
+.contadoresCanal {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  border: 0; margin: 0; padding: 0; min-width: 0;
+}
+/* Mesmo desenho do chip de filtro (Chip.module.css): parado é preenchimento
+   sem contorno, ligado ganha fundo e anel da marca. A forma muda junto com a
+   cor (WCAG 1.4.1). */
+.contadorCanal {
+  display: grid; gap: 2px; min-width: 0; min-height: var(--toque); text-align: left;
+  padding: 6px var(--e-2); border-radius: var(--r-1);
+  border: var(--b-1) solid transparent; background: var(--preenchimento); color: var(--tinta);
+}
+.contadorCanal:hover:not(.contadorLigado) { background: var(--preenchimento-forte); }
+.contadorLigado {
+  background: var(--ragu-claro); border-color: color-mix(in srgb, var(--ragu) 45%, transparent);
+}
+.topoContador { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.topoContador svg { width: 18px; height: 18px; flex-shrink: 0; }
+.rotuloContador {
+  font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.contadorLigado .rotuloContador { color: var(--ragu); }
+/* Número lido de relance e, embaixo, "precisam": sempre em linhas próprias
+   para os três contadores terem o mesmo desenho, com um ou três dígitos. */
+.numerosContador { display: grid; gap: 2px; justify-items: start; min-width: 0; }
+.numeroContador {
+  font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--tinta);
+}
+.precisamContador {
+  font-size: var(--t-micro); font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--tinta-3); white-space: nowrap;
+}
+/* Âmbar só quando alguém espera ação dela (tokens.css, --atencao). */
+.precisamAtivo { color: var(--atencao); }
+/* Pulso breve quando o número sobe. O global de prefers-reduced-motion
+   (base.css) esmaga a duração, então quem pediu menos movimento não vê pulo. */
+.pulso { display: inline-block; animation: pulsoContador var(--dur-longa) var(--ease-pulo); }
+@keyframes pulsoContador {
+  from { transform: scale(1.35); color: var(--ragu); }
+  to { transform: none; }
+}
+
+/* Grupos recolhidos do fim de "Todas": Encerradas e Bloqueados (seção 1). */
+.grupo { border-top: var(--b-1) solid var(--linha); }
+.tituloGrupo {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; min-height: var(--toque);
+  padding: 0 var(--e-3); background: var(--elevado); border: 0; color: var(--tinta-2);
+  font-size: var(--t-apoio); font-weight: 600; text-align: left;
+}
+.chevronAberto { transform: rotate(90deg); }
+
+/* Cor por canal, pelo nome do ícone do catálogo (conversa, camera, globo). */
+.canal_conversa { color: var(--c-whatsapp); }
+.canal_camera { color: var(--c-instagram); }
+.canal_globo { color: var(--c-site); }
+
+/* Rodada 6c: avatar em toda conversa, com o selo do canal no canto e um
+   ponto de marca quando a última mensagem é do cliente (espera resposta). */
+.cartao { align-items: flex-start; }
+.avatarCartao { position: relative; flex-shrink: 0; margin-top: 2px; }
+.naoLida {
+  position: absolute; top: -1px; left: -1px; width: 12px; height: 12px;
+  border-radius: var(--r-pilula); background: var(--acao-gradiente);
+  box-shadow: 0 0 0 2px var(--papel); animation: estalarPonto var(--dur-longa) var(--ease-pulo) both;
+}
+.cartao[aria-current='true'] .naoLida { box-shadow: 0 0 0 2px var(--papel); }
+@keyframes estalarPonto { from { transform: scale(0); } to { transform: none; } }
+.corpo { min-width: 0; flex: 1; }
+
+/* O canal já está no selo do avatar: o ícone da linha de apoio saiu. */
+.apoio .iconeCanalPequeno { display: none; }
+
+/* Glifo real do canal (banca, item 24). */
+.canal_whatsapp { color: var(--c-whatsapp); }
+.canal_instagram { color: var(--c-instagram); }
+
+/* Contador único (banca, item 4) nas abas e no cartão. O número no cartão é
+   quantas mensagens do cliente esperam resposta; substitui o ponto sem número. */
+.contadorAba { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-11); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); margin-left: 6px; }
+.topo time { margin-left: auto; }
+.naoLida { display: none; }
+
+/* Prévia: o prefixo "Automático:" ou "Você:" vira ícone pequeno (o texto
+   fica para leitor de tela); a prévia cabe em até duas linhas, para número
+   de pedido não morrer em reticência. */
+.prefixo { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--tinta-3); vertical-align: -2px; }
+.previa { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; overflow: hidden; }
+.cartao:active:not(:disabled) { background: var(--preenchimento-forte); }
+
+/* Correção da integração (prova-f1-balcao, seção 1: seis cartões inteiros por
+   tela a 1440 x 900): cartão em três linhas, nome, prévia de uma linha e selos.
+   O canal está no selo do avatar; a linha "canal · pedidos" saiu. */
+.previa { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; }
+.cartao { padding-top: 10px; padding-bottom: 10px; }
+
+/* Rodada 12 (issue #16, dúvidas da Thatiane). Mensagens sem resposta
+   escritas por extenso no lugar do número num círculo, e a origem do
+   "Passou para você" numa linha própria. */
+.marcaComMotivo { display: inline-flex; }
+.contagemSemResposta { color: var(--tinta-2); font-weight: 600; }
+.origemPassagem {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  margin-top: 2px; font-size: var(--t-apoio); color: var(--atencao); line-height: 1.35;
+}

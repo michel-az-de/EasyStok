@@ -1,0 +1,307 @@
+/* Entregas de hoje (rodada 5, seção 6). Compartilhado por `GavetaEntregas`,
+   `TelaEntregas`, `CartaoEntrega`, `PainelViagem` e os modais da feature: as
+   duas janelas (gaveta e janela própria) mostram o MESMO conteúdo, só a
+   moldura muda. */
+
+/* Gaveta pela direita (seção 6): min(720px, 100vw - 32px), mais larga que a
+   `--gaveta` de 384px dos outros painéis, porque a coluna de viagens ao lado
+   das entregas soltas não cabe no padrão. */
+.gaveta {
+  position: fixed; inset: 0 0 0 auto; z-index: 60;
+  width: min(720px, calc(100vw - 32px));
+  display: flex; flex-direction: column;
+  background: var(--fundo); color: var(--tinta);
+  border-left: var(--b-1) solid var(--linha); box-shadow: var(--sombra-alta);
+  animation: gavetaEntra var(--dur-longa) var(--ease-mola) both;
+}
+@keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
+.cortina {
+  position: fixed; inset: 0; z-index: 59;
+  background: var(--cortina); border: 0; padding: 0; width: 100%;
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.cortina:active:not(:disabled) { transform: none; }
+.topoGaveta {
+  display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
+  min-height: 64px; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+}
+.topoGaveta h2 { margin: 0; flex: 1; font-size: var(--t-titulo); font-weight: 700; letter-spacing: var(--ls-titulo); }
+
+.pagina {
+  display: flex; flex-direction: column; height: 100%; min-height: 0;
+  background: var(--fundo); color: var(--tinta); font-family: var(--f-corpo);
+}
+.topoPagina {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  flex-shrink: 0;
+}
+.topoPagina h1 { margin: 0; font-size: var(--t-forte); font-weight: 700; flex: 1; }
+.horaTopo { font-family: var(--f-dado); color: var(--tinta-2); font-size: var(--t-apoio); }
+
+.aviso {
+  margin: var(--e-4); padding: var(--e-4); text-align: center;
+  background: var(--elevado); border: var(--b-1) dashed var(--linha-forte);
+  border-radius: var(--r-2); color: var(--tinta-2);
+}
+
+/* Uma rolagem só, na página inteira (achado da própria prova, rodada 5):
+   `.listaColuna` chegou a rolar por dentro, mas o menu ⋯ de cada cartão
+   (`Popover.jsx`, variante "abaixo") tem 360 px fixos para um gatilho de
+   barra larga, e o cartão de entrega tem uns 300 px — o menu sempre
+   transborda à esquerda dele. Uma coluna de 330 px de largura com
+   `overflow-y: auto` também recorta esse transbordo no eixo X (regra do
+   CSS: só dá pra `overflow-y` sozinho quando o X já é `visible`, e aqui não
+   é); só quem tem largura de sobra (as duas colunas juntas, `.dashboard`,
+   ~720 px) rola sem cortar o menu. */
+.dashboard {
+  display: flex; flex-direction: column; gap: var(--e-3); min-height: 0; flex: 1; overflow-y: auto;
+  container: entregas / inline-size;
+}
+
+.faixaControles {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+}
+/* Achado 6 (banca capricho R10): 5 chips de estado quebravam 4+1, "Canceladas
+   0" sozinha numa segunda linha com o resto da largura vazio do lado. Uma
+   linha só, com rolagem horizontal quando não coube, como o grupo de filtro
+   do Front: nunca deixa um chip solto boiando. */
+.linhaChips {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: nowrap;
+  overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px;
+}
+.linhaChips > button { flex-shrink: 0; white-space: nowrap; }
+.linhaChips strong { font-size: var(--t-apoio); color: var(--tinta-2); font-weight: 600; }
+.contadorChip { font-family: var(--f-dado); }
+.proximaConferencia {
+  margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
+  display: flex; align-items: center; gap: var(--e-1);
+}
+
+.colunas {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-4);
+  padding: 0 var(--e-4) var(--e-4);
+}
+@media (max-width: 900px) {
+  .colunas { grid-template-columns: 1fr; }
+}
+/* Integração: na gaveta (meia tela), duas colunas deixavam o cartão com 330 px,
+   nome quebrado em duas linhas e o ⋯ sozinho numa linha. Abaixo de 820 px de
+   painel, as viagens vão para baixo da lista; a janela própria segue em duas. */
+@container entregas (max-width: 820px) {
+  .colunas { grid-template-columns: 1fr; }
+}
+.coluna { display: flex; flex-direction: column; gap: var(--e-2); }
+.coluna h2 {
+  margin: 0; font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--tinta-3); font-weight: 700;
+}
+.listaColuna {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2);
+  min-height: 60px; padding-bottom: var(--e-3);
+}
+.grupoJanela { display: grid; gap: var(--e-2); }
+.tituloGrupo { margin: var(--e-2) 0 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); }
+
+.zonaNovaViagem {
+  border: var(--b-2) dashed var(--linha-forte); border-radius: var(--r-2);
+  padding: var(--e-4); text-align: center; color: var(--tinta-3); font-size: var(--t-apoio);
+  min-height: var(--toque);
+}
+.zonaNovaViagemSobre { border-color: var(--ragu); color: var(--ragu); background: var(--ragu-claro); }
+
+/* --- Cartão de entrega --------------------------------------------------- */
+.cartao {
+  display: grid; gap: 6px; padding: var(--e-3) var(--e-3) var(--e-3) var(--e-2);
+  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  box-shadow: var(--sombra);
+  transition: box-shadow var(--dur-curta) var(--ease-padrao), transform var(--dur-media) var(--ease-mola);
+  /* backwards e não both: com o fim da animação preso, cada cartão virava
+     camada própria e o menu ⋯ de um ficava por baixo do cartão seguinte. */
+  animation: cartaoEntra var(--dur-media) var(--ease-saida) backwards;
+}
+.cartao:hover { box-shadow: var(--sombra-media); }
+@keyframes cartaoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.cartao:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; }
+
+/* Achado 1 (rodada 10): cartão que muda sozinho (pagamento, "precisa de
+   você") pisca por ~1,5 s, mesmo tempo do destaque sonoro
+   (aplicacao/useAvisoSonoro.js) e mesma receita do cartão da Cozinha. */
+.cartaoNovo { animation: cartaoRealce 1.5s var(--ease-pulo); }
+@keyframes cartaoRealce {
+  0% { background: var(--ok-pastel); }
+  100% { background: var(--papel); }
+}
+.arrastando { opacity: .5; box-shadow: var(--sombra-alta); }
+/* Linha 1 numa linha só: alça, anel, nome (encolhe com reticências), estado e
+   menu. Antes quebrava e o nome ficava em duas linhas com o menu embaixo. */
+.linha1 { display: flex; align-items: center; gap: var(--e-2); flex-wrap: nowrap; min-width: 0; }
+/* O estado desce para baixo do nome (order + base 100%), para o nome ter a
+   linha inteira em vez de virar reticência. */
+.linha1 { flex-wrap: wrap; row-gap: 0; }
+.pilulaEstado {
+  order: 9; flex-basis: 100%; padding-left: 88px; margin-top: -6px;
+  white-space: nowrap; font-size: var(--t-micro); color: var(--tinta-3);
+}
+.alcaArrasto {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: var(--toque); height: var(--toque); margin: calc(var(--toque) * -0.25);
+  background: none; border: 0; color: var(--tinta-3); cursor: grab; touch-action: none;
+}
+.nomeCartao {
+  flex: 1; min-width: 0; font-family: var(--f-display); font-size: var(--t-forte); font-weight: 600;
+  background: none; border: 0; padding: 0; margin: 0; text-align: left; color: inherit; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em;
+}
+.nomeCartao:focus-visible { outline: var(--b-3) solid var(--ragu); outline-offset: 2px; border-radius: var(--r-1); }
+.linha2 {
+  display: flex; align-items: baseline; gap: var(--e-2); justify-content: space-between;
+  padding-left: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2);
+}
+.faixaCartao { font-family: var(--f-dado); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--tinta-3); }
+.linha3 {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding-left: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2);
+}
+.marcas { font-size: var(--t-apoio); color: var(--atencao); }
+/* Motivo do botão do marco desabilitado (RN-14). */
+.motivoDesabilitado { margin: 0; padding-left: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
+
+.corpoCartao {
+  display: grid; gap: var(--e-2); padding-top: var(--e-2); border-top: var(--b-1) solid var(--linha);
+}
+.corpoCartao p { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+/* --- Anel pequeno (44 px, seção 6) --------------------------------------- */
+.anelNumero { font-family: var(--f-dado); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--t-micro); }
+
+/* --- Menu ⋯ (mesmo espírito de MenuDoPedido) ----------------------------- */
+.comMenu { position: relative; flex-shrink: 0; }
+.gatilhoMenu {
+  padding: 0; min-width: 36px; min-height: 36px; border-radius: var(--r-pilula);
+  background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--tinta-3);
+}
+.gatilhoMenu:hover { background: var(--preenchimento) !important; color: var(--tinta); }
+.menuAcoes { display: grid; min-width: 220px; }
+.itemMenu {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; text-align: left;
+  min-height: var(--toque); padding: var(--e-2) var(--e-3); background: none; border: 0;
+  font-size: var(--t-apoio); color: var(--tinta); cursor: pointer;
+}
+.itemMenu:hover { background: var(--elevado); }
+.itemMenu.perigo { color: var(--parado); }
+.submenu { padding-left: var(--e-5); display: grid; }
+
+.confirmacaoInline {
+  display: grid; gap: var(--e-2); padding: var(--e-2) var(--e-3); background: var(--elevado);
+  border-radius: var(--r-1); font-size: var(--t-apoio);
+}
+.confirmacaoInline p { margin: 0; }
+.confirmacaoBotoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+
+/* --- Viagem --------------------------------------------------------------- */
+.viagem {
+  display: grid; gap: var(--e-2); padding: var(--e-3);
+  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+}
+.viagemSobre { border-color: var(--ragu); border-style: dashed; background: var(--ragu-claro); }
+.cabecaViagem { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.cabecaViagem h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; flex: 1; }
+.saiViagem { font-size: var(--t-apoio); color: var(--tinta-2); font-family: var(--f-dado); }
+
+.paradas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); }
+.parada {
+  display: flex; align-items: center; gap: var(--e-2); padding: var(--e-2);
+  background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
+}
+.paradaAtrasada { color: var(--parado); }
+.numeroParada { font-family: var(--f-dado); color: var(--tinta-3); width: 1.5em; }
+.nomeParada { flex: 1; }
+.botoesOrdem { display: flex; }
+.botaoOrdem { padding: 4px; min-width: 36px; min-height: 36px; }
+.baixo { transform: rotate(180deg); }
+
+.acoesViagem { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+
+.chamado {
+  display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3);
+  background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
+}
+.pillSimulado { font-style: italic; color: var(--tinta-3); }
+
+/* --- Modais desta feature -------------------------------------------------- */
+.linhaJanela {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%; text-align: left;
+  min-height: var(--toque); padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-1); background: var(--papel); font-size: var(--t-apoio);
+}
+.linhaJanela[aria-pressed='true'] { border-color: var(--ragu); background: var(--ragu-claro); }
+.linhaJanela:disabled { opacity: .5; cursor: not-allowed; }
+.motivoJanela { margin: 0; font-size: var(--t-apoio); color: var(--parado); }
+
+.previaAviso {
+  display: flex; align-items: flex-start; gap: var(--e-2); font-size: var(--t-apoio);
+  color: var(--tinta-2); padding: var(--e-2); background: var(--elevado); border-radius: var(--r-1);
+}
+
+.listaRota { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.paradaRota {
+  display: grid; gap: 2px; padding: var(--e-2) var(--e-3);
+  background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
+}
+.paradaRota strong { font-size: var(--t-corpo); }
+.linkMapa { color: var(--ragu); font-weight: 600; }
+
+/* Ação do passo dentro do cartão: botão tinto, não cheio. Quatro primários
+   cheios empilhados competiam entre si e com a ação principal da tela. */
+.linha3 > button,
+.linha3 > button:hover:not(:disabled) {
+  background: var(--ragu-claro); color: var(--ragu); border-color: transparent;
+  box-shadow: none; min-height: 36px;
+}
+.linha3 > button:hover:not(:disabled) { background: color-mix(in srgb, var(--ragu) 18%, var(--ragu-claro)); }
+
+/* Issue #17 (rodada 12): dica do "por janela de entrega", alcance por bairro,
+   número do pedido para o entregador e quem leva no cartão. */
+.dicaJanela { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 60rem; }
+
+.alcance {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+  max-height: 45vh; overflow-y: auto;
+}
+.alcanceTopo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-3); }
+.alcanceTopo h2 { margin: 0; font-size: var(--t-17); }
+.alcanceLista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-1); }
+/* Dentro de um contêiner que rola, filho de flex encolhe até sumir: fixa. */
+.alcance > * { flex-shrink: 0; }
+/* Bairro e números na primeira linha, barra inteira embaixo: cabe igual na
+   gaveta estreita e na janela própria. */
+.alcanceLinha {
+  display: grid; align-items: center; gap: 2px var(--e-3);
+  grid-template-columns: auto 1fr; grid-template-areas: "bairro numeros" "barra barra";
+  padding: var(--e-1) 0;
+}
+.alcanceBairro { grid-area: bairro; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1); font-weight: 600; }
+.alcanceMarca {
+  font-size: var(--t-13); font-weight: 600; color: var(--tinta-2);
+  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-pilula); padding: 0 var(--e-2);
+}
+.alcanceBarra { grid-area: barra; height: 8px; border-radius: var(--r-pilula); background: var(--preenchimento); overflow: hidden; }
+.alcanceBarra span { display: block; height: 100%; background: var(--ragu); border-radius: inherit; }
+.alcanceNumeros { grid-area: numeros; text-align: right; font-size: var(--t-apoio); font-family: var(--f-dado); color: var(--tinta-2); }
+.alcanceVariacao { color: var(--ok); }
+.alcanceCaiu { color: var(--parado); }
+@media (max-width: 600px) {
+  .alcanceLinha { grid-template-columns: 1fr; grid-template-areas: "bairro" "numeros" "barra"; }
+  .alcanceNumeros { text-align: left; }
+}
+
+.numeroEntrega { font-family: var(--f-dado); font-weight: 700; color: var(--tinta); }
+.quemLeva {
+  margin: 0; padding-left: var(--e-1); display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1);
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+.quemLeva b { color: var(--tinta); }

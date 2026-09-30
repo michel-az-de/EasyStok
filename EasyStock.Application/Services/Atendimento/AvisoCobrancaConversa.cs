@@ -27,6 +27,11 @@ public sealed class AvisoCobrancaConversa(
     public static string TextoLinkTrocado(string link) =>
         $"Aqui está o link para pagar seu pedido, válido por 30 minutos (Pix ou cartão, como preferir): {link}";
 
+    /// <summary>S32: o Mercado Pago recusou o pagamento; o mesmo link continua valendo.</summary>
+    public static string TextoPagamentoRecusado(string? link) => link is null
+        ? "O pagamento não foi aprovado. Você pode tentar de novo com outro cartão ou pelo Pix."
+        : $"O pagamento não foi aprovado. Você pode tentar de novo com outro cartão ou pelo Pix, no mesmo link: {link}";
+
     public const string TextoPedidoCancelado =
         "Seu pedido foi cancelado porque o pagamento não foi confirmado a tempo. Se ainda quiser, é só pedir de novo por aqui.";
 

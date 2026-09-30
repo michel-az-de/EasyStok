@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 
@@ -29,6 +30,25 @@ public sealed class GerenciarConversaAtendimentoUseCase(IConversaRepository conv
             return conversaRepository.AddMensagemAsync(
                 Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, PrefixoLiberacao + command.UsuarioId),
+                ct);
+        }, ct);
+
+    public const string PrefixoLiberacaoForaDeArea = "entrega fora da área liberada pelo usuário ";
+
+    /// <summary>
+    /// S14: a dona libera a entrega fora da área. Grava <c>foraDeAreaLiberado=true</c> e o motivo no contexto
+    /// da conversa (o próximo <c>criar_pedido</c> marca o pedido para aprovação, S12) e deixa nota interna.
+    /// </summary>
+    public Task<ConversaSituacaoResult> LiberarForaDeAreaAsync(AcaoConversaCommand command, string? motivo, CancellationToken ct = default) =>
+        ExecutarAsync(command, (conversa, agora) =>
+        {
+            var motivoLimpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+            ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaLiberado, true);
+            ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaMotivo, motivoLimpo);
+            var texto = PrefixoLiberacaoForaDeArea + command.UsuarioId + (motivoLimpo is null ? "" : $": {motivoLimpo}");
+            if (texto.Length > Mensagem.TextoTamanhoMaximo) texto = texto[..Mensagem.TextoTamanhoMaximo];
+            return conversaRepository.AddMensagemAsync(
+                Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto),
                 ct);
         }, ct);
 

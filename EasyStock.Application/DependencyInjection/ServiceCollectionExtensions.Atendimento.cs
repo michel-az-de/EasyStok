@@ -25,6 +25,7 @@ public static partial class ServiceCollectionExtensions
 
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
+        services.AddScoped<AvisoStatusPedidoCliente>(); // S13: aviso de status ao cliente
         services.AddScoped<OptOutPorPalavra>();
         services.AddScoped<SaudacaoAtendimento>();
 
@@ -32,6 +33,11 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AgenteAtendimentoService>();
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE
         services.AddScoped<RoteadorAcoesBotao>();
+        services.AddScoped<ConfirmarEnderecoPendente>(); // S14
+
+        // S31: interesse em item (use cases em UseCases.Campanhas, fora da convenção do atendimento).
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.RegistrarInteresseItemUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Campanhas.Interesse.ListarSugestoesInteresseUseCase>();
 
         // S36: chat do site (canal próprio, sem provedor externo)
         services.AddScoped<ICanalMensageria, CanalChatSite>();

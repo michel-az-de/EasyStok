@@ -47,6 +47,7 @@ public static partial class ServiceCollectionExtensions
         // forma e desfazer pagamento manual. ConfirmarPagamentoPedidoUseCase é o ponto de entrada da S32.
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.GerarCobrancaPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ConfirmarPagamentoPedidoUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.AtualizarCobrancaPorPagamentoUseCase>(); // S32
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.TrocarFormaPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.DesfazerPagamentoManualUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();

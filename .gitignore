@@ -27,6 +27,8 @@ EasyStock.Api/uploaded-files/
 node_modules/
 **/wwwroot/css/tailwind.dist.css
 package-lock.json
+# Console (ADR-0054) versiona o lock: o CI roda npm ci
+!EasyStock.Console/package-lock.json
 
 # User-specific files
 *.rsuser
@@ -408,10 +410,6 @@ EasyStock.Api/easystock.db*
 # Build artifact que escapou pra raiz em 2026-05-16 (incidente wip(snapshot))
 # Ver: docs/dev/incidentes/2026-05-16-master-broken-wip-snapshot.md
 /admin/
-
-# Previews locais do design system Deck do Admin (server.js + *.html de showcase).
-# Ferramenta de verificacao no browser (issue 730); nao faz parte do deploy nem do build.
-EasyStock.Admin/wwwroot/dev/
 
 # Cache NuGet local acidental (nunca deve existir no repo)
 .nuget/

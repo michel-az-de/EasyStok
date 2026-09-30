@@ -30,7 +30,7 @@ public class RoteadorAcoesBotaoTests
         // resolvida pelo handler. A prova de que o webhook não enfileira o turno do agente para
         // "acao:" está em ProcessarEventoWhatsAppUseCaseTests.BotaoAcaoNaoChamaAgente.
         var roteador = new RoteadorAcoesBotao(
-            [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()))],
+            [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()), ConfirmacaoEnderecoFake.Nova(), _conversaRepository)],
             NullLogger<RoteadorAcoesBotao>.Instance);
         var conversa = NovaConversa();
 

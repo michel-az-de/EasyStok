@@ -19,7 +19,11 @@ public sealed record RegistrarPagamentoPedidoCommand(
     // aviso. Hoje so o Detail.cshtml (onde o aviso de excedente ja existe) envia true; o
     // cockpit NAO envia -- mantem o bloqueio duro la, onde o risco de fat-finger e maior e o
     // valor costuma vir pre-preenchido de uma listagem que pode estar desatualizada.
-    bool PermitirExcedente = false);
+    bool PermitirExcedente = false,
+    // S13: pagamento já confirmado na fonte pelo provedor (ConfirmarPagamentoPedidoUseCase). Dinheiro
+    // recebido é registrado mesmo com o pedido aguardando a aprovação da dona (Pedido.RequerAprovacao,
+    // S12); a guarda de pré-operacional continua valendo para todo registro manual.
+    bool ConfirmadoPeloProvedor = false);
 
 public class RegistrarPagamentoPedidoUseCase(
     IPedidoRepository repo,
@@ -56,7 +60,8 @@ public class RegistrarPagamentoPedidoUseCase(
         // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o
         // pagamento-fantasma em pedido do cardapio nao aprovado, em TODA superficie que chame
         // este use case (cockpit, Detail, mobile, API). Espelha PRE_OPERACIONAL do cockpit (issue 862).
-        if (StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
+        if (!cmd.ConfirmadoPeloProvedor
+            && StatusPedidoMapper.TryParse(pedido.Status, out var statusPedido)
             && !PedidoStateMachine.AceitaPagamento(statusPedido))
         {
             throw new UseCaseValidationException(

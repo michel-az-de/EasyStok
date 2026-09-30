@@ -1,0 +1,23 @@
+/* Anel genérico (seção 6 e 8 da direção visual): mesma família visual do
+   relógio do Pix, agora com tamanho e traço por parâmetro. RelogioPix.jsx e
+   o relógio de cada entrega (Frente F6) usam este arquivo, nunca desenham o
+   próprio SVG. */
+
+.aro { position: relative; display: grid; place-items: center; }
+.aro > svg { position: absolute; inset: 0; }
+.aro > .centro { position: relative; }
+
+.anel { display: block; }
+.trilho { fill: none; stroke: var(--linha); }
+/* Trilho inteiro em --parado (RelogioPix.jsx, "ao zerar"): estado raro o
+   bastante para não virar mais um `tom`, só um reforço opcional por cima. */
+.trilhoParado { stroke: var(--parado); }
+.arco {
+  fill: none; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
+  transition: stroke-dashoffset 1s linear, stroke .3s ease;
+}
+.arco.ok { stroke: var(--ok); }
+.arco.atencao { stroke: var(--atencao); }
+.arco.parado { stroke: var(--parado); }
+
+.centro { display: grid; justify-items: center; gap: var(--e-1); }

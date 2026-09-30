@@ -1,0 +1,25 @@
+using EasyStock.Domain.Entities.Campanhas;
+
+namespace EasyStock.Application.Ports.Output.Persistence.Campanhas;
+
+/// <summary>Interesses em item indisponível (S31). <c>EmpresaId</c> no WHERE (ADR-0010).</summary>
+public interface IInteresseItemRepository
+{
+    Task AddAsync(InteresseItem interesse, CancellationToken ct = default);
+
+    /// <summary>Quantos interesses abertos (<c>AtendidoEm</c> nulo) o item tem.</summary>
+    Task<int> ContarAbertosDoItemAsync(Guid empresaId, Guid cardapioItemId, CancellationToken ct = default);
+
+    /// <summary>Interesses abertos no item com o cliente, do mais recente para o mais antigo.</summary>
+    Task<IReadOnlyList<InteresseAbertoCliente>> ListarAbertosDoItemAsync(Guid empresaId, Guid cardapioItemId, CancellationToken ct = default);
+}
+
+/// <summary>Linha da sugestão de quem avisar quando o item volta (S31).</summary>
+public sealed record InteresseAbertoCliente(
+    Guid InteresseId,
+    Guid ClienteId,
+    string ClienteNome,
+    string? ClienteTelefone,
+    string? Descricao,
+    string Origem,
+    DateTime RegistradoEm);

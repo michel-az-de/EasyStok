@@ -14,9 +14,7 @@ public class AuthController(
     ApiClient api,
     SessionService session,
     IWebHostEnvironment env,
-    IJwtClaimsReader jwt,
-    IConfiguration config,
-    ILogger<AuthController> log) : Controller
+    IJwtClaimsReader jwt) : Controller
 {
     [AllowAnonymous]
     [HttpGet("/auth/login")]
@@ -276,98 +274,6 @@ public class AuthController(
     {
         session.SetLoja(lojaId, lojaNome, lojaEmoji, empresaId);
         return RedirectToAction("Index", "Launcher");
-    }
-
-    /// <summary>
-    /// Handoff de impersonation vindo do EasyStock.Admin. Recebe o JWT por POST
-    /// (form body) — nunca por querystring — para que o token não vaze em logs
-    /// de servidor, history do browser ou referrer headers.
-    /// </summary>
-    [AllowAnonymous]
-    [HttpPost("/auth/impersonate")]
-    [IgnoreAntiforgeryToken]
-    public async Task<IActionResult> Impersonate(
-        [FromForm] string token,
-        [FromForm] string? refreshToken = null,
-        [FromForm] long? ts = null,
-        [FromForm] string? assinatura = null)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-            return RedirectToAction(nameof(Login));
-
-        // Issue 802: este e o unico POST anonimo sem antiforgery do app e le claims do JWT
-        // sem validar assinatura — sem um segredo de handoff, um token vazado poderia ser
-        // replayado aqui para materializar sessao de browser. Com Auth:ImpersonationHandoffSecret
-        // configurado (no Admin E no Web), exigimos HMAC do Admin com validade curta.
-        // Sem o segredo configurado, mantem o comportamento atual (compat de rollout) e loga.
-        var handoffSecret = config["Auth:ImpersonationHandoffSecret"];
-        if (!string.IsNullOrWhiteSpace(handoffSecret))
-        {
-            if (ts is null || string.IsNullOrWhiteSpace(assinatura)
-                || Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts.Value) > 60
-                || !AssinaturaHandoffValida(handoffSecret, token, ts.Value, assinatura))
-            {
-                log.LogWarning("Impersonate rejeitado: handoff sem HMAC valido (ts={Ts}).", ts);
-                return Forbid();
-            }
-        }
-        else
-        {
-            log.LogWarning("Impersonate aceito SEM validacao de handoff — configure Auth:ImpersonationHandoffSecret no Admin e no Web (issue 802).");
-        }
-
-        session.Clear();
-        session.SetTokens(token, refreshToken ?? string.Empty);
-
-        var nome = jwt.TryReadClaim(token, "nome") ?? jwt.TryReadClaim(token, ClaimTypes.Name) ?? "Operador";
-        var email = jwt.TryReadClaim(token, "email") ?? "";
-        var nivel = jwt.TryReadClaim(token, "nivel") ?? "Admin";
-        var empresaId = jwt.TryReadClaim(token, "empresaId");
-        var userId = jwt.TryReadClaim(token, "sub") ?? "";
-
-        if (!string.IsNullOrEmpty(empresaId))
-            session.SetEmpresaId(empresaId);
-        session.SetUsuario(userId, nome, nivel);
-
-        var lojas = await api.GetAsync<List<Loja>>("lojas");
-        if (lojas.Success && lojas.Data is { Count: > 0 } ls)
-            session.SetLoja(ls[0].Id, ls[0].Nome, ls[0].Emoji, ls[0].EmpresaId);
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.Name, nome),
-            new(ClaimTypes.Email, email),
-            new(ClaimTypes.Role, nivel)
-        };
-        if (!string.IsNullOrEmpty(empresaId))
-            claims.Add(new Claim("empresaId", empresaId));
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var props = new AuthenticationProperties { IsPersistent = false, ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(60) };
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), props);
-
-        TempData["Toast"] = "info|Sessão de suporte iniciada. Saia ao terminar.";
-        return RedirectToAction("Index", "Launcher");
-    }
-
-    /// <summary>
-    /// HMAC-SHA256 hex de "{token}|{ts}" — espelho de
-    /// <c>EasyStock.Admin.Pages.Tenants.IndexModel.AssinarHandoff</c> (issue 802);
-    /// manter os dois em sincronia (Web e Admin nao compartilham projeto).
-    /// </summary>
-    public static string ComputarAssinaturaHandoff(string secret, string token, long ts)
-    {
-        using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
-        return Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{token}|{ts}")));
-    }
-
-    private static bool AssinaturaHandoffValida(string secret, string token, long ts, string assinatura)
-    {
-        var esperado = ComputarAssinaturaHandoff(secret, token, ts);
-        var recebido = assinatura.Trim().ToUpperInvariant();
-        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(esperado),
-            System.Text.Encoding.UTF8.GetBytes(recebido));
     }
 
     [AllowAnonymous]

@@ -41,7 +41,7 @@ internal sealed class CobrancaPedidoFixture
 {
     public static readonly DateTime Agora = new(2026, 9, 29, 15, 0, 0, DateTimeKind.Utc);
 
-    public Guid EmpresaId { get; } = Guid.NewGuid();
+    public Guid EmpresaId { get; }
     public Pedido Pedido { get; }
     public List<CobrancaPedido> Cobrancas { get; } = new();
     public List<PedidoEvento> Eventos { get; } = new();
@@ -62,13 +62,26 @@ internal sealed class CobrancaPedidoFixture
     public IPrazoPreparoPedidoQueries PrazoQueries { get; } = Substitute.For<IPrazoPreparoPedidoQueries>();
     public List<CriarPreferenceCommand> Preferencias { get; } = new();
 
-    public CobrancaPedidoFixture(string status = StatusPedidoMapper.AguardandoPagamento)
+    /// <summary>O que <c>payments/search?external_reference=</c> devolve (S32).</summary>
+    public List<PagamentoMercadoPago> PagamentosNoMercadoPago { get; } = new();
+
+    /// <param name="pedido">Pedido já criado por outro use case (caminho completo); sem ele, um pedido de R$ 25.</param>
+    public CobrancaPedidoFixture(string status = StatusPedidoMapper.AguardandoPagamento, Pedido? pedido = null)
     {
-        Pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
-        Pedido.Status = status;
-        Pedido.Itens.Add(Item("Brigadeiro", 2, 10m));
-        Pedido.Itens.Add(Item("Frete SP Centro", 1, 5m));
-        Pedido.RecalcularTotal();
+        if (pedido is not null)
+        {
+            EmpresaId = pedido.EmpresaId;
+            Pedido = pedido;
+        }
+        else
+        {
+            EmpresaId = Guid.NewGuid();
+            Pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
+            Pedido.Status = status;
+            Pedido.Itens.Add(Item("Brigadeiro", 2, 10m));
+            Pedido.Itens.Add(Item("Frete SP Centro", 1, 5m));
+            Pedido.RecalcularTotal();
+        }
 
         PedidoRepo.GetByIdWithDetailsAsync(EmpresaId, Pedido.Id).Returns(Pedido);
         PedidoRepo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))
@@ -97,9 +110,13 @@ internal sealed class CobrancaPedidoFixture
                 return new PreferenceCriadaResult($"pref-{sequencia}", $"https://mp.test/pref-{sequencia}");
             });
 
+        MpClient.BuscarPagamentosPorReferenciaAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(_ => PagamentosNoMercadoPago.ToList());
+
         Uow.SetupExecuteInTransactionSemRetry<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(SituacaoAtualizacaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<CobrancaPedidoResult>();
-        Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?)>();
+        Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<DesfazerPagamentoManualResult>();
         Uow.SetupExecuteInTransactionSemRetry<(ResultadoExpiracaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
@@ -153,7 +170,12 @@ internal sealed class CobrancaPedidoFixture
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Relogio, NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
-        new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, Uow, Relogio);
+        new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
+            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance);
+
+    public AtualizarCobrancaPorPagamentoUseCase AtualizarPorPagamento() =>
+        new(CobrancaRepo, PedidoStorefrontRepo, Aviso(), Tenant, Uow, Relogio,
+            NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
 
     public DesfazerPagamentoManualUseCase Desfazer() =>
         new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio);
@@ -163,13 +185,14 @@ internal sealed class CobrancaPedidoFixture
         var estoque = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
             Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Options.Create(new PedidoEstoqueOptions()),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque, Substitute.For<IContaReceberRepository>(), Uow,
             NullLogger<CancelarPedidoUseCase>.Instance);
         var liberarVaga = new LiberarVagaOnPedidoCanceladoHandler(VagaRepo, NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance);
         return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar, liberarVaga,
-            Aviso(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance);
+            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance);
     }
 
     public void AdicionarPagamento(string? referencia, decimal valor = 25m)
