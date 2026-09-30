@@ -2,6 +2,7 @@
 // Registra UseCases relacionados a: Pedidos, Caixa, Lotes, Produtos, Estoque, Listas de Compras
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -75,6 +76,10 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<PedidoEstoqueIntegrationService>();
         services.AddScoped<CriarPedidoUseCase>();
         services.AddScoped<AtualizarStatusPedidoUseCase>();
+        // S19: KDS do console sobre Pedido
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.ListarPedidosKdsUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<CancelarPedidoUseCase>();
         services.AddScoped<ObterPedidoDetalhesUseCase>();
         services.AddScoped<AdicionarItemPedidoUseCase>();

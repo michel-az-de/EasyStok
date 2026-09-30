@@ -22,12 +22,14 @@ public sealed record CriarPedidoAtendimentoInput(
 /// snapshot do cardápio e observação por item, frete pelo CEP do endereço escolhido, vaga ocupada e
 /// pedido em <c>AguardandoPagamento</c> com <c>Origem = "whatsapp"</c>. Grava
 /// <c>Conversa.PedidoEmAndamentoId</c>. A cobrança fica com a S11, que recebe o
-/// <see cref="PedidoReservado"/> devolvido aqui.
+/// <see cref="PedidoReservado"/> devolvido aqui. O núcleo revalida o prazo mínimo (S16, RN-21) com o preparo
+/// padrão e o respiro de <c>ConfiguracaoAtendimento</c>.
 /// </summary>
 public sealed class CriarPedidoAtendimentoUseCase(
     CheckoutCoreService checkoutCore,
     IConversaRepository conversaRepository,
     IClienteRepository clienteRepository,
+    IConfiguracaoAtendimentoRepository configuracaoRepository,
     IUnitOfWork unitOfWork)
 {
     public async Task<PedidoReservado> ExecuteAsync(
@@ -46,8 +48,14 @@ public sealed class CriarPedidoAtendimentoUseCase(
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException($"Cliente {input.ClienteId} não encontrado.");
 
+        // S24: bloqueio vale em todos os canais; nada de vaga ocupada nem pedido.
+        if (cliente.Bloqueado)
+            throw new ClienteBloqueadoException(cliente.Id);
+
         var endereco = cliente.Enderecos.FirstOrDefault(e => e.Id == input.EnderecoId)
             ?? throw new RegraDeDominioVioladaException($"Endereço {input.EnderecoId} não pertence ao cliente.");
+
+        var configuracao = await configuracaoRepository.GetOrDefaultAsync(input.EmpresaId);
 
         var reservado = await checkoutCore.CriarPedidoComReservaAsync(
             new CheckoutCoreInput(
@@ -58,12 +66,22 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 Cep: endereco.Cep ?? string.Empty,
                 Origem: OrigemPedido.WhatsApp,
                 EmpresaId: input.EmpresaId,
-                Observacoes: input.Observacoes),
+                Observacoes: input.Observacoes,
+                Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos)),
             ct);
 
         conversa.DefinirPedidoEmAndamento(reservado.Pedido.Id);
         await unitOfWork.CommitAsync();
 
         return reservado;
+    }
+
+    /// <summary>Endereço padrão do cliente ou, sem padrão, o único cadastrado; senão nulo (é preciso perguntar).</summary>
+    public static Guid? EnderecoPadrao(EasyStock.Domain.Entities.Cliente cliente)
+    {
+        ArgumentNullException.ThrowIfNull(cliente);
+        var padrao = cliente.Enderecos.FirstOrDefault(e => e.Padrao);
+        if (padrao is not null) return padrao.Id;
+        return cliente.Enderecos.Count == 1 ? cliente.Enderecos.First().Id : null;
     }
 }

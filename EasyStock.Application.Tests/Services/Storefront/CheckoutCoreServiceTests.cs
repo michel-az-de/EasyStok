@@ -3,6 +3,7 @@ using EasyStock.Application.Services.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute.ExceptionExtensions;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
@@ -31,7 +32,15 @@ public class CheckoutCoreServiceTests
         public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();
         public IPedidoStorefrontRepository PedidoRepo { get; } = Substitute.For<IPedidoStorefrontRepository>();
         public IExpedienteLojaRepository ExpedienteRepo { get; } = Substitute.For<IExpedienteLojaRepository>();
+
+        /// <summary>Configuração padrão do atendimento (preparo 60 + respiro 40), para quem cria pelo atendimento.</summary>
+        public EasyStock.Application.Ports.Output.Persistence.IConfiguracaoAtendimentoRepository ConfiguracaoAtendimentoRepo { get; } =
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.IConfiguracaoAtendimentoRepository>();
+
+        /// <summary>Véspera da entrega, 12:00 em Brasília: qualquer janela do dia seguinte atende o prazo.</summary>
+        public FakeTimeProvider Relogio { get; } = new(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero));
         public StorefrontEntity Storefront { get; }
+        public CardapioItem CardapioItem { get; }
         public Guid JanelaId => CheckoutCoreServiceTests.JanelaId;
         public Guid CardapioItemId => CheckoutCoreServiceTests.CardapioItemId;
         public DateOnly DataEntrega => CheckoutCoreServiceTests.DataEntrega;
@@ -42,6 +51,8 @@ public class CheckoutCoreServiceTests
         {
             Storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
             Storefront.Ativar();
+            ConfiguracaoAtendimentoRepo.GetOrDefaultAsync(Storefront.EmpresaId)
+                .Returns(EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento.CriarPadrao(Storefront.EmpresaId));
             StorefrontRepo.GetBySlugAsync("casa-da-baba", Arg.Any<CancellationToken>()).Returns(Storefront);
             StorefrontRepo.GetByEmpresaAsync(Storefront.EmpresaId, Arg.Any<CancellationToken>()).Returns(Storefront);
 
@@ -54,6 +65,7 @@ public class CheckoutCoreServiceTests
             var cardapioItem = CardapioItem.CriarAPartirDeProduto(Storefront.Id, produto);
             cardapioItem.TornarVisivel();
             cardapioItem.Produto = produto;
+            CardapioItem = cardapioItem;
             typeof(CardapioItem).GetProperty("Id")!.SetValue(cardapioItem, CheckoutCoreServiceTests.CardapioItemId);
             CardapioRepo.GetByIdAsync(Storefront.Id, CheckoutCoreServiceTests.CardapioItemId, Arg.Any<CancellationToken>())
                 .Returns(cardapioItem);
@@ -93,7 +105,7 @@ public class CheckoutCoreServiceTests
 
         public CheckoutCoreService Servico() => new(
             StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, FreteZonaRepo, VagaRepo, PedidoRepo,
-            ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance);
+            ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, Relogio);
     }
 
     private static CheckoutCoreInput Input(Cenario c) => new(
@@ -155,5 +167,51 @@ public class CheckoutCoreServiceTests
 
         reservado.Itens[0].LinhaSnapshot.Should().Be("paraServir");
         reservado.ItemFrete.LinhaSnapshot.Should().BeNull("frete não é produto");
+    }
+    // ── S16: antecedência mínima ─────────────────────────────────────────
+
+    [Fact]
+    public async Task RejeitaJanelaAbaixoDoPrazo()
+    {
+        // Janela 9-12h do dia da entrega; agora 08:00 em Brasília; prazo 60 + 40 = 100 min → 09:40 > 09:00.
+        var c = new Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 11, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(
+            Input(c) with { Prazo = new PrazoPreparoCheckout(TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40) });
+
+        (await act.Should().ThrowAsync<RegraDeDominioVioladaException>())
+            .WithMessage("janela_abaixo_do_prazo");
+        c.PedidosAdicionados.Should().BeEmpty();
+        await c.VagaRepo.DidNotReceive().OcuparAsync(
+            Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AceitaJanelaNoPrazo()
+    {
+        // Agora 07:00 em Brasília; 100 min → 08:40, antes das 09:00.
+        var c = new Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 10, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(
+            Input(c) with { Prazo = new PrazoPreparoCheckout(TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40) });
+
+        reservado.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Fact]
+    public async Task ItemEsgotadoRecusaOCheckout()
+    {
+        var c = new Cenario();
+        c.CardapioItem.MarcarEsgotado();
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>()
+            .WithMessage($"*{CardapioItemId}*indisponível*");
+        c.PedidosAdicionados.Should().BeEmpty("item esgotado não pode virar pedido");
+        await c.VagaRepo.DidNotReceive().OcuparAsync(
+            Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }
