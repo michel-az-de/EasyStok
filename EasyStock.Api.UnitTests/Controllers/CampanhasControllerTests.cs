@@ -19,6 +19,7 @@ public class CampanhasControllerTests
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly ICampanhaRepository _repo = Substitute.For<ICampanhaRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly ICampanhaPublicoQueries _publico = Substitute.For<ICampanhaPublicoQueries>();
     private readonly CampanhasController _controller;
 
     public CampanhasControllerTests()
@@ -35,6 +36,8 @@ public class CampanhasControllerTests
             new CriarCampanhaUseCase(_repo, _uow, relogio),
             new AtualizarCampanhaUseCase(_repo, _uow, relogio),
             new CancelarCampanhaUseCase(_repo, _uow),
+            new CalcularPublicoCampanhaUseCase(_repo, _publico, _uow, relogio),
+            new ListarDestinatariosCampanhaUseCase(_repo, _publico),
             _currentUser)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
@@ -70,6 +73,9 @@ public class CampanhasControllerTests
         (await _controller.Obter(Guid.NewGuid(), null, CancellationToken.None)).Should().BeOfType<NotFoundObjectResult>();
         (await _controller.Atualizar(Guid.NewGuid(), Body(null), null, CancellationToken.None)).Should().BeOfType<NotFoundObjectResult>();
         (await _controller.Cancelar(Guid.NewGuid(), null, CancellationToken.None)).Should().BeOfType<NotFoundObjectResult>();
+        (await _controller.CalcularPublico(Guid.NewGuid(), null, CancellationToken.None)).Should().BeOfType<NotFoundObjectResult>();
+        (await _controller.ListarDestinatarios(Guid.NewGuid(), null, null, CancellationToken.None))
+            .Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -84,5 +90,33 @@ public class CampanhasControllerTests
 
         (await _controller.Cancelar(campanha.Id, null, CancellationToken.None))
             .Should().BeOfType<BadRequestObjectResult>("cancelar duas vezes é regra violada");
+    }
+
+    [Fact]
+    public async Task PublicoRecalculaEDevolveResumoEDestinatariosFiltramPorStatus()
+    {
+        var campanha = Campanha.Criar(_empresaId, Guid.NewGuid(),
+            new DadosCampanha("x", "y", null, null, FiltroCampanha.ParaTodos, [], null, false, null), DateTime.UtcNow);
+        _repo.ObterAsync(_empresaId, campanha.Id, Arg.Any<CancellationToken>()).Returns(campanha);
+        _repo.ListarDestinatariosAsync(_empresaId, campanha.Id, Arg.Any<CancellationToken>()).Returns([]);
+        var cliente = new CandidatoPublicoCampanha(Guid.NewGuid(), "Ana", true, false, true, [], null, null);
+        _publico.ListarCandidatosAsync(_empresaId, campanha.Id, null, Arg.Any<CancellationToken>()).Returns([cliente]);
+        var linha = new DestinatarioCampanhaResumo(cliente.ClienteId, "Ana", StatusCampanhaDestinatario.Pendente, null, 0, null);
+        _publico.ListarDestinatariosAsync(_empresaId, campanha.Id, StatusCampanhaDestinatario.Pendente,
+            ListarDestinatariosCampanhaUseCase.LimitePadrao, Arg.Any<CancellationToken>()).Returns([linha]);
+
+        (await _controller.CalcularPublico(campanha.Id, null, CancellationToken.None))
+            .Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeEquivalentTo(new
+            {
+                Data = new { Total = 1, Pendentes = 1, Amostra = new[] { "Ana" } },
+            });
+        await _uow.Received(1).CommitAsync();
+
+        (await _controller.ListarDestinatarios(campanha.Id, StatusCampanhaDestinatario.Pendente, null, CancellationToken.None))
+            .Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeEquivalentTo(new { Data = new[] { linha } });
+
+        campanha.Cancelar([]);
+        (await _controller.CalcularPublico(campanha.Id, null, CancellationToken.None))
+            .Should().BeOfType<BadRequestObjectResult>("campanha cancelada não recalcula");
     }
 }
