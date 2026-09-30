@@ -181,6 +181,8 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<Cliente> Clientes { get; set; } = null!;
         public DbSet<ClienteTag> ClienteTags { get; set; } = null!;
         public DbSet<ClienteNota> ClienteNotas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Campanhas.Campanha> Campanhas { get; set; } = null!; // S28
+        public DbSet<EasyStock.Domain.Entities.Campanhas.CampanhaDestinatario> CampanhaDestinatarios { get; set; } = null!; // S28
         public DbSet<Pedido> Pedidos { get; set; } = null!;
         public DbSet<MovimentoCaixa> MovimentosCaixa { get; set; } = null!;
         public DbSet<FechamentoCaixa> FechamentosCaixa { get; set; } = null!;

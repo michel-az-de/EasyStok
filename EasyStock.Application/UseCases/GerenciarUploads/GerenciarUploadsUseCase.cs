@@ -22,6 +22,8 @@ public sealed record BannerImagemUploadResult(string StorageKey, string Url, str
 /// <summary>Imagem do console de atendimento (S07): a chave vai para a mensagem, a URL pública para a Meta.</summary>
 public sealed record ImagemAtendimentoUploadResult(string StorageKey, string Url, string ContentType);
 
+public sealed record ArteCampanhaUploadResult(string StorageKey, string Url, string ContentType);
+
 public sealed class GerenciarUploadsUseCase(
     IFileStorage fileStorage,
     IImageProcessor imageProcessor,
@@ -259,6 +261,30 @@ public sealed class GerenciarUploadsUseCase(
             cancellationToken);
 
         return new ImagemAtendimentoUploadResult(stored.StorageKey, stored.Url, optContentType);
+    }
+
+    /// <summary>
+    /// Arte da campanha (S28). Mesma validação e otimização das demais; pública porque a Meta busca
+    /// a imagem pela URL. Não persiste nada: a URL vai em <c>imagemUrl</c> da campanha.
+    /// </summary>
+    public async Task<ArteCampanhaUploadResult> UploadArteCampanhaAsync(
+        Guid empresaId, string fileName, string contentType, byte[] content, CancellationToken cancellationToken = default)
+    {
+        ValidarImagem(fileName, contentType, content, 6 * 1024 * 1024); // ate 6MB antes de otimizar
+
+        var (optimized, optContentType, optExt) = await Task.Run(
+            () => imageProcessor.Optimize(content, contentType, maxSide: 1920, quality: 85),
+            cancellationToken);
+
+        var stored = await fileStorage.UploadAsync(
+            new FileUploadRequest(
+                $"campanhas/{empresaId}",
+                $"{Guid.NewGuid()}{optExt}",
+                optContentType,
+                optimized),
+            cancellationToken);
+
+        return new ArteCampanhaUploadResult(stored.StorageKey, stored.Url, optContentType);
     }
 
     /// <summary>
