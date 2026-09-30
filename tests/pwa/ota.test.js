@@ -25,7 +25,7 @@ module.exports = function ({ test, sandbox, assert }) {
   function loadSwSource() {
     // Tenta apk/web (copiado) primeiro, fallback pra fonte do PWA.
     const candidatos = [
-      path.resolve(__dirname, '../web/sw.js'),
+      path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/sw.js'),
       path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/sw.js'),
       path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/sw.js'),
     ];
@@ -37,7 +37,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   function loadSyncSource() {
     const candidatos = [
-      path.resolve(__dirname, '../web/sync.js'),
+      path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/sync.js'),
       path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/sync.js'),
       path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/sync.js'),
     ];
@@ -221,7 +221,7 @@ module.exports = function ({ test, sandbox, assert }) {
     const idx = require('fs').readFileSync(
       sandbox.location && sandbox.location.href.startsWith('file:')
         ? sandbox.location.href.replace('file://', '')
-        : (process.env.PWA_HTML || require('path').resolve(__dirname, '../web/index.html')),
+        : (process.env.PWA_HTML || require('path').resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html')),
       'utf8'
     );
     assert.ok(idx.includes('updatefound'),
@@ -232,7 +232,7 @@ module.exports = function ({ test, sandbox, assert }) {
 
   test('index.html: controllerchange listener recarrega a página', () => {
     const idx = require('fs').readFileSync(
-      process.env.PWA_HTML || require('path').resolve(__dirname, '../web/index.html'),
+      process.env.PWA_HTML || require('path').resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'),
       'utf8'
     );
     assert.ok(idx.includes('controllerchange'),

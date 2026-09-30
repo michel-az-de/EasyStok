@@ -22,7 +22,7 @@ const vm = require('vm');
 const assert = require('assert');
 
 const HTML_PATH = process.env.PWA_HTML
-  || path.resolve(__dirname, '../web/index.html');
+  || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html');
 
 // ---------- 1. Carrega index.html e extrai scripts inline + externos locais ----------
 // Scripts inline rodam diretamente. Scripts externos com src local (ex: sync.js,
