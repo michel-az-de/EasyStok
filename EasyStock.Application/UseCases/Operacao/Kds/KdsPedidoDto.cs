@@ -7,6 +7,8 @@ namespace EasyStock.Application.UseCases.Operacao.Kds;
 /// <param name="InicioPrevistoEm">Quando o preparo precisa começar (S21); nulo sem janela (pedido para já).</param>
 /// <param name="Atrasado">Com início previsto: aguardando e o início já passou (S21). Sem ele: pedido aberto de
 /// dia de produção anterior a hoje.</param>
+/// <param name="Endereco">Endereço do cliente em texto (S14), para a gaveta de Entregas do console (F04).</param>
+/// <param name="RequerAprovacao">Exceção que a dona aprova à mão, como entrega fora de área (S12).</param>
 public sealed record KdsPedidoDto(
     Guid Id,
     string NumeroCurto,
@@ -22,7 +24,10 @@ public sealed record KdsPedidoDto(
     bool Atrasado,
     DateTime? PagoEm,
     DateTime CriadoEm,
-    string? Observacoes);
+    string? Observacoes,
+    string? Endereco,
+    bool RequerAprovacao,
+    string? MotivoRequerAprovacao);
 
 public sealed record KdsJanelaDto(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

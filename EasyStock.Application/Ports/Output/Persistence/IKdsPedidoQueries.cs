@@ -21,6 +21,8 @@ public interface IKdsPedidoQueries
 
 /// <param name="DataProducao">Dia de produção (data civil de Brasília), conforme <see cref="IKdsPedidoQueries.ListarAsync"/>.</param>
 /// <param name="InicioPrevistoEm"><c>Pedido.InicioPrevistoEm</c> (S21).</param>
+/// <param name="Endereco">Endereço do cadastro do cliente (logradouro, bairro, cidade), para a entrega (S14).</param>
+/// <param name="RequerAprovacao"><c>Pedido.RequerAprovacao</c> (S12).</param>
 public sealed record KdsPedidoLeitura(
     Guid Id,
     string Status,
@@ -33,7 +35,10 @@ public sealed record KdsPedidoLeitura(
     DateOnly DataProducao,
     DateTime? InicioPrevistoEm,
     KdsJanelaLeitura? Janela,
-    IReadOnlyList<KdsItemLeitura> Itens);
+    IReadOnlyList<KdsItemLeitura> Itens,
+    string? Endereco = null,
+    bool RequerAprovacao = false,
+    string? MotivoRequerAprovacao = null);
 
 public sealed record KdsJanelaLeitura(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

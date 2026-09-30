@@ -52,6 +52,17 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
             .GroupBy(x => x.PedidoId)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Endereço do cadastro do cliente (S14), com EmpresaId no WHERE como o resto da leitura.
+        var clienteIds = pedidos.Where(p => p.ClienteId != null).Select(p => p.ClienteId!.Value).Distinct().ToList();
+        var enderecos = clienteIds.Count == 0
+            ? new Dictionary<Guid, string?>()
+            : (await db.Clientes
+                .AsNoTracking()
+                .Where(c => c.EmpresaId == empresaId && clienteIds.Contains(c.Id))
+                .Select(c => new { c.Id, c.Endereco, c.Bairro, c.Cidade })
+                .ToListAsync(ct))
+                .ToDictionary(c => c.Id, c => EnderecoEmTexto(c.Endereco, c.Bairro, c.Cidade));
+
         var cardapioIds = pedidos
             .SelectMany(p => p.Itens)
             .Where(i => i.CardapioItemId != null)
@@ -89,7 +100,18 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                         Observacao: i.Observacao,
                         Linha: i.LinhaSnapshot,
                         Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null))
-                    .ToList());
+                    .ToList(),
+                Endereco: p.ClienteId is { } cid ? enderecos.GetValueOrDefault(cid) : null,
+                RequerAprovacao: p.RequerAprovacao,
+                MotivoRequerAprovacao: p.MotivoRequerAprovacao);
         }).ToList();
+    }
+
+    /// <summary>Mesmo formato do despacho da viagem (S44): sem logradouro, sem endereço.</summary>
+    private static string? EnderecoEmTexto(string? endereco, string? bairro, string? cidade)
+    {
+        if (string.IsNullOrWhiteSpace(endereco)) return null;
+        return string.Join(", ", new[] { endereco, bairro, cidade }
+            .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.Trim()));
     }
 }
