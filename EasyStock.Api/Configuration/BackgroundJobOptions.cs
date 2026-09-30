@@ -10,6 +10,9 @@ public sealed class BackgroundJobOptions
     public bool EnableHealthSnapshot { get; set; } = true;
     public bool EnableLogStorage { get; set; } = true;
 
+    /// <summary>S39: disparador das mensagens programadas ao cliente. Desligar é o rollback.</summary>
+    public bool EnableMensagensProgramadas { get; set; } = true;
+
     // Jobs opcionais (default false)
     public bool EnableAlertasEstoqueJob { get; set; }
     public bool EnableProcessarRecebimentoJob { get; set; }

@@ -41,6 +41,14 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
     public IEnumerable<JsonElement> PlanosList { get; private set; } = Enumerable.Empty<JsonElement>();
     public IEnumerable<JsonElement> Features { get; private set; } = Enumerable.Empty<JsonElement>();
 
+    /// <summary>phone_number_id da Meta vinculado a esta empresa (#1102); null quando não há.</summary>
+    public string? WhatsAppPhoneNumberId =>
+        Empresa.ValueKind == JsonValueKind.Object
+        && Empresa.TryGetProperty("whatsAppPhoneNumberId", out var w)
+        && w.ValueKind == JsonValueKind.String
+            ? w.GetString()
+            : null;
+
     public async Task<IActionResult> OnGetAsync()
     {
         if (Id == Guid.Empty) return NotFound();
@@ -280,6 +288,41 @@ public class DetailModel(AdminApiClient api, AdminSessionService session, IConfi
             SetErro($"Falha ao alterar feature: {ex.Message}");
         }
         return RedirectToPage(new { Id });
+    }
+
+    /// <summary>
+    /// Card "WhatsApp" da aba Features (#1102): vincula o phone_number_id da Meta à empresa. A API
+    /// valida formato e devolve 409 quando outra empresa já usa o número; a mensagem dela vai
+    /// direto para o banner.
+    /// </summary>
+    public async Task<IActionResult> OnPostSalvarWhatsAppAsync(string? phoneNumberId)
+    {
+        var numero = (phoneNumberId ?? "").Trim();
+        if (numero.Length is 0 or > 32 || !numero.All(char.IsAsciiDigit))
+        {
+            SetErro("phone_number_id inválido: use só os dígitos do id da Meta (até 32).");
+            return RedirectToPage(new { Id, tab = "features" });
+        }
+        return await EnviarWhatsAppAsync(numero, $"WhatsApp vinculado ao número {numero}.");
+    }
+
+    public Task<IActionResult> OnPostDesvincularWhatsAppAsync()
+        => EnviarWhatsAppAsync(null, "WhatsApp desvinculado. O envio volta a usar o número global.");
+
+    private async Task<IActionResult> EnviarWhatsAppAsync(string? phoneNumberId, string sucesso)
+    {
+        try
+        {
+            await api.PutRawAsync($"api/admin/tenants/{Id}/whatsapp", new { phoneNumberId });
+            SetSucesso(sucesso);
+        }
+        catch (SessionExpiredException) { throw; }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Falha ao alterar o WhatsApp do tenant {TenantId}", Id);
+            SetErro($"Falha ao alterar o WhatsApp: {ex.Message}");
+        }
+        return RedirectToPage(new { Id, tab = "features" });
     }
 
     // ─────────────────────── Ações sobre usuário do tenant (P0) ───────────────────────

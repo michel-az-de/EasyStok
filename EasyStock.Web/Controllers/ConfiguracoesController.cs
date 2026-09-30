@@ -1,4 +1,3 @@
-using EasyStock.Web.Models.ViewModels.ConfiguracaoFiscal;
 using EasyStock.Web.Models.ViewModels.Configuracoes;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +6,6 @@ namespace EasyStock.Web.Controllers;
 
 public class ConfiguracoesController(
     ConfiguracoesService svc,
-    ConfiguracaoFiscalService fiscalSvc,
     SessionService session) : BaseController(session)
 {
     [HttpGet("/configuracoes")]
@@ -37,8 +35,8 @@ public class ConfiguracoesController(
     }
 
     /// <summary>
-    /// Compõe a página (aba Geral + aba Fiscal) de forma EAGER (PATCH-2): usado pelo
-    /// GET e pelo caminho de erro do POST, p/ a aba fiscal nunca renderizar sem VM.
+    /// Compõe a página de forma EAGER (PATCH-2): usado pelo GET e pelo caminho de
+    /// erro do POST.
     /// Quando <paramref name="geral"/> vem (re-render de erro), preserva o que o usuário
     /// digitou; senão busca do backend.
     /// </summary>
@@ -64,9 +62,6 @@ public class ConfiguracoesController(
                 : new ConfiguracoesViewModel();
         }
 
-        var fiscalResult = await fiscalSvc.ObterAsync();
-        var fiscal = (fiscalResult.Success ? fiscalResult.Data : null) ?? new ConfiguracaoFiscalViewModel();
-
-        return new ConfiguracoesPageViewModel(geral, fiscal);
+        return new ConfiguracoesPageViewModel(geral);
     }
 }

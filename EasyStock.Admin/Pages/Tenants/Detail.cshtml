@@ -1199,6 +1199,50 @@ function operacaoErp(tenantId) {
 
     <!-- Feature Flags -->
     <div x-show="tab === 'features'" x-cloak>
+        <!-- WhatsApp (#1102): número da Meta pelo qual o atendimento recebe e responde -->
+        <div class="card mb-4">
+            <div class="flex items-start justify-between gap-4 mb-3">
+                <div>
+                    <div class="text-sm font-semibold text-es-ink">WhatsApp</div>
+                    <div class="text-xs text-es-ink-mute mt-0.5">
+                        phone_number_id da Cloud API da Meta. O webhook roteia por ele e as respostas saem por ele;
+                        sem número, o envio usa o global.
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.WhatsAppPhoneNumberId))
+                {
+                    <span class="text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap"
+                          style="background:rgba(79,191,159,0.15);color:#4fbf9f;border:1px solid rgba(79,191,159,0.3)">✓ Vinculado</span>
+                }
+                else
+                {
+                    <span class="text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap"
+                          style="background:rgba(135,147,167,0.1);color:#8793a7;border:1px solid rgba(135,147,167,0.2)">Sem número</span>
+                }
+            </div>
+            <div class="flex flex-wrap gap-2 items-end">
+                <form method="post" asp-page-handler="SalvarWhatsApp" class="flex gap-2 items-end flex-1"
+                      x-data="{ numero: '@Model.WhatsAppPhoneNumberId' }">
+                    @Html.AntiForgeryToken()
+                    <div class="flex-1">
+                        <label class="form-label" for="whatsapp-phone-number-id">phone_number_id</label>
+                        <input id="whatsapp-phone-number-id" type="text" name="phoneNumberId" x-model="numero"
+                               class="form-input font-mono" inputmode="numeric" pattern="[0-9]{1,32}" maxlength="32"
+                               placeholder="Ex: 123456789012345" required />
+                    </div>
+                    <button type="submit" :disabled="!/^[0-9]{1,32}$/.test(numero.trim())" class="btn-primary text-sm">Salvar</button>
+                </form>
+                @if (!string.IsNullOrEmpty(Model.WhatsAppPhoneNumberId))
+                {
+                    <form method="post" asp-page-handler="DesvincularWhatsApp"
+                          onsubmit="return confirm('Desvincular o WhatsApp desta empresa? O webhook deixa de rotear para ela.');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn-danger text-sm">Desvincular</button>
+                    </form>
+                }
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach (var f in Model.Features)
             {

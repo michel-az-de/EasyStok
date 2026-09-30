@@ -41,7 +41,7 @@ public class WebhookWhatsAppController(
     }
 
     [HttpPost]
-    [EnableRateLimiting("public-post")]
+    [EnableRateLimiting("webhook-meta")]
     public async Task<IActionResult> Receber(CancellationToken ct)
     {
         Request.EnableBuffering();

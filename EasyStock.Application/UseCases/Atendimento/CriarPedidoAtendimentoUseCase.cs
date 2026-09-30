@@ -39,6 +39,10 @@ public sealed class CriarPedidoAtendimentoUseCase(
         var conversa = await conversaRepository.ObterPorIdAsync(input.EmpresaId, input.ConversaId, ct)
             ?? throw new RegraDeDominioVioladaException($"Conversa {input.ConversaId} não encontrada.");
 
+        if (conversa.ClienteId != input.ClienteId)
+            throw new RegraDeDominioVioladaException(
+                $"Cliente {input.ClienteId} não é o cliente vinculado à conversa {input.ConversaId}.");
+
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException($"Cliente {input.ClienteId} não encontrado.");
 
