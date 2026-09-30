@@ -82,7 +82,10 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
         {mensagem.modelo && <span className={css.selo}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
-        {mensagem.dir === 'out' && (
+        {mensagem.status === 'falhou' && (
+          <span className={css.falhou} role="alert">⚠ {mensagem.erro ?? 'Não enviada.'}</span>
+        )}
+        {mensagem.dir === 'out' && mensagem.status !== 'falhou' && (
           <span>
             <span aria-hidden="true">{entregue ? '✓✓' : '✓'}</span>
             <span className="sr">{entregue ? 'entregue' : 'enviando'}</span>

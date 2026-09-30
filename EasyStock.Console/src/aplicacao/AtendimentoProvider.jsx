@@ -34,6 +34,9 @@ import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom
 import { dataHora } from '../dominio/formato'
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
 import { criarAcoesCardapio } from './acoes/cardapio'
+import { FONTE_API } from '../infra/fonteDados'
+import { comApi } from './acoesApi'
+import { useSincronizacaoApi } from './useSincronizacaoApi'
 import { criarAcoesCliente } from './acoes/cliente'
 import { criarAcoesComanda } from './acoes/comanda'
 import { criarAcoesCobranca } from './acoes/cobranca'
@@ -70,8 +73,13 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, children }) {
-  const [estado, despachar] = useReducer(reducer, null, () => estadoInicial(carregar()))
+export function AtendimentoProvider({ agora, sessao = null, children }) {
+  const [estado, despachar] = useReducer(reducer, null, () => ({
+    ...estadoInicial(carregar()),
+    // Modo API (F01): a lista nasce vazia e chega pelo polling.
+    sincronizacao: { estado: FONTE_API ? 'carregando' : 'desligada', mensagem: null, aviso: null },
+  }))
+  useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -568,6 +576,11 @@ export function AtendimentoProvider({ agora, children }) {
     })
   }, [conversasAgora, agoraEfetivo, estado.catalogo.janelas])
 
+  const acoesAtivas = useMemo(
+    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef }) : acoes),
+    [acoes],
+  )
+
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
     return {
@@ -639,12 +652,16 @@ export function AtendimentoProvider({ agora, children }) {
       // por cadastro. Pontos GANHOS não vêm daqui: são derivados do
       // `historico` (acima), ver dominio/fidelidade.js.
       fidelidade: estado.fidelidade,
+      // Modo API (F01): estado do polling e quem está logado.
+      fonteApi: FONTE_API,
+      sincronizacao: estado.sincronizacao,
+      sessao,
     }
-  }, [estado, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>
-      <ContextoAcoes.Provider value={acoes}>
+      <ContextoAcoes.Provider value={acoesAtivas}>
         <ContextoEstado.Provider value={valor}>{children}</ContextoEstado.Provider>
       </ContextoAcoes.Provider>
     </ContextoCatalogo.Provider>
