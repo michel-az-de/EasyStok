@@ -6,6 +6,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Webhook do Mercado Pago de ponta a ponta** (S32): `POST /api/webhooks/mercadopago` ganha o
+  `MercadoPagoWebhookProcessor` (antes respondia 500). Só o tópico `payment`; o `data.id` do corpo
+  dispara `GET v1/payments/{id}` e só o que a fonte devolve vale. `approved` confirma o pedido pela S11
+  (`AguardandoPagamento → Aguardando`, `PedidoPagamento`, `pedido.pago`); valor menor e recusa só gravam
+  o motivo (recusa avisa a conversa uma vez); `refunded`/`charged_back` marcam a cobrança `Estornada`.
+  Idempotência pelo id da notificação (numérico) no `WebhookRecebido`. Client: preferência em
+  `POST checkout/preferences`, consulta, `payments/search` por `external_reference` (o job de cobrança
+  confirma webhook perdido antes de expirar), estorno com `X-Idempotency-Key` e `PUT checkout/preferences/{id}`
+  para expirar o link antigo na troca de forma. Corrige o DI que entregava a porta com `HttpClient` sem
+  `BaseAddress`. Sem credencial ainda (onda 0.9). (#1136)
 - **Instagram Direct e Messenger** (S35, ADR-0051): webhook `api/webhooks/meta/mensageria` (objetos
   `instagram` e `page`, mesmo HMAC do App Secret), roteado por `Empresa.InstagramAccountId` e
   `Empresa.FacebookPageId`, idempotente pelo `mid`. Adaptadores `CanalInstagram` e `CanalMessenger` na

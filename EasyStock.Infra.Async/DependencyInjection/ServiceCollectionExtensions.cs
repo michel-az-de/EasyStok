@@ -181,6 +181,8 @@ public static class ServiceCollectionExtensions
             services.AddScoped<MercadoPagoGatewayAdapter>();
             services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
             services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
+            // S32: sem processor o /api/webhooks/mercadopago respondia 500. Rollback: remover esta linha.
+            services.AddScoped<IGatewayWebhookProcessor, MercadoPagoWebhookProcessor>();
         }
 
         return services;
