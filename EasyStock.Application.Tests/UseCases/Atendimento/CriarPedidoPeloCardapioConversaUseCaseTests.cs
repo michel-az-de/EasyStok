@@ -77,7 +77,7 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
 
             UseCase = new CriarPedidoPeloCardapioConversaUseCase(
                 LinkService, Tenant, ConversaRepo, clienteRepo,
-                new CriarPedidoAtendimentoUseCase(Checkout.Servico(), ConversaRepo, clienteRepo, Uow),
+                new CriarPedidoAtendimentoUseCase(Checkout.Servico(), ConversaRepo, clienteRepo, Checkout.ConfiguracaoAtendimentoRepo, Uow),
                 gerar, trocar, Uow, TimeProvider.System,
                 NullLogger<CriarPedidoPeloCardapioConversaUseCase>.Instance);
         }
