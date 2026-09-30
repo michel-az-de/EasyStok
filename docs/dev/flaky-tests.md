@@ -10,15 +10,6 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
-## EasyStock.Application.Tests / PollingOutboxSignalerTests.WaitAsync_completa_quando_intervalo_passa
-
-- **Por que é flaky:** o teste cria um `PollingOutboxSignaler(TimeSpan.FromMilliseconds(50))` e aguarda `Task.Delay(150)` antes de validar que `task.IsCompleted == true`. Em runner sob carga (CI lento, máquina dev compilando outra coisa), o scheduler do .NET pode atrasar o tick em ~100ms+ e a asserção falha.
-- **Como confirmar:** re-run resolve. Falha aparece tipicamente no primeiro test run após cold-start ou após qualquer outro teste com alto uso de CPU. Estabilidade próxima de 99% em runs limpos.
-- **Por que não foi corrigido:** corrigir exige (a) trocar `Task.Delay` por `FakeTimeProvider` injetável e refatorar `PollingOutboxSignaler` para aceitar `TimeProvider`, ou (b) aumentar a tolerância (`Task.Delay(500)`) e aceitar suite mais lenta. Ambos têm custo de refator/tempo de suite que não compensa para um teste que valida comportamento óbvio do `Task.Delay`.
-- **Quando promover a "corrigir":** se a flakiness subir de 1 falha esporádica para >5%/sprint, OU se outro teste de Notifications passar a flakar em conjunto (sinal de problema sistêmico de timing).
-
----
-
 ## ✅ CORRIGIDO (#1117) — gate de worktrees paralelos compartilhava a pasta de build
 
 Visto em `MigrationDesignerHygieneTests` (qualquer arch-test pode ser a vitima).

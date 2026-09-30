@@ -88,7 +88,8 @@ public static class NotificationsHostingServiceCollectionExtensions
                         intervaloMs, MinIntervaloMs, MinIntervaloMs);
                     efetivo = MinIntervaloMs;
                 }
-                return new PollingOutboxSignaler(TimeSpan.FromMilliseconds(efetivo));
+                return new PollingOutboxSignaler(
+                    TimeSpan.FromMilliseconds(efetivo), sp.GetRequiredService<TimeProvider>());
             });
         }
 

@@ -1,4 +1,5 @@
 using EasyStock.Application.Services.Notifications;
+using FakeTimeProvider = Microsoft.Extensions.Time.Testing.FakeTimeProvider;
 
 namespace EasyStock.Application.Tests.Services.Notifications;
 
@@ -43,18 +44,17 @@ public class PollingOutboxSignalerTests
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
-    // FLAKY: timing-sensitive (TimeSpan.FromMilliseconds(50) vs Task.Delay(150)).
-    // Pode falhar em CI lento ou em runner sob carga. Re-run resolve.
-    // Não-fiscal, não bloqueia deploy. Ver docs/dev/flaky-tests.md.
     [Fact]
     public async Task WaitAsync_completa_quando_intervalo_passa()
     {
-        using var sut = new PollingOutboxSignaler(TimeSpan.FromMilliseconds(50));
+        var time = new FakeTimeProvider();
+        using var sut = new PollingOutboxSignaler(TimeSpan.FromSeconds(5), time);
 
-        // Primeiro tick após ~50ms
         var task = sut.WaitAsync(CancellationToken.None);
-        await Task.Delay(150);
+        time.Advance(TimeSpan.FromSeconds(4));
+        task.IsCompleted.Should().BeFalse();
 
-        task.IsCompleted.Should().BeTrue();
+        time.Advance(TimeSpan.FromSeconds(1));
+        await task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }
