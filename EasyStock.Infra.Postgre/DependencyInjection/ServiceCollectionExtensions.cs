@@ -2,12 +2,10 @@ using EasyStock.Application.Events.Storefront.Handlers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
-using EasyStock.Application.Ports.Output.Caching;
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
-using EasyStock.Infra.Postgre.Caching;
 using EasyStock.Infra.Postgre.Configuration;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
@@ -36,8 +34,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
 
             services.AddSingleton<AuditTimestampsInterceptor>();
             services.AddSingleton<SetTenantOnConnectionInterceptor>();
-            services.AddSingleton<ISubscriptionStatusCache, SubscriptionStatusCache>();
-            services.AddSingleton<AssinaturaCacheInvalidationInterceptor>();
             services.AddScoped<EntityChangeInterceptor>();
             // BUG-009 (#517): invalida o cache de saldo (produto-detalhe) em QUALQUER
             // mutacao de ItemEstoque via SaveChanges. Chokepoint — pega os 8 mutadores
@@ -58,7 +54,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 .AddInterceptors(
                     sp.GetRequiredService<AuditTimestampsInterceptor>(),
                     sp.GetRequiredService<SetTenantOnConnectionInterceptor>(),
-                    sp.GetRequiredService<AssinaturaCacheInvalidationInterceptor>(),
                     sp.GetRequiredService<EntityChangeInterceptor>(),
                     // BUG-009 (#517): por ULTIMO — captura o estado final da entidade.
                     sp.GetRequiredService<EstoqueSaldoCacheInvalidationInterceptor>()));
@@ -111,7 +106,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IProdutoComposicaoAlteracaoRepository, ProdutoComposicaoAlteracaoRepository>();
             services.AddScoped<IMovimentacaoEstoqueAlteracaoRepository, MovimentacaoEstoqueAlteracaoRepository>();
             services.AddScoped<IIdempotencyKeyRepository, IdempotencyKeyRepository>();
-            services.AddScoped<ICobrancaAssinaturaRepository, CobrancaAssinaturaRepository>();
             services.AddScoped<IFaturaRepository, FaturaRepository>();
             services.AddScoped<IFaturaNumeradorService, FaturaNumeradorService>();
             services.AddScoped<ILancamentoRepository, LancamentoRepository>();
@@ -141,7 +135,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICupomAdminRepository, CupomAdminRepository>();
             services.AddScoped<IAdminDashboardQueries, AdminDashboardQueries>();
             services.AddScoped<IFleetOperationQueries, FleetOperationQueries>();
-            services.AddScoped<IRevenueMetricsQueries, RevenueMetricsQueries>(); // ADR-0037 adendo / #754
             services.AddScoped<IMetricasFinanceirasQueries, MetricasFinanceirasQueries>(); // #762 — bypass condicional a SuperAdmin
             services.AddScoped<IEntityAuditQueries, EntityAuditQueries>();
             services.AddScoped<IPublicadorEventos, PublicadorEventosEmMemoria>();

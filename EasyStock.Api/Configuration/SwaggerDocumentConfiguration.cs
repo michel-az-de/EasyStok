@@ -50,10 +50,9 @@ public static class SwaggerConfiguration
             - 📱 **Módulo Mobile** (Casa da Babá PWA — sync delta offline-first)
 
             ### Autenticação
-            1. `POST /api/auth/register` — cadastre um usuário
-            2. `POST /api/empresas/registrar` — registre sua empresa
-            3. `POST /api/auth/login` — obtenha o token JWT
-            4. Clique em **Authorize** e informe `Bearer <seu-token>`
+            1. A empresa e o primeiro usuário são criados pelo suporte (`POST /api/admin/tenants`)
+            2. `POST /api/auth/login` — obtenha o token JWT
+            3. Clique em **Authorize** e informe `Bearer <seu-token>`
 
             ### Envelope de Resposta
             Todas as respostas seguem um envelope padronizado:
