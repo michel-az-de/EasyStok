@@ -96,6 +96,37 @@ public class CampanhaDestinatario
         EnviadoEm = Campanha.Utc(em);
     }
 
+    /// <summary>O outbox desistiu da mensagem (S30): falha permanente ou tentativas esgotadas.</summary>
+    public void MarcarFalhou()
+    {
+        if (Status != StatusCampanhaDestinatario.Enfileirado)
+            throw new RegraDeDominioVioladaException($"Destinatário {Status} não pode ser marcado como falho.");
+        Status = StatusCampanhaDestinatario.Falhou;
+    }
+
+    /// <summary>
+    /// Campanha cancelada antes de a mensagem sair do outbox (S30): o destinatário volta a não ter
+    /// recebido, excluído com motivo <see cref="MotivoExclusaoCampanha.Cancelada"/>. Onda e mensagem
+    /// ficam como rastro.
+    /// </summary>
+    public void CancelarEnvio()
+    {
+        if (Status != StatusCampanhaDestinatario.Enfileirado)
+            throw new RegraDeDominioVioladaException($"Destinatário {Status} não está na fila para cancelar.");
+        Status = StatusCampanhaDestinatario.Excluido;
+        MotivoExclusao = MotivoExclusaoCampanha.Cancelada;
+    }
+
+    /// <summary>Pedido atribuído à campanha (S30): só quem recebeu, e só o primeiro pedido conta.</summary>
+    public void RegistrarPedido(Guid pedidoId)
+    {
+        if (pedidoId == Guid.Empty) throw new RegraDeDominioVioladaException("PedidoId é obrigatório.");
+        if (Status != StatusCampanhaDestinatario.Enviado)
+            throw new RegraDeDominioVioladaException($"Destinatário {Status} não pode ter pedido atribuído.");
+        Status = StatusCampanhaDestinatario.Pediu;
+        PedidoId = pedidoId;
+    }
+
     private void GarantirPendente()
     {
         if (Status != StatusCampanhaDestinatario.Pendente)

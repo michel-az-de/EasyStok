@@ -209,4 +209,76 @@ public class CampanhaTests
         var recalcularCancelada = () => campanha.GarantirPublicoRecalculavel();
         recalcularCancelada.Should().Throw<RegraDeDominioVioladaException>();
     }
+
+    [Fact]
+    public void ConcluirOndaLiberaAProximaSoComOndas()
+    {
+        var comOndas = Nova(Dados(tamanhoOnda: 30));
+        comOndas.Agendar(Agora.AddHours(1), Agora);
+        var antes = () => comOndas.ConcluirOnda();
+        antes.Should().Throw<RegraDeDominioVioladaException>("nada saiu ainda");
+
+        comOndas.IniciarOnda(Agora.AddHours(1));
+        comOndas.ConcluirOnda();
+        comOndas.Status.Should().Be(StatusCampanha.Enviada);
+        comOndas.IniciarOnda(Agora.AddDays(1)).Should().Be(2);
+        comOndas.Status.Should().Be(StatusCampanha.Enviando);
+
+        var semOndas = Nova();
+        semOndas.Agendar(Agora.AddHours(1), Agora);
+        semOndas.IniciarOnda(Agora.AddHours(1));
+        semOndas.ConcluirOnda();
+        var outra = () => semOndas.IniciarOnda(Agora.AddDays(1));
+        outra.Should().Throw<RegraDeDominioVioladaException>("sem ondas a campanha já saiu para todos");
+    }
+
+    [Fact]
+    public void DestinatarioEnfileiradoTerminaEnviadoFalhouOuCancelado()
+    {
+        var campanha = Nova();
+
+        var falhou = CampanhaDestinatario.Criar(campanha, Guid.NewGuid());
+        var falharPendente = () => falhou.MarcarFalhou();
+        falharPendente.Should().Throw<RegraDeDominioVioladaException>();
+        falhou.Enfileirar(1, Guid.NewGuid());
+        falhou.MarcarFalhou();
+        falhou.Status.Should().Be(StatusCampanhaDestinatario.Falhou);
+        falhou.EnviadoEm.Should().BeNull();
+
+        var cancelado = CampanhaDestinatario.Criar(campanha, Guid.NewGuid());
+        var outboxId = Guid.NewGuid();
+        cancelado.Enfileirar(2, outboxId);
+        cancelado.CancelarEnvio();
+        cancelado.Status.Should().Be(StatusCampanhaDestinatario.Excluido);
+        cancelado.MotivoExclusao.Should().Be(MotivoExclusaoCampanha.Cancelada);
+        cancelado.OutboxMensagemId.Should().Be(outboxId, "fica o rastro da mensagem cancelada");
+        cancelado.Onda.Should().Be(2);
+
+        var enviado = CampanhaDestinatario.Criar(campanha, Guid.NewGuid());
+        enviado.Enfileirar(1, Guid.NewGuid());
+        enviado.MarcarEnviado(Agora);
+        var cancelarEnviado = () => enviado.CancelarEnvio();
+        cancelarEnviado.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void PediuSoDepoisDeRecebido()
+    {
+        var campanha = Nova();
+        var destinatario = CampanhaDestinatario.Criar(campanha, Guid.NewGuid());
+        destinatario.Enfileirar(1, Guid.NewGuid());
+        var pedidoId = Guid.NewGuid();
+
+        var antesDeReceber = () => destinatario.RegistrarPedido(pedidoId);
+        antesDeReceber.Should().Throw<RegraDeDominioVioladaException>();
+
+        destinatario.MarcarEnviado(Agora);
+        destinatario.RegistrarPedido(pedidoId);
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
+        destinatario.PedidoId.Should().Be(pedidoId);
+        destinatario.EnviadoEm.Should().Be(Agora, "o limite semanal continua contando o envio");
+
+        var outroPedido = () => destinatario.RegistrarPedido(Guid.NewGuid());
+        outroPedido.Should().Throw<RegraDeDominioVioladaException>("a conversão conta o primeiro pedido");
+    }
 }

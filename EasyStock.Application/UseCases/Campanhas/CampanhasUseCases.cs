@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Domain.Entities.Campanhas;
 using EasyStock.Domain.Enums.Campanhas;
+using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.UseCases.Campanhas;
 
@@ -26,7 +27,8 @@ public sealed record CampanhaResult(
         c.EncerramentoEm, c.EnviarLembreteEncerramento, c.TamanhoOnda, c.OndaAtual, c.CriadaEm, c.CriadaPorUsuarioId);
 }
 
-public sealed record CancelarCampanhaResult(CampanhaResult Campanha, int DestinatariosExcluidos);
+/// <param name="MensagensCanceladas">Mensagens da onda em curso tiradas do outbox antes de sair (S30).</param>
+public sealed record CancelarCampanhaResult(CampanhaResult Campanha, int DestinatariosExcluidos, int MensagensCanceladas);
 
 /// <summary>Vira 404 na API: inexistente ou de outra empresa (não vaza existência).</summary>
 public sealed class CampanhaNaoEncontradaException(Guid id)
@@ -88,7 +90,11 @@ public sealed class ListarCampanhasUseCase(ICampanhaRepository repository)
         (await repository.ListarAsync(empresaId, status, LimitePadrao, ct)).Select(CampanhaResult.De).ToList();
 }
 
-/// <summary>S28: cancela; pendentes viram excluídos com motivo "cancelada", enviados ficam como estão.</summary>
+/// <summary>
+/// S28: cancela; pendentes viram excluídos com motivo "cancelada", enviados ficam como estão. S30: quem
+/// está na fila com a mensagem ainda pendente no outbox sai dela (mensagem cancelada, motivo "cancelada");
+/// a mensagem que já foi pega pelo dispatcher segue e o job a concilia.
+/// </summary>
 public sealed class CancelarCampanhaUseCase(ICampanhaRepository repository, IUnitOfWork unitOfWork)
 {
     public async Task<CancelarCampanhaResult> ExecuteAsync(Guid empresaId, Guid campanhaId, CancellationToken ct = default)
@@ -99,7 +105,16 @@ public sealed class CancelarCampanhaUseCase(ICampanhaRepository repository, IUni
         var pendentes = await repository.ListarPendentesAsync(empresaId, campanhaId, ct);
         var excluidos = campanha.Cancelar(pendentes);
 
+        var canceladas = 0;
+        foreach (var (destinatario, mensagem) in await repository.ListarEnfileiradosAsync(empresaId, campanhaId, ct))
+        {
+            if (mensagem?.Status != StatusOutbox.Pendente) continue;
+            mensagem.Cancelar();
+            destinatario.CancelarEnvio();
+            canceladas++;
+        }
+
         await unitOfWork.CommitAsync();
-        return new CancelarCampanhaResult(CampanhaResult.De(campanha), excluidos);
+        return new CancelarCampanhaResult(CampanhaResult.De(campanha), excluidos, canceladas);
     }
 }

@@ -88,7 +88,8 @@ public sealed class CalcularPublicoCampanhaUseCase(
                 && compra >= agora.AddDays(-(filtro.ComprouNosUltimosDias ?? FiltroCampanha.DiasMaximo)));
     }
 
-    private static string? MotivoExclusao(CandidatoPublicoCampanha cliente, HashSet<string> restricoes, DateTime agora)
+    /// <summary>Primeiro motivo da ordem que tira o cliente; o disparo (S30) reconfere no instante do envio.</summary>
+    internal static string? MotivoExclusao(CandidatoPublicoCampanha cliente, HashSet<string> restricoes, DateTime agora)
     {
         if (cliente.Bloqueado) return MotivoExclusaoCampanha.Bloqueado;
         if (!cliente.ConsentiuMarketing) return MotivoExclusaoCampanha.SemConsentimento;

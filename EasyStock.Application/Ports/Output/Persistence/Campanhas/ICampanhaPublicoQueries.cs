@@ -14,6 +14,7 @@ namespace EasyStock.Application.Ports.Output.Persistence.Campanhas;
 /// <param name="UltimaCampanhaRecebidaEm">
 /// <c>EnviadoEm</c> mais recente de outra campanha (destinatário <c>Enviado</c> ou <c>Pediu</c>).
 /// </param>
+/// <param name="Telefone">Como está no cadastro; o disparo (S30) normaliza para E.164.</param>
 public sealed record CandidatoPublicoCampanha(
     Guid ClienteId,
     string Nome,
@@ -22,7 +23,8 @@ public sealed record CandidatoPublicoCampanha(
     bool ConsentiuMarketing,
     IReadOnlyList<string> Tags,
     DateTime? UltimaCompraItemEm,
-    DateTime? UltimaCampanhaRecebidaEm);
+    DateTime? UltimaCampanhaRecebidaEm,
+    string? Telefone = null);
 
 /// <summary>Destinatário da campanha com o nome do cliente, para a dona conferir a lista.</summary>
 public sealed record DestinatarioCampanhaResumo(

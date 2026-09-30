@@ -146,6 +146,17 @@ public class Campanha
         return OndaAtual;
     }
 
+    /// <summary>
+    /// A onda em curso terminou (S30): nenhum destinatário dela segue na fila do outbox. Com
+    /// <see cref="TamanhoOnda"/>, a próxima fica à espera da dona (RN-42).
+    /// </summary>
+    public void ConcluirOnda()
+    {
+        if (Status != StatusCampanha.Enviando)
+            throw new RegraDeDominioVioladaException($"Campanha {Status} não tem onda em curso.");
+        Status = StatusCampanha.Enviada;
+    }
+
     /// <summary>O público (S29) só é recalculado enquanto a campanha pode mandar mais alguma onda.</summary>
     public void GarantirPublicoRecalculavel()
     {
