@@ -22,7 +22,7 @@ public class TestHygieneTests
 
     private static readonly string[] ProductionProjectPrefixes =
         ["EasyStock.Domain", "EasyStock.Application", "EasyStock.Api",
-         "EasyStock.Infra.", "EasyStock.Web", "EasyStock.Admin",
+         "EasyStock.Infra.", "EasyStock.Web",
          "EasyStock.Worker", "EasyStock.Contracts"];
 
     // (a) Casa "if (!<algo>Available) return;" (single-condition).

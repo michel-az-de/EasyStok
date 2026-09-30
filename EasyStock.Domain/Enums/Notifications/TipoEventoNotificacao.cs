@@ -52,11 +52,17 @@ public enum TipoEventoNotificacao
     // Caixa esquecido aberto de um dia anterior (CaixaEsquecidoJob — só notifica, não fecha).
     CaixaAbertoEsquecido = 37,
 
-    // Atendimento por WhatsApp (S07): o agente passou a conversa para a dona. 38-45 reservados pelo
-    // plano (docs/plan/atendimento-whatsapp: status de pedido, avaliacao, reembolso, campanhas).
+    // Avisos de status do pedido ao cliente pelo WhatsApp (S13). 42-45 seguem reservados pelo plano
+    // (docs/plan/atendimento-whatsapp: avaliacao, reembolso, campanhas).
+    PedidoPagoConfirmado = 38,
+    PedidoEmPreparo = 39,
+    PedidoSaiuParaEntrega = 40,
+    PedidoEntregue = 41,
+
     // Ocorrencia (S27): reembolso confirmado pelo gateway; avisa o cliente.
     ReembolsoEfetuado = 43,
 
+    // Atendimento por WhatsApp (S07): o agente passou a conversa para a dona.
     ConversaEscalada = 46,
 
     // Lembretes da dona (S43): lembrete venceu (manual) ou nasceu do avaliador (pagamento sem baixa,

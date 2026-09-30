@@ -69,7 +69,8 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
                 cobrancaRepo, mp, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             var trocar = new TrocarFormaPagamentoPedidoUseCase(Checkout.PedidoRepo, cobrancaRepo, gerar,
                 new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([]), Uow, NullLogger<AvisoCobrancaConversa>.Instance),
-                Substitute.For<IPublicadorEventoIntegracao>(), Uow, TimeProvider.System);
+                Substitute.For<IPublicadorEventoIntegracao>(), mp, Uow, TimeProvider.System,
+                NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance);
 
             LinkService = new LinkCardapioConversaService(Links,
                 new SaudacaoAtendimento(Checkout.StorefrontRepo, new ConfigurationBuilder().Build()));

@@ -117,4 +117,27 @@ public class CobrancaPedidoTests
     [InlineData(null, null, "outro")]
     public void MapearMetodo_TraduzOCodigoDoMercadoPago(string? metodo, string? tipo, string esperado) =>
         CobrancaPedido.MapearMetodo(metodo, tipo).Should().Be(esperado);
+
+    [Fact]
+    public void MarcarEstornada_SoCobrancaPaga_EIdempotente()
+    {
+        var c = Online();
+        c.MarcarPaga("pay-1", 25m, "credito", Agora);
+
+        c.MarcarEstornada("estorno_mp: pagamento pay-1 (refunded)", Agora.AddHours(1));
+        c.MarcarEstornada("estorno_mp: repetido", Agora.AddHours(2));
+
+        c.Status.Should().Be(StatusCobrancaPedido.Estornada);
+        c.Motivo.Should().Be("estorno_mp: pagamento pay-1 (refunded)", "o segundo aviso de estorno é no-op");
+        c.AtualizadaEm.Should().Be(Agora.AddHours(1));
+        var pagarDeNovo = () => c.MarcarPaga("pay-1", 25m, "credito", Agora.AddHours(3));
+        pagarDeNovo.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void MarcarEstornada_CobrancaNaoPaga_Recusa()
+    {
+        var act = () => Online().MarcarEstornada("estorno", Agora);
+        act.Should().Throw<RegraDeDominioVioladaException>();
+    }
 }

@@ -1,5 +1,8 @@
-﻿using System.Net.Http.Json;
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,11 +10,18 @@ using Microsoft.Extensions.Options;
 namespace EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 
 /// <summary>
-/// Adapter HTTP direto para a Preferences API do MercadoPago (ADR-0005).
+/// Adapter HTTP direto para a API do MercadoPago (ADR-0005): Preferences do Checkout Pro
+/// (<c>checkout/preferences</c>) e Payments (<c>v1/payments</c>, S32).
 /// NÃO usa o SDK estático MercadoPago.NET — usa <see cref="HttpClient"/> tipado
 /// com timeout configurado externamente (5 s via caller em <c>IniciarCheckoutUseCase</c>).
+///
+/// <para>
+/// Ids que entram no caminho da URL passam por formato fechado (pagamento: só dígitos; preferência:
+/// letras, dígitos e hífen): um id vindo de webhook nunca muda o recurso chamado.
+/// Nada de token, corpo ou dado do comprador vai para o log.
+/// </para>
 /// </summary>
-public sealed class MercadoPagoClient(
+public sealed partial class MercadoPagoClient(
     HttpClient httpClient,
     IOptions<MercadoPagoOptions> options,
     ILogger<MercadoPagoClient> logger) : IMercadoPagoClient
@@ -22,6 +32,12 @@ public sealed class MercadoPagoClient(
         // Campo opcional ausente não vai no corpo (ex.: expiration_date_to sem expiração).
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
+
+    [GeneratedRegex("^[0-9]{1,30}$")]
+    private static partial Regex FormatoPagamentoId();
+
+    [GeneratedRegex("^[A-Za-z0-9-]{1,120}$")]
+    private static partial Regex FormatoPreferenceId();
 
     public async Task<PreferenceCriadaResult> CriarPreferenceAsync(
         CriarPreferenceCommand command,
@@ -50,9 +66,9 @@ public sealed class MercadoPagoClient(
             expiration_date_to = command.ExpiraEm.HasValue ? FormatarDataMp(command.ExpiraEm.Value) : null,
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "v1/payments/preferences");
+        // S32: endpoint documentado do Checkout Pro (o antigo v1/payments/preferences nunca foi validado).
+        using var request = Requisicao(HttpMethod.Post, "checkout/preferences");
         request.Content = JsonContent.Create(payload, options: JsonOpts);
-        request.Headers.Add("Authorization", $"Bearer {options.Value.AccessToken}");
         if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
             request.Headers.Add("X-Idempotency-Key", command.IdempotencyKey);
 
@@ -75,7 +91,129 @@ public sealed class MercadoPagoClient(
         return new PreferenceCriadaResult(id, initPoint);
     }
 
+    public async Task<PagamentoMercadoPago?> ConsultarPagamentoAsync(string pagamentoId, CancellationToken ct = default)
+    {
+        var id = ValidarPagamentoId(pagamentoId);
+
+        using var request = Requisicao(HttpMethod.Get, $"v1/payments/{id}");
+        using var response = await httpClient.SendAsync(request, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        return LerPagamento(doc.RootElement);
+    }
+
+    public async Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPorReferenciaAsync(
+        string referenciaExterna, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(referenciaExterna))
+            throw new ArgumentException("Referência externa é obrigatória.", nameof(referenciaExterna));
+
+        var url = $"v1/payments/search?external_reference={Uri.EscapeDataString(referenciaExterna.Trim())}" +
+                  "&sort=date_created&criteria=desc";
+        using var request = Requisicao(HttpMethod.Get, url);
+        using var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+            return [];
+
+        return results.EnumerateArray().Select(LerPagamento).ToList();
+    }
+
+    public async Task<EstornoMercadoPagoResult> EstornarAsync(
+        string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        var id = ValidarPagamentoId(pagamentoId);
+        if (valor is <= 0m)
+            throw new ArgumentOutOfRangeException(nameof(valor), "Valor do estorno deve ser maior que zero.");
+
+        var chave = string.IsNullOrWhiteSpace(idempotencyKey)
+            ? $"estorno-{id}-{(valor.HasValue ? valor.Value.ToString("F2", CultureInfo.InvariantCulture) : "total")}"
+            : idempotencyKey.Trim();
+
+        using var request = Requisicao(HttpMethod.Post, $"v1/payments/{id}/refunds");
+        request.Headers.Add("X-Idempotency-Key", chave);
+        // Estorno total vai sem corpo; parcial leva amount (documentação de Reembolsos).
+        if (valor.HasValue)
+            request.Content = JsonContent.Create(new { amount = valor.Value }, options: JsonOpts);
+
+        using var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        var root = doc.RootElement;
+        var estornoId = Texto(root, "id")
+            ?? throw new InvalidOperationException("MercadoPago não retornou id do estorno.");
+
+        logger.LogInformation("MP estorno criado paymentId={PaymentId}", id);
+        return new EstornoMercadoPagoResult(estornoId, Numero(root, "amount"), Texto(root, "status"));
+    }
+
+    public async Task ExpirarPreferenciaAsync(string preferenceId, DateTime expiraEm, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(preferenceId) || !FormatoPreferenceId().IsMatch(preferenceId))
+            throw new ArgumentException("Id de preferência fora do formato.", nameof(preferenceId));
+
+        using var request = Requisicao(HttpMethod.Put, $"checkout/preferences/{preferenceId}");
+        request.Content = JsonContent.Create(
+            new { expires = true, expiration_date_to = FormatarDataMp(expiraEm) }, options: JsonOpts);
+
+        using var response = await httpClient.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        logger.LogInformation("MP preference expirada preferenceId={PreferenceId}", preferenceId);
+    }
+
+    private HttpRequestMessage Requisicao(HttpMethod metodo, string caminho)
+    {
+        var request = new HttpRequestMessage(metodo, caminho);
+        request.Headers.Add("Authorization", $"Bearer {options.Value.AccessToken}");
+        return request;
+    }
+
+    private static string ValidarPagamentoId(string pagamentoId)
+    {
+        if (string.IsNullOrWhiteSpace(pagamentoId) || !FormatoPagamentoId().IsMatch(pagamentoId))
+            throw new ArgumentException("Id de pagamento fora do formato (só dígitos).", nameof(pagamentoId));
+        return pagamentoId;
+    }
+
+    private static PagamentoMercadoPago LerPagamento(JsonElement p) => new(
+        Id: Texto(p, "id") ?? throw new InvalidOperationException("MercadoPago não retornou id do pagamento."),
+        Status: Texto(p, "status") ?? string.Empty,
+        StatusDetail: Texto(p, "status_detail"),
+        ExternalReference: Texto(p, "external_reference"),
+        TransactionAmount: Numero(p, "transaction_amount") ?? 0m,
+        DateApproved: Data(p, "date_approved"),
+        PaymentMethodId: Texto(p, "payment_method_id"),
+        PaymentTypeId: Texto(p, "payment_type_id"));
+
+    /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
+    private static string? Texto(JsonElement e, string campo)
+    {
+        if (!e.TryGetProperty(campo, out var v)) return null;
+        return v.ValueKind switch
+        {
+            JsonValueKind.String => v.GetString(),
+            JsonValueKind.Number => v.GetRawText(),
+            _ => null,
+        };
+    }
+
+    private static decimal? Numero(JsonElement e, string campo) =>
+        e.TryGetProperty(campo, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var d) ? d : null;
+
+    private static DateTime? Data(JsonElement e, string campo) =>
+        Texto(e, campo) is { } s && DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d.UtcDateTime
+            : null;
+
     /// <summary>ISO 8601 com milissegundos e offset, formato que o Mercado Pago aceita (<c>2026-09-29T12:30:00.000+00:00</c>).</summary>
     private static string FormatarDataMp(DateTime utc) =>
-        new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", System.Globalization.CultureInfo.InvariantCulture);
+        new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
 }

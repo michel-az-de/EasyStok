@@ -54,8 +54,8 @@ public class CodeQlCsrfFilterTests
             .ToList();
 
         exclusoes.Should().Equal(new[] { "EasyStock.Api/**" },
-            "a supressao do CSRF vale so para a Api, que e bearer. EasyStock.Web e EasyStock.Admin " +
-            "autenticam por cookie e precisam da regra inteira (ADR-0052).");
+            "a supressao do CSRF vale so para a Api, que e bearer. EasyStock.Web " +
+            "autentica por cookie e precisa da regra inteira (ADR-0052).");
     }
 
     [Fact]

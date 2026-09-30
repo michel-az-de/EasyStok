@@ -25,4 +25,23 @@ public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger)
 
         return Task.FromResult(new PreferenceCriadaResult(preferenceId, initPoint));
     }
+
+    /// <summary>Stub não conhece pagamento nenhum: o webhook (que não chega em Development) seria ignorado.</summary>
+    public Task<PagamentoMercadoPago?> ConsultarPagamentoAsync(string pagamentoId, CancellationToken ct = default) =>
+        Task.FromResult<PagamentoMercadoPago?>(null);
+
+    /// <summary>Sem pagamento no stub: o job de cobrança segue expirando normalmente.</summary>
+    public Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPorReferenciaAsync(
+        string referenciaExterna, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<PagamentoMercadoPago>>([]);
+
+    public Task<EstornoMercadoPagoResult> EstornarAsync(
+        string pagamentoId, decimal? valor = null, string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        logger.LogInformation("StubMercadoPago estorno simulado");
+        return Task.FromResult(new EstornoMercadoPagoResult($"stub-estorno-{Guid.NewGuid():N}", valor, "approved"));
+    }
+
+    public Task ExpirarPreferenciaAsync(string preferenceId, DateTime expiraEm, CancellationToken ct = default) =>
+        Task.CompletedTask;
 }

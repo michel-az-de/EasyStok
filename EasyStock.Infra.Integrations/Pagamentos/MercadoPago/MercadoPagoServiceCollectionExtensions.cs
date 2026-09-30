@@ -23,17 +23,18 @@ public static class MercadoPagoServiceCollectionExtensions
         else
         {
             services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.Section));
-            services.AddHttpClient<MercadoPagoClient>(client =>
+            // S32: registra a PORTA como client tipado. O antigo AddHttpClient<MercadoPagoClient> +
+            // AddScoped<IMercadoPagoClient, MercadoPagoClient> resolvia a porta com um HttpClient sem BaseAddress.
+            services.AddHttpClient<IMercadoPagoClient, MercadoPagoClient>(client =>
             {
                 var baseUrl = configuration["MercadoPago:BaseUrl"] ?? "https://api.mercadopago.com/";
                 client.BaseAddress = new Uri(baseUrl);
                 client.Timeout = TimeSpan.FromSeconds(10); // timeout externo de segurança
             });
-            services.AddScoped<IMercadoPagoClient, MercadoPagoClient>();
         }
 
-        // S27: estorno de pedido. Troca pelo adaptador do Mercado Pago quando a S32 entrar.
-        services.AddScoped<IEstornoPedidoGateway, EstornoPedidoIndisponivelGateway>();
+        // S27: estorno da ocorrência sobre o EstornarAsync (S32).
+        services.AddScoped<IEstornoPedidoGateway, MercadoPagoEstornoPedidoGateway>();
 
         return services;
     }

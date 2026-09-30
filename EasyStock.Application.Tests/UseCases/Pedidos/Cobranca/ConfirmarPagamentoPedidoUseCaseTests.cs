@@ -50,6 +50,24 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task RequerAprovacaoVaiParaAprovacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        f.Pedido.MarcarRequerAprovacao("fora_de_area");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        r.Confirmado.Should().BeTrue();
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba,
+            "pedido de exceção (S12) vai para a aprovação da dona, não direto para a fila");
+        await f.Publicador.Received(1).PublicarAsync(
+            f.EmpresaId, "pedido.mudou_status", "pedido", f.Pedido.Id,
+            Arg.Is<PedidoMudouStatusEvent>(e => e.StatusNovo == StatusPedidoMapper.AguardandoAprovacaoBaba),
+            Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task CalculaInicioPrevisto()
     {
         // S21: janela de 12:00 (Brasília) e prazo de 100 min (maior preparo 60 + respiro 40) → começa 10:20.
