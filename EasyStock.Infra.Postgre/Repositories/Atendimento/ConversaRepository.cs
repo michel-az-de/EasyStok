@@ -18,6 +18,21 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
     public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.AtendimentoConversas.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id, ct);
 
+    public async Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default)
+    {
+        // Leitura escalar de propósito: a entidade já rastreada no escopo (agente, console) não é
+        // relida pelo EF, e recarregá-la descartaria mudanças pendentes. Só esta coluna decide.
+        var linhas = await db.Database
+            .SqlQuery<Guid?>($"""
+                SELECT "PedidoEmAndamentoId" AS "Value"
+                FROM atendimento_conversas
+                WHERE "EmpresaId" = {empresaId} AND "Id" = {id}
+                FOR UPDATE
+                """)
+            .ToListAsync(ct);
+        return linhas.Count == 0 ? null : linhas[0];
+    }
+
     public Task<SituacaoConversa?> ObterSituacaoAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.AtendimentoConversas
             .AsNoTracking()

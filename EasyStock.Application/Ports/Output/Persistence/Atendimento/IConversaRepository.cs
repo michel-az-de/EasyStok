@@ -25,6 +25,13 @@ public interface IConversaRepository
     Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
     /// <summary>
+    /// Trava a linha da conversa (<c>SELECT ... FOR UPDATE</c>) e devolve o <c>PedidoEmAndamentoId</c>
+    /// lido do banco nesse instante, não o da entidade rastreada (#1238). Exige transação explícita
+    /// aberta: o lock dura até o commit e serializa a geração de pedido da mesma conversa.
+    /// </summary>
+    Task<Guid?> TravarParaPedidoAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
+    /// <summary>
     /// Situacao gravada no banco, sem tracking (nulo se a conversa nao existe). O turno do agente rele
     /// antes de enviar: a dona pode ter assumido enquanto o LLM respondia (#1288).
     /// </summary>

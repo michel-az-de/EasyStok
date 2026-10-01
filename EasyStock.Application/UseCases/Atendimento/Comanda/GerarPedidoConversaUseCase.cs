@@ -4,7 +4,6 @@ using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
-using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
@@ -37,13 +36,12 @@ public sealed record PedidoConversaGeradoResult(
 ///
 /// <para>
 /// Um pedido por vez: com pedido em andamento ainda não finalizado na conversa, recusa (clique duplo
-/// não cria dois pedidos nem ocupa duas vagas).
+/// não cria dois pedidos nem ocupa duas vagas). A regra vive no núcleo, com a conversa travada (#1238).
 /// </para>
 /// </summary>
 public sealed class GerarPedidoConversaUseCase(
     IConversaRepository conversaRepository,
     IClienteRepository clienteRepository,
-    IPedidoRepository pedidoRepository,
     CriarPedidoAtendimentoUseCase criarPedido,
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
@@ -69,7 +67,6 @@ public sealed class GerarPedidoConversaUseCase(
             ?? throw new ConversaNaoEncontradaException(input.ConversaId);
         if (!conversa.EstaAberta)
             throw new RegraDeDominioVioladaException("A conversa está encerrada.");
-        await GarantirSemPedidoEmAndamentoAsync(input.EmpresaId, conversa.PedidoEmAndamentoId);
 
         if (conversa.ClienteId is not { } clienteId)
             throw new RegraDeDominioVioladaException("Cadastre o cliente desta conversa antes de gerar o pedido.");
@@ -87,14 +84,6 @@ public sealed class GerarPedidoConversaUseCase(
         var enviado = await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto, relogio.GetUtcNow().UtcDateTime, ct);
 
         return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado);
-    }
-
-    private async Task GarantirSemPedidoEmAndamentoAsync(Guid empresaId, Guid? pedidoEmAndamentoId)
-    {
-        if (pedidoEmAndamentoId is not { } pedidoId) return;
-        var anterior = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
-        if (anterior is not null && !PedidoStateMachine.EstaFinalizado(anterior.StatusEnum))
-            throw new RegraDeDominioVioladaException("Esta conversa já tem um pedido em andamento.");
     }
 
     private async Task<CobrancaPedidoResult?> CobrarAsync(

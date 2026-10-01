@@ -56,6 +56,41 @@ public sealed class KdsPedidoQueriesPostgresTests(PostgreSqlDatabaseFixture fixt
         comVaga.Itens.Should().ContainSingle().Which.Linha.Should().Be("prepararEmCasa");
     }
 
+    /// <summary>
+    /// F08 item 5 (#1238): pedido fora de área para daqui a 3 dias espera a dona aprovar hoje. O corte por
+    /// dia de produção vale para a cozinha, não para a fila de aprovação.
+    /// </summary>
+    [SkippableFact]
+    public async Task AguardandoAprovacao_ApareceSemCorteDeData()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var empresa = Guid.NewGuid();
+        db.SetMobileTenantContext(empresa);
+        db.Empresas.Add(NovaEmpresa(empresa));
+        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(empresa, $"sf-kds-{Guid.NewGuid():N}", "SF KDS", 0m);
+        db.Storefronts.Add(storefront);
+        var janela = JanelaEntrega.Criar(storefront.Id, 1, new TimeOnly(11, 0), new TimeOnly(13, 0), 10, "Almoço");
+        db.JanelasEntrega.Add(janela);
+
+        var hoje = HorarioBrasil.Hoje();
+        var paraAprovar = NovoPedido(empresa, StatusPedidoMapper.AguardandoAprovacaoBaba);
+        var cozinhaDaquiA3Dias = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+        db.Pedidos.AddRange(paraAprovar, cozinhaDaquiA3Dias);
+        db.VagasOcupadas.Add(VagaOcupada.Ocupar(janela.Id, hoje.AddDays(3), paraAprovar.Id));
+        db.VagasOcupadas.Add(VagaOcupada.Ocupar(janela.Id, hoje.AddDays(3), cozinhaDaquiA3Dias.Id));
+        await db.SaveChangesAsync();
+
+        var lidos = await new KdsPedidoQueries(db).ListarAsync(
+            empresa,
+            [StatusPedidoMapper.AguardandoAprovacaoBaba, StatusPedidoMapper.Aguardando],
+            hoje.AddDays(-1),
+            hoje);
+
+        lidos.Select(p => p.Id).Should().Equal(paraAprovar.Id);
+    }
+
     private static Empresa NovaEmpresa(Guid empresaId) => new()
     {
         Id = empresaId,
