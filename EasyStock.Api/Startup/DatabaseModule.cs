@@ -69,6 +69,11 @@ public static class DatabaseModule
                 builder.Services.AddEasyStockMetaMensageria(builder.Configuration);
                 // Atendimento WhatsApp (S06) — LLM do agente (Anthropic:*; desligado sem chave).
                 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
+                // Login com Google (#1324): Auth:Google:ClientId; desligado sem ele.
+                builder.Services.Configure<EasyStock.Infra.Integrations.Auth.GoogleAuthOptions>(
+                    builder.Configuration.GetSection(EasyStock.Infra.Integrations.Auth.GoogleAuthOptions.Secao));
+                builder.Services.AddSingleton<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator,
+                    EasyStock.Infra.Integrations.Auth.GoogleIdTokenValidator>();
                 // Key ring compartilhado com o Worker via Postgres (#1035). O certificado A1
                 // cifrado aqui e decifrado la na emissao/reprocessamento fiscal — com o
                 // registro default cada processo tinha o seu key ring e o Unprotect cruzado
