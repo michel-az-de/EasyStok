@@ -16,7 +16,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
     {
         // Fail-fast: valida filename (path traversal) e MIME antes de qualquer IO.
         var safeFileName = UploadSecurityValidator.SanitizeFileName(request.FileName);
-        UploadSecurityValidator.EnsureValidMime(request.ContentType);
+        UploadSecurityValidator.EnsureValidMime(request);
 
         var relativePath = request.BucketPath.Replace('\\', '/').Trim('/');
         var rootPath = Path.GetFullPath(GetRootPath());

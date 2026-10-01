@@ -46,9 +46,10 @@ public sealed class SmtpEmailCanal(
             }, ct);
 
             sw.Stop();
+            // Sem o endereço: dado pessoal fora do log (LGPD, #1292); o OutboxId leva à mensagem.
             logger.LogInformation(
-                "Email enviado para {Destinatario} outbox={OutboxId} em {Ms}ms",
-                mensagem.Destinatario, mensagem.OutboxId, sw.ElapsedMilliseconds);
+                "Email enviado outbox={OutboxId} em {Ms}ms",
+                mensagem.OutboxId, sw.ElapsedMilliseconds);
 
             return new ResultadoEnvio(
                 Sucesso: true,
@@ -59,8 +60,8 @@ public sealed class SmtpEmailCanal(
         {
             sw.Stop();
             logger.LogError(ex,
-                "Falha ao enviar email para {Destinatario} outbox={OutboxId}",
-                mensagem.Destinatario, mensagem.OutboxId);
+                "Falha ao enviar email outbox={OutboxId}",
+                mensagem.OutboxId);
 
             return new ResultadoEnvio(
                 Sucesso: false,

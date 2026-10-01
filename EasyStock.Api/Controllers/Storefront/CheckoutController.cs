@@ -19,6 +19,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/checkout")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class CheckoutController(
     IniciarCheckoutUseCase iniciarCheckoutUseCase,
     IniciarCheckoutGuestUseCase iniciarCheckoutGuestUseCase,

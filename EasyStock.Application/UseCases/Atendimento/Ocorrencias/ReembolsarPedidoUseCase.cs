@@ -3,10 +3,12 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Ocorrencias;
 
@@ -24,7 +26,9 @@ public sealed record ReembolsoResultado(SituacaoReembolso Situacao, string Codig
 /// Devolve o dinheiro do pedido da ocorrência (S27, RN-36). Busca a <see cref="CobrancaPedido"/> online
 /// paga (S11) e estorna pelo gateway com <c>X-Idempotency-Key = ocorrenciaId</c> (S32). Sucesso grava o
 /// reembolso na ocorrência, cria a <c>ClienteNota</c> "reembolso de R$ X: motivo" e enfileira
-/// <see cref="TipoEventoNotificacao.ReembolsoEfetuado"/> para avisar o cliente (outbox, ADR-0030).
+/// <see cref="TipoEventoNotificacao.ReembolsoEfetuado"/> para avisar o cliente (outbox, ADR-0030) com
+/// <c>telefone</c> (E.164), <c>nome</c> e <c>numero</c> no payload, como o aviso de status do pedido (#1292).
+/// Sem telefone válido o aviso não é enfileirado: o reembolso vale do mesmo jeito.
 /// Pedido pago fora do gateway responde <see cref="CodigoReembolsoManual"/> e guarda o valor para
 /// conferência. Valor maior que o pago é <see cref="UseCaseValidationException"/> (400).
 /// Não faz commit: é parte da resolução (<see cref="ResolverOcorrenciaUseCase"/>).
@@ -75,15 +79,22 @@ public sealed class ReembolsarPedidoUseCase(
         await crm.AdicionarNotaAsync(
             ClienteNota.Criar(ocorrencia.EmpresaId, ocorrencia.ClienteId, texto, AutorNota, agora, ocorrencia.PedidoId), ct);
 
-        var payload = JsonSerializer.Serialize(new
+        var cliente = await crm.ObterComTagsAsync(ocorrencia.EmpresaId, ocorrencia.ClienteId, ct);
+        if (TelefoneE164(cliente?.Telefone) is { } telefone)
         {
-            ocorrenciaId = ocorrencia.Id.ToString(),
-            pedidoId = ocorrencia.PedidoId.ToString(),
-            clienteId = ocorrencia.ClienteId.ToString(),
-            conversaId = ocorrencia.ConversaId?.ToString(),
-            valor = Reais(valor),
-        });
-        await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, ocorrencia.EmpresaId, payload, ocorrencia.Id, ct);
+            var payload = JsonSerializer.Serialize(new
+            {
+                ocorrenciaId = ocorrencia.Id.ToString(),
+                pedidoId = ocorrencia.PedidoId.ToString(),
+                clienteId = ocorrencia.ClienteId.ToString(),
+                conversaId = ocorrencia.ConversaId?.ToString(),
+                telefone,
+                nome = PrimeiroNome(cliente!.Nome),
+                numero = ocorrencia.PedidoId.ToString("N")[..8].ToUpperInvariant(),
+                valor = Reais(valor),
+            });
+            await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, ocorrencia.EmpresaId, payload, ocorrencia.Id, ct);
+        }
 
         return new ReembolsoResultado(SituacaoReembolso.Efetuado, CodigoReembolsoEfetuado, valor, estorno.IdSolicitacao);
     }
@@ -91,6 +102,22 @@ public sealed class ReembolsarPedidoUseCase(
     private async Task<CobrancaPedido?> CobrancaPagaAsync(Guid empresaId, Guid pedidoId, CancellationToken ct) =>
         (await cobrancas.ListarDoPedidoAsync(empresaId, pedidoId, ct))
             .LastOrDefault(c => c.EhOnline && c.Status == StatusCobrancaPedido.Paga && !string.IsNullOrWhiteSpace(c.PagamentoExternoId));
+
+    private static string? TelefoneE164(string? telefone)
+    {
+        if (string.IsNullOrWhiteSpace(telefone)) return null;
+        try
+        {
+            return NormalizadorTelefone.NormalizarE164Br(telefone);
+        }
+        catch (TelefoneInvalidoException)
+        {
+            return null;
+        }
+    }
+
+    private static string PrimeiroNome(string? nome) =>
+        string.IsNullOrWhiteSpace(nome) ? "cliente" : nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 
     private static string Reais(decimal valor) => valor.ToString("C2", PtBr).Replace(' ', ' ');
 }

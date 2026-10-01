@@ -194,7 +194,9 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 // Modo API (F01). A conversa do servidor manda; do lado de cá só sobrevivem os
 // balões da dona ainda sem resposta da API (enviando) ou recusados (falhou), para
 // ela ver o que não saiu. O resto do estado local (rascunhos, filtros) fica.
-const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou'
+// #1287: a confirmada pela API (`aguardandoSync`) também fica até um sync que a contenha,
+// porque a leitura em voo pode ter saído antes de o servidor gravá-la.
+const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
 
 // F03: sem pedido no servidor, a comanda que a dona monta (rascunho) fica. Com pedido, o do
 // servidor manda; a janela e o meio escolhidos na tela vêm junto (a API não os devolve).
@@ -266,10 +268,18 @@ const CASOS_API = {
     ...estado, sincronizacao: { ...estado.sincronizacao, estado: 'erro', mensagem },
   }),
 
+  // Sync que já trouxe a mensagem do servidor: o balão local sai, senão ficam dois com o
+  // mesmo id (#1287).
   [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem }) =>
-    mapear(estado, id, (c) => ({
-      ...c, mensagens: c.mensagens.map((m) => (m.id === mensagemId ? mensagem : m)),
-    })),
+    mapear(estado, id, (c) => {
+      const jaVeio = c.mensagens.some((m) => m.id === mensagem.id && m.id !== mensagemId)
+      return {
+        ...c,
+        mensagens: jaVeio
+          ? c.mensagens.filter((m) => m.id !== mensagemId)
+          : c.mensagens.map((m) => (m.id === mensagemId ? { ...mensagem, aguardandoSync: true } : m)),
+      }
+    }),
 
   [acao.FALHAR_ENVIO_API]: (estado, { id, mensagemId, erro }) =>
     mapear(estado, id, (c) => ({

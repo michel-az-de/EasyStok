@@ -467,6 +467,65 @@ public class AtendimentoConversasControllerTests
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    // #1287: mídia recebida do cliente sai do storage privado pelo endpoint autenticado.
+    private (ObterMidiaMensagemUseCase UseCase, IFileStorage Storage) MidiaUseCase()
+    {
+        var storage = Substitute.For<IFileStorage>();
+        return (new ObterMidiaMensagemUseCase(_repositorio, storage), storage);
+    }
+
+    private Mensagem FotoDoCliente(Guid empresaId, Guid conversaId)
+    {
+        var foto = Mensagem.Entrada(empresaId, conversaId, DateTime.UtcNow, TipoConteudoMensagem.Imagem, null, "wamid.foto");
+        foto.AnexarMidia($"atendimento/{empresaId}/{conversaId}/wamid.foto.jpg", "image/jpeg");
+        _repositorio.Mensagens.Add(foto);
+        return foto;
+    }
+
+    [Fact]
+    public async Task MidiaDevolveArquivoDoStorage()
+    {
+        var conversa = ConversaComClienteAgora();
+        var foto = FotoDoCliente(_empresaId, conversa.Id);
+        var (useCase, storage) = MidiaUseCase();
+        storage.ExistsAsync(foto.MidiaChave!, Arg.Any<CancellationToken>()).Returns(true);
+        storage.DownloadAsync(foto.MidiaChave!, Arg.Any<CancellationToken>()).Returns([1, 2, 3]);
+
+        var result = await _controller.Midia(conversa.Id, foto.Id, useCase, default);
+
+        var arquivo = result.Should().BeOfType<FileContentResult>().Subject;
+        arquivo.ContentType.Should().Be("image/jpeg");
+        arquivo.FileContents.Should().Equal(1, 2, 3);
+    }
+
+    [Fact]
+    public async Task MidiaDeOutraEmpresaDevolve404SemTocarNoStorage()
+    {
+        var outra = Conversa.Abrir(Guid.NewGuid(), WaId, DateTime.UtcNow, "Zé");
+        _repositorio.Conversas.Add(outra);
+        var foto = FotoDoCliente(outra.EmpresaId, outra.Id);
+        var (useCase, storage) = MidiaUseCase();
+
+        var result = await _controller.Midia(outra.Id, foto.Id, useCase, default);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+        await storage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task MidiaDeMensagemSemArquivoOuForaDoStorageDevolve404()
+    {
+        var conversa = ConversaComClienteAgora();
+        var texto = _repositorio.Mensagens.Single(m => m.ConversaId == conversa.Id);
+        var foto = FotoDoCliente(_empresaId, conversa.Id);
+        var (useCase, storage) = MidiaUseCase();
+        storage.ExistsAsync(foto.MidiaChave!, Arg.Any<CancellationToken>()).Returns(false);
+
+        (await _controller.Midia(conversa.Id, texto.Id, useCase, default)).Should().BeOfType<NotFoundObjectResult>();
+        (await _controller.Midia(conversa.Id, foto.Id, useCase, default)).Should().BeOfType<NotFoundObjectResult>();
+        await storage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
+    }
+
     /// <summary>Repositório em memória: basta para os use cases e para o turno do agente.</summary>
     private sealed class ConversaRepositoryEmMemoria : IConversaRepository
     {
@@ -475,6 +534,9 @@ public class AtendimentoConversasControllerTests
 
         public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id));
+
+        public Task<SituacaoConversa?> ObterSituacaoAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+            Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id)?.Situacao);
 
         public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
         {
@@ -520,6 +582,9 @@ public class AtendimentoConversasControllerTests
 
         public Task<Mensagem?> ObterMensagemPorExternoIdAsync(Guid empresaId, string externoId, CancellationToken ct = default) =>
             Task.FromResult(Mensagens.FirstOrDefault(m => m.EmpresaId == empresaId && m.ExternoId == externoId));
+
+        public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+            Task.FromResult(Mensagens.FirstOrDefault(m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId));
 
         public Task AddAsync(Conversa conversa, CancellationToken ct = default)
         {

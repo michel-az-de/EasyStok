@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Campanhas;
@@ -6,6 +7,8 @@ using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
@@ -72,6 +75,9 @@ public class IniciarCheckoutUseCaseTests
         // S11: a fase 3 grava a CobrancaPedido pelo GerarCobrancaPedidoUseCase.
         public ICobrancaPedidoRepository CobrancaRepo { get; init; } = CobrancaRepoVazio();
         public IUnitOfWork Uow { get; init; } = Substitute.For<IUnitOfWork>();
+
+        /// <summary>Cliente da sessão (#1291): sem cadastro devolvido, não está bloqueado.</summary>
+        public IClienteStorefrontRepository ClienteRepo { get; } = Substitute.For<IClienteStorefrontRepository>();
 
         /// <summary>Campanhas do cliente (#1226): sem envio recente, o pedido não é atribuído a nenhuma.</summary>
         public ICampanhaRepository CampanhaRepo { get; } = Substitute.For<ICampanhaRepository>();
@@ -149,6 +155,7 @@ public class IniciarCheckoutUseCaseTests
         var freteZonaRepo = Substitute.For<IFreteZonaRepository>();
         freteZonaRepo.GetAtivasDoStorefrontOrdenadasAsync(storefront.Id, Arg.Any<CancellationToken>())
             .Returns(new List<FreteZona> { freteZona });
+        freteZonaRepo.BuscarZonaPelasAtivas();
 
         var vagaRepo = Substitute.For<IVagaOcupadaRepository>();
         vagaRepo.OcuparAsync(JanelaId, DataEntrega, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -199,12 +206,16 @@ public class IniciarCheckoutUseCaseTests
             f.CardapioRepo,
             f.JanelaRepo,
             f.BloqueioRepo,
-            f.FreteZonaRepo,
+            new CalcularFreteUseCase(
+                f.StorefrontRepo, f.FreteZonaRepo, Substitute.For<ICepLookupClient>(), Substitute.For<IGeocodingClient>(),
+                Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance),
             f.VagaRepo,
             f.PedidoRepo,
             f.ExpedienteRepo,
             NullLogger<CheckoutCoreService>.Instance,
             TimeProvider.System),
+        f.StorefrontRepo,
+        f.ClienteRepo,
         f.IdempotencyService,
         new GerarCobrancaPedidoUseCase(
             Substitute.For<IPedidoRepository>(),
@@ -544,5 +555,97 @@ public class IniciarCheckoutUseCaseTests
         segunda.InitPointUrl.Should().Be(primeira.InitPointUrl);
         await f.PedidoRepo.Received(1).AddAsync(Arg.Any<EasyStock.Domain.Entities.Pedido>(), Arg.Any<CancellationToken>());
         await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ClienteBloqueado_RecusaSemPedidoNemVaga()
+    {
+        // #1291: o bloqueio vale em todos os canais (spec 05-crm-e-pos-venda); antes só a conversa conferia.
+        var f = BuildFakes();
+        var cliente = EasyStock.Domain.Entities.Cliente.CriarParaStorefront(f.Storefront.EmpresaId, "hash", TimeProvider.System);
+        cliente.Bloquear("calote", DateTime.UtcNow);
+        f.ClienteRepo.GetByIdAsync(ClienteId, Arg.Any<CancellationToken>()).Returns(cliente);
+
+        var act = () => BuildUseCase(f).ExecuteAsync(InputValido());
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        await f.PedidoRepo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MesmaIdempotencyKey_RespostaSoValeDepoisDoCommit()
+    {
+        // #1291: o UpdateAsync do repositório não salva; sem commit depois do RegistrarResposta, o retry
+        // não via a resposta e recriava pedido, vaga e link. O banco aqui só enxerga o que foi commitado.
+        var banco = new BancoIdempotenciaFake();
+        var f = BuildFakes() with
+        {
+            IdempotencyService = new CheckoutIdempotencyService(
+                banco.Repositorio(), NullLogger<CheckoutIdempotencyService>.Instance),
+        };
+        f.Uow.When(u => u.CommitAsync()).Do(_ => banco.Commitar());
+        var input = InputValido() with { IdempotencyKey = Guid.NewGuid() };
+        input = input with { ContentHash = CheckoutContentHasher.ComputarHash(input) };
+
+        var primeira = await BuildUseCase(f).ExecuteAsync(input);
+        banco.FimDaRequisicao();
+        var segunda = await BuildUseCase(f).ExecuteAsync(input);
+
+        segunda.PedidoId.Should().Be(primeira.PedidoId);
+        await f.PedidoRepo.Received(1).AddAsync(Arg.Any<EasyStock.Domain.Entities.Pedido>(), Arg.Any<CancellationToken>());
+        await f.VagaRepo.Received(1).OcuparAsync(JanelaId, DataEntrega, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Tabela de idempotência com a semântica do EF: a reserva salva na hora (o repositório faz
+    /// <c>SaveChanges</c>), o <c>UpdateAsync</c> só marca a entidade e a mudança chega ao banco no commit.
+    /// Cada leitura devolve uma instância nova, como uma consulta faria.
+    /// </summary>
+    private sealed class BancoIdempotenciaFake
+    {
+        private readonly Dictionary<(Guid Key, string Hash), (Guid? FaturaId, string? InitPoint)> _linhas = new();
+        private readonly List<CheckoutIdempotency> _marcadas = new();
+
+        public void Commitar()
+        {
+            foreach (var r in _marcadas)
+                _linhas[(r.Key, r.ContentHash)] = (r.FaturaId, r.InitPoint);
+            _marcadas.Clear();
+        }
+
+        /// <summary>O DbContext da requisição morre: o que não foi commitado se perde.</summary>
+        public void FimDaRequisicao() => _marcadas.Clear();
+
+        public ICheckoutIdempotencyRepository Repositorio()
+        {
+            var repo = Substitute.For<ICheckoutIdempotencyRepository>();
+            repo.GetByKeyAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(ci => _linhas.Keys.Where(k => k.Key == ci.ArgAt<Guid>(0)).Select(Ler).ToList());
+            repo.GetByKeyHashAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(ci => _linhas.Keys
+                    .Where(k => k.Key == ci.ArgAt<Guid>(0) && k.Hash == ci.ArgAt<string>(1).Trim().ToLowerInvariant())
+                    .Select(Ler)
+                    .FirstOrDefault());
+            repo.TentarReservarAsync(Arg.Any<CheckoutIdempotency>(), Arg.Any<CancellationToken>())
+                .Returns(ci =>
+                {
+                    var p = ci.Arg<CheckoutIdempotency>();
+                    _linhas[(p.Key, p.ContentHash)] = (null, null);
+                    return (true, p);
+                });
+            repo.When(r => r.UpdateAsync(Arg.Any<CheckoutIdempotency>(), Arg.Any<CancellationToken>()))
+                .Do(ci => _marcadas.Add(ci.Arg<CheckoutIdempotency>()));
+            return repo;
+        }
+
+        private CheckoutIdempotency Ler((Guid Key, string Hash) chave)
+        {
+            var registro = CheckoutIdempotency.Criar(chave.Key, chave.Hash);
+            var (faturaId, initPoint) = _linhas[chave];
+            if (faturaId is { } id && initPoint is not null)
+                registro.VincularFatura(id, initPoint);
+            return registro;
+        }
     }
 }

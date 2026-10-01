@@ -65,6 +65,19 @@ public class AtendimentoConversasController(
         => Tratar(async () => DataOk(await listarMensagensUseCase.ExecuteAsync(
             new ListarMensagensConversaQuery(currentUser.EmpresaId, id, antesDe, limite), ct)));
 
+    /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
+    [SwaggerOperation(Summary = "Media file of a message (private storage, #1287)",
+        Description = "Mesma permissão de ler a conversa. 404 para mensagem de outra empresa, sem arquivo ou com o arquivo fora do storage.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}/mensagens/{mensagemId:guid}/midia")]
+    public async Task<IActionResult> Midia(
+        Guid id, Guid mensagemId, [FromServices] ObterMidiaMensagemUseCase midiaUseCase, CancellationToken ct = default)
+    {
+        var midia = await midiaUseCase.ExecuteAsync(new ObterMidiaMensagemQuery(currentUser.EmpresaId, id, mensagemId), ct);
+        return midia is null ? DataNotFound("Mídia não encontrada.") : File(midia.Conteudo, midia.Mime);
+    }
+
     [SwaggerOperation(Summary = "Customer dossier beside the conversation (S25)",
         Description = "Mesma projeção de GET api/clientes/{id}/dossie. Conversa sem cliente vinculado devolve o dossiê mínimo (nome do perfil e telefone).")]
     [ProducesResponseType(StatusCodes.Status200OK)]

@@ -53,6 +53,9 @@ public sealed class GerarCobrancaPedidoUseCase(
     ILogger<GerarCobrancaPedidoUseCase> logger)
 {
     public static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
+
+    /// <summary>Motivo gravado na pendente cancelada porque o total do pedido mudou (#1291).</summary>
+    public const string MotivoValorAlterado = "valor_do_pedido_alterado";
     private static readonly TimeSpan MpTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>Pedido recém-criado pelo núcleo do checkout (site ou conversa).</summary>
@@ -98,9 +101,13 @@ public sealed class GerarCobrancaPedidoUseCase(
         if (pendente is not null && !pendente.EhOnline)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaNaEntrega,
                 "O pedido está combinado para pagar na entrega; troque a forma para gerar link.");
-        if (pendente is not null && !pendente.Venceu(agora))
+        if (pendente is not null && pendente.Venceu(agora))
+            pendente.Expirar(agora);
+        else if (pendente is not null && pendente.Valor != dados.Total)
+            // #1291: item editado em AguardandoPagamento; o link antigo cobraria o valor velho.
+            pendente.Cancelar(MotivoValorAlterado, agora);
+        else if (pendente is not null)
             return CobrancaPedidoResult.De(pendente, reutilizada: true);
-        pendente?.Expirar(agora);
 
         var expiraEm = agora.Add(Validade);
         var command = new CriarPreferenceCommand(
@@ -110,7 +117,7 @@ public sealed class GerarCobrancaPedidoUseCase(
             ValorTotal: dados.Total,
             Items: dados.Itens
                 .Where(i => i.PrecoUnitario > 0m)
-                .Select(i => new PreferenceItemCommand(i.Nome, (int)i.Quantidade, i.PrecoUnitario))
+                .Select(ItemDaPreferencia)
                 .ToList(),
             ExpiraEm: expiraEm,
             IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
@@ -127,6 +134,19 @@ public sealed class GerarCobrancaPedidoUseCase(
             "Cobranca pedido criada pedidoId={PedidoId} cobrancaId={CobrancaId} tentativa={Tentativa}",
             dados.PedidoId, cobranca.Id, tentativa);
         return CobrancaPedidoResult.De(cobranca);
+    }
+
+    /// <summary>
+    /// Item da preferência. O Mercado Pago só aceita quantidade inteira: item fracionário (1,5 kg) vai como
+    /// 1 unidade com o subtotal arredondado a 2 casas, e a soma da preferência fecha com o total (#1291).
+    /// </summary>
+    private static PreferenceItemCommand ItemDaPreferencia(PedidoItem item)
+    {
+        if (item.Quantidade == decimal.Truncate(item.Quantidade))
+            return new PreferenceItemCommand(item.Nome, (int)item.Quantidade, item.PrecoUnitario);
+
+        var subtotal = Math.Round(item.Quantidade * item.PrecoUnitario, 2, MidpointRounding.AwayFromZero);
+        return new PreferenceItemCommand(item.Nome, 1, subtotal);
     }
 
     private async Task<PreferenceCriadaResult> CriarPreferenciaAsync(CriarPreferenceCommand command, CancellationToken ct)

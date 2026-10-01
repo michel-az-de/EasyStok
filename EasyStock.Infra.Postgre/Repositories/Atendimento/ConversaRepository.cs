@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Postgre.Data;
@@ -17,15 +18,28 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
     public Task<Conversa?> ObterPorIdAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
         db.AtendimentoConversas.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id, ct);
 
+    public Task<SituacaoConversa?> ObterSituacaoAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
+        db.AtendimentoConversas
+            .AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && c.Id == id)
+            .Select(c => (SituacaoConversa?)c.Situacao)
+            .FirstOrDefaultAsync(ct);
+
     public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
     {
         var contato = Conversa.NormalizarContato(canal, contatoIdExterno);
-        return db.AtendimentoConversas.FirstOrDefaultAsync(
-            c => c.EmpresaId == empresaId
-                 && c.Canal == canal
-                 && c.ContatoIdExterno == contato
-                 && c.Situacao != SituacaoConversa.Encerrada,
-            ct);
+        // #1290: no WhatsApp o mesmo celular aparece com e sem o nono dígito (wa_id da Meta x cadastro).
+        // string[] de propósito: o Npgsql manda array como parâmetro (= ANY), sem tipo gerado pelo compilador.
+        string[] grafias = canal == CanalConversa.WhatsApp
+            ? [.. NormalizadorTelefone.VariantesContatoWhatsApp(contato)]
+            : [contato];
+        return db.AtendimentoConversas
+            .Where(c => c.EmpresaId == empresaId
+                        && c.Canal == canal
+                        && grafias.Contains(c.ContatoIdExterno)
+                        && c.Situacao != SituacaoConversa.Encerrada)
+            .OrderBy(c => c.ContatoIdExterno == contato ? 0 : 1)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default)
@@ -173,6 +187,10 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
     public Task<Mensagem?> ObterMensagemPorExternoIdAsync(Guid empresaId, string externoId, CancellationToken ct = default) =>
         db.AtendimentoMensagens.FirstOrDefaultAsync(m => m.EmpresaId == empresaId && m.ExternoId == externoId, ct);
+
+    public Task<Mensagem?> ObterMensagemAsync(Guid empresaId, Guid conversaId, Guid mensagemId, CancellationToken ct = default) =>
+        db.AtendimentoMensagens.AsNoTracking().FirstOrDefaultAsync(
+            m => m.EmpresaId == empresaId && m.ConversaId == conversaId && m.Id == mensagemId, ct);
 
     public Task AddAsync(Conversa conversa, CancellationToken ct = default)
     {

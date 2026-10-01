@@ -53,6 +53,12 @@ public class OcorrenciaUseCasesTests
         return c;
     }
 
+    private void ClienteComTelefone(string? telefone = "(11) 99999-0001")
+    {
+        var cliente = new Cliente { Id = _clienteId, EmpresaId = _empresaId, Nome = "Maria Souza", Telefone = telefone };
+        _crm.ObterComTagsAsync(_empresaId, _clienteId, Arg.Any<CancellationToken>()).Returns(cliente);
+    }
+
     private Ocorrencia OcorrenciaAberta(Guid pedidoId)
     {
         var o = Ocorrencia.Abrir(_empresaId, pedidoId, _clienteId, null, OrigemOcorrencia.Dona,
@@ -108,6 +114,7 @@ public class OcorrenciaUseCasesTests
     {
         var pedido = NovoPedido();
         CobrancaPaga(pedido.Id, 80m);
+        ClienteComTelefone();
         var ocorrencia = OcorrenciaAberta(pedido.Id);
         _gateway.EstornarAsync("pay-123", 30m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
             .Returns(EstornoPedidoResult.Ok("ref-9"));
@@ -123,6 +130,46 @@ public class OcorrenciaUseCasesTests
             Arg.Any<CancellationToken>());
         await _notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, _empresaId,
             Arg.Any<string>(), ocorrencia.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReembolsarPedido_AvisoLevaTelefoneENomeDoCliente()
+    {
+        // #1292: sem "telefone" no payload o NotificadorService não resolve o destinatário do WhatsApp.
+        var pedido = NovoPedido();
+        CobrancaPaga(pedido.Id, 80m);
+        ClienteComTelefone();
+        var ocorrencia = OcorrenciaAberta(pedido.Id);
+        _gateway.EstornarAsync("pay-123", 30m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Ok("ref-9"));
+        string? payload = null;
+        await _notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, _empresaId,
+            Arg.Do<string>(p => payload = p), ocorrencia.Id, Arg.Any<CancellationToken>());
+
+        await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora);
+
+        payload.Should().NotBeNull();
+        var json = System.Text.Json.JsonDocument.Parse(payload!).RootElement;
+        json.GetProperty("telefone").GetString().Should().Be("+5511999990001");
+        json.GetProperty("nome").GetString().Should().Be("Maria");
+        json.GetProperty("numero").GetString().Should().Be(pedido.Id.ToString("N")[..8].ToUpperInvariant());
+        json.GetProperty("valor").GetString().Should().Be("R$ 30,00");
+    }
+
+    [Fact]
+    public async Task ReembolsarPedido_SemTelefoneValidoNaoEnfileiraAviso()
+    {
+        var pedido = NovoPedido();
+        CobrancaPaga(pedido.Id, 80m);
+        ClienteComTelefone(telefone: null);
+        var ocorrencia = OcorrenciaAberta(pedido.Id);
+        _gateway.EstornarAsync("pay-123", 30m, ocorrencia.Id.ToString(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Ok("ref-9"));
+
+        var r = await Reembolsar().ExecuteAsync(ocorrencia, 30m, "bolo azedo", Agora);
+
+        r.Situacao.Should().Be(SituacaoReembolso.Efetuado, "o dinheiro já voltou; só o aviso não tem para onde ir");
+        await _notificador.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default);
     }
 
     [Fact]

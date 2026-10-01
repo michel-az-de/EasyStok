@@ -11,7 +11,7 @@ import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesComandaApi } from './api/comanda'
 import { criarAcoesClienteApi } from './api/cliente'
 import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
-import { criarAvisosNaoLigadas } from './api/naoLigadas'
+import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -40,7 +40,14 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
     ...clienteApi,
-    enviar: (id, texto) => {
+    enviar: (id, texto, opcoes = {}) => {
+      // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
+      if (!texto?.trim()) return
+      const naoLigado = envioNaoLigado(opcoes)
+      if (naoLigado) {
+        despachar({ tipo: acao.AVISO_API, mensagem: textoNaoLigado(naoLigado) })
+        return
+      }
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
       enviarTexto(id, texto)

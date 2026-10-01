@@ -21,6 +21,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/pedidos")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class PedidosClienteController(
     ListarPedidosClienteUseCase listarUseCase,
     ObterPedidoClienteUseCase obterUseCase,

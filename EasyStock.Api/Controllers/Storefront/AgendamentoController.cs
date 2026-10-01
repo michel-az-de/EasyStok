@@ -23,6 +23,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 [ApiController]
 [Route("api/storefront/{slug}/janelas")]
 [AllowAnonymous]
+[TenantDoStorefront]
 public sealed class AgendamentoController(
     ListarJanelasDisponiveisUseCase listarJanelasUseCase) : EasyStockControllerBase
 {

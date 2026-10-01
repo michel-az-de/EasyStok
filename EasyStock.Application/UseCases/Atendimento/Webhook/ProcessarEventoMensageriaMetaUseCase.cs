@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.FeatureFlags;
@@ -62,7 +64,8 @@ public sealed class ProcessarEventoMensageriaMetaUseCase(
             return true;
         }
 
-        if (await conversaRepository.ObterMensagemPorExternoIdAsync(empresa.Id, msg.Mid, ct) is not null)
+        var externoId = ExternoId(msg.Mid);
+        if (await conversaRepository.ObterMensagemPorExternoIdAsync(empresa.Id, externoId, ct) is not null)
             return true; // reentrega da Meta
 
         // A janela conta da mensagem do cliente, não do processamento.
@@ -78,7 +81,7 @@ public sealed class ProcessarEventoMensageriaMetaUseCase(
             var payload = msg.PostbackPayload is { Length: > Mensagem.BotaoIdTamanhoMaximo } longo
                 ? longo[..Mensagem.BotaoIdTamanhoMaximo]
                 : msg.PostbackPayload;
-            mensagem = Mensagem.Entrada(empresa.Id, conversa.Id, enviadaEm, tipo, texto, msg.Mid, payload);
+            mensagem = Mensagem.Entrada(empresa.Id, conversa.Id, enviadaEm, tipo, texto, externoId, payload);
             conversa.RegistrarEntrada(enviadaEm);
             await conversaRepository.AddMensagemAsync(mensagem, ct);
             await unitOfWork.CommitAsync();
@@ -88,8 +91,11 @@ public sealed class ProcessarEventoMensageriaMetaUseCase(
             // Ex.: duas entregas da 1ª mensagem do contato ao mesmo tempo violando o índice da conversa
             // aberta. Descarta o que ficou rastreado e pede reenvio; o mid já gravado é pulado.
             unitOfWork.DescartarAlteracoesPendentes();
-            logger.LogWarning(ex, "Webhook Meta: falha ao gravar mensagem de {Canal}; a Meta vai reenviar.", msg.Canal);
-            return false;
+            logger.LogWarning(ex, "Webhook Meta: falha ao gravar mensagem de {Canal}.", msg.Canal);
+
+            // Regra de domínio não passa num reenvio: pedir retry faria a Meta reenviar para sempre
+            // (mesmo critério do webhook do WhatsApp).
+            return ex is RegraDeDominioVioladaException;
         }
 
         try
@@ -113,12 +119,24 @@ public sealed class ProcessarEventoMensageriaMetaUseCase(
         return conversa;
     }
 
+    /// <summary>
+    /// O <c>mid</c> do Instagram pode passar de <see cref="Mensagem.ExternoIdTamanhoMaximo"/>. Sem
+    /// alargar a coluna, o longo vira um id determinístico (<c>h:</c> + SHA-256), que mantém a
+    /// deduplicação da reentrega.
+    /// </summary>
+    private static string ExternoId(string mid) =>
+        mid.Length <= Mensagem.ExternoIdTamanhoMaximo
+            ? mid
+            : "h:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(mid))).ToLowerInvariant();
+
     /// <summary>A mídia recebida ainda não é guardada (a URL da CDN expira): fica o tipo e um aviso.</summary>
     private static (TipoConteudoMensagem Tipo, string? Texto) Conteudo(MensagemRecebidaMeta msg)
     {
         if (msg.PostbackPayload is not null) return (TipoConteudoMensagem.Botao, msg.Texto);
         return msg.TipoAnexo switch
         {
+            // Mensagem apagada ou sem suporte (is_deleted, is_unsupported) chega sem texto e sem anexo.
+            null when string.IsNullOrWhiteSpace(msg.Texto) => (TipoConteudoMensagem.Outro, "[mensagem sem conteúdo suportado; abra no app para ver]"),
             null => (TipoConteudoMensagem.Texto, msg.Texto),
             "image" => (TipoConteudoMensagem.Imagem, msg.Texto ?? "[imagem recebida; abra no app para ver]"),
             "audio" => (TipoConteudoMensagem.Audio, msg.Texto ?? "[áudio recebido; abra no app para ouvir]"),
