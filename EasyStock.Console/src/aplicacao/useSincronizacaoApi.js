@@ -1,22 +1,24 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
-import { listarConversas, listarMensagens } from '../infra/api/conversasApi'
+import { listarTodasConversas, listarMensagens } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { listarCardapio, obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
+import { deveRelerMensagens, deveRelerPedido } from './planoDeSincronizacao'
 
 // Polling da inbox (F01): não existe SSE de conversas ainda (S18). A lista vem a
-// cada ciclo; as mensagens só são buscadas de novo quando a conversa mudou
-// (`ultimaMensagemEm`), para 30 conversas não virarem 30 chamadas a cada 5 s.
+// cada ciclo, paginada (F07); o que mais se relê está em `planoDeSincronizacao.js`:
+// a conversa aberta sempre, as outras só quando mudaram.
 //
-// F03: o pedido da conversa (`pedidoEmAndamentoId`) vem junto. Pagamento confirmado pelo
-// Mercado Pago não mexe na conversa, então pedido ainda aberto é relido a cada ciclo; pedido
-// entregue ou cancelado fica no cache até o id mudar. O cardápio da vitrine vem ao entrar e a
-// cada minuto (saldo).
+// F03: o pedido da conversa (`pedidoEmAndamentoId`) vem junto. O cardápio da vitrine
+// vem ao entrar e a cada minuto (saldo).
 const INTERVALO_MS = 5000
-const CICLOS_DO_CARDAPIO = 12
-const STATUS_FINAIS = new Set(['entregue', 'cancelado'])
+const CICLOS_POR_MINUTO = 12
 
-export function useSincronizacaoApi({ ativo, usuario, despachar }) {
+export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId = null }) {
+  // A seleção muda a cada clique; num ref, o laço não recomeça por causa dela.
+  const selecionadaRef = useRef(selecionadaId)
+  useEffect(() => { selecionadaRef.current = selecionadaId }, [selecionadaId])
+
   useEffect(() => {
     if (!ativo) return undefined
     let vivo = true
@@ -27,7 +29,7 @@ export function useSincronizacaoApi({ ativo, usuario, despachar }) {
 
     async function mensagensDe(resumo) {
       const guardado = cache.get(resumo.id)
-      if (guardado && guardado.ultima === resumo.ultimaMensagemEm) return guardado.mensagens
+      if (!deveRelerMensagens(resumo, guardado, selecionadaRef.current)) return guardado.mensagens
       try {
         const mensagens = await listarMensagens(resumo.id)
         cache.set(resumo.id, { ultima: resumo.ultimaMensagemEm, mensagens })
@@ -37,15 +39,15 @@ export function useSincronizacaoApi({ ativo, usuario, despachar }) {
       }
     }
 
-    async function pedidoDe(resumo) {
+    async function pedidoDe(resumo, cicloLento) {
       if (!resumo.pedidoEmAndamentoId) return null
       const guardado = pedidos.get(resumo.id)
-      if (guardado?.pedidoId === resumo.pedidoEmAndamentoId && STATUS_FINAIS.has(guardado.dados?.status)) {
+      if (!deveRelerPedido(resumo, guardado, { selecionadaId: selecionadaRef.current, cicloLento })) {
         return guardado.dados
       }
       try {
         const dados = await obterPedido(resumo.id)
-        pedidos.set(resumo.id, { pedidoId: resumo.pedidoEmAndamentoId, dados })
+        pedidos.set(resumo.id, { pedidoId: resumo.pedidoEmAndamentoId, ultima: resumo.ultimaMensagemEm, dados })
         return dados
       } catch {
         return guardado?.dados ?? null
@@ -62,12 +64,13 @@ export function useSincronizacaoApi({ ativo, usuario, despachar }) {
     }
 
     async function ciclo() {
-      if (ciclos % CICLOS_DO_CARDAPIO === 0) await cardapio()
+      const cicloLento = ciclos % CICLOS_POR_MINUTO === 0
+      if (cicloLento) await cardapio()
       ciclos += 1
       try {
-        const lista = await listarConversas()
+        const lista = await listarTodasConversas()
         const conversas = await Promise.all(lista.map(async (resumo) => {
-          const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo)])
+          const [mensagens, pedido] = await Promise.all([mensagensDe(resumo), pedidoDe(resumo, cicloLento)])
           return { ...conversaDaApi(resumo, mensagens, usuario), pedido: pedidoDaApi(pedido) }
         }))
         if (vivo) despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas })

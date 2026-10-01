@@ -252,7 +252,7 @@ const SEM_CONVERSAS = []
 const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 
 function AppPrincipal() {
-  const agora = useRelogio(INICIO_DO_RELOGIO)
+  const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { sessao, listarEmpresas, entrarNaEmpresa, encerrarSessao } = useSessaoApi()
   if (FONTE_API && !sessao) {
     return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />

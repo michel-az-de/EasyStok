@@ -69,7 +69,9 @@ const ms = (valor) => (valor ? new Date(instante(valor)).getTime() : null)
 function cobrancaDaApi(c, meioAnterior) {
   if (!c) return null
   const naEntrega = c.provedor === FORMA_NA_ENTREGA
-  const meio = naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
+  // Sem meio anterior (polling, recarga), o meio é o padrão da forma: link do Mercado Pago
+  // online, maquininha na entrega. Antes caía em `undefined` e a tela mostrava "Pix" (F07).
+  const meio = meioAnterior && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
     ? meioAnterior
     : (naEntrega ? 'maquininha' : 'cartao-link')
   const criadaEm = ms(c.criadaEm)
