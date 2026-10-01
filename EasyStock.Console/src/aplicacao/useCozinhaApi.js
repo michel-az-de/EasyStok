@@ -10,6 +10,13 @@ const POLLING_SEM_SSE_MS = 15000
 const RECONECTAR_MS = 10000
 const RECARREGA_COM = (evento) => evento === 'ready' || evento.startsWith('pedido.')
 
+// O Blob URL fica vivo o bastante para a janela carregar e imprimir.
+const REVOGAR_CANHOTO_MS = 60000
+const IMPRIMIR_AO_ABRIR = '<script>addEventListener("load", () => print())</script>'
+const comImpressaoAoAbrir = (html) => (/<\/body>/i.test(html)
+  ? html.replace(/<\/body>/i, `${IMPRIMIR_AO_ABRIR}</body>`)
+  : html + IMPRIMIR_AO_ABRIR)
+
 export function useCozinhaApi() {
   const [pedidos, setPedidos] = useState(null)
   const [erro, setErro] = useState(null)
@@ -77,20 +84,22 @@ export function useCozinhaApi() {
   }, [recarregar])
 
   // S20: abre o canhoto HTML numa janela e chama a impressão do navegador.
+  // F07, item 10: a janela abre no clique (senão o bloqueador de pop-up segura), perde o
+  // `opener` na hora e recebe o canhoto por Blob URL, sem `document.write`.
   const imprimirCanhoto = useCallback((id) => {
     const janela = window.open('', '_blank')
+    if (janela) janela.opener = null
     obterCanhotoHtml(id)
       .then((html) => {
         if (!janela) return setErro('O navegador bloqueou a janela do canhoto.')
-        janela.document.open()
-        janela.document.write(html)
-        janela.document.close()
-        janela.focus()
-        janela.print()
+        const endereco = URL.createObjectURL(new Blob([comImpressaoAoAbrir(html)], { type: 'text/html' }))
+        janela.location.replace(endereco)
+        setTimeout(() => URL.revokeObjectURL(endereco), REVOGAR_CANHOTO_MS)
+        return undefined
       })
       .catch((e) => {
         janela?.close()
-        setErro(e.message)
+        setErro(`O canhoto não abriu: ${e.message}`)
       })
   }, [])
 
