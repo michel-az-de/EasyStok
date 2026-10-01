@@ -54,6 +54,12 @@ public sealed class EnfileiradorMensagensCampanha(
 
     public const string IdiomaMeta = "pt_BR";
 
+    /// <summary>
+    /// Metadado com a URL pública da arte (#1226): cabeçalho de imagem do template fora da janela de
+    /// 24 h e mensagem <c>image</c> com legenda dentro dela. Só na onda; o lembrete sai sem arte.
+    /// </summary>
+    public const string ChaveImagem = "imagem";
+
     private static readonly Regex EspacosRegex = new(@"\s+", RegexOptions.Compiled);
 
     /// <summary>
@@ -140,7 +146,8 @@ public sealed class EnfileiradorMensagensCampanha(
 
     /// <summary>
     /// Template da Meta para fora da janela de 24 h. O genérico recebe nome e texto; o da campanha,
-    /// aprovado para ela, só o nome. Parâmetro de template não aceita quebra de linha.
+    /// aprovado para ela, só o nome. Parâmetro de template não aceita quebra de linha. A arte da onda
+    /// (#1226) vai em <see cref="ChaveImagem"/>: cabeçalho do template ou imagem com legenda na janela.
     /// </summary>
     private static Dictionary<string, string> Metadados(
         Campanha campanha, MensagemCampanha tipo, ContatoCampanha contato, string texto)
@@ -160,6 +167,9 @@ public sealed class EnfileiradorMensagensCampanha(
             metadados["template"] = TemplateMetaGenerico;
             metadados["param2"] = EspacosRegex.Replace(texto, " ").Trim();
         }
+
+        if (tipo == MensagemCampanha.Onda && !string.IsNullOrWhiteSpace(campanha.ImagemUrl))
+            metadados[ChaveImagem] = campanha.ImagemUrl.Trim();
 
         return metadados;
     }

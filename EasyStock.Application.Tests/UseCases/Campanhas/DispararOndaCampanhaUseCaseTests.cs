@@ -158,6 +158,31 @@ public class DispararOndaCampanhaUseCaseTests
     }
 
     [Fact]
+    public async Task ArteDaCampanhaVaiNosMetadadosComOTemplate()
+    {
+        // #1226: a arte vira cabeçalho do template fora da janela e imagem com legenda dentro dela.
+        var campanha = _c.Campanha(imagemUrl: "https://cdn.test/campanhas/arte.jpg");
+        _c.Pendente(campanha, "Ana");
+
+        await _c.Disparar().ExecuteAsync(_c.EmpresaId, campanha.Id, OrigemOndaCampanha.Agendamento);
+
+        _c.Mensagens.Single().LerMetadados().Should()
+            .Contain(EnfileiradorMensagensCampanha.ChaveImagem, "https://cdn.test/campanhas/arte.jpg")
+            .And.Contain("template", EnfileiradorMensagensCampanha.TemplateMetaGenerico);
+    }
+
+    [Fact]
+    public async Task CampanhaSemArteNaoLevaImagem()
+    {
+        var campanha = _c.Campanha();
+        _c.Pendente(campanha, "Ana");
+
+        await _c.Disparar().ExecuteAsync(_c.EmpresaId, campanha.Id, OrigemOndaCampanha.Agendamento);
+
+        _c.Mensagens.Single().LerMetadados().Should().NotContainKey(EnfileiradorMensagensCampanha.ChaveImagem);
+    }
+
+    [Fact]
     public async Task KillSwitchDoWhatsAppSeguraOEnvioSemMudarACampanha()
     {
         var campanha = _c.Campanha();
