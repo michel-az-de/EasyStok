@@ -211,6 +211,11 @@ function pedidoMesclado(local, doServidor) {
   }
 }
 
+// F09: o resumo da inbox não traz o cadastro. O que o dossiê carregou (tags, notas, histórico)
+// fica até o vínculo da conversa mudar de cliente.
+const clienteMesclado = (local, doServidor) =>
+  (local.cliente?.dossie && local.clienteId === doServidor.clienteId ? local.cliente : doServidor.cliente)
+
 function mesclarDoServidor(local, doServidor) {
   if (!local) return doServidor
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
@@ -218,6 +223,7 @@ function mesclarDoServidor(local, doServidor) {
   return {
     ...local,
     ...doServidor,
+    cliente: clienteMesclado(local, doServidor),
     pedido: pedidoMesclado(local.pedido, doServidor.pedido),
     mensagens: [...doServidor.mensagens, ...soLocais],
   }
