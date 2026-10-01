@@ -120,12 +120,19 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
         var pagamentos = await repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, iniUtc, fimUtc, lojaId)
                          ?? (IReadOnlyList<PedidoPagamento>)[];
 
+        // F14 (#1244): nome do cliente de cada pedido pago, para o console listar os pagamentos.
+        var nomes = pagamentos.Count == 0
+            ? new Dictionary<Guid, string?>()
+            : await repo.GetClientesDosPedidosAsync(empresaId, pagamentos.Select(p => p.PedidoId).Distinct().ToList())
+              ?? new Dictionary<Guid, string?>();
+
         var linhas = new List<CaixaLinhaExtraResult>(vendas.Count + pagamentos.Count);
         linhas.AddRange(vendas.Select(v => new CaixaLinhaExtraResult(
             v.DataVenda, "venda", v.ValorTotal == null ? 0m : v.ValorTotal.Valor,
             v.Observacoes, v.FormaPagamentoPrincipal, "Venda")));
         linhas.AddRange(pagamentos.Select(p => new CaixaLinhaExtraResult(
-            p.PagoEm, "pagamento", p.Valor, "Pagamento de pedido", p.Metodo, "Pedido")));
+            p.PagoEm, "pagamento", p.Valor, "Pagamento de pedido", p.Metodo, "Pedido",
+            p.PedidoId, nomes.GetValueOrDefault(p.PedidoId))));
 
         return linhas.OrderBy(l => l.Hora).ToList();
     }

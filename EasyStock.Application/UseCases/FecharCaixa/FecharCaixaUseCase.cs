@@ -8,7 +8,9 @@ public sealed record FecharCaixaCommand(
     Guid? LojaId = null,
     string? Observacoes = null,
     Guid? FechadoPorUserId = null,
-    [property: MaxLength(120)] string? FechadoPorNome = null);
+    [property: MaxLength(120)] string? FechadoPorNome = null,
+    // F14 (#1244): quanto a dona contou na gaveta. Opcional; sem ele o fechamento é o de sempre.
+    decimal? ValorContado = null);
 
 /// <summary>
 /// Fecha a sessão de caixa ABERTA (server-authoritative): resolve a sessão via
@@ -35,6 +37,8 @@ public class FecharCaixaUseCase(
     public async Task<FechamentoCaixaResult> ExecuteAsync(FecharCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        if (cmd.ValorContado is < 0)
+            throw new UseCaseValidationException("O valor contado não pode ser negativo.");
 
         var hoje = HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
@@ -108,6 +112,7 @@ public class FecharCaixaUseCase(
         fechamento.FechadoPorUserId = cmd.FechadoPorUserId;
         fechamento.FechadoPorNome = cmd.FechadoPorNome;
         fechamento.Observacoes = observacoes;
+        if (cmd.ValorContado is { } contado) fechamento.RegistrarContagem(contado);
 
         // Cria movimento "fechamento" como marcador (não move saldo). Usa o instante real
         // do fechamento (DateTime.UtcNow, Kind=Utc): data.ToDateTime(TimeOnly.MaxValue) produz
@@ -149,5 +154,6 @@ public class FecharCaixaUseCase(
         f.Id, f.EmpresaId, f.LojaId, f.Data,
         f.SaldoInicial, f.TotalVendas, f.TotalPagamentosPedidos,
         f.TotalEntradasExtras, f.TotalSaidasExtras, f.SaldoFinal,
-        f.FechadoPorUserId, f.FechadoPorNome, f.Observacoes, f.FechadoEm);
+        f.FechadoPorUserId, f.FechadoPorNome, f.Observacoes, f.FechadoEm,
+        f.ValorContado, f.Diferenca);
 }

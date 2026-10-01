@@ -35,6 +35,7 @@ public class OcorrenciaUseCasesTests
     private readonly IClienteCrmRepository _crm = Substitute.For<IClienteCrmRepository>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly ICaixaRepository _caixa = Substitute.For<ICaixaRepository>();
 
     private Pedido NovoPedido()
     {
@@ -68,7 +69,7 @@ public class OcorrenciaUseCasesTests
         new(_cobrancas, _gateway, _crm, _notificador);
 
     private ResolverOcorrenciaUseCase Resolver() =>
-        new(_repo, Reembolsar(), _uow, new RelogioFixo(Agora));
+        new(_repo, Reembolsar(), new LancarReembolsoNoCaixaUseCase(_caixa, _cobrancas), _uow, new RelogioFixo(Agora));
 
     [Fact]
     public async Task AbrirOcorrencia_EscalaConversa()
@@ -185,6 +186,7 @@ public class OcorrenciaUseCasesTests
         ocorrencia.ResolvidaPorUsuarioId.Should().Be(usuario);
         ocorrencia.ResolvidaEm.Should().Be(Agora);
         await _gateway.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        await _caixa.DidNotReceiveWithAnyArgs().AddMovimentoAsync(default!);
         await _uow.Received(1).CommitAsync();
     }
 
@@ -203,6 +205,10 @@ public class OcorrenciaUseCasesTests
         r!.Reembolso!.Situacao.Should().Be(SituacaoReembolso.Efetuado);
         ocorrencia.Status.Should().Be(StatusOcorrencia.Resolvida);
         ocorrencia.ReembolsoValor.Should().Be(80m);
+        // F14 (#1244): a devolução sai do caixa do dia, no método da cobrança paga.
+        await _caixa.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m =>
+            m.Tipo == "saida" && m.Valor == 80m && m.Metodo == "pix"
+            && m.Origem == LancarReembolsoNoCaixaUseCase.Origem && m.Referencia == ocorrencia.Id.ToString()));
     }
 
     [Fact]
@@ -219,6 +225,7 @@ public class OcorrenciaUseCasesTests
 
         r!.Reembolso!.Situacao.Should().Be(SituacaoReembolso.Falhou);
         ocorrencia.Status.Should().Be(StatusOcorrencia.Aberta);
+        await _caixa.DidNotReceiveWithAnyArgs().AddMovimentoAsync(default!);
         await _uow.DidNotReceive().CommitAsync();
     }
 

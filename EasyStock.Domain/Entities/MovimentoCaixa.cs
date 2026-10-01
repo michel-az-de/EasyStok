@@ -126,8 +126,29 @@ namespace EasyStock.Domain.Entities
         public string? Observacoes { get; set; }
         public DateTime FechadoEm { get; set; }
 
+        /// <summary>Quanto a dona contou na gaveta ao fechar. Null = fechou sem conferir
+        /// (PWA, Web e fechamentos antigos).</summary>
+        public decimal? ValorContado { get; private set; }
+
+        /// <summary>Contado menos o saldo do atendimento (<see cref="SaldoFinal"/> sem as vendas
+        /// do PDV): positivo sobrou, negativo faltou. Null quando não houve contagem.</summary>
+        public decimal? Diferenca { get; private set; }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
+
+        /// <summary>
+        /// Conferência do fechamento (F14, #1244). A base é o saldo que o console mostra:
+        /// abertura + pagamentos de pedido + entradas − saídas. As vendas do PDV ficam à parte
+        /// (lacuna 2 da F14), então a diferença não as cobra da gaveta.
+        /// </summary>
+        public void RegistrarContagem(decimal valorContado)
+        {
+            if (valorContado < 0)
+                throw new Exceptions.RegraDeDominioVioladaException("Valor contado não pode ser negativo.");
+            ValorContado = valorContado;
+            Diferenca = valorContado - (SaldoFinal - TotalVendas);
+        }
 
         public static FechamentoCaixa Criar(
             Guid empresaId, DateOnly data,

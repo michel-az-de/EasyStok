@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.FecharCaixa;
 
 namespace EasyStock.Application.UseCases.ObterCaixaDia;
 
@@ -32,18 +33,44 @@ public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc)
         // "Movimentos do dia" reconciliar com o saldo (BUG-5): movimentos + linhas == saldo.
         var linhasExtras = await calc.GetLinhasExtrasAsync(q.EmpresaId, b.JanelaInicioUtc, b.JanelaFimUtc, q.LojaId);
 
-        FechamentoCaixaResult? fechResult = b.Fechamento == null ? null : new FechamentoCaixaResult(
-            b.Fechamento.Id, b.Fechamento.EmpresaId, b.Fechamento.LojaId, b.Fechamento.Data,
-            b.Fechamento.SaldoInicial, b.Fechamento.TotalVendas, b.Fechamento.TotalPagamentosPedidos,
-            b.Fechamento.TotalEntradasExtras, b.Fechamento.TotalSaidasExtras, b.Fechamento.SaldoFinal,
-            b.Fechamento.FechadoPorUserId, b.Fechamento.FechadoPorNome, b.Fechamento.Observacoes,
-            b.Fechamento.FechadoEm);
+        var fechResult = b.Fechamento == null ? null : FecharCaixaUseCase.Map(b.Fechamento);
+
+        // F14 (#1244): o console mostra o saldo do atendimento (vendas do PDV à parte) e o resumo
+        // por método. Aditivos: SaldoEsperado acima continua o de sempre para a PWA e o Web.
+        var saldoAtendimento = b.SaldoInicial + b.TotalPagamentosPedidos + b.TotalEntradas - b.TotalSaidas;
+        var porMetodo = ResumoPorMetodo(b.Movimentos, linhasExtras);
 
         return new CaixaDiaResult(
             b.Data, q.EmpresaId, q.LojaId,
             b.SaldoInicial, b.TotalVendas, b.TotalPagamentosPedidos, b.TotalEntradas, b.TotalSaidas,
             b.SaldoEsperado, b.Aberto, b.Fechado, fechResult,
             b.Movimentos.Select(AbrirCaixaUseCase.Map).ToList(),
-            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras);
+            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras,
+            saldoAtendimento, porMetodo);
+    }
+
+    private static readonly string[] OrdemMetodos = ["pix", "dinheiro", "credito", "debito", "transferencia", "outro"];
+
+    /// <summary>Pagamentos de pedido + entradas − saídas, por método (a abertura não entra).
+    /// Método vazio ou desconhecido cai em "outro"; método que somou zero some da lista.</summary>
+    internal static IReadOnlyList<CaixaMetodoResult> ResumoPorMetodo(
+        IEnumerable<MovimentoCaixa> movimentos, IEnumerable<CaixaLinhaExtraResult> linhas)
+    {
+        static string Chave(string? metodo)
+        {
+            var m = metodo?.Trim().ToLowerInvariant();
+            return m is not null && OrdemMetodos.Contains(m) ? m : "outro";
+        }
+
+        var parcelas = linhas.Where(l => l.Tipo == "pagamento").Select(l => (Chave(l.Metodo), l.Valor))
+            .Concat(movimentos.Where(m => m.Tipo == "entrada").Select(m => (Chave(m.Metodo), m.Valor)))
+            .Concat(movimentos.Where(m => m.Tipo == "saida").Select(m => (Chave(m.Metodo), -m.Valor)));
+
+        return parcelas
+            .GroupBy(p => p.Item1)
+            .Select(g => new CaixaMetodoResult(g.Key, g.Sum(p => p.Item2)))
+            .Where(r => r.Valor != 0m)
+            .OrderBy(r => Array.IndexOf(OrdemMetodos, r.Metodo))
+            .ToList();
     }
 }

@@ -228,5 +228,18 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(x => x.pg)
                 .ToListAsync();
         }
+
+        public async Task<IReadOnlyDictionary<Guid, string?>> GetClientesDosPedidosAsync(Guid empresaId, IReadOnlyCollection<Guid> pedidoIds)
+        {
+            if (pedidoIds.Count == 0) return new Dictionary<Guid, string?>();
+            return await db.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && pedidoIds.Contains(p.Id))
+                .Select(p => new { p.Id, p.ClienteNome })
+                .ToDictionaryAsync(p => p.Id, p => p.ClienteNome);
+        }
+
+        public Task<bool> ExisteMovimentoAsync(Guid empresaId, string origem, string referencia, CancellationToken ct = default) =>
+            db.MovimentosCaixa.AsNoTracking()
+                .AnyAsync(m => m.EmpresaId == empresaId && m.Origem == origem && m.Referencia == referencia, ct);
     }
 }

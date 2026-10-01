@@ -90,5 +90,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// listar como linhas no caixa. Mesma seleção de
         /// <see cref="GetTotalPagamentosPedidosNoIntervaloAsync"/>.</summary>
         Task<IReadOnlyList<PedidoPagamento>> GetPagamentosPedidosListaNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
+
+        /// <summary>F14 (#1244): nome do cliente (snapshot do pedido) de cada pedido informado, para
+        /// o console mostrar de quem é cada pagamento. Pedido de outra empresa não volta.</summary>
+        Task<IReadOnlyDictionary<Guid, string?>> GetClientesDosPedidosAsync(Guid empresaId, IReadOnlyCollection<Guid> pedidoIds);
+
+        /// <summary>F14 (#1244): já existe movimento (estornado ou não) desta origem com esta referência?
+        /// Idempotência de lançamento automático, como o reembolso de ocorrência.</summary>
+        Task<bool> ExisteMovimentoAsync(Guid empresaId, string origem, string referencia, CancellationToken ct = default);
     }
 }

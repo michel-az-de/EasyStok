@@ -13,11 +13,13 @@ public sealed record ResolverOcorrenciaResult(OcorrenciaDto Ocorrencia, Reembols
 /// Resolução humana da ocorrência (S27, RN-35), só pela dona no console. Sem reembolso grava a
 /// resolução e não toca o gateway. Com reembolso chama <see cref="ReembolsarPedidoUseCase"/>: se o
 /// gateway recusa, nada é gravado e a ocorrência continua aberta; reembolso manual (pago fora do
-/// gateway) resolve e guarda o valor para conferência. Null quando a ocorrência não é da empresa.
+/// gateway) resolve e guarda o valor para conferência. Reembolso efetuado ou manual vira saída do
+/// caixa do dia (<see cref="LancarReembolsoNoCaixaUseCase"/>, F14). Null quando a ocorrência não é da empresa.
 /// </summary>
 public sealed class ResolverOcorrenciaUseCase(
     IOcorrenciaRepository repo,
     ReembolsarPedidoUseCase reembolsar,
+    LancarReembolsoNoCaixaUseCase lancarNoCaixa,
     IUnitOfWork unitOfWork,
     TimeProvider relogio)
 {
@@ -45,6 +47,9 @@ public sealed class ResolverOcorrenciaUseCase(
             reembolso = await reembolsar.ExecuteAsync(ocorrencia, valor, input.Resolucao, agora, ct);
             if (reembolso.Situacao == SituacaoReembolso.Falhou)
                 return new ResolverOcorrenciaResult(OcorrenciaDto.De(ocorrencia), reembolso);
+
+            // F14 (#1244): o dinheiro devolvido sai do caixa do dia, no mesmo commit da resolução.
+            await lancarNoCaixa.ExecuteAsync(new LancarReembolsoNoCaixaInput(ocorrencia, reembolso, input.UsuarioId, agora), ct);
         }
 
         ocorrencia.Resolver(input.Resolucao, input.UsuarioId, agora);
