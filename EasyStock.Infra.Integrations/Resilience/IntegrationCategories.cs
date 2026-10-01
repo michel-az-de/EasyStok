@@ -19,6 +19,12 @@ public static class IntegrationCategories
     public const string Logistics = "logistics";
     public const string WhatsApp = "whatsapp";
 
+    /// <summary>
+    /// Envio de mensagem pela Cloud API (<c>POST /messages</c>): circuit breaker e timeout, sem retry,
+    /// porque o POST não é idempotente (#1292). Fora de <see cref="All"/>, que recebe o pipeline com retry.
+    /// </summary>
+    public const string WhatsAppEnvio = "whatsapp-envio";
+
     public static readonly IReadOnlyCollection<string> All = new[]
     {
         Payments, Fiscal, Marketplace, Logistics, WhatsApp,

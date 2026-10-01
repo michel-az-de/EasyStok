@@ -11,7 +11,9 @@ namespace EasyStock.Infra.Integrations.WhatsApp;
 /// <summary>
 /// Cliente real da Cloud API da Meta. Erros de aplicação (código numérico da Meta, ex.: 131047)
 /// nunca passam pelo pipeline Polly como exceção — só a chamada HTTP em si é envolvida por ele,
-/// então falha permanente da Meta não é reenviada automaticamente (só rede/timeout retry).
+/// então falha permanente da Meta não é reenviada automaticamente. O <c>POST /messages</c> usa o
+/// pipeline <see cref="IntegrationCategories.WhatsAppEnvio"/>, sem retry (#1292): não é idempotente
+/// e um timeout depois de a Meta aceitar duplicaria a mensagem. Só o GET de mídia repete.
 /// </summary>
 public sealed class WhatsAppCloudClient(
     HttpClient httpClient,
@@ -187,21 +189,28 @@ public sealed class WhatsAppCloudClient(
     private async Task<HttpResponseMessage> PostMessagesAsync(object payload, CancellationToken ct)
     {
         var phoneNumberId = await ResolverPhoneNumberIdAsync(ct);
-        var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsApp);
+        var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsAppEnvio);
         var url = $"{phoneNumberId}/messages";
         return await pipeline.ExecuteAsync(async pollyCt => await httpClient.PostAsJsonAsync(url, payload, pollyCt), ct);
     }
 
     /// <summary>
-    /// Número da empresa do tenant corrente (#1102); sem ele, o global de
-    /// <c>Notifications:WhatsApp:Meta:PhoneNumberId</c>. Sem nenhum dos dois a chamada é recusada
-    /// aqui, antes da rede: um POST em "/messages" só devolveria um erro opaco da Meta.
+    /// Número da empresa do tenant corrente (#1102). O global de
+    /// <c>Notifications:WhatsApp:Meta:PhoneNumberId</c> só vale sem tenant (diagnóstico): empresa sem
+    /// número vinculado não fala com o cliente dela pelo número de outra (#1292). Sem número a chamada
+    /// é recusada aqui, antes da rede: um POST em "/messages" só devolveria um erro opaco da Meta.
     /// </summary>
     private async Task<string> ResolverPhoneNumberIdAsync(CancellationToken ct)
     {
         var doTenant = await remetente.ObterPhoneNumberIdAsync(ct);
         if (!string.IsNullOrWhiteSpace(doTenant))
             return doTenant.Trim();
+
+        if (remetente.HaTenantCorrente)
+            throw new WhatsAppCloudException(0,
+                "A empresa não tem phone_number_id do WhatsApp vinculado: vincule o número à empresa " +
+                "(Admin > Tenants > WhatsApp). O número global não é usado para cliente de empresa.",
+                ehPermanente: true);
 
         if (!string.IsNullOrWhiteSpace(_options.PhoneNumberId))
             return _options.PhoneNumberId.Trim();
