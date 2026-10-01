@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Postgre.Data;
@@ -27,12 +28,18 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
     public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
     {
         var contato = Conversa.NormalizarContato(canal, contatoIdExterno);
-        return db.AtendimentoConversas.FirstOrDefaultAsync(
-            c => c.EmpresaId == empresaId
-                 && c.Canal == canal
-                 && c.ContatoIdExterno == contato
-                 && c.Situacao != SituacaoConversa.Encerrada,
-            ct);
+        // #1290: no WhatsApp o mesmo celular aparece com e sem o nono dígito (wa_id da Meta x cadastro).
+        // string[] de propósito: o Npgsql manda array como parâmetro (= ANY), sem tipo gerado pelo compilador.
+        string[] grafias = canal == CanalConversa.WhatsApp
+            ? [.. NormalizadorTelefone.VariantesContatoWhatsApp(contato)]
+            : [contato];
+        return db.AtendimentoConversas
+            .Where(c => c.EmpresaId == empresaId
+                        && c.Canal == canal
+                        && grafias.Contains(c.ContatoIdExterno)
+                        && c.Situacao != SituacaoConversa.Encerrada)
+            .OrderBy(c => c.ContatoIdExterno == contato ? 0 : 1)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default)

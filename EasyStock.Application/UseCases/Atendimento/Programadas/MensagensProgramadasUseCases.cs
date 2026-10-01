@@ -115,7 +115,12 @@ internal static class DestinoMensagemProgramada
                 ?? throw new RegraDeDominioVioladaException($"Conversa {id} não encontrada.");
             if (conversa.ClienteId != cliente.Id || conversa.Canal != canal)
                 throw new RegraDeDominioVioladaException("A conversa informada não é deste cliente neste canal.");
-            return conversa.EstaAberta ? conversa : null;
+            if (conversa.EstaAberta) return conversa;
+
+            // #1290: a conversa do agendamento foi encerrada; o cliente pode ter voltado a falar numa
+            // nova, do mesmo contato. Uma aberta já vinculada a outro cliente não serve.
+            var atual = await conversas.ObterAbertaPorContatoAsync(empresaId, canal, conversa.ContatoIdExterno, ct);
+            return atual is not null && (atual.ClienteId is null || atual.ClienteId == cliente.Id) ? atual : null;
         }
 
         var contatoCadastro = ContatoDoCadastro(cliente, canal);
