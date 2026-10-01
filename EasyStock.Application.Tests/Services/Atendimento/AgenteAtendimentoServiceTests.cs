@@ -115,6 +115,22 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task RespostaDoAgenteSaiSemTravessao()
+    {
+        // #1330: travessão vira pontuação simples antes de ir ao WhatsApp e ao histórico.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(Texto("Temos ravioli de carne — R$ 22,50."));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Temos ravioli de carne, R$ 22,50.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Agente && m.Texto == "Temos ravioli de carne, R$ 22,50."),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task CadernoEntraNoPromptAntesDoDossie()
     {
         var horario = TrechoCaderno.Criar(_empresaId, "Horário", "Abrimos de terça a sábado.", null, nucleo: true, Agora);
