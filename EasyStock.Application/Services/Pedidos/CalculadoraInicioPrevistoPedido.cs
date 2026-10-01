@@ -1,3 +1,5 @@
+using EasyStock.Domain.Sales;
+
 namespace EasyStock.Application.Services.Pedidos;
 
 /// <summary>
@@ -23,5 +25,19 @@ public class CalculadoraInicioPrevistoPedido(IPrazoPreparoPedidoQueries queries)
         var prazo = CalculadoraPrazoPedido.PrazoMinimo(
             leitura.TemposPreparoMinutos, leitura.TempoPreparoPadraoMinutos, leitura.RespiroMinutos);
         return DateTime.SpecifyKind(entrega.Value, DateTimeKind.Utc).AddMinutes(-prazo);
+    }
+
+    /// <summary>
+    /// Ponto único de entrada na fila (#1230): pedido em <see cref="StatusPedido.Aguardando"/> grava o início
+    /// previsto; em outro status, nada muda. Todo caminho que coloca o pedido na fila ou registra o pagamento
+    /// dele passa por aqui (pagamento na entrega, troca genérica de status, criação no ERP, pagamento manual);
+    /// o teste de arquitetura <c>InicioPrevistoNaFilaTests</c> barra caminho novo que esqueça.
+    /// O pedido precisa estar gravado: a leitura da janela e dos itens vai ao banco.
+    /// </summary>
+    public async Task AplicarNaFilaAsync(Pedido pedido, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pedido);
+        if (pedido.StatusEnum != StatusPedido.Aguardando) return;
+        pedido.DefinirInicioPrevisto(await CalcularAsync(pedido, ct));
     }
 }

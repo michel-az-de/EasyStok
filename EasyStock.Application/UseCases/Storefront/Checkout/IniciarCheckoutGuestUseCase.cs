@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -34,7 +35,10 @@ public sealed class IniciarCheckoutGuestUseCase(
     GerarCobrancaPedidoUseCase gerarCobranca,
     IClienteStorefrontRepository clienteRepository,
     IPedidoStorefrontRepository pedidoRepository,
+    IUnitOfWork unitOfWork,
     AcompanhamentoTokenService tokenService,
+    AtribuicaoPedidoCampanha atribuicaoCampanha,
+    ITenantContextAccessor tenantContext,
     TimeProvider timeProvider,
     ILogger<IniciarCheckoutGuestUseCase> logger)
 {
@@ -89,7 +93,14 @@ public sealed class IniciarCheckoutGuestUseCase(
         pedido.ClienteTelefone = telefoneE164;
         await pedidoRepository.UpdateAsync(pedido, ct);
 
-        // ── Fase 3: cobranca do Mercado Pago (S11), grava tudo no commit ──
+        // #1226: mesma conversão da campanha que o pedido da conversa (S30); requisição anônima, o tenant
+        // da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar com o pedido já criado
+        // (mesma ordem do checkout logado).
+        tenantContext.SetCurrentTenant(storefront.EmpresaId);
+        await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, cliente.Id, pedido.Id, ct);
+        await unitOfWork.CommitAsync();
+
+        // ── Fase 3: cobranca do Mercado Pago (S11) ─────────────────────────
         var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: null, ct);
 
         var token = tokenService.Gerar(pedido.Id);

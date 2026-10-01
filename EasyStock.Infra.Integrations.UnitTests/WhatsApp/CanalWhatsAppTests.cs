@@ -28,12 +28,26 @@ public class CanalWhatsAppTests
     public async Task ModeloDelegaComoTemplate()
     {
         _cloud.EnviarTemplateAsync("5511999990001", "pedido_pago", "pt_BR",
-                Arg.Is<IReadOnlyList<string>>(p => p.Count == 1 && p[0] == "#123"), null, Arg.Any<CancellationToken>())
+                Arg.Is<IReadOnlyList<string>>(p => p.Count == 1 && p[0] == "#123"), null, null, Arg.Any<CancellationToken>())
             .Returns(new EnvioWhatsAppResult("wamid.2"));
         var canal = new CanalWhatsApp(_cloud);
 
         var id = await canal.EnviarModeloAsync("5511999990001", "pedido_pago", "pt_BR", ["#123"]);
 
         id.Should().Be("wamid.2");
+    }
+    [Fact]
+    public async Task ModeloComImagemMandaOCabecalho()
+    {
+        // #1226: arte da campanha no cabeçalho do template de marketing.
+        _cloud.EnviarTemplateAsync("5511999990001", "campanha_generica", "pt_BR",
+                Arg.Any<IReadOnlyList<string>>(), null, "https://cdn.test/arte.jpg", Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.3"));
+        ICanalMensageria canal = new CanalWhatsApp(_cloud);
+
+        var id = await canal.EnviarModeloComImagemAsync(
+            "5511999990001", "campanha_generica", "pt_BR", ["Ana", "Oi"], "https://cdn.test/arte.jpg");
+
+        id.Should().Be("wamid.3");
     }
 }

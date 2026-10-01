@@ -14,7 +14,8 @@ public sealed record MensagemPronta(
 {
     /// <summary>
     /// Dados do envio que o canal interpreta (S09). No WhatsApp da Meta: <c>template</c>,
-    /// <c>idioma</c>, <c>param1..paramN</c> e <c>botao1..botao3</c> para envio fora da janela de 24 h.
+    /// <c>idioma</c>, <c>param1..paramN</c> e <c>botao1..botao3</c> para envio fora da janela de 24 h, e
+    /// <c>imagem</c> (URL pública da arte da campanha, #1226) para o cabeçalho do template ou a imagem com legenda.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Metadados { get; init; }
 }

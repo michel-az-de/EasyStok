@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
@@ -13,7 +14,7 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class AtualizarStatusPedidoUseCaseTests
 {
-    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null)
+    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null, IPrazoPreparoPedidoQueries? prazoQueries = null)
     {
         var pedidoRepo = Substitute.For<IPedidoRepository>();
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
@@ -30,7 +31,8 @@ public class AtualizarStatusPedidoUseCaseTests
         var opts = Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = permiteNegativo });
         var integ = new PedidoEstoqueIntegrationService(itemRepo, movRepo, Substitute.For<IPublicadorEventoIntegracao>(), opts, NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var uc = new AtualizarStatusPedidoUseCase(pedidoRepo, integ, configRepo, gerarCr, publicador,
-            operacaoEventos ?? Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
+            operacaoEventos ?? Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(prazoQueries ?? Substitute.For<IPrazoPreparoPedidoQueries>()));
         return (uc, pedidoRepo, itemRepo, movRepo, uow, publicador);
     }
 
@@ -48,6 +50,41 @@ public class AtualizarStatusPedidoUseCaseTests
             PrecoUnitario = 10m
         });
         return p;
+    }
+
+    [Fact]
+    public async Task AguardandoPagamentoParaAguardando_GravaInicioPrevisto()
+    {
+        // #1230: a dona tira o pedido de "aguardando pagamento" pela troca de status (pagou no Pix
+        // direto); o pedido entra na fila com início previsto, senão o aviso de atraso nunca sai.
+        var prazo = Substitute.For<IPrazoPreparoPedidoQueries>();
+        var (uc, repo, _, _, _, _) = Build(prazoQueries: prazo);
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1, "aguardando_pagamento");
+        var entrega = new DateTime(2026, 10, 2, 15, 0, 0, DateTimeKind.Utc);
+        pedido.AgendadoParaEm = entrega;
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        prazo.ObterAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new PrazoPreparoPedidoLeitura(null, null, [null], TempoPreparoPadraoMinutos: 60, RespiroMinutos: 40));
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "aguardando"));
+
+        pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+    }
+
+    [Fact]
+    public async Task ForaDaFila_NaoConsultaInicioPrevisto()
+    {
+        // #1230: só a entrada em "aguardando" calcula; avançar o preparo não gasta consulta.
+        var prazo = Substitute.For<IPrazoPreparoPedidoQueries>();
+        var (uc, repo, _, _, _, _) = Build(prazoQueries: prazo);
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1);
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "preparando"));
+
+        await prazo.DidNotReceiveWithAnyArgs().ObterAsync(default, default, default);
     }
 
     [Fact]

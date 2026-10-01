@@ -32,6 +32,7 @@ public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
         string idioma,
         IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null,
+        string? imagemCabecalho = null,
         CancellationToken ct = default)
         => Registrar("template", waId, nomeTemplate);
 

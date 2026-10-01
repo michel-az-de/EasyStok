@@ -1,12 +1,17 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Checkout;
+using EasyStock.Domain.Entities.Campanhas;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Enums.Campanhas;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -23,7 +28,8 @@ namespace EasyStock.Application.Tests.UseCases.Storefront.Checkout;
 /// Checkout sem login (#1254): o guest passa pelo mesmo núcleo do checkout logado e da conversa
 /// (<see cref="CheckoutCoreService"/>, S10), reserva a vaga da janela e é cobrado pelo Mercado Pago
 /// (<see cref="GerarCobrancaPedidoUseCase"/>, S11). Antes, o pedido ia para a aprovação da dona sem
-/// vaga e sem cobrança.
+/// vaga e sem cobrança. Também a conversão da campanha (#1226): o pedido de quem recebeu campanha nos
+/// últimos 7 dias marca o destinatário como <c>Pediu</c>, pela mesma regra do pedido da conversa.
 /// </summary>
 public class IniciarCheckoutGuestUseCaseTests
 {
@@ -48,6 +54,8 @@ public class IniciarCheckoutGuestUseCaseTests
         public ICobrancaPedidoRepository CobrancaRepo { get; } = Substitute.For<ICobrancaPedidoRepository>();
         public IMercadoPagoClient MpClient { get; } = Substitute.For<IMercadoPagoClient>();
         public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+        public ICampanhaRepository CampanhaRepo { get; } = Substitute.For<ICampanhaRepository>();
+        public ITenantContextAccessor Tenant { get; } = Substitute.For<ITenantContextAccessor>();
         public List<CobrancaPedido> Cobrancas { get; } = new();
         public List<DomainPedido> Pedidos { get; } = new();
         public List<DomainCliente> Clientes { get; } = new();
@@ -114,8 +122,9 @@ public class IniciarCheckoutGuestUseCaseTests
                 VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, TimeProvider.System);
             var cobranca = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), StorefrontRepo, CobrancaRepo,
                 MpClient, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
-            return new IniciarCheckoutGuestUseCase(StorefrontRepo, core, cobranca, ClienteRepo, PedidoRepo,
-                new AcompanhamentoTokenService(config, TimeProvider.System), TimeProvider.System,
+            return new IniciarCheckoutGuestUseCase(StorefrontRepo, core, cobranca, ClienteRepo, PedidoRepo, Uow,
+                new AcompanhamentoTokenService(config, TimeProvider.System),
+                new AtribuicaoPedidoCampanha(CampanhaRepo, TimeProvider.System), Tenant, TimeProvider.System,
                 NullLogger<IniciarCheckoutGuestUseCase>.Instance);
         }
     }
@@ -202,5 +211,45 @@ public class IniciarCheckoutGuestUseCaseTests
 
         await act.Should().ThrowAsync<TelefoneInvalidoException>();
         await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task PedidoGuestDeQuemRecebeuCampanhaMarcaPediu()
+    {
+        var f = new Fixture();
+        var empresaId = f.Storefront.EmpresaId;
+        const string telefone = "+5511987654321";
+        var cliente = new DomainCliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria", Telefone = telefone };
+        f.ClienteRepo.GetByTelefoneHashAsync(empresaId, ClienteOtp.CalcularTelefoneHash(telefone), Arg.Any<CancellationToken>())
+            .Returns(cliente);
+
+        var agora = DateTime.UtcNow;
+        var campanha = Campanha.Criar(empresaId, Guid.NewGuid(),
+            new DadosCampanha("Bolo de fubá", "Oi {{nome}}", null, null, FiltroCampanha.ParaTodos, [], null, false, null),
+            agora.AddDays(-3));
+        var destinatario = CampanhaDestinatario.Criar(campanha, cliente.Id);
+        destinatario.Enfileirar(1, Guid.NewGuid());
+        destinatario.MarcarEnviado(agora.AddDays(-2));
+        f.CampanhaRepo.ObterEnviadoParaAtribuirAsync(empresaId, cliente.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(destinatario);
+
+        var resultado = await f.UseCase().ExecuteAsync(Input());
+
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
+        destinatario.PedidoId.Should().Be(resultado.PedidoId);
+        f.Tenant.Received().SetCurrentTenant(empresaId);
+    }
+
+    [Fact]
+    public async Task SemCampanhaRecenteOPedidoSegueNormal()
+    {
+        // Cliente novo (nenhum envio de campanha): o repositório não acha destinatário e nada muda.
+        var f = new Fixture();
+
+        var resultado = await f.UseCase().ExecuteAsync(Input());
+
+        resultado.PedidoId.Should().NotBeEmpty();
+        f.Pedidos.Should().ContainSingle(p => p.Id == resultado.PedidoId);
+        f.Cobrancas.Should().ContainSingle();
     }
 }

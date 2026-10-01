@@ -94,9 +94,19 @@ public sealed class WhatsAppCloudClient(
         string idioma,
         IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null,
+        string? imagemCabecalho = null,
         CancellationToken ct = default)
     {
         var components = new List<object>();
+        if (!string.IsNullOrWhiteSpace(imagemCabecalho))
+        {
+            components.Add(new
+            {
+                type = "header",
+                parameters = new object[] { new { type = "image", image = new { link = imagemCabecalho } } }
+            });
+        }
+
         if (parametrosCorpo.Count > 0)
         {
             components.Add(new

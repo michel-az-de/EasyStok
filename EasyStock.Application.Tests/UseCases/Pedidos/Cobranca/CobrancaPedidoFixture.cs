@@ -162,7 +162,8 @@ internal sealed class CobrancaPedidoFixture
 
     public ConfirmarPagamentoPedidoUseCase Confirmar() =>
         new(CobrancaRepo, PedidoStorefrontRepo,
-            new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance),
+            new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+                new CalculadoraInicioPrevistoPedido(PrazoQueries)),
             Publicador, OperacaoEventos, ImpressaoRepo, Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(PrazoQueries));
 
@@ -171,7 +172,7 @@ internal sealed class CobrancaPedidoFixture
 
     public TrocarFormaPagamentoPedidoUseCase Trocar() =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
-            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance);
+            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries));
 
     public AtualizarCobrancaPorPagamentoUseCase AtualizarPorPagamento() =>
         new(CobrancaRepo, PedidoStorefrontRepo, Aviso(), Tenant, Uow, Relogio,

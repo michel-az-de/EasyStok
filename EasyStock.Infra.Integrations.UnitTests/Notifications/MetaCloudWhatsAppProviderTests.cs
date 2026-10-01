@@ -204,4 +204,88 @@ public class MetaCloudWhatsAppProviderTests
             Arg.Is<IReadOnlyList<(string Id, string Titulo)>?>(b => b != null && b.Count == 2 && b[1].Id == "acao:avaliacao:negativa:abc"),
             Arg.Any<CancellationToken>());
     }
+    private const string Arte = "https://cdn.test/campanhas/arte.jpg";
+    private const string TextoCampanha = "Oi Ana, saiu bolo de fubá!";
+
+    private MensagemPronta MensagemCampanha(string corpo = TextoCampanha) => new(
+        Guid.NewGuid(), _empresaId, "+" + Telefone, "", corpo,
+        CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Marketing)
+    {
+        Metadados = new Dictionary<string, string>
+        {
+            ["template"] = "campanha_generica",
+            ["idioma"] = "pt_BR",
+            ["param1"] = "Ana",
+            ["param2"] = TextoCampanha,
+            ["imagem"] = Arte,
+        }
+    };
+
+    [Fact]
+    public async Task ForaDaJanelaArteVaiNoCabecalhoDoTemplate()
+    {
+        // #1226: a arte da campanha é o cabeçalho de imagem do template de marketing.
+        ConversaComEntradaHa(TimeSpan.FromHours(25));
+        _canal.EnviarModeloComImagemAsync(Telefone, "campanha_generica", "pt_BR",
+                Arg.Is<IReadOnlyList<string>>(p => p.SequenceEqual(new[] { "Ana", TextoCampanha })), Arte,
+                Arg.Any<CancellationToken>())
+            .Returns("wamid.arte");
+
+        var resultado = await Provider().EnviarAsync(MensagemCampanha());
+
+        resultado.Sucesso.Should().BeTrue();
+        await _canal.Received(1).EnviarModeloComImagemAsync(Telefone, "campanha_generica", "pt_BR",
+            Arg.Any<IReadOnlyList<string>>(), Arte, Arg.Any<CancellationToken>());
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ExternoId == "wamid.arte"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DentroDaJanelaArteSaiComoImagemComLegenda()
+    {
+        ConversaComEntradaHa(TimeSpan.FromHours(1));
+        _canal.EnviarImagemAsync(Telefone, Arte, TextoCampanha, Arg.Any<CancellationToken>()).Returns("wamid.imagem");
+
+        var resultado = await Provider().EnviarAsync(MensagemCampanha());
+
+        resultado.Sucesso.Should().BeTrue();
+        await _canal.Received(1).EnviarImagemAsync(Telefone, Arte, TextoCampanha, Arg.Any<CancellationToken>());
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloComImagemAsync(default!, default!, default!, default!, default!, default);
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ExternoId == "wamid.imagem"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LegendaAcimaDoLimiteDaMetaSaiImagemEDepoisTexto()
+    {
+        // A Meta aceita legenda de imagem até 1024 caracteres; a mensagem da campanha vai até 4096.
+        ConversaComEntradaHa(TimeSpan.FromHours(1));
+        var longo = new string('a', MetaCloudWhatsAppProvider.LegendaImagemTamanhoMaximo + 1);
+        _canal.EnviarImagemAsync(Telefone, Arte, null, Arg.Any<CancellationToken>()).Returns("wamid.imagem");
+        _canal.EnviarTextoAsync(Telefone, longo, Arg.Any<CancellationToken>()).Returns("wamid.texto");
+
+        var resultado = await Provider().EnviarAsync(MensagemCampanha(longo));
+
+        resultado.Sucesso.Should().BeTrue();
+        Received.InOrder(() =>
+        {
+            _canal.EnviarImagemAsync(Telefone, Arte, null, Arg.Any<CancellationToken>());
+            _canal.EnviarTextoAsync(Telefone, longo, Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task SemArteNadaMuda()
+    {
+        ConversaComEntradaHa(TimeSpan.FromHours(25));
+        _canal.EnviarModeloAsync(Telefone, "pedido_pago", "pt_BR", Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns("wamid.template");
+
+        (await Provider().EnviarAsync(Mensagem(ComTemplate))).Sucesso.Should().BeTrue();
+
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloComImagemAsync(default!, default!, default!, default!, default!, default);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+    }
 }

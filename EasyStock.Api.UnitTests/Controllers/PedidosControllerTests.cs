@@ -47,7 +47,7 @@ public class PedidosControllerTests
 
         var criar = new CriarPedidoUseCase(
             _pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-            NullLogger<CriarPedidoUseCase>.Instance);
+            NullLogger<CriarPedidoUseCase>.Instance, new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
         var estoqueIntegration = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),
@@ -78,7 +78,8 @@ public class PedidosControllerTests
             Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(),
             Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>(),
             _uow,
-            NullLogger<AtualizarStatusPedidoUseCase>.Instance);
+            NullLogger<AtualizarStatusPedidoUseCase>.Instance,
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
         var cancelar = new CancelarPedidoUseCase(
             _pedidoRepo, estoqueIntegration, Substitute.For<IContaReceberRepository>(),
@@ -100,7 +101,8 @@ public class PedidosControllerTests
             _pedidoRepo, estoqueIntegration, _uow, NullLogger<RemoverItemPedidoUseCase>.Instance);
 
         var addPag = new RegistrarPagamentoPedidoUseCase(
-            _pedidoRepo, _uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance);
+            _pedidoRepo, _uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
 
         var removePag = new RemoverPagamentoPedidoUseCase(
             _pedidoRepo, _uow, NullLogger<RemoverPagamentoPedidoUseCase>.Instance);

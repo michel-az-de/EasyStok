@@ -32,5 +32,15 @@ public interface ICanalMensageria
         IReadOnlyList<(string Id, string Titulo)>? botoes, CancellationToken ct = default) =>
         EnviarModeloAsync(contatoIdExterno, nome, idioma, parametros, ct);
 
+    /// <summary>
+    /// Modelo aprovado com imagem no cabeçalho (#1226: arte da campanha de marketing). O modelo precisa
+    /// ter sido aprovado com cabeçalho <c>IMAGE</c>; <paramref name="urlImagem"/> é HTTPS pública. Canal sem
+    /// cabeçalho de mídia manda o modelo sem ele.
+    /// </summary>
+    Task<string> EnviarModeloComImagemAsync(
+        string contatoIdExterno, string nome, string idioma, IReadOnlyList<string> parametros, string urlImagem,
+        CancellationToken ct = default) =>
+        EnviarModeloAsync(contatoIdExterno, nome, idioma, parametros, ct);
+
     Task MarcarComoLidaAsync(string idMensagemExterna, CancellationToken ct = default);
 }
