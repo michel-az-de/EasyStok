@@ -39,3 +39,7 @@
   gap: 12px;
   align-items: center;
 }
+
+.vence {
+  color: var(--perigo);
+}

@@ -32,6 +32,7 @@ import { FONTE_API } from '../infra/fonteDados'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
+import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
 
 const carregar = () => ({
   conversas: carregarConversas(),
@@ -58,8 +59,11 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
     // Modo API (F02): mensagens do expediente (S40); horário e controle vivem em
     // `funcionamento` e `lojaAberta`, os mesmos do modo demonstração.
     expediente: { carregado: false, mensagemForaDoHorario: '', mensagemLojaFechada: '' },
+    // F07, item 6: o rascunho de antes do 401 volta depois do novo login.
+    ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
   }))
-  useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar })
+  useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
+  useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -292,6 +296,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   useEffect(() => {
     if (FONTE_API) acoesAtivas.recarregarExpediente()
   }, [acoesAtivas])
+  useEffect(() => () => acoesAtivas.cancelarHorarioPendente?.(), [acoesAtivas])
 
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null

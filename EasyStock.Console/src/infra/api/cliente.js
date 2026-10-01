@@ -21,8 +21,7 @@ const MENSAGEM_POR_STATUS = {
   502: 'O canal não respondeu. Tente de novo.',
 }
 
-async function lerCorpo(resposta) {
-  const texto = await resposta.text()
+const comoJson = (texto) => {
   if (!texto) return null
   try { return JSON.parse(texto) } catch { return null }
 }
@@ -30,7 +29,8 @@ async function lerCorpo(resposta) {
 // Envelope da EasyStock.Api: sucesso em `{ data, meta }`; erro em `{ error: { code, message } }`,
 // exceto o 409 da janela de 24 h (`{ erro, sugestao }`) e os 401/403 de corpo vazio.
 // `formulario` (FormData) vai como multipart: o navegador escreve o Content-Type com o boundary.
-export async function chamarApi(caminho, { metodo = 'GET', corpo, formulario, autenticado = true } = {}) {
+// `texto`: página pronta fora do envelope (canhoto HTML da S20); devolve o corpo cru.
+export async function chamarApi(caminho, { metodo = 'GET', corpo, formulario, autenticado = true, texto = false } = {}) {
   const cabecalhos = { Accept: 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (autenticado) {
@@ -47,7 +47,9 @@ export async function chamarApi(caminho, { metodo = 'GET', corpo, formulario, au
   } catch {
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
-  const json = await lerCorpo(resposta)
+  const bruto = await resposta.text()
+  if (resposta.ok && texto) return bruto
+  const json = comoJson(bruto)
   if (resposta.ok) return json?.data ?? null
 
   if (resposta.status === 401 && autenticado) {

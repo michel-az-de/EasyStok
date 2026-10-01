@@ -3,6 +3,8 @@
 // O que a API ainda não entrega (pedido, notas, tags, endereço) nasce vazio: cada módulo
 // ganha o dado de verdade quando for ligado (matriz 10-console.md).
 
+import { pausaDaSituacao } from '../../dominio/automatico'
+
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
   ChatSite: 'Chat do site', Email: 'E-mail', Sms: 'SMS',
@@ -11,7 +13,7 @@ const NOME_DO_CANAL = {
 const ESTADO_DA_SITUACAO = { Automatica: 'Aberto', Assumida: 'Em atendimento', Encerrada: 'Encerrado' }
 
 const STATUS_DA_MENSAGEM = {
-  Pendente: 'enviando', Enviada: 'enviada', Entregue: 'lida', Lida: 'lida', Falhou: 'falhou',
+  Pendente: 'enviando', Enviada: 'enviada', Entregue: 'entregue', Lida: 'lida', Falhou: 'falhou',
 }
 
 const ROTULO_DO_CONTEUDO = {
@@ -52,6 +54,14 @@ function janelaExpiraEm(resumo, mensagens) {
   return resumo.dentroDaJanela ? new Date(ultima + HORAS_DA_JANELA * MS_POR_HORA).toISOString() : new Date(ultima).toISOString()
 }
 
+// `Assumida` sem responsável: o automático passou a conversa para a fila humana. Vira a
+// mesma `passagem` do protótipo (selo "Precisa de você" com o motivo). `motivoEscalada` é
+// opcional (F08); sem ele, o motivo padrão. A API não dá a hora da escalada.
+function passagemDaApi(resumo) {
+  if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
+  return { motivo: resumo.motivoEscalada || null, em: null, assumida: false }
+}
+
 export function conversaDaApi(resumo, mensagensDaApi, usuario) {
   const mensagens = (mensagensDaApi ?? []).map(mensagemDaApi).sort(cronologica)
   const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
@@ -66,6 +76,9 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     responsavel: resumo.assumidaPorUsuarioId ? (minha ? usuario.nome : 'Outro atendente') : null,
+    // F07, item 3: quem pausou o automático (você, outro atendente ou a escalada) e a passagem.
+    pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
+    passagem: passagemDaApi(resumo),
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
     naoLidas: resumo.naoLidas,

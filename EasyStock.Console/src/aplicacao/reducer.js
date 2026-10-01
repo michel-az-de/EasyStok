@@ -233,7 +233,7 @@ const CASOS_API = {
       conversas: mescladas,
       selecionadaId: aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null),
       automaticoPausado: Object.fromEntries(
-        mescladas.map((c) => [c.id, c.situacaoApi === 'Assumida' ? PAUSA_POR_ASSUMIR : false]),
+        mescladas.map((c) => [c.id, c.pausaApi ?? false]),
       ),
       // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
       sincronizacao: { estado: 'ok', mensagem: null, em: Date.now(), aviso: estado.sincronizacao?.aviso ?? null },

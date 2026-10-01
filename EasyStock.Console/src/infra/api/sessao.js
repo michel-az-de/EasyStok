@@ -21,3 +21,15 @@ export function gravarSessao(sessao) {
 export function limparSessao() {
   try { sessionStorage.removeItem(CHAVE) } catch { /* nada a limpar */ }
 }
+
+// Vencimento do JWT lido do próprio token (`exp`, segundos), em ms. Token sem `exp` ou
+// ilegível devolve null e quem chama usa o `expiresIn` da resposta do login.
+export function vencimentoDoToken(token) {
+  try {
+    const carga = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const { exp } = JSON.parse(atob(carga.padEnd(Math.ceil(carga.length / 4) * 4, '=')))
+    return Number.isFinite(exp) ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}

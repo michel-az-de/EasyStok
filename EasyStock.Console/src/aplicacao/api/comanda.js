@@ -32,8 +32,9 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const pedidoDe = (id) => estadoRef.current.conversas.find((c) => c.id === id)?.pedido ?? null
   const pedidoCriado = (id) => pedidoDe(id)?.pedidoId ?? null
 
+  // O meio escolhido na tela vai junto: a API devolve a forma, não o meio (F07, item 5).
   async function recarregar(id) {
-    const pedido = pedidoDaApi(await obterPedido(id))
+    const pedido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
     if (pedido) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id, pedido })
   }
 
@@ -46,9 +47,13 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const trocarForma = (id, meio) => {
     const pedidoId = pedidoCriado(id)
     despachar({ tipo: acao.ESCOLHER_MEIO_PAGAMENTO, id, meio })
+    // Falhou: o meio local já mudou, então volta ao que o EasyStok tem (F07, item 5).
     return trocarFormaPagamento(pedidoId, formaDoMeio(meio))
       .then(() => recarregar(id))
-      .catch((erro) => avisar(`Forma de pagamento: ${erro.message}`))
+      .catch((erro) => {
+        avisar(`Forma de pagamento: ${erro.message}`)
+        return recarregar(id).catch(() => {})
+      })
   }
 
   return {
