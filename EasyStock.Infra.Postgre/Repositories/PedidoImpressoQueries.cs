@@ -50,6 +50,23 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 .FirstOrDefaultAsync(ct)
             : null;
 
+        // S52: alergias do cadastro (tags "alergia_*", S24) e molho do item do cardápio, como no canhoto.
+        var alergias = p.ClienteId is { } idCliente
+            ? await db.ClienteTags
+                .AsNoTracking()
+                .Where(t => t.EmpresaId == empresaId && t.ClienteId == idCliente && t.Tag.StartsWith("alergia_"))
+                .Select(t => t.Tag)
+                .ToListAsync(ct)
+            : [];
+
+        var cardapioIds = p.Itens.Where(i => i.CardapioItemId != null).Select(i => i.CardapioItemId!.Value).Distinct().ToList();
+        var molhos = cardapioIds.Count == 0
+            ? new Dictionary<Guid, string?>()
+            : await db.CardapioItens
+                .AsNoTracking()
+                .Where(c => cardapioIds.Contains(c.Id) && c.SugestaoMolho != null)
+                .ToDictionaryAsync(c => c.Id, c => c.SugestaoMolho, ct);
+
         var formaCobranca = await db.CobrancasPedido
             .AsNoTracking()
             .Where(c => c.EmpresaId == empresaId && c.PedidoId == p.Id && c.MetodoPagamento != null)
@@ -102,7 +119,8 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 p.ClienteApt,
                 cliente?.Bairro,
                 cliente?.Cidade,
-                cliente?.Cep),
+                cliente?.Cep,
+                alergias),
             Observacoes: p.Observacoes,
             Total: p.Total.Valor,
             Pagamentos: p.Pagamentos.Select(g => new PedidoImpressoPagamentoLeitura(g.Valor, g.PagoEm, g.Metodo)).ToList(),
@@ -113,7 +131,9 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 .OrderBy(i => i.CriadoEm)
                 .Select(i => new PedidoImpressoItemLeitura(
                     i.Nome, i.VariacaoRotuloSnapshot, i.Quantidade, i.Unidade, i.PrecoUnitario, i.Subtotal, i.Observacao,
-                    EhProduto: !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null))
+                    EhProduto: !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null,
+                    Linha: i.LinhaSnapshot,
+                    Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null))
                 .ToList());
     }
 }
