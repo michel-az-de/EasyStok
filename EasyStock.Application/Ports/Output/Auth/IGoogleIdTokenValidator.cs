@@ -12,5 +12,8 @@ public interface IGoogleIdTokenValidator
     /// <summary>Nulo quando o login com Google está desligado (sem ClientId).</summary>
     string? ClientId { get; }
 
+    /// <summary>#1326: CNPJ ou nome da empresa que o superadmin recebe ao entrar pelo Google.</summary>
+    string? EmpresaPadrao { get; }
+
     Task<IdentidadeGoogle?> ValidarAsync(string idToken, CancellationToken ct = default);
 }

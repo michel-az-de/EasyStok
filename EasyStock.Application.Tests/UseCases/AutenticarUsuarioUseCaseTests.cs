@@ -163,6 +163,49 @@ public class AutenticarUsuarioUseCaseTests
     }
 
     [Fact]
+    public async Task LoginGoogle_SuperAdminEntraNaEmpresaPadrao()
+    {
+        // #1326: o console recusa token sem empresa; pelo Google o superadmin recebe a empresa padrão.
+        var usuario = SuperAdmin();
+        var empresaPadrao = Guid.NewGuid();
+
+        var result = await CriarUseCase(Substitute.For<IUsuarioRepository>())
+            .ConcluirLoginGoogleAsync(usuario, null, empresaPadrao);
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Equal(empresaPadrao, result.EmpresaId);
+    }
+
+    [Fact]
+    public async Task LoginGoogle_SuperAdminSemEmpresaPadraoContinuaSemEmpresa()
+    {
+        var result = await CriarUseCase(Substitute.For<IUsuarioRepository>())
+            .ConcluirLoginGoogleAsync(SuperAdmin(), null, null);
+
+        Assert.Equal(NivelAcesso.SuperAdmin, result.Nivel);
+        Assert.Null(result.EmpresaId);
+    }
+
+    private static Usuario SuperAdmin()
+    {
+        var usuarioId = Guid.NewGuid();
+        var perfilId = Guid.NewGuid();
+        return new Usuario
+        {
+            Id = usuarioId, Nome = "Felipe", Email = "felipe.azevedoit@gmail.com", SenhaHash = "x", Ativo = true,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow, Empresas = new List<UsuarioEmpresa>(),
+            Perfis = new List<UsuarioPerfil>
+            {
+                new UsuarioPerfil
+                {
+                    Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = Guid.Empty, PerfilId = perfilId, AtribuidoEm = DateTime.UtcNow,
+                    Perfil = new Perfil { Id = perfilId, Nome = "SuperAdmin", EmpresaId = null, Nivel = NivelAcesso.SuperAdmin, Permissoes = new List<PerfilPermissao>() }
+                }
+            }
+        };
+    }
+
+    [Fact]
     public async Task Autenticar_DeveRetornarSuperAdmin_QuandoUsuarioTemPerfilGlobal()
     {
         // Regressao: o login do SuperAdmin (admin@easystok.com no painel admin)

@@ -12,6 +12,9 @@ public sealed class GoogleAuthOptions
 
     /// <summary>ID do cliente OAuth (Web) do Google Cloud. É público: vai também para o console.</summary>
     public string? ClientId { get; set; }
+
+    /// <summary>CNPJ ou nome da empresa padrão do superadmin no console (#1326).</summary>
+    public string? EmpresaPadrao { get; set; }
 }
 
 /// <summary>
@@ -22,6 +25,8 @@ public sealed class GoogleIdTokenValidator(IOptions<GoogleAuthOptions> options, 
     : IGoogleIdTokenValidator
 {
     public string? ClientId => string.IsNullOrWhiteSpace(options.Value.ClientId) ? null : options.Value.ClientId.Trim();
+
+    public string? EmpresaPadrao => string.IsNullOrWhiteSpace(options.Value.EmpresaPadrao) ? null : options.Value.EmpresaPadrao.Trim();
 
     public async Task<IdentidadeGoogle?> ValidarAsync(string idToken, CancellationToken ct = default)
     {
