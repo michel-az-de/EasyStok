@@ -36,7 +36,8 @@ public class LancarLotePapelUseCaseTests
             Options.Create(new PedidoEstoqueOptions { PermiteEstoqueNegativo = true }),
             NullLogger<PedidoEstoqueIntegrationService>.Instance);
         var atualizar = new AtualizarStatusPedidoUseCase(_pedidoRepo, integ, configRepo, gerarCr, _publicador,
-            Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance);
+            Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
+            new EasyStock.Application.Services.Pedidos.CalculadoraInicioPrevistoPedido(Substitute.For<EasyStock.Application.Ports.Output.Persistence.IPrazoPreparoPedidoQueries>()));
         var lote = new AtualizarStatusPedidosEmLoteUseCase(atualizar, uow,
             NullLogger<AtualizarStatusPedidosEmLoteUseCase>.Instance);
         _pedidoRepo.AddEventoAsync(Arg.Do<PedidoEvento>(_eventos.Add));
