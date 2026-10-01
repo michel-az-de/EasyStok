@@ -104,35 +104,16 @@ public class AvaliadorLembretesTests
         await _publisher.Received(1).PublicarAsync(AvaliarLembretesUseCase.EventoSse, _empresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
     }
 
-    /// <summary>Repositório em memória: a idempotência é do avaliador, não do mock.</summary>
-    private sealed class LembreteRepositoryEmMemoria : ILembreteRepository
+    [Fact]
+    public async Task LembreteDoVigiaDeIntegracoesNaoEhResolvidoPeloAvaliador()
     {
-        private readonly List<Lembrete> _itens = [];
-        public IReadOnlyList<Lembrete> Todos => _itens;
+        // F16 (#1246): o vigia das integrações é quem resolve o lembrete de integração parada.
+        await _repo.AddAsync(Lembrete.Automatico(_empresaId, TipoLembrete.IntegracaoParada, "mercadopago:20260930",
+            "Integração parada: Mercado Pago.", Agora));
 
-        public Task AddAsync(Lembrete lembrete, CancellationToken ct = default)
-        {
-            _itens.Add(lembrete);
-            return Task.CompletedTask;
-        }
+        await Avaliador().ExecuteAsync();
 
-        public Task<Lembrete?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
-            Task.FromResult(_itens.FirstOrDefault(l => l.EmpresaId == empresaId && l.Id == id));
-
-        public Task<IReadOnlyList<Lembrete>> ListarAsync(
-            Guid empresaId, Guid? usuarioId, bool incluirConcluidos, int limite, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<Lembrete>>(_itens
-                .Where(l => l.EmpresaId == empresaId && (incluirConcluidos || l.EstaAberto)
-                    && (usuarioId is null || l.ParaUsuarioId is null || l.ParaUsuarioId == usuarioId))
-                .Take(limite).ToList());
-
-        public Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default) =>
-            Task.FromResult(_itens.Any(l => l.EmpresaId == empresaId && l.Tipo == tipo && l.Referencia == referencia));
-
-        public Task<IReadOnlyList<Lembrete>> ListarAutomaticosAbertosAsync(CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<Lembrete>>(_itens.Where(l => l.Tipo != TipoLembrete.Manual && l.EstaAberto).ToList());
-
-        public Task<IReadOnlyList<Lembrete>> ListarVencidosSemAvisoAsync(DateTime agoraUtc, int limite, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<Lembrete>>(_itens.Where(l => l.DeveAvisar(agoraUtc)).Take(limite).ToList());
+        _repo.Todos.Should().ContainSingle().Which.EstaAberto.Should().BeTrue(
+            "o fato (chave quebrada) não está nas consultas do avaliador, e nem por isso deixou de valer");
     }
 }

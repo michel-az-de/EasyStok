@@ -61,4 +61,10 @@ public static class LockKeys
     /// lembrete em dobro. "Campanh" em hex ASCII.
     /// </summary>
     public const long CampanhaJob = 0x4361_6D70_616E_6800L;
+
+    /// <summary>
+    /// Vigia das integrações (F16, #1246), a cada 15 min. Serializa entre réplicas para não testar
+    /// nem lembrar em dobro. "Integra" em hex ASCII.
+    /// </summary>
+    public const long VigiaIntegracoes = 0x496E_7465_6772_6100L;
 }

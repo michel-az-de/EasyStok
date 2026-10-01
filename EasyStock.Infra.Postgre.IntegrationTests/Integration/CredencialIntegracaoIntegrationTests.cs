@@ -157,4 +157,37 @@ public class CredencialIntegracaoIntegrationTests(PostgreSqlDatabaseFixture fixt
         deB.Should().Be(0, "a credencial de outra empresa é invisível pela policy tenant_isolation");
         deA.Should().Be(1);
     }
+
+    [SkippableFact]
+    public async Task AlvosDoVigiaSaoEmpresasComAtendimentoOuChaveAtiva()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var comAtendimento = Guid.NewGuid();
+        var comChave = Guid.NewGuid();
+        var semNada = Guid.NewGuid();
+        var config = ConfigComKek("kek-a", KekNova());
+        foreach (var empresa in new[] { comAtendimento, comChave, semNada })
+        {
+            await using var db = fixture.CreateDbContext();
+            db.SetMobileTenantContext(empresa);
+            await CriarEmpresaAsync(db, empresa);
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.TenantFeatureFlags.Add(TenantFeatureFlag.Criar(comAtendimento, "modulo.atendimento", true, "teste@fma"));
+            db.TenantFeatureFlags.Add(TenantFeatureFlag.Criar(semNada, "modulo.atendimento", false, "teste@fma"));
+            await db.SaveChangesAsync();
+        }
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(comChave);
+            await Resolver(db, config).SalvarAsync(comChave, CategoriaIntegracao.Logistics, "lalamove",
+                AmbienteIntegracao.Sandbox, new ChaveTeste(Segredo), Guid.NewGuid());
+        }
+
+        await using var vigia = fixture.CreateDbContext();
+        var alvos = await new EasyStock.Infra.Postgre.Repositories.Integracoes.AlvosVigiaIntegracoesQuery(vigia).ListarEmpresasAsync();
+
+        alvos.Should().Contain([comAtendimento, comChave]).And.NotContain(semNada);
+    }
 }

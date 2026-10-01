@@ -73,6 +73,8 @@ public sealed class AvaliarLembretesUseCase(
         var resolvidos = 0;
         foreach (var aberto in await repository.ListarAutomaticosAbertosAsync(ct))
         {
+            // Só resolve os tipos que ele mesmo cria. O de integração (F16, #1246) é do vigia.
+            if (aberto.Tipo is not (TipoLembrete.PagamentoSemBaixa or TipoLembrete.ClienteSemResposta)) continue;
             if (aberto.Referencia is { } r && vigentes.Contains((aberto.EmpresaId, aberto.Tipo, r))) continue;
             aberto.Concluir(agora);
             resolvidos++;
