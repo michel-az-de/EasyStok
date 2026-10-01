@@ -25,6 +25,7 @@ operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API m�
 | Console | [10-console.md](10-console.md) | F01–F05 | ADR-0054: o protótipo vira o console do operador neste repositório; matriz de paridade e ordem de ligação à API |
 | 9 | [12-impressos.md](12-impressos.md) | S49–S53 | Impressos da Casa da Baba: motor de modelos por papel (etiqueta 10×15, cupom 58 mm, A4 econômico), o Pedido e a Comanda (número do dia, alergia do cadastro, congelado à parte); backlog dos demais documentos |
 | Homologação | [13-homologacao-organica.md](13-homologacao-organica.md) | H00–H16 | Aderência medida do atendimento (61 %), 14 achados Altos e spec de correção revisada por banca de 5 lentes |
+| 10 | [14-caderno-da-loja.md](14-caderno-da-loja.md) | S54–S56 | Caderno da loja em trechos para o agente: núcleo e índice no prompt, texto sob demanda por `consultar_caderno`; depois pré-busca e busca semântica |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).
