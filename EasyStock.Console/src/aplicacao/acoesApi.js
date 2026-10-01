@@ -9,6 +9,8 @@ import { criarAcoesConfiguracaoApi } from './api/configuracao'
 import { criarAcoesAssistenteApi } from './api/assistente'
 import { criarAcoesConsentimentosApi } from './api/consentimentos'
 import { criarAcoesComandaApi } from './api/comanda'
+import { criarAcoesEncerramentoEMidiaApi } from './api/encerramentoEMidia'
+import { criarAvisosNaoLigadas } from './api/naoLigadas'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -16,17 +18,20 @@ const motivoDaRecusa = (erro) => (erro.codigo === FORA_DA_JANELA
   ? 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
   : `Não enviada: ${erro.message}`)
 
-// Modo API (F01, F02, F03): as ações que a caixa de entrada, o expediente, a configuração,
-// o assistente, os avisos da Ficha e a comanda (pedido e cobrança) já ligam passam a valer
-// no EasyStok.
+// Modo API (F01, F02, F03, F06): as ações que a caixa de entrada, o expediente, a configuração,
+// o assistente, os avisos da Ficha, a comanda (pedido e cobrança), o encerramento e a foto
+// já ligam passam a valer no EasyStok.
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
-// traz o estado do servidor. Todo o resto das ações continua local (módulos ainda
-// não ligados, matriz 10-console.md).
+// traz o estado do servidor. As ações ainda não ligadas (lista única em
+// `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
 export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
 
   return {
     ...acoes,
+    ...criarAvisosNaoLigadas(despachar),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, motivoDaRecusa }),
+    fecharAvisoApi: () => despachar({ tipo: acao.FECHAR_AVISO_API }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),

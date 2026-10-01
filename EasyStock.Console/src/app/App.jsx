@@ -153,7 +153,9 @@ function Composicao({ aoSair }) {
         aoAbrirGestao={() => setModal('gestao')}
         aoAbrirEntregas={() => setModal('entregas')}
         simulando={simulando}
-        aoAlternarSimulacoes={() => setSimulando((v) => !v)}
+        // Modo API (F06): sem Simular. Cenário simulado em conversa de verdade some em 5 s
+        // e desloca o relógio; sem o gatilho, nem o botão nem o F2 aparecem.
+        aoAlternarSimulacoes={FONTE_API ? null : () => setSimulando((v) => !v)}
         larguras={larguras}
         aoRedimensionar={aoRedimensionar}
       />
@@ -214,7 +216,7 @@ function Composicao({ aoSair }) {
 
       {/* Rodada 5, seção 7 (passo zero): painel vazio, a F7 constrói os
           cenários. Só existe para o botão "Simular" ter o que abrir. */}
-      {simulando && <PainelSimulacoes roteiro={roteiro} aoFechar={() => setSimulando(false)} />}
+      {simulando && !FONTE_API && <PainelSimulacoes roteiro={roteiro} aoFechar={() => setSimulando(false)} />}
 
       {/* RN-27: fila do canhoto automático no pagamento, global porque o
           pedido pago pode não ser o da ficha aberta agora. */}
@@ -273,6 +275,13 @@ function CozinhaApi() {
   return <TelaCozinhaApi key={sessao.token} />
 }
 
+// Cardápio por link no modo API (F06): sem canal entre janelas, e nada abre sem sessão.
+function CardapioLinkApi() {
+  const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
+  if (!sessao) return <TelaLogin listarEmpresas={listarEmpresas} entrarNaEmpresa={entrarNaEmpresa} />
+  return <TelaCardapioLink />
+}
+
 // Entregas no modo API (F04): janela própria lê a API, sem espelho do Balcão.
 function EntregasApi() {
   const { sessao, listarEmpresas, entrarNaEmpresa } = useSessaoApi()
@@ -285,6 +294,6 @@ export function App() {
   const rota = rotaDaHash(hash)
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi /> : <TelaEntregas />
   if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi /> : <TelaCozinha />
-  if (rota.tipo === ROTA_CARDAPIO_LINK) return <TelaCardapioLink />
+  if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <CardapioLinkApi /> : <TelaCardapioLink />
   return <AppPrincipal />
 }

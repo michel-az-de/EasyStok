@@ -32,3 +32,10 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+.texto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}

@@ -235,7 +235,8 @@ const CASOS_API = {
       automaticoPausado: Object.fromEntries(
         mescladas.map((c) => [c.id, c.situacaoApi === 'Assumida' ? PAUSA_POR_ASSUMIR : false]),
       ),
-      sincronizacao: { estado: 'ok', mensagem: null, em: Date.now() },
+      // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
+      sincronizacao: { estado: 'ok', mensagem: null, em: Date.now(), aviso: estado.sincronizacao?.aviso ?? null },
     }
   },
 
@@ -255,6 +256,10 @@ const CASOS_API = {
 
   [acao.AVISO_API]: (estado, { mensagem }) => ({
     ...estado, sincronizacao: { ...estado.sincronizacao, aviso: mensagem },
+  }),
+
+  [acao.FECHAR_AVISO_API]: (estado) => ({
+    ...estado, sincronizacao: { ...estado.sincronizacao, aviso: null },
   }),
 
   // F03: o cardápio da vitrine substitui o da massa. Adicional da massa não existe na API.
