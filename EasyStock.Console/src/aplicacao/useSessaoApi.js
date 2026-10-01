@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { entrar, listarEmpresas, sair } from '../infra/api/autenticacao'
+import { configGoogle, entrar, entrarComGoogle, listarEmpresas, sair } from '../infra/api/autenticacao'
 import { EVENTO_SESSAO_EXPIRADA } from '../infra/api/cliente'
 import { lerSessao } from '../infra/api/sessao'
 
@@ -18,10 +18,15 @@ export function useSessaoApi() {
     setSessao(await entrar(email, senha, empresa))
   }, [])
 
+  const entrarGoogle = useCallback(async (idToken) => {
+    setSessao(await entrarComGoogle(idToken))
+  }, [])
+
   const encerrarSessao = useCallback(() => {
     sair()
     setSessao(null)
   }, [])
 
-  return { sessao, listarEmpresas, entrarNaEmpresa, encerrarSessao }
+  const google = { buscarClientId: configGoogle, entrar: entrarGoogle }
+  return { sessao, listarEmpresas, entrarNaEmpresa, google, encerrarSessao }
 }

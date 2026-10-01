@@ -49,3 +49,9 @@
   color: var(--perigo);
   font-size: var(--t-15);
 }
+
+.google {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
