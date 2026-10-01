@@ -27,7 +27,9 @@ public sealed record IntegracaoResult(
     string? Alerta,
     bool LojaGrava,
     string? GeridoPelaFma,
-    string? Numero);
+    string? Numero,
+    IReadOnlyList<string>? Campos = null,
+    bool EscolheAmbiente = false);
 
 public sealed record SalvarChaveIntegracaoCommand(
     Guid EmpresaId,
@@ -76,7 +78,8 @@ public sealed class ListarIntegracoesUseCase(
                 return new IntegracaoResult(d.Provider, d.Nome, d.Categoria.ToString(), CatalogoIntegracoes.NomeAmbiente(linha.Ambiente),
                     Ativo: true, TemCredencial: true, "loja", linha.Mascara, linha.ValidoAte,
                     linha.UltimoTesteEm, linha.UltimoTesteOk, linha.UltimoTesteMensagem,
-                    RegrasIntegracao.Alerta(linha.UltimoTesteOk, linha.ValidoAte, agora), d.LojaGrava, d.GeridoPelaFma, null);
+                    RegrasIntegracao.Alerta(linha.UltimoTesteOk, linha.ValidoAte, agora), d.LojaGrava, d.GeridoPelaFma, null,
+                    d.CamposObrigatorios, d.EscolheAmbiente);
 
             var temGlobal = chavesGlobais.Obter(d.Provider) is not null
                 && (d.Provider != CatalogoIntegracoes.WhatsApp || !string.IsNullOrWhiteSpace(numero));
@@ -84,7 +87,8 @@ public sealed class ListarIntegracoesUseCase(
             return new IntegracaoResult(d.Provider, d.Nome, d.Categoria.ToString(), "producao",
                 Ativo: temGlobal, TemCredencial: temGlobal, temGlobal ? "global" : null, Mascara: null, ValidoAte: null,
                 estado?.TestadoEm, estado?.Ok, estado?.Mensagem, RegrasIntegracao.Alerta(estado?.Ok, null, agora),
-                d.LojaGrava, d.GeridoPelaFma, d.Provider == CatalogoIntegracoes.WhatsApp ? numero : null);
+                d.LojaGrava, d.GeridoPelaFma, d.Provider == CatalogoIntegracoes.WhatsApp ? numero : null,
+                d.CamposObrigatorios, d.EscolheAmbiente);
         }).ToList();
     }
 }

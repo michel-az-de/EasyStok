@@ -144,6 +144,11 @@ public class IntegracoesTests
         mp.Alerta.Should().Be("parada", "é o que acende a faixa vermelha do console");
         System.Text.Json.JsonSerializer.Serialize(lista).Should().NotContain(Segredo);
         lista[1].LojaGrava.Should().BeFalse("WhatsApp é gerido pela FMA");
+        // O console monta o formulário pelos campos do catálogo, sem uma segunda lista.
+        lista[0].Campos.Should().Equal("accessToken");
+        lista[3].Campos.Should().Equal("apiKey", "apiSecret");
+        lista[3].EscolheAmbiente.Should().BeTrue();
+        lista[1].Campos.Should().BeEmpty();
     }
 
     [Fact]

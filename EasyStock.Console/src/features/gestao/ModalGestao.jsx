@@ -13,6 +13,7 @@ import { AbaCaixa } from './caixa/AbaCaixa'
 import { AbaJanelas } from './janelas/AbaJanelas'
 import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
+import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
@@ -31,13 +32,12 @@ const ABAS_API = [{ id: 'atendimento', rotulo: 'Atendimento' }, ...ABAS_DEMONSTR
 
 // Modo API (F06, decisão do Felipe em 30/09): as abas sem backend não somem. Abrem com a
 // faixa e os controles desabilitados até a fatia de cada uma entrar. Nada é gravado: as
-// ações delas também avisam (`aplicacao/api/naoLigadas.js`), e Integrações nunca guarda chave.
+// ações delas também avisam (`aplicacao/api/naoLigadas.js`). Integrações ligou na F16 (#1246).
 const AINDA_NAO_LIGADO = {
   producao: 'Produção e cardápio ainda não estão ligados ao EasyStok nesta versão (F11). Nada aqui é gravado.',
   caixa: 'O caixa ainda não está ligado ao EasyStok nesta versão (F14). Nada aqui é gravado.',
   janelas: 'Esta aba ainda não está ligada. As janelas de verdade estão em Entregas › Janelas e frete.',
   fidelidade: 'Fidelidade e cupons ainda não estão ligados ao EasyStok nesta versão (F15). Nada aqui é gravado.',
-  integracoes: 'As integrações ainda não estão ligadas nesta versão (F16). Nenhuma chave é guardada no navegador.',
 }
 
 function AbaNaoLigada({ texto, children }) {
@@ -64,7 +64,8 @@ function lerAbaSalva(abas) {
   return abas[0].id
 }
 
-function gravarAba(id) {
+// Exportada para o atalho da faixa abrir a Gestão direto numa aba (F16: "Ver integrações").
+export function gravarAba(id) {
   try {
     window.sessionStorage.setItem(CHAVE_ABA, id)
   } catch {
@@ -107,8 +108,8 @@ export function ModalGestao({ aoFechar }) {
     caixa: <AbaCaixa />,
     janelas: <AbaJanelas />,
     fidelidade: <AbaFidelidade />,
-    integracoes: <AbaIntegracoes />,
-  }), [])
+    integracoes: fonteApi ? <AbaIntegracoesApi /> : <AbaIntegracoes />,
+  }), [fonteApi])
 
   return (
     <Modal
