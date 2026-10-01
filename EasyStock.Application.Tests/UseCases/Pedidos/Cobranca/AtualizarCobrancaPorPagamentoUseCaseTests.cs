@@ -79,6 +79,36 @@ public class AtualizarCobrancaPorPagamentoUseCaseTests
     }
 
     [Fact]
+    public async Task PixVencidoCancelado_NaoAvisaTentarDeNovo()
+    {
+        // #1289: o Mercado Pago cancela o Pix no instante do vencimento; o job (60 s) ainda não expirou a cobrança.
+        var f = new CobrancaPedidoFixture();
+        var conversaId = Guid.NewGuid();
+        var cobranca = f.AdicionarOnline(conversaId: conversaId, expiraEm: CobrancaPedidoFixture.Agora);
+
+        var r = await f.AtualizarPorPagamento().ExecuteAsync(Input(f.Pedido.Id, "cancelled"));
+
+        r.Should().Be(SituacaoAtualizacaoCobranca.Recusada);
+        cobranca.Motivo.Should().Contain("cancelled");
+        await f.ConversaRepo.DidNotReceive().ObterPorIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StatusDetalheExpirado_NaoAvisaTentarDeNovo()
+    {
+        // O relógio do Mercado Pago pode estar à frente do nosso: status_detail = expired basta.
+        var f = new CobrancaPedidoFixture();
+        var conversaId = Guid.NewGuid();
+        f.AdicionarOnline(conversaId: conversaId);
+
+        var r = await f.AtualizarPorPagamento().ExecuteAsync(
+            Input(f.Pedido.Id, "cancelled") with { StatusDetalhe = "expired" });
+
+        r.Should().Be(SituacaoAtualizacaoCobranca.Recusada);
+        await f.ConversaRepo.DidNotReceive().ObterPorIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PedidoSemCobranca_Ignora()
     {
         var f = new CobrancaPedidoFixture();

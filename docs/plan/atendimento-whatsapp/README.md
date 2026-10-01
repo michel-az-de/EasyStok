@@ -23,6 +23,7 @@ operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API m�
 | MP | [08-mercado-pago.md](08-mercado-pago.md) | S32–S33 | Cadastro da integração com o Mercado Pago (checklist externo, chaves exatas), processor do webhook que hoje não existe, estorno; opção A adotada: gateway único |
 | 8 | [09-sistema-completo.md](09-sistema-completo.md) | S34–S47 | ADR-0051: canal como porta, Instagram, Messenger, chat do site, e-mail e SMS, consentimento por canal, mensagem programada, expediente da loja, atendentes, respostas prontas e automações, lembretes, entregadores e viagens, cadastros, lote de papel, assistente |
 | Console | [10-console.md](10-console.md) | F01–F05 | ADR-0054: o protótipo vira o console do operador neste repositório; matriz de paridade e ordem de ligação à API |
+| 9 | [12-impressos.md](12-impressos.md) | S49–S53 | Impressos da Casa da Baba: motor de modelos por papel (etiqueta 10×15, cupom 58 mm, A4 econômico), o Pedido e a Comanda (número do dia, alergia do cadastro, congelado à parte); backlog dos demais documentos |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -18,7 +19,8 @@ public sealed record ItemPedidoCheckout(Guid CardapioItemId, int Qtd, string? Ob
 
 /// <summary>
 /// Entrada do núcleo do checkout (S10). A loja vem do <see cref="Slug"/> (site) ou da
-/// <see cref="EmpresaId"/> (atendimento); um dos dois é obrigatório.
+/// <see cref="EmpresaId"/> (atendimento); um dos dois é obrigatório. <see cref="Numero"/> do endereço
+/// melhora o geocode do frete por raio (opcional, como na cotação).
 /// </summary>
 public sealed record CheckoutCoreInput(
     Guid ClienteId,
@@ -30,7 +32,8 @@ public sealed record CheckoutCoreInput(
     string? Slug = null,
     Guid? EmpresaId = null,
     string? Observacoes = null,
-    PrazoPreparoCheckout? Prazo = null);
+    PrazoPreparoCheckout? Prazo = null,
+    string? Numero = null);
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
@@ -56,7 +59,8 @@ public sealed record PedidoReservado(
 ///
 /// <para>
 /// <strong>Fase 1:</strong> cria o <c>Pedido(Rascunho)</c> com itens (snapshot do cardápio e
-/// observação por item) e o item de frete da zona do CEP.
+/// observação por item) e o item de frete. O frete é o do <see cref="CalcularFreteUseCase"/>, a mesma
+/// cotação que o cliente viu (raio quando a loja tem config, senão zona; #1291).
 /// </para>
 ///
 /// <para>
@@ -75,7 +79,7 @@ public sealed class CheckoutCoreService(
     ICardapioItemRepository cardapioItemRepository,
     IJanelaEntregaRepository janelaEntregaRepository,
     IBloqueioEntregaRepository bloqueioEntregaRepository,
-    IFreteZonaRepository freteZonaRepository,
+    CalcularFreteUseCase calcularFrete,
     IVagaOcupadaRepository vagaOcupadaRepository,
     IPedidoStorefrontRepository pedidoRepository,
     IExpedienteLojaRepository expedienteLojaRepository,
@@ -129,11 +133,10 @@ public sealed class CheckoutCoreService(
         if (expediente?.ControleManual == Domain.Enums.Storefront.ControleManualLoja.ForcarFechada)
             throw new LojaFechadaException(expediente.MensagemLojaFechada);
 
-        // ── Validar cobertura de CEP ──────────────────────────────────────
-        var zonas = await freteZonaRepository.GetAtivasDoStorefrontOrdenadasAsync(storefront.Id, ct);
-        var zonaMatch = zonas.FirstOrDefault(z => z.CobreCep(cep));
-        if (zonaMatch is null)
-            throw new CepSemCoberturaException();
+        // ── Cobertura e valor do frete: a mesma cotação do site (#1291) ───
+        // Fora da área (zona ou raio), o CalcularFrete lança CepSemCoberturaException.
+        var frete = await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
+        var valorFrete = frete.Valor / 100m;
 
         // ── Validar janela ────────────────────────────────────────────────
         var janela = await janelaEntregaRepository.GetByIdAsync(input.JanelaId, ct);
@@ -194,14 +197,14 @@ public sealed class CheckoutCoreService(
         await pedidoRepository.AddAsync(pedido, ct);
 
         var itens = await AdicionarItensAsync(pedido, input.Itens!, cardapioItens, ct);
-        var itemFrete = await AdicionarItemFreteAsync(pedido, zonaMatch, ct);
+        var itemFrete = await AdicionarItemFreteAsync(pedido, frete.ZonaLabel, valorFrete, ct);
 
         // Total agregado (itens + frete) — persistir no Pedido. Os itens são inseridos
         // via AddItemAsync (DbSet) e NÃO em pedido.Itens, então RecalcularTotal() computaria
         // 0 (coleção vazia); por isso atribuímos o Total diretamente. É o mesmo somatório
         // cobrado no MercadoPago (Fase 3), reutilizado aqui.
         decimal total = input.Itens!.Sum(i => cardapioItens[i.CardapioItemId].PrecoEfetivo() * i.Qtd)
-                        + zonaMatch.Valor;
+                        + valorFrete;
         pedido.Total = Dinheiro.FromDecimal(total);
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
@@ -314,10 +317,11 @@ public sealed class CheckoutCoreService(
         return criados;
     }
 
-    /// <summary>Grava o item de frete da zona (<c>Entrega — rótulo</c>, quantidade 1).</summary>
+    /// <summary>Grava o item de frete cotado (<c>Entrega — rótulo</c>, quantidade 1).</summary>
     public async Task<DomainPedidoItem> AdicionarItemFreteAsync(
         DomainPedido pedido,
-        FreteZona zona,
+        string rotulo,
+        decimal valor,
         CancellationToken ct = default)
     {
         var itemFrete = new DomainPedidoItem
@@ -325,10 +329,10 @@ public sealed class CheckoutCoreService(
             Id = Guid.NewGuid(),
             PedidoId = pedido.Id,
             ProdutoId = null,
-            Nome = $"Entrega — {zona.Label}",
+            Nome = $"Entrega — {rotulo}",
             Quantidade = 1,
-            PrecoUnitario = zona.Valor,
-            Subtotal = zona.Valor,
+            PrecoUnitario = valor,
+            Subtotal = valor,
             CriadoEm = DateTime.UtcNow,
         };
         await pedidoRepository.AddItemAsync(itemFrete, ct);

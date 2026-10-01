@@ -3,11 +3,14 @@ import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
+import { BolhaMidiaApi } from './BolhaMidiaApi'
 import css from './atendimento.module.css'
 
 const CLASSE = { in: css.entrada, out: css.saida }
 
 function Corpo({ mensagem }) {
+  // Modo API: arquivo do canal servido pelo endpoint autenticado (#1287).
+  if (mensagem.midia) return <BolhaMidiaApi mensagem={mensagem} />
   if (mensagem.formato === 'figurinha') {
     return <img className={css.figurinha} src={mensagem.arte} alt={mensagem.texto} />
   }
@@ -62,7 +65,8 @@ export function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica }) {
       </p>
     )
   }
-  const entregue = mensagem.status === 'lida'
+  // ✓✓ para entregue e lida (F07, item 4): a API distingue as duas; a massa só tem `lida`.
+  const entregue = mensagem.status === 'lida' || mensagem.status === 'entregue'
   return (
     <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
       <Corpo mensagem={mensagem} />

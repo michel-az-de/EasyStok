@@ -154,6 +154,20 @@ public class NotificarClienteStatusPedidoHandlerTests
         _outbox.Should().ContainSingle().Which.CorpoRenderizado.Should().Contain("Obrigada");
     }
 
+    [Theory]
+    [InlineData(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Preparando)]
+    [InlineData(StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega)]
+    public async Task RespeitaAvisosStatus(string statusAnterior, string statusNovo)
+    {
+        // S24: com AvisosStatusAtivos=false, preparo e saída não enfileiram; entregue enfileira (teste acima).
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+
+        await MudarStatusAsync(statusAnterior, statusNovo);
+
+        _eventos.Should().BeEmpty();
+        _outbox.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task IdempotentePorPedidoEStatus()
     {

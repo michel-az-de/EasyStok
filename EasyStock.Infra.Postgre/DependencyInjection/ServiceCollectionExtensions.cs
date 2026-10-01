@@ -148,6 +148,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ICentroCustoRepository, CentroCustoRepository>();
             services.AddScoped<IFluxoCaixaQueries, FluxoCaixaQueries>();
             services.AddScoped<IKdsPedidoQueries, KdsPedidoQueries>(); // S19: KDS do console
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IPedidoImpressoQueries, PedidoImpressoQueries>(); // S49: impresso do pedido
             services.AddScoped<IPrazoPreparoPedidoQueries, PrazoPreparoPedidoQueries>(); // S21: início previsto
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();

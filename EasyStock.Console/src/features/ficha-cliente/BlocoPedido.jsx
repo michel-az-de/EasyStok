@@ -116,6 +116,9 @@ export function BlocoPedido({
   // pedido, então só diz "enviada" o que o reducer aceitou de verdade.
   const [aviso, setAviso] = useState(null)
   const esperandoEnvio = useRef(false)
+  // #1287: no modo API o envio é uma ida ao EasyStok; o botão fica travado até ela
+  // voltar, senão o segundo clique cria outro pedido.
+  const [enviando, setEnviando] = useState(false)
   const cobrancaEnviada = pedido.cobranca ?? null
   const primeiroNome = (nomeCliente ?? '').split(' ')[0]
   useEffect(() => {
@@ -147,7 +150,14 @@ export function BlocoPedido({
   const observacaoTravada = fechado || Boolean(pedido.cobranca)
   const envio = situacaoDoEnvio(pedido, { bloqueado })
   const podeGerar = envio.pode
-  const enviar = (meio) => { esperandoEnvio.current = true; aoGerarPedido(meio) }
+  const enviar = (meio) => {
+    if (enviando) return
+    esperandoEnvio.current = true
+    const ida = aoGerarPedido(meio)
+    if (!ida?.finally) return
+    setEnviando(true)
+    ida.finally(() => setEnviando(false))
+  }
   const itens = itensDetalhados(pedido, cardapio)
   const total = totalDoPedido(pedido, cardapio)
   const grupos = agruparPorLinha(itens, linhas)
@@ -230,7 +240,7 @@ export function BlocoPedido({
                 linha diz por que não; comanda vazia já se explica no papel. */}
             {(podeGerar || envio.chave === 'vazia') ? (
               <Botao
-                largo variante="primario" icone="enviar" disabled={!podeGerar}
+                largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}
                 onClick={() => (pedido.meio ? enviar(pedido.meio) : setPedindoMeio(true))}
               >
                 {ROTULO_ENVIAR}

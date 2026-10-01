@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using EasyStock.Application.Ports.Output.Storage;
 
 namespace EasyStock.Application.UseCases.GerenciarUploads;
 
@@ -103,12 +104,33 @@ public static class UploadSecurityValidator
     }
 
     /// <summary>
+    /// Valida o ContentType de um upload: o público sempre contra <see cref="AllowedMimeTypes"/>; o
+    /// privado contra a allowlist própria dele, quando informada (ex.: mídia do atendimento), senão
+    /// contra a mesma whitelist pública.
+    /// </summary>
+    public static void EnsureValidMime(FileUploadRequest request)
+    {
+        if (request.IsPublic || request.PrivateAllowedMimeTypes is null)
+        {
+            EnsureValidMime(request.ContentType);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ContentType))
+            throw new InvalidOperationException("ContentType nao informado no upload.");
+
+        var mainType = request.ContentType.Split(';', 2)[0].Trim();
+        if (!request.PrivateAllowedMimeTypes.Contains(mainType))
+            throw new InvalidOperationException($"ContentType '{mainType}' nao permitido neste upload privado.");
+    }
+
+    /// <summary>
     /// Valida que os PRIMEIROS BYTES do conteudo batem com a assinatura (magic number)
     /// do tipo declarado. Defesa contra arquivo malicioso renomeado (ex.: HTML/SVG/EXE
     /// com ContentType image/jpeg) que seria servido publico do bucket (XSS armazenado,
     /// content smuggling). So rejeita quando a assinatura do tipo e CONHECIDA e nao
     /// corresponde; tipos sem assinatura confiavel (ex.: text/csv) passam de proposito.
-    /// Chame APOS <see cref="EnsureValidMime"/>.
+    /// Chame APOS <see cref="EnsureValidMime(string?)"/>.
     /// </summary>
     public static void EnsureContentMatchesDeclaredType(byte[]? content, string? contentType)
     {

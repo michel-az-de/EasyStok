@@ -33,8 +33,6 @@ public class InicioPrevistoNaFilaTests
             "só Pronto -> SaiuParaEntrega -> Entregue",
         ["EasyStock.Application/Services/Storefront/CheckoutCoreService.cs"] =
             "nasce Rascunho/AguardandoPagamento; entra na fila pelo ConfirmarPagamentoPedidoUseCase",
-        ["EasyStock.Application/UseCases/Storefront/Checkout/IniciarCheckoutGuestUseCase.cs"] =
-            "nasce AguardandoAprovacaoBaba; atraso só vale em Aguardando",
     };
 
     [Fact]

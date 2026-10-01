@@ -22,9 +22,10 @@ public sealed record ResultadoTurnoAgente(bool ChamouLlm, bool Respondeu, bool E
 /// e repete até a resposta final, no máximo <see cref="MaximoIteracoes"/> chamadas. Grava a resposta
 /// como <c>Mensagem(Saida, Agente)</c>, envia pela Cloud API e registra o consumo em <c>UsoIa</c>.
 ///
-/// <para>Guardas: LLM indisponível (<c>Anthropic:Enabled=false</c> ou sem chave), conversa que não está
-/// <see cref="SituacaoConversa.Automatica"/> (RN-04), fora da janela de 24 h, ou última mensagem que não é
-/// do cliente (job repetido) → não chama o LLM nem envia nada.</para>
+/// <para>Guardas: conversa que não está <see cref="SituacaoConversa.Automatica"/> (RN-04), fora da janela
+/// de 24 h, ou sem entrada pendente do cliente (job repetido) → não chama o LLM nem envia nada. LLM
+/// indisponível (<c>Anthropic:Enabled=false</c> ou sem chave) ou canal sem agente → escala para a dona.
+/// Se a dona assumir durante a chamada ao LLM, a resposta é descartada (#1288).</para>
 /// </summary>
 public sealed class AgenteAtendimentoService(
     IAgenteLlmClient llm,
@@ -45,14 +46,10 @@ public sealed class AgenteAtendimentoService(
     private readonly IReadOnlyDictionary<string, IFerramentaAgente> _ferramentas =
         ferramentas.ToDictionary(f => f.Nome, StringComparer.Ordinal);
 
+    public const string MotivoAgenteDesligado = "agente desligado (LLM indisponível)";
+
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
-        if (!llm.Disponivel)
-        {
-            logger.LogInformation("Agente de atendimento desligado (Anthropic): conversa {ConversaId} fica para a dona.", conversaId);
-            return ResultadoTurnoAgente.Ignorado;
-        }
-
         var dados = await conversaRepository.ObterComMensagensAsync(empresaId, conversaId, UltimasMensagens, ct);
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
@@ -60,15 +57,25 @@ public sealed class AgenteAtendimentoService(
         if (conversa.Situacao != SituacaoConversa.Automatica || !conversa.DentroDaJanela(agora))
             return ResultadoTurnoAgente.Ignorado;
 
-        // O agente envia pelo cliente do WhatsApp: em outro canal a resposta sairia pelo canal errado.
-        // Instagram, Messenger e chat do site ficam com o humano até o agente enviar pela porta de canal.
-        if (conversa.Canal != CanalConversa.WhatsApp)
-        {
-            logger.LogInformation("Agente: conversa {ConversaId} é do canal {Canal}; fica para a dona.", conversaId, conversa.Canal);
+        var pendentes = EntradasPendentes(dados.Mensagens);
+        if (pendentes.Count == 0)
             return ResultadoTurnoAgente.Ignorado;
+
+        // Ninguém responderia: LLM desligado (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o
+        // agente envia pelo cliente do WhatsApp; em outro canal sairia pelo canal errado). Passa de fato
+        // para a dona, senão a conversa fica Automatica sem ninguém e fora do lembrete (#1288).
+        var motivoSemAgente = !llm.Disponivel ? MotivoAgenteDesligado
+            : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
+            : null;
+        if (motivoSemAgente is not null)
+        {
+            logger.LogInformation("Agente: conversa {ConversaId} fica para a dona ({Motivo}).", conversaId, motivoSemAgente);
+            await escalador.EscalarAsync(empresaId, conversa, motivoSemAgente, agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
-        var mensagens = MontarConversacao(dados.Mensagens);
+        var mensagens = MontarConversacao(dados.Mensagens, pendentes);
         if (mensagens.Count == 0 || mensagens[^1].Papel != MensagemLlm.Usuario)
             return ResultadoTurnoAgente.Ignorado;
 
@@ -109,7 +116,7 @@ public sealed class AgenteAtendimentoService(
             {
                 resposta = await llm.EnviarAsync(new RequisicaoLlm(system, [.. mensagens], definicoes), ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", conversaId);
                 motivoEscalada = "o agente não conseguiu responder (falha ao chamar o LLM)";
@@ -132,6 +139,21 @@ public sealed class AgenteAtendimentoService(
             foreach (var uso in resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>())
                 resultados.Add(await ExecutarFerramentaAsync(contexto, uso, ct));
             mensagens.Add(new MensagemLlm(MensagemLlm.Usuario, resultados));
+        }
+
+        // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
+        // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
+        await MarcarProcessadasAsync(empresaId, dados.Mensagens, agora, ct);
+
+        // A dona pode ter assumido (ou encerrado) enquanto o LLM respondia: a Situacao carregada no
+        // início está velha. Fora do automático o agente não envia nem escala (#1288).
+        if (await conversaRepository.ObterSituacaoAsync(empresaId, conversaId, ct) != SituacaoConversa.Automatica)
+        {
+            logger.LogInformation("Agente: conversa {ConversaId} saiu do automático durante o turno; resposta descartada.", conversaId);
+            if (tokens > 0)
+                await RegistrarUsoAsync(empresaId, tokens, agora);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: false, Escalou: false);
         }
 
         var respondeu = false;
@@ -167,7 +189,7 @@ public sealed class AgenteAtendimentoService(
         {
             return new BlocoResultadoFerramentaLlm(uso.Id, await ferramenta.ExecutarAsync(contexto, uso.Entrada, ct));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogError(ex, "Agente de atendimento: ferramenta {Ferramenta} falhou na conversa {ConversaId}.",
                 ferramenta.Nome, contexto.Conversa.Id);
@@ -188,7 +210,7 @@ public sealed class AgenteAtendimentoService(
             saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto, envio.Wamid);
             enviou = true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Agente de atendimento: falha ao enviar a resposta da conversa {ConversaId}.", conversa.Id);
             saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto);
@@ -226,13 +248,54 @@ public sealed class AgenteAtendimentoService(
     }
 
     /// <summary>
-    /// Cliente → <c>user</c>; agente e dona → <c>assistant</c>. Mensagens do sistema não entram na
-    /// conversa (vão para o dossiê). Mensagens seguidas do mesmo papel viram uma só.
+    /// Entradas do cliente que ninguém respondeu ainda (#1288). A ordem por <c>EnviadaEm</c> não basta:
+    /// a entrada usa o timestamp da Meta (truncado em segundos) e a resposta do agente o início do
+    /// turno, então uma mensagem que chegou durante o turno pode ficar antes da resposta. Vale
+    /// <see cref="Mensagem.ProcessadaEm"/>: entrada não processada é pendente, salvo se a dona escreveu
+    /// depois dela. Janela sem nenhuma entrada processada (histórico anterior ao #1288) segue a regra
+    /// antiga: qualquer resposta posterior, do agente ou da dona, conta.
     /// </summary>
-    private static List<MensagemLlm> MontarConversacao(IReadOnlyList<Mensagem> historico)
+    private static IReadOnlyList<Mensagem> EntradasPendentes(IReadOnlyList<Mensagem> historico)
+    {
+        var legado = !historico.Any(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is not null);
+        var pendentes = new List<Mensagem>();
+        for (var i = 0; i < historico.Count; i++)
+        {
+            var msg = historico[i];
+            if (msg.Autor != AutorMensagem.Cliente || msg.ProcessadaEm is not null) continue;
+
+            var respondida = historico.Skip(i + 1).Any(m =>
+                m.Autor == AutorMensagem.Dona || (legado && m.Autor == AutorMensagem.Agente));
+            if (!respondida) pendentes.Add(msg);
+        }
+
+        return pendentes;
+    }
+
+    /// <summary>
+    /// Marca no rastreamento as entradas que este turno levou ao LLM. O histórico vem sem tracking:
+    /// a entidade rastreada é buscada pelo <c>wamid</c>.
+    /// </summary>
+    private async Task MarcarProcessadasAsync(Guid empresaId, IReadOnlyList<Mensagem> historico, DateTime agora, CancellationToken ct)
+    {
+        foreach (var entrada in historico.Where(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is null))
+        {
+            if (entrada.ExternoId is not { } externoId) continue;
+            var rastreada = await conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, externoId, ct);
+            rastreada?.MarcarProcessada(agora);
+        }
+    }
+
+    /// <summary>
+    /// Cliente → <c>user</c>; agente e dona → <c>assistant</c>. Mensagens do sistema não entram na
+    /// conversa (vão para o dossiê). Mensagens seguidas do mesmo papel viram uma só. As
+    /// <paramref name="pendentes"/> vão para o fim: o agente ainda não as viu (#1288).
+    /// </summary>
+    private static List<MensagemLlm> MontarConversacao(IReadOnlyList<Mensagem> historico, IReadOnlyList<Mensagem> pendentes)
     {
         var resultado = new List<MensagemLlm>();
-        foreach (var msg in historico.Where(m => m.Autor != AutorMensagem.Sistema))
+        var ordenado = historico.Where(m => !pendentes.Contains(m)).Concat(pendentes);
+        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema))
         {
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch

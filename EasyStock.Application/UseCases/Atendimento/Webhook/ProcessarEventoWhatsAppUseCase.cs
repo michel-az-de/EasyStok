@@ -39,6 +39,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 {
     private const string Provedor = "meta_whatsapp";
 
+    /// <summary>Tipos gravados para a dona ver, mas que não pedem resposta: o agente não responde a um emoji.</summary>
+    private static readonly HashSet<string> TiposSemTurnoDoAgente = new(StringComparer.Ordinal) { "reaction", "unsupported", "system" };
+
     /// <returns>
     /// <c>false</c> quando alguma mensagem falhou por motivo que um reenvio pode resolver (ex.: dois
     /// POSTs concorrentes da 1ª mensagem de um contato violando o índice da conversa aberta). O
@@ -161,8 +164,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
 
             // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
-            // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24).
-            if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true && publicadorEventos is not null)
+            // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24),
+            // nem entrada que o agente não vai responder (botão "acao:", reação; issue 1285).
+            if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true
+                && !SemRespostaAutomatica(msg.Tipo, botaoId) && publicadorEventos is not null)
                 await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
                     new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
 
@@ -216,14 +221,19 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 return;
             }
 
-            // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s.
-            if (identificacao is not null)
+            // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s. Sem agente para cumprir
+            // o "já te respondo" (botão "acao:", reação), não há saudação (issue 1285).
+            if (identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId))
                 await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, ct);
 
-            if (mensagem.BotaoId is { } botaoId && botaoId.StartsWith("acao:", StringComparison.Ordinal))
+            if (EhAcaoDeBotao(mensagem.BotaoId))
             {
                 // S06: "acao:<nome>:<payload>" é resolvido sem LLM; o turno do agente não é enfileirado.
-                await ExecutarAcaoDeBotaoAsync(empresaId, conversa, botaoId!, ct);
+                await ExecutarAcaoDeBotaoAsync(empresaId, conversa, mensagem.BotaoId!, ct);
+            }
+            else if (TiposSemTurnoDoAgente.Contains(msg.Tipo))
+            {
+                // Reação, mensagem sem suporte ou de sistema: fica gravada para a dona; o agente não responde.
             }
             else if (await optOut.TentarAsync(empresaId, conversa, mensagem.Texto, DateTime.UtcNow, ct))
             {
@@ -339,6 +349,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         return configuracao;
     }
+
+    private static bool EhAcaoDeBotao(string? botaoId) =>
+        botaoId is not null && botaoId.StartsWith("acao:", StringComparison.Ordinal);
+
+    private static bool SemRespostaAutomatica(string tipo, string? botaoId) =>
+        EhAcaoDeBotao(botaoId) || TiposSemTurnoDoAgente.Contains(tipo);
 
     private static TipoConteudoMensagem MapearTipoConteudo(string tipo) => tipo switch
     {

@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.WhatsApp;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -27,7 +29,8 @@ public class WhatsAppCloudClientTests
     }
 
     private static WhatsAppCloudClient BuildClient(
-        SequenceHandler handler, string? phoneNumberIdDoTenant = null, string phoneNumberIdGlobal = "1234567890")
+        SequenceHandler handler, string? phoneNumberIdDoTenant = null, string phoneNumberIdGlobal = "1234567890",
+        bool? haTenant = null, ResiliencePipelineProvider<string>? pipelines = null)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://graph.test/v19.0/") };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "token-teste");
@@ -41,9 +44,11 @@ public class WhatsAppCloudClientTests
 
         var remetente = Substitute.For<IRemetenteWhatsApp>();
         remetente.ObterPhoneNumberIdAsync(Arg.Any<CancellationToken>()).Returns(phoneNumberIdDoTenant);
+        remetente.HaTenantCorrente.Returns(haTenant ?? phoneNumberIdDoTenant is not null);
 
-        var pipelineProvider = Substitute.For<ResiliencePipelineProvider<string>>();
-        pipelineProvider.GetPipeline(Arg.Any<string>()).Returns(ResiliencePipeline.Empty);
+        var pipelineProvider = pipelines ?? Substitute.For<ResiliencePipelineProvider<string>>();
+        if (pipelines is null)
+            pipelineProvider.GetPipeline(Arg.Any<string>()).Returns(ResiliencePipeline.Empty);
 
         return new WhatsAppCloudClient(http, options, remetente, pipelineProvider, NullLogger<WhatsAppCloudClient>.Instance);
     }
@@ -65,15 +70,71 @@ public class WhatsAppCloudClientTests
     }
 
     [Fact]
-    public async Task SemNumeroNoTenantUsaOGlobal()
+    public async Task SemTenantUsaOGlobal()
     {
         var handler = new SequenceHandler();
         handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
-        var client = BuildClient(handler, phoneNumberIdDoTenant: null);
+        var client = BuildClient(handler, phoneNumberIdDoTenant: null, haTenant: false);
 
         await client.EnviarTextoAsync("5511999998888", "Oi!");
 
-        handler.UltimaUrl.Should().Be("https://graph.test/v19.0/1234567890/messages");
+        handler.UltimaUrl.Should().Be("https://graph.test/v19.0/1234567890/messages",
+            "sem empresa corrente (diagnóstico) o número global ainda serve");
+    }
+
+    [Fact]
+    public async Task TenantSemNumeroFalhaSemUsarOGlobal()
+    {
+        // #1292: a empresa B sem número vinculado não pode falar com o cliente dela pelo número da empresa A.
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var client = BuildClient(handler, phoneNumberIdDoTenant: null, haTenant: true);
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        var ex = await act.Should().ThrowAsync<WhatsAppCloudException>();
+        ex.Which.EhPermanente.Should().BeTrue();
+        ex.Which.Message.Should().Contain("phone_number_id");
+        handler.Chamadas.Should().Be(0, "o envio não pode sair pelo número global");
+    }
+
+    [Fact]
+    public async Task PostDeEnvioNaoEhReenviadoQuandoARedeFalha()
+    {
+        // #1292: POST /messages não é idempotente; repetir depois de um timeout ou queda de conexão
+        // pode entregar a mesma mensagem duas vezes ao cliente.
+        var handler = new SequenceHandler();
+        handler.EnfileirarFalha(new HttpRequestException("conexão caiu depois do envio"));
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111", pipelines: PipelinesReais());
+
+        var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        handler.Chamadas.Should().Be(1, "o envio só pode ir à Meta uma vez");
+    }
+
+    [Fact]
+    public async Task GetDeMidiaContinuaComRetry()
+    {
+        var handler = new SequenceHandler();
+        handler.EnfileirarFalha(new HttpRequestException("falha transitória"));
+        handler.Enfileirar(HttpStatusCode.OK,
+            """{"url":"https://graph.test/media-cdn/abc","mime_type":"image/jpeg","id":"media-1"}""");
+        handler.Enfileirar(HttpStatusCode.OK, "binario-fake");
+        var client = BuildClient(handler, phoneNumberIdDoTenant: "5550001111", pipelines: PipelinesReais());
+
+        var (_, mime) = await client.BaixarMidiaAsync("media-1");
+
+        mime.Should().Be("image/jpeg");
+        handler.Chamadas.Should().Be(3, "GET é idempotente: a falha transitória é repetida");
+    }
+
+    private static ResiliencePipelineProvider<string> PipelinesReais()
+    {
+        var services = new ServiceCollection();
+        services.AddEasyStockIntegrationResilience();
+        return services.BuildServiceProvider().GetRequiredService<ResiliencePipelineProvider<string>>();
     }
 
     [Fact]
@@ -92,7 +153,7 @@ public class WhatsAppCloudClientTests
     public async Task SemNenhumNumeroLancaErroClaroSemChamarARede()
     {
         var handler = new SequenceHandler();
-        var client = BuildClient(handler, phoneNumberIdDoTenant: null, phoneNumberIdGlobal: "");
+        var client = BuildClient(handler, phoneNumberIdDoTenant: null, phoneNumberIdGlobal: "", haTenant: false);
 
         var act = async () => await client.EnviarTextoAsync("5511999998888", "Oi!");
 
@@ -196,14 +257,16 @@ public class WhatsAppCloudClientTests
 
     private sealed class SequenceHandler : HttpMessageHandler
     {
-        private readonly Queue<(HttpStatusCode Status, string Body)> _respostas = new();
+        private readonly Queue<(HttpStatusCode Status, string Body, Exception? Falha)> _respostas = new();
 
         public int Chamadas { get; private set; }
         public string? UltimoCorpo { get; private set; }
         public string? UltimaUrl { get; private set; }
         public bool TodosComBearer { get; private set; } = true;
 
-        public void Enfileirar(HttpStatusCode status, string body) => _respostas.Enqueue((status, body));
+        public void Enfileirar(HttpStatusCode status, string body) => _respostas.Enqueue((status, body, null));
+
+        public void EnfileirarFalha(Exception falha) => _respostas.Enqueue((default, string.Empty, falha));
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -215,7 +278,8 @@ public class WhatsAppCloudClientTests
             if (request.Content is not null)
                 UltimoCorpo = await request.Content.ReadAsStringAsync(cancellationToken);
 
-            var (status, body) = _respostas.Count > 0 ? _respostas.Dequeue() : (HttpStatusCode.OK, "{}");
+            var (status, body, falha) = _respostas.Count > 0 ? _respostas.Dequeue() : (HttpStatusCode.OK, "{}", null);
+            if (falha is not null) throw falha;
             return new HttpResponseMessage(status)
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json")

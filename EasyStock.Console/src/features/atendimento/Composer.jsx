@@ -67,6 +67,8 @@ export function Composer({
       aoMudarRascunho('')
       return
     }
+    // Enter com o campo vazio não manda balão vazio (#1287).
+    if (!rascunho.trim()) return
     aoEnviar()
   }
 

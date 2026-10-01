@@ -67,17 +67,24 @@ function CampoCupom({
 // que existe uma espera ali, senão estranha no dia em que o Pix real demorar.
 const MS_DE_EMISSAO = 700
 
+// #1287: no modo API a emissão devolve a promessa da ida ao EasyStok; o "emitindo" só
+// desliga quando ela volta, e o clique repetido no meio do caminho é ignorado.
 function useEmissao(aoEmitir) {
   const [emitindo, setEmitindo] = useState(false)
   const pendente = useRef(null)
+  const ocupado = useRef(false)
 
   useEffect(() => () => clearTimeout(pendente.current), [])
 
   const emitir = (...argumentos) => {
+    if (ocupado.current) return
+    ocupado.current = true
     setEmitindo(true)
     pendente.current = setTimeout(() => {
-      setEmitindo(false)
-      aoEmitir(...argumentos)
+      const liberar = () => { ocupado.current = false; setEmitindo(false) }
+      const ida = aoEmitir(...argumentos)
+      if (ida?.finally) ida.finally(liberar)
+      else liberar()
     }, MS_DE_EMISSAO)
   }
 

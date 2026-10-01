@@ -3,6 +3,8 @@
 // O que a API ainda não entrega (pedido, notas, tags, endereço) nasce vazio: cada módulo
 // ganha o dado de verdade quando for ligado (matriz 10-console.md).
 
+import { pausaDaSituacao } from '../../dominio/automatico'
+
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
   ChatSite: 'Chat do site', Email: 'E-mail', Sms: 'SMS',
@@ -11,7 +13,7 @@ const NOME_DO_CANAL = {
 const ESTADO_DA_SITUACAO = { Automatica: 'Aberto', Assumida: 'Em atendimento', Encerrada: 'Encerrado' }
 
 const STATUS_DA_MENSAGEM = {
-  Pendente: 'enviando', Enviada: 'enviada', Entregue: 'lida', Lida: 'lida', Falhou: 'falhou',
+  Pendente: 'enviando', Enviada: 'enviada', Entregue: 'entregue', Lida: 'lida', Falhou: 'falhou',
 }
 
 const ROTULO_DO_CONTEUDO = {
@@ -27,7 +29,9 @@ export const instante = (valor) => {
   return /[zZ]|[+-]\d{2}:\d{2}$/.test(valor) ? valor : `${valor}Z`
 }
 
-export function mensagemDaApi(m) {
+// `conversaId` vem da listagem: com ele, a mensagem com arquivo leva o endereço para o balão
+// buscar a mídia no endpoint autenticado (#1287). Sem ele (confirmação de envio), só o rótulo.
+export function mensagemDaApi(m, conversaId = null) {
   const saida = m.direcao === 'Saida'
   return {
     id: m.id,
@@ -37,6 +41,7 @@ export function mensagemDaApi(m) {
     ...(saida ? { status: STATUS_DA_MENSAGEM[m.status] ?? 'enviada' } : {}),
     ...(saida && m.autor === 'Agente' ? { automatica: true } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
+    ...(m.midiaChave && conversaId ? { midia: { conversaId, mensagemId: m.id, mime: m.midiaMime ?? null } } : {}),
   }
 }
 
@@ -52,8 +57,16 @@ function janelaExpiraEm(resumo, mensagens) {
   return resumo.dentroDaJanela ? new Date(ultima + HORAS_DA_JANELA * MS_POR_HORA).toISOString() : new Date(ultima).toISOString()
 }
 
+// `Assumida` sem responsável: o automático passou a conversa para a fila humana. Vira a
+// mesma `passagem` do protótipo (selo "Precisa de você" com o motivo). `motivoEscalada` é
+// opcional (F08); sem ele, o motivo padrão. A API não dá a hora da escalada.
+function passagemDaApi(resumo) {
+  if (resumo.situacao !== 'Assumida' || resumo.assumidaPorUsuarioId) return null
+  return { motivo: resumo.motivoEscalada || null, em: null, assumida: false }
+}
+
 export function conversaDaApi(resumo, mensagensDaApi, usuario) {
-  const mensagens = (mensagensDaApi ?? []).map(mensagemDaApi).sort(cronologica)
+  const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
   const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
   return {
     id: resumo.id,
@@ -66,8 +79,13 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario) {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     responsavel: resumo.assumidaPorUsuarioId ? (minha ? usuario.nome : 'Outro atendente') : null,
+    // F07, item 3: quem pausou o automático (você, outro atendente ou a escalada) e a passagem.
+    pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
+    passagem: passagemDaApi(resumo),
     janelaExpiraEm: janelaExpiraEm(resumo, mensagens),
     ultimaEm: instante(resumo.ultimaMensagemEm),
+    // Prévia do cartão quando as mensagens não foram carregadas (encerrada, #1287).
+    ultimaMensagemTexto: resumo.ultimaMensagemTexto ?? null,
     naoLidas: resumo.naoLidas,
     atrasada: false,
     cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },

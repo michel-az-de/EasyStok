@@ -69,7 +69,9 @@ const ms = (valor) => (valor ? new Date(instante(valor)).getTime() : null)
 function cobrancaDaApi(c, meioAnterior) {
   if (!c) return null
   const naEntrega = c.provedor === FORMA_NA_ENTREGA
-  const meio = naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
+  // Sem meio anterior (polling, recarga), o meio é o padrão da forma: link do Mercado Pago
+  // online, maquininha na entrega. Antes caía em `undefined` e a tela mostrava "Pix" (F07).
+  const meio = meioAnterior && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
     ? meioAnterior
     : (naEntrega ? 'maquininha' : 'cartao-link')
   const criadaEm = ms(c.criadaEm)
@@ -100,7 +102,8 @@ export function pedidoDaApi(p, anterior = null) {
   const cobranca = cobrancaDaApi(p.cobranca, anterior?.meio)
   return {
     pedidoId: p.pedidoId,
-    numero: `EZ-${p.pedidoId.slice(0, 6).toUpperCase()}`,
+    // Mesmo código curto do backend (VariaveisAtendimento.CodigoCurto): o que o cliente lê.
+    numero: p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
     estado: ESTADO_DO_STATUS[p.status] ?? 'aguardando',
     statusApi: p.status,
     janela: anterior?.janela ?? null,
@@ -148,6 +151,10 @@ export function corpoDoPedido(pedido) {
 
 export const gerarPedido = (conversaId, corpo) =>
   chamarApi(pedidoDaConversa(conversaId), { metodo: 'POST', corpo })
+
+// Emissão do link da S11 para pedido que nasceu sem cobrança (Mercado Pago fora na hora).
+export const reemitirCobranca = (pedidoId) =>
+  chamarApi(`/api/pedidos/${pedidoId}/cobranca`, { metodo: 'POST' })
 
 // Troca de forma da S11: com conversa aberta, o link novo sai ao cliente pelo EasyStok.
 export const trocarFormaPagamento = (pedidoId, forma) =>

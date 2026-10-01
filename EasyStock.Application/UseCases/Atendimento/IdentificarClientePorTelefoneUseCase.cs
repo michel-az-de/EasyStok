@@ -16,7 +16,8 @@ public sealed record IdentificacaoCliente(ClienteEntity Cliente, bool EhLead, bo
 /// <summary>
 /// RN-02 e RN-03 (S05): acha o <see cref="ClienteEntity"/> do contato pelo telefone ou cria o lead.
 /// Procura, nesta ordem, pelo <c>TelefoneHash</c> (preenchido pelo OTP do storefront) e pelo
-/// <c>Telefone</c> do cadastro em E.164 e em dígitos nacionais. Não faz commit: participa da unidade
+/// telefone do cadastro em E.164, com o DDI sem <c>+</c> e em dígitos nacionais; achado pelo telefone,
+/// ganha o <c>TelefoneHash</c> que faltar. Não faz commit: participa da unidade
 /// de trabalho do chamador, para o cliente novo e a conversa que o referencia nascerem juntos.
 /// </summary>
 public sealed class IdentificarClientePorTelefoneUseCase(
@@ -61,20 +62,33 @@ public sealed class IdentificarClientePorTelefoneUseCase(
 
         foreach (var e164 in candidatos)
         {
-            var porTelefone = await clienteRepository.FindByTelefoneAsync(empresaId, e164);
-            if (porTelefone is not null)
-                return porTelefone;
-
-            // Cadastro do ERP guarda o número como digitado; "11997573992" é a forma sem máscara mais comum.
-            if (e164.StartsWith("+55", StringComparison.Ordinal))
+            foreach (var grafia in GrafiasDoCadastro(e164))
             {
-                porTelefone = await clienteRepository.FindByTelefoneAsync(empresaId, e164[3..]);
-                if (porTelefone is not null)
-                    return porTelefone;
+                var porTelefone = await clienteRepository.FindByTelefoneAsync(empresaId, grafia);
+                if (porTelefone is null) continue;
+
+                // #1290: cadastro do ERP não tem TelefoneHash; sem ele o OTP e o checkout guest do site
+                // (que procuram por hash) criam outro cliente. O hash do canônico está livre: nenhum
+                // candidato achou cliente por hash logo acima.
+                porTelefone.TelefoneHash ??= ClienteOtp.CalcularTelefoneHash(candidatos[0]);
+                return porTelefone;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Como o ERP pode ter gravado o número: E.164 (<c>+5511997573992</c>), com o DDI sem <c>+</c>
+    /// (<c>5511997573992</c>, que é como o VO <c>Telefone</c> guarda o digitado) e nacional
+    /// (<c>11997573992</c>, a forma sem máscara mais comum).
+    /// </summary>
+    private static IEnumerable<string> GrafiasDoCadastro(string e164)
+    {
+        yield return e164;
+        if (!e164.StartsWith("+55", StringComparison.Ordinal)) yield break;
+        yield return e164[1..];
+        yield return e164[3..];
     }
 
     private static ClienteEntity CriarLead(Guid empresaId, string telefoneE164, string? nomePerfil)

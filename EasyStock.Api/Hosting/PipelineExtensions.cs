@@ -186,7 +186,8 @@ public static class PipelineExtensions
         }
 
         app.UseHttpsRedirection();
-        app.UseStaticFiles();
+        // S49: as fontes do impresso precisam de CORS (o console as carrega de outra origem).
+        app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = EasyStock.Api.Services.Impressao.FontesImpressao.LiberarCors });
 
         // Serve uploaded files from local storage path (skip for S3 — served directly)
         var fileStorageOptions = app.Configuration

@@ -11,11 +11,11 @@ import css from './cozinha.module.css'
 // ao vivo pelo SSE de operação (S18), com início previsto e atraso (S21) e o
 // canhoto da S20. Um toque no cartão chama a API; a máquina de estados é dela.
 // A cozinha da demonstração (`TelaCozinha`, espelho do Balcão) segue intacta.
-// Mesmo desenho do `INICIO_DO_RELOGIO` do App no modo API: relógio real, lido ao carregar.
+// Mesmo desenho do `INICIO_DO_RELOGIO` do App no modo API: relógio real, relido a cada tique (F07).
 const ABERTURA = Date.now()
 
 export function TelaCozinhaApi() {
-  const agora = useRelogio(ABERTURA)
+  const agora = useRelogio(ABERTURA, undefined, { real: true })
   const { pedidos, erro, aoVivo, movendo, avancar, imprimirCanhoto, reimprimir, limparErro } = useCozinhaApi()
 
   return (

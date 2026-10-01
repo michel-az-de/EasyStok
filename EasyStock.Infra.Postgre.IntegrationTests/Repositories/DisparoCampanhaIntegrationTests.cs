@@ -120,6 +120,59 @@ public class DisparoCampanhaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     }
 
     [SkippableFact]
+    public async Task DuasCampanhasNoMesmoTickNaoAtingemOMesmoCliente()
+    {
+        // #1292 (RN-40): a primeira campanha deixa Ana Enfileirada (ainda sem EnviadoEm); a segunda, no mesmo
+        // tick do job, precisa enxergar esse envio e tirá-la pelo limite semanal.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Casa da Baba Limite Semanal", "12121212000191");
+        var ana = Cliente.Criar(empresa.Id, "Ana");
+        ana.Telefone = "(11) 99757-3992";
+        ana.DefinirConsentimentoMarketing(true, agora);
+        Campanha NovaAgendada(string nome)
+        {
+            var campanha = Campanha.Criar(empresa.Id, Guid.NewGuid(),
+                new DadosCampanha(nome, "Oi {{nome}}!", null, null, FiltroCampanha.ParaTodos, [], null, false, null),
+                agora.AddHours(-2));
+            campanha.Agendar(agora.AddHours(-1), agora.AddHours(-2));
+            return campanha;
+        }
+        var primeira = NovaAgendada("Bolo de fubá");
+        var segunda = NovaAgendada("Pão de mel");
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            await db.Database.MigrateAsync();
+            db.Empresas.Add(empresa);
+            db.Clientes.Add(ana);
+            db.Campanhas.AddRange(primeira, segunda);
+            await db.SaveChangesAsync();
+        }
+
+        await SemearTemplateGlobalAsync();
+        foreach (var campanha in new[] { primeira, segunda })
+        {
+            await using var db = TenantDb(empresa.Id);
+            await new CalcularPublicoCampanhaUseCase(new CampanhaRepository(db), new CampanhaPublicoQueries(db), db, TimeProvider.System)
+                .ExecuteAsync(empresa.Id, campanha.Id);
+        }
+
+        (await RodarJobAsync(empresa.Id, primeira.Id)).OndaDisparada.Should().Be(1);
+        await RodarJobAsync(empresa.Id, segunda.Id);
+
+        await using (var db = TenantDb(empresa.Id))
+        {
+            var naSegunda = await db.CampanhaDestinatarios.SingleAsync(d => d.CampanhaId == segunda.Id);
+            naSegunda.Status.Should().Be(StatusCampanhaDestinatario.Excluido, "Ana já está na fila da primeira campanha");
+            naSegunda.MotivoExclusao.Should().Be(MotivoExclusaoCampanha.LimiteSemanal);
+            (await db.NotifOutboxMensagens.CountAsync(m => m.Destinatario == "+5511997573992")).Should().Be(1);
+        }
+    }
+
+    [SkippableFact]
     public async Task TemplateGlobalApareceNoEscopoDaEmpresaMesmoComRls()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
