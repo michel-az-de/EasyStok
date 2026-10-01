@@ -1,6 +1,6 @@
-# Onda 9 — Impressos operacionais da Casa da Baba (S49–S51)
+# Onda 9 — Impressos operacionais da Casa da Baba (S49–S53)
 
-Issue: #1267 · Layout aprovado: [impressos/pedido-aprovado.html](impressos/pedido-aprovado.html) (abrir no navegador)
+Issues: #1267, #1279 · Layouts aprovados: [Pedido](impressos/pedido-aprovado.html), [Comanda](impressos/comanda-aprovada.html) (abrir no navegador)
 
 Objetivo: todo papel que sai da operação tem a identidade da Casa da Baba e cabe na impressora que vai
 usá-lo. Hoje existem o canhoto de produção da S20 (80 mm, visual genérico) e o cupom do PWA (texto cru de
@@ -117,11 +117,60 @@ Bluetooth do PWA, e em modo texto ela usa a fonte interna (sem acento, sem a mar
 
 ---
 
+### S52 · Comanda de cozinha (10×15 e 58 mm)
+
+**Problema.** O canhoto da S20 é genérico e não destaca prazo, alergia nem o que já saiu. Layout aprovado em
+`impressos/comanda-aprovada.html` (banca de 01/10/2026: lista com caixas venceu a tabela, 6,3 a 5,7).
+**Abordagem.** Mesmo motor da S49: a leitura `IPedidoImpressoQueries` ganha linha, molho e alergias; o cálculo
+de prazo sai do `MontarPedidoImpressoUseCase` para um helper compartilhado; `MontarComandaUseCase` monta o
+`ComandaDto`; modelos `comanda.etiqueta-10x15.sbn` e `comanda.cupom-58.sbn`. Térmica só preto.
+**Escopo.**
+- Leitura: item com `Linha` (`LinhaSnapshot`) e `Molho` (`CardapioItem.SugestaoMolho`, como o canhoto); cliente com `Alergias` = tags do cadastro que começam com `alergia_` (texto depois do prefixo, `_` vira espaço, maiúsculas). Frete e taxa ficam fora da comanda.
+- `ComandaDto`: número (8 hex), `NumeroDoDia` (nulo até a S53; sem ele, o código grande ocupa o lugar), prazo (o mesmo do Pedido), cliente, entrega, alergias, grupos na ordem preparar em casa, para servir, outros, com itens (quantidade, unidade, nome, porção, molho, observação), observação do pedido, solicitado e impresso.
+- Grupo diz quantas **linhas** tem ("3 itens", as caixas a marcar); o rodapé traz o total de linhas.
+- Faixa preta de alergia no topo quando houver tag; vale para o pedido inteiro ("confira todos os itens").
+- Molho em letra reta e grossa ("MOLHO: SUGO"); observação do item com contorno fino; campos "Feito por" e "Embalado por"; CODE128 do número.
+- `GET api/pedidos/{id}/comanda?modelo=etiqueta-10x15|cupom-58` (policy `ImpressaoFila`).
+**Fora.** Número do dia e conservação (S53). Consumidor (S51). A4.
+**Aceite.**
+- [ ] Os dois modelos renderizam o exemplo igual ao snapshot conferido contra `impressos/comanda-aprovada.html`.
+- [ ] Sem preço, sem endereço, sem PIX.
+- [ ] Tag `alergia_castanha` vira "ALERGIA: CASTANHA"; sem tag, sem faixa; outras tags não aparecem.
+- [ ] Contagem por linha; frete fora.
+- [ ] Texto do cliente escapado; térmica só preto.
+- [ ] Pedido de outra empresa → 404; modelo inválido → 400.
+**Testes (Red).** `MontarComandaUseCaseTests.AgrupaPorLinhaNaOrdem`, `...AlergiaDoCadastro`, `...FreteFora`; `ComandaHtmlTests.Snapshot*`, `...SemPrecoNemEndereco`, `...EscapaTexto`, `...TermicoSoPreto`.
+**Rollback.** Remover o endpoint; nada persiste.
+**Depende de.** S49.
+**Tamanho.** M. **Tier.** baixo (spec de plano aprovado, sem migração).
+
+---
+
+### S53 · Número do dia e conservação do item
+
+**Problema.** A cozinha fala o pedido em voz alta ("042"), e a embalagem separa congelado de refrigerado. Nenhum
+dos dois existe no domínio.
+**Escopo.**
+- `Pedido.NumeroDoDia` (int?) e `Pedido.DataNumero` (DateOnly?), atribuídos na confirmação do pagamento (ou no início do preparo, o que vier primeiro): próximo número da empresa no dia operacional de Brasília. Índice único `(EmpresaId, DataNumero, NumeroDoDia)` com nova tentativa em colisão. Não muda depois de atribuído.
+- `CardapioItem.Conservacao` (`ambiente`, `refrigerado`, `congelado`; padrão `ambiente`) e `PedidoItem.ConservacaoSnapshot`, copiado como a linha.
+- Comanda: número do dia grande com o código embaixo; "Preparar em casa" dividido em congelado e refrigerado.
+- Migration `AddNumeroDoDiaEConservacao`.
+**Aceite.**
+- [ ] Dois pagamentos simultâneos não recebem o mesmo número.
+- [ ] O número não muda quando um pedido antigo sincroniza depois.
+- [ ] Item congelado sai no grupo "Preparar em casa · congelado".
+**Testes (Red).** `AtribuirNumeroDoDiaTests.SequenciaPorDia`, `...ConcorrenciaNaoDuplica`; `MontarComandaUseCaseTests.SeparaCongelado`.
+**Rollback.** Migration `Down`; a comanda volta a mostrar o código.
+**Depende de.** S52.
+**Tamanho.** M. **Tier.** alto (migração).
+
+---
+
 ## Backlog (um documento por vez, mesmo ciclo)
 
 | Ordem | Documento | Papéis prováveis | Observação |
 |---|---|---|---|
-| 1 | Comanda | 58 mm, 10×15 | Derivada do Pedido, sem preço, observações em destaque |
+| 1 | ~~Comanda~~ | 58 mm, 10×15 | Aprovada em 01/10/2026: S52 e S53 |
 | 2 | Resumo do pedido | 10×15, A4 | Para o cliente |
 | 3 | Recibo de pagamento | 58 mm, A4 | |
 | 4 | Recibo de envio | 10×15 | Formato natural da etiqueta de envio |
