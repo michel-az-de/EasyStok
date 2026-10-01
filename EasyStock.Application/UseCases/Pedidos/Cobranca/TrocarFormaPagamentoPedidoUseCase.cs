@@ -147,7 +147,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return;
 
         var statusAntigo = pedido.Status;
-        pedido.MudarStatus(StatusPedido.Aguardando);
+        // #1291: pedido de exceção (ex.: lead liberado fora de área) espera a dona, como no pago online.
+        pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
         // #1230: paga na entrega, mas a janela já é compromisso: início previsto como no Mercado Pago.
         await inicioPrevisto.AplicarNaFilaAsync(pedido, ct);
         await pedidoRepository.UpdateAsync(pedido, ct);
