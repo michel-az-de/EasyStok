@@ -115,6 +115,20 @@ public class ComandaHtmlTests
     }
 
     [Fact]
+    public async Task GrupoCongeladoSaiComOTitulo()
+    {
+        // S53: "Preparar em casa" dividido por conservação; o título vem pronto do use case.
+        var dto = Exemplo() with
+        {
+            Grupos = [new ComandaGrupoDto("prepararEmCasa", "Preparar em casa · congelado",
+                [new ComandaItemDto(2, "un", "Nhoque de batata", "800 g", "sugo", null)], "congelado")],
+        };
+        var corpo = Corpo(await Renderizar(dto, ImpressoHtml.Etiqueta10x15));
+
+        corpo.Should().Contain("<span>Preparar em casa · congelado</span><span>1 item</span>");
+    }
+
+    [Fact]
     public async Task ModeloA4NaoExisteParaComanda()
     {
         var act = () => Renderizar(Exemplo(), ImpressoHtml.A4);

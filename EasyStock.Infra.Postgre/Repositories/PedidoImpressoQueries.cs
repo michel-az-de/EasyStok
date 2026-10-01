@@ -133,7 +133,9 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                     i.Nome, i.VariacaoRotuloSnapshot, i.Quantidade, i.Unidade, i.PrecoUnitario, i.Subtotal, i.Observacao,
                     EhProduto: !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null,
                     Linha: i.LinhaSnapshot,
-                    Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null))
-                .ToList());
+                    Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null,
+                    Conservacao: i.ConservacaoSnapshot))
+                .ToList(),
+            NumeroDoDia: p.NumeroDoDia);
     }
 }
