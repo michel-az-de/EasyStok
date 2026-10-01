@@ -3,11 +3,14 @@ import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
+import { BolhaMidiaApi } from './BolhaMidiaApi'
 import css from './atendimento.module.css'
 
 const CLASSE = { in: css.entrada, out: css.saida }
 
 function Corpo({ mensagem }) {
+  // Modo API: arquivo do canal servido pelo endpoint autenticado (#1287).
+  if (mensagem.midia) return <BolhaMidiaApi mensagem={mensagem} />
   if (mensagem.formato === 'figurinha') {
     return <img className={css.figurinha} src={mensagem.arte} alt={mensagem.texto} />
   }

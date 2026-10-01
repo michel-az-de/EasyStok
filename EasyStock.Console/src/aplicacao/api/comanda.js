@@ -1,7 +1,7 @@
 import * as acao from '../acoes'
 import {
-  corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  trocarFormaPagamento,
+  FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
+  reemitirCobranca, trocarFormaPagamento,
 } from '../../infra/api/comandaApi'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
@@ -43,6 +43,18 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     if (pedido) despachar({ tipo: acao.SINCRONIZAR_PEDIDO, id, pedido })
   }
 
+  // Uma ida ao EasyStok por conversa (#1287): o segundo clique com a primeira em voo
+  // recebe a mesma promessa, sem outro POST. O botão espera essa promessa para destravar.
+  const emVoo = new Map()
+  const umaPorConversa = (id, fazer) => {
+    if (emVoo.has(id)) return emVoo.get(id)
+    const promessa = fazer()
+    if (!promessa) return promessa
+    const final = promessa.finally(() => emVoo.delete(id))
+    emVoo.set(id, final)
+    return final
+  }
+
   const soSemPedidoCriado = (nome) => (id, ...resto) => {
     if (!pedidoCriado(id)) return acoes[nome](id, ...resto)
     avisar('Comanda: o pedido já está no EasyStok e não muda por aqui.')
@@ -54,7 +66,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     return undefined
   }
 
-  const trocarForma = (id, meio) => {
+  const trocarForma = (id, meio) => umaPorConversa(id, () => {
     const pedidoId = pedidoCriado(id)
     despachar({ tipo: acao.ESCOLHER_MEIO_PAGAMENTO, id, meio })
     // Falhou: o meio local já mudou, então volta ao que o EasyStok tem (F07, item 5).
@@ -64,11 +76,12 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         avisar(`Forma de pagamento: ${erro.message}`)
         return recarregar(id).catch(() => {})
       })
-  }
+  })
 
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
-  // manda o resumo pela conversa.
-  function criarPedido(id, meio = null) {
+  // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
+  // falha depois dele é só a tela atrasada, a polling traz o pedido.
+  const criarPedido = (id, meio = null) => umaPorConversa(id, () => {
     const pedido = pedidoDe(id)
     if (!pedido || pedidoCriado(id)) return undefined
     if (!janelaDoId(pedido.janela)) {
@@ -76,22 +89,37 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       return undefined
     }
     const corpo = corpoDoPedido({ ...pedido, meio: meio ?? pedido.meio })
-    return gerarPedido(id, corpo)
-      .then((gerado) => {
-        if (!gerado.enviadoAoCliente) {
-          avisar('Pedido criado no EasyStok, mas o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar).')
+    return gerarPedido(id, corpo).then(
+      (gerado) => {
+        // Mercado Pago fora: o pedido nasce sem link e nada o emite sozinho (#1287).
+        const faltas = []
+        if (!gerado?.cobranca && corpo.forma === FORMA_ONLINE) {
+          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
         }
-        return recarregar(id)
-      })
-      .catch((erro) => avisar(`Pedido não criado: ${erro.message}`))
-  }
+        if (!gerado?.enviadoAoCliente) {
+          faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
+        }
+        const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
+        if (aviso) avisar(aviso)
+        return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
+      },
+      (erro) => avisar(`Pedido não criado: ${erro.message}`),
+    )
+  })
 
-  // Com pedido criado, gerar ou reenviar a cobrança só troca a forma (S11); o link vencido é
-  // reemitido e enviado pelo próprio EasyStok (job de expiração).
+  // Pedido criado sem link (Mercado Pago fora na hora): a operadora pede a emissão (S11).
+  const reemitir = (id) => umaPorConversa(id, () => reemitirCobranca(pedidoCriado(id)).then(
+    () => recarregar(id).catch(() => {}),
+    (erro) => avisar(`Cobrança: ${erro.message}`),
+  ))
+
+  // Com pedido criado, gerar ou reenviar a cobrança troca a forma (S11) ou, sem cobrança
+  // online, emite o link; o link vencido é reemitido e enviado pelo EasyStok (job de expiração).
   const cobrar = (id, meio) => {
     if (!pedidoCriado(id)) return criarPedido(id, meio)
     const atual = pedidoDe(id)
     if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
+    if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
     avisar('A cobrança já está no EasyStok. Link vencido é reemitido e enviado sozinho.')
     return undefined
   }

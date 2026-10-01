@@ -29,7 +29,7 @@ export function useSincronizacaoApi({ ativo, usuario, despachar, selecionadaId =
 
     async function mensagensDe(resumo) {
       const guardado = cache.get(resumo.id)
-      if (!deveRelerMensagens(resumo, guardado, selecionadaRef.current)) return guardado.mensagens
+      if (!deveRelerMensagens(resumo, guardado, selecionadaRef.current)) return guardado?.mensagens ?? []
       try {
         const mensagens = await listarMensagens(resumo.id)
         cache.set(resumo.id, { ultima: resumo.ultimaMensagemEm, mensagens })

@@ -17,7 +17,8 @@ const ROTULO_DO_FORMATO = {
 // (título, aria-label) faz `prefixo + corpo`.
 export function previaDaConversa(conversa) {
   const ultima = conversa.mensagens.at(-1)
-  if (!ultima) return { prefixo: '', corpo: 'Sem mensagens' }
+  // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
+  if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
   const prefixo = ultima.dir === 'sistema'
     ? 'Sistema: '
     : ultima.dir === 'out'

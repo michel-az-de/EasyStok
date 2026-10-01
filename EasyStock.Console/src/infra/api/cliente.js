@@ -30,8 +30,11 @@ const comoJson = (texto) => {
 // exceto o 409 da janela de 24 h (`{ erro, sugestao }`) e os 401/403 de corpo vazio.
 // `formulario` (FormData) vai como multipart: o navegador escreve o Content-Type com o boundary.
 // `texto`: página pronta fora do envelope (canhoto HTML da S20); devolve o corpo cru.
-export async function chamarApi(caminho, { metodo = 'GET', corpo, formulario, autenticado = true, texto = false } = {}) {
-  const cabecalhos = { Accept: 'application/json' }
+// `arquivo`: binário fora do envelope (mídia da conversa, #1287); devolve o Blob.
+export async function chamarApi(caminho, {
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false,
+} = {}) {
+  const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (autenticado) {
     const sessao = lerSessao()
@@ -47,6 +50,7 @@ export async function chamarApi(caminho, { metodo = 'GET', corpo, formulario, au
   } catch {
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
+  if (resposta.ok && arquivo) return resposta.blob()
   const bruto = await resposta.text()
   if (resposta.ok && texto) return bruto
   const json = comoJson(bruto)
