@@ -233,7 +233,7 @@ const CASOS_API = {
       conversas: mescladas,
       selecionadaId: aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null),
       automaticoPausado: Object.fromEntries(
-        mescladas.map((c) => [c.id, c.situacaoApi === 'Assumida' ? PAUSA_POR_ASSUMIR : false]),
+        mescladas.map((c) => [c.id, c.pausaApi ?? false]),
       ),
       sincronizacao: { estado: 'ok', mensagem: null, em: Date.now() },
     }

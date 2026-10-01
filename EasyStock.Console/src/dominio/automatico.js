@@ -31,6 +31,19 @@ export const MODOS = {
 // botão Assumir. Escrever na conversa continua gravando `true`.
 export const PAUSA_POR_ASSUMIR = 'assumiu'
 
+// Modo API (F07, item 3): outro atendente assumiu a conversa. O automático
+// também está calado, mas não foi ela que assumiu.
+export const PAUSA_POR_OUTRO = 'outro'
+
+// Pausa que a situação da conversa na API significa para quem está logado.
+// `Assumida` sem responsável é a fila humana: o agente escalou (ou o canal pediu
+// gente) e a conversa é dela; o texto sai da `passagem`, não da pausa.
+export function pausaDaSituacao({ situacao, assumidaPorUsuarioId } = {}, usuarioId = null) {
+  if (situacao !== 'Assumida') return false
+  if (!assumidaPorUsuarioId) return true
+  return assumidaPorUsuarioId === usuarioId ? PAUSA_POR_ASSUMIR : PAUSA_POR_OUTRO
+}
+
 // Os três momentos que pedem som na cozinha (D6). O nome mora aqui, no
 // domínio, porque a tela precisa listar e infra precisa tocar, e nenhuma das
 // duas pode depender da outra.
@@ -67,6 +80,12 @@ const DESCRICOES = {
     tom: 'info',
     detalhe: 'Aviso de esteira continua saindo. O resto espera você devolver.',
   },
+  // Modo API: a conversa está com outro atendente (F07, item 3).
+  outro: {
+    rotulo: 'Pausado porque outro atendente assumiu',
+    tom: 'info',
+    detalhe: 'O automático não responde enquanto outro atendente cuida desta conversa.',
+  },
   [MODOS.COM_VOCE]: {
     rotulo: 'Passou para você',
     tom: 'aviso',
@@ -86,6 +105,8 @@ const DESCRICOES = {
     detalhe: 'Nada sai em nenhum canal. Desbloqueie na ficha, bloco Cliente.',
   },
 }
+
+const DESCRICAO_DA_PAUSA = { [PAUSA_POR_ASSUMIR]: DESCRICOES.assumiu, [PAUSA_POR_OUTRO]: DESCRICOES.outro }
 
 // Precedência: bloqueio cala todo o resto, depois conversa encerrada, depois
 // passou para você, depois pausa, e por último o automático ligado. `bloqueada`
@@ -107,7 +128,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
     return { chave: MODOS.COM_VOCE, ...base, detalhe: origemDaPassagem(conversa.passagem).longo }
   }
   if (pausado) {
-    const base = pausado === PAUSA_POR_ASSUMIR ? DESCRICOES.assumiu : DESCRICOES[MODOS.PAUSADO]
+    const base = DESCRICAO_DA_PAUSA[pausado] ?? DESCRICOES[MODOS.PAUSADO]
     return {
       chave: MODOS.PAUSADO,
       ...base,
