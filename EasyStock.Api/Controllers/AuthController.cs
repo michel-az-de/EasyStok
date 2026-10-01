@@ -88,13 +88,17 @@ public class AuthController(
         [FromBody] LoginGoogleRequest request,
         [FromServices] IGoogleIdTokenValidator google,
         [FromServices] IdentificarUsuarioGoogleUseCase identificar,
+        [FromServices] EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontRepository vitrines,
         CancellationToken ct)
     {
         if (google.ClientId is null) return DataNotFound("Login com Google desligado.");
         try
         {
             var usuario = await identificar.ExecuteAsync(request.IdToken ?? string.Empty, ct);
-            var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId);
+            var empresaPadrao = google.EmpresaPadraoSlug is { } slug
+                ? (await vitrines.GetBySlugAsync(slug, ct))?.EmpresaId
+                : null;
+            var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId, empresaPadrao);
             return await EmitirSessaoAsync(resultado, "login_google");
         }
         catch (CredenciaisInvalidasException ex)

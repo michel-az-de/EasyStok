@@ -87,11 +87,13 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         /// #1324: final do login sem senha (Google), com a identidade já validada. Sem empresa pedida, entra
         /// na empresa ativa do usuário; com mais de uma, na primeira por nome (escolha de empresa fica para depois).
         /// </summary>
-        public Task<AutenticarUsuarioResult> ConcluirLoginGoogleAsync(Domain.Entities.Usuario usuario, Guid? empresaId) =>
-            ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario));
+        /// <param name="empresaPadrao">#1326: empresa do superadmin no console (que recusa token sem empresa).</param>
+        public Task<AutenticarUsuarioResult> ConcluirLoginGoogleAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaPadrao = null) =>
+            ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario),
+                empresaDoSuperAdmin: empresaId ?? empresaPadrao);
 
         /// <summary>SuperAdmin, empresa, nível e permissões, e o último acesso. Credencial já conferida.</summary>
-        private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId)
+        private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null)
         {
             // SuperAdmin: perfil global com Perfil.EmpresaId=null. Nao tem vinculo
             // em UsuarioEmpresa, entao o fluxo padrao (que exige empresaId resolvido)
@@ -114,7 +116,7 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
 
                 return new AutenticarUsuarioResult(
                     UsuarioId: usuario.Id,
-                    EmpresaId: null,
+                    EmpresaId: empresaDoSuperAdmin,
                     Nome: usuario.Nome,
                     Email: usuario.Email,
                     Nivel: NivelAcesso.SuperAdmin,

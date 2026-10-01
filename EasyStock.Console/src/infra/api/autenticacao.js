@@ -28,8 +28,9 @@ export async function entrarComGoogle(idToken) {
   const dados = await chamarApi('/api/auth/google/login', {
     metodo: 'POST', corpo: { idToken }, autenticado: false,
   })
-  if (dados?.usuario?.nivel === 'SuperAdmin') throw new Error('Superadmin não atende conversas. Entre com um usuário da empresa.')
   const empresaId = empresaDoToken(dados.token)
+  // #1326: superadmin entra quando a API dá a ele a empresa padrão; sem empresa, a inbox viria vazia.
+  if (!empresaId) throw new Error('Este usuário não tem empresa para atender. Configure a empresa padrão do login Google.')
   return abrirSessao(dados, empresaId ? { id: empresaId, nome: null } : null)
 }
 
